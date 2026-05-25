@@ -1,0 +1,374 @@
+[gd_scene format=3 uid="uid://dqyy1q5715r4q"]
+
+[ext_resource type="Script" uid="uid://huinkh28jc1c" path="res://Scripts/World/Main.cs" id="1_tscn_script"]
+[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://textures/kenney_prototype/PNG/Dark/texture_01.png" id="ext_texture_dark_01"]
+[ext_resource type="Texture2D" uid="uid://bq8llkb2y1rqs" path="res://textures/kenney_prototype/PNG/Green/texture_01.png" id="ext_texture_green_01"]
+[ext_resource type="Texture2D" uid="uid://bmeeey57nv2m2" path="res://textures/kenney_prototype/PNG/Orange/texture_01.png" id="ext_texture_orange_01"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+sky_top_color = Color(0.3, 0.5, 0.9, 1)
+sky_horizon_color = Color(0.6, 0.7, 0.9, 1)
+ground_bottom_color = Color(0.2, 0.2, 0.2, 1)
+ground_horizon_color = Color(0.4, 0.4, 0.4, 1)
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.8
+glow_strength = 1.2
+glow_bloom = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_texture = ExtResource("ext_texture_dark_01")
+roughness = 0.8
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_outer_walls"]
+albedo_texture = ExtResource("ext_texture_green_01")
+roughness = 0.8
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_walls"]
+albedo_texture = ExtResource("ext_texture_orange_01")
+roughness = 0.8
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_red_walls"]
+albedo_color = Color(0.8, 0.1, 0.1, 1)
+roughness = 0.6
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue_walls"]
+albedo_color = Color(0.1, 0.3, 0.8, 1)
+roughness = 0.6
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_purple_walls"]
+albedo_color = Color(0.6, 0.1, 0.8, 1)
+roughness = 0.6
+uv1_scale = Vector3(0.02, 0.02, 0.02)
+uv1_triplanar = true
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_enemy"]
+radius = 6.0
+height = 18.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_enemy"]
+albedo_color = Color(1, 0.2, 0.2, 1)
+metallic = 0.5
+roughness = 0.3
+emission_enabled = true
+emission = Color(0.8, 0, 0, 1)
+emission_energy_multiplier = 1.5
+
+[node name="Main" type="Node3D" unique_id=627421798]
+script = ExtResource("1_tscn_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1384337908]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=805661540]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 100, 100, 100)
+shadow_enabled = true
+
+
+[node name="ArenaFloor" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, -5, 100)
+use_collision = true
+size = Vector3(200, 10, 200)
+material = SubResource("StandardMaterial3D_floor")
+
+[node name="NorthWall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 25, -5)
+use_collision = true
+size = Vector3(210, 50, 10)
+material = SubResource("StandardMaterial3D_outer_walls")
+
+[node name="SouthWall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 25, 205)
+use_collision = true
+size = Vector3(210, 50, 10)
+material = SubResource("StandardMaterial3D_outer_walls")
+
+[node name="WestWall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 25, 100)
+use_collision = true
+size = Vector3(10, 50, 210)
+material = SubResource("StandardMaterial3D_outer_walls")
+
+[node name="EastWall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 205, 25, 100)
+use_collision = true
+size = Vector3(10, 50, 210)
+material = SubResource("StandardMaterial3D_outer_walls")
+
+; --- CENTRAL PLATFORM (raised 40x40) ---
+[node name="CentralPlatform" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1.5, 100)
+use_collision = true
+size = Vector3(40, 3, 40)
+material = SubResource("StandardMaterial3D_walls")
+
+; --- PILLARS (2 rows of 4, 8 total) ---
+; Left row X=45, Right row X=155
+; Z positions: 30, 70, 110, 150
+
+[node name="Pillar_L1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 30)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_L2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 70)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_L3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 110)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_L4" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 150)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_R1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 30)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_R2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 70)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_R3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 110)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="Pillar_R4" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 150)
+use_collision = true
+size = Vector3(4, 8, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+; --- SIDE GALLERIES (raised platforms at Y=4) ---
+; Accessible via 2-step stairs at each end
+
+[node name="LeftGallery" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 4.5, 100)
+use_collision = true
+size = Vector3(12, 1, 100)
+material = SubResource("StandardMaterial3D_blue_walls")
+
+[node name="RightGallery" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 4.5, 100)
+use_collision = true
+size = Vector3(12, 1, 100)
+material = SubResource("StandardMaterial3D_blue_walls")
+
+; Gallery support pillars
+[node name="LeftGallerySupport_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2.5, 40)
+use_collision = true
+size = Vector3(10, 5, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="LeftGallerySupport_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2.5, 160)
+use_collision = true
+size = Vector3(10, 5, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="RightGallerySupport_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 2.5, 40)
+use_collision = true
+size = Vector3(10, 5, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="RightGallerySupport_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 2.5, 160)
+use_collision = true
+size = Vector3(10, 5, 4)
+material = SubResource("StandardMaterial3D_walls")
+
+; Stairs to Left Gallery (north end)
+[node name="LeftStair_N_1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 26)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+[node name="LeftStair_N_2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3, 26)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+; Stairs to Left Gallery (south end)
+[node name="LeftStair_S_1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 174)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+[node name="LeftStair_S_2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3, 174)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+; Stairs to Right Gallery (north end)
+[node name="RightStair_N_1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 1, 26)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+[node name="RightStair_N_2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 3, 26)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+; Stairs to Right Gallery (south end)
+[node name="RightStair_S_1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 1, 174)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+[node name="RightStair_S_2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 3, 174)
+use_collision = true
+size = Vector3(8, 2, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+; --- CORNER ENCLOSURES (U-shaped, 3 walls each, open toward center) ---
+; NW corner - center at (20, 20), open to SE
+[node name="NW_Wall_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 2.5, 8)
+use_collision = true
+size = Vector3(24, 5, 2)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="NW_Wall_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2.5, 20)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="NW_Wall_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 2.5, 20)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+; NE corner - center at (180, 20), open to SW
+[node name="NE_Wall_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2.5, 8)
+use_collision = true
+size = Vector3(24, 5, 2)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="NE_Wall_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 2.5, 20)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="NE_Wall_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 2.5, 20)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+; SW corner - center at (20, 180), open to NE
+[node name="SW_Wall_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 2.5, 192)
+use_collision = true
+size = Vector3(24, 5, 2)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="SW_Wall_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2.5, 180)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="SW_Wall_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 2.5, 180)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+; SE corner - center at (180, 180), open to NW
+[node name="SE_Wall_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2.5, 192)
+use_collision = true
+size = Vector3(24, 5, 2)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="SE_Wall_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 2.5, 180)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+[node name="SE_Wall_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 2.5, 180)
+use_collision = true
+size = Vector3(2, 5, 24)
+material = SubResource("StandardMaterial3D_red_walls")
+
+; --- LOW COVER WALLS (half-height, for ducking behind) ---
+[node name="CoverWall_N1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1, 76)
+use_collision = true
+size = Vector3(16, 2, 2)
+material = SubResource("StandardMaterial3D_blue_walls")
+
+[node name="CoverWall_N2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1, 124)
+use_collision = true
+size = Vector3(16, 2, 2)
+material = SubResource("StandardMaterial3D_blue_walls")
+
+; --- DECORATIVE CENTERPIECE (small platform in center of central platform) ---
+[node name="CenterPiece" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 3.5, 100)
+use_collision = true
+size = Vector3(8, 1, 8)
+material = SubResource("StandardMaterial3D_purple_walls")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=89426561]
+
+[node name="Label" type="Label" parent="CanvasLayer" unique_id=1659088413]
+anchors_preset = 2
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -620.0
+offset_top = 30.0
+offset_right = -20.0
+offset_bottom = 230.0
+theme_override_font_sizes/font_size = 18
+text = "MoveBox 3D Arena Sandbox"
