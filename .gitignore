@@ -1,0 +1,62 @@
+# ==========================================
+# Godot Engine
+# ==========================================
+.godot/
+*.translation
+export_presets.cfg
+*.import
+
+# Editor settings (contains API keys!)
+editor_settings-*.tres
+
+# Godot AI — user-specific memory, never commit
+user://godot_ai_memory.json
+
+# ==========================================
+# Build outputs
+# ==========================================
+build/
+export/
+bin/
+obj/
+
+# ==========================================
+# IDE / Editor
+# ==========================================
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# OS files
+# ==========================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# AI / LLM configs (user-specific)
+# ==========================================
+.claude/
+CLAUDE.md
+.aider*
+.cursor/
+.windsurf/
+
+# ==========================================
+# Large binary data (use Git LFS or generate at runtime)
+# ==========================================
+heightmap.bin
+
+# ==========================================
+# NuGet
+# ==========================================
+packages/
+*.nupkg
