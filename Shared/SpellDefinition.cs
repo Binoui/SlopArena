@@ -1,4 +1,4 @@
-using SlopArena.Shared
+using System;
 
 namespace SlopArena.Shared
 {
@@ -12,8 +12,8 @@ namespace SlopArena.Shared
 		Finisher = 2,   // Punish: massive damage, zero stun, requires setup
 		Setup = 3,      // Zone control: delayed AoE, forces movement
 		Mobility = 4,   // Movement: instant cast, short stun (0.2s), repositioning
-using SlopArena.Shared
-
+	}
+	
 	/// <summary>
 	/// Visual shape / behavior of a spell effect.
 	/// </summary>
@@ -25,8 +25,8 @@ using SlopArena.Shared
 		Beam = 3,            // Hitscan / instant line
 		Trap = 4,            // Ground trap, triggers on proximity
 		DelayedAoE = 5,      // Delayed circular AoE at target position
-using SlopArena.Shared
-
+	}
+	
 	/// <summary>
 	/// Pure data definition of a spell.
 	/// No Godot dependencies - usable by Server, Shared, and Client.
@@ -41,15 +41,15 @@ using SlopArena.Shared
 		public float CastTime;       // Seconds before effect triggers
 		public float StunDuration;   // Hitstun in seconds (0 = no stun)
 		public float Damage;
-using SlopArena.Shared
-
+		public float Cooldown;       // Cooldown in seconds
+		
 		// Projectile / AoE physics
 		public float Speed;          // Projectile speed (units/sec), 0 = instant
 		public float Range;          // Max travel distance / AoE range
 		public float Radius;         // Projectile hit radius / AoE radius
 		public float KnockbackForce;
-using SlopArena.Shared
-
+		public float KnockbackUpward;
+		
 		public SpellDefinition(
 			ushort spellId,
 			string name,
@@ -81,8 +81,8 @@ using SlopArena.Shared
 			KnockbackForce = knockbackForce;
 			KnockbackUpward = knockbackUpward;
 		}
-using SlopArena.Shared
-
+	}
+	
 	/// <summary>
 	/// Static catalog of all spell definitions.
 	/// Single source of truth for spell balance.
@@ -101,8 +101,8 @@ using SlopArena.Shared
 			new(5,  "Sunder Armor",   "Shatters armor in melee range (Vulnerable 4s)", SpellRole.Starter, SpellShape.MeleeCone, 0.20f, 0.8f, 8, 6, speed:0, range:5, radius:3, knockbackForce:10, knockbackUpward:5),
 			new(6,  "Radiant Shield", "Radiant barrier that absorbs damage (Shield 4s)", SpellRole.Starter, SpellShape.Beam, 0.10f, 0.0f, 0, 8, speed:0, range:0, radius:0, knockbackForce:0, knockbackUpward:0),
 			new(7,  "Freezing Trap",  "Ground trap that freezes on trigger (Slow 4s + bonus)", SpellRole.Setup, SpellShape.Trap, 0.50f, 1.0f, 10, 7, speed:0, range:5, radius:4, knockbackForce:5, knockbackUpward:2),
-using SlopArena.Shared
-
+			new(8,  "Corrupted Ground","Corrupts the ground beneath targets (Vulnerable + Burn)", SpellRole.Setup, SpellShape.DelayedAoE, 0.40f, 1.5f, 5, 9, speed:0, range:6, radius:5, knockbackForce:3, knockbackUpward:1),
+			
 			// ==========================================
 			// CONSUME SPELLS (IDs 9-16) — Finishers
 			// ==========================================
@@ -113,8 +113,8 @@ using SlopArena.Shared
 			new(13, "Execute",        "Brutal execution, +150% dmg vs Vulnerable", SpellRole.Finisher, SpellShape.MeleeCone, 0.40f, 1.0f, 25, 10, speed:0, range:6, radius:4, knockbackForce:30, knockbackUpward:10),
 			new(14, "Shield Bash",    "Shield strike, bonus effect if Shielded", SpellRole.Finisher, SpellShape.MeleeCone, 0.20f, 0.5f, 10, 9, speed:0, range:4, radius:2, knockbackForce:40, knockbackUpward:5),
 			new(15, "Feedback Pulse", "Shockwave, bonus dmg per status consumed", SpellRole.Finisher, SpellShape.DelayedAoE, 0.30f, 0.5f, 10, 7, speed:0, range:0, radius:5, knockbackForce:5, knockbackUpward:2),
-using SlopArena.Shared
-
+			new(16, "Dark Harvest",   "Harvests life force, heals if status consumed", SpellRole.Finisher, SpellShape.FastProjectile, 0.35f, 0.3f, 20, 8, speed:40, range:3000, radius:1.5f, knockbackForce:10, knockbackUpward:3),
+			
 			// ==========================================
 			// CONTROL SPELLS (IDs 17-24) — Setup
 			// ==========================================
@@ -125,8 +125,8 @@ using SlopArena.Shared
 			new(21, "Chain Pull",    "Chain that pulls an enemy toward you", SpellRole.Setup, SpellShape.SlowProjectile, 0.30f, 0.5f, 10, 8, speed:60, range:3000, radius:1.5f, knockbackForce:-40, knockbackUpward:5),
 			new(22, "Shockwave",     "Horizontal shockwave in a wide cone", SpellRole.Setup, SpellShape.MeleeCone, 0.35f, 1.2f, 12, 7, speed:0, range:8, radius:5, knockbackForce:25, knockbackUpward:10),
 			new(23, "Void Zone",     "Zone of void energy dealing damage over time", SpellRole.Setup, SpellShape.DelayedAoE, 0.40f, 1.0f, 8, 10, speed:0, range:5, radius:4, knockbackForce:5, knockbackUpward:2),
-using SlopArena.Shared
-
+			new(24, "Counter",       "Parries incoming attacks, knocks back attacker", SpellRole.Setup, SpellShape.Beam, 0.10f, 0.5f, 0, 10, speed:0, range:0, radius:0, knockbackForce:0, knockbackUpward:0),
+			
 			// ==========================================
 			// UTILITY SPELLS (IDs 25-32) — Mobility
 			// ==========================================
@@ -137,8 +137,8 @@ using SlopArena.Shared
 			new(29, "Purify",        "Removes all negative status effects from self", SpellRole.Mobility, SpellShape.Beam, 0.15f, 0.0f, 0, 12, speed:0, range:0, radius:0, knockbackForce:0, knockbackUpward:0),
 			new(30, "Blood Pact",    "Sacrifices HP to gain a damage buff", SpellRole.Mobility, SpellShape.FastProjectile, 0.20f, 0.5f, 0, 14, speed:0, range:0, radius:0, knockbackForce:0, knockbackUpward:0),
 			new(31, "Magic Barrier", "Protective magic barrier around self", SpellRole.Mobility, SpellShape.Beam, 0.15f, 0.0f, 0, 9, speed:0, range:0, radius:0, knockbackForce:0, knockbackUpward:0),
-using SlopArena.Shared
-
+			new(32, "Charge",        "Charges forward knocking back enemies", SpellRole.Mobility, SpellShape.MeleeCone, 0.10f, 0.5f, 10, 8, speed:80, range:0, radius:1.5f, knockbackForce:50, knockbackUpward:10),
+			
 			// ==========================================
 			// ELITE SPELLS (IDs 33-40) — Ultimates
 			// ==========================================
@@ -150,8 +150,8 @@ using SlopArena.Shared
 			new(38, "Nova",          "Massive energy explosion around self", SpellRole.Finisher, SpellShape.DelayedAoE, 0.60f, 1.5f, 50, 28, speed:0, range:0, radius:7, knockbackForce:40, knockbackUpward:15),
 			new(39, "Time Warp",     "Temporal slow zone, applies Slow to enemies", SpellRole.Setup, SpellShape.DelayedAoE, 0.50f, 1.0f, 5, 35, speed:0, range:10, radius:6, knockbackForce:0, knockbackUpward:0),
 			new(40, "Void Zone",     "Massive void zone that persists over time", SpellRole.Setup, SpellShape.DelayedAoE, 0.60f, 2.0f, 15, 30, speed:0, range:6, radius:6, knockbackForce:5, knockbackUpward:2),
-using SlopArena.Shared
-
+		};
+		
 		public static SpellDefinition GetSpell(ushort id)
 		{
 			foreach (var spell in AllSpells)
@@ -162,4 +162,4 @@ using SlopArena.Shared
 			return AllSpells[0]; // Default to Frost Bolt
 		}
 	}
-using SlopArena.Shared
+}

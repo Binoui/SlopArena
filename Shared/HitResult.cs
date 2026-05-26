@@ -1,4 +1,4 @@
-using SlopArena.Shared
+using System;
 
 namespace SlopArena.Shared
 {
@@ -13,8 +13,8 @@ namespace SlopArena.Shared
 		public float Damage;
 		public float KnockbackX;
 		public float KnockbackY;
-using SlopArena.Shared
-
+		public float KnockbackZ;
+		
 		public HitResult(ulong targetId, float damage, float kbX, float kbY, float kbZ)
 		{
 			DidHit = true;
@@ -23,8 +23,8 @@ using SlopArena.Shared
 			KnockbackX = kbX;
 			KnockbackY = kbY;
 			KnockbackZ = kbZ;
-using SlopArena.Shared
-
+		}
+		
 		public static HitResult NoHit => new HitResult { DidHit = false };
 	}
-using SlopArena.Shared
+}

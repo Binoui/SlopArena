@@ -41,6 +41,19 @@ public partial class ActionBarHUD : Control
 	private List<SlotUI> _slots = new();
 	private HBoxContainer? _hbox;
 	
+	// Extra ability slots for dash and roll (not SpellSystem slots)
+	private class AbilitySlot
+	{
+		public Panel Panel = null!;
+		public Label KeyLabel = null!;
+		public Label NameLabel = null!;
+		public ColorRect CooldownOverlay = null!;
+		public Label CooldownText = null!;
+		public System.Func<float> CooldownGetter = null!;
+	}
+	
+	private List<AbilitySlot> _abilities = new();
+	
 	// ==========================================
 	// COLORS PER ROLE
 	// ==========================================
@@ -79,6 +92,9 @@ public partial class ActionBarHUD : Control
 		// Create 8 slots
 		foreach (SlotType slot in Enum.GetValues<SlotType>())
 		{
+			// Skip Shift — it's now Dash, not a spell slot
+			if (slot == SlotType.Shift) continue;
+			
 			var slotUI = new SlotUI();
 			slotUI.SlotType = slot;
 			
@@ -135,8 +151,54 @@ public partial class ActionBarHUD : Control
 			_slots.Add(slotUI);
 		}
 		
+		// --- Dash ability indicator ---
+		AddAbilitySlot("Shift", "Dash", () => _player?.GetDashCooldown() ?? 0f);
+		
 		// Position the HBox at bottom center after layout
 		UpdatePosition();
+	}
+	
+	private void AddAbilitySlot(string keyName, string displayName, System.Func<float> cdGetter)
+	{
+		var ab = new AbilitySlot();
+		ab.CooldownGetter = cdGetter;
+		
+		ab.Panel = new Panel();
+		ab.Panel.CustomMinimumSize = new Vector2(100f, 110f);
+		
+		var vbox = new VBoxContainer();
+		vbox.Position = new Vector2(5f, 5f);
+		vbox.Size = new Vector2(90f, 100f);
+		ab.Panel.AddChild(vbox);
+		
+		ab.KeyLabel = new Label();
+		ab.KeyLabel.Text = keyName;
+		ab.KeyLabel.AddThemeFontSizeOverride("font_size", 14);
+		ab.KeyLabel.Modulate = new Color(0.7f, 0.7f, 0.7f);
+		vbox.AddChild(ab.KeyLabel);
+		
+		ab.NameLabel = new Label();
+		ab.NameLabel.Text = displayName;
+		ab.NameLabel.AddThemeFontSizeOverride("font_size", 12);
+		ab.NameLabel.Modulate = new Color(0.5f, 1f, 0.5f); // Green tint
+		vbox.AddChild(ab.NameLabel);
+		
+		ab.CooldownOverlay = new ColorRect();
+		ab.CooldownOverlay.Color = new Color(0f, 0f, 0f, 0.6f);
+		ab.CooldownOverlay.Size = new Vector2(100f, 110f);
+		ab.CooldownOverlay.Visible = false;
+		ab.Panel.AddChild(ab.CooldownOverlay);
+		
+		ab.CooldownText = new Label();
+		ab.CooldownText.AddThemeFontSizeOverride("font_size", 22);
+		ab.CooldownText.HorizontalAlignment = HorizontalAlignment.Center;
+		ab.CooldownText.VerticalAlignment = VerticalAlignment.Center;
+		ab.CooldownText.Size = new Vector2(100f, 110f);
+		ab.CooldownText.Visible = false;
+		ab.Panel.AddChild(ab.CooldownText);
+		
+		_hbox?.AddChild(ab.Panel);
+		_abilities.Add(ab);
 	}
 	
 	private void UpdatePosition()
@@ -147,7 +209,7 @@ public partial class ActionBarHUD : Control
 		Vector2 viewportSize = GetViewportRect().Size;
 		
 		// Position the HBox at bottom center
-		float totalWidth = _slots.Count * 130f;
+		float totalWidth = (_slots.Count * 130f) + (_abilities.Count * 100f);
 		float x = (viewportSize.X - totalWidth) / 2f;
 		float y = viewportSize.Y - 130f;
 		
@@ -162,6 +224,7 @@ public partial class ActionBarHUD : Control
 		
 		if (_spellSystem == null) return;
 		
+		// Update spell slot cooldowns
 		foreach (var slotUI in _slots)
 		{
 			var spell = _spellSystem.GetSpellInSlot(slotUI.SlotType);
@@ -171,11 +234,9 @@ public partial class ActionBarHUD : Control
 			{
 				slotUI.NameLabel.Text = spell.Name;
 				
-				// Color by role
 				var def = SpellCatalog.GetSpell((ushort)spell.SpellID);
 				slotUI.NameLabel.Modulate = RoleColors.GetValueOrDefault(def.Role, Colors.White);
 				
-				// Cooldown overlay
 				if (cd > 0f)
 				{
 					slotUI.CooldownOverlay.Visible = true;
@@ -193,6 +254,23 @@ public partial class ActionBarHUD : Control
 				slotUI.NameLabel.Text = "";
 				slotUI.CooldownOverlay.Visible = false;
 				slotUI.CooldownText.Visible = false;
+			}
+		}
+		
+		// Update dash and roll cooldowns
+		foreach (var ab in _abilities)
+		{
+			float cd = ab.CooldownGetter();
+			if (cd > 0f)
+			{
+				ab.CooldownOverlay.Visible = true;
+				ab.CooldownText.Visible = true;
+				ab.CooldownText.Text = cd.ToString("F1");
+			}
+			else
+			{
+				ab.CooldownOverlay.Visible = false;
+				ab.CooldownText.Visible = false;
 			}
 		}
 	}

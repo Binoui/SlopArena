@@ -2,6 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SlopArena.Shared;
 
 /// <summary>
@@ -18,17 +19,52 @@ public partial class PlayerController : CharacterBody3D
 	// EXPORTED VARIABLES (realistic scales)
 	// ==========================================
 	
-	[Export] public float Speed = 35.0f;
-	[Export] public float BackwardSpeed = 22.0f;  // Reduced backward speed
-	[Export] public float JumpForce = 14.0f;
-	[Export] public float Gravity = 45.0f;       // Heavy gravity for fast landing
+	// ==========================================
+	// GROUND MOVEMENT (acceleration-based)
+	// ==========================================
+	
+	[Export] public float WalkSpeed = 10.0f;
+	[Export] public float SprintSpeed = 14.0f;       // Faster but committed
+	
+	// ==========================================
+	// SPRINT / DASH DANCE
+	// ==========================================
+	
+	[Export] public float SprintThreshold = 0.2f;    // Hold direction this long to enter sprint
+	[Export] public float TurnaroundLag = 0.1f;      // Lag when changing direction during sprint
+	[Export] public float GroundFriction = 18.0f;    // Deceleration when no input
+	
+	// ==========================================
+	// AIR MOVEMENT
+	// ==========================================
+	
+	[Export] public float JumpVelocity = 13.0f;
+	[Export] public float Gravity = 35.0f;
+	[Export] public float FastFallKick = 25.0f;      // Instant Y velocity on fast fall
+	[Export] public float FastFallGravityMult = 2.0f;
+	[Export] public float MaxFallSpeed = 50.0f;
+	[Export] public float AirAcceleration = 14.0f;
+	[Export] public float AirDrag = 0.2f;            // Minimal drag in air
+	
+	// ==========================================
+	// DASH (ground)
+	// ==========================================
+	
+	[Export] public float DashSpeed = 30.0f;
+	[Export] public float DashDuration = 0.18f;
+	[Export] public float DashCooldown = 1.0f;
+	
+	// ==========================================
+	// AIR DODGE (replaces roll)
+	// ==========================================
+	
+	[Export] public float AirDodgeSpeed = 35.0f;     // Fast burst
+	[Export] public float AirDodgeDuration = 0.12f;
+	[Export] public int MaxAirDodges = 1;             // Reset on ground
 	
 	// ==========================================
 	// KNOCKBACK
 	// ==========================================
-	
-	private Vector3 _knockbackVelocity = Vector3.Zero;
-	private float _knockbackDecay = 8.0f;
 	
 	// ==========================================
 	// HP / HURTBOX
@@ -37,6 +73,39 @@ public partial class PlayerController : CharacterBody3D
 	private float _hp = 100f;
 	private const float MaxHP = 100f;
 	private Hurtbox? _hurtbox;
+	
+	// ==========================================
+	// DASH / ROLL STATE
+	// ==========================================
+	
+	private enum MoveState { Normal, Dashing, AirDodging }
+	private MoveState _moveState = MoveState.Normal;
+	
+	private float _dashTimer = 0f;
+	private float _dashCooldownTimer = 0f;
+	private Vector3 _dashDirection = Vector3.Zero;
+	
+	private float _airDodgeTimer = 0f;
+	private Vector3 _airDodgeDirection = Vector3.Zero;
+	
+	private int _airDodgesLeft = 0;
+	
+	// Sprint / dash dance state
+	private float _dirHoldTime = 0f;
+	private bool _isSprinting = false;
+	private float _turnaroundTimer = 0f;
+	private Vector3 _lastInputDir = Vector3.Zero;
+	
+	// Knockback state (applied on top of normal velocity)
+	private Vector3 _knockbackVelocity = Vector3.Zero;
+	
+	// Tech roll & knockback tracking
+	private bool _wasAirborneDuringKnockback = false;
+	
+	// Trinket
+	private float _trinketCooldownTimer = 0f;
+	[Export] public float TrinketCooldown = 120f;
+	[Export] public float TrinketPushSpeed = 18.0f;
 	
 	// ==========================================
 	// REFERENCES
@@ -96,6 +165,11 @@ public partial class PlayerController : CharacterBody3D
 	public CombatComponent? GetCombatComponent() => _combatComponent;
 	
 	/// <summary>
+	/// Get dash cooldown remaining (0 = ready).
+	/// </summary>
+	public float GetDashCooldown() => _dashCooldownTimer;
+	
+	/// <summary>
 	/// Setup combat component (called by Main.cs after creation).
 	/// </summary>
 	public void SetupCombat(LocalSimulation simulation)
@@ -104,6 +178,9 @@ public partial class PlayerController : CharacterBody3D
 		_combatComponent.Name = "CombatComponent";
 		_combatComponent.Setup(this, simulation, 1);
 		AddChild(_combatComponent);
+		
+		// Subscribe to spell cast events for animations
+		_combatComponent.OnSpellCast += OnSpellCast;
 	}
 	
 	// ==========================================
@@ -130,27 +207,18 @@ public partial class PlayerController : CharacterBody3D
 		collisionShape.Shape = capsule;
 		AddChild(collisionShape);
 		
-		// --- Kenney character (FBX model) ---
+		// --- Pro Magic Pack character (FBX model) ---
 		_playerModel = LoadPlayerModel();
 		
-		// --- Animations Kenney ---
-		// Create AnimationPlayer as child of MODEL (pas du PlayerController)
-		// pour que les chemins relatifs des animations fonctionnent correctement.
+		// --- Load animations from Pro Magic Pack ---
 		_animPlayer = new AnimationPlayer();
 		_animPlayer.Name = "AnimationPlayer";
 		
-		// Add AnimationPlayer to model (or PlayerController if no model)
 		if (_playerModel != null)
-		{
 			_playerModel.AddChild(_animPlayer);
-		}
 		else
-		{
 			AddChild(_animPlayer);
-		}
 		
-		// Set RootNode on the skeleton so relative paths
-		// like "Hips", "Spine", etc. resolve relative to the skeleton
 		var skeleton = _playerModel != null ? FindSkeleton(_playerModel) : null;
 		if (skeleton != null)
 		{
@@ -161,28 +229,27 @@ public partial class PlayerController : CharacterBody3D
 		var animLib = new AnimationLibrary();
 		_animPlayer.AddAnimationLibrary("default", animLib);
 		
-		// Charger les animations depuis les fichiers FBX
-		// Different approach : on clone l'animation et on remplace
-		// the "Root|" prefix with "" (empty) since RootNode is already on the skeleton.
-		// Les os du squelette s'appellent "Hips", "Spine", etc. directement.
-		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/idle.fbx", "idle");
-		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/run.fbx", "run");
-		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/jump.fbx", "jump");
+		// Load all animations from the Pro Magic Pack directory
+		LoadAllAnimations(animLib);
 		
-		// Fallback: try loading from model
-		if (animLib.GetAnimationList().Count == 0)
-		{
-			GD.Print("No animations loaded from separate FBX files, trying model's embedded animations...");
-			LoadAnimationsFromModel(animLib);
-		}
+		// Log which animations we loaded
+		var loadedAnims = animLib.GetAnimationList();
+		GD.Print($"Loaded {loadedAnims.Count} animations:");
+		foreach (var animName in loadedAnims)
+			GD.Print($"  - {animName}");
 		
-		// Jouer l'animation disponible
+		// Play idle if available
 		if (animLib.HasAnimation("idle"))
-			_animPlayer.Play("default/idle");
-		else if (animLib.GetAnimationList().Count > 0)
 		{
-			string firstAnim = animLib.GetAnimationList()[0];
+			animLib.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
+			_animPlayer.Play("default/idle");
+		}
+		else if (loadedAnims.Count > 0)
+		{
+			string firstAnim = loadedAnims[0];
 			GD.Print($"Playing first available animation: {firstAnim}");
+			var first = animLib.GetAnimation(firstAnim);
+			if (first != null) first.LoopMode = Animation.LoopModeEnum.Linear;
 			_animPlayer.Play("default/" + firstAnim);
 		}
 		else
@@ -245,6 +312,9 @@ public partial class PlayerController : CharacterBody3D
 		AddInputAction("move_left",    new InputEventKey { PhysicalKeycode = Key.A });
 		AddInputAction("move_right",   new InputEventKey { PhysicalKeycode = Key.D });
 		AddInputAction("jump",         new InputEventKey { PhysicalKeycode = Key.Space });
+		AddInputAction("dash",         new InputEventKey { PhysicalKeycode = Key.Shift });
+		AddInputAction("crouch",       new InputEventKey { PhysicalKeycode = Key.Ctrl });
+		AddInputAction("crouch",       new InputEventKey { PhysicalKeycode = Key.C });
 		
 		// Spell actions (Keycode for layout-aware letter matching)
 		AddInputAction("spell_slot1", new InputEventKey { PhysicalKeycode = Key.Key1 });
@@ -253,13 +323,14 @@ public partial class PlayerController : CharacterBody3D
 		AddInputAction("spell_slot4", new InputEventKey { PhysicalKeycode = Key.Key4 });
 		AddInputAction("spell_slotA", new InputEventKey { Keycode = Key.A });
 		AddInputAction("spell_slotE", new InputEventKey { Keycode = Key.E });
-		AddInputAction("spell_shift", new InputEventKey { Keycode = Key.Shift });
-		AddInputAction("spell_elite", new InputEventKey { Keycode = Key.R });
+		AddInputAction("spell_slotR", new InputEventKey { Keycode = Key.R });
 		
 		// UI actions
 		AddInputAction("spellbook_toggle", new InputEventKey { Keycode = Key.B });
 		AddInputAction("ui_cancel",         new InputEventKey { Keycode = Key.Escape });
 		AddInputAction("target_next",       new InputEventKey { PhysicalKeycode = Key.Tab });
+		AddInputAction("trinket",           new InputEventKey { Keycode = Key.G });
+		AddInputAction("tech",             new InputEventKey { Keycode = Key.F });
 		
 		GD.Print("InputMap setup complete (AZERTY + QWERTY compatible)");
 	}
@@ -386,8 +457,10 @@ public partial class PlayerController : CharacterBody3D
 		else if (Input.IsActionJustPressed("spell_slot4")) TriggerSpellSlot(SlotType.Slot4);
 		else if (Input.IsActionJustPressed("spell_slotA")) TriggerSpellSlot(SlotType.SlotA);
 		else if (Input.IsActionJustPressed("spell_slotE")) TriggerSpellSlot(SlotType.SlotE);
-		else if (Input.IsActionJustPressed("spell_shift")) TriggerSpellSlot(SlotType.Shift);
-		else if (Input.IsActionJustPressed("spell_elite")) TriggerSpellSlot(SlotType.Elite);
+		else if (Input.IsActionJustPressed("spell_slotR")) TriggerSpellSlot(SlotType.Elite);
+		else if (Input.IsActionJustPressed("dash"))        TryDash();
+		else if (Input.IsActionJustPressed("crouch"))     { /* Air dodge now in _PhysicsProcess */ }
+		else if (Input.IsActionJustPressed("trinket"))    UseTrinket();
 		else if (Input.IsActionJustPressed("ui_cancel"))   Input.MouseMode = Input.MouseModeEnum.Visible;
 		else if (Input.IsActionJustPressed("target_next"))
 		{
@@ -413,6 +486,171 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
+	// TIMERS (ticked every frame)
+	// ==========================================
+	
+	public override void _Process(double delta)
+	{
+		float dt = (float)delta;
+		
+		if (_dashCooldownTimer > 0f)
+			_dashCooldownTimer -= dt;
+		
+		if (_dashTimer > 0f)
+			_dashTimer -= dt;
+		
+		if (_airDodgeTimer > 0f)
+			_airDodgeTimer -= dt;
+		
+		if (_turnaroundTimer > 0f)
+			_turnaroundTimer -= dt;
+		
+		if (_trinketCooldownTimer > 0f)
+			_trinketCooldownTimer -= dt;
+		
+		if (_castAnimTimer > 0f)
+			_castAnimTimer -= dt;
+	}
+	
+	/// <summary>
+	/// Attempt a ground dash. Ground only — short burst, cancelable into jump/attack.
+	/// </summary>
+	private void TryDash()
+	{
+		if (_dashCooldownTimer > 0f) return;
+		if (_moveState != MoveState.Normal) return;
+		if (!IsOnFloor()) return;
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		
+		// Direction: input or forward
+		Vector3 inputDir = GetInputDirection();
+		if (inputDir.LengthSquared() < 0.01f)
+		{
+			inputDir = -Transform.Basis.Z;
+			inputDir.Y = 0;
+			inputDir = inputDir.Normalized();
+		}
+		
+		_dashDirection = inputDir;
+		_dashTimer = DashDuration;
+		_dashCooldownTimer = DashCooldown;
+		_moveState = MoveState.Dashing;
+		
+		// Apply dash burst (set horizontal, preserve vertical momentum)
+		Velocity = new Vector3(
+			_dashDirection.X * DashSpeed,
+			Mathf.Max(Velocity.Y, 0f),
+			_dashDirection.Z * DashSpeed
+		);
+		
+		GD.Print($"Dash!");
+	}
+	
+	/// <summary>
+	/// Attempt an air dodge. Directional, once per jump, short burst.
+	/// Replaces both the old roll and air dash.
+	/// </summary>
+	private void TryAirDodge()
+	{
+		if (_airDodgesLeft <= 0) return;
+		if (_moveState != MoveState.Normal) return;
+		if (IsOnFloor()) return; // Air only
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		
+		// Direction: input or forward
+		Vector3 inputDir = GetInputDirection();
+		if (inputDir.LengthSquared() < 0.01f)
+		{
+			// No input = spot dodge (barely move)
+			inputDir = -Transform.Basis.Z;
+			inputDir.Y = 0;
+			inputDir = inputDir.Normalized();
+		}
+		
+		_airDodgeDirection = inputDir;
+		_airDodgeTimer = AirDodgeDuration;
+		_moveState = MoveState.AirDodging;
+		_airDodgesLeft--;
+		
+		// Burst in direction, preserve Y (fall still happens)
+		Velocity = new Vector3(
+			_airDodgeDirection.X * AirDodgeSpeed,
+			Velocity.Y,
+			_airDodgeDirection.Z * AirDodgeSpeed
+		);
+		
+		GD.Print($"Air dodge! ({_airDodgesLeft} left this jump)");
+	}
+	
+	/// <summary>
+	/// Tech roll: press crouch/trinket right before landing during knockback.
+	/// Clears knockback, gives iframes, and lets you act immediately.
+	/// </summary>
+	private void DoTechRoll()
+	{
+		_knockbackVelocity = Vector3.Zero;
+		_moveState = MoveState.Normal;
+		
+		// Small roll in input direction (or forward if no input)
+		Vector3 rollDir = GetInputDirection();
+		if (rollDir.LengthSquared() < 0.01f)
+		{
+			rollDir = -Transform.Basis.Z;
+			rollDir.Y = 0;
+			rollDir = rollDir.Normalized();
+		}
+		Velocity = new Vector3(rollDir.X * 10f, 0f, rollDir.Z * 10f);
+		
+		GD.Print("Tech roll!");
+	}
+	
+	/// <summary>
+	/// Trinket: G key, long cooldown, breaks combos.
+	/// Clears knockback and bursts backward (no hitstun — resets to neutral).
+	/// </summary>
+	private void UseTrinket()
+	{
+		if (_trinketCooldownTimer > 0f) return;
+		
+		_knockbackVelocity = Vector3.Zero;
+		_moveState = MoveState.Normal;
+		
+		// Push backward (away from facing direction)
+		Vector3 backDir = Transform.Basis.Z; // +Z = backward in Godot
+		backDir.Y = 0;
+		backDir = backDir.Normalized();
+		Velocity = new Vector3(backDir.X * TrinketPushSpeed, JumpVelocity * 0.5f, backDir.Z * TrinketPushSpeed);
+		
+		_trinketCooldownTimer = TrinketCooldown;
+		
+		GD.Print($"Trinket! ({TrinketCooldown}s cooldown)");
+	}
+	
+	/// <summary>
+	/// Get the input direction relative to the player's facing.
+	/// </summary>
+	private Vector3 GetInputDirection()
+	{
+		Vector3 dir = Vector3.Zero;
+		Vector3 playerForward = -Transform.Basis.Z;
+		playerForward.Y = 0;
+		playerForward = playerForward.Normalized();
+		Vector3 playerRight = Transform.Basis.X;
+		playerRight.Y = 0;
+		playerRight = playerRight.Normalized();
+		
+		if (Input.IsActionPressed("move_forward"))  dir += playerForward;
+		if (Input.IsActionPressed("move_back"))     dir -= playerForward;
+		if (Input.IsActionPressed("move_left"))     dir -= playerRight;
+		if (Input.IsActionPressed("move_right"))    dir += playerRight;
+		
+		if (dir.LengthSquared() > 0f)
+			dir = dir.Normalized();
+		
+		return dir;
+	}
+	
+	// ==========================================
 	// PHYSICS
 	// ==========================================
 	
@@ -420,83 +658,235 @@ public partial class PlayerController : CharacterBody3D
 	{
 		float dt = (float)delta;
 		
+		// --- Knockback ---
 		if (_knockbackVelocity.LengthSquared() > 0.001f)
 		{
-			_knockbackVelocity = _knockbackVelocity.Lerp(Vector3.Zero, _knockbackDecay * dt);
+			float decay = 8.0f;
+			_knockbackVelocity = _knockbackVelocity.Lerp(Vector3.Zero, decay * dt);
 			Velocity = _knockbackVelocity;
-		}
-		else
-		{
-			_knockbackVelocity = Vector3.Zero;
+			ApplyGravity(dt);
 			
-			bool isGrounded = IsOnFloor();
-			bool inputJump = Input.IsActionPressed("jump");
+			bool wasAirborne = !IsOnFloor();
+			MoveAndSlide();
 			
-			if (isGrounded)
+			// Tech roll on landing: press F (tech) to avoid knockdown
+			if (wasAirborne && IsOnFloor())
 			{
-				// --- ON GROUND: player-relative direction (pas a la camera) ---
-				// Left click must NOT influence la direction de deplacement.
-				Vector3 inputDir = Vector3.Zero;
-				
-				// Use player direction (Transform.Basis.Z) qui n'est changee
-				// que par le clic droit.
-				Vector3 playerForward = -Transform.Basis.Z;
-				playerForward.Y = 0;
-				playerForward = playerForward.Normalized();
-				Vector3 playerRight = Transform.Basis.X;
-				playerRight.Y = 0;
-				playerRight = playerRight.Normalized();
-				
-				if (Input.IsActionPressed("move_forward"))  inputDir += playerForward;
-				if (Input.IsActionPressed("move_back"))     inputDir -= playerForward;
-				if (Input.IsActionPressed("move_left"))     inputDir -= playerRight;
-				if (Input.IsActionPressed("move_right"))    inputDir += playerRight;
-				
-				if (inputDir.LengthSquared() > 0f)
-					inputDir = inputDir.Normalized();
-				
-				// Apply ground speed
-				float speed = Speed;
-				Velocity = new Vector3(inputDir.X * speed, Velocity.Y, inputDir.Z * speed);
-				
-				// FIXED JUMP (WoW-style) : on garde la Velocity.X/Z calculee a cette frame
-				if (inputJump)
+				if (Input.IsActionJustPressed("tech"))
+					DoTechRoll();
+				else
 				{
-					Velocity = new Vector3(Velocity.X, JumpForce, Velocity.Z);
+					// Normal knockdown landing
+					_knockbackVelocity = Vector3.Zero;
+					_moveState = MoveState.Normal;
+				}
+			}
+			
+			PostMove();
+			return;
+		}
+		
+		// --- Dashing (maintain velocity while timer active) ---
+		if (_moveState == MoveState.Dashing)
+		{
+			if (_dashTimer > 0f)
+			{
+				// Dash can be canceled by jump
+				if (Input.IsActionPressed("jump") && IsOnFloor())
+				{
+					_moveState = MoveState.Normal;
+					Velocity = new Vector3(Velocity.X, JumpVelocity, Velocity.Z);
+				}
+				else
+				{
+					Velocity = new Vector3(
+						_dashDirection.X * DashSpeed,
+						Mathf.Max(Velocity.Y, 0f),
+						_dashDirection.Z * DashSpeed
+					);
 				}
 			}
 			else
 			{
-				// --- IN AIR: strict WoW behavior ---
-				// Do NOT touch Velocity.X or Velocity.Z!
-				// Keyboard and camera are ignored pour la trajectoire.
-				// Character continues on its trajectory XZ initiale.
+				_moveState = MoveState.Normal;
 			}
 		}
 		
-		// Gravity (applied even if knockback active)
-		if (!IsOnFloor())
+		// --- Air dodge (maintain velocity while timer active) ---
+		if (_moveState == MoveState.AirDodging)
 		{
-			Velocity -= new Vector3(0f, Gravity * dt, 0f);
-			
-			// Clamp vertical velocity pour eviter de traverser le sol
-			if (Velocity.Y < -100f)
-				Velocity = new Vector3(Velocity.X, -100f, Velocity.Z);
+			if (_airDodgeTimer > 0f)
+			{
+				Velocity = new Vector3(
+					_airDodgeDirection.X * AirDodgeSpeed,
+					Velocity.Y,
+					_airDodgeDirection.Z * AirDodgeSpeed
+				);
+			}
+			else
+			{
+				_moveState = MoveState.Normal;
+			}
 		}
 		
+		// --- Normal movement (acceleration-based) ---
+		if (_moveState == MoveState.Normal)
+		{
+			bool isGrounded = IsOnFloor();
+			bool inputJump = Input.IsActionPressed("jump");
+			Vector3 inputDir = GetInputDirection();
+			
+			if (isGrounded)
+			{
+				// Reset air dodges on landing
+				_airDodgesLeft = MaxAirDodges;
+				
+				bool hasInput = inputDir.LengthSquared() > 0.01f;
+				
+				if (hasInput)
+				{
+					// Detect direction change (dot < 0.5 means significant change)
+					bool dirChanged = _lastInputDir.LengthSquared() > 0.01f
+						&& inputDir.Dot(_lastInputDir) < 0.5f;
+					
+					if (dirChanged)
+					{
+						_dirHoldTime = 0f;
+						if (_isSprinting)
+						{
+							// Sprint → turnaround lag (can't move for a moment)
+							_turnaroundTimer = TurnaroundLag;
+							_isSprinting = false;
+						}
+						// else: walk → instant turn (no lag)
+					}
+					else
+					{
+						// Same direction or initial press
+						_dirHoldTime += dt;
+						if (_dirHoldTime >= SprintThreshold && !_isSprinting)
+							_isSprinting = true;
+					}
+					
+					_lastInputDir = inputDir;
+					
+					if (_turnaroundTimer > 0f)
+					{
+						// Turnaround lag: decelerate, can't move in new direction yet
+						float friction = GroundFriction * dt;
+						Velocity = new Vector3(
+							Mathf.MoveToward(Velocity.X, 0f, Mathf.Abs(Velocity.X) * friction),
+							Velocity.Y,
+							Mathf.MoveToward(Velocity.Z, 0f, Mathf.Abs(Velocity.Z) * friction)
+						);
+					}
+					else
+					{
+						// Walk or sprint: instant speed
+						float speed = _isSprinting ? SprintSpeed : WalkSpeed;
+						Velocity = new Vector3(inputDir.X * speed, Velocity.Y, inputDir.Z * speed);
+					}
+					
+					// Jump
+					if (inputJump)
+						Velocity = new Vector3(Velocity.X, JumpVelocity, Velocity.Z);
+				}
+				else
+				{
+					// No input: reset sprint, decelerate fast
+					_dirHoldTime = 0f;
+					_isSprinting = false;
+					_lastInputDir = Vector3.Zero;
+					
+					float friction = GroundFriction * dt;
+					Velocity = new Vector3(
+						Mathf.MoveToward(Velocity.X, 0f, Mathf.Abs(Velocity.X) * friction),
+						Velocity.Y,
+						Mathf.MoveToward(Velocity.Z, 0f, Mathf.Abs(Velocity.Z) * friction)
+					);
+				}
+			}
+			else
+			{
+				// AIR: reduced acceleration, some drag
+				Vector3 targetVel = inputDir * WalkSpeed;
+				float airAccel = AirAcceleration * dt;
+				float newX = Mathf.MoveToward(Velocity.X, targetVel.X, airAccel);
+				float newZ = Mathf.MoveToward(Velocity.Z, targetVel.Z, airAccel);
+				Velocity = new Vector3(newX, Velocity.Y, newZ);
+				
+				// Air drag (gentle slowdown)
+				float drag = AirDrag * dt;
+				Velocity = new Vector3(
+					Velocity.X * (1f - drag),
+					Velocity.Y,
+					Velocity.Z * (1f - drag)
+				);
+				
+				// Air dodge trigger (physics-synchronous)
+				if (Input.IsActionJustPressed("crouch") && _airDodgesLeft > 0)
+				{
+					TryAirDodge();
+				}
+			}
+		}
+		
+		ApplyGravity(dt);
 		MoveAndSlide();
 		
-		// Safety check : si on est sous le sol, on remonte
+		// Air dodge landing: just go back to normal (no slide)
+		if (_moveState == MoveState.AirDodging && IsOnFloor())
+		{
+			_moveState = MoveState.Normal;
+			_airDodgeTimer = 0f;
+		}
+		
+		PostMove();
+	}
+	
+	private void ApplyGravity(float dt)
+	{
+		if (!IsOnFloor())
+		{
+			bool inputDown = Input.IsActionPressed("move_back") || Input.IsActionPressed("crouch");
+			
+			if (inputDown && _moveState != MoveState.AirDodging)
+			{
+				// Fast fall: instant kick downward (Melee-style)
+				if (Velocity.Y > -FastFallKick)
+					Velocity = new Vector3(Velocity.X, -FastFallKick, Velocity.Z);
+				
+				// Maintain speed with extra gravity
+				Velocity -= new Vector3(0f, Gravity * FastFallGravityMult * dt, 0f);
+			}
+			else
+			{
+				Velocity -= new Vector3(0f, Gravity * dt, 0f);
+			}
+			
+			// Hard cap on fall speed
+			if (Velocity.Y < -MaxFallSpeed)
+				Velocity = new Vector3(Velocity.X, -MaxFallSpeed, Velocity.Z);
+		}
+	}
+	
+	private void PostMove()
+	{
+		// Safety: under the floor
 		if (GlobalPosition.Y < 0f && IsOnFloor())
 		{
 			GlobalPosition = new Vector3(GlobalPosition.X, 1f, GlobalPosition.Z);
 			Velocity = new Vector3(Velocity.X, 0f, Velocity.Z);
 		}
 		
-		// --- Animations ---
+		// Reset air dashes on landing (if not already done in normal movement)
+		if (IsOnFloor() && _moveState == MoveState.Dashing)
+		{
+			_airDodgesLeft = MaxAirDodges;
+		}
+		
 		UpdateAnimations();
 		
-		// Fall safety net
 		if (GlobalPosition.Y < -50f)
 		{
 			GD.Print("Player fell through the floor! Respawning...");
@@ -516,6 +906,9 @@ public partial class PlayerController : CharacterBody3D
 	public void ApplyKnockback(Vector3 force)
 	{
 		_knockbackVelocity = force;
+		_moveState = MoveState.Normal;
+		_dashTimer = 0f;
+		_airDodgeTimer = 0f;
 	}
 	
 	// ==========================================
@@ -642,7 +1035,11 @@ public partial class PlayerController : CharacterBody3D
 		var skinTex = GD.Load<Texture2D>("res://assets/characters/Skins/skaterMaleA.png");
 		ApplySkinRecursive(playerInstance, skinTex);
 		
-		// Adjust model scale and position
+		// Mixamo models face +Z but Godot uses -Z as forward.
+		// Rotate the model 180° around Y so it faces away from camera.
+		playerInstance.RotateY(Mathf.Pi);
+		
+		// Adjust model position and scale
 		playerInstance.Scale = new Vector3(0.5f, 0.5f, 0.5f);
 		playerInstance.Position = new Vector3(0f, -1.5f, 0f);
 		
@@ -681,111 +1078,277 @@ public partial class PlayerController : CharacterBody3D
 	// ANIMATION LOADING
 	// ==========================================
 	
-	private void LoadAnimationsFromFbx(AnimationLibrary animLib, string fbxPath, string animName)
+	// ==========================================
+	// ANIMATION LOADING
+	// ==========================================
+	
+	/// <summary>
+	/// Load ALL FBX animation files from the Pro Magic Pack directory.
+	/// Each FBX file contains one animation clip. We load it and name it
+	/// by a standardized key derived from the filename.
+	/// </summary>
+	private void LoadAllAnimations(AnimationLibrary animLib)
+	{
+		string animDir = "res://assets/characters/ProMagicPack/";
+		
+		// Use Godot's Directory API to list FBX files
+		var dir = DirAccess.Open(animDir);
+		if (dir == null)
+		{
+			GD.PrintErr($"Cannot open animation directory: {animDir}");
+			return;
+		}
+		
+		dir.ListDirBegin();
+		int loadedCount = 0;
+		
+		while (true)
+		{
+			string fileName = dir.GetNext();
+			if (string.IsNullOrEmpty(fileName))
+				break;
+			
+			// Only process FBX files (skip .import, directories, etc.)
+			if (!fileName.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
+				continue;
+			
+			if (fileName.Equals("characterMedium.fbx", StringComparison.OrdinalIgnoreCase))
+				continue; // Skip the model file itself
+			
+			string fbxPath = animDir + fileName;
+			string animKey = NormalizeAnimationName(fileName);
+			
+			if (LoadSingleAnimation(animLib, fbxPath, animKey))
+				loadedCount++;
+		}
+		
+		dir.ListDirEnd();
+		GD.Print($"Loaded {loadedCount} animations from {animDir}");
+	}
+	
+	/// <summary>
+	/// Convert a filename like "Standing Run Forward.fbx" to "run_forward"
+	/// </summary>
+	private string NormalizeAnimationName(string fileName)
+	{
+		// Remove .fbx extension
+		string name = fileName;
+		int extIdx = name.LastIndexOf(".fbx", StringComparison.OrdinalIgnoreCase);
+		if (extIdx > 0)
+			name = name.Substring(0, extIdx);
+		
+		// Remove common prefixes
+		if (name.StartsWith("Standing ", StringComparison.OrdinalIgnoreCase))
+			name = name.Substring("Standing ".Length);
+		else if (name.StartsWith("standing ", StringComparison.OrdinalIgnoreCase))
+			name = name.Substring("standing ".Length);
+		else if (name.StartsWith("Crouch ", StringComparison.OrdinalIgnoreCase))
+			name = "crouch_" + name.Substring("Crouch ".Length);
+		
+		// Replace spaces with underscores, lowercase
+		name = name.Replace(" ", "_").ToLower();
+		
+		// Remove leading whitespace only (not digits — "1h" and "2h" matter!)
+		name = name.TrimStart();
+		
+		// Specific renames for common animations
+		var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+		{
+			// Idle variants → single "idle"
+			{ "idle", "idle" },
+			{ "idle_02", "idle" },
+			{ "idle_03", "idle" },
+			{ "idle_04", "idle" },
+			
+			// Movement
+			{ "run_forward", "run" },
+			{ "walk_forward", "walk" },
+			{ "sprint_forward", "sprint" },
+			{ "jump", "jump" },
+			{ "jump_running", "jump_run" },
+			{ "land_to_standing_idle", "land" },
+			{ "jump_running_landing", "land_run" },
+			{ "idle_to_crouch", "crouch_transition" },
+			{ "crouch_idle", "crouch_idle" },
+			{ "crouch_walk_forward", "crouch_walk" },
+			{ "crouch_to_standing_idle", "stand_transition" },
+			
+			// Cast animations
+			{ "1h_cast_spell_01", "cast_1h" },
+			{ "2h_cast_spell_01", "cast_2h" },
+			
+			// Attack animations
+			{ "1h_magic_attack_01", "attack_1h" },
+			{ "1h_magic_attack_02", "attack_1h_b" },
+			{ "1h_magic_attack_03", "attack_1h_c" },
+			{ "2h_magic_attack_01", "attack_2h" },
+			{ "2h_magic_attack_02", "attack_2h_b" },
+			{ "2h_magic_attack_03", "attack_2h_c" },
+			{ "2h_magic_attack_04", "attack_2h_d" },
+			{ "2h_magic_attack_05", "attack_2h_e" },
+			{ "2h_magic_area_attack_01", "attack_area_2h" },
+			{ "2h_magic_area_attack_02", "attack_area_2h_b" },
+			
+			// Block
+			{ "block_idle", "block_idle" },
+			{ "block_start", "block_start" },
+			{ "block_end", "block_end" },
+			{ "block_react_large", "block_react" },
+			
+			// Hit reactions
+			{ "react_small_from_front", "hit_small_front" },
+			{ "react_small_from_back", "hit_small_back" },
+			{ "react_small_from_left", "hit_small_left" },
+			{ "react_small_from_right", "hit_small_right" },
+			{ "react_large_from_front", "hit_large_front" },
+			{ "react_large_from_back", "hit_large_back" },
+			{ "react_large_from_left", "hit_large_left" },
+			{ "react_large_from_right", "hit_large_right" },
+			
+			// Death
+			{ "react_death_forward", "death_forward" },
+			{ "react_death_backward", "death_backward" },
+			{ "react_death_left", "death_left" },
+			{ "react_death_right", "death_right" },
+			
+			// Turn
+			{ "turn_left_90", "turn_left" },
+			{ "turn_right_90", "turn_right" },
+		};
+		
+		if (renames.ContainsKey(name))
+			return renames[name];
+		
+		return name;
+	}
+	
+	/// <summary>
+	/// Load a single animation from an FBX file and add it to the library.
+	/// Handles both scene-based FBX (with AnimationPlayer) and direct Animation resources.
+	/// </summary>
+	private bool LoadSingleAnimation(AnimationLibrary animLib, string fbxPath, string animKey)
 	{
 		if (!ResourceLoader.Exists(fbxPath))
 		{
 			GD.Print($"Animation file not found: {fbxPath}");
-			return;
+			return false;
 		}
 		
-		var scene = GD.Load<PackedScene>(fbxPath);
-		if (scene == null)
+		// Try loading as PackedScene first (most common for FBX animations)
+		var scene = ResourceLoader.Load<PackedScene>(fbxPath);
+		if (scene != null)
 		{
-			GD.Print($"Failed to load animation scene: {fbxPath}");
-			return;
-		}
-		
-		var tempInstance = scene.Instantiate<Node>();
-		if (tempInstance == null)
-		{
-			GD.Print($"Failed to instantiate animation scene: {fbxPath}");
-			return;
-		}
-		
-		// Chercher un AnimationPlayer dans l'instance
-		var animPlayerInScene = FindAnimationPlayer(tempInstance);
-		if (animPlayerInScene != null)
-		{
-			// Copier toutes les animations de l'AnimationLibrary
-			foreach (var libName in animPlayerInScene.GetAnimationLibraryList())
+			var tempInstance = scene.Instantiate<Node>();
+			if (tempInstance == null) return false;
+			
+			var animPlayerInScene = FindAnimationPlayer(tempInstance);
+			if (animPlayerInScene != null)
 			{
-				var lib = animPlayerInScene.GetAnimationLibrary(libName);
-				if (lib != null)
+				foreach (var libName in animPlayerInScene.GetAnimationLibraryList())
 				{
+					var lib = animPlayerInScene.GetAnimationLibrary(libName);
+					if (lib == null) continue;
+					
 					foreach (var animNameInLib in lib.GetAnimationList())
 					{
 						var anim = lib.GetAnimation(animNameInLib);
+						if (anim == null) continue;
+						
+						// Remap bone paths: handle both "Root|" (Kenney) and bare bones (Mixamo)
+						anim = RemapAnimationPaths(anim);
 						if (anim != null)
 						{
-							// IMPORTANT: Les animations Kenney utilisent des chemins comme "Root|Hips"
-							// but in our scene the skeleton is at a different path.
-							// We must remap paths pour qu'ils pointent vers le squelette du modele.
-							anim = RemapAnimationPaths(anim, animNameInLib);
-							if (anim != null)
+							if (animLib.HasAnimation(animKey))
 							{
-								animLib.AddAnimation(animName, anim);
-								GD.Print($"Loaded animation: {animName} (from {animNameInLib} in {fbxPath})");
+								GD.Print($"  Skipping duplicate animation key: {animKey} (from {fbxPath})");
+							}
+							else
+							{
+								animLib.AddAnimation(animKey, anim);
+								GD.Print($"  Loaded: {animKey} <- {fbxPath}");
 							}
 						}
 					}
 				}
 			}
-		}
-		else
-		{
-			GD.Print($"No AnimationPlayer found in {fbxPath}, trying direct Animation resource...");
+			else
+			{
+				// Try loading as direct Animation resource
+				LoadDirectAnimation(animLib, fbxPath, animKey);
+			}
 			
-			try
-			{
-				var directAnim = ResourceLoader.Load<Animation>(fbxPath);
-				if (directAnim != null)
-				{
-					directAnim = RemapAnimationPaths(directAnim, animName);
-					if (directAnim != null)
-					{
-						animLib.AddAnimation(animName, directAnim);
-						GD.Print($"Loaded animation directly: {animName} from {fbxPath}");
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				GD.Print($"Could not load animation directly from {fbxPath}: {ex.Message}");
-			}
+			tempInstance.QueueFree();
+			return true;
 		}
 		
-		tempInstance.QueueFree();
+		// Fallback: try direct Animation resource
+		return LoadDirectAnimation(animLib, fbxPath, animKey);
+	}
+	
+	private bool LoadDirectAnimation(AnimationLibrary animLib, string fbxPath, string animKey)
+	{
+		try
+		{
+			var directAnim = ResourceLoader.Load<Animation>(fbxPath);
+			if (directAnim != null)
+			{
+				directAnim = RemapAnimationPaths(directAnim);
+				if (directAnim != null)
+				{
+					animLib.AddAnimation(animKey, directAnim);
+					GD.Print($"  Loaded direct: {animKey} <- {fbxPath}");
+					return true;
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			GD.Print($"  Could not load animation from {fbxPath}: {ex.Message}");
+		}
+		return false;
 	}
 	
 	/// <summary>
-/// Remaps Kenney animation paths (which use "Root|...")
-	/// to the actual skeleton paths in our scene.
-	/// Kenney animations target nodes like "Root|Hips", "Root|Spine", etc.
-	/// "Root|" is the root node prefix in the FBX animation file.
-	/// Since our AnimationPlayer's RootNode is set to the skeleton,
-	/// we replace "Root|" with "" (empty) so paths become
-	/// just "Hips", "Spine", etc. (relative to the skeleton).
-	/// We Duplicate to avoid modifying the shared original animation.
+	/// Remap bone paths in animation tracks to match our skeleton.
+	/// Our AnimationPlayer's RootNode is set to the skeleton node.
+	/// Mixamo FBX animations have tracks referencing "Root/Skeleton3D" or "Root/Skeleton"
+	/// which need to be stripped so paths resolve relative to the skeleton.
+	/// Kenney animations use "Root|" prefix which also gets stripped.
 	/// </summary>
-	private Animation? RemapAnimationPaths(Animation anim, string animName)
+	private Animation RemapAnimationPaths(Animation anim)
 	{
-		// Make a copy to avoid modifying the shared original
 		var animCopy = (Animation)anim.Duplicate();
-		
-		// Remap paths in the copied animation
 		int trackCount = animCopy.GetTrackCount();
+		
+		// Detect the skeleton path prefix used in this animation
+		// Mixamo: "Root/Skeleton3D" or "Root/Skeleton"
+		// Kenney: "Root|"
+		string? prefixToStrip = null;
+		
+		for (int i = 0; i < trackCount && prefixToStrip == null; i++)
+		{
+			string path = animCopy.TrackGetPath(i);
+			if (path.Contains("Root/Skeleton3D"))
+				prefixToStrip = "Root/Skeleton3D";
+			else if (path.Contains("Root/Skeleton"))
+				prefixToStrip = "Root/Skeleton";
+			else if (path.Contains("Root|"))
+				prefixToStrip = "Root|";
+		}
+		
+		if (prefixToStrip == null)
+			return animCopy; // No remapping needed
+		
+		GD.Print($"  Remapping paths: stripping '{prefixToStrip}' prefix");
+		
 		for (int i = 0; i < trackCount; i++)
 		{
 			string trackPath = animCopy.TrackGetPath(i);
-			// Les chemins Kenney sont comme "Root|Hips:position" ou "Root|Hips:rotation_quaternion"
-			// On remplace "Root|" par "" (vide) car le RootNode de l'AnimationPlayer
-			// is already set to the skeleton
-			if (trackPath.Contains("Root|"))
+			
+			if (trackPath.Contains(prefixToStrip))
 			{
-				string newPath = trackPath.Replace("Root|", "");
+				string newPath = trackPath.Replace(prefixToStrip, "");
 				animCopy.TrackSetPath(i, new NodePath(newPath));
-				GD.Print($"  Remapped track: {trackPath} -> {newPath}");
 			}
 		}
 		
@@ -808,37 +1371,6 @@ public partial class PlayerController : CharacterBody3D
 		return null;
 	}
 	
-	private void LoadAnimationsFromModel(AnimationLibrary animLib)
-	{
-		if (_playerModel == null) return;
-		
-		var animPlayerInModel = FindAnimationPlayer(_playerModel);
-		if (animPlayerInModel != null)
-		{
-			GD.Print("Found AnimationPlayer in model!");
-			foreach (var libName in animPlayerInModel.GetAnimationLibraryList())
-			{
-				var lib = animPlayerInModel.GetAnimationLibrary(libName);
-				if (lib != null)
-				{
-					foreach (var animName in lib.GetAnimationList())
-					{
-						var anim = lib.GetAnimation(animName);
-						if (anim != null)
-						{
-							animLib.AddAnimation(animName, anim);
-							GD.Print($"Loaded animation from model: {animName}");
-						}
-					}
-				}
-			}
-		}
-		else
-		{
-			GD.Print("No AnimationPlayer found in model either.");
-		}
-	}
-	
 	/// <summary>
 	/// Recursively finds an AnimationPlayer in the node tree.
 	/// </summary>
@@ -855,33 +1387,143 @@ public partial class PlayerController : CharacterBody3D
 		return null;
 	}
 	
+	// ==========================================
+	// ANIMATION STATE
+	// ==========================================
+	
+	private string _currentAnim = "";
+	private float _castAnimTimer = 0f;
+	
+	/// <summary>
+	/// Called when a spell is cast. Plays an appropriate cast/attack animation.
+	/// </summary>
+	private void OnSpellCast(SlotType slot)
+	{
+		if (_animPlayer == null) return;
+		
+		// Try cast animations first, fall back to attack animations
+		string[] castAnims;
+		if (slot == SlotType.Elite)
+		{
+			// Elite/ultimate spells: dramatic 2H cast
+			castAnims = new[] { "cast_2h", "attack_area_2h", "attack_area_2h_b" };
+		}
+		else if (slot == SlotType.SlotE || slot == SlotType.Shift)
+		{
+			// Utility/defense: 1H cast
+			castAnims = new[] { "cast_1h", "attack_1h" };
+		}
+		else
+		{
+			// Regular spells: mix of attacks and casts
+			castAnims = new[] { "attack_1h", "attack_1h_b", "attack_1h_c", "attack_2h", "attack_2h_b", "cast_1h", "cast_2h" };
+		}
+		
+		// Pick the first available animation from the list
+		foreach (string anim in castAnims)
+		{
+			string fullPath = "default/" + anim;
+			if (_animPlayer.HasAnimation(fullPath))
+			{
+				_animPlayer.Play(fullPath);
+				_currentAnim = fullPath;
+				_castAnimTimer = 2.0f;
+				GD.Print($"Playing cast anim: {anim} for slot {slot}");
+				return;
+			}
+		}
+		
+		GD.Print($"No cast/attack animation found for slot {slot}");
+	}
+	
 	private void UpdateAnimations()
 	{
 		if (_animPlayer == null) return;
 		
-		bool isGrounded = IsOnFloor();
-		float hSpeed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
-		bool isMoving = hSpeed > 1f;
+		// Cast animation takes priority
+		if (_castAnimTimer > 0f)
+		{
+			if (!_animPlayer.IsPlaying())
+				_castAnimTimer = 0f;
+			return;
+		}
 		
 		string targetAnim;
 		
-		if (!isGrounded)
+		// Movement state → animation
+		switch (_moveState)
 		{
-			targetAnim = "default/jump";
-		}
-		else if (isMoving)
-		{
-			targetAnim = "default/run";
-		}
-		else
-		{
-			targetAnim = "default/idle";
+			case MoveState.Dashing:
+				targetAnim = _dashTimer > 0f ? "run" : "run";
+				break;
+				
+			case MoveState.AirDodging:
+				targetAnim = "jump";
+				break;
+				
+			default:
+				bool isGrounded = IsOnFloor();
+				float hSpeed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
+				bool isWalking = hSpeed > 1f && hSpeed < 11f;
+				bool isRunning = hSpeed >= 11f;
+				
+				if (!isGrounded)
+					targetAnim = "jump";
+				else if (isRunning)
+					targetAnim = "run";
+				else if (isWalking)
+					targetAnim = "walk";
+				else
+					targetAnim = "idle";
+				break;
 		}
 		
-		if (_animPlayer.HasAnimation(targetAnim) && _animPlayer.CurrentAnimation != targetAnim)
+		PlayAnimWithFallback(targetAnim);
+	}
+	
+	private void PlayAnimWithFallback(string animName)
+	{
+		if (_animPlayer == null) return;
+		string fullPath = "default/" + animName;
+		
+		if (_animPlayer.HasAnimation(fullPath) && _currentAnim != fullPath)
 		{
-			_animPlayer.Play(targetAnim, 0.2f); // Crossfade de 0.2s
+			SetLoopMode(fullPath, animName);
+			_animPlayer.Play(fullPath, 0.2f);
+			_currentAnim = fullPath;
 		}
+		else if (!_animPlayer.HasAnimation(fullPath))
+		{
+			// Fallback: find any animation that starts with the same prefix
+			foreach (var available in _animPlayer.GetAnimationList())
+			{
+				if (available.StartsWith(animName) || animName.StartsWith(available))
+				{
+					string fallbackPath = "default/" + available;
+					if (_currentAnim != fallbackPath)
+					{
+						SetLoopMode(fallbackPath, available);
+						_animPlayer.Play(fallbackPath, 0.2f);
+						_currentAnim = fallbackPath;
+						return;
+					}
+				}
+			}
+		}
+	}
+	
+	private void SetLoopMode(string fullPath, string animName)
+	{
+		if (_animPlayer == null) return;
+		// fullPath is "default/animName", GetAnimation might need bare name
+		var anim = _animPlayer.GetAnimation(animName);
+		if (anim == null) return;
+		
+		// Loop movement / idle animations, not attacks/casts/reacts
+		bool shouldLoop = animName == "idle" || animName == "run" || animName == "walk"
+			|| animName.StartsWith("idle") || animName.StartsWith("run") || animName.StartsWith("walk")
+			|| animName.StartsWith("crouch");
+		anim.LoopMode = shouldLoop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
 	}
 	
 }
