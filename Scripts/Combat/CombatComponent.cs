@@ -2,7 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Generic combat component usable by PlayerController, Dummy, or AI bots.
@@ -353,27 +353,27 @@ public partial class CombatComponent : Node
 	
 	/// <summary>
 	/// Take damage (called by LocalSimulation when this entity is hit).
-	/// Applies status modifiers: Vulnérable → +30%, Bouclier → absorbs damage.
+	/// Applies status modifiers: Vulnerable → +30%, Bouclier → absorbs damage.
 	/// </summary>
 	public void TakeDamage(float damage, float kbX, float kbY, float kbZ)
 	{
 		float finalDamage = damage;
 		
-		// Check Vulnérable → +30% damage
+		// Check Vulnerable → +30% damage
 		if (ConsumeStatus(StatusType.Vulnerable))
 		{
 			finalDamage *= 1.3f;
 		}
 		
 		// Check Bouclier → absorbs damage
-		if (HasStatus(StatusType.Bouclier))
+		if (HasStatus(StatusType.Shielded))
 		{
 			float shieldAbsorb = damage * 0.5f; // 50% damage reduction while shielded
 			finalDamage -= shieldAbsorb;
 			if (finalDamage < 0f) finalDamage = 0f;
 			
 			// Bouclier expires after absorbing
-			RemoveStatus(StatusType.Bouclier);
+			RemoveStatus(StatusType.Shielded);
 		}
 		
 		OnTakeDamage?.Invoke(finalDamage, kbX, kbY, kbZ);
@@ -409,15 +409,15 @@ public partial class CombatComponent : Node
 			OnStatusExpired?.Invoke(type);
 		}
 		
-		// Tick Brulure damage
-		if (_statuses.ContainsKey(StatusType.Brulure) && _statuses[StatusType.Brulure] > 0f)
+// Tick Burn damage
+		if (_statuses.ContainsKey(StatusType.Burn) && _statuses[StatusType.Burn] > 0f)
 		{
-			// Brulure ticks once per second
+// Burn ticks once per second
 			// We handle this in the simulation for now - just visual/event
 		}
 		
 		// Electrifie stacking
-		if (_statuses.ContainsKey(StatusType.Electrifie) && _statuses[StatusType.Electrifie] > 0f)
+		if (_statuses.ContainsKey(StatusType.Electrified) && _statuses[StatusType.Electrified] > 0f)
 		{
 			// Electrifie at 2+ stacks stuns - handled by spell effects currently
 		}

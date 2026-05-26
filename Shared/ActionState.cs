@@ -1,4 +1,4 @@
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
     public enum ActionState : byte
     {

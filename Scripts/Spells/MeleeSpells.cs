@@ -1,7 +1,7 @@
 #nullable enable
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Melee-type spells (knockbacks, charges, area control).

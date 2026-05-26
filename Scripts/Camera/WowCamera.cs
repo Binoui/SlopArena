@@ -4,11 +4,11 @@ using System;
 public partial class WowCamera : Node3D
 {
 	[Export] public Node3D? Target;
-	[Export] public float Sensibilite = 0.003f;
+	[Export] public float Sensitivity = 0.003f;
 	
 	[Export] public float MinZoom = 5.0f;
 	[Export] public float MaxZoom = 80.0f;
-	[Export] public float VitesseZoom = 3.0f;
+	[Export] public float ZoomSpeed = 3.0f;
 	
 	private SpringArm3D? _springArm;
 	private Camera3D? _camera;
@@ -22,15 +22,15 @@ public partial class WowCamera : Node3D
 	
 	public override void _Ready()
 	{
-		// Créer le SpringArm3D
+		// Create the SpringArm3D
 		_springArm = new SpringArm3D();
 		_springArm.Name = "SpringArm";
 		_springArm.SpringLength = 60f;
 		_springArm.Margin = 0.5f;
-		_springArm.CollisionMask = 0; // Désactiver la collision du SpringArm pour éviter qu'il se rétracte dans le joueur
+		_springArm.CollisionMask = 0; // Disable SpringArm collision to prevent retracting into the player
 		AddChild(_springArm);
 		
-		// Créer la caméra, enfant du SpringArm
+		// Create camera, child of SpringArm
 		_camera = new Camera3D();
 		_camera.Name = "Camera";
 		_camera.Current = true;
@@ -41,7 +41,7 @@ public partial class WowCamera : Node3D
 			_springArm.AddExcludedObject(collisionTarget.GetRid());
 		}
 		
-		// Pitch initial : -45° (regarde vers le bas)
+		// Initial pitch: -45° (looks downward)
 		_targetPitch = Mathf.DegToRad(-45.0f);
 		
 		if (Target != null)
@@ -61,31 +61,31 @@ public partial class WowCamera : Node3D
 		Vector3 targetPos = Target.GlobalPosition;
 		GlobalPosition = new Vector3(targetPos.X, targetPos.Y + 1.5f, targetPos.Z);
 		
-		// _cameraYaw est la rotation Y GLOBALE souhaitée pour la caméra (orbite).
-		// On calcule la rotation locale = globale - rotation du parent.
+		// _cameraYaw is the desired GLOBAL Y rotation for the camera (orbit).
+		// Local rotation = global - parent rotation.
 		float localYaw = _cameraYaw - Target.GlobalRotation.Y;
 		Rotation = new Vector3(0f, localYaw, 0f);
 		_springArm.Rotation = new Vector3(_targetPitch, 0f, 0f);
 	}
 	
 	/// <summary>
-	/// Gère la rotation orbitale de la caméra. Appelé par le PlayerController.
-	/// isClickingLeft : le yaw et pitch changent (la caméra tourne librement)
-	/// isClickingRight : idem + le personnage tourne avec la caméra
+"Handles orbital camera rotation. Called by PlayerController."
+	/// isClickingLeft : yaw and pitch change (camera orbits freely)
+	/// isClickingRight : same + character rotates with camera
 	/// </summary>
 	public void RotateCamera(Vector2 relativeMotion, bool isClickingLeft, bool isClickingRight)
 	{
 		if (isClickingRight)
 		{
-			// Clic droit : la caméra ET le personnage tournent
+			// Right click: camera AND character rotate
 			_targetYaw -= relativeMotion.X * Sensibilite;
 			_cameraYaw = _targetYaw;
 			_targetPitch -= relativeMotion.Y * Sensibilite;
 			
-			// Limite verticale entre -85° (plongée) et -5° (ras du sol)
+			// Limite verticale entre -85° (plongee) et -5° (ras du sol)
 			_targetPitch = Mathf.Clamp(_targetPitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
 			
-			// Le personnage pivote avec la caméra
+			// Character rotates with camera
 			if (Target is CharacterBody3D player)
 			{
 				player.GlobalRotation = new Vector3(0f, _targetYaw, 0f);
@@ -93,22 +93,22 @@ public partial class WowCamera : Node3D
 		}
 		else if (isClickingLeft)
 		{
-			// Clic gauche : seule la caméra tourne (le personnage ne bouge pas)
+			// Left click: only camera rotates (character stays)
 			_cameraYaw -= relativeMotion.X * Sensibilite;
 			_targetPitch -= relativeMotion.Y * Sensibilite;
 			
-			// Limite verticale entre -85° (plongée) et -5° (ras du sol)
+			// Limite verticale entre -85° (plongee) et -5° (ras du sol)
 			_targetPitch = Mathf.Clamp(_targetPitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
 		}
 	}
 	
 	/// <summary>
-	/// Gère le zoom du SpringArm. Appelé par le PlayerController.
+"Handles SpringArm zoom. Called by PlayerController."
 	/// </summary>
 	public void ZoomCamera(float direction)
 	{
 		if (_springArm == null) return;
-		_springArm.SpringLength = Mathf.Clamp(_springArm.SpringLength + (direction * VitesseZoom), MinZoom, MaxZoom);
+		_springArm.SpringLength = Mathf.Clamp(_springArm.SpringLength + (direction * ZoomSpeed), MinZoom, MaxZoom);
 	}
 
 	/// <summary>

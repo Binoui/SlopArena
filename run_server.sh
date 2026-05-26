@@ -9,5 +9,5 @@ then
     exit 1
 fi
 
-echo "Building and starting MoveBox Authoritative Server..."
-dotnet run --project Server/MoveBox.Server.csproj
+echo "Building and starting SlopArena Authoritative Server..."
+dotnet run --project Server/SlopArena.Server.csproj

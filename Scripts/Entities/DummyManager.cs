@@ -137,7 +137,7 @@ public partial class DummyManager : Node3D
 		float dt = (float)delta;
 		for (int i = 0; i < 5; i++)
 		{
-			// Update hit flash (visuel : émission boostée)
+			// Update hit flash (visuel : emission boostee)
 			if (_hitFlashTimers[i] > 0)
 			{
 				_hitFlashTimers[i] -= dt;

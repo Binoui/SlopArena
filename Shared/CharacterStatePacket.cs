@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
+using SlopArena.Shared
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
     public struct CharacterStatePacket
     {
@@ -13,15 +13,15 @@ namespace MoveBox.Shared
         public float VelocityY;
         public float VelocityZ;
         public byte CurrentActionState;      // Idle, Dashing, Hitstun, WallCling, Sliding
-        public ushort StateDurationFrames;   // Number of physics frames remaining in this state
+using SlopArena.Shared
 
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 2; // 31 bytes
+using SlopArena.Shared
 
         public void Serialize(Span<byte> buffer)
         {
             if (buffer.Length < Size) 
-                throw new ArgumentException("Buffer too small");
-                
+using SlopArena.Shared
+
             BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(0, 4), TickNumber);
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(4, 4), PositionX);
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(8, 4), PositionY);
@@ -31,13 +31,13 @@ namespace MoveBox.Shared
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(24, 4), VelocityZ);
             buffer[28] = CurrentActionState;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(29, 2), StateDurationFrames);
-        }
+using SlopArena.Shared
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length < Size) 
-                throw new ArgumentException("Buffer too small");
-                
+using SlopArena.Shared
+
             var packet = new CharacterStatePacket();
             packet.TickNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
             packet.PositionX = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(4, 4));
@@ -51,4 +51,4 @@ namespace MoveBox.Shared
             return packet;
         }
     }
-}
+using SlopArena.Shared

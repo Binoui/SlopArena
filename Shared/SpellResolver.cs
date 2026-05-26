@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
 	/// <summary>
 	/// Pure C# spell resolution logic.

@@ -1,6 +1,6 @@
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 public static class HeightmapGenerator
 {
