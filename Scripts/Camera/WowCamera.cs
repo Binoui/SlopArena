@@ -69,18 +69,18 @@ public partial class WowCamera : Node3D
 	}
 	
 	/// <summary>
-"Handles orbital camera rotation. Called by PlayerController."
-	/// isClickingLeft : yaw and pitch change (camera orbits freely)
-	/// isClickingRight : same + character rotates with camera
+	/// Handles orbital camera rotation. Called by PlayerController.
+	/// isClickingLeft: yaw and pitch change (camera orbits freely)
+	/// isClickingRight: same + character rotates with camera
 	/// </summary>
 	public void RotateCamera(Vector2 relativeMotion, bool isClickingLeft, bool isClickingRight)
 	{
 		if (isClickingRight)
 		{
 			// Right click: camera AND character rotate
-			_targetYaw -= relativeMotion.X * Sensibilite;
+			_targetYaw -= relativeMotion.X * Sensitivity;
 			_cameraYaw = _targetYaw;
-			_targetPitch -= relativeMotion.Y * Sensibilite;
+			_targetPitch -= relativeMotion.Y * Sensitivity;
 			
 			// Limite verticale entre -85° (plongee) et -5° (ras du sol)
 			_targetPitch = Mathf.Clamp(_targetPitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
@@ -94,8 +94,8 @@ public partial class WowCamera : Node3D
 		else if (isClickingLeft)
 		{
 			// Left click: only camera rotates (character stays)
-			_cameraYaw -= relativeMotion.X * Sensibilite;
-			_targetPitch -= relativeMotion.Y * Sensibilite;
+			_cameraYaw -= relativeMotion.X * Sensitivity;
+			_targetPitch -= relativeMotion.Y * Sensitivity;
 			
 			// Limite verticale entre -85° (plongee) et -5° (ras du sol)
 			_targetPitch = Mathf.Clamp(_targetPitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
@@ -103,7 +103,7 @@ public partial class WowCamera : Node3D
 	}
 	
 	/// <summary>
-"Handles SpringArm zoom. Called by PlayerController."
+	/// Handles SpringArm zoom. Called by PlayerController.
 	/// </summary>
 	public void ZoomCamera(float direction)
 	{

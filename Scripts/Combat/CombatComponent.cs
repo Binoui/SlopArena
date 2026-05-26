@@ -63,6 +63,12 @@ public partial class CombatComponent : Node
 	/// </summary>
 	public event Action<StatusType>? OnStatusExpired;
 	
+	/// <summary>
+	/// Fired when a spell is cast (for animations).
+	/// Passes the SlotType that was triggered.
+	/// </summary>
+	public event Action<SlotType>? OnSpellCast;
+	
 	// ==========================================
 	// STATUS EFFECTS
 	// ==========================================
@@ -117,7 +123,13 @@ public partial class CombatComponent : Node
 	public bool TriggerSlot(SlotType slot)
 	{
 		if (_spellSystem == null) return false;
-		return _spellSystem.TriggerSlot(slot, this);
+		bool result = _spellSystem.TriggerSlot(slot, this);
+		if (result)
+		{
+			OnSpellCast?.Invoke(slot);
+			GD.Print($"Spell cast: slot {slot}");
+		}
+		return result;
 	}
 	
 	/// <summary>

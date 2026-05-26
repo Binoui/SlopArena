@@ -6,6 +6,7 @@ namespace SlopArena.Shared
         Dashing = 1,
         Hitstun = 2,
         Sliding = 3,
-        Attacking = 4
+        Attacking = 4,
+        AirDodging = 5
     }
 }

@@ -416,7 +416,9 @@ _label.Text = $"SlopArena Arena Sandbox\n" +
 					  $"Souris : Viser / Tourner\n" +
 					  $"ZQSD : Movement\n" +
 					  $"Space : Saut\n" +
-					  $"1-4, A, E, Shift, R : Sorts\n" +
+					  $"Shift : Dash (air dash si en l'air)\n" +
+					  $"Ctrl : Roll (au sol, distance fixe)\n" +
+					  $"1-4, A, E, R : Sorts\n" +
 					  $"B : Spellbook (assigner des sorts)\n" +
 					  $"Escape: Release mouse";
 	}

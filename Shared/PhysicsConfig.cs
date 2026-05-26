@@ -1,35 +1,35 @@
-using SlopArena.Shared
+using System;
 
 namespace SlopArena.Shared
 {
     public static class PhysicsConfig
     {
         public const int TickRate = 60;
-using SlopArena.Shared
+        public const float TimeStep = 1.0f / TickRate;
 
         // Dash Settings
         public const ushort DashDurationTicks = 10;
-using SlopArena.Shared
+        public const ushort DashCooldownTicks = 30;
 
         // Hitstun & Knockback
-using SlopArena.Shared
+        public const float KnockbackDecay = 10.0f;
 
         // 3D Height & Jump
         public const float Gravity = 1400f;
         public const float JumpForce = 600f;
         public const float WallJumpForce = 800f;
-using SlopArena.Shared
+        public const float WallJumpHorizontal = 550f;
 
         // Arena Bounds
         public const float ArenaMinX = 50f;
         public const float ArenaMaxX = 4950f;
         public const float ArenaMinY = 50f;
-using SlopArena.Shared
+        public const float ArenaMaxY = 4950f;
 
         // Heightmap
         public static float[] Heightmap = null;
         public static int GridCount = 0;
-using SlopArena.Shared
+        public static float GridSpacing = 0f;
 
         public static void Initialize()
         {
@@ -41,7 +41,7 @@ using SlopArena.Shared
             if (!System.IO.File.Exists(path))
                 path = "Shared/heightmap.bin";
             LoadHeightmap(path);
-using SlopArena.Shared
+        }
 
         public static void LoadHeightmap(string path)
         {
@@ -69,34 +69,34 @@ using SlopArena.Shared
             {
                 Console.WriteLine($"PhysicsConfig: Heightmap file not found at: {path}");
             }
-using SlopArena.Shared
+        }
 
         public static float GetGroundHeight(float x, float y)
         {
-using SlopArena.Shared
+            if (Heightmap == null) return 0f;
 
             float gx = x / GridSpacing;
-using SlopArena.Shared
+            float gy = y / GridSpacing;
 
             int ix = (int)MathF.Floor(gx);
-using SlopArena.Shared
+            int iy = (int)MathF.Floor(gy);
 
             ix = Math.Clamp(ix, 0, GridCount - 2);
-using SlopArena.Shared
+            iy = Math.Clamp(iy, 0, GridCount - 2);
 
             float tx = gx - ix;
-using SlopArena.Shared
+            float ty = gy - iy;
 
             float h00 = Heightmap[iy * GridCount + ix];
             float h10 = Heightmap[iy * GridCount + (ix + 1)];
             float h01 = Heightmap[(iy + 1) * GridCount + ix];
-using SlopArena.Shared
+            float h11 = Heightmap[(iy + 1) * GridCount + (ix + 1)];
 
             float h0 = h00 * (1f - tx) + h10 * tx;
-using SlopArena.Shared
+            float h1 = h01 * (1f - tx) + h11 * tx;
 
             return h0 * (1f - ty) + h1 * ty;
-using SlopArena.Shared
+        }
 
         public static void SimulateStep(
             ref float posX, ref float posY, ref float posZ,
@@ -108,7 +108,7 @@ using SlopArena.Shared
             bool? nearWallOverride = null)
         {
             MovementProfiles.ApplyFromActionFlags(input.ActionFlags);
-using SlopArena.Shared
+            MovementProfile prof = MovementProfiles.Active;
 
             // Respawn Flag
             bool inputRespawn = (input.MovementFlags & 0x40) != 0;
@@ -121,7 +121,7 @@ using SlopArena.Shared
                 stateTicksRemaining = 0; dashCooldown = 0;
                 combatLockoutTicks = 0; slideMomentumActive = false;
                 return;
-using SlopArena.Shared
+            }
 
             // Parse inputs
             bool inputUp = (input.MovementFlags & 0x01) != 0;
@@ -131,32 +131,32 @@ using SlopArena.Shared
             bool inputJump = (input.MovementFlags & 0x10) != 0;
             bool inputDash = (input.MovementFlags & 0x20) != 0;
             bool inputCrouch = (input.MovementFlags & 0x80) != 0;
-using SlopArena.Shared
+            bool inputAttack = (input.ActionFlags & 0x01) != 0;
 
-using SlopArena.Shared
+            if (combatLockoutTicks > 0) combatLockoutTicks--;
 
-using SlopArena.Shared
+            float speed2D = MathF.Sqrt(velX * velX + velY * velY);
 
             ResolveMovementInput(
                 input, posX, posY,
                 inputUp, inputLeft, inputDown, inputRight,
-using SlopArena.Shared
+                out float moveX, out float moveY, out float moveMaxSpeed);
 
-using SlopArena.Shared
+            if (dashCooldown > 0) dashCooldown--;
 
             float dt = TimeStep;
             float groundHeight = GetGroundHeight(posX, posY);
             bool isGrounded = posZ <= groundHeight + 0.1f;
             if (!isGrounded && actionState != ActionState.Dashing && posZ <= groundHeight + 3.0f && velZ <= 0.1f)
-using SlopArena.Shared
-using SlopArena.Shared
+                isGrounded = true;
+
 
             // === STATE MACHINE ===
             if (actionState == ActionState.Hitstun)
             {
                 velX -= velX * KnockbackDecay * dt;
                 velY -= velY * KnockbackDecay * dt;
-using SlopArena.Shared
+                velZ -= velZ * KnockbackDecay * dt;
 
                 // DI
                 float diX = 0f, diY = 0f;
@@ -172,7 +172,7 @@ using SlopArena.Shared
                     float diForce = currentSpeed * 0.15f + 50f;
                     velX += diX * diForce * dt;
                     velY += diY * diForce * dt;
-using SlopArena.Shared
+                }
 
                 if (stateTicksRemaining > 0) stateTicksRemaining--;
                 if (stateTicksRemaining == 0) actionState = ActionState.Idle;
@@ -207,7 +207,7 @@ using SlopArena.Shared
                     velX = dashDirX * prof.DashSpeed;
                     velY = dashDirY * prof.DashSpeed;
                     velZ = 0f;
-using SlopArena.Shared
+                    if (isGrounded) posZ = groundHeight;
 
                     stateTicksRemaining--;
                     if (stateTicksRemaining == 0) actionState = ActionState.Idle;
@@ -237,7 +237,7 @@ using SlopArena.Shared
                     float drag = slideMomentumActive ? prof.SlideMomentumDrag : prof.SlideNormalDrag;
                     velX -= velX * drag * dt;
                     velY -= velY * drag * dt;
-using SlopArena.Shared
+                    ClampSlideSpeed(ref velX, ref velY, prof, slideMomentumActive);
 
                     if (moveX != 0 || moveY != 0)
                     {
@@ -245,7 +245,7 @@ using SlopArena.Shared
                         velX += moveX * steer * dt;
                         velY += moveY * steer * dt;
                         ClampSlideSpeed(ref velX, ref velY, prof, slideMomentumActive);
-using SlopArena.Shared
+                    }
 
                     if (inputJump && isGrounded)
                     {
@@ -269,6 +269,15 @@ using SlopArena.Shared
                         actionState = ActionState.Idle;
                     }
                 }
+            }
+            else if (actionState == ActionState.AirDodging)
+            {
+                // Maintain some velocity, slow down gently
+                velX *= 0.94f;
+                velY *= 0.94f;
+                stateTicksRemaining--;
+                if (stateTicksRemaining == 0)
+                    actionState = ActionState.Idle;
             }
             else // Idle / Jogging
             {
@@ -294,10 +303,10 @@ using SlopArena.Shared
                     float accel = isGrounded ? prof.Acceleration : prof.AirAcceleration;
                     float drag = isGrounded
                         ? ((moveX == 0 && moveY == 0) ? prof.DragWhenStopped : prof.DragWhenMoving)
-using SlopArena.Shared
+                        : 0.5f;
 
                     velX -= velX * drag * dt;
-using SlopArena.Shared
+                    velY -= velY * drag * dt;
 
                     if (moveX != 0 || moveY != 0)
                     {
@@ -310,14 +319,35 @@ using SlopArena.Shared
                             velX += moveX * addedSpeed;
                             velY += moveY * addedSpeed;
                         }
-using SlopArena.Shared
+                    }
 
                     // Jump
                     if (inputJump && isGrounded)
                     {
                         velZ = JumpForce;
                         isGrounded = false;
-using SlopArena.Shared
+                    }
+
+                    // Air dodge: crouch in air
+                    if (!isGrounded && inputCrouch)
+                    {
+                        const ushort AirDodgeDurationTicks = 6; // ~0.1s at 60Hz
+                        actionState = ActionState.AirDodging;
+                        stateTicksRemaining = AirDodgeDurationTicks;
+                        if (moveX != 0f || moveY != 0f)
+                        {
+                            float len = MathF.Sqrt(moveX * moveX + moveY * moveY);
+                            velX = (moveX / len) * prof.DashSpeed;
+                            velY = (moveY / len) * prof.DashSpeed;
+                        }
+                        else
+                        {
+                            // No input = backward dodge
+                            velX = 0f;
+                            velY = -prof.DashSpeed * 0.5f;
+                        }
+                        velZ = 0f;
+                    }
 
                     // Slide from idle
                     if (isGrounded && inputCrouch)
@@ -332,33 +362,38 @@ using SlopArena.Shared
                             CanMomentumSlide(prof, combatLockoutTicks, speed2D));
                     }
                 }
-using SlopArena.Shared
+            }
 
-            // Gravity
+            // Gravity (with fast fall)
             if (!isGrounded && actionState != ActionState.Dashing && actionState != ActionState.Attacking)
-using SlopArena.Shared
+            {
+                float gravMult = (inputDown || inputCrouch) ? 1.5f : 1.0f;
+                if (actionState == ActionState.AirDodging)
+                    gravMult = 1.0f; // No fast fall during air dodge
+                velZ -= Gravity * gravMult * dt;
+            }
 
             // Position update with heightmap collision
             float nextX = posX + velX * dt;
             float nextY = posY + velY * dt;
-using SlopArena.Shared
+            float nextGroundHeight = GetGroundHeight(nextX, nextY);
 
             float eps = 8f;
             float hL = GetGroundHeight(nextX - eps, nextY);
             float hR = GetGroundHeight(nextX + eps, nextY);
             float hD = GetGroundHeight(nextX, nextY - eps);
-using SlopArena.Shared
+            float hU = GetGroundHeight(nextX, nextY + eps);
 
             float nx = hL - hR;
             float ny = hD - hU;
             float nz = 2f * eps;
             float len3D = MathF.Sqrt(nx * nx + ny * ny + nz * nz);
-using SlopArena.Shared
+            float slopeUp = len3D > 0.001f ? (nz / len3D) : 1f;
 
             if (isGrounded)
             {
                 float verticalDelta = nextGroundHeight - posZ;
-using SlopArena.Shared
+                bool isWall = (slopeUp < 0.14f) && (verticalDelta > 0.01f);
 
                 if (isWall)
                 {
@@ -409,7 +444,7 @@ using SlopArena.Shared
                 float curNY = curHD - curHU;
                 float curLen = MathF.Sqrt(curNX * curNX + curNY * curNY);
                 float maxGroundAround = MathF.Max(MathF.Max(curHL, curHR), MathF.Max(curHD, curHU));
-using SlopArena.Shared
+                bool nearWall = curLen > 20f && maxGroundAround > posZ + 10f;
 
                 bool wallDetected = false;
                 bool hasNearWall = nearWallOverride ?? nearWall;
@@ -445,7 +480,7 @@ using SlopArena.Shared
                             }
                         }
                     }
-using SlopArena.Shared
+                }
 
                 if (!wallDetected)
                 {
@@ -509,7 +544,7 @@ using SlopArena.Shared
                         posZ += velZ * dt;
                     }
                 }
-using SlopArena.Shared
+            }
 
             // Floor clamp
             groundHeight = GetGroundHeight(posX, posY);
@@ -531,7 +566,7 @@ using SlopArena.Shared
                     actionState = ActionState.Idle;
                     stateTicksRemaining = 0;
                 }
-using SlopArena.Shared
+            }
 
             // Jump check
             if (isGrounded && inputJump && actionState != ActionState.Dashing && actionState != ActionState.Attacking)
@@ -539,21 +574,21 @@ using SlopArena.Shared
                 velZ = JumpForce;
                 posZ += velZ * dt;
                 isGrounded = false;
-using SlopArena.Shared
+            }
 
             // Arena bounds
             if (posX < ArenaMinX) { posX = ArenaMinX; velX = 0; }
             if (posX > ArenaMaxX) { posX = ArenaMaxX; velX = 0; }
             if (posY < ArenaMinY) { posY = ArenaMinY; velY = 0; }
             if (posY > ArenaMaxY) { posY = ArenaMaxY; velY = 0; }
-using SlopArena.Shared
+        }
 
         private static bool CanMomentumSlide(MovementProfile prof, ushort combatLockoutTicks, float speed2D)
         {
             return prof.EnableMomentumSlide
                 && combatLockoutTicks == 0
                 && speed2D >= prof.SlideMomentumMinSpeed;
-using SlopArena.Shared
+        }
 
         private static void BeginSlide(
             ref ActionState actionState, ref ushort stateTicksRemaining, ref bool slideMomentumActive,
@@ -562,7 +597,7 @@ using SlopArena.Shared
             actionState = ActionState.Sliding;
             slideMomentumActive = momentum;
             stateTicksRemaining = 0;
-using SlopArena.Shared
+        }
 
         private static void ClampSlideSpeed(
             ref float velX, ref float velY, MovementProfile prof, bool slideMomentumActive)
@@ -574,7 +609,7 @@ using SlopArena.Shared
                 float scale = prof.SlideMaxSpeed / sp;
                 velX *= scale; velY *= scale;
             }
-using SlopArena.Shared
+        }
 
         public static void ApplyKnockback(
             ref float velX, ref float velY, ref float velZ,
@@ -586,18 +621,18 @@ using SlopArena.Shared
             stateTicksRemaining = durationTicks;
             velX = knockbackX * force;
             velY = knockbackY * force;
-using SlopArena.Shared
+            velZ = 300f;
 
             bool inputUp = (input.MovementFlags & 0x01) != 0;
             bool inputLeft = (input.MovementFlags & 0x02) != 0;
             bool inputDown = (input.MovementFlags & 0x04) != 0;
-using SlopArena.Shared
+            bool inputRight = (input.MovementFlags & 0x08) != 0;
 
             float diX = 0f, diY = 0f;
             if (inputUp) diY -= 1f;
             if (inputDown) diY += 1f;
             if (inputLeft) diX -= 1f;
-using SlopArena.Shared
+            if (inputRight) diX += 1f;
 
             if (diX != 0f || diY != 0f)
             {
@@ -607,7 +642,7 @@ using SlopArena.Shared
                 velX += diX * force * diStrength;
                 velY += diY * force * diStrength;
             }
-using SlopArena.Shared
+        }
 
         private static void ResolveMovementInput(
             ClientInputPacket input, float posX, float posY,
@@ -620,7 +655,7 @@ using SlopArena.Shared
             if (inputUp) moveY -= 1f;
             if (inputDown) moveY += 1f;
             if (inputLeft) moveX -= 1f;
-using SlopArena.Shared
+            if (inputRight) moveX += 1f;
 
             if (moveX != 0f || moveY != 0f)
             {
@@ -631,4 +666,4 @@ using SlopArena.Shared
             }
         }
     }
-using SlopArena.Shared
+}
