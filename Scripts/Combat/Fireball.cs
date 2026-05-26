@@ -1,7 +1,7 @@
 #nullable enable
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Visual-only Fireball projectile.
@@ -44,7 +44,7 @@ public partial class Fireball : Node3D
 		_coreMesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
 		AddChild(_coreMesh);
 		
-		// Traînée de particules
+		// Trainee de particules
 		_trailParticles = new GpuParticles3D();
 		_trailParticles.Name = "FireTrail";
 		_trailParticles.Emitting = true;
@@ -88,7 +88,7 @@ public partial class Fireball : Node3D
 		AddChild(_trailParticles);
 		_trailParticles.Position = new Vector3(0f, 0f, -0.3f);
 		
-		// Lumière
+		// Lumiere
 		_light = new OmniLight3D();
 		_light.LightColor = new Color(1f, 0.3f, 0f);
 		_light.LightEnergy = 2.0f;

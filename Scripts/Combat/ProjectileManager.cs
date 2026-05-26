@@ -1,7 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Manages projectile visuals via Object Pooling.

@@ -1,6 +1,6 @@
-using System;
+using SlopArena.Shared
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
     public readonly struct MovementProfile
     {
@@ -20,19 +20,19 @@ namespace MoveBox.Shared
         public float SlideMaxSpeed { get; init; }
         public ushort AttackDurationTicks { get; init; }
         public ushort PostAttackSlideLockoutTicks { get; init; }
-    }
+using SlopArena.Shared
 
     /// <summary>
     /// Single movement profile for the wizard arena brawler.
     /// </summary>
     public static class MovementProfiles
     {
-        public static MovementProfile Active { get; private set; }
-        
+using SlopArena.Shared
+
         static MovementProfiles()
         {
             Active = Default;
-        }
+using SlopArena.Shared
 
         public static readonly MovementProfile Default = new MovementProfile
         {
@@ -52,22 +52,22 @@ namespace MoveBox.Shared
             SlideMaxSpeed = 1100f,
             AttackDurationTicks = 14,
             PostAttackSlideLockoutTicks = 20,
-        };
+using SlopArena.Shared
 
         public static void SetActive(int profileId)
         {
             // Only one profile for now
             Active = Default;
-        }
+using SlopArena.Shared
 
         public static void ApplyFromActionFlags(byte actionFlags)
         {
             // No profile switching via flags anymore
-        }
+using SlopArena.Shared
 
         public static byte EncodeProfileBits(int profileId)
         {
             return 0;
         }
     }
-}
+using SlopArena.Shared

@@ -1,6 +1,6 @@
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 public partial class Main : Node3D
 {
@@ -19,7 +19,7 @@ public partial class Main : Node3D
 	
 	public override async void _Ready()
 	{
-		GD.Print("MoveBox 3D C# Client Started!");
+		GD.Print("SlopArena 3D C# Client Started!");
 		
 		_canvasLayer = GetNodeOrNull<CanvasLayer>("CanvasLayer");
 		if (_canvasLayer == null)
@@ -286,7 +286,7 @@ public partial class Main : Node3D
 	{
 		var ring = new MeshInstance3D();
 		
-		// Créer un anneau plat avec SurfaceTool
+		// Create a flat ring with SurfaceTool
 		var st = new SurfaceTool();
 		st.Begin(Mesh.PrimitiveType.Triangles);
 		
@@ -318,7 +318,7 @@ public partial class Main : Node3D
 		st.GenerateNormals();
 		ring.Mesh = st.Commit();
 		
-		// Matériau jaunâtre avec émission
+		// Yellowish emissive material
 		var mat = new StandardMaterial3D
 		{
 			AlbedoColor = new Color(1f, 0.85f, 0.2f),
@@ -407,17 +407,17 @@ public partial class Main : Node3D
 			}
 		}
 		
-		_label.Text = $"MoveBox Arena Sandbox\n" +
+_label.Text = $"SlopArena Arena Sandbox\n" +
 					  $"---------------------------------\n" +
 					  $"Speed: {speed2D:F1}\n" +
 					  $"Position: ({posX:F1}, {posY:F1}, {posZ:F1})\n" +
 					  $"\n" +
 					  $"--- CONTROLS ---\n" +
 					  $"Souris : Viser / Tourner\n" +
-					  $"ZQSD : Déplacement\n" +
+					  $"ZQSD : Movement\n" +
 					  $"Space : Saut\n" +
 					  $"1-4, A, E, Shift, R : Sorts\n" +
 					  $"B : Spellbook (assigner des sorts)\n" +
-					  $"Échap : Relâcher la souris";
+					  $"Escape: Release mouse";
 	}
 }

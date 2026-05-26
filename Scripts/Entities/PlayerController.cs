@@ -2,26 +2,26 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
-/// Contrôleur de mouvement Action-MMO pour Godot 4 C#.
-/// - Caméra WoW-like gérée par WowCamera (SpringArm3D)
-/// - ZQSD relatif à la direction de la caméra
-/// - Clic gauche : tourner la caméra
-/// - Clic droit : tourner caméra + personnage
-/// - Physique réaliste : échelles en mètres, inertie du saut conservée
+/// Action-MMO movement controller for Godot 4 C#.
+/// - WoW-like camera managed by WowCamera (SpringArm3D)
+/// - ZQSD/WASD relative to camera direction
+/// - Left click: orbit camera
+/// - Right click: rotate camera + character
+/// - Realistic physics: meter-scaled, conserved jump momentum
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
 	// ==========================================
-	// VARIABLES EXPORTÉES (échelles réalistes)
+	// EXPORTED VARIABLES (realistic scales)
 	// ==========================================
 	
-	[Export] public float Vitesse = 35.0f;       // Course rapide et nerveuse
-	[Export] public float VitesseRecul = 22.0f;  // Recul bridé
-	[Export] public float ForceSaut = 14.0f;     // Impulsion verticale proportionnelle
-	[Export] public float Gravite = 45.0f;       // Gravité lourde pour retomber vite au sol
+	[Export] public float Speed = 35.0f;
+	[Export] public float BackwardSpeed = 22.0f;  // Reduced backward speed
+	[Export] public float JumpForce = 14.0f;
+	[Export] public float Gravity = 45.0f;       // Heavy gravity for fast landing
 	
 	// ==========================================
 	// KNOCKBACK
@@ -39,7 +39,7 @@ public partial class PlayerController : CharacterBody3D
 	private Hurtbox? _hurtbox;
 	
 	// ==========================================
-	// RÉFÉRENCES
+	// REFERENCES
 	// ==========================================
 	
 	private WowCamera? _wowCamera;
@@ -48,7 +48,7 @@ public partial class PlayerController : CharacterBody3D
 	private CombatComponent? _combatComponent;
 	
 	// ==========================================
-	// ÉTAT UI
+	// UI STATE
 	// ==========================================
 	
 	/// <summary>
@@ -63,10 +63,10 @@ public partial class PlayerController : CharacterBody3D
 	private float _leftClickDragDistance = 0f;
 	private Vector2 _leftClickPressPosition = Vector2.Zero;
 	private bool _leftClickIsDrag = false;
-	private const float ClickThreshold = 5f; // pixels max de mouvement pour considérer comme un clic (pas un drag)
+	private const float ClickThreshold = 5f; // max pixel movement to count as a click (not a drag)
 	
 	// ==========================================
-	// ÉVÉNEMENTS
+	// EVENTS
 	// ==========================================
 	
 	public event Action<float, float, float, float, float>? OnStateUpdated;
@@ -82,7 +82,7 @@ public partial class PlayerController : CharacterBody3D
 	public event Action<ulong>? OnLeftClickEntity;
 	
 	// ==========================================
-	// GETTERS PUBLICS
+	// PUBLIC GETTERS
 	// ==========================================
 	
 	public float GetVelZ() => Velocity.Y;
@@ -107,7 +107,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// INITIALISATION
+	// INITIALIZATION
 	// ==========================================
 	
 	public override void _Ready()
@@ -130,16 +130,16 @@ public partial class PlayerController : CharacterBody3D
 		collisionShape.Shape = capsule;
 		AddChild(collisionShape);
 		
-		// --- Personnage Kenney (modèle FBX) ---
+		// --- Kenney character (FBX model) ---
 		_playerModel = LoadPlayerModel();
 		
 		// --- Animations Kenney ---
-		// On crée l'AnimationPlayer comme enfant du MODÈLE (pas du PlayerController)
+		// Create AnimationPlayer as child of MODEL (pas du PlayerController)
 		// pour que les chemins relatifs des animations fonctionnent correctement.
 		_animPlayer = new AnimationPlayer();
 		_animPlayer.Name = "AnimationPlayer";
 		
-		// Ajouter l'AnimationPlayer au modèle (ou au PlayerController si pas de modèle)
+		// Add AnimationPlayer to model (or PlayerController if no model)
 		if (_playerModel != null)
 		{
 			_playerModel.AddChild(_animPlayer);
@@ -149,8 +149,8 @@ public partial class PlayerController : CharacterBody3D
 			AddChild(_animPlayer);
 		}
 		
-		// Définir le RootNode sur le squelette pour que les chemins relatifs
-		// comme "Hips", "Spine", etc. soient résolus par rapport au squelette
+		// Set RootNode on the skeleton so relative paths
+		// like "Hips", "Spine", etc. resolve relative to the skeleton
 		var skeleton = _playerModel != null ? FindSkeleton(_playerModel) : null;
 		if (skeleton != null)
 		{
@@ -162,14 +162,14 @@ public partial class PlayerController : CharacterBody3D
 		_animPlayer.AddAnimationLibrary("default", animLib);
 		
 		// Charger les animations depuis les fichiers FBX
-		// On utilise une approche différente : on clone l'animation et on remplace
-		// le préfixe "Root|" par "" (vide) puisque le RootNode est déjà sur le squelette.
+		// Different approach : on clone l'animation et on remplace
+		// the "Root|" prefix with "" (empty) since RootNode is already on the skeleton.
 		// Les os du squelette s'appellent "Hips", "Spine", etc. directement.
 		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/idle.fbx", "idle");
 		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/run.fbx", "run");
 		LoadAnimationsFromFbx(animLib, "res://assets/characters/Animations/jump.fbx", "jump");
 		
-		// Fallback: essayer de charger depuis le modèle
+		// Fallback: try loading from model
 		if (animLib.GetAnimationList().Count == 0)
 		{
 			GD.Print("No animations loaded from separate FBX files, trying model's embedded animations...");
@@ -190,7 +190,7 @@ public partial class PlayerController : CharacterBody3D
 			GD.Print("WARNING: No animations loaded at all!");
 		}
 		
-		// --- Hurtbox (pour recevoir les dégâts) ---
+		// --- Hurtbox (to receive damage) ---
 		_hurtbox = new Hurtbox();
 		_hurtbox.Name = "Hurtbox";
 		_hurtbox.OwnerEntity = this;
@@ -220,14 +220,14 @@ public partial class PlayerController : CharacterBody3D
 			}
 		};
 		
-		// --- Caméra WoW-like (SpringArm3D) ---
-		// WowCamera crée son propre SpringArm3D et Camera3D dans _Ready
+		// --- WoW-style camera (SpringArm3D) ---
+		// WowCamera creates its own SpringArm3D and Camera3D in _Ready
 		_wowCamera = new WowCamera();
 		_wowCamera.Name = "WowCamera";
 		_wowCamera.Target = this;
 		AddChild(_wowCamera);
 		
-		// Spawn au centre de l'arène
+		// Spawn at arena center
 		Position = new Vector3(100f, 10f, 100f);
 	}
 	
@@ -278,7 +278,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		// Si le spellbook est ouvert, on ignore les clics souris
-		// pour permettre le drag & drop sans que la caméra bouge
+		// so drag & drop works without camera moving
 		if (IsSpellBookOpen)
 		{
 			if (Input.IsActionJustPressed("ui_cancel"))
@@ -289,7 +289,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 		
-		// 1. Gestion de l'état de la souris (Visible vs Capturée)
+		// 1. Mouse state management (Visible vs Captured)
 		if (@event is InputEventMouseButton mouseBtn)
 		{
 			if (mouseBtn.Pressed)
@@ -304,13 +304,13 @@ public partial class PlayerController : CharacterBody3D
 				}
 				else if (mouseBtn.ButtonIndex == MouseButton.Right)
 				{
-					// Clic droit : capture immédiate (comme avant)
+					// Right click: immediate capture (as before)
 					if (Input.MouseMode != Input.MouseModeEnum.Captured)
 					{
 						Input.MouseMode = Input.MouseModeEnum.Captured;
 					}
 					
-					// Aligner le personnage sur la direction de la caméra
+					// Align character with camera direction
 					if (_wowCamera != null)
 					{
 						float cameraYaw = _wowCamera.GetCameraYaw();
@@ -329,7 +329,7 @@ public partial class PlayerController : CharacterBody3D
 			}
 			else
 			{
-				// Clic gauche relâché
+				// Left click released
 				if (mouseBtn.ButtonIndex == MouseButton.Left)
 				{
 					if (!_leftClickIsDrag)
@@ -337,14 +337,14 @@ public partial class PlayerController : CharacterBody3D
 						// Clic rapide sans drag → raycast pour cibler
 						DoClickRaycast();
 					}
-					// Si c'était un drag, la souris est Capturée → la libérer
+					// If it was a drag, mouse is Captured → la liberer
 					if (Input.MouseMode == Input.MouseModeEnum.Captured)
 					{
 						Input.MouseMode = Input.MouseModeEnum.Visible;
 					}
 				}
 				
-				// Clic droit relâché
+				// Clic droit relache
 				if (mouseBtn.ButtonIndex == MouseButton.Right)
 				{
 					if (!Input.IsMouseButtonPressed(MouseButton.Left))
@@ -355,22 +355,22 @@ public partial class PlayerController : CharacterBody3D
 			}
 		}
 		
-		// 2. Mouvement de la souris → orbite caméra (quand capturée)
+		// 2. Mouse movement → orbite camera (quand capturee)
 		if (@event is InputEventMouseMotion mouseMotion)
 		{
-			// Détection de drag pour le clic gauche (avant capture)
+			// Drag detection for left click (avant capture)
 			if (Input.IsMouseButtonPressed(MouseButton.Left) && Input.MouseMode != Input.MouseModeEnum.Captured)
 			{
 				_leftClickDragDistance += mouseMotion.Relative.Length();
 				if (_leftClickDragDistance > ClickThreshold && !_leftClickIsDrag)
 				{
-					// Le joueur a assez bougé → c'est un drag, pas un clic → capturer
+					// Player moved enough → c'est un drag, pas un clic → capturer
 					_leftClickIsDrag = true;
 					Input.MouseMode = Input.MouseModeEnum.Captured;
 				}
 			}
 			
-			// Rotation caméra (une fois capturé)
+			// Camera rotation (once captured)
 			if (Input.MouseMode == Input.MouseModeEnum.Captured)
 			{
 				bool isLeftDown = Input.IsMouseButtonPressed(MouseButton.Left) || _leftClickIsDrag;
@@ -413,7 +413,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// PHYSIQUE
+	// PHYSICS
 	// ==========================================
 	
 	public override void _PhysicsProcess(double delta)
@@ -434,11 +434,11 @@ public partial class PlayerController : CharacterBody3D
 			
 			if (isGrounded)
 			{
-				// --- AU SOL : direction relative au JOUEUR (pas à la caméra) ---
-				// Le clic gauche ne doit PAS influencer la direction de déplacement.
+				// --- ON GROUND: player-relative direction (pas a la camera) ---
+				// Left click must NOT influence la direction de deplacement.
 				Vector3 inputDir = Vector3.Zero;
 				
-				// Utiliser la direction du joueur (Transform.Basis.Z) qui n'est changée
+				// Use player direction (Transform.Basis.Z) qui n'est changee
 				// que par le clic droit.
 				Vector3 playerForward = -Transform.Basis.Z;
 				playerForward.Y = 0;
@@ -455,38 +455,38 @@ public partial class PlayerController : CharacterBody3D
 				if (inputDir.LengthSquared() > 0f)
 					inputDir = inputDir.Normalized();
 				
-				// Application de la vitesse au sol
-				float speed = Vitesse;
+				// Apply ground speed
+				float speed = Speed;
 				Velocity = new Vector3(inputDir.X * speed, Velocity.Y, inputDir.Z * speed);
 				
-				// SAUT FIXE (style WoW) : on garde la Velocity.X/Z calculée à cette frame
+				// FIXED JUMP (WoW-style) : on garde la Velocity.X/Z calculee a cette frame
 				if (inputJump)
 				{
-					Velocity = new Vector3(Velocity.X, ForceSaut, Velocity.Z);
+					Velocity = new Vector3(Velocity.X, JumpForce, Velocity.Z);
 				}
 			}
 			else
 			{
-				// --- EN L'AIR : comportement WoW strict ---
-				// On ne touche PAS à Velocity.X ni Velocity.Z !
-				// Le clavier et la caméra sont ignorés pour la trajectoire.
-				// Le personnage continue sur sa lancée XZ initiale.
+				// --- IN AIR: strict WoW behavior ---
+				// Do NOT touch Velocity.X or Velocity.Z!
+				// Keyboard and camera are ignored pour la trajectoire.
+				// Character continues on its trajectory XZ initiale.
 			}
 		}
 		
-		// Gravité (appliquée même si knockback actif)
+		// Gravity (applied even if knockback active)
 		if (!IsOnFloor())
 		{
-			Velocity -= new Vector3(0f, Gravite * dt, 0f);
+			Velocity -= new Vector3(0f, Gravity * dt, 0f);
 			
-			// Limiter la vélocité verticale pour éviter de traverser le sol
+			// Clamp vertical velocity pour eviter de traverser le sol
 			if (Velocity.Y < -100f)
 				Velocity = new Vector3(Velocity.X, -100f, Velocity.Z);
 		}
 		
 		MoveAndSlide();
 		
-		// Vérification supplémentaire : si on est sous le sol, on remonte
+		// Safety check : si on est sous le sol, on remonte
 		if (GlobalPosition.Y < 0f && IsOnFloor())
 		{
 			GlobalPosition = new Vector3(GlobalPosition.X, 1f, GlobalPosition.Z);
@@ -496,7 +496,7 @@ public partial class PlayerController : CharacterBody3D
 		// --- Animations ---
 		UpdateAnimations();
 		
-		// Filet de sécurité anti-chute
+		// Fall safety net
 		if (GlobalPosition.Y < -50f)
 		{
 			GD.Print("Player fell through the floor! Respawning...");
@@ -519,12 +519,12 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// CLIC → RAYCAST → CIBLAGE
+	// CLICK → RAYCAST → TARGETING
 	// ==========================================
 	
 	/// <summary>
-	/// Lance un raycast depuis la caméra vers la position de la souris pour détecter un clic sur une unité.
-	/// Les dummies sont sur le layer de collision 2, le joueur sur le layer 1.
+/// Casts a ray from camera to mouse position to detect clicks on units.
+	/// Dummies are on collision layer 2, player on layer 1.
 	/// </summary>
 	private void DoClickRaycast()
 	{
@@ -554,7 +554,7 @@ public partial class PlayerController : CharacterBody3D
 			
 			if (collider != null)
 			{
-				// Remonter dans le parent jusqu'à trouver un CharacterBody3D
+				// Walk up parents jusqu'a trouver un CharacterBody3D
 				Node? body = collider;
 				while (body != null && body is not CharacterBody3D)
 				{
@@ -577,7 +577,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// SORTS (utilisant la direction du joueur)
+	// SPELLS (using player direction)
 	// ==========================================
 	
 	public Vector3 GetPlayerForward()
@@ -613,7 +613,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// CHARGEMENT DU MODÈLE
+	// MODEL LOADING
 	// ==========================================
 	
 	private Node3D? LoadPlayerModel()
@@ -638,11 +638,11 @@ public partial class PlayerController : CharacterBody3D
 		playerInstance.Name = "PlayerModel";
 		AddChild(playerInstance);
 		
-		// Appliquer un skin à TOUS les MeshInstance3D du modèle
+		// Apply skin to ALL MeshInstance3D nodes in the model
 		var skinTex = GD.Load<Texture2D>("res://assets/characters/Skins/skaterMaleA.png");
 		ApplySkinRecursive(playerInstance, skinTex);
 		
-		// Ajuster l'échelle et la position du modèle
+		// Adjust model scale and position
 		playerInstance.Scale = new Vector3(0.5f, 0.5f, 0.5f);
 		playerInstance.Position = new Vector3(0f, -1.5f, 0f);
 		
@@ -663,14 +663,14 @@ public partial class PlayerController : CharacterBody3D
 			}
 			else
 			{
-				// Si pas de skin, au moins mettre un matériau visible
+				// If no skin, at least use a visible material
 				var mat2 = new StandardMaterial3D();
 				mat2.AlbedoColor = new Color(0.7f, 0.7f, 0.7f, 1f);
 				mi.MaterialOverride = mat2;
 			}
 		}
 		
-		// Continuer la récursion pour les enfants
+		// Continue recursion for children
 		foreach (var child in node.GetChildren())
 		{
 			ApplySkinRecursive(child, skinTex);
@@ -678,7 +678,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	// ==========================================
-	// CHARGEMENT DES ANIMATIONS
+	// ANIMATION LOADING
 	// ==========================================
 	
 	private void LoadAnimationsFromFbx(AnimationLibrary animLib, string fbxPath, string animName)
@@ -719,8 +719,8 @@ public partial class PlayerController : CharacterBody3D
 						if (anim != null)
 						{
 							// IMPORTANT: Les animations Kenney utilisent des chemins comme "Root|Hips"
-							// mais dans notre scène le squelette est à un chemin différent.
-							// On doit remapper les chemins pour qu'ils pointent vers le squelette du modèle.
+							// but in our scene the skeleton is at a different path.
+							// We must remap paths pour qu'ils pointent vers le squelette du modele.
 							anim = RemapAnimationPaths(anim, animNameInLib);
 							if (anim != null)
 							{
@@ -759,28 +759,28 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	/// <summary>
-	/// Remappe les chemins des animations Kenney (qui utilisent "Root|...") 
-	/// vers les chemins réels du squelette dans notre scène.
-	/// Les animations Kenney ciblent des noeuds comme "Root|Hips", "Root|Spine", etc.
-	/// Le "Root|" est le préfixe du noeud racine dans le fichier FBX d'animation.
-	/// Puisque notre AnimationPlayer a son RootNode défini sur le squelette,
-	/// on doit remplacer "Root|" par "" (vide) pour que les chemins deviennent
-	/// juste "Hips", "Spine", etc. (relatifs au squelette).
-	/// On fait une copie (Duplicate) pour ne pas modifier l'animation originale partagée.
+/// Remaps Kenney animation paths (which use "Root|...")
+	/// to the actual skeleton paths in our scene.
+	/// Kenney animations target nodes like "Root|Hips", "Root|Spine", etc.
+	/// "Root|" is the root node prefix in the FBX animation file.
+	/// Since our AnimationPlayer's RootNode is set to the skeleton,
+	/// we replace "Root|" with "" (empty) so paths become
+	/// just "Hips", "Spine", etc. (relative to the skeleton).
+	/// We Duplicate to avoid modifying the shared original animation.
 	/// </summary>
 	private Animation? RemapAnimationPaths(Animation anim, string animName)
 	{
-		// Faire une copie pour ne pas modifier l'original partagé
+		// Make a copy to avoid modifying the shared original
 		var animCopy = (Animation)anim.Duplicate();
 		
-		// Remapper les chemins dans l'animation copiée
+		// Remap paths in the copied animation
 		int trackCount = animCopy.GetTrackCount();
 		for (int i = 0; i < trackCount; i++)
 		{
 			string trackPath = animCopy.TrackGetPath(i);
 			// Les chemins Kenney sont comme "Root|Hips:position" ou "Root|Hips:rotation_quaternion"
 			// On remplace "Root|" par "" (vide) car le RootNode de l'AnimationPlayer
-			// est déjà défini sur le squelette
+			// is already set to the skeleton
 			if (trackPath.Contains("Root|"))
 			{
 				string newPath = trackPath.Replace("Root|", "");
@@ -793,7 +793,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	/// <summary>
-	/// Trouve récursivement un Skeleton3D dans l'arbre de noeuds.
+	/// Recursively finds a Skeleton3D in the node tree.
 	/// </summary>
 	private Skeleton3D? FindSkeleton(Node node)
 	{
@@ -840,7 +840,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	/// <summary>
-	/// Recherche récursivement un AnimationPlayer dans l'arbre de noeuds.
+	/// Recursively finds an AnimationPlayer in the node tree.
 	/// </summary>
 	private AnimationPlayer? FindAnimationPlayer(Node node)
 	{

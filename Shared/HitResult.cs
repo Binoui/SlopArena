@@ -1,6 +1,6 @@
-using System;
+using SlopArena.Shared
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
 	/// <summary>
 	/// Result of a hit check between a spell effect and an entity.
@@ -13,8 +13,8 @@ namespace MoveBox.Shared
 		public float Damage;
 		public float KnockbackX;
 		public float KnockbackY;
-		public float KnockbackZ;
-		
+using SlopArena.Shared
+
 		public HitResult(ulong targetId, float damage, float kbX, float kbY, float kbZ)
 		{
 			DidHit = true;
@@ -23,8 +23,8 @@ namespace MoveBox.Shared
 			KnockbackX = kbX;
 			KnockbackY = kbY;
 			KnockbackZ = kbZ;
-		}
-		
+using SlopArena.Shared
+
 		public static HitResult NoHit => new HitResult { DidHit = false };
 	}
-}
+using SlopArena.Shared

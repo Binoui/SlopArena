@@ -2,7 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Action Bar HUD - bottom-of-screen bar showing 8 spell slots with cooldown overlays.

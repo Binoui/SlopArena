@@ -1,7 +1,7 @@
 #nullable enable
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// WoW-style Unit Frames — top-left of the screen.

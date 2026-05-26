@@ -2,7 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Status-interactive spells — the core of SlopArena's combo system.
@@ -32,7 +32,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Shadow Mark: fast projectile, applies Marqué 5s.
+	/// Shadow Mark: fast projectile, applies Marked 5s.
 	/// </summary>
 	public static void ShadowMark(CombatComponent combat)
 	{
@@ -41,7 +41,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Ignite: slow projectile, applies Brûlure 4s.
+	/// Ignite: slow projectile, applies Burn 4s.
 	/// </summary>
 	public static void Ignite(CombatComponent combat)
 	{
@@ -50,7 +50,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Static Shock: beam hitscan, applies Electrifié 3s.
+	/// Static Shock: beam hitscan, applies Electrified 3s.
 	/// </summary>
 	public static void StaticShock(CombatComponent combat)
 	{
@@ -59,11 +59,11 @@ public static class StatusSpells
 		CreateBeamVisual(combat, pos, forward, 15f, new Color(0.2f, 0.6f, 1f, 0.4f), 0.3f);
 		
 		var hits = combat.CheckMeleeCone(pos, forward, 15f, 5f, 10f, 5f, 2f); // Narrow beam
-		combat.ApplyStatusToLastHit(StatusType.Electrifie, 3f);
+		combat.ApplyStatusToLastHit(StatusType.Electrified, 3f);
 	}
 	
 	/// <summary>
-	/// Sunder Armor: melee cone, applies Vulnérable 4s.
+	/// Sunder Armor: melee cone, applies Vulnerable 4s.
 	/// </summary>
 	public static void SunderArmor(CombatComponent combat)
 	{
@@ -80,7 +80,7 @@ public static class StatusSpells
 	/// </summary>
 	public static void RadiantShield(CombatComponent combat)
 	{
-		combat.ApplyStatus(StatusType.Bouclier, 4f, combat.GetEntityId());
+		combat.ApplyStatus(StatusType.Shielded, 4f, combat.GetEntityId());
 		
 		// Visual: gold glow around self
 		var pos = combat.GetOwnerPosition();
@@ -111,16 +111,16 @@ public static class StatusSpells
 			
 			// Apply status + damage
 			combat.CheckCircleHit(impactPos, radius, 10f, 5f, 2f);
-			combat.ApplyStatusToLastHit(StatusType.Ralenti, 4f);
+			combat.ApplyStatusToLastHit(StatusType.Slowed, 4f);
 			
 			// If target already Ralenti → also stun
 			// (handled by checking after hit)
 			foreach (ulong targetId in combat.GetSimulation()?.CombatComponents?.Keys ?? new Dictionary<ulong, CombatComponent>().Keys)
 			{
-				if (combat.ConsumeStatusOnTarget(targetId, StatusType.Ralenti))
+				if (combat.ConsumeStatusOnTarget(targetId, StatusType.Slowed))
 				{
 					// Re-apply Ralenti + extra stun is handled by the duration refresh
-					combat.ApplyStatusToEntity(targetId, StatusType.Ralenti, 4f);
+					combat.ApplyStatusToEntity(targetId, StatusType.Slowed, 4f);
 				}
 			}
 			
@@ -130,7 +130,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Corrupted Ground: AoE zone, applies Vulnérable + Brûlure.
+	/// Corrupted Ground: AoE zone, applies Vulnerable + Burn.
 	/// </summary>
 	public static void CorruptedGround(CombatComponent combat)
 	{
@@ -150,7 +150,7 @@ public static class StatusSpells
 		combat.CheckCircleHit(impactPos, radius, 5f, 3f, 1f);
 		combat.ApplyStatusToLastHit(StatusType.Vulnerable, 3f);
 		
-		// Tick damage over time (Brûlure ticks)
+		// Tick damage over time (Burn ticks)
 		var tickCount = 0;
 		var tickTimer = combat.GetTree().CreateTimer(0.5f, false);
 		System.Action tick = () => {};
@@ -161,7 +161,7 @@ public static class StatusSpells
 			if (tickCount > duration * 2) return;
 			
 			combat.CheckCircleHit(impactPos, radius, 3f, 0f, 0f);
-			combat.ApplyStatusToLastHit(StatusType.Brulure, 3f);
+			combat.ApplyStatusToLastHit(StatusType.Burn, 3f);
 			
 			var nextTick = combat.GetTree().CreateTimer(0.5f, false);
 			nextTick.Timeout += tick;
@@ -177,7 +177,7 @@ public static class StatusSpells
 	// ==========================================
 	
 	/// <summary>
-	/// Piercing Shot: projectile, CONSUME Marqué → +100% damage.
+	/// Piercing Shot: projectile, CONSUME Marked → +100% damage.
 	/// </summary>
 	public static void PiercingShot(CombatComponent combat)
 	{
@@ -198,7 +198,7 @@ public static class StatusSpells
 		var hits = combat.CheckMeleeCone(pos, forward, 12f, 4f, 25f, 15f, 5f);
 		foreach (ulong targetId in hits)
 		{
-			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Ralenti))
+			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Slowed))
 			{
 				// Bonus: apply stun-like effect (longer stun duration)
 				// For now, just deal extra damage via simulation
@@ -208,7 +208,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Combustion: melee strike, CONSUME Brûlure → AoE explosion.
+	/// Combustion: melee strike, CONSUME Burn → AoE explosion.
 	/// </summary>
 	public static void Combustion(CombatComponent combat)
 	{
@@ -220,7 +220,7 @@ public static class StatusSpells
 		bool anyConsumed = false;
 		foreach (ulong targetId in hits)
 		{
-			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Brulure))
+			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Burn))
 			{
 				anyConsumed = true;
 			}
@@ -241,7 +241,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Execute: melee cone, CONSUME Vulnérable → +150% damage.
+	/// Execute: melee cone, CONSUME Vulnerable → +150% damage.
 	/// </summary>
 	public static void Execute(CombatComponent combat)
 	{
@@ -261,7 +261,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Overload: AoE around self, CONSUME Electrifié → stun 1.5s.
+	/// Overload: AoE around self, CONSUME Electrified → stun 1.5s.
 	/// </summary>
 	public static void Overload(CombatComponent combat)
 	{
@@ -271,7 +271,7 @@ public static class StatusSpells
 		var hits = combat.CheckCircleHit(pos, 5f, 15f, 15f, 5f);
 		foreach (ulong targetId in hits)
 		{
-			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Electrifie))
+			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Electrified))
 			{
 				// Bonus stun + damage
 				combat.GetSimulation()?.OnEntityHit?.Invoke(targetId, 20f, 0f, 5f, 0f);
@@ -291,7 +291,7 @@ public static class StatusSpells
 		var hits = combat.CheckMeleeCone(pos, forward, 4f, 45f, 10f, 40f, 5f);
 		
 		// Check if CASTER has Bouclier → consume for stun on primary target
-		if (combat.ConsumeStatus(StatusType.Bouclier))
+		if (combat.ConsumeStatus(StatusType.Shielded))
 		{
 			if (hits.Count > 0)
 			{
@@ -367,7 +367,7 @@ public static class StatusSpells
 	public static void Counter(CombatComponent combat)
 	{
 		// Simple: apply Bouclier + a brief counter window
-		combat.ApplyStatus(StatusType.Bouclier, 1.5f, combat.GetEntityId());
+		combat.ApplyStatus(StatusType.Shielded, 1.5f, combat.GetEntityId());
 		
 		// Visual
 		var pos = combat.GetOwnerPosition();
@@ -382,7 +382,7 @@ public static class StatusSpells
 	// ==========================================
 	
 	/// <summary>
-	/// Meteor Rain: 5 meteors over 3s. CONSUME Brûlure → +50% damage per meteor.
+	/// Meteor Rain: 5 meteors over 3s. CONSUME Burn → +50% damage per meteor.
 	/// </summary>
 	public static void MeteorRain(CombatComponent combat)
 	{
@@ -395,8 +395,8 @@ public static class StatusSpells
 		
 		Vector3 centerPos = new Vector3(pos.X + forward.X * distance, 0.5f, pos.Z + forward.Z * distance);
 		
-		// Check if caster has Brûlure → consume for bonus
-		bool empowered = combat.ConsumeStatus(StatusType.Brulure);
+		// Check if caster has Burn → consume for bonus
+		bool empowered = combat.ConsumeStatus(StatusType.Burn);
 		float dmgMult = empowered ? 1.5f : 1f;
 		
 		for (int i = 0; i < meteorCount; i++)
@@ -416,7 +416,7 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Annihilate: massive cone. CONSUME Vulnérable → +100% damage.
+	/// Annihilate: massive cone. CONSUME Vulnerable → +100% damage.
 	/// </summary>
 	public static void Annihilate(CombatComponent combat)
 	{
@@ -426,7 +426,7 @@ public static class StatusSpells
 		
 		var hits = combat.CheckMeleeCone(pos, forward, 8f, 90f, 100f, 60f, 20f);
 		
-		// Check targets for Vulnérable
+		// Check targets for Vulnerable
 		foreach (ulong targetId in hits)
 		{
 			if (combat.ConsumeStatusOnTarget(targetId, StatusType.Vulnerable))
@@ -437,14 +437,14 @@ public static class StatusSpells
 	}
 	
 	/// <summary>
-	/// Storm Surge: your next spells cast faster. CONSUME Electrifié → longer.
+	/// Storm Surge: your next spells cast faster. CONSUME Electrified → longer.
 	/// </summary>
 	public static void StormSurge(CombatComponent combat)
 	{
 		// Buff: reduce cast times by 50% for next 3 spells
-		combat.ApplyStatus(StatusType.Electrifie, 6f, combat.GetEntityId()); // reuse status as buff tracker
+		combat.ApplyStatus(StatusType.Electrified, 6f, combat.GetEntityId()); // reuse status as buff tracker
 		
-		bool empowered = combat.ConsumeStatus(StatusType.Electrifie);
+		bool empowered = combat.ConsumeStatus(StatusType.Electrified);
 		float duration = empowered ? 10f : 6f;
 		
 		// Visual
@@ -465,7 +465,7 @@ public static class StatusSpells
 		Vector3 forward = combat.GetCameraForward();
 		Vector3 pos = combat.GetOwnerPosition();
 		
-		bool shielded = combat.ConsumeStatus(StatusType.Bouclier);
+		bool shielded = combat.ConsumeStatus(StatusType.Shielded);
 		
 		if (!shielded)
 		{
@@ -473,7 +473,7 @@ public static class StatusSpells
 			combat.GetSimulation()?.OnEntityHit?.Invoke(combat.GetEntityId(), 30f, 0f, 0f, 0f);
 		}
 		
-		// Projectile dealing 80 damage + applies Brûlure + Vulnérable
+		// Projectile dealing 80 damage + applies Burn + Vulnerable
 		combat.FireProjectile(1, pos + forward * 2f + new Vector3(0f, 1f, 0f), forward);
 		
 		GD.Print($"Dark Pact! Shielded: {shielded}");
@@ -552,7 +552,7 @@ public static class StatusSpells
 	public static void PhaseShift(CombatComponent combat)
 	{
 		// Apply Bouclier for a brief duration
-		combat.ApplyStatus(StatusType.Bouclier, 1.5f, combat.GetEntityId());
+		combat.ApplyStatus(StatusType.Shielded, 1.5f, combat.GetEntityId());
 		
 		// Visual: shimmer around self
 		var pos = combat.GetOwnerPosition();
@@ -570,10 +570,10 @@ public static class StatusSpells
 	public static void Purify(CombatComponent combat)
 	{
 		// Remove all negative statuses (all except Bouclier - which is positive)
-		combat.RemoveStatus(StatusType.Ralenti);
-		combat.RemoveStatus(StatusType.Brulure);
-		combat.RemoveStatus(StatusType.Marque);
-		combat.RemoveStatus(StatusType.Electrifie);
+		combat.RemoveStatus(StatusType.Slowed);
+		combat.RemoveStatus(StatusType.Burn);
+		combat.RemoveStatus(StatusType.Marked);
+		combat.RemoveStatus(StatusType.Electrified);
 		combat.RemoveStatus(StatusType.Vulnerable);
 		
 		// Visual: cleansing burst
@@ -589,7 +589,7 @@ public static class StatusSpells
 	public static void MagicBarrier(CombatComponent combat)
 	{
 		// Apply Bouclier with longer duration to represent magic barrier
-		combat.ApplyStatus(StatusType.Bouclier, 6f, combat.GetEntityId());
+		combat.ApplyStatus(StatusType.Shielded, 6f, combat.GetEntityId());
 		
 		// Visual: blue barrier
 		var pos = combat.GetOwnerPosition();
@@ -609,8 +609,8 @@ public static class StatusSpells
 		// Self-damage
 		combat.GetSimulation()?.OnEntityHit?.Invoke(combat.GetEntityId(), 20f, 0f, 0f, 0f);
 		
-		// Apply Electrifié as a damage buff (consumed by Storm Surge for longer duration)
-		combat.ApplyStatus(StatusType.Electrifie, 6f, combat.GetEntityId());
+		// Apply Electrified as a damage buff (consumed by Storm Surge for longer duration)
+		combat.ApplyStatus(StatusType.Electrified, 6f, combat.GetEntityId());
 		
 		// Visual: red burst
 		var pos = combat.GetOwnerPosition();
@@ -638,7 +638,7 @@ public static class StatusSpells
 		
 		// Initial hit
 		combat.CheckCircleHit(centerPos, radius, 5f, 0f, 0f);
-		combat.ApplyStatusToLastHit(StatusType.Ralenti, 3f);
+		combat.ApplyStatusToLastHit(StatusType.Slowed, 3f);
 		
 		// Tick apply Ralenti over duration
 		var tickCount = 0;
@@ -651,7 +651,7 @@ public static class StatusSpells
 			if (tickCount > duration * 2) return;
 			
 			combat.CheckCircleHit(centerPos, radius, 0f, 0f, 0f);
-			combat.ApplyStatusToLastHit(StatusType.Ralenti, 3f);
+			combat.ApplyStatusToLastHit(StatusType.Slowed, 3f);
 			
 			var nextTick = combat.GetTree().CreateTimer(0.5f, false);
 			nextTick.Timeout += tick;

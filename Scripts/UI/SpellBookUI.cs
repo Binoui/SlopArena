@@ -2,7 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Spell Book UI - full-screen overlay for browsing and assigning spells.

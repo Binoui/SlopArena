@@ -1,6 +1,6 @@
-using System;
+using SlopArena.Shared
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
 	/// <summary>
 	/// Pure math functions for combat calculations.
@@ -24,8 +24,8 @@ namespace MoveBox.Shared
 			float dz = targetZ - centerZ;
 			float distSq = dx * dx + dz * dz;
 			return distSq <= radius * radius;
-		}
-		
+using SlopArena.Shared
+
 		/// <summary>
 		/// Check if a point is within a cone originating from a position.
 		/// The cone is defined by its origin, direction, angle (half-angle in radians), and range.
@@ -38,24 +38,24 @@ namespace MoveBox.Shared
 		{
 			float dx = targetX - originX;
 			float dz = targetZ - originZ;
-			float distSq = dx * dx + dz * dz;
-			
+using SlopArena.Shared
+
 			if (distSq > range * range)
-				return false;
-			
+using SlopArena.Shared
+
 			if (distSq < 0.001f)
-				return true; // At origin
-			
+using SlopArena.Shared
+
 			float dist = MathF.Sqrt(distSq);
-			float dot = (dx * dirX + dz * dirZ) / dist; // Normalized dot product
-			
+using SlopArena.Shared
+
 			// Clamp to avoid NaN from floating point
 			dot = Math.Clamp(dot, -1f, 1f);
-			float angle = MathF.Acos(dot);
-			
+using SlopArena.Shared
+
 			return angle <= halfAngleRad;
-		}
-		
+using SlopArena.Shared
+
 		/// <summary>
 		/// Check if a line segment (projectile path) intersects a circle (entity hitbox).
 		/// Uses segment-to-circle distance check.
@@ -69,24 +69,24 @@ namespace MoveBox.Shared
 			float dx = lineEndX - lineStartX;
 			float dz = lineEndZ - lineStartZ;
 			float fx = lineStartX - circleX;
-			float fz = lineStartZ - circleZ;
-			
+using SlopArena.Shared
+
 			float a = dx * dx + dz * dz;
 			float b = 2f * (fx * dx + fz * dz);
-			float c = fx * fx + fz * fz - radius * radius;
-			
+using SlopArena.Shared
+
 			float discriminant = b * b - 4f * a * c;
 			if (discriminant < 0)
-				return false;
-			
+using SlopArena.Shared
+
 			discriminant = MathF.Sqrt(discriminant);
 			float t1 = (-b - discriminant) / (2f * a);
-			float t2 = (-b + discriminant) / (2f * a);
-			
+using SlopArena.Shared
+
 			// Check if intersection is within the segment [0, 1]
 			return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1) || (t1 < 0 && t2 > 1);
-		}
-		
+using SlopArena.Shared
+
 		/// <summary>
 		/// Calculate knockback direction from attacker to target (horizontal only).
 		/// </summary>
@@ -98,8 +98,8 @@ namespace MoveBox.Shared
 		{
 			float dx = targetX - attackerX;
 			float dz = targetZ - attackerZ;
-			float distSq = dx * dx + dz * dz;
-			
+using SlopArena.Shared
+
 			if (distSq > 0.001f)
 			{
 				float dist = MathF.Sqrt(distSq);
@@ -110,11 +110,11 @@ namespace MoveBox.Shared
 			{
 				kbX = 0f;
 				kbZ = force; // Default forward
-			}
-			
+using SlopArena.Shared
+
 			kbY = upward;
-		}
-		
+using SlopArena.Shared
+
 		/// <summary>
 		/// Distance between two 3D points (horizontal only, XZ plane).
 		/// </summary>
@@ -125,4 +125,4 @@ namespace MoveBox.Shared
 			return MathF.Sqrt(dx * dx + dz * dz);
 		}
 	}
-}
+using SlopArena.Shared

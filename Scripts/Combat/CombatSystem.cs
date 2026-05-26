@@ -1,6 +1,6 @@
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Abstract combat system: handles dealing damage, knockback, hitstun, and DI.

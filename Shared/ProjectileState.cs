@@ -1,6 +1,6 @@
-using System;
+using SlopArena.Shared
 
-namespace MoveBox.Shared
+namespace SlopArena.Shared
 {
 	/// <summary>
 	/// Pure state of a projectile in flight.
@@ -17,8 +17,8 @@ namespace MoveBox.Shared
 		public float DirY;
 		public float DirZ;
 		public float DistanceTraveled;
-		public bool IsActive;
-		
+using SlopArena.Shared
+
 		public ProjectileState(ulong id, ushort spellId, float posX, float posY, float posZ, 
 		                       float dirX, float dirY, float dirZ)
 		{
@@ -32,29 +32,29 @@ namespace MoveBox.Shared
 			DirZ = dirZ;
 			DistanceTraveled = 0f;
 			IsActive = true;
-		}
-		
+using SlopArena.Shared
+
 		/// <summary>
 		/// Advance the projectile by delta time.
 		/// Returns true if the projectile is still in flight.
 		/// </summary>
 		public bool Update(float delta, SpellDefinition spell)
 		{
-			if (!IsActive) return false;
-			
+using SlopArena.Shared
+
 			float step = spell.Speed * delta;
 			PosX += DirX * step;
 			PosY += DirY * step;
 			PosZ += DirZ * step;
-			DistanceTraveled += step;
-			
+using SlopArena.Shared
+
 			if (DistanceTraveled >= spell.Range)
 			{
 				IsActive = false;
 				return false;
-			}
-			
+using SlopArena.Shared
+
 			return true;
 		}
 	}
-}
+using SlopArena.Shared

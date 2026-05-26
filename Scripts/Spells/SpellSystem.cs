@@ -2,7 +2,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Spell system managing action slots, cooldowns, and spell registration.
@@ -77,34 +77,34 @@ public partial class SpellSystem : Node
 		
 		// ID 1 — Frost Bolt: projectile, applies Ralenti 3s
 		Register(1,  "Frost Bolt",    3f, 0.20f, 0.5f,  StatusSpells.FrostBolt);
-		// ID 2 — Shadow Mark: fast projectile, applies Marqué 5s
+		// ID 2 — Shadow Mark: fast projectile, applies Marked 5s
 		Register(2,  "Shadow Mark",   2f, 0.15f, 0.3f,  StatusSpells.ShadowMark);
-		// ID 3 — Ignite: slow projectile, applies Brûlure 4s
+		// ID 3 — Ignite: slow projectile, applies Burn 4s
 		Register(3,  "Ignite",        4f, 0.25f, 0.5f,  StatusSpells.Ignite);
-		// ID 4 — Static Shock: beam hitscan, applies Electrifié 3s
+		// ID 4 — Static Shock: beam hitscan, applies Electrified 3s
 		Register(4,  "Static Shock",  5f, 0.15f, 0.3f,  StatusSpells.StaticShock);
-		// ID 5 — Sunder Armor: melee cone, applies Vulnérable 4s
+		// ID 5 — Sunder Armor: melee cone, applies Vulnerable 4s
 		Register(5,  "Sunder Armor",  6f, 0.20f, 0.8f,  StatusSpells.SunderArmor);
 		// ID 6 — Radiant Shield: self-buff, applies Bouclier 4s
 		Register(6,  "Radiant Shield", 8f, 0.10f, 0.0f, StatusSpells.RadiantShield);
 		// ID 7 — Freezing Trap: ground trap, applies Ralenti + bonus if already
 		Register(7,  "Freezing Trap",  7f, 0.50f, 1.0f, StatusSpells.FreezingTrap);
-		// ID 8 — Corrupted Ground: AoE zone, applies Vulnérable + Brûlure
+		// ID 8 — Corrupted Ground: AoE zone, applies Vulnerable + Burn
 		Register(8,  "Corrupted Ground", 9f, 0.40f, 1.5f, StatusSpells.CorruptedGround);
 		
 		// ==================================================================
 		// CONSUME SPELLS (IDs 9-16) — Consume status for bonus damage/effects
 		// ==================================================================
 		
-		// ID 9 — Piercing Shot: projectile, CONSUME Marqué → +100% dmg
+		// ID 9 — Piercing Shot: projectile, CONSUME Marked → +100% dmg
 		Register(9,  "Piercing Shot", 6f, 0.30f, 0.5f,  StatusSpells.PiercingShot);
 		// ID 10 — Frost Lance: beam, CONSUME Ralenti → stun + extra dmg
 		Register(10, "Frost Lance",   5f, 0.25f, 0.75f, StatusSpells.FrostLance);
-		// ID 11 — Combustion: melee strike, CONSUME Brûlure → AoE explosion
+		// ID 11 — Combustion: melee strike, CONSUME Burn → AoE explosion
 		Register(11, "Combustion",    7f, 0.20f, 0.5f,  StatusSpells.Combustion);
-		// ID 12 — Overload: AoE self, CONSUME Electrifié → stun
+		// ID 12 — Overload: AoE self, CONSUME Electrified → stun
 		Register(12, "Overload",      8f, 0.30f, 0.8f,  StatusSpells.Overload);
-		// ID 13 — Execute: melee cone, CONSUME Vulnérable → +150% dmg
+		// ID 13 — Execute: melee cone, CONSUME Vulnerable → +150% dmg
 		Register(13, "Execute",       10f, 0.40f, 1.0f, StatusSpells.Execute);
 		// ID 14 — Shield Bash: melee, CONSUME Bouclier → stun + bonus
 		Register(14, "Shield Bash",   9f, 0.20f, 0.5f,  StatusSpells.ShieldBash);
@@ -159,11 +159,11 @@ public partial class SpellSystem : Node
 		// ELITE SPELLS (IDs 33-40) — High CD, massive impact
 		// ==================================================================
 		
-		// ID 33 — Meteor Rain: 5 meteors over 3s, CONSUME Brûlure → +50%
+		// ID 33 — Meteor Rain: 5 meteors over 3s, CONSUME Burn → +50%
 		Register(33, "Meteor Rain",   35f, 1.00f, 2.0f, StatusSpells.MeteorRain);
-		// ID 34 — Annihilate: massive cone, CONSUME Vulnérable → +100%
+		// ID 34 — Annihilate: massive cone, CONSUME Vulnerable → +100%
 		Register(34, "Annihilate",    40f, 1.50f, 3.0f, StatusSpells.Annihilate);
-		// ID 35 — Storm Surge: buff, spells cast faster, CONSUME Electrifié → longer
+		// ID 35 — Storm Surge: buff, spells cast faster, CONSUME Electrified → longer
 		Register(35, "Storm Surge",   32f, 0.30f, 0.0f, StatusSpells.StormSurge);
 		// ID 36 — Dark Pact: sacrifice HP, massive burst, CONSUME Bouclier → free
 		Register(36, "Dark Pact",     30f, 0.50f, 1.0f, StatusSpells.DarkPact);
@@ -203,11 +203,11 @@ public partial class SpellSystem : Node
 			[SlotType.Elite] = 39,  // Time Warp (elite)
 		};
 		
-		// "Shadowblade" — Marqué + Piercing Shot synergy (burst melee)
+		// "Shadowblade" — Marked + Piercing Shot synergy (burst melee)
 		_presets["Shadowblade"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 2,   // Shadow Mark (applies Marqué)
-			[SlotType.Slot2] = 9,   // Piercing Shot (consumes Marqué → +100%)
+			[SlotType.Slot1] = 2,   // Shadow Mark (applies Marked)
+			[SlotType.Slot2] = 9,   // Piercing Shot (consumes Marked → +100%)
 			[SlotType.Slot3] = 17,  // Wind Slash (basic melee)
 			[SlotType.Slot4] = 14,  // Shield Bash (Bouclier consume)
 			[SlotType.SlotA] = 21,  // Chain Pull (gap closer)
@@ -216,37 +216,37 @@ public partial class SpellSystem : Node
 			[SlotType.Elite] = 34,  // Annihilate (massive burst)
 		};
 		
-		// "Inferno" — Brûlure + Combustion synergy (AoE fire mage)
+		// "Inferno" — Burn + Combustion synergy (AoE fire mage)
 		_presets["Inferno"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 3,   // Ignite (applies Brûlure)
-			[SlotType.Slot2] = 11,  // Combustion (consumes Brûlure → AoE)
+			[SlotType.Slot1] = 3,   // Ignite (applies Burn)
+			[SlotType.Slot2] = 11,  // Combustion (consumes Burn → AoE)
 			[SlotType.Slot3] = 8,   // Corrupted Ground (zone)
 			[SlotType.Slot4] = 23,  // Void Zone (DoT zone)
 			[SlotType.SlotA] = 18,  // Arcane Shot (poke)
 			[SlotType.SlotE] = 20,  // Force Push (pushback)
 			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 33,  // Meteor Rain (CONSUME Brûlure → empowered)
+			[SlotType.Elite] = 33,  // Meteor Rain (CONSUME Burn → empowered)
 		};
 		
-		// "Tempest" — Electrifié + Overload synergy (control mage)
+		// "Tempest" — Electrified + Overload synergy (control mage)
 		_presets["Tempest"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 4,   // Static Shock (applies Electrifié)
-			[SlotType.Slot2] = 12,  // Overload (consumes Electrifié → stun)
+			[SlotType.Slot1] = 4,   // Static Shock (applies Electrified)
+			[SlotType.Slot2] = 12,  // Overload (consumes Electrified → stun)
 			[SlotType.Slot3] = 22,  // Shockwave (KB)
 			[SlotType.Slot4] = 6,   // Radiant Shield (Bouclier)
 			[SlotType.SlotA] = 20,  // Force Push (AoE push)
 			[SlotType.SlotE] = 24,  // Counter (defense)
 			[SlotType.Shift] = 26,  // Blink (mobility)
-			[SlotType.Elite] = 35,  // Storm Surge (CONSUME Electrifié → longer)
+			[SlotType.Elite] = 35,  // Storm Surge (CONSUME Electrified → longer)
 		};
 		
-		// "Juggernaut" — Vulnérable + Execute synergy (tank/melee)
+		// "Juggernaut" — Vulnerable + Execute synergy (tank/melee)
 		_presets["Juggernaut"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 5,   // Sunder Armor (applies Vulnérable)
-			[SlotType.Slot2] = 13,  // Execute (consumes Vulnérable → +150%)
+			[SlotType.Slot1] = 5,   // Sunder Armor (applies Vulnerable)
+			[SlotType.Slot2] = 13,  // Execute (consumes Vulnerable → +150%)
 			[SlotType.Slot3] = 19,  // Power Strike (heavy KB)
 			[SlotType.Slot4] = 32,  // Charge (gap close)
 			[SlotType.SlotA] = 14,  // Shield Bash (Bouclier consume)

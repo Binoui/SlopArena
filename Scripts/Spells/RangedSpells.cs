@@ -1,7 +1,7 @@
 #nullable enable
 using Godot;
 using System;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
 /// <summary>
 /// Ranged-type spells (fireballs, AoE, zone control).

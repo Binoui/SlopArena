@@ -1,6 +1,6 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoveBox", "MoveBox.csproj", "{4C449378-C700-4C37-975E-A361DE8916D1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlopArena", "SlopArena.csproj", "{4C449378-C700-4C37-975E-A361DE8916D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

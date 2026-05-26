@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using MoveBox.Shared;
+using SlopArena.Shared;
 
-namespace MoveBox.Server
+namespace SlopArena.Server
 {
 	class Program
 	{
@@ -13,7 +13,7 @@ namespace MoveBox.Server
 		private static IPEndPoint? _clientEndPoint;
 		private static bool _running = true;
 
-		// Player state variables (spawn au centre de l'arène 5000x5000)
+		// Player state variables (spawn at arena center 5000x5000)
 		private static uint _serverTick = 0;
 		private static float _posX = 2500f;
 		private static float _posY = 2500f;
@@ -35,7 +35,7 @@ namespace MoveBox.Server
 
 		static void Main(string[] args)
 		{
-			Console.WriteLine("=== MoveBox Authoritative Physics Server ===");
+			Console.WriteLine("=== SlopArena Authoritative Physics Server ===");
 			
 			PhysicsConfig.Initialize();
 			_posZ = PhysicsConfig.GetGroundHeight(_posX, _posY);
