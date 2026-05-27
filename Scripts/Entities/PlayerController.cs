@@ -124,6 +124,11 @@ public partial class PlayerController : CharacterBody3D
 	/// Set to true when the spell book is open, so we don't capture the mouse.
 	/// </summary>
 	public bool IsSpellBookOpen { get; set; } = false;
+
+	/// <summary>
+	/// Set to true when the escape menu is open, so we don't capture the mouse.
+	/// </summary>
+	public bool IsEscapeMenuOpen { get; set; } = false;
 	
 	// ==========================================
 	// CLIC POUR CIBLER
@@ -348,9 +353,9 @@ public partial class PlayerController : CharacterBody3D
 	
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		// Si le spellbook est ouvert, on ignore les clics souris
+		// Si le spellbook ou le menu echap est ouvert, on ignore les clics souris
 		// so drag & drop works without camera moving
-		if (IsSpellBookOpen)
+		if (IsSpellBookOpen || IsEscapeMenuOpen)
 		{
 			if (Input.IsActionJustPressed("ui_cancel"))
 			{
