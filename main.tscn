@@ -114,9 +114,9 @@ material = SubResource("StandardMaterial3D_outer_walls")
 
 ; --- CENTRAL PLATFORM (raised 40x40) ---
 [node name="CentralPlatform" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1.5, 100)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 2.5, 100)
 use_collision = true
-size = Vector3(40, 3, 40)
+size = Vector3(40, 5, 40)
 material = SubResource("StandardMaterial3D_walls")
 
 ; --- PILLARS (2 rows of 4, 8 total) ---
@@ -124,238 +124,238 @@ material = SubResource("StandardMaterial3D_walls")
 ; Z positions: 30, 70, 110, 150
 
 [node name="Pillar_L1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 7, 30)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_L2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 70)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 7, 70)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_L3" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 110)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 7, 110)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_L4" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 4, 150)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 7, 150)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_R1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 7, 30)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_R2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 70)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 7, 70)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_R3" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 110)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 7, 110)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="Pillar_R4" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 4, 150)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 7, 150)
 use_collision = true
-size = Vector3(4, 8, 4)
+size = Vector3(4, 14, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 ; --- SIDE GALLERIES (raised platforms at Y=4) ---
 ; Accessible via 2-step stairs at each end
 
 [node name="LeftGallery" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 4.5, 100)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 7.5, 100)
 use_collision = true
 size = Vector3(12, 1, 100)
 material = SubResource("StandardMaterial3D_blue_walls")
 
 [node name="RightGallery" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 4.5, 100)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 7.5, 100)
 use_collision = true
 size = Vector3(12, 1, 100)
 material = SubResource("StandardMaterial3D_blue_walls")
 
 ; Gallery support pillars
 [node name="LeftGallerySupport_N" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2.5, 40)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 4, 40)
 use_collision = true
-size = Vector3(10, 5, 4)
+size = Vector3(10, 8, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="LeftGallerySupport_S" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2.5, 160)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 4, 160)
 use_collision = true
-size = Vector3(10, 5, 4)
+size = Vector3(10, 8, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="RightGallerySupport_N" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 2.5, 40)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 4, 40)
 use_collision = true
-size = Vector3(10, 5, 4)
+size = Vector3(10, 8, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 [node name="RightGallerySupport_S" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 2.5, 160)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 4, 160)
 use_collision = true
-size = Vector3(10, 5, 4)
+size = Vector3(10, 8, 4)
 material = SubResource("StandardMaterial3D_walls")
 
 ; Stairs to Left Gallery (north end)
 [node name="LeftStair_N_1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 26)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 2, 26)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 [node name="LeftStair_N_2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3, 26)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 6, 26)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 ; Stairs to Left Gallery (south end)
 [node name="LeftStair_S_1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, 174)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 2, 174)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 [node name="LeftStair_S_2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3, 174)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 6, 174)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 ; Stairs to Right Gallery (north end)
 [node name="RightStair_N_1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 1, 26)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2, 26)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 [node name="RightStair_N_2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 3, 26)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 6, 26)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 ; Stairs to Right Gallery (south end)
 [node name="RightStair_S_1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 1, 174)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2, 174)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 [node name="RightStair_S_2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 3, 174)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 6, 174)
 use_collision = true
-size = Vector3(8, 2, 8)
+size = Vector3(8, 4, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
 
 ; --- CORNER ENCLOSURES (U-shaped, 3 walls each, open toward center) ---
 ; NW corner - center at (20, 20), open to SE
 [node name="NW_Wall_N" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 2.5, 8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3.5, 8)
 use_collision = true
-size = Vector3(24, 5, 2)
+size = Vector3(24, 7, 2)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="NW_Wall_W" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2.5, 20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 3.5, 20)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="NW_Wall_E" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 2.5, 20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 3.5, 20)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 ; NE corner - center at (180, 20), open to SW
 [node name="NE_Wall_N" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2.5, 8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 3.5, 8)
 use_collision = true
-size = Vector3(24, 5, 2)
+size = Vector3(24, 7, 2)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="NE_Wall_E" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 2.5, 20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 3.5, 20)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="NE_Wall_W" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 2.5, 20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 3.5, 20)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 ; SW corner - center at (20, 180), open to NE
 [node name="SW_Wall_S" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 2.5, 192)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 3.5, 192)
 use_collision = true
-size = Vector3(24, 5, 2)
+size = Vector3(24, 7, 2)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="SW_Wall_W" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2.5, 180)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 3.5, 180)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="SW_Wall_E" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 2.5, 180)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 3.5, 180)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 ; SE corner - center at (180, 180), open to NW
 [node name="SE_Wall_S" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 2.5, 192)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 180, 3.5, 192)
 use_collision = true
-size = Vector3(24, 5, 2)
+size = Vector3(24, 7, 2)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="SE_Wall_E" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 2.5, 180)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 3.5, 180)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 [node name="SE_Wall_W" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 2.5, 180)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 168, 3.5, 180)
 use_collision = true
-size = Vector3(2, 5, 24)
+size = Vector3(2, 7, 24)
 material = SubResource("StandardMaterial3D_red_walls")
 
 ; --- LOW COVER WALLS (half-height, for ducking behind) ---
 [node name="CoverWall_N1" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1, 76)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 2, 76)
 use_collision = true
-size = Vector3(16, 2, 2)
+size = Vector3(16, 4, 2)
 material = SubResource("StandardMaterial3D_blue_walls")
 
 [node name="CoverWall_N2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 1, 124)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 2, 124)
 use_collision = true
-size = Vector3(16, 2, 2)
+size = Vector3(16, 4, 2)
 material = SubResource("StandardMaterial3D_blue_walls")
 
 ; --- DECORATIVE CENTERPIECE (small platform in center of central platform) ---
 [node name="CenterPiece" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 3.5, 100)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 5.5, 100)
 use_collision = true
 size = Vector3(8, 1, 8)
 material = SubResource("StandardMaterial3D_purple_walls")
