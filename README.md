@@ -182,6 +182,27 @@ See [gdd.md](gdd.md) for the full Game Design Document covering:
 
 ---
 
+## Contributing
+
+SlopArena is a **community-driven project** — everyone is welcome!
+
+- **🐛 Found a bug?** [Open an issue](https://github.com/Binoui/SlopArena/issues/new?template=bug_report.yml)
+- **💡 Have an idea?** [Submit a feature request](https://github.com/Binoui/SlopArena/issues/new?template=feature_request.yml)
+- **🛠️ Want to code?** Read the [Contributing Guide](CONTRIBUTING.md) to get started
+- **🎨 Designer / artist / writer?** Non-code contributions are just as valuable — see the guide
+
+By participating, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+### Quick Start for Contributors
+
+```bash
+git clone https://github.com/Binoui/SlopArena.git
+cd SlopArena
+# Open project.godot in Godot 4.6+ (.NET version) and press F5
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide on spells, architecture, and coding conventions.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
