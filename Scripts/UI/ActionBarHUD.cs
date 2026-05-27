@@ -152,7 +152,7 @@ public partial class ActionBarHUD : Control
 		}
 		
 		// --- Dash ability indicator ---
-		AddAbilitySlot("Shift", "Dash", () => _player?.GetDashCooldown() ?? 0f);
+		AddAbilitySlot("7", "Dash", () => _player?.GetDashCooldown() ?? 0f);
 		
 		// Position the HBox at bottom center after layout
 		UpdatePosition();
@@ -303,10 +303,10 @@ public partial class ActionBarHUD : Control
 			SlotType.Slot2 => "2",
 			SlotType.Slot3 => "3",
 			SlotType.Slot4 => "4",
-			SlotType.SlotA => "A",
-			SlotType.SlotE => "E",
-			SlotType.Shift => "Shift",
-			SlotType.Elite => "R",
+			SlotType.SlotA => "5",
+			SlotType.SlotE => "6",
+			SlotType.Shift => "7",
+			SlotType.Elite => "8",
 			_ => "?"
 		};
 	}
