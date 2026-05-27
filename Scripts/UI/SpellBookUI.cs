@@ -453,10 +453,10 @@ public partial class SpellBookUI : Control
 			SlotType.Slot2 => "2",
 			SlotType.Slot3 => "3",
 			SlotType.Slot4 => "4",
-			SlotType.SlotA => "A",
-			SlotType.SlotE => "E",
-			SlotType.Shift => "Shift",
-			SlotType.Elite => "R",
+			SlotType.SlotA => "5",
+			SlotType.SlotE => "6",
+			SlotType.Shift => "7",
+			SlotType.Elite => "8",
 			_ => "?"
 		};
 	}

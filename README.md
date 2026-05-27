@@ -162,10 +162,10 @@ The sandbox runs a local simulation with 5 training dummies, a full spell system
 | **Scroll Wheel** | Zoom in/out |
 | **Tab** | Cycle target (dummies) |
 | **1 / 2 / 3 / 4** | Spell slots 1-4 |
-| **A** | Spell slot A (Control) |
-| **E** | Spell slot E (Utility) |
-| **Shift** | Dash |
-| **R** | Elite spell (Ultimate) |
+| **A** | Spell slot 5 (Control) |
+| **E** | Spell slot 6 (Utility) |
+| **Shift** | Dash (Slot 7) |
+| **R** | Spell slot 8 (Ultimate) |
 | **B** | Toggle spellbook |
 | **Escape** | Release mouse |
 

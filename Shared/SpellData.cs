@@ -7,14 +7,14 @@ namespace SlopArena.Shared
 	/// </summary>
 	public enum SlotType
 	{
-		Slot1,  // Key 1 (Spam / Basic)
-		Slot2,  // Key 2 (Combo)
-		Slot3,  // Key 3 (Burst)
-		Slot4,  // Key 4 (Utility)
-		SlotA,  // Key A (Control / Zone)
-		SlotE,  // Key E (Utility 2 / Defense)
-		Shift,  // Shift key (Mobility / Dash)
-		Elite   // R key (Ultimate)
+		Slot1,  // Slot 1 (Spam / Basic)
+		Slot2,  // Slot 2 (Combo)
+		Slot3,  // Slot 3 (Burst)
+		Slot4,  // Slot 4 (Utility)
+		Slot5,  // Slot 5 (Control / Zone)
+		Slot6,  // Slot 6 (Utility 2 / Defense)
+		Slot7,  // Slot 7 (Mobility / Dash)
+		Slot8   // Slot 8 (Ultimate)
 	}
 	
 	/// <summary>
