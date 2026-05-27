@@ -13,6 +13,7 @@ public partial class Main : Node3D
 	private ActionBarHUD? _actionBarHUD;
 	private SpellBookUI? _spellBookUI;
 	private UnitFrames? _unitFrames;
+	private EscapeMenuUI? _escapeMenu;
 	
 	// Cercle de ciblage (WoW-style ring under target)
 	private MeshInstance3D? _targetRing;
@@ -186,6 +187,29 @@ public partial class Main : Node3D
 					}
 					
 					GD.Print("SpellBookUI initialized!");
+
+					// --- Escape Menu (pause overlay) ---
+					_escapeMenu = new EscapeMenuUI();
+					_escapeMenu.Name = "EscapeMenuUI";
+					_canvasLayer.AddChild(_escapeMenu);
+					_escapeMenu.Build();
+
+					// Connect escape menu events
+					_escapeMenu.OnResumePressed += () => { };
+					_escapeMenu.OnSpellbookRequested += () =>
+					{
+						_spellBookUI?.Toggle();
+					};
+					_escapeMenu.OnExitLobby += () =>
+					{
+						GD.Print("Exit Lobby - would return to main menu");
+						GetTree().ChangeSceneToFile("res://main.tscn");
+					};
+					_escapeMenu.OnExitGame += () =>
+					{
+						GD.Print("Exiting game...");
+						GetTree().Quit();
+					};
 				}
 			}
 		}
@@ -391,6 +415,25 @@ public partial class Main : Node3D
 		}
 	}
 	
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (@event is InputEventKey key && key.Pressed && !key.Echo)
+		{
+			if (key.Keycode == Key.Escape || key.PhysicalKeycode == Key.Escape)
+			{
+				if (_escapeMenu != null && _player != null)
+				{
+					_escapeMenu.Toggle(_player);
+					if (_escapeMenu.IsOpen())
+						_player.IsEscapeMenuOpen = true;
+					else
+						_player.IsEscapeMenuOpen = false;
+					GetViewport().SetInputAsHandled();
+				}
+			}
+		}
+	}
+
 	private void UpdateHUD(float posX, float posY, float posZ, float velX, float velY)
 	{
 		if (_label == null) return;
