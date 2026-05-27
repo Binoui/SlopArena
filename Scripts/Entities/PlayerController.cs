@@ -38,8 +38,8 @@ public partial class PlayerController : CharacterBody3D
 	// AIR MOVEMENT
 	// ==========================================
 	
-	[Export] public float JumpVelocity = 13.0f;
-	[Export] public float Gravity = 35.0f;
+	[Export] public float JumpVelocity = 16.0f;
+	[Export] public float Gravity = 40.0f;
 	[Export] public float FastFallKick = 25.0f;      // Instant Y velocity on fast fall
 	[Export] public float FastFallGravityMult = 2.0f;
 	[Export] public float MaxFallSpeed = 50.0f;
