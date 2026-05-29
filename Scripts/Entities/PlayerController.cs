@@ -15,6 +15,56 @@ using SlopArena.Shared;
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
+	public enum PlayerClass
+	{
+		Vanguard,
+		Wraith,
+		Channeler
+	}
+	
+	private PlayerClass _playerClass = PlayerClass.Vanguard;
+	
+	public void SetClass(PlayerClass pc)
+	{
+		_playerClass = pc;
+		ApplyClassStats();
+	}
+	
+	public PlayerClass GetClass() => _playerClass;
+	
+	private void ApplyClassStats()
+	{
+		switch (_playerClass)
+		{
+			case PlayerClass.Vanguard:
+				WalkSpeed = 9f;
+				SprintSpeed = 12f;
+				BackwardSpeed = 6f;
+				JumpVelocity = 14f;
+				Gravity = 42f;
+				AirAcceleration = 12f;
+				GroundFriction = 22f;
+				break;
+			case PlayerClass.Wraith:
+				WalkSpeed = 11f;
+				SprintSpeed = 15f;
+				BackwardSpeed = 8f;
+				JumpVelocity = 18f;
+				Gravity = 38f;
+				AirAcceleration = 16f;
+				GroundFriction = 14f;
+				break;
+			case PlayerClass.Channeler:
+				WalkSpeed = 10f;
+				SprintSpeed = 13f;
+				BackwardSpeed = 7f;
+				JumpVelocity = 16f;
+				Gravity = 35f;
+				AirAcceleration = 14f;
+				GroundFriction = 16f;
+				break;
+		}
+	}
 	// ==========================================
 	// EXPORTED VARIABLES (realistic scales)
 	// ==========================================
@@ -25,6 +75,7 @@ public partial class PlayerController : CharacterBody3D
 	
 	[Export] public float WalkSpeed = 10.0f;
 	[Export] public float SprintSpeed = 14.0f;       // Faster but committed
+	[Export] public float BackwardSpeed = 7.0f;      // Slower when walking backward
 	
 	// ==========================================
 	// SPRINT / DASH DANCE
@@ -75,6 +126,60 @@ public partial class PlayerController : CharacterBody3D
 	private Hurtbox? _hurtbox;
 	
 	// ==========================================
+	// MELEE COMBO (LMB)
+	// ==========================================
+	
+	[Export] public float ComboStepDistance = 0f;      // Base lunge
+	[Export] public float ComboWindow = 0.7f;         // Time to press next hit
+	[Export] public float[] ComboDamage = { 5f, 7f, 12f };
+	[Export] public float[] ComboRange = { 2.5f, 3.0f, 4.0f };
+	[Export] public float[] ComboLunge = { 4f, 6f, 8f }; // Forward lunge multiplier per hit
+	[Export] public float[] ComboKnockback = { 3f, 5f, 15f };
+	
+	private int _comboStage = 0;     // 0=idle, 1=hit1, 2=hit2, 3=hit3
+	private float _comboTimer = 0f;  // Remaining window to press next hit
+	private float _comboAnimLock = 0f; // Brief lock after each hit
+	
+	// ==========================================
+	// HEAVY ATTACK (RMB)
+	// ==========================================
+	
+	[Export] public float HeavyDamage = 10f;
+	[Export] public float HeavyKnockback = 20f;
+	[Export] public float HeavyRange = 4f;
+	[Export] public float HeavyLunge = 6f;
+	[Export] public float HeavyAnimLock = 0.3f;
+	
+	[Export] public float HeavyChargedDamage = 15f;
+	[Export] public float HeavyChargedKnockback = 30f;
+	[Export] public float HeavyChargedRange = 5f;
+	[Export] public float HeavyChargedLunge = 8f;
+	[Export] public float HeavyChargedLock = 0.5f;
+	
+	// ==========================================
+	// AIR ATTACKS
+	// ==========================================
+	
+	[Export] public float AirLightDamage = 4f;
+	[Export] public float AirLightLunge = 5f;
+	[Export] public float AirHeavyDamage = 8f;
+	[Export] public float AirHeavyKnockback = 15f;
+	[Export] public float AirHeavyLunge = 4f;
+	
+	// ==========================================
+	// CHARACTER ROTATION
+	// ==========================================
+	
+	[Export] public float RotationSpeed = 12.0f;     // Rad/s for smooth turn
+	
+	// ==========================================
+	// DOUBLE JUMP
+	// ==========================================
+	
+	[Export] public int MaxJumps = 2;
+	private int _jumpsLeft = 2;
+	
+	// ==========================================
 	// DASH / ROLL STATE
 	// ==========================================
 	
@@ -115,6 +220,38 @@ public partial class PlayerController : CharacterBody3D
 	private AnimationPlayer? _animPlayer;
 	private Node3D? _playerModel;
 	private CombatComponent? _combatComponent;
+	
+	// First mesh found in model (for NPC hit flash)
+	private MeshInstance3D? _firstMesh;
+	
+	// ==========================================
+	// PLAYER vs NPC
+	// ==========================================
+	
+	private bool _isPlayerControlled = true;
+	private bool _isNPC = false;
+	
+	// NPC state
+	private int _npcHP = 300;
+	private const int NpcMaxHP = 300;
+	private float _npcRespawnTimer = 0f;
+	private const float NpcRespawnDelay = 3.0f;
+	private Vector3 _npcSpawnPosition;
+	private float _npcHitFlashTimer = 0f;
+	private MeshInstance3D? _npcMesh;
+	private float _npcOriginalEmission = 1.5f;
+	
+	public void SetNPC(bool isNpc)
+	{
+		_isNPC = isNpc;
+		_isPlayerControlled = !isNpc;
+		if (isNpc)
+			_npcSpawnPosition = GlobalPosition;
+	}
+	
+	public bool IsNPC() => _isNPC;
+	public int GetNpcHP() => _npcHP;
+	public bool IsNpcAlive() => _npcRespawnTimer <= 0f && _npcHP > 0;
 	
 	// ==========================================
 	// UI STATE
@@ -194,6 +331,9 @@ public partial class PlayerController : CharacterBody3D
 	
 	public override void _Ready()
 	{
+		// Apply class movement stats
+		ApplyClassStats();
+		
 		// --- Input Map setup (AZERTY + QWERTY compatible) ---
 		SetupInputMap();
 		
@@ -228,7 +368,7 @@ public partial class PlayerController : CharacterBody3D
 		if (skeleton != null)
 		{
 			_animPlayer.RootNode = skeleton.GetPath();
-			GD.Print($"AnimationPlayer RootNode set to: {skeleton.GetPath()}");
+			//GD.Print($"AnimationPlayer RootNode set to: {skeleton.GetPath()}");
 		}
 		
 		var animLib = new AnimationLibrary();
@@ -239,9 +379,9 @@ public partial class PlayerController : CharacterBody3D
 		
 		// Log which animations we loaded
 		var loadedAnims = animLib.GetAnimationList();
-		GD.Print($"Loaded {loadedAnims.Count} animations:");
-		foreach (var animName in loadedAnims)
-			GD.Print($"  - {animName}");
+		//GD.Print($"Loaded {loadedAnims.Count} animations:");
+		//foreach (var animName in loadedAnims)
+		//	GD.Print($"  - {animName}");
 		
 		// Play idle if available
 		if (animLib.HasAnimation("idle"))
@@ -293,14 +433,21 @@ public partial class PlayerController : CharacterBody3D
 		};
 		
 		// --- WoW-style camera (SpringArm3D) ---
-		// WowCamera creates its own SpringArm3D and Camera3D in _Ready
-		_wowCamera = new WowCamera();
-		_wowCamera.Name = "WowCamera";
-		_wowCamera.Target = this;
-		AddChild(_wowCamera);
+		// Only for player-controlled characters
+		if (_isPlayerControlled)
+		{
+			_wowCamera = new WowCamera();
+			_wowCamera.Name = "WowCamera";
+			_wowCamera.Target = this;
+			AddChild(_wowCamera);
+		}
 		
-		// Spawn at arena center
-		Position = new Vector3(100f, 10f, 100f);
+		// Position is set by Main.cs for both player and NPCs
+		//Position = new Vector3(100f, 10f, 100f);
+		
+		// Capture mouse immediately for free camera orbit (player only)
+		if (_isPlayerControlled)
+			Input.MouseMode = Input.MouseModeEnum.Captured;
 	}
 	
 	// ==========================================
@@ -318,7 +465,6 @@ public partial class PlayerController : CharacterBody3D
 		AddInputAction("move_right",   new InputEventKey { PhysicalKeycode = Key.D });
 		AddInputAction("jump",         new InputEventKey { PhysicalKeycode = Key.Space });
 		AddInputAction("dash",         new InputEventKey { PhysicalKeycode = Key.Shift });
-		AddInputAction("crouch",       new InputEventKey { PhysicalKeycode = Key.Ctrl });
 		AddInputAction("crouch",       new InputEventKey { PhysicalKeycode = Key.C });
 		
 		// Spell actions (Keycode for layout-aware letter matching)
@@ -333,7 +479,6 @@ public partial class PlayerController : CharacterBody3D
 		// UI actions
 		AddInputAction("spellbook_toggle", new InputEventKey { Keycode = Key.B });
 		AddInputAction("ui_cancel",         new InputEventKey { Keycode = Key.Escape });
-		AddInputAction("target_next",       new InputEventKey { PhysicalKeycode = Key.Tab });
 		AddInputAction("trinket",           new InputEventKey { Keycode = Key.G });
 		AddInputAction("tech",             new InputEventKey { Keycode = Key.F });
 		
@@ -353,140 +498,242 @@ public partial class PlayerController : CharacterBody3D
 	
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		// Si le spellbook ou le menu echap est ouvert, on ignore les clics souris
-		// so drag & drop works without camera moving
-		if (IsSpellBookOpen || IsEscapeMenuOpen)
+		// Skip input for NPCs
+		if (!_isPlayerControlled) return;
+		
+		// Si le menu echap est ouvert, on ignore tout
+		if (IsEscapeMenuOpen)
 		{
 			if (Input.IsActionJustPressed("ui_cancel"))
 			{
 				Input.MouseMode = Input.MouseModeEnum.Visible;
 			}
-			// On ignore les events souris
 			return;
 		}
 		
-		// 1. Mouse state management (Visible vs Captured)
+		// 1. Mouse capture: any click captures, Escape uncaptures
 		if (@event is InputEventMouseButton mouseBtn)
 		{
 			if (mouseBtn.Pressed)
 			{
-				if (mouseBtn.ButtonIndex == MouseButton.Left)
-				{
-					// Clic gauche : NE PAS capturer tout de suite.
-					// On attend de voir si le joueur drag (pour orbite) ou clique (pour cibler).
-					_leftClickDragDistance = 0f;
-					_leftClickIsDrag = false;
-					_leftClickPressPosition = GetViewport().GetMousePosition();
-				}
-				else if (mouseBtn.ButtonIndex == MouseButton.Right)
-				{
-					// Right click: immediate capture (as before)
-					if (Input.MouseMode != Input.MouseModeEnum.Captured)
-					{
-						Input.MouseMode = Input.MouseModeEnum.Captured;
-					}
-					
-					// Align character with camera direction
-					if (_wowCamera != null)
-					{
-						float cameraYaw = _wowCamera.GetCameraYaw();
-						GlobalRotation = new Vector3(0f, cameraYaw, 0f);
-						_wowCamera.SetYaw(cameraYaw);
-					}
-				}
-				else if (mouseBtn.ButtonIndex == MouseButton.WheelUp)
+				if (mouseBtn.ButtonIndex == MouseButton.WheelUp)
 				{
 					_wowCamera?.ZoomCamera(-1f);
+					return;
 				}
-				else if (mouseBtn.ButtonIndex == MouseButton.WheelDown)
+				if (mouseBtn.ButtonIndex == MouseButton.WheelDown)
 				{
 					_wowCamera?.ZoomCamera(1f);
-				}
-			}
-			else
-			{
-				// Left click released
-				if (mouseBtn.ButtonIndex == MouseButton.Left)
-				{
-					if (!_leftClickIsDrag)
-					{
-						// Clic rapide sans drag → raycast pour cibler
-						DoClickRaycast();
-					}
-					// If it was a drag, mouse is Captured → la liberer
-					if (Input.MouseMode == Input.MouseModeEnum.Captured)
-					{
-						Input.MouseMode = Input.MouseModeEnum.Visible;
-					}
+					return;
 				}
 				
-				// Clic droit relache
-				if (mouseBtn.ButtonIndex == MouseButton.Right)
+				// Any click captures mouse if not already captured
+				if (Input.MouseMode != Input.MouseModeEnum.Captured)
 				{
-					if (!Input.IsMouseButtonPressed(MouseButton.Left))
-					{
-						Input.MouseMode = Input.MouseModeEnum.Visible;
-					}
+					Input.MouseMode = Input.MouseModeEnum.Captured;
 				}
 			}
 		}
 		
-		// 2. Mouse movement → orbite camera (quand capturee)
+		// 2. Mouse movement → orbit camera when captured (no button needed)
 		if (@event is InputEventMouseMotion mouseMotion)
 		{
-			// Drag detection for left click (avant capture)
-			if (Input.IsMouseButtonPressed(MouseButton.Left) && Input.MouseMode != Input.MouseModeEnum.Captured)
-			{
-				_leftClickDragDistance += mouseMotion.Relative.Length();
-				if (_leftClickDragDistance > ClickThreshold && !_leftClickIsDrag)
-				{
-					// Player moved enough → c'est un drag, pas un clic → capturer
-					_leftClickIsDrag = true;
-					Input.MouseMode = Input.MouseModeEnum.Captured;
-				}
-			}
-			
-			// Camera rotation (once captured)
 			if (Input.MouseMode == Input.MouseModeEnum.Captured)
 			{
-				bool isLeftDown = Input.IsMouseButtonPressed(MouseButton.Left) || _leftClickIsDrag;
-				bool isRightDown = Input.IsMouseButtonPressed(MouseButton.Right);
-				_wowCamera?.RotateCamera(mouseMotion.Relative, isLeftDown, isRightDown);
+				_wowCamera?.RotateCamera(mouseMotion.Relative);
 			}
 		}
 
-		// 3. Sorts via SpellSystem (via InputMap actions)
-		if (Input.IsActionJustPressed("spell_slot1"))     TriggerSpellSlot(SlotType.Slot1);
-		else if (Input.IsActionJustPressed("spell_slot2")) TriggerSpellSlot(SlotType.Slot2);
-		else if (Input.IsActionJustPressed("spell_slot3")) TriggerSpellSlot(SlotType.Slot3);
-		else if (Input.IsActionJustPressed("spell_slot4")) TriggerSpellSlot(SlotType.Slot4);
-		else if (Input.IsActionJustPressed("spell_slotA")) TriggerSpellSlot(SlotType.SlotA);
-		else if (Input.IsActionJustPressed("spell_slotE")) TriggerSpellSlot(SlotType.SlotE);
-		else if (Input.IsActionJustPressed("spell_slotR")) TriggerSpellSlot(SlotType.Elite);
-		else if (Input.IsActionJustPressed("dash"))        TryDash();
-		else if (Input.IsActionJustPressed("crouch"))     { /* Air dodge now in _PhysicsProcess */ }
-		else if (Input.IsActionJustPressed("trinket"))    UseTrinket();
-		else if (Input.IsActionJustPressed("ui_cancel"))   Input.MouseMode = Input.MouseModeEnum.Visible;
-		else if (Input.IsActionJustPressed("target_next"))
+		// 3. LMB = Light Attack (ground combo or air lunge)
+		if (@event is InputEventMouseButton lightAction)
 		{
-			// Cycle target — handled by Main.cs via event
-			OnTargetNextPressed?.Invoke();
-		}
-		else if (Input.IsActionJustPressed("spellbook_toggle"))
-		{
-			var spellBook = GetNodeOrNull<SpellBookUI>("../CanvasLayer/SpellBookUI");
-			if (spellBook != null)
+			if (lightAction.Pressed && lightAction.ButtonIndex == MouseButton.Left && _combatComponent != null)
 			{
-				spellBook.Toggle();
+				if (IsOnFloor())
+					TryCombo();
+				else
+					TryAirLight();
+				GetViewport().SetInputAsHandled();
+				return;
 			}
 		}
+		
+		// 4. RMB = Heavy Attack (press) or Charged (hold > 0.3s)
+		if (@event is InputEventMouseButton heavyAction)
+		{
+			if (heavyAction.ButtonIndex == MouseButton.Right && _combatComponent != null)
+			{
+				if (heavyAction.Pressed)
+				{
+					_heavyHoldTimer = 0f;
+					_heavyHeld = false;
+				}
+				else
+				{
+					// Released — trigger if not held long enough for charged
+					if (!_heavyHeld)
+					{
+						if (!IsOnFloor())
+							TryAirHeavy();
+						else
+							TryHeavy(false);
+					}
+					GetViewport().SetInputAsHandled();
+					return;
+				}
+			}
+		}
+		
+		// 5. Class abilities: Q, E, R, F
+		if (Input.IsActionJustPressed("spell_slot1")) TriggerClassAbility(0); // Q
+		if (Input.IsActionJustPressed("spell_slotE")) TriggerClassAbility(1); // E
+		if (Input.IsActionJustPressed("spell_slotR")) TriggerClassAbility(2); // R
+		if (Input.IsActionJustPressed("spell_slot3")) TriggerClassAbility(3); // F (ultimate)
+		if (Input.IsActionJustPressed("dash"))       TryDash();
+		if (Input.IsActionJustPressed("ui_cancel"))   Input.MouseMode = Input.MouseModeEnum.Visible;
 	}
 	
-	private void TriggerSpellSlot(SlotType slot)
+	private float _heavyHoldTimer = 0f;
+	private bool _heavyHeld = false;
+	
+	private void TryHeavy(bool charged)
 	{
-		if (_combatComponent != null)
+		if (_moveState != MoveState.Normal) return;
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		if (_comboAnimLock > 0f) return;
+		
+		Vector3 forward = -Transform.Basis.Z;
+		forward.Y = 0; forward = forward.Normalized();
+		
+		float dmg = charged ? HeavyChargedDamage : HeavyDamage;
+		float kb = charged ? HeavyChargedKnockback : HeavyKnockback;
+		float range = charged ? HeavyChargedRange : HeavyRange;
+		float lunge = charged ? HeavyChargedLunge : HeavyLunge;
+		float animLock = charged ? HeavyChargedLock : HeavyAnimLock;
+		
+		// Forward lunge
+		Velocity = new Vector3(forward.X * lunge * 3f, Velocity.Y + 2f, forward.Z * lunge * 3f);
+		
+		// Hit detection
+		var simulation = _combatComponent?.GetSimulation();
+		if (simulation == null) return;
+		
+		ulong playerId = _combatComponent!.GetEntityId();
+		float halfAngle = 45f;
+		Vector3 pos = GlobalPosition;
+		
+		foreach (var kvp in simulation.Entities)
 		{
-			_combatComponent.TriggerSlot(slot);
+			ulong eid = kvp.Key;
+			var (epos, eradius, active) = kvp.Value;
+			if (!active || eid == playerId) continue;
+			
+			float dx = epos.X - pos.X;
+			float dz = epos.Z - pos.Z;
+			float dist = MathF.Sqrt(dx * dx + dz * dz);
+			if (dist > range + eradius) continue;
+			
+			float angle = MathF.Atan2(forward.Z, forward.X);
+			Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
+			float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
+			float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
+			if (diff > halfAngle * Mathf.Pi / 180f) continue;
+			
+			simulation.OnEntityHit?.Invoke(eid, dmg, forward.X * kb, kb * 0.5f, forward.Z * kb);
+		}
+		
+		_comboAnimLock = animLock;
+		//GD.Print(charged ? "Heavy Charged!" : "Heavy!");
+	}
+	
+	private void TryAirLight()
+	{
+		if (_comboAnimLock > 0f) return;
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		
+		Vector3 forward = -Transform.Basis.Z;
+		forward.Y = 0; forward = forward.Normalized();
+		Velocity = new Vector3(forward.X * AirLightLunge * 3f, Velocity.Y + 2f, forward.Z * AirLightLunge * 3f);
+		
+		var simulation = _combatComponent?.GetSimulation();
+		if (simulation == null) return;
+		
+		ulong playerId = _combatComponent!.GetEntityId();
+		Vector3 pos = GlobalPosition;
+		
+		foreach (var kvp in simulation.Entities)
+		{
+			ulong eid = kvp.Key;
+			var (epos, eradius, active) = kvp.Value;
+			if (!active || eid == playerId) continue;
+			float dx = epos.X - pos.X, dz = epos.Z - pos.Z;
+			if (MathF.Sqrt(dx*dx + dz*dz) > 3f + eradius) continue;
+			simulation.OnEntityHit?.Invoke(eid, AirLightDamage, forward.X * 5f, 3f, forward.Z * 5f);
+		}
+		
+		_comboAnimLock = 0.15f;
+	}
+	
+	private void TryAirHeavy()
+	{
+		if (_comboAnimLock > 0f) return;
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		
+		Vector3 forward = -Transform.Basis.Z;
+		forward.Y = 0; forward = forward.Normalized();
+		Velocity = new Vector3(forward.X * AirHeavyLunge * 3f, -8f, forward.Z * AirHeavyLunge * 3f); // Slam down
+		
+		var simulation = _combatComponent?.GetSimulation();
+		if (simulation == null) return;
+		
+		ulong playerId = _combatComponent!.GetEntityId();
+		Vector3 pos = GlobalPosition;
+		
+		foreach (var kvp in simulation.Entities)
+		{
+			ulong eid = kvp.Key;
+			var (epos, eradius, active) = kvp.Value;
+			if (!active || eid == playerId) continue;
+			float dx = epos.X - pos.X, dz = epos.Z - pos.Z;
+			if (MathF.Sqrt(dx*dx + dz*dz) > 4f + eradius) continue;
+			simulation.OnEntityHit?.Invoke(eid, AirHeavyDamage, forward.X * AirHeavyKnockback * 0.5f, -AirHeavyKnockback, forward.Z * AirHeavyKnockback * 0.5f);
+		}
+		
+		_comboAnimLock = 0.2f;
+	}
+	private void TriggerClassAbility(int index)
+	{
+		if (_combatComponent == null) return;
+		
+		switch (_playerClass)
+		{
+			case PlayerClass.Vanguard:
+				switch (index)
+				{
+					case 0: ClassAbilities.VanguardShieldBash(_combatComponent); break;   // Q
+					case 1: ClassAbilities.VanguardWarCry(_combatComponent); break;      // E
+					case 2: ClassAbilities.VanguardIntervene(_combatComponent); break;    // R
+					case 3: ClassAbilities.VanguardThunderclap(_combatComponent); break;  // F
+				}
+				break;
+			case PlayerClass.Wraith:
+				switch (index)
+				{
+					case 0: ClassAbilities.WraithViperShot(_combatComponent); break;      // Q
+					case 1: ClassAbilities.WraithShadowStep(_combatComponent); break;     // E
+					case 2: ClassAbilities.WraithRapidFire(_combatComponent); break;      // R
+					case 3: ClassAbilities.WraithFreezingTrap(_combatComponent); break;   // F
+				}
+				break;
+			case PlayerClass.Channeler:
+				switch (index)
+				{
+					case 0: ClassAbilities.ChannelerFrostbolt(_combatComponent); break;   // Q
+					case 1: ClassAbilities.ChannelerDragonsBreath(_combatComponent); break; // E
+					case 2: ClassAbilities.ChannelerIceLance(_combatComponent); break;    // R
+					case 3: ClassAbilities.ChannelerMeteor(_combatComponent); break;      // F
+				}
+				break;
 		}
 	}
 	
@@ -515,6 +762,60 @@ public partial class PlayerController : CharacterBody3D
 		
 		if (_castAnimTimer > 0f)
 			_castAnimTimer -= dt;
+		
+		// Combo timer decay
+		if (_comboTimer > 0f)
+		{
+			_comboTimer -= dt;
+			if (_comboTimer <= 0f)
+				_comboStage = 0;
+		}
+		if (_comboAnimLock > 0f)
+			_comboAnimLock -= dt;
+		
+		// Heavy hold timer (for charged attack)
+		if (Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
+		{
+			_heavyHoldTimer += dt;
+			if (_heavyHoldTimer > 0.3f && !_heavyHeld)
+			{
+				_heavyHeld = true;
+				if (!IsOnFloor())
+					TryAirHeavy();
+				else
+					TryHeavy(true);
+			}
+		}
+		
+		// NPC updates
+		if (_isNPC)
+		{
+			// Respawn timer
+			if (_npcRespawnTimer > 0f)
+			{
+				_npcRespawnTimer -= dt;
+				if (_npcRespawnTimer <= 0f)
+					NpcRespawn();
+			}
+			
+			// Hit flash
+			if (_npcHitFlashTimer > 0f)
+			{
+				_npcHitFlashTimer -= dt;
+				if (_npcMesh?.MaterialOverride is StandardMaterial3D mat)
+					mat.EmissionEnergyMultiplier = 8f;
+			}
+			else
+			{
+				if (_npcMesh?.MaterialOverride is StandardMaterial3D mat
+					&& !Mathf.IsEqualApprox(mat.EmissionEnergyMultiplier, _npcOriginalEmission))
+					mat.EmissionEnergyMultiplier = _npcOriginalEmission;
+			}
+			
+			// Visibility during respawn
+			bool alive = _npcRespawnTimer <= 0f;
+			Visible = alive;
+		}
 	}
 	
 	/// <summary>
@@ -524,7 +825,6 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (_dashCooldownTimer > 0f) return;
 		if (_moveState != MoveState.Normal) return;
-		if (!IsOnFloor()) return;
 		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
 		
 		// Direction: input or forward
@@ -541,14 +841,95 @@ public partial class PlayerController : CharacterBody3D
 		_dashCooldownTimer = DashCooldown;
 		_moveState = MoveState.Dashing;
 		
-		// Apply dash burst (set horizontal, preserve vertical momentum)
+		// Apply dash burst
 		Velocity = new Vector3(
 			_dashDirection.X * DashSpeed,
 			Mathf.Max(Velocity.Y, 0f),
 			_dashDirection.Z * DashSpeed
 		);
 		
-		GD.Print($"Dash!");
+		//GD.Print($"Dash!");
+	}
+	
+	private void TryCombo()
+	{
+		if (_moveState != MoveState.Normal) return;
+		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
+		if (_comboAnimLock > 0f) return;
+		if (_combatComponent == null) return;
+		
+		// If no combo active, start at hit 1
+		// If active and within window, advance to next hit
+		if (_comboStage == 0 || _comboTimer <= 0f)
+		{
+			_comboStage = 1;
+		}
+		else if (_comboStage < 3)
+		{
+			_comboStage++;
+		}
+		else
+		{
+			// Full combo done, reset
+			_comboStage = 0;
+			return;
+		}
+		
+		int hit = _comboStage - 1; // 0-indexed
+		Vector3 forward = -Transform.Basis.Z;
+		forward.Y = 0;
+		forward = forward.Normalized();
+		Vector3 pos = GlobalPosition;
+		
+		// Forward lunge (per-hit distance for air combo freedom)
+		float lunge = ComboLunge[hit];
+		Velocity = new Vector3(
+			forward.X * lunge * 3f,
+			Velocity.Y + 2f, // Small upward boost to stay airborne
+			forward.Z * lunge * 3f
+		);
+		
+		// Hit detection — use CombatComponent's simulation
+		// We call CheckMeleeCone via the combat component
+		ulong playerId = _combatComponent.GetEntityId();
+		var simulation = _combatComponent.GetSimulation();
+		if (simulation == null) return;
+		
+		// Direct check against simulation entities
+		float range = ComboRange[hit];
+		float halfAngle = 45f; // 90 degree cone
+		float damage = ComboDamage[hit];
+		float kb = ComboKnockback[hit];
+		float stun = 0.3f + hit * 0.15f; // 0.3, 0.45, 0.6
+		
+		foreach (var kvp in simulation.Entities)
+		{
+			ulong eid = kvp.Key;
+			var (epos, eradius, active) = kvp.Value;
+			if (!active || eid == playerId) continue;
+			
+			float dx = epos.X - pos.X;
+			float dz = epos.Z - pos.Z;
+			float dist = MathF.Sqrt(dx * dx + dz * dz);
+			if (dist > range + eradius) continue;
+			
+			// Check angle
+			float angle = MathF.Atan2(forward.Z, forward.X);
+			Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
+			float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
+			float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
+			if (diff > halfAngle * Mathf.Pi / 180f) continue;
+			
+			// Hit!
+			simulation.OnEntityHit?.Invoke(eid, damage, forward.X * kb, stun * 10f, forward.Z * kb);
+			//GD.Print($"Combo hit {hit + 1} on entity {eid} for {damage} damage");
+		}
+		
+		// Combo timing
+		_comboTimer = ComboWindow;
+		_comboAnimLock = 0.15f; // Brief animation lock between hits
+		
+		//GD.Print($"Combo stage {_comboStage}/3");
 	}
 	
 	/// <summary>
@@ -584,7 +965,7 @@ public partial class PlayerController : CharacterBody3D
 			_airDodgeDirection.Z * AirDodgeSpeed
 		);
 		
-		GD.Print($"Air dodge! ({_airDodgesLeft} left this jump)");
+		//GD.Print($"Air dodge! ({_airDodgesLeft} left this jump)");
 	}
 	
 	/// <summary>
@@ -632,22 +1013,35 @@ public partial class PlayerController : CharacterBody3D
 	}
 	
 	/// <summary>
-	/// Get the input direction relative to the player's facing.
+	/// Get the input direction relative to the camera (not character facing).
+	/// Character will rotate to face this direction during movement.
 	/// </summary>
 	private Vector3 GetInputDirection()
 	{
 		Vector3 dir = Vector3.Zero;
-		Vector3 playerForward = -Transform.Basis.Z;
-		playerForward.Y = 0;
-		playerForward = playerForward.Normalized();
-		Vector3 playerRight = Transform.Basis.X;
-		playerRight.Y = 0;
-		playerRight = playerRight.Normalized();
 		
-		if (Input.IsActionPressed("move_forward"))  dir += playerForward;
-		if (Input.IsActionPressed("move_back"))     dir -= playerForward;
-		if (Input.IsActionPressed("move_left"))     dir -= playerRight;
-		if (Input.IsActionPressed("move_right"))    dir += playerRight;
+		// Use camera forward/right for direction
+		Vector3 camForward = Vector3.Zero;
+		Vector3 camRight = Vector3.Zero;
+		if (_wowCamera != null)
+		{
+			camForward = _wowCamera.GetForwardDirection();
+			camRight = _wowCamera.GetRightDirection();
+		}
+		else
+		{
+			camForward = -Transform.Basis.Z;
+			camForward.Y = 0;
+			camForward = camForward.Normalized();
+			camRight = Transform.Basis.X;
+			camRight.Y = 0;
+			camRight = camRight.Normalized();
+		}
+		
+		if (Input.IsActionPressed("move_forward"))  dir += camForward;
+		if (Input.IsActionPressed("move_back"))     dir -= camForward;
+		if (Input.IsActionPressed("move_left"))     dir -= camRight;
+		if (Input.IsActionPressed("move_right"))    dir += camRight;
 		
 		if (dir.LengthSquared() > 0f)
 			dir = dir.Normalized();
@@ -687,6 +1081,15 @@ public partial class PlayerController : CharacterBody3D
 				}
 			}
 			
+			PostMove();
+			return;
+		}
+		
+		// --- NPCs don't process input-based movement ---
+		if (!_isPlayerControlled)
+		{
+			ApplyGravity(dt);
+			MoveAndSlide();
 			PostMove();
 			return;
 		}
@@ -745,6 +1148,8 @@ public partial class PlayerController : CharacterBody3D
 			{
 				// Reset air dodges on landing
 				_airDodgesLeft = MaxAirDodges;
+				// Reset jumps on landing
+				_jumpsLeft = MaxJumps;
 				
 				bool hasInput = inputDir.LengthSquared() > 0.01f;
 				
@@ -788,13 +1193,19 @@ public partial class PlayerController : CharacterBody3D
 					else
 					{
 						// Walk or sprint: instant speed
-						float speed = _isSprinting ? SprintSpeed : WalkSpeed;
+						// Backward movement is slower regardless of sprint
+						bool goingBack = Input.IsActionPressed("move_back") && !Input.IsActionPressed("move_forward");
+						float speed = goingBack ? BackwardSpeed
+							: (_isSprinting ? SprintSpeed : WalkSpeed);
 						Velocity = new Vector3(inputDir.X * speed, Velocity.Y, inputDir.Z * speed);
 					}
 					
-					// Jump
-					if (inputJump)
+					// Jump (ground or air — double jump)
+					if (inputJump && _jumpsLeft > 0 && _comboAnimLock <= 0f)
+					{
 						Velocity = new Vector3(Velocity.X, JumpVelocity, Velocity.Z);
+						_jumpsLeft--;
+					}
 				}
 				else
 				{
@@ -828,10 +1239,10 @@ public partial class PlayerController : CharacterBody3D
 					Velocity.Z * (1f - drag)
 				);
 				
-				// Air dodge trigger (physics-synchronous)
-				if (Input.IsActionJustPressed("crouch") && _airDodgesLeft > 0)
+				// Dash on Shift — works both ground and air
+				if (Input.IsActionJustPressed("dash") && _airDodgesLeft > 0)
 				{
-					TryAirDodge();
+					TryDash();
 				}
 			}
 		}
@@ -851,23 +1262,13 @@ public partial class PlayerController : CharacterBody3D
 	
 	private void ApplyGravity(float dt)
 	{
+		// Disable gravity during combo attacks (allows air combos)
+		if (_comboAnimLock > 0f) return;
+		
 		if (!IsOnFloor())
 		{
-			bool inputDown = Input.IsActionPressed("move_back") || Input.IsActionPressed("crouch");
-			
-			if (inputDown && _moveState != MoveState.AirDodging)
-			{
-				// Fast fall: instant kick downward (Melee-style)
-				if (Velocity.Y > -FastFallKick)
-					Velocity = new Vector3(Velocity.X, -FastFallKick, Velocity.Z);
-				
-				// Maintain speed with extra gravity
-				Velocity -= new Vector3(0f, Gravity * FastFallGravityMult * dt, 0f);
-			}
-			else
-			{
-				Velocity -= new Vector3(0f, Gravity * dt, 0f);
-			}
+			// DKO-style gravity
+			Velocity -= new Vector3(0f, Gravity * dt, 0f);
 			
 			// Hard cap on fall speed
 			if (Velocity.Y < -MaxFallSpeed)
@@ -891,6 +1292,15 @@ public partial class PlayerController : CharacterBody3D
 		}
 		
 		UpdateAnimations();
+		
+		// Face movement direction (not camera — 100% decoupled)
+		Vector3 horizontalVel = new Vector3(Velocity.X, 0f, Velocity.Z);
+		if (horizontalVel.LengthSquared() > 0.01f)
+		{
+			float moveYaw = Mathf.Atan2(horizontalVel.X, -horizontalVel.Z);
+			GlobalRotation = new Vector3(0f, moveYaw, 0f);
+		}
+		// else: keep current rotation when idle
 		
 		if (GlobalPosition.Y < -50f)
 		{
@@ -1061,7 +1471,7 @@ public partial class PlayerController : CharacterBody3D
 				mat2.AlbedoTexture = skinTex;
 				mat2.TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear;
 				mi.MaterialOverride = mat2;
-				GD.Print($"Applied skin to MeshInstance3D: {mi.Name}");
+				//GD.Print($"Applied skin to MeshInstance3D: {mi.Name}");
 			}
 			else
 			{
@@ -1069,6 +1479,17 @@ public partial class PlayerController : CharacterBody3D
 				var mat2 = new StandardMaterial3D();
 				mat2.AlbedoColor = new Color(0.7f, 0.7f, 0.7f, 1f);
 				mi.MaterialOverride = mat2;
+			}
+			// Store first mesh for NPC hit flash (only for NPCs)
+			if (_isNPC && _firstMesh == null)
+			{
+				_firstMesh = mi;
+				if (mi.MaterialOverride is StandardMaterial3D sm)
+				{
+					sm.EmissionEnabled = true;
+					sm.Emission = new Color(0.8f, 0f, 0f);
+					_npcOriginalEmission = sm.EmissionEnergyMultiplier;
+				}
 			}
 		}
 		
@@ -1128,7 +1549,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 		
 		dir.ListDirEnd();
-		GD.Print($"Loaded {loadedCount} animations from {animDir}");
+		//GD.Print($"Loaded {loadedCount} animations from {animDir}");
 	}
 	
 	/// <summary>
@@ -1265,12 +1686,12 @@ public partial class PlayerController : CharacterBody3D
 						{
 							if (animLib.HasAnimation(animKey))
 							{
-								GD.Print($"  Skipping duplicate animation key: {animKey} (from {fbxPath})");
+								//GD.Print($"  Skipping duplicate animation key: {animKey} (from {fbxPath})");
 							}
 							else
 							{
 								animLib.AddAnimation(animKey, anim);
-								GD.Print($"  Loaded: {animKey} <- {fbxPath}");
+								//GD.Print($"  Loaded: {animKey} <- {fbxPath}");
 							}
 						}
 					}
@@ -1301,7 +1722,7 @@ public partial class PlayerController : CharacterBody3D
 				if (directAnim != null)
 				{
 					animLib.AddAnimation(animKey, directAnim);
-					GD.Print($"  Loaded direct: {animKey} <- {fbxPath}");
+			//GD.Print($"  Loaded direct: {animKey} <- {fbxPath}");
 					return true;
 				}
 			}
@@ -1344,7 +1765,7 @@ public partial class PlayerController : CharacterBody3D
 		if (prefixToStrip == null)
 			return animCopy; // No remapping needed
 		
-		GD.Print($"  Remapping paths: stripping '{prefixToStrip}' prefix");
+			//GD.Print($"  Remapping paths: stripping '{prefixToStrip}' prefix");
 		
 		for (int i = 0; i < trackCount; i++)
 		{
@@ -1408,12 +1829,12 @@ public partial class PlayerController : CharacterBody3D
 		
 		// Try cast animations first, fall back to attack animations
 		string[] castAnims;
-		if (slot == SlotType.Elite)
+		if (slot == SlotType.Slot8)
 		{
 			// Elite/ultimate spells: dramatic 2H cast
 			castAnims = new[] { "cast_2h", "attack_area_2h", "attack_area_2h_b" };
 		}
-		else if (slot == SlotType.SlotE || slot == SlotType.Shift)
+		else if (slot == SlotType.Slot6 || slot == SlotType.Slot7)
 		{
 			// Utility/defense: 1H cast
 			castAnims = new[] { "cast_1h", "attack_1h" };
@@ -1520,8 +1941,8 @@ public partial class PlayerController : CharacterBody3D
 	private void SetLoopMode(string fullPath, string animName)
 	{
 		if (_animPlayer == null) return;
-		// fullPath is "default/animName", GetAnimation might need bare name
-		var anim = _animPlayer.GetAnimation(animName);
+		// Use full path like "default/idle" for GetAnimation
+		var anim = _animPlayer.GetAnimation(fullPath);
 		if (anim == null) return;
 		
 		// Loop movement / idle animations, not attacks/casts/reacts
@@ -1531,4 +1952,37 @@ public partial class PlayerController : CharacterBody3D
 		anim.LoopMode = shouldLoop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
 	}
 	
+	// ==========================================
+	// NPC METHODS
+	// ==========================================
+	
+	public void NpcTakeDamage(int damage, Vector3 knockbackForce)
+	{
+		if (_npcRespawnTimer > 0f) return;
+		_npcHP -= damage;
+		_npcHitFlashTimer = 0.3f;
+		_npcMesh = _firstMesh;
+		Velocity = knockbackForce;
+		
+		if (_npcHP <= 0)
+		{
+			_npcHP = 0;
+			_npcRespawnTimer = NpcRespawnDelay;
+			//GD.Print($"{Name} DEFEATED! Respawning in {NpcRespawnDelay}s");
+		}
+	}
+	
+	private void NpcRespawn()
+	{
+		_npcHP = NpcMaxHP;
+		_npcRespawnTimer = 0f;
+		GlobalPosition = _npcSpawnPosition;
+		Velocity = Vector3.Zero;
+		GD.Print($"{Name} respawned!");
+	}
+	
+	public void SetNpcSpawnPosition(Vector3 pos)
+	{
+		_npcSpawnPosition = pos;
+	}
 }

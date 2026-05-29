@@ -61,8 +61,8 @@ public partial class SpellSystem : Node
 		// Register presets (synergy-based builds)
 		RegisterPresets();
 		
-		// Load a default preset
-		LoadPreset("Frostbite");
+		// Load the default functional kit
+		LoadPreset("Brawler");
 	}
 	
 	// ==========================================
@@ -175,6 +175,8 @@ public partial class SpellSystem : Node
 		Register(39, "Time Warp",     35f, 0.50f, 1.0f, StatusSpells.TimeWarp);
 		// ID 40 — Void Zone: large DoT zone
 		Register(40, "Void Zone",     30f, 0.60f, 2.0f, RangedSpells.FireWall);
+		// ID 41 — Cone of Cold: frontal frost cone, slows enemies
+		Register(41, "Cone of Cold", 8f,  0.25f, 1.5f, StatusSpells.ConeOfCold);
 		
 		GD.Print($"Registered {_spellRegistry.Count} spells globally.");
 	}
@@ -197,10 +199,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 10,  // Frost Lance (consumes Ralenti → stun)
 			[SlotType.Slot3] = 18,  // Arcane Shot (basic poke)
 			[SlotType.Slot4] = 7,   // Freezing Trap (zone control)
-			[SlotType.SlotA] = 17,  // Wind Slash (melee backup)
-			[SlotType.SlotE] = 22,  // Shockwave (pushback)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 39,  // Time Warp (elite)
+			[SlotType.Slot5] = 17,  // Wind Slash (melee backup)
+			[SlotType.Slot6] = 22,  // Shockwave (pushback)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 39,  // Time Warp (elite)
 		};
 		
 		// "Shadowblade" — Marked + Piercing Shot synergy (burst melee)
@@ -210,10 +212,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 9,   // Piercing Shot (consumes Marked → +100%)
 			[SlotType.Slot3] = 17,  // Wind Slash (basic melee)
 			[SlotType.Slot4] = 14,  // Shield Bash (Bouclier consume)
-			[SlotType.SlotA] = 21,  // Chain Pull (gap closer)
-			[SlotType.SlotE] = 24,  // Counter (defense)
-			[SlotType.Shift] = 26,  // Blink (mobility)
-			[SlotType.Elite] = 34,  // Annihilate (massive burst)
+			[SlotType.Slot5] = 21,  // Chain Pull (gap closer)
+			[SlotType.Slot6] = 24,  // Counter (defense)
+			[SlotType.Slot7] = 26,  // Blink (mobility)
+			[SlotType.Slot8] = 34,  // Annihilate (massive burst)
 		};
 		
 		// "Inferno" — Burn + Combustion synergy (AoE fire mage)
@@ -223,10 +225,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 11,  // Combustion (consumes Burn → AoE)
 			[SlotType.Slot3] = 8,   // Corrupted Ground (zone)
 			[SlotType.Slot4] = 23,  // Void Zone (DoT zone)
-			[SlotType.SlotA] = 18,  // Arcane Shot (poke)
-			[SlotType.SlotE] = 20,  // Force Push (pushback)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 33,  // Meteor Rain (CONSUME Burn → empowered)
+			[SlotType.Slot5] = 18,  // Arcane Shot (poke)
+			[SlotType.Slot6] = 20,  // Force Push (pushback)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 33,  // Meteor Rain (CONSUME Burn → empowered)
 		};
 		
 		// "Tempest" — Electrified + Overload synergy (control mage)
@@ -236,10 +238,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 12,  // Overload (consumes Electrified → stun)
 			[SlotType.Slot3] = 22,  // Shockwave (KB)
 			[SlotType.Slot4] = 6,   // Radiant Shield (Bouclier)
-			[SlotType.SlotA] = 20,  // Force Push (AoE push)
-			[SlotType.SlotE] = 24,  // Counter (defense)
-			[SlotType.Shift] = 26,  // Blink (mobility)
-			[SlotType.Elite] = 35,  // Storm Surge (CONSUME Electrified → longer)
+			[SlotType.Slot5] = 20,  // Force Push (AoE push)
+			[SlotType.Slot6] = 24,  // Counter (defense)
+			[SlotType.Slot7] = 26,  // Blink (mobility)
+			[SlotType.Slot8] = 35,  // Storm Surge (CONSUME Electrified → longer)
 		};
 		
 		// "Juggernaut" — Vulnerable + Execute synergy (tank/melee)
@@ -249,23 +251,23 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 13,  // Execute (consumes Vulnerable → +150%)
 			[SlotType.Slot3] = 19,  // Power Strike (heavy KB)
 			[SlotType.Slot4] = 32,  // Charge (gap close)
-			[SlotType.SlotA] = 14,  // Shield Bash (Bouclier consume)
-			[SlotType.SlotE] = 28,  // Iron Wall (defense)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 34,  // Annihilate (massive burst)
+			[SlotType.Slot5] = 14,  // Shield Bash (Bouclier consume)
+			[SlotType.Slot6] = 28,  // Iron Wall (defense)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 34,  // Annihilate (massive burst)
 		};
 		
-		// "Starter" — legacy balanced build (kept for familiarity)
-		_presets["Starter"] = new Dictionary<SlotType, int>
+		// "Brawler" — fonctionnel avec projectile, cone, stun zone, cast, AoE sol
+		_presets["Brawler"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 18,  // Arcane Shot (basic ranged)
-			[SlotType.Slot2] = 17,  // Wind Slash (basic melee)
-			[SlotType.Slot3] = 25,  // Dash Roll (mobility)
-			[SlotType.Slot4] = 6,   // Radiant Shield (shield)
-			[SlotType.SlotA] = 26,  // Blink (teleport)
-			[SlotType.SlotE] = 22,  // Shockwave (KB)
-			[SlotType.Shift] = 24,  // Counter (parry)
-			[SlotType.Elite] = 38,  // Nova (big AoE)
+			[SlotType.Slot1] = 18,  // Arcane Shot — projectile low cd (spam)
+			[SlotType.Slot2] = 41,  // Cone of Cold — cone frontal, slow, récompense le spacing
+			[SlotType.Slot3] = 7,   // Freezing Trap — zone au sol, applique Slowed
+			[SlotType.Slot4] = 10,  // Frost Lance — consume Slowed → stun, beam
+			[SlotType.Slot5] = 6,   // Corrupted Ground — AoE sol DoT (Vulnérable + Brûlure)
+			[SlotType.Slot6] = 22,  // Shockwave — AoE pushback
+			[SlotType.Slot7] = 25,  // Dash Roll — mobilité
+			[SlotType.Slot8] = 33,  // Meteor Rain — cast ultimate, AoE géant
 		};
 	}
 	

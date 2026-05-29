@@ -1,0 +1,101 @@
+=== Amaterasu ===
+Agility and a relentless blade make Amaterasu a formidable opponent. She strikes quickly and decisively, knocking her foes all around the arena; launching them upwards, downwards, even backwards!
+
+Abilities
+Sunseeker Dash forward a long distance before flying upward With a sword uppercut. Enemies hit by the dash take 6 Damage and Light Knockback. Enemies hit by the upward attack take 10 Damage and are launched into the air in front of you. Dash forward a long distance before flying upward With a sword uppercut. Heavenly Strike Slash through enemies in front of you. Enemies hit are briefly held in place and take 6 Damage, then launched away in the opposite direction with a Heavy Knockback and take another 8 Damage. Slash through enemies in front of you. Sunlit Uppercut Slash upward and rise into the air. Enemies hit take 6 Damage and are knocked into the air directly in front of you. Slash upward and rise into the air. Final Light Send a ray of light forward. Enemies hit cannot move for 2s and are rapidly slashed before being finished off With a final Heavy Knockback
+
+=== Athena ===
+Athena's heavy shield makes her a difficult opponent to face. Her defenses allow her to stay in the fight and her mighty spear toss leaves no enemy safe at any range. Ancient guardians answer her call and can quickly turn the tide of battle.
+
+Abilities
+Protector Guardian Q Jump into the air and leap to a target location, dealing 10 Damage and Medium Knockback where you land. You gain 50% Knockback Protection and 50% Damage Protection for 5s. Spear Toss E Toss a spear projectile that does 10 Damage and Medium Knockback. If the spear embeds into the ground of a wall, It can be jumped on to launch you into the air and empower your next aerial attack. Parry R Raise your shield for 0.75s and form a protective bubble. If struck while protected you negate the damage and immediately parry, dealing 20 Damage and Medium Knockback. If no one attacks, you end with a spin move that does 10 Damage. Aegis Charge F Summon 2 groups of Guardians that charge forward. Enemies hit by your Guardians take 20 Damage and Heavy Knockback. The Guardians block most projectiles.
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Swipe your spear horizontally as you travel forward. Enemies hit take 5 Damage and Light Knockback. If you used Spear Toss as a launchpad to get into the air, this ability deals 10 Damage and Medium Knockback instead. Heavy Attack RMB Dash forward and stab with your spear, dealing 10 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Lunge forward and thrust with your spear before bashing targets away with your shield. The first hit deals 5 Damage. The second hit deals 10 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB
+
+=== Hercules ===
+Hercules uses his impossible strength to crush and overpower. The demigod rips out earth to throw at opponents and charges at foes to quickly close long distances. Enemies beware when he enrages!
+
+Abilities
+Pounce Q Leap into the air with momentum. Upon refiring this ability you slam straight down to the ground. Enemies hit take 12 Damage and Medium Knockback. Boulder Toss E Rip a boulder out of the ground and throw it at enemies as a projectile. Enemies hit take 15 Damage and Medium Knockback. Driving Strike R Charge forward for 4s. Enemies hit during the charge take 2 Damage and Light Knockback. Refiring the ability ends the charge with a shoulder check that deals 15 Damage and Heavy Knockback. Berserker Rage F Enter a Berserk state where you are Fully Immune but have limited controls. Unleash a flurry of 6 powerful attacks, each dealing 15 Damage and Heavy Knockback
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Lunge forward in the air with your fist, dealing 5 Damage and pushing enemies hit in front of you. Heavy Attack RMB Dash forward and swing your club in a wide arc, dealing 10 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Smash through the ground with your club, causing a chunk of rock to rip out of the earth. Enemies hit by this take 15 Damage and Heavy Knockback. The rock persists for 1.75 seconds and can block movement and projectiles. Air Heavy Attack InAir + RMB Lurch forward with a large swing, dealing 8 Damage and Heavy Knockback dodge (wiki truncated) in any direction, dodge (wiki truncated).
+
+Talents
+Traits Enraged Divine Trait (truncated)
+
+=== Izanami ===
+Driven by wrathful anger, Izanami expertly wields her kama sickles to slice and dice her way across the battlefield. She can quickly scuttle towards her foes and follow up with devastating attacks, or release a frightening apparition to send them running away in fear.
+
+Abilities
+Fade Q Rise high into the air and select a ground location. On landing, you become Invisible for 3s. Performing an action or getting hit takes you out of stealth. Enemies in the landing zone take 5 Damage and Light Knockback. Seeking Sickle E Throw a sickle projectile that launches player into the air if hitting them on the way out, dealing 10 Damage. On return it launches enemies towards you, dealing another 10 Damage and Heavy Knockback. Lunging Cleave R Scamper forward quickly and slash multiple times with your sickles. The first 3 hits deal 3 Damage. The final hit deals 6 Damage and Heavy Knockback. Spectral Projection F Izanami unleashes a spectral projection that Fears enemies it touches for 2s. After travelling for a while it splits into multiple projections that guard an area, Fearing additional enemies that come into range. Refiring the ability causes it to stop early.
+
+Attacks
+Light Attack LMB 4-Hit Combo Attack, dealing 6/6/6/6 Damage. Air Light Attack InAir + LMB Throw an energy sickle projectile in front of you a short distance, dealing 5 Damage to the first target in its path and pushing them back slightly. Heavy Attack RMB Lunge forward and unleash a strong attack with your kama sickles, dealing 10 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Lunge forward and fire a stream of dark energy that deals 15 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB
+
+=== King Arthur ===
+Empowered by the mighty sword Excalibur, King Arthur uses divine power to stun his opponents and send waves of pure energy across the battlefield. In times of need, Excalibur can grant him extra strength. For Camelot!
+
+Abilities
+Albion's Rally Q Jump into the air and slam down at a target location, dealing 5 Damage and Light Knockback. You place a banner where you land that provides Increased Movement Speed to allies within 10m for 5s. Soaring Edge E Unleash an energy wave projectile. Enemies hit take 15 Damage and are Slowed for 3s. Blinding Light R Excalibur flashes light in a frontal cone, dealing 12 Damage. Enemies hit are stunned for 1.25s. Might of Excalibur F Arthur slams the ground with Excalibur, dealing 20 Damage and Heavy Knockback to targets around him. For the next 10s, Excalibur gains 4m Increased Ranged and hits 8% Extra Damage.
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Slash upwards with Excalibur, dealing 5 Damage and sending enemies upwards with you. Heavy Attack RMB Advance forward quickly and execute a strong overhead attack, dealing 10 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Lunge forward and slash at enemies in a wide radius, dealing 15 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB Overhead slash with Excalibur, dealing 5 Damage and sending enemies downward. dodge (wiki truncated) in any direction, dodge (wiki truncated).
+
+Talents
+Traits Destined Strike Divine Trait Enemies hit while Slowed by Sparing Edge take an additional 20% Knockback and 20% Damage. Default Master Swordsmanship (truncated)
+
+=== Sol ===
+Sol's fiery nature combined with her mastery of the sun gives her an arsenal of toasty abilities. From ranged fireballs to concussive explosions and the ability to throw a portion of the sun itself! You will want to avoid her gaze lest you get burned.
+
+Abilities
+Disapparate Q Turn into a fireball that travels in the direction you are looking at. Enemies you fly into take 6 Damage and Light Knockback. You are Knockback Immune during this ability. Fireball E Lob a fireball projectile that explodes into multiple lingering flame when it hits a player or the world. The fireball deals 10 Damage and Medium Knockback on impact. The lingering flames deal 2 Damage every 0.5s. Combustion R Gather energy for a short duration before exploding in a 10m radius around you. Enemies hit take 10 Damage and Heavy Knockback. You can freely move or jump while gathering energy. Supernova F Rise high into the air and select a ground location. After 2s, you throw a massive fireball projectile down at the target location, dealing 30 Damage and Heavy Knockback to enemies it hits.
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Lunge forward in the air, dealing 4 Damage and pushing enemies hit in front of you. Heavy Attack RMB Shoot a jet of fire forward while propelling yourself backwards. Hold Heavy Attack  Hold + RMB Dash forward and hit all enemies in a small area with flames, dealing 15 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB Spin in the air, creating a circle of fire around you and knock away enemies you hit, dealing 8 Damage and Heavy Knockback. dodge (wiki truncated) (truncated - wiki data cut off)
+
+=== Sun Wukong ===
+Sun Wukong wields the legendary staff Ruyi Jingu Bang. He attacks precisely, and can magically extend the staff across the battlefield to smack unsuspecting foes. He can take various animal forms to attack with increased speed and ferocity. Finally, in true trickster fashion, his summoned clone is sure to confuse and confound!
+
+=== Susano ===
+Susano unleashes a whirlwind of attacks. Utilizing wind he excels at launching his opponents upward to be sliced through by his aerial strikes. Beware of the swirling Typhoon unless you want to be blown away!
+
+Abilities
+Updraft Q Rise high into the air and select a ground location. You land with a spinning flourish, dealing 12 Damage and Medium Knockback to enemies caught within the area. Swirling Tempest E Call forth a tornado projectile that travels forward for 30m. Enemies hit take 5 Damage are held in the air for 1.1s. Storm Kata R Susano unleashes 3 strikes that can be used in sequence by refiring the ability within 4s of the previous fire. The strikes deal 10/5/5 Damage. The final hit knocks targets into the air. Summer Storms F Conjure a massive Typhoon at a target location. Enemies are pulled to the center, held in place and take 12 Damage. You then fly through the Typhoon and knock everyone out with a powerful strike, dealing another 15 Damage and Heavy Knockback.
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Spin in the air 3 times with your blade outstretched. Enemies hit by the first two spins take 3 Damage and are pushed back slightly. Enemies hit by the final spin take 5 Damage and are pushed back a little further. Heavy Attack RMB Rush forward and slice at your foes, dealing 8 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Lunge forward and swing your blade in a wide arc. Enemies hit take 15 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB Dash forward and slash with a powerful swing, dealing 6 Damage and Heavy Knockback. dodge (wiki truncated) in any direction, dodge (truncated)
+
+=== Thanatos ===
+Thanatos empowers his abilities using his own life force, and can steal the essence of foes to heal himself. He swoops, lunges and swing away at enemies with his iconic scythe. Those that are close to death beware!
+
+Abilities
+Hovering Death Q Rise into the air and hover around, then dive down through the selected area and hit enemies for 3 Damage. Quickly re-emerge and deal an additional 10 Damage and Heavy Knockback outwards. Take 5 Damage on use. Deal extra damage and knockback to targets over 100% Vulnerability. Soul Leech E An enlarged scythe erupts at the target location, knocking enemies towards you, dealing 10 Damage. Enemies hit release 5 orbs that Heal you for 4 Vulnerability each. Targets Over 100% Vulnerability take extra damage and knockback, and spawn 3 extra orbs. On the Hunt R Swing your scythe in a wide arc in front of you, dealing 15 Damage and Heavy Knockback. Mortal Coil F Charge forward quickly. On touching an enemy pull them into the air and leech 20 Vulnerability to Heal yourself, before swatting them away, dealing 15 Damage and Heavy Knockback.
+
+Attacks
+All Attack Targets over 100% Vulnerability take extra damage and knockback. Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Fly forward and jab with your scythe. Enemies hit take 6 Damage and are pushed a short distance in front of you. Heavy Attack RMB Lunge forward and swipe in an angled upward strike, dealing 10 Damage and Heavy Knockback. Hold Heavy Attack (truncated)
+
+=== Thor ===
+Thor wields Mjolnir with devastating force, calling down lightning and storms to crush his foes. His anvil strikes stun, his thrown hammer punishes at range, and his tectonic fury reshapes the battlefield.
+
+Abilities
+Anvil of Dawn Q Rise into the air and select a ground location. Slam down with Mjolnir, dealing 14 Damage and Stunning enemies in the area for 1.25s. Mjolnir's Attunement E Throw Mjolnir forward as projectile, dealing 10 Damage and Light Knockback. At maximum range Mjolnir explodes, dealing 15 Damage and Heavy Knockback to enemies within a 7.5m radius. Berserker's Barrage R Spin around 3 times with Mjolnir. Gain 25% Increased Movement Speed during this ability and deal 5 Damage and Light Knockback to enemies hit during these spins, before unleashing a final swing that deals 12 Damage and Heavy Knockback. Tectonic Rift F Channel lightning into Mjolnir then slam it into the ground. The earth erupts in a line, dealing 25 Damage and Heavy Knockback. The wall of earth persists for 5s and blocks projectiles and movement.
+
+Attacks
+Light Attack LMB 3-Hit Combo Attack, dealing 6/6/12 Damage. Air Light Attack InAir + LMB Mjolnir pulls you forward, dealing 6 Damage and pushing enemies hit in front of you. Heavy Attack RMB Charge forward and swing the mighty Mjolnir in an arc in front of you. Enemies hit take 8 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Rush forward and unleash a devastating strike with Mjolnir, dealing 16 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB Wind up Mjolnir before swinging it in front of you with heavy force. dodge (wiki truncated)
+
+=== Ymir ===
+Ymir loves to push his weight around and bully his opponents. For particularly agile foes he use his frost breath to slow them down to a standstill! If he gets on a roll well... he turns into a snowball of course! Avoid being caught in the snow if you want to stay on the field!
+
+Abilities
+Icicle Slide Q Glide forward riding an icicle, then launch yourself upwards when you finish gliding. You can end the glide early by jumping or refiring the ability. Enemies hit by the icicle take 12 Damage and Medium Knockback. Frost Breath E Channel a frost breath in front of you for 6 ticks over 2s. Each tick deals 3 Damage and Slows enemies down for 2s. On receiving 4 ticks enemies are Frozen in place for 3s. You are Knockback Immune while channelling. Ice Wall R Summon a wall of ice in front of you that lasts 6s. The wall blocks enemies, allies and projectiles. You can refire this ability to bring the wall down early. Snowball! F Turn into a snowball for 6s. You grow in size over time and pick up enemies you roll over. When the snowball expires enemies are launched out, taking 16 Damage and Heavy Knockback. If you jump off the arena, enemies are launched upwards instead.
+
+Attacks
+Light Attack LMB 2-Hit Combo Attack, dealing 9/15 Damage. Air Light Attack InAir + LMB Lunge forward, belly first! Enemies hit take 5 Damage and Medium Knockback. Heavy Attack RMB Lunge forward with a mighty swing with your frost mallet, dealing 12 Damage and Heavy Knockback. Hold Heavy Attack  Hold + RMB Move forward slightly and smash the ground with your frost mallet, creating an explosion of ice that deals 15 Damage and Heavy Knockback. Air Heavy Attack InAir + RMB Crash down to the ground in a cannonball (truncated)
+
+=== Zeus ===
+Zeus' lightning is flexible, as is his game plan. His attacks and Thunderstruck can allow him to deal high area damage at close range while his Bolts of Olympus lets him pick off foes from range. He can surge through his foes before doubling up on his attack or fleeing, his choice. When you see dark thunder clouds take cover as Zeus is about to let the Heaven's Rage!
+
+Abilities
+Surge Dash forward 17.5m, damaging enemies along the way. Enemies hit take 6 Damage and Medium Knockback. Zeus can refire this ability within 4 seconds to dash again. Zeus floats while aiming this ability. Dash forward 17.5m, damaging enemies along the way. Bolt of Olympus Rip Hold a bolt of Olympus aloft before throwing the projectile forward stopping on first enemy hit. Enemies hit take 7 Damage and Heavy Knockback. If Zeus holds it for 1s it deals 12 Damage, becomes a large projectile, and will shock enemies near the enemy hit for 6 Damage. Rip Hold a bolt of Olympus aloft before throwing the projectile forward stopping on first enemy hit. Thunderstruck Call down thunder from the sky, striking 3 areas in a line in front of him in a quick sequence. Enemies hit by the initial 2 strikes take 4 Damage and are pushed (truncated)

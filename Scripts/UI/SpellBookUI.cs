@@ -449,15 +449,73 @@ public partial class SpellBookUI : Control
 	{
 		return slot switch
 		{
-			SlotType.Slot1 => "1",
-			SlotType.Slot2 => "2",
-			SlotType.Slot3 => "3",
-			SlotType.Slot4 => "4",
-			SlotType.SlotA => "5",
-			SlotType.SlotE => "6",
-			SlotType.Shift => "7",
-			SlotType.Elite => "8",
+			SlotType.Slot1 => GetActionKey("spell_slot1"),
+			SlotType.Slot2 => GetActionKey("spell_slot2"),
+			SlotType.Slot3 => GetActionKey("spell_slot3"),
+			SlotType.Slot4 => GetActionKey("spell_slot4"),
+			SlotType.Slot5 => GetActionKey("spell_slotA"),
+			SlotType.Slot6 => GetActionKey("spell_slotE"),
+			SlotType.Slot8 => GetActionKey("spell_slotR"),
 			_ => "?"
+		};
+	}
+	
+	private static string GetActionKey(string actionName)
+	{
+		var events = InputMap.ActionGetEvents(actionName);
+		if (events.Count > 0 && events[0] is InputEventKey keyEvent)
+		{
+			Key key = keyEvent.PhysicalKeycode != Key.None
+				? keyEvent.PhysicalKeycode
+				: keyEvent.Keycode;
+			return KeyDisplayName(key);
+		}
+		return "(unbound)";
+	}
+	
+	private static string KeyDisplayName(Key key)
+	{
+		return key switch
+		{
+			Key.Space => "Space",
+			Key.Shift => "Shift",
+			Key.Ctrl => "Ctrl",
+			Key.Escape => "Esc",
+			Key.Key1 => "1",
+			Key.Key2 => "2",
+			Key.Key3 => "3",
+			Key.Key4 => "4",
+			Key.Key5 => "5",
+			Key.Key6 => "6",
+			Key.Key7 => "7",
+			Key.Key8 => "8",
+			Key.A => "A",
+			Key.B => "B",
+			Key.C => "C",
+			Key.D => "D",
+			Key.E => "E",
+			Key.F => "F",
+			Key.G => "G",
+			Key.H => "H",
+			Key.I => "I",
+			Key.J => "J",
+			Key.K => "K",
+			Key.L => "L",
+			Key.M => "M",
+			Key.N => "N",
+			Key.O => "O",
+			Key.P => "P",
+			Key.Q => "Q",
+			Key.R => "R",
+			Key.S => "S",
+			Key.T => "T",
+			Key.U => "U",
+			Key.V => "V",
+			Key.W => "W",
+			Key.X => "X",
+			Key.Y => "Y",
+			Key.Z => "Z",
+			_ => key.ToString()
 		};
 	}
 	

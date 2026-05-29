@@ -60,3 +60,8 @@ heightmap.bin
 # ==========================================
 packages/
 *.nupkg
+
+# ==========================================
+# Redundant archives (extracted assets already present)
+# ==========================================
+*.zip
