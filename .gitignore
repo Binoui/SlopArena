@@ -1,16 +1,23 @@
 # ==========================================
-# Godot Engine
+# Unreal Engine 5
 # ==========================================
-.godot/
-*.translation
-export_presets.cfg
-*.import
-
-# Editor settings (contains API keys!)
-editor_settings-*.tres
-
-# Godot AI — user-specific memory, never commit
-user://godot_ai_memory.json
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+Binaries/
+*.sln
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+*.VC.opendb
+*.xcodeproj
+*.xcworkspace
+.vscode/
+.vs/
+*.code-workspace
 
 # ==========================================
 # Build outputs
@@ -23,9 +30,6 @@ obj/
 # ==========================================
 # IDE / Editor
 # ==========================================
-.vs/
-.vscode/
-*.suo
 *.user
 *.userosscache
 *.sln.docstates
@@ -54,9 +58,3 @@ CLAUDE.md
 # Large binary data (use Git LFS or generate at runtime)
 # ==========================================
 heightmap.bin
-
-# ==========================================
-# NuGet
-# ==========================================
-packages/
-*.nupkg

@@ -1,13 +1,6 @@
 #!/bin/bash
-if ! command -v dotnet &> /dev/null
-then
-    echo "============================================="
-    echo "Error: .NET SDK (dotnet) is not installed."
-    echo "Please install it using your package manager:"
-    echo "  sudo pacman -S dotnet-sdk-8.0"
-    echo "============================================="
-    exit 1
-fi
-
-echo "Building and starting SlopArena Authoritative Server..."
-dotnet run --project Server/SlopArena.Server.csproj
+echo "=== SlopArena Server ==="
+echo "Server/ is reserved for future multiplayer (Unreal dedicated server)."
+echo "The old Godot C# server has been archived."
+echo ""
+echo "To run: use Unreal Editor or packaged game build."
