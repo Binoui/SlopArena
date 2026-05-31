@@ -18,6 +18,7 @@ public class SlopArena : ModuleRules
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
+			"AIModule",
 			"NetworkPrediction",
 			"UMG",
 		});

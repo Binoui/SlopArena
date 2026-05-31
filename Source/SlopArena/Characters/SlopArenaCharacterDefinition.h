@@ -1,14 +1,13 @@
 // Copyright SlopArena Contributors. MIT License.
 
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
 #include "SlopArenaCharacterDefinition.generated.h"
 
 class UGameplayAbility;
-class UGameplayEffect;
+class UAnimMontage;
 
 /** Shape of an ability's hitbox for hit detection. */
 UENUM(BlueprintType)
@@ -101,14 +100,20 @@ class SLOPARENA_API USlopArenaCharacterDefinition : public UDataAsset
 	GENERATED_BODY()
 
 public:
+	// ~ Identity
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	FText CharacterName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	FText Description;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
-	TObjectPtr<USkeletalMesh> Mesh;
+	// ~ Visual
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual")
+	TSoftObjectPtr<USkeletalMesh> Mesh;
+
+	/** Shared humanoid skeleton (Mixamo-based) used by all characters. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual")
+	TSoftObjectPtr<USkeleton> Skeleton;
 
 	// ~ Stats
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
@@ -123,15 +128,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	float Weight = 1.0f; // Knockback resistance multiplier
 
-	// ~ Light attack (3-hit chain)
+	// ~ Combat data
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combo")
 	FLightAttackData LightAttack;
 
-	// ~ Heavy attack
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combo")
 	FAbilityData HeavyAttack;
 
-	// ~ Abilities (DKO-style: 3 + 1 ultimate)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities")
 	FAbilityData Ability1;
 
@@ -143,6 +146,25 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Abilities")
 	FAbilityData Ultimate;
+
+	// ~ Animation slots (one UAnimMontage per ability)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> LightAttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> HeavyMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> Ability1Montage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> Ability2Montage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> Ability3Montage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	TSoftObjectPtr<UAnimMontage> UltimateMontage;
 
 	// ~ GAS references (set in Blueprint child, only needed at runtime)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS")

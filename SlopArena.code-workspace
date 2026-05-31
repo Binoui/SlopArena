@@ -1,8 +1,879 @@
 {
 	"folders": [
 		{
+			"name": "SlopArena",
 			"path": "."
+		},
+		{
+			"name": "UE5",
+			"path": "/home/binoui/UnrealEngine"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"typescript.tsc.autoDetect": "off",
+		"npm.autoDetect": "off",
+		"terminal.integrated.env.linux": {
+			"PATH": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64:${env:PATH}",
+			"DOTNET_ROOT": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64",
+			"DOTNET_HOST_PATH": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64/dotnet",
+			"DOTNET_MULTILEVEL_LOOKUP": "0",
+			"DOTNET_ROLL_FORWARD": "LatestMajor"
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.cpptools",
+			"ms-dotnettools.csharp"
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "SlopArena Linux Debug Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Debug Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena Linux Debug Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Debug Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux DebugGame Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena Linux DebugGame Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux DebugGame Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Development Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena Linux Development Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Development Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Test Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Test Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena Linux Test Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Test Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Shipping Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Shipping Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena Linux Shipping Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena Linux Shipping Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"Linux",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Debug Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Debug Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena LinuxArm64 Debug Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Debug Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 DebugGame Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena LinuxArm64 DebugGame Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 DebugGame Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Development Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena LinuxArm64 Development Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Development Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Test Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Test Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena LinuxArm64 Test Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Test Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Test",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Shipping Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Shipping Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArena LinuxArm64 Shipping Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArena LinuxArm64 Shipping Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArena",
+					"LinuxArm64",
+					"Shipping",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Debug Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Debug Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArenaEditor Linux Debug Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Debug Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Debug",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux DebugGame Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArenaEditor Linux DebugGame Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux DebugGame Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Development Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"SlopArenaEditor Linux Development Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			},
+			{
+				"label": "SlopArenaEditor Linux Development Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"SlopArenaEditor",
+					"Linux",
+					"Development",
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/binoui/UnrealEngine"
+				}
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Launch SlopArena (Debug)",
+				"request": "launch",
+				"program": "/home/binoui/Projects/SlopArena/Binaries/Linux/SlopArena-Linux-Debug",
+				"preLaunchTask": "SlopArena Linux Debug Build",
+				"args": [
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArena (DebugGame)",
+				"request": "launch",
+				"program": "/home/binoui/Projects/SlopArena/Binaries/Linux/SlopArena-Linux-DebugGame",
+				"preLaunchTask": "SlopArena Linux DebugGame Build",
+				"args": [
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArena (Development)",
+				"request": "launch",
+				"program": "/home/binoui/Projects/SlopArena/Binaries/Linux/SlopArena",
+				"preLaunchTask": "SlopArena Linux Development Build",
+				"args": [
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArena (Test)",
+				"request": "launch",
+				"program": "/home/binoui/Projects/SlopArena/Binaries/Linux/SlopArena-Linux-Test",
+				"preLaunchTask": "SlopArena Linux Test Build",
+				"args": [
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArena (Shipping)",
+				"request": "launch",
+				"program": "/home/binoui/Projects/SlopArena/Binaries/Linux/SlopArena-Linux-Shipping",
+				"preLaunchTask": "SlopArena Linux Shipping Build",
+				"args": [
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArenaEditor (Debug)",
+				"request": "launch",
+				"program": "/home/binoui/UnrealEngine/Engine/Binaries/Linux/UnrealEditor-Linux-Debug",
+				"preLaunchTask": "SlopArenaEditor Linux Debug Build",
+				"args": [
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject"
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArenaEditor (DebugGame)",
+				"request": "launch",
+				"program": "/home/binoui/UnrealEngine/Engine/Binaries/Linux/UnrealEditor-Linux-DebugGame",
+				"preLaunchTask": "SlopArenaEditor Linux DebugGame Build",
+				"args": [
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject"
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Launch SlopArenaEditor (Development)",
+				"request": "launch",
+				"program": "/home/binoui/UnrealEngine/Engine/Binaries/Linux/UnrealEditor",
+				"preLaunchTask": "SlopArenaEditor Linux Development Build",
+				"args": [
+					"/home/binoui/Projects/SlopArena/SlopArena.uproject"
+				],
+				"cwd": "/home/binoui/UnrealEngine",
+				"type": "cppdbg",
+				"visualizerFile": "/home/binoui/UnrealEngine/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
+			},
+			{
+				"name": "Generate Project Files",
+				"type": "coreclr",
+				"request": "launch",
+				"preLaunchTask": "UnrealBuildTool Linux Development Build",
+				"program": "/home/binoui/UnrealEngine/Engine/Build/BatchFiles/RunUBT.bat",
+				"args": [
+					"-projectfiles",
+					"-vscode",
+					"-project=/home/binoui/Projects/SlopArena/SlopArena.uproject",
+					"-game",
+					"-engine",
+					"-dotnet"
+				],
+				"env": {
+					"PATH": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64:${env:PATH}",
+					"DOTNET_ROOT": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64",
+					"DOTNET_HOST_PATH": "/home/binoui/UnrealEngine/Engine/Binaries/ThirdParty/DotNet/8.0.412/linux-x64/dotnet",
+					"DOTNET_MULTILEVEL_LOOKUP": "0",
+					"DOTNET_ROLL_FORWARD": "LatestMajor"
+				},
+				"console": "internalConsole",
+				"internalConsoleOptions": "openOnSessionStart",
+				"stopAtEntry": false,
+				"cwd": "/home/binoui/UnrealEngine"
+			}
+		]
+	}
 }

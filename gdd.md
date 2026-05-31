@@ -1,84 +1,163 @@
-# SlopArena — Game Design Document (Vision & Concept)
+# SlopArena — Game Design Document
 
-## 1. Executive Summary & Core Philosophy
+## 1. Core Concept
 
-### High Concept
+SlopArena is a **third-person arena brawler** where 2-8 players fight in compact, low-verticality arenas using pre-assembled character kits. The game emphasizes positioning, resource management (cooldowns), and mechanical execution over aim precision or gear progression.
 
-**SlopArena** is a high-execution, non-profit, open-source 3D Arena Brawler positioned as **"The Melee of Battle Arenas."**
+Each character has a defined role and a fixed kit of 6 abilities:
+- **Light Attack** — 3-hit melee chain with a finisher
+- **Heavy Attack** — Higher-damage special attack with longer cooldown
+- **Ability 1, 2, 3** — Signature abilities forming the core playstyle
+- **Ultimate** — High-impact ability with a long cooldown
 
-The game fuses the visceral physical movement of third-person action titles with the tactical positioning and target management of classic competitive MMORPGs. It strips away modern gaming friction—such as endless matchmaking queues, meta-progression grinding, paywalls, and microtransactions—to focus entirely on pure, unadulterated player skill.
+---
 
-### Core Philosophy
+## 2. Design Pillars
 
-- **PvP First:** No PvE, no farming, no laning. The arena is a playground designed solely for players interactions and outplays.
-    
-- **Load & Play:** A completely classless system. Players select their abilities from a universal grimoire to create a personal build.
-    
-- **Community-Driven & Open-Source:** Built by the community, for the community. Future features, balance patches, and design priorities are decided entirely by community votes.
-    
+### 2.1 PvP-First, Zero Friction
 
-## 2. Design Heritage: Where the Pieces Fit
+- No PvE, no matchmaking queues, no battle passes
+- Drop-in/drop-out FFA deathmatch servers
+- 1v1 / 2v2 arena sockets for coordinated play
 
-SlopArena does not seek to reinvent the wheel, but rather to isolate and perfect specific mechanical layers from various competitive genres:
+### 2.2 Small Kits, High Skill Ceiling
 
-> ### The SlopArena Synthesis
-> 
-> - **From MMORPG Arena PvP:** We take the over-the-shoulder camera ergonomics, right-click steering, and left-click target locking.
->     
-> - **From Arena Brawlers:** We take the compact ability kits, active parries, and reliance on spatial zones rather than hitscan gunplay.
->     
-> - **From Fighting Games & Fast-Action Titles:** We take _frame-canceling_, _hitstun_, and _directional influence (DI)_ to make combos a dynamic, interactive dialogue.
->     
-> - **From Modern Mobility Games:** We take the heavy, kinetic satisfaction of momentum conservation—specifically chaining dashes into ground slides to navigate micro-geometry.
->     
+- Every ability must have clear counterplay (telegraphed, dodgeable, or punishable)
+- Cooldowns are the primary resource — no mana, no ammo
+- Light attack combos reward mechanical execution (chain timing, directional reads)
 
-## 3. The Core Gameplay Loop: Smooth, Low-Verticality Movement
+### 2.3 Physics-Driven Combat
 
-Movement in SlopArena is an offensive and defensive tool. The game rejects static, linear speeds, opting instead for a weight-driven physics model that emphasizes **horizontal smoothness** over high-altitude aerial chaos.
+- Hitstun and knockback create openings for combos
+- Directional Influence (DI) lets the defender influence their trajectory during knockback, making combos an interactive exchange rather than a scripted sequence
+- Weight stat determines knockback resistance — heavier characters are harder to launch
 
-### The Mobility Chain
+---
 
-1. **Velocity Decoupling (Airborne Control):** When jumping, a player's horizontal flight path is locked. While airborne, the player can freely spin their camera 360° to face any direction, target enemies, or cast spells behind them without losing momentum or altering their original trajectory.
-    
-2. **The Dash:** A high-velocity vector impulse used to close distances or dodge incoming attacks. It is governed by a **strict cooldown** to prevent infinite spamming and enforce tactical intent.
-    
-3. **The Ground Slide:** If the player holds the _Crouch_ key upon landing a jump or during a Dash, ground friction is heavily reduced. The player's existing kinetic energy is absorbed and converted into a high-speed slide. All combat options, abilities, and attacks remain fully functional mid-slide.
-    
+## 3. Character Roles
 
-### Low-Verticality Map Design
+The roster is divided into five roles, each with a distinct stat profile and playstyle:
 
-To maintain combat readability without requiring FPS-style vertical aiming, arenas utilize a flat layout enhanced by standardized, low-profile platforms and shallow ramps. Sensation of speed comes from **drifting around corners** and sliding past pillars to break line-of-sight, rather than flying through the air.
+### Brawler (Colossus)
+- **Fantasy:** Melee juggernaut who controls the pace of engagement
+- **Strengths:** Durability, crowd control (grapple, shield bash), teamfight presence
+- **Weaknesses:** Moderate speed, predictable approach, vulnerable when abilities are down
+- **Signature:** Shield Bash (armored startup), Grapple (pull into melee range)
 
-## 4. Combat Dynamics & Ability System
+### Ranger (Marksman)
+- **Fantasy:** Precision ranged fighter who controls space
+- **Strengths:** Long-range poke, zone denial (traps), kite potential
+- **Weaknesses:** Low HP, poor close-range options, relies on spacing
+- **Signature:** Snare Trap (root on trigger), Arrow Volley (spread pressure)
 
-Combat is strictly dictated by server-validated hitboxes and hurtboxes. There is no automated tracking for skillshots; positioning and timing are paramount.
+### Assassin (Wraith)
+- **Fantasy:** Elusive burst damage that strikes from unexpected angles
+- **Strengths:** Highest speed, teleport (Shadow Step), stealth, execute ultimate
+- **Weaknesses:** Lowest HP, fragile, punishable if caught
+- **Signature:** Shadow Step (teleport), Death Mark (delayed detonation, CD reset on kill)
 
-### The Combo & Hitstun Architecture
+### Tank (Titan)
+- **Fantasy:** Immovable force that disrupts and protects
+- **Strengths:** Highest HP, knockback immunity (Fortify), wall-creating ultimate
+- **Weaknesses:** Slowest speed, predictable, limited ranged options
+- **Signature:** Charge (grab + wall slam), Arena (trapping walls)
 
-- **True Hitstun:** Landed attacks apply a brief window of un-actionable hitstun to the defender, which is necessary to allow execution-heavy combos.
-    
-- **Directional Influence (DI):** To prevent guaranteed, non-interactive "100-to-0" death scripts, projected players can use their movement keys to influence their trajectory while airborne. The attacker must actively read and adjust to the defender's DI to sustain a combo.
-    
-- **Anti-Lockdown Safeguards:** Continuous hits automatically scale down hitstun duration (diminishing returns) and scale up knockback distance, naturally pushing players out of infinite stuns—crucial for multiplayer survival.
-    
+### Mage (Sol)
+- **Fantasy:** Glass cannon that controls space with area denial
+- **Strengths:** High damage output, long-range beam (Sunbeam), powerful AoE ultimate
+- **Weaknesses:** Low HP, light weight (launched easily), telegraphed projectiles
+- **Signature:** Solar Orb (slow, high-damage projectile), Sunburst (AoE from above)
 
-### Spell Typology
+---
 
-The universal grimoire allows players to mix and match abilities across distinct execution styles:
+## 4. Combat System
 
-|**Spell Type**|**Targeting Method**|**Counterplay Strategy**|
-|---|---|---|
-|**Targeted / Homing**|Requires a hard Left-Click target lock. Projectile tracks the entity.|Defensive cooldowns, active parries, or breaking line-of-sight.|
-|**Linear Skillshots**|Fires directly along the camera axis, ignoring targeted locks.|Physical dodging via Dash or Slide.|
-|**Ground AoE**|Lobs or drops hazard zones independently of targets.|Spatial awareness, repositioning, or predictive movement.|
-|**Centered AoE / Counters**|Triggers an immediate effect or parry stance around the player.|Baiting out the ability, frame-canceling to stop your own attack.|
+### 4.1 Light Attack Chain
 
-## 5. Game Modes & Zero Friction
+Every character has a 3-hit light attack combo:
+- **Hit 1-2:** Low knockback, short hitstun. Fast recovery.
+- **Hit 3 (Finisher):** Higher knockback multiplier, longer hitstun. Slower recovery.
+- **Chain Window:** Time window to chain the next hit. Miss it, the combo resets.
 
-SlopArena is architected to eliminate matchmaking fatigue. If the player count is volatile, the game remains instantly playable.
+Chain windows vary by character (Titan: 0.5s generous, Wraith: 0.3s tight).
 
-- **Primary Mode: FFA Deathmatch:** Hosted on continuous, dedicated "drop-in / drop-out" servers. Players can hop into an active, chaotic arena instantly. If you die, you respawn immediately.
-    
-- **Secondary Mode: Arena Sockets (1v1 / 2v2):** A curated, competitive match format utilizing the exact same mechanical rulebook, but played within tight boundaries for coordinated teams and pure execution duals.
-    
-- **The Anti-Frustration Flow:** To keep the FFA format competitive and reward aggressive play, securing a kill instantly grants a partial health burst or resource reset, preventing players from simply waiting on the sidelines to backstab weakened survivors.
+### 4.2 Knockback & DI
+
+- Knockback is a physics impulse (force + upward component)
+- Negative knockback force = pull toward the attacker (Grapple)
+- The defender can influence their trajectory while airborne using WASD (Directional Influence)
+- Weight stat scales knockback resistance linearly
+
+### 4.3 Hit Detection Shapes
+
+| Shape | Behavior | Example |
+|-------|----------|---------|
+| MeleeCone | Frontal cone from the attacker | Shield Bash, Haymaker |
+| Projectile | Traveling hitbox with speed and lifetime | Solar Orb, Arrow Volley |
+| CircleAoE | Radial blast from a center point | Colossus Slam, Supernova |
+| Beam | Hitscan line from caster to max range | Sunbeam |
+| SelfBuff | No hitbox — applies to self | War Cry, Fortify |
+
+### 4.4 Status Effects
+
+Statuses are applied via `FGameplayTag` and affect combat outcomes:
+- **Burn** — Damage over time
+- **Stun** — Cannot act
+- **Slow** — Reduced movement speed
+- **Poison** — Damage over time (stacking)
+- **Root** — Cannot move (can still attack)
+
+---
+
+## 5. Movement
+
+### 5.1 Core Movement
+- Ground speed varies by character (480-700)
+- Jump force varies by character (500-650)
+- Air control is intentional but limited — you commit to your jump trajectory
+
+### 5.2 Dash
+- Universal movement ability on cooldown
+- Quick directional burst, maintains momentum on landing
+- Can be chained into attacks or slides
+
+### 5.3 Hitstun
+- Landing an attack applies a brief window where the target cannot act
+- Diminishing returns on repeated hits to prevent infinite stuns
+- Knockback scales up as combo length increases (natural combo breaker)
+
+---
+
+## 6. Game Modes
+
+### FFA Deathmatch (Primary)
+- Continuous drop-in/drop-out arena
+- Kill scoring, immediate respawn
+- Kill grants partial HP recovery to reward aggression
+
+### Arena Sockets 1v1 / 2v2 (Secondary)
+- Round-based format
+- Tight arena boundaries
+- Same mechanics, coordinated team play
+
+---
+
+## 7. Technical Architecture
+
+### Engine & Language
+- **Unreal Engine 5.7** — C++ project
+- **GAS (Gameplay Ability System)** — Ability activation, effects, attributes
+- **Server-authoritative** — All combat decisions are validated server-side
+
+### Data Flow
+- Registry holds character definitions (compiled-in table, migratable to DataAssets)
+- GameMode selects roster and manages spawns
+- Character pawn holds runtime state (HP via GAS AttributeSet)
+- Abilities read from character definition at spawn time
+
+### Current Status
+- Character data: Complete (5 characters, all stats defined)
+- Pawn/Movement: Skeleton implementation
+- GAS abilities: Stub implementations (real effects pending)
+- AI: Bot controller with basic decision-making
+- Networking: Placeholder state types, not yet wired

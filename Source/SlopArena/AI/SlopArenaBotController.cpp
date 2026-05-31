@@ -100,35 +100,35 @@ void ASlopArenaBotController::ExecuteDecision(const FBotDecision& Decision)
 		// Trigger via GAS
 		if (UAbilitySystemComponent* ASC = ControlledChar->GetAbilitySystemComponent())
 		{
-			ASC->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.LightAttack")));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.LightAttack"))));
 		}
 	}
 	if (Decision.ActionFlags & 0x08) // Ability 1
 	{
 		if (UAbilitySystemComponent* ASC = ControlledChar->GetAbilitySystemComponent())
 		{
-			ASC->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability1")));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability1"))));
 		}
 	}
 	if (Decision.ActionFlags & 0x10) // Ability 2
 	{
 		if (UAbilitySystemComponent* ASC = ControlledChar->GetAbilitySystemComponent())
 		{
-			ASC->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability2")));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability2"))));
 		}
 	}
 	if (Decision.ActionFlags & 0x20) // Ability 3
 	{
 		if (UAbilitySystemComponent* ASC = ControlledChar->GetAbilitySystemComponent())
 		{
-			ASC->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability3")));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability3"))));
 		}
 	}
 	if (Decision.ActionFlags & 0x40) // Ultimate
 	{
 		if (UAbilitySystemComponent* ASC = ControlledChar->GetAbilitySystemComponent())
 		{
-			ASC->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ultimate")));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ultimate"))));
 		}
 	}
 

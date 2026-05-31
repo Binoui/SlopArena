@@ -13,6 +13,9 @@ class UAttributeSet;
 class UGameplayAbility;
 class UInputAction;
 class UInputMappingContext;
+class USpringArmComponent;
+class UCameraComponent;
+struct FInputActionValue;
 
 /**
  * Main player character for SlopArena.
@@ -40,7 +43,7 @@ public:
 
 	/** Take damage with knockback. */
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void ApplyDamageWithKnockback(float Damage, FVector Knockback, AActor* Instigator);
+	void ApplyDamageWithKnockback(float Damage, FVector Knockback, AActor* DamageInstigator);
 
 protected:
 	// ~ GAS

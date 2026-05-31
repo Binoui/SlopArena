@@ -1,454 +1,251 @@
 // Copyright SlopArena Contributors. MIT License.
 
 #include "CharacterRegistry.h"
+#include "Engine/ObjectLibrary.h"
+#include "Engine/DataAsset.h"
 
 // =====================================================================
-// BRAWLER — Melee all-rounder (Hercules / Arthur archetype)
-// Playstyle: In your face, grabs, shields, relentless pressure
+// Compact data table — one entry per character.
+// Keeps all stats in a flat struct so the roster is readable at a glance.
+// When the editor is available, replace this with Blueprint DataAssets
+// and they'll load via LoadFromPath() instead.
 // =====================================================================
-USlopArenaCharacterDefinition* FCharacterRegistry::CreateBrawler()
+
+namespace
+{
+
+/** Stat block for one ability. */
+struct FAbilityEntry
+{
+	FName Name;
+	int32 Damage = 0;
+	float Cooldown = 0.0f;
+	float KnockbackForce = 0.0f;
+	float KnockbackUpward = 0.0f;
+	float Range = 0.0f;
+	float Radius = 0.0f;
+	float CastTime = 0.0f;
+	float ProjectileSpeed = 0.0f;
+	EAbilityShape Shape = EAbilityShape::SelfBuff;
+};
+
+/** Light-attack chain data. */
+struct FLightEntry
+{
+	int32 Damage = 8;
+	float KnockbackForce = 10.0f;
+	float KnockbackUpward = 3.0f;
+	float Range = 250.0f;
+	float Radius = 120.0f;
+	float ChainWindow = 0.4f;
+	float FinisherMultiplier = 1.5f;
+};
+
+/** Complete kit for one playable character. */
+struct FCharacterKit
+{
+	FName Name;
+	FString Description;
+
+	float MaxHP = 100.0f;
+	float WalkSpeed = 600.0f;
+	float JumpForce = 600.0f;
+	float Weight = 1.0f;
+
+	FLightEntry Light;
+	FAbilityEntry Heavy;
+	FAbilityEntry Ability1;
+	FAbilityEntry Ability2;
+	FAbilityEntry Ability3;
+	FAbilityEntry Ultimate;
+};
+
+// =====================================================================
+// Roster data
+// =====================================================================
+
+static const FCharacterKit CharacterTable[] =
+{
+	// ---- Colossus (Brawler) --------------------------------------------
+	{
+		.Name = "Colossus",
+		.Description = "An unstoppable melee force. Grapples enemies, blocks attacks, and slams the arena.",
+		.MaxHP = 120.0f,
+		.WalkSpeed = 550.0f,
+		.JumpForce = 550.0f,
+		.Weight = 1.3f,
+		.Light = { 8, 12.0f, 3.0f, 280.0f, 130.0f, 0.4f, 1.5f },
+		.Heavy = { "Haymaker", 20, 2.0f, 40.0f, 8.0f, 350.0f, 150.0f, 0.3f },
+		.Ability1 = { "Shield Bash", 15, 8.0f, 25.0f, 10.0f, 300.0f, 140.0f, 0.15f },
+		.Ability2 = { "Grapple", 10, 10.0f, -50.0f, 2.0f, 800.0f, 80.0f, 0.0f, 3000.0f, EAbilityShape::Projectile },
+		.Ability3 = { "War Cry", 0, 14.0f },
+		.Ultimate = { "Colossus Slam", 40, 60.0f, 60.0f, 25.0f, 500.0f, 400.0f, 0.5f, 0.0f, EAbilityShape::CircleAoE },
+	},
+	// ---- Marksman (Ranger) ---------------------------------------------
+	{
+		.Name = "Marksman",
+		.Description = "A precise ranged fighter. Controls space with traps and devastating arrow volleys.",
+		.MaxHP = 80.0f,
+		.WalkSpeed = 650.0f,
+		.JumpForce = 620.0f,
+		.Weight = 0.8f,
+		.Light = { 6, 10.0f, 2.0f, 300.0f, 100.0f, 0.35f, 1.4f },
+		.Heavy = { "Power Shot", 18, 1.5f, 35.0f, 5.0f, 2000.0f, 80.0f, 0.4f, 4000.0f, EAbilityShape::Projectile },
+		.Ability1 = { "Arrow Volley", 10, 6.0f, 15.0f, 3.0f, 1800.0f, 60.0f, 0.0f, 3500.0f, EAbilityShape::Projectile },
+		.Ability2 = { "Snare Trap", 5, 12.0f, 0.0f, 0.0f, 300.0f, 150.0f, 0.0f, 0.0f, EAbilityShape::CircleAoE },
+		.Ability3 = { "Evade", 12, 10.0f, 0.0f, 0.0f, 0.0f, 200.0f },
+		.Ultimate = { "Rain of Arrows", 35, 55.0f, 40.0f, 15.0f, 1500.0f, 350.0f, 0.3f, 0.0f, EAbilityShape::CircleAoE },
+	},
+	// ---- Wraith (Assassin) ---------------------------------------------
+	{
+		.Name = "Wraith",
+		.Description = "A deadly shadow. Teleports behind enemies, poisons, and executes marked targets.",
+		.MaxHP = 70.0f,
+		.WalkSpeed = 700.0f,
+		.JumpForce = 650.0f,
+		.Weight = 0.7f,
+		.Light = { 7, 8.0f, 0.0f, 240.0f, 110.0f, 0.3f, 2.0f },
+		.Heavy = { "Backstab", 15, 3.0f, 20.0f, 5.0f, 260.0f, 120.0f, 0.1f },
+		.Ability1 = { "Shadow Step", 0, 6.0f },
+		.Ability2 = { "Poison Blade", 20, 8.0f },
+		.Ability3 = { "Smoke Bomb", 0, 14.0f },
+		.Ultimate = { "Death Mark", 60, 50.0f, 0.0f, 0.0f, 1000.0f, 80.0f, 0.0f, 2000.0f, EAbilityShape::Projectile },
+	},
+	// ---- Titan (Tank) --------------------------------------------------
+	{
+		.Name = "Titan",
+		.Description = "An immovable fortress. Charges through enemies, shields allies, and traps foes in the arena.",
+		.MaxHP = 150.0f,
+		.WalkSpeed = 480.0f,
+		.JumpForce = 500.0f,
+		.Weight = 1.6f,
+		.Light = { 6, 15.0f, 2.0f, 300.0f, 150.0f, 0.5f, 1.3f },
+		.Heavy = { "Hammer Slam", 14, 2.5f, 50.0f, 12.0f, 380.0f, 200.0f, 0.4f },
+		.Ability1 = { "Charge", 20, 10.0f, 70.0f, 5.0f, 800.0f, 160.0f, 0.0f },
+		.Ability2 = { "Fortify", 0, 12.0f },
+		.Ability3 = { "Ground Pound", 12, 8.0f, 20.0f, 0.0f, 0.0f, 350.0f, 0.0f, 0.0f, EAbilityShape::CircleAoE },
+		.Ultimate = { "Arena", 25, 65.0f, 30.0f, 0.0f, 0.0f, 500.0f, 0.3f, 0.0f, EAbilityShape::CircleAoE },
+	},
+	// ---- Sol (Sun Mage) ------------------------------------------------
+	{
+		.Name = "Sol",
+		.Description = "The blazing sun incarnate. Controls space with orbs and beams, then burns everything in a supernova.",
+		.MaxHP = 75.0f,
+		.WalkSpeed = 625.0f,
+		.JumpForce = 600.0f,
+		.Weight = 0.75f,
+		.Light = { 7, 10.0f, 3.0f, 260.0f, 120.0f, 0.35f, 1.5f },
+		.Heavy = { "Solar Orb", 18, 3.0f, 30.0f, 5.0f, 1200.0f, 150.0f, 0.0f, 1500.0f, EAbilityShape::Projectile },
+		.Ability1 = { "Solar Flare", 14, 7.0f, 20.0f, 8.0f, 400.0f, 250.0f, 0.15f },
+		.Ability2 = { "Sunbeam", 12, 5.0f, 15.0f, 3.0f, 2000.0f, 80.0f, 0.2f, 0.0f, EAbilityShape::Beam },
+		.Ability3 = { "Supernova", 10, 10.0f, 45.0f, 15.0f, 0.0f, 350.0f, 0.1f, 0.0f, EAbilityShape::CircleAoE },
+		.Ultimate = { "Sunburst", 45, 55.0f, 55.0f, 25.0f, 800.0f, 400.0f, 0.6f, 0.0f, EAbilityShape::CircleAoE },
+	},
+};
+
+static constexpr int32 CharacterCount = sizeof(CharacterTable) / sizeof(CharacterTable[0]);
+
+// =====================================================================
+// Builder — converts a FCharacterKit entry into a runtime UObject
+// =====================================================================
+
+static USlopArenaCharacterDefinition* BuildFromEntry(const FCharacterKit& Entry)
 {
 	FLightAttackData Light;
-	Light.Damage = 8.0f;
-	Light.KnockbackForce = 12.0f;
-	Light.KnockbackUpward = 3.0f;
-	Light.Range = 280.0f;
-	Light.Radius = 130.0f;
-	Light.ChainWindow = 0.4f;
-	Light.FinisherMultiplier = 1.5f;
+	Light.Damage = static_cast<float>(Entry.Light.Damage);
+	Light.KnockbackForce = Entry.Light.KnockbackForce;
+	Light.KnockbackUpward = Entry.Light.KnockbackUpward;
+	Light.Range = Entry.Light.Range;
+	Light.Radius = Entry.Light.Radius;
+	Light.ChainWindow = Entry.Light.ChainWindow;
+	Light.FinisherMultiplier = Entry.Light.FinisherMultiplier;
 
-	FAbilityData Heavy;
-	Heavy.Name = "Haymaker";
-	Heavy.Description = NSLOCTEXT("SlopArena", "BrawlerHeavy", "A devastating lunging punch that knocks enemies back hard.");
-	Heavy.Shape = EAbilityShape::MeleeCone;
-	Heavy.Cooldown = 2.0f;
-	Heavy.Damage = 20.0f;
-	Heavy.KnockbackForce = 40.0f;
-	Heavy.KnockbackUpward = 8.0f;
-	Heavy.Range = 350.0f;
-	Heavy.Radius = 150.0f;
-	Heavy.CastTime = 0.3f;
+	auto ToAbility = [](const FAbilityEntry& Src) -> FAbilityData
+	{
+		FAbilityData Dst;
+		Dst.Name = Src.Name;
+		Dst.Shape = Src.Shape;
+		Dst.Cooldown = Src.Cooldown;
+		Dst.Damage = static_cast<float>(Src.Damage);
+		Dst.KnockbackForce = Src.KnockbackForce;
+		Dst.KnockbackUpward = Src.KnockbackUpward;
+		Dst.Range = Src.Range;
+		Dst.Radius = Src.Radius;
+		Dst.CastTime = Src.CastTime;
+		Dst.ProjectileSpeed = Src.ProjectileSpeed;
+		return Dst;
+	};
 
-	FAbilityData Q; // Shield Bash
-	Q.Name = "Shield Bash";
-	Q.Description = NSLOCTEXT("SlopArena", "BrawlerQ", "Raise your shield, then bash forward. Blocks incoming attacks during startup. Stuns on hit.");
-	Q.Shape = EAbilityShape::MeleeCone;
-	Q.Cooldown = 8.0f;
-	Q.Damage = 15.0f;
-	Q.KnockbackForce = 25.0f;
-	Q.KnockbackUpward = 10.0f;
-	Q.Range = 300.0f;
-	Q.Radius = 140.0f;
-	Q.CastTime = 0.15f;
-
-	FAbilityData E; // Grapple
-	E.Name = "Grapple";
-	E.Description = NSLOCTEXT("SlopArena", "BrawlerE", "Throw a chain that pulls an enemy toward you. Stuns briefly on arrival.");
-	E.Shape = EAbilityShape::Projectile;
-	E.Cooldown = 10.0f;
-	E.Damage = 10.0f;
-	E.KnockbackForce = -50.0f; // Negative = pull toward caster
-	E.KnockbackUpward = 2.0f;
-	E.Range = 800.0f;
-	E.Radius = 80.0f;
-	E.ProjectileSpeed = 3000.0f;
-
-	FAbilityData R; // War Cry (self buff)
-	R.Name = "War Cry";
-	R.Description = NSLOCTEXT("SlopArena", "BrawlerR", "Let out a mighty roar. Gain a damage buff and slow immunity for 4 seconds.");
-	R.Shape = EAbilityShape::SelfBuff;
-	R.Cooldown = 14.0f;
-	R.Damage = 0.0f;
-	R.Range = 0.0f;
-	R.Radius = 0.0f;
-
-	FAbilityData Ult; // Colossus Slam
-	Ult.Name = "Colossus Slam";
-	Ult.Description = NSLOCTEXT("SlopArena", "BrawlerUlt", "Leap into the air and slam down, creating a massive shockwave that launches all nearby enemies.");
-	Ult.Shape = EAbilityShape::CircleAoE;
-	Ult.Cooldown = 60.0f;
-	Ult.Damage = 40.0f;
-	Ult.KnockbackForce = 60.0f;
-	Ult.KnockbackUpward = 25.0f;
-	Ult.Range = 500.0f;
-	Ult.Radius = 400.0f;
-	Ult.CastTime = 0.5f;
-
-	return MakeDefinition(
-		NSLOCTEXT("SlopArena", "BrawlerName", "Colossus"),
-		NSLOCTEXT("SlopArena", "BrawlerDesc", "An unstoppable melee force. Grapples enemies, blocks attacks, and slams the arena."),
-		120.0f,  // HP
-		550.0f,  // Speed
-		550.0f,  // Jump
-		1.3f,    // Weight (knockback resistant)
-		Light, Heavy, Q, E, R, Ult
-	);
+	USlopArenaCharacterDefinition* Def = NewObject<USlopArenaCharacterDefinition>();
+	Def->CharacterName = FText::FromString(Entry.Name.ToString());
+	Def->Description = FText::FromString(Entry.Description);
+	Def->MaxHP = Entry.MaxHP;
+	Def->WalkSpeed = Entry.WalkSpeed;
+	Def->JumpForce = Entry.JumpForce;
+	Def->Weight = Entry.Weight;
+	Def->LightAttack = Light;
+	Def->HeavyAttack = ToAbility(Entry.Heavy);
+	Def->Ability1 = ToAbility(Entry.Ability1);
+	Def->Ability2 = ToAbility(Entry.Ability2);
+	Def->Ability3 = ToAbility(Entry.Ability3);
+	Def->Ultimate = ToAbility(Entry.Ultimate);
+	return Def;
 }
 
-// =====================================================================
-// RANGER — Ranged poke / zone control (Sol / Artemis archetype)
-// Playstyle: Keep distance, poke with projectiles, zone with traps
-// =====================================================================
-USlopArenaCharacterDefinition* FCharacterRegistry::CreateRanger()
-{
-	FLightAttackData Light;
-	Light.Damage = 6.0f;
-	Light.KnockbackForce = 10.0f;
-	Light.KnockbackUpward = 2.0f;
-	Light.Range = 300.0f;
-	Light.Radius = 100.0f;
-	Light.ChainWindow = 0.35f;
-	Light.FinisherMultiplier = 1.4f;
-
-	FAbilityData Heavy;
-	Heavy.Name = "Power Shot";
-	Heavy.Description = NSLOCTEXT("SlopArena", "RangerHeavy", "A charged shot that pierces through enemies. Longer range and higher knockback.");
-	Heavy.Shape = EAbilityShape::Projectile;
-	Heavy.Cooldown = 1.5f;
-	Heavy.Damage = 18.0f;
-	Heavy.KnockbackForce = 35.0f;
-	Heavy.KnockbackUpward = 5.0f;
-	Heavy.Range = 2000.0f;
-	Heavy.Radius = 80.0f;
-	Heavy.CastTime = 0.4f;
-	Heavy.ProjectileSpeed = 4000.0f;
-
-	FAbilityData Q; // Arrow Volley
-	Q.Name = "Arrow Volley";
-	Q.Description = NSLOCTEXT("SlopArena", "RangerQ", "Fire a volley of 3 arrows in a spread pattern.");
-	Q.Shape = EAbilityShape::Projectile;
-	Q.Cooldown = 6.0f;
-	Q.Damage = 10.0f;
-	Q.KnockbackForce = 15.0f;
-	Q.KnockbackUpward = 3.0f;
-	Q.Range = 1800.0f;
-	Q.Radius = 60.0f;
-	Q.ProjectileSpeed = 3500.0f;
-
-	FAbilityData E; // Trap
-	E.Name = "Snare Trap";
-	E.Description = NSLOCTEXT("SlopArena", "RangerE", "Place a trap on the ground. The first enemy to step on it is rooted in place for 2 seconds.");
-	E.Shape = EAbilityShape::CircleAoE;
-	E.Cooldown = 12.0f;
-	E.Damage = 5.0f;
-	E.KnockbackForce = 0.0f;
-	E.Range = 300.0f;
-	E.Radius = 150.0f;
-
-	FAbilityData R; // Evade (mobility)
-	R.Name = "Evade";
-	R.Description = NSLOCTEXT("SlopArena", "RangerR", "Quickly roll backward, leaving a decoy that explodes after a brief delay.");
-	R.Shape = EAbilityShape::SelfBuff;
-	R.Cooldown = 10.0f;
-	R.Damage = 12.0f;
-	R.Radius = 200.0f;
-
-	FAbilityData Ult; // Rain of Arrows
-	Ult.Name = "Rain of Arrows";
-	Ult.Description = NSLOCTEXT("SlopArena", "RangerUlt", "Launch a signal arrow. After a delay, a massive volley rains down on the targeted area.");
-	Ult.Shape = EAbilityShape::CircleAoE;
-	Ult.Cooldown = 55.0f;
-	Ult.Damage = 35.0f;
-	Ult.KnockbackForce = 40.0f;
-	Ult.KnockbackUpward = 15.0f;
-	Ult.Range = 1500.0f;
-	Ult.Radius = 350.0f;
-	Ult.CastTime = 0.3f;
-
-	return MakeDefinition(
-		NSLOCTEXT("SlopArena", "RangerName", "Marksman"),
-		NSLOCTEXT("SlopArena", "RangerDesc", "A precise ranged fighter. Controls space with traps and devastating arrow volleys."),
-		80.0f,   // HP
-		650.0f,  // Speed
-		620.0f,  // Jump
-		0.8f,    // Weight (light)
-		Light, Heavy, Q, E, R, Ult
-	);
-}
+} // anonymous namespace
 
 // =====================================================================
-// ASSASSIN — Fast melee burst (Izanami / Loki archetype)
-// Playstyle: Hit-and-run, stealth, backstab, high mobility
-// =====================================================================
-USlopArenaCharacterDefinition* FCharacterRegistry::CreateAssassin()
-{
-	FLightAttackData Light;
-	Light.Damage = 7.0f;
-	Light.KnockbackForce = 8.0f;
-	Light.Range = 240.0f;
-	Light.Radius = 110.0f;
-	Light.ChainWindow = 0.3f;  // Tight chain window — high skill
-	Light.FinisherMultiplier = 2.0f; // Big finisher reward
-
-	FAbilityData Heavy;
-	Heavy.Name = "Backstab";
-	Heavy.Description = NSLOCTEXT("SlopArena", "AssassinHeavy", "A precise strike. Deals 2x damage if hitting an enemy from behind.");
-	Heavy.Shape = EAbilityShape::MeleeCone;
-	Heavy.Cooldown = 3.0f;
-	Heavy.Damage = 15.0f;
-	Heavy.KnockbackForce = 20.0f;
-	Heavy.KnockbackUpward = 5.0f;
-	Heavy.Range = 260.0f;
-	Heavy.Radius = 120.0f;
-	Heavy.CastTime = 0.1f;
-
-	FAbilityData Q; // Shadow Step (teleport)
-	Q.Name = "Shadow Step";
-	Q.Description = NSLOCTEXT("SlopArena", "AssassinQ", "Teleport a short distance in the direction you're moving. Leave a shadow behind.");
-	Q.Shape = EAbilityShape::SelfBuff;
-	Q.Cooldown = 6.0f;
-	Q.Range = 500.0f;
-
-	FAbilityData E; // Poison Blade
-	E.Name = "Poison Blade";
-	E.Description = NSLOCTEXT("SlopArena", "AssassinE", "Enchant your weapon with poison. Your next light attack deals bonus damage over time.");
-	E.Shape = EAbilityShape::SelfBuff;
-	E.Cooldown = 8.0f;
-	E.Damage = 20.0f;
-
-	FAbilityData R; // Smoke Bomb
-	R.Name = "Smoke Bomb";
-	R.Description = NSLOCTEXT("SlopArena", "AssassinR", "Throw a smoke bomb at your feet. Become invisible and gain movement speed for 3 seconds. Attacking breaks stealth.");
-	R.Shape = EAbilityShape::SelfBuff;
-	R.Cooldown = 14.0f;
-
-	FAbilityData Ult; // Death Mark
-	Ult.Name = "Death Mark";
-	Ult.Description = NSLOCTEXT("SlopArena", "AssassinUlt", "Mark a target enemy. After 2 seconds, the mark detonates for massive damage. If the target dies, reset all ability cooldowns.");
-	Ult.Shape = EAbilityShape::Projectile;
-	Ult.Cooldown = 50.0f;
-	Ult.Damage = 60.0f;
-	Ult.Range = 1000.0f;
-	Ult.Radius = 80.0f;
-	Ult.ProjectileSpeed = 2000.0f;
-
-	return MakeDefinition(
-		NSLOCTEXT("SlopArena", "AssassinName", "Wraith"),
-		NSLOCTEXT("SlopArena", "AssassinDesc", "A deadly shadow. Teleports behind enemies, poisons, and executes marked targets."),
-		70.0f,   // HP
-		700.0f,  // Speed (fastest)
-		650.0f,  // Jump (highest)
-		0.7f,    // Weight (lightest)
-		Light, Heavy, Q, E, R, Ult
-	);
-}
-
-// =====================================================================
-// TANK — Heavy initiator (Thor / Herc tank archetype)
-// Playstyle: Slow, disruptive, absorb damage, CC the backline
-// =====================================================================
-USlopArenaCharacterDefinition* FCharacterRegistry::CreateTank()
-{
-	FLightAttackData Light;
-	Light.Damage = 6.0f;
-	Light.KnockbackForce = 15.0f; // High pushback
-	Light.KnockbackUpward = 2.0f;
-	Light.Range = 300.0f;
-	Light.Radius = 150.0f;
-	Light.ChainWindow = 0.5f; // Generous chains
-	Light.FinisherMultiplier = 1.3f;
-
-	FAbilityData Heavy;
-	Heavy.Name = "Hammer Slam";
-	Heavy.Description = NSLOCTEXT("SlopArena", "TankHeavy", "Slam your hammer down in front of you, creating a short-range shockwave.");
-	Heavy.Shape = EAbilityShape::MeleeCone;
-	Heavy.Cooldown = 2.5f;
-	Heavy.Damage = 14.0f;
-	Heavy.KnockbackForce = 50.0f;
-	Heavy.KnockbackUpward = 12.0f;
-	Heavy.Range = 380.0f;
-	Heavy.Radius = 200.0f;
-	Heavy.CastTime = 0.4f;
-
-	FAbilityData Q; // Charge
-	Q.Name = "Charge";
-	Q.Description = NSLOCTEXT("SlopArena", "TankQ", "Rush forward, grabbing the first enemy you hit. Carry them and slam them into a wall for bonus damage.");
-	Q.Shape = EAbilityShape::MeleeCone;
-	Q.Cooldown = 10.0f;
-	Q.Damage = 20.0f;
-	Q.KnockbackForce = 70.0f;
-	Q.KnockbackUpward = 5.0f;
-	Q.Range = 800.0f;
-	Q.Radius = 160.0f;
-
-	FAbilityData E; // Fortify (shield)
-	E.Name = "Fortify";
-	E.Description = NSLOCTEXT("SlopArena", "TankE", "Become immune to knockback and gain a shield that absorbs damage for 3 seconds.");
-	E.Shape = EAbilityShape::SelfBuff;
-	E.Cooldown = 12.0f;
-
-	FAbilityData R; // Ground Pound (AoE slow)
-	R.Name = "Ground Pound";
-	R.Description = NSLOCTEXT("SlopArena", "TankR", "Stomp the ground, creating a shockwave that slows and damages all enemies around you.");
-	R.Shape = EAbilityShape::CircleAoE;
-	R.Cooldown = 8.0f;
-	R.Damage = 12.0f;
-	R.KnockbackForce = 20.0f;
-	R.Radius = 350.0f;
-
-	FAbilityData Ult; // Arena
-	Ult.Name = "Arena";
-	Ult.Description = NSLOCTEXT("SlopArena", "TankUlt", "Create a ring of stone pillars around you, trapping enemies inside. The walls last 6 seconds.");
-	Ult.Shape = EAbilityShape::CircleAoE;
-	Ult.Cooldown = 65.0f;
-	Ult.Damage = 25.0f;
-	Ult.KnockbackForce = 30.0f;
-	Ult.Radius = 500.0f;
-	Ult.CastTime = 0.3f;
-
-	return MakeDefinition(
-		NSLOCTEXT("SlopArena", "TankName", "Titan"),
-		NSLOCTEXT("SlopArena", "TankDesc", "An immovable fortress. Charges through enemies, shields allies, and traps foes in the arena."),
-		150.0f,  // HP (tankiest)
-		480.0f,  // Speed (slowest)
-		500.0f,  // Jump (lowest)
-		1.6f,    // Weight
-		Light, Heavy, Q, E, R, Ult
-	);
-}
-
-// =====================================================================
-// SOL — Sun mage, glass cannon zoning (DKO Sol faithful adaptation)
-// Playstyle: Zone with orbs, poke with beams, all-in with ultimate
-//
-// Inspired by Sol from Divine Knockout:
-//   Heavy: Solar Orb — slow projectile that explodes
-//   Q: Solar Flare — wide fire cone
-//   E: Sunbeam — hitscan beam, her signature move
-//   R: Supernova — AoE knockback escape
-//   Ult: Sunburst — fly up, come crashing down
-// =====================================================================
-USlopArenaCharacterDefinition* FCharacterRegistry::CreateSol()
-{
-	FLightAttackData Light;
-	Light.Damage = 7.0f;
-	Light.KnockbackForce = 10.0f;
-	Light.KnockbackUpward = 3.0f;
-	Light.Range = 260.0f;
-	Light.Radius = 120.0f;
-	Light.ChainWindow = 0.35f;
-	Light.FinisherMultiplier = 1.5f;
-
-	// HEAVY: Solar Orb — slow projectile that explodes on contact
-	FAbilityData Heavy;
-	Heavy.Name = "Solar Orb";
-	Heavy.Description = NSLOCTEXT("SlopArena", "SolHeavy", "Launch a slow-moving orb of condensed sunlight. Explodes on contact, dealing AoE damage.");
-	Heavy.Shape = EAbilityShape::Projectile;
-	Heavy.Cooldown = 3.0f;
-	Heavy.Damage = 18.0f;
-	Heavy.KnockbackForce = 30.0f;
-	Heavy.KnockbackUpward = 5.0f;
-	Heavy.Range = 1200.0f;
-	Heavy.Radius = 150.0f;
-	Heavy.ProjectileSpeed = 1500.0f; // Slow — easy to dodge, high reward
-
-	// Q: Solar Flare — wide cone, Sol's bread and butter
-	FAbilityData Q;
-	Q.Name = "Solar Flare";
-	Q.Description = NSLOCTEXT("SlopArena", "SolQ", "Unleash a burst of solar energy in a wide cone. Sets enemies on fire, dealing damage over time.");
-	Q.Shape = EAbilityShape::MeleeCone;
-	Q.Cooldown = 7.0f;
-	Q.Damage = 14.0f;
-	Q.KnockbackForce = 20.0f;
-	Q.KnockbackUpward = 8.0f;
-	Q.Range = 400.0f;
-	Q.Radius = 250.0f; // Wide cone
-	Q.CastTime = 0.15f;
-
-	// E: Sunbeam — hitscan beam, her signature poke
-	FAbilityData E;
-	E.Name = "Sunbeam";
-	E.Description = NSLOCTEXT("SlopArena", "SolE", "Channel a beam of pure sunlight. Deals rapid damage to the first enemy hit. Longer range than any other ability.");
-	E.Shape = EAbilityShape::Beam;
-	E.Cooldown = 5.0f;
-	E.Damage = 12.0f;
-	E.KnockbackForce = 15.0f;
-	E.KnockbackUpward = 3.0f;
-	E.Range = 2000.0f;
-	E.Radius = 80.0f;
-	E.CastTime = 0.2f;
-
-	// R: Supernova — AoE burst around self, escape tool
-	FAbilityData R;
-	R.Name = "Supernova";
-	R.Description = NSLOCTEXT("SlopArena", "SolR", "Detonate your solar energy, pushing all nearby enemies away. Gives you a brief speed boost.");
-	R.Shape = EAbilityShape::CircleAoE;
-	R.Cooldown = 10.0f;
-	R.Damage = 10.0f;
-	R.KnockbackForce = 45.0f;
-	R.KnockbackUpward = 15.0f;
-	R.Radius = 350.0f;
-	R.CastTime = 0.1f;
-
-	// ULT: Sunburst — fly up, then crash down
-	FAbilityData Ult;
-	Ult.Name = "Sunburst";
-	Ult.Description = NSLOCTEXT("SlopArena", "SolUlt", "Ascend into the sky and transform into a blazing sun. After a moment, crash down on the target area, dealing massive AoE damage and knockback.");
-	Ult.Shape = EAbilityShape::CircleAoE;
-	Ult.Cooldown = 55.0f;
-	Ult.Damage = 45.0f;
-	Ult.KnockbackForce = 55.0f;
-	Ult.KnockbackUpward = 25.0f;
-	Ult.Range = 800.0f; // Target selection range
-	Ult.Radius = 400.0f;
-	Ult.CastTime = 0.6f; // Wind-up before ascending
-
-	return MakeDefinition(
-		NSLOCTEXT("SlopArena", "SolName", "Sol"),
-		NSLOCTEXT("SlopArena", "SolDesc", "The blazing sun incarnate. Controls space with orbs and beams, then burns everything in a supernova."),
-		75.0f,   // HP — glass cannon
-		625.0f,  // Speed — mobile
-		600.0f,  // Jump — floaty
-		0.75f,   // Weight — light, launched easily
-		Light, Heavy, Q, E, R, Ult
-	);
-}
-
-// =====================================================================
-// Factory
+// FCharacterRegistry implementation
 // =====================================================================
 
 TArray<USlopArenaCharacterDefinition*> FCharacterRegistry::GetAll()
 {
-	TArray<USlopArenaCharacterDefinition*> Characters;
-	Characters.Add(CreateBrawler());
-	Characters.Add(CreateRanger());
-	Characters.Add(CreateAssassin());
-	Characters.Add(CreateTank());
-	Characters.Add(CreateSol());
-	return Characters;
+	// Try loading from DataAssets first (editor workflow).
+	// If none found, fall back to the compiled-in character table.
+	TArray<USlopArenaCharacterDefinition*> Result = LoadFromPath(TEXT("/Game/Characters/Roster"));
+
+	if (Result.Num() > 0)
+	{
+		return Result;
+	}
+
+	// No DataAssets yet — use the compiled fallback table.
+	return CreateFallbackRoster();
 }
 
-USlopArenaCharacterDefinition* FCharacterRegistry::MakeDefinition(
-	const FText& Name,
-	const FText& Desc,
-	float HP,
-	float Speed,
-	float Jump,
-	float Weight,
-	FLightAttackData Light,
-	FAbilityData Heavy,
-	FAbilityData Ability1,
-	FAbilityData Ability2,
-	FAbilityData Ability3,
-	FAbilityData Ultimate)
+TArray<USlopArenaCharacterDefinition*> FCharacterRegistry::LoadFromPath(const FString& ContentPath)
 {
-	// Note: In a real Unreal build, this would construct a UObject via NewObject<USlopArenaCharacterDefinition>()
-	// For now, we just populate the struct data. The actual object creation happens at runtime.
-	// This function is a placeholder — in the editor, these will be DataAssets created from the Content Browser.
+	TArray<USlopArenaCharacterDefinition*> Result;
 
-	USlopArenaCharacterDefinition* Def = NewObject<USlopArenaCharacterDefinition>();
-	Def->CharacterName = Name;
-	Def->Description = Desc;
-	Def->MaxHP = HP;
-	Def->WalkSpeed = Speed;
-	Def->JumpForce = Jump;
-	Def->Weight = Weight;
-	Def->LightAttack = Light;
-	Def->HeavyAttack = Heavy;
-	Def->Ability1 = Ability1;
-	Def->Ability2 = Ability2;
-	Def->Ability3 = Ability3;
-	Def->Ultimate = Ultimate;
-	return Def;
+	UObjectLibrary* Lib = UObjectLibrary::CreateLibrary(USlopArenaCharacterDefinition::StaticClass(), false, true);
+	Lib->AddToRoot();
+	Lib->LoadAssetDataFromPath(ContentPath);
+	Lib->LoadAssetsFromAssetData();
+
+	TArray<FAssetData> AssetDataList;
+	Lib->GetAssetDataList(AssetDataList);
+
+	for (const FAssetData& Asset : AssetDataList)
+	{
+		if (USlopArenaCharacterDefinition* Def = Cast<USlopArenaCharacterDefinition>(Asset.GetAsset()))
+		{
+			Result.Add(Def);
+		}
+	}
+
+	Lib->RemoveFromRoot();
+	return Result;
+}
+
+TArray<USlopArenaCharacterDefinition*> FCharacterRegistry::CreateFallbackRoster()
+{
+	TArray<USlopArenaCharacterDefinition*> Result;
+	Result.Reserve(CharacterCount);
+
+	for (int32 i = 0; i < CharacterCount; ++i)
+	{
+		Result.Add(BuildFromEntry(CharacterTable[i]));
+	}
+
+	return Result;
 }

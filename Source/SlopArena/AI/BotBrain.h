@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "SlopArena/Shared/MovementProfile.h"
+#include "BotBrain.generated.h"
 
 class ASlopArenaCharacter;
 

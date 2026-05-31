@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EActionState.h"
-#include "MovementProfile.h"
+#include "SlopArena/Shared/EActionState.h"
+#include "SlopArena/Shared/MovementProfile.h"
 #include "GameFramework/Actor.h"
 #include "CharacterState.generated.h"
 

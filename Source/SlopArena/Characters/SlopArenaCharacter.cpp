@@ -3,7 +3,7 @@
 #include "SlopArenaCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
-#include "GameplayAbility.h"
+#include "Abilities/GameplayAbility.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -112,13 +112,13 @@ void ASlopArenaCharacter::OnRep_PlayerState()
 	}
 }
 
-void ASlopArenaCharacter::ApplyDamageWithKnockback(float Damage, FVector Knockback, AActor* Instigator)
+void ASlopArenaCharacter::ApplyDamageWithKnockback(float Damage, FVector Knockback, AActor* DamageInstigator)
 {
 	UE_LOG(LogSlopArenaCombat, Log, TEXT("%s took %.1f damage with knockback (%s)"),
 		*GetName(), Damage, *Knockback.ToString());
 
 	// Apply via GAS gameplay effect
-	if (AbilitySystemComponent && Instigator)
+	if (AbilitySystemComponent && DamageInstigator)
 	{
 		// TODO: Create and apply FGameplayEffectSpec for damage
 	}
@@ -156,7 +156,7 @@ void ASlopArenaCharacter::OnLightAttack()
 	// TODO: Trigger light attack ability via GAS
 	if (AbilitySystemComponent)
 	{
-		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.LightAttack")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.LightAttack"))));
 	}
 }
 
@@ -164,7 +164,7 @@ void ASlopArenaCharacter::OnAbility1()
 {
 	if (AbilitySystemComponent)
 	{
-		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability1")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability1"))));
 	}
 }
 
@@ -172,7 +172,7 @@ void ASlopArenaCharacter::OnAbility2()
 {
 	if (AbilitySystemComponent)
 	{
-		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability2")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability2"))));
 	}
 }
 
@@ -180,7 +180,7 @@ void ASlopArenaCharacter::OnAbility3()
 {
 	if (AbilitySystemComponent)
 	{
-		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ability3")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ability3"))));
 	}
 }
 
@@ -188,6 +188,6 @@ void ASlopArenaCharacter::OnUltimate()
 {
 	if (AbilitySystemComponent)
 	{
-		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTag::RequestGameplayTag(FName("Ability.Ultimate")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Ultimate"))));
 	}
 }

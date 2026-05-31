@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
-#include "Shared/CombatMath.h"
-#include "Shared/SpellResolver.h"
-#include "SlopArenaCharacterDefinition.h"
+#include "SlopArena/Shared/CombatMath.h"
+#include "SlopArena/Shared/SpellResolver.h"
+#include "SlopArena/Characters/SlopArenaCharacterDefinition.h"
 #include "SlopArenaAbility.generated.h"
 
 class ASlopArenaCharacter;
