@@ -15,28 +15,7 @@ public partial class SettingsUI : Control
 	// REBINDABLE ACTIONS
 	// ==========================================
 	
-	private readonly List<(string actionName, string displayName)> _bindableActions = new()
-	{
-		("move_forward",  "Move Forward"),
-		("move_back",     "Move Back"),
-		("move_left",     "Move Left"),
-		("move_right",    "Move Right"),
-		("jump",          "Jump"),
-		("dash",          "Dash"),
-		("crouch",        "Crouch"),
-		("spell_slot1",   "Spell Slot 1"),
-		("spell_slot2",   "Spell Slot 2"),
-		("spell_slot3",   "Spell Slot 3"),
-		("spell_slot4",   "Spell Slot 4"),
-		("spell_slotA",   "Spell Slot 5"),
-		("spell_slotE",   "Spell Slot 6"),
-		("spell_slotR",   "Spell Slot 8"),
-		("spellbook_toggle", "Spellbook"),
-		("target_next",   "Target Next"),
-		("trinket",       "Trinket"),
-		("tech",          "Tech Roll"),
-		("fast_fall",     "Fast Fall"),
-	};
+	private readonly List<(string actionName, string displayName)> _bindableActions = DefaultBindings;
 	
 	// ==========================================
 	// STATE
@@ -259,6 +238,9 @@ public partial class SettingsUI : Control
 		inputEvent.PhysicalKeycode = key;
 		InputMap.ActionAddEvent(actionName, inputEvent);
 		
+		// Persist to disk
+		SaveBindings();
+		
 		GD.Print($"Rebound \"{actionName}\" to {key}");
 	}
 	
@@ -357,7 +339,78 @@ public partial class SettingsUI : Control
 			_ => actionName
 		};
 	}
-	
+
+	// ==========================================
+	// PERSISTENCE
+	// ==========================================
+
+	private const string ConfigPath = "user://input.cfg";
+
+	public static void SaveBindings()
+	{
+		var config = new ConfigFile();
+		foreach (var (actionName, _) in DefaultBindings)
+		{
+			var events = InputMap.ActionGetEvents(actionName);
+			if (events.Count > 0 && events[0] is InputEventKey keyEvent)
+			{
+				int keyCode = (int)keyEvent.PhysicalKeycode;
+				if (keyCode != 0)
+					config.SetValue("input", actionName, keyCode);
+			}
+		}
+		config.Save(ConfigPath);
+	}
+
+	public static void LoadBindings()
+	{
+		var config = new ConfigFile();
+		if (config.Load(ConfigPath) != Error.Ok)
+			return;
+
+		foreach (var (actionName, _) in DefaultBindings)
+		{
+			var keyCode = (Key)(int)config.GetValue("input", actionName, 0);
+			if (keyCode == Key.None) continue;
+
+			var events = InputMap.ActionGetEvents(actionName);
+			for (int i = events.Count - 1; i >= 0; i--)
+			{
+				if (events[i] is InputEventKey keyEv)
+				{
+					InputMap.ActionEraseEvent(actionName, keyEv);
+					break;
+				}
+			}
+			var inputEvent = new InputEventKey();
+			inputEvent.PhysicalKeycode = keyCode;
+			InputMap.ActionAddEvent(actionName, inputEvent);
+		}
+	}
+
+	private static readonly List<(string actionName, string displayName)> DefaultBindings = new()
+	{
+		("move_forward",  "Move Forward"),
+		("move_back",     "Move Back"),
+		("move_left",     "Move Left"),
+		("move_right",    "Move Right"),
+		("jump",          "Jump"),
+		("dash",          "Dash"),
+		("crouch",        "Crouch"),
+		("spell_slot1",   "Spell Slot 1"),
+		("spell_slot2",   "Spell Slot 2"),
+		("spell_slot3",   "Spell Slot 3"),
+		("spell_slot4",   "Spell Slot 4"),
+		("spell_slotA",   "Spell Slot 5"),
+		("spell_slotE",   "Spell Slot 6"),
+		("spell_slotR",   "Spell Slot 8"),
+		("spellbook_toggle", "Spellbook"),
+		("target_next",   "Target Next"),
+		("trinket",       "Trinket"),
+		("tech",          "Tech Roll"),
+		("fast_fall",     "Fast Fall"),
+	};
+
 	public void Close()
 	{
 		CancelListening();

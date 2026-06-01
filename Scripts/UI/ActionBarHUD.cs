@@ -115,25 +115,20 @@ public partial class ActionBarHUD : Control
 	private void UpdateAbilityNames()
 	{
 		if (_player == null) return;
-		
-		var pc = _player.GetClass();
-		string className = pc switch
-		{
-			CharacterClass.Vanguard => "VANGUARD",
-			CharacterClass.Wraith => "WRAITH",
-			CharacterClass.Channeler => "CHANNELER",
-			_ => "UNKNOWN"
-		};
+
+		var def = _player.GetCharacterDef();
 		
 		if (_classNameLabel != null)
-			_classNameLabel.Text = className;
+			_classNameLabel.Text = def.DisplayName.ToUpper();
 		
-		string[] nameSet = pc switch
+		string[] nameSet = new[]
 		{
-			CharacterClass.Vanguard => new[]{ "Combo", "Heavy", "Shield Bash", "War Cry", "Intervene", "Thunderclap" },
-			CharacterClass.Wraith => new[]{ "Combo", "Heavy", "Viper Shot", "Shadow Step", "Rapid Fire", "Freezing Trap" },
-			CharacterClass.Channeler => new[]{ "Combo", "Heavy", "Frostbolt", "Dragon's Breath", "Ice Lance", "Meteor" },
-			_ => new[]{ "-", "-", "-", "-", "-", "-" }
+			def.LMB.Name,
+			def.RMB.Name,
+			def.Q.Name,
+			def.E.Name,
+			def.R.Name,
+			def.F.Name,
 		};
 		
 		for (int i = 0; i < _slots.Count && i < nameSet.Length; i++)
