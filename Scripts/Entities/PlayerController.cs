@@ -460,9 +460,9 @@ public partial class PlayerController : CharacterBody3D
 		else if (Input.IsActionJustPressed("spell_slot2")) TriggerSpellSlot(SlotType.Slot2);
 		else if (Input.IsActionJustPressed("spell_slot3")) TriggerSpellSlot(SlotType.Slot3);
 		else if (Input.IsActionJustPressed("spell_slot4")) TriggerSpellSlot(SlotType.Slot4);
-		else if (Input.IsActionJustPressed("spell_slotA")) TriggerSpellSlot(SlotType.SlotA);
-		else if (Input.IsActionJustPressed("spell_slotE")) TriggerSpellSlot(SlotType.SlotE);
-		else if (Input.IsActionJustPressed("spell_slotR")) TriggerSpellSlot(SlotType.Elite);
+		else if (Input.IsActionJustPressed("spell_slotA")) TriggerSpellSlot(SlotType.Slot5);
+		else if (Input.IsActionJustPressed("spell_slotE")) TriggerSpellSlot(SlotType.Slot6);
+		else if (Input.IsActionJustPressed("spell_slotR")) TriggerSpellSlot(SlotType.Slot8);
 		else if (Input.IsActionJustPressed("dash"))        TryDash();
 		else if (Input.IsActionJustPressed("crouch"))     { /* Air dodge now in _PhysicsProcess */ }
 		else if (Input.IsActionJustPressed("trinket"))    UseTrinket();
@@ -1408,12 +1408,12 @@ public partial class PlayerController : CharacterBody3D
 		
 		// Try cast animations first, fall back to attack animations
 		string[] castAnims;
-		if (slot == SlotType.Elite)
+		if (slot == SlotType.Slot8)
 		{
 			// Elite/ultimate spells: dramatic 2H cast
 			castAnims = new[] { "cast_2h", "attack_area_2h", "attack_area_2h_b" };
 		}
-		else if (slot == SlotType.SlotE || slot == SlotType.Shift)
+		else if (slot == SlotType.Slot6 || slot == SlotType.Slot7)
 		{
 			// Utility/defense: 1H cast
 			castAnims = new[] { "cast_1h", "attack_1h" };

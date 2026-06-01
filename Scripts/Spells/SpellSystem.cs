@@ -197,10 +197,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 10,  // Frost Lance (consumes Ralenti → stun)
 			[SlotType.Slot3] = 18,  // Arcane Shot (basic poke)
 			[SlotType.Slot4] = 7,   // Freezing Trap (zone control)
-			[SlotType.SlotA] = 17,  // Wind Slash (melee backup)
-			[SlotType.SlotE] = 22,  // Shockwave (pushback)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 39,  // Time Warp (elite)
+			[SlotType.Slot5] = 17,  // Wind Slash (melee backup)
+			[SlotType.Slot6] = 22,  // Shockwave (pushback)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 39,  // Time Warp (elite)
 		};
 		
 		// "Shadowblade" — Marked + Piercing Shot synergy (burst melee)
@@ -210,10 +210,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 9,   // Piercing Shot (consumes Marked → +100%)
 			[SlotType.Slot3] = 17,  // Wind Slash (basic melee)
 			[SlotType.Slot4] = 14,  // Shield Bash (Bouclier consume)
-			[SlotType.SlotA] = 21,  // Chain Pull (gap closer)
-			[SlotType.SlotE] = 24,  // Counter (defense)
-			[SlotType.Shift] = 26,  // Blink (mobility)
-			[SlotType.Elite] = 34,  // Annihilate (massive burst)
+			[SlotType.Slot5] = 21,  // Chain Pull (gap closer)
+			[SlotType.Slot6] = 24,  // Counter (defense)
+			[SlotType.Slot7] = 26,  // Blink (mobility)
+			[SlotType.Slot8] = 34,  // Annihilate (massive burst)
 		};
 		
 		// "Inferno" — Burn + Combustion synergy (AoE fire mage)
@@ -223,10 +223,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 11,  // Combustion (consumes Burn → AoE)
 			[SlotType.Slot3] = 8,   // Corrupted Ground (zone)
 			[SlotType.Slot4] = 23,  // Void Zone (DoT zone)
-			[SlotType.SlotA] = 18,  // Arcane Shot (poke)
-			[SlotType.SlotE] = 20,  // Force Push (pushback)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 33,  // Meteor Rain (CONSUME Burn → empowered)
+			[SlotType.Slot5] = 18,  // Arcane Shot (poke)
+			[SlotType.Slot6] = 20,  // Force Push (pushback)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 33,  // Meteor Rain (CONSUME Burn → empowered)
 		};
 		
 		// "Tempest" — Electrified + Overload synergy (control mage)
@@ -236,10 +236,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 12,  // Overload (consumes Electrified → stun)
 			[SlotType.Slot3] = 22,  // Shockwave (KB)
 			[SlotType.Slot4] = 6,   // Radiant Shield (Bouclier)
-			[SlotType.SlotA] = 20,  // Force Push (AoE push)
-			[SlotType.SlotE] = 24,  // Counter (defense)
-			[SlotType.Shift] = 26,  // Blink (mobility)
-			[SlotType.Elite] = 35,  // Storm Surge (CONSUME Electrified → longer)
+			[SlotType.Slot5] = 20,  // Force Push (AoE push)
+			[SlotType.Slot6] = 24,  // Counter (defense)
+			[SlotType.Slot7] = 26,  // Blink (mobility)
+			[SlotType.Slot8] = 35,  // Storm Surge (CONSUME Electrified → longer)
 		};
 		
 		// "Juggernaut" — Vulnerable + Execute synergy (tank/melee)
@@ -249,10 +249,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 13,  // Execute (consumes Vulnerable → +150%)
 			[SlotType.Slot3] = 19,  // Power Strike (heavy KB)
 			[SlotType.Slot4] = 32,  // Charge (gap close)
-			[SlotType.SlotA] = 14,  // Shield Bash (Bouclier consume)
-			[SlotType.SlotE] = 28,  // Iron Wall (defense)
-			[SlotType.Shift] = 25,  // Dash Roll (mobility)
-			[SlotType.Elite] = 34,  // Annihilate (massive burst)
+			[SlotType.Slot5] = 14,  // Shield Bash (Bouclier consume)
+			[SlotType.Slot6] = 28,  // Iron Wall (defense)
+			[SlotType.Slot7] = 25,  // Dash Roll (mobility)
+			[SlotType.Slot8] = 34,  // Annihilate (massive burst)
 		};
 		
 		// "Starter" — legacy balanced build (kept for familiarity)
@@ -262,10 +262,10 @@ public partial class SpellSystem : Node
 			[SlotType.Slot2] = 17,  // Wind Slash (basic melee)
 			[SlotType.Slot3] = 25,  // Dash Roll (mobility)
 			[SlotType.Slot4] = 6,   // Radiant Shield (shield)
-			[SlotType.SlotA] = 26,  // Blink (teleport)
-			[SlotType.SlotE] = 22,  // Shockwave (KB)
-			[SlotType.Shift] = 24,  // Counter (parry)
-			[SlotType.Elite] = 38,  // Nova (big AoE)
+			[SlotType.Slot5] = 26,  // Blink (teleport)
+			[SlotType.Slot6] = 22,  // Shockwave (KB)
+			[SlotType.Slot7] = 24,  // Counter (parry)
+			[SlotType.Slot8] = 38,  // Nova (big AoE)
 		};
 	}
 	
