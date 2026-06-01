@@ -69,12 +69,12 @@ public partial class UnitFrames : Control
 	
 	// ==========================================
 	// INIT
-	// ==========================================
+	private PlayerController?[]? _npcs;
 	
-	public void Setup(PlayerController player, DummyManager? dummyMgr)
+	public void Setup(PlayerController player, PlayerController?[] npcs)
 	{
 		_player = player;
-		_dummyMgr = dummyMgr;
+		_npcs = npcs;
 		
 		BuildUI();
 	}
@@ -263,20 +263,20 @@ public partial class UnitFrames : Control
 			_playerHpBar.Color = new Color(0.9f, 0.2f, 0.1f); // Red
 		
 		// --- Update target frame ---
-		if (_hasTarget && _dummyMgr != null)
+		if (_hasTarget && _npcs != null)
 		{
-			// Dummy IDs are 100-104
-			int dummyIndex = (int)(_targetEntityId - 100);
-			if (dummyIndex >= 0 && dummyIndex < 5)
+			// NPC IDs are 100-104
+			int npcIndex = (int)(_targetEntityId - 100);
+			if (npcIndex >= 0 && npcIndex < 5 && _npcs[npcIndex] != null)
 			{
-				int targetHp = _dummyMgr.GetHP(dummyIndex);
-				int targetMaxHp = _dummyMgr.GetMaxHP();
+				int targetHp = _npcs[npcIndex]!.GetNpcHP();
+				int targetMaxHp = 300;
 				float targetRatio = Mathf.Clamp((float)targetHp / targetMaxHp, 0f, 1f);
 				
 				float targetBarWidth = _targetHpBarBg.Size.X;
 				_targetHpBar.Size = new Vector2(targetBarWidth * targetRatio, BarHeight);
 				_targetHpText.Text = $"{targetHp} / {targetMaxHp}";
-				_targetNameLabel.Text = $"Dummy {dummyIndex + 1}";
+				_targetNameLabel.Text = $"NPC {npcIndex + 1}";
 				
 				// Color
 				if (targetRatio > 0.6f)
