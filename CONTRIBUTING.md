@@ -102,6 +102,25 @@ SlopArena/
 - Use `readonly struct` for packet and state types
 - XML-doc public APIs
 
+### Netcode Rules (Server-Authoritative 60Hz UDP)
+
+SlopArena uses a tick-based server-authoritative model. Gameplay code must work deterministically on both client and server.
+
+**Shared/ is sacred.** No Godot imports, no `Vector3`, no `GetWorld3D().DirectSpaceState` — EVER in Shared/. All hit detection uses `CombatMath.cs` pure math.
+
+**Tick-based timers, not delta.** All cooldowns, stuns, cast times are `ushort` tick counts:
+```csharp
+ushort cooldownTicks = 90; // 1.5s at 60Hz
+if (cooldownTicks > 0) cooldownTicks--;
+```
+NOT `float -= delta`.
+
+**Pure math for server-side combat.** No Godot physics queries on the server. Use `CombatMath.IsInCircle()`, `IsInCone()`, `LineIntersectsCircle()` from Shared/.
+
+**Packets are primitives only.** `ClientInputPacket` (14 bytes) and `CharacterStatePacket` (31 bytes) serialize with `System.Buffers.Binary.BinaryPrimitives` — no Godot types.
+
+**Visuals are client-only.** Rendering, particles, sounds, animations never affect game state. State comes from Shared/ logic and is authoritative on the server.
+
 ## Spell System Guide
 
 Spells are the heart of SlopArena. Here's how they work:
