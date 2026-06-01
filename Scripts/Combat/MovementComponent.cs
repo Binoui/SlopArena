@@ -91,7 +91,6 @@ public class MovementComponent
 
     // Configurable constants (from PlayerController [Export] fields
     // that are NOT in MovementStats but are essential to the movement feel)
-    private const float BackwardSpeed = 7.0f;
     private const float SprintThreshold = 0.2f;
     private const float TurnaroundLag = 0.1f;
     private const float AirDrag = 0.2f;
@@ -497,9 +496,7 @@ public class MovementComponent
             else
             {
                 // Walk or sprint: instant speed
-                bool goingBack = input.Down && !input.Up;
-                float speed = goingBack ? BackwardSpeed
-                    : (_isSprinting ? stats.SprintSpeed : stats.WalkSpeed);
+                float speed = _isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
                 _body.Velocity = new Vector3(inputDir.X * speed, _body.Velocity.Y, inputDir.Z * speed);
             }
 

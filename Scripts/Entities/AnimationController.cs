@@ -60,6 +60,9 @@ public partial class AnimationController : Node
 		_animPlayer = animPlayer;
 		_skeleton = skeleton;
 		_playerModel = playerModel;
+
+		// Global blend time for smooth animation transitions
+		_animPlayer.PlaybackDefaultBlendTime = 0.15f;
 	}
 
 	/// <summary>
@@ -500,7 +503,7 @@ public partial class AnimationController : Node
 		if (_animPlayer.HasAnimation(fullPath) && _currentAnim != fullPath)
 		{
 			SetLoopMode(fullPath, animName);
-			_animPlayer.Play(fullPath, 0.2f);
+			_animPlayer.Play(fullPath);
 			_currentAnim = fullPath;
 		}
 		else if (!_animPlayer.HasAnimation(fullPath))
@@ -514,7 +517,7 @@ public partial class AnimationController : Node
 					if (_currentAnim != fallbackPath)
 					{
 						SetLoopMode(fallbackPath, available);
-						_animPlayer.Play(fallbackPath, 0.2f);
+						_animPlayer.Play(fallbackPath);
 						_currentAnim = fallbackPath;
 						return;
 					}
