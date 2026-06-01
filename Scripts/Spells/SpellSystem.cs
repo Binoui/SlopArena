@@ -61,8 +61,8 @@ public partial class SpellSystem : Node
 		// Register presets (synergy-based builds)
 		RegisterPresets();
 		
-		// Load a default preset
-		LoadPreset("Frostbite");
+		// Load the default functional kit
+		LoadPreset("Brawler");
 	}
 	
 	// ==========================================
@@ -175,6 +175,8 @@ public partial class SpellSystem : Node
 		Register(39, "Time Warp",     35f, 0.50f, 1.0f, StatusSpells.TimeWarp);
 		// ID 40 — Void Zone: large DoT zone
 		Register(40, "Void Zone",     30f, 0.60f, 2.0f, RangedSpells.FireWall);
+		// ID 41 — Cone of Cold: frontal frost cone, slows enemies
+		Register(41, "Cone of Cold", 8f,  0.25f, 1.5f, StatusSpells.ConeOfCold);
 		
 		GD.Print($"Registered {_spellRegistry.Count} spells globally.");
 	}
@@ -255,17 +257,17 @@ public partial class SpellSystem : Node
 			[SlotType.Slot8] = 34,  // Annihilate (massive burst)
 		};
 		
-		// "Starter" — legacy balanced build (kept for familiarity)
-		_presets["Starter"] = new Dictionary<SlotType, int>
+		// "Brawler" — fonctionnel avec projectile, cone, stun zone, cast, AoE sol
+		_presets["Brawler"] = new Dictionary<SlotType, int>
 		{
-			[SlotType.Slot1] = 18,  // Arcane Shot (basic ranged)
-			[SlotType.Slot2] = 17,  // Wind Slash (basic melee)
-			[SlotType.Slot3] = 25,  // Dash Roll (mobility)
-			[SlotType.Slot4] = 6,   // Radiant Shield (shield)
-			[SlotType.Slot5] = 26,  // Blink (teleport)
-			[SlotType.Slot6] = 22,  // Shockwave (KB)
-			[SlotType.Slot7] = 24,  // Counter (parry)
-			[SlotType.Slot8] = 38,  // Nova (big AoE)
+			[SlotType.Slot1] = 18,  // Arcane Shot — projectile low cd (spam)
+			[SlotType.Slot2] = 41,  // Cone of Cold — cone frontal, slow, récompense le spacing
+			[SlotType.Slot3] = 7,   // Freezing Trap — zone au sol, applique Slowed
+			[SlotType.Slot4] = 10,  // Frost Lance — consume Slowed → stun, beam
+			[SlotType.Slot5] = 6,   // Corrupted Ground — AoE sol DoT (Vulnérable + Brûlure)
+			[SlotType.Slot6] = 22,  // Shockwave — AoE pushback
+			[SlotType.Slot7] = 25,  // Dash Roll — mobilité
+			[SlotType.Slot8] = 33,  // Meteor Rain — cast ultimate, AoE géant
 		};
 	}
 	

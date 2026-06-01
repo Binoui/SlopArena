@@ -5,13 +5,12 @@ using SlopArena.Shared;
 public partial class Main : Node3D
 {
 	private PlayerController? _player;
-	private DummyManager? _dummyMgr;
+	private PlayerController?[] _npcs = new PlayerController?[5];
 	private LocalSimulation? _simulation;
 	private ProjectileManager? _projectileMgr;
 	private Label? _label;
 	private CanvasLayer? _canvasLayer;
 	private ActionBarHUD? _actionBarHUD;
-	private SpellBookUI? _spellBookUI;
 	private UnitFrames? _unitFrames;
 	private EscapeMenuUI? _escapeMenu;
 	
@@ -21,6 +20,9 @@ public partial class Main : Node3D
 	public override async void _Ready()
 	{
 		GD.Print("SlopArena 3D C# Client Started!");
+		
+		// Force fullscreen — UI elements size themselves to viewport on Build()
+		DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
 		
 		_canvasLayer = GetNodeOrNull<CanvasLayer>("CanvasLayer");
 		if (_canvasLayer == null)
@@ -43,6 +45,9 @@ public partial class Main : Node3D
 		_label.AddThemeFontSizeOverride("font_size", 18);
 		_label.HorizontalAlignment = HorizontalAlignment.Right;
 		
+		// --- Crosshair (TPS aiming reticle) ---
+		CreateCrosshair();
+		
 		// --- Projectile Manager (Object Pooling) ---
 		_projectileMgr = new ProjectileManager();
 		_projectileMgr.Name = "ProjectileManager";
@@ -54,22 +59,42 @@ public partial class Main : Node3D
 		_simulation.ProjectileVisuals = _projectileMgr;
 		AddChild(_simulation);
 		
-		// --- Dummy Manager ---
-		_dummyMgr = new DummyManager();
-		AddChild(_dummyMgr);
+		// --- NPC Enemies (5 PlayerController instances, not player controlled) ---
+		Vector3[] npcPositions = new Vector3[]
+		{
+			new Vector3(60f, 1.5f, 60f),
+			new Vector3(140f, 1.5f, 60f),
+			new Vector3(100f, 1.5f, 80f),
+			new Vector3(60f, 1.5f, 140f),
+			new Vector3(140f, 1.5f, 140f),
+		};
+		
+		for (int i = 0; i < 5; i++)
+		{
+			var npc = new PlayerController();
+			npc.Name = $"NPC_{i}";
+			npc.Position = npcPositions[i];
+			// Cycle through classes
+			npc.SetClass((PlayerController.PlayerClass)(i % 3));
+			AddChild(npc);
+			npc.SetNPC(true);
+			npc.SetNpcSpawnPosition(npcPositions[i]);
+			_npcs[i] = npc;
+		}
 		
 		// --- Targeting Ring (WoW-style circle under target) ---
 		_targetRing = CreateTargetRing();
 		AddChild(_targetRing);
 		_targetRing.Visible = false;
 		
-		// Register dummies in the simulation
-		RegisterDummiesInSimulation();
+		// Register NPCs and player in simulation
+		RegisterEntitiesInSimulation();
 		
 		// --- Player ---
 		_player = new PlayerController();
 		_player.Name = "Player";
 		AddChild(_player);
+		_player.Position = new Vector3(100f, 1.5f, 100f);
 		
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
@@ -85,44 +110,58 @@ public partial class Main : Node3D
 		// Register player in the simulation
 		RegisterPlayerInSimulation();
 		
-		// Give dummies CombatComponents for status testing
-		RegisterDummyCombatComponents();
+		// Register NPC combat components
+		RegisterNpcCombatComponents();
 		
 		// Wire up HUD
 		if (_player != null)
 		{
 			_player.OnStateUpdated += UpdateHUD;
 			
-			// Tab targeting: cycle through dummies
+			// Tab targeting: soft lock — raycast from camera center
 			_player.OnTargetNextPressed += () =>
 			{
 				if (_unitFrames == null) return;
 				
-				ulong currentTarget = _unitFrames.GetTarget();
-				ulong nextTarget = 0;
+				var viewport = GetViewport();
+				if (viewport == null) return;
 				
-				if (currentTarget == 0)
+				var camera = viewport.GetCamera3D();
+				if (camera == null) return;
+				
+				var center = viewport.GetVisibleRect().Size / 2;
+				var from = camera.ProjectRayOrigin(center);
+				var dir = camera.ProjectRayNormal(center);
+				var to = from + dir * 100f;
+				
+				var query = PhysicsRayQueryParameters3D.Create(from, to);
+				query.CollisionMask = 2; // Layer 2 = entities (dummies)
+				var result = GetWorld3D().DirectSpaceState.IntersectRay(query);
+				
+				if (result.Count > 0 && result.ContainsKey("collider"))
 				{
-					// No target — target the first alive dummy
-					nextTarget = 100;
-				}
-				else
-				{
-					// Cycle to next alive dummy
-					int currentIndex = (int)(currentTarget - 100);
-					for (int i = 1; i <= 5; i++)
+					var collider = (Node?)result["collider"];
+					while (collider != null)
 					{
-						int nextIndex = (currentIndex + i) % 5;
-						if (_dummyMgr != null && _dummyMgr.IsAlive(nextIndex))
+						if (collider is not CharacterBody3D)
 						{
-							nextTarget = (ulong)(100 + nextIndex);
-							break;
+							collider = collider.GetParent();
+							continue;
 						}
+						// Check if it's an NPC
+						string name = collider.Name;
+						if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
+						{
+							if (idx >= 0 && idx < _npcs.Length && _npcs[idx] != null && _npcs[idx]!.IsNpcAlive())
+							{
+								ulong targetId = (ulong)(100 + idx);
+								_unitFrames.SetTarget(targetId);
+								UpdateTargetRing(targetId);
+							}
+						}
+						break;
 					}
 				}
-				
-				_unitFrames.SetTarget(nextTarget);
-				UpdateTargetRing(nextTarget);
 			};
 			
 			// Click targeting: left-click on a dummy to target it
@@ -138,7 +177,7 @@ public partial class Main : Node3D
 		_unitFrames = new UnitFrames();
 		_unitFrames.Name = "UnitFrames";
 		_canvasLayer.AddChild(_unitFrames);
-		_unitFrames.Setup(_player!, _dummyMgr);
+		_unitFrames.Setup(_player!, _npcs);
 		
 		// --- Action Bar HUD (bottom bar with cooldowns) ---
 		// Must be added to CanvasLayer (Control nodes need CanvasLayer)
@@ -146,72 +185,61 @@ public partial class Main : Node3D
 		_actionBarHUD.Name = "ActionBarHUD";
 		_canvasLayer.AddChild(_actionBarHUD);
 		
-		// Connecter au SpellSystem du joueur (via CombatComponent)
+		// Connect to player for class abilities
 		if (_player != null)
 		{
-			var combat = _player.GetCombatComponent();
-			if (combat != null)
+			_actionBarHUD.Setup(_player);
+			GD.Print("ActionBarHUD connected!");
+			
+			// --- Status routing ---
+			// Route status application requests through the simulation
+			if (_simulation != null)
 			{
-				var spellSystem = combat.GetSpellSystem();
-				if (spellSystem != null)
+				_simulation.OnStatusApply += (ulong targetId, StatusType type, float duration, ulong sourceId) =>
 				{
-					_actionBarHUD.Setup(_player, spellSystem);
-					GD.Print("ActionBarHUD connected to SpellSystem!");
-					
-					// --- Spell Book UI (full-screen spell browser) ---
-					_spellBookUI = new SpellBookUI();
-					_spellBookUI.Name = "SpellBookUI";
-					_canvasLayer.AddChild(_spellBookUI);
-					_spellBookUI.Setup(_player, spellSystem);
-					
-					// --- Status routing ---
-					// Route status application requests through the simulation
-					if (_simulation != null)
+					if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
 					{
-						_simulation.OnStatusApply += (ulong targetId, StatusType type, float duration, ulong sourceId) =>
-						{
-							if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
-							{
-								targetCombat.ApplyStatus(type, duration, sourceId);
-							}
-						};
-						
-						_simulation.OnStatusConsume += (ulong targetId, StatusType type) =>
-						{
-							if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
-							{
-								return targetCombat.ConsumeStatus(type);
-							}
-							return false;
-						};
+						targetCombat.ApplyStatus(type, duration, sourceId);
 					}
-					
-					GD.Print("SpellBookUI initialized!");
-
-					// --- Escape Menu (pause overlay) ---
-					_escapeMenu = new EscapeMenuUI();
-					_escapeMenu.Name = "EscapeMenuUI";
-					_canvasLayer.AddChild(_escapeMenu);
-					_escapeMenu.Build();
-
-					// Connect escape menu events
-					_escapeMenu.OnResumePressed += () => { };
-					_escapeMenu.OnSpellbookRequested += () =>
+				};
+				
+				_simulation.OnStatusConsume += (ulong targetId, StatusType type) =>
+				{
+					if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
 					{
-						_spellBookUI?.Toggle();
-					};
-					_escapeMenu.OnExitLobby += () =>
-					{
-						GD.Print("Exit Lobby - would return to main menu");
-						GetTree().ChangeSceneToFile("res://main.tscn");
-					};
-					_escapeMenu.OnExitGame += () =>
-					{
-						GD.Print("Exiting game...");
-						GetTree().Quit();
-					};
-				}
+						return targetCombat.ConsumeStatus(type);
+					}
+					return false;
+				};
 			}
+			
+			// --- Escape Menu (pause overlay) ---
+			_escapeMenu = new EscapeMenuUI();
+			_escapeMenu.Name = "EscapeMenuUI";
+			_canvasLayer.AddChild(_escapeMenu);
+			_escapeMenu.Build();
+
+			// Connect escape menu events
+			_escapeMenu.OnResumePressed += () => { };
+			_escapeMenu.OnClassSelected += (PlayerController.PlayerClass pc) =>
+			{
+				if (_player != null)
+				{
+					_player.SetClass(pc);
+					_actionBarHUD?.OnClassChanged();
+					GD.Print($"Switched to {pc}");
+				}
+			};
+			_escapeMenu.OnExitLobby += () =>
+			{
+				GD.Print("Exit Lobby - would return to main menu");
+				GetTree().ChangeSceneToFile("res://main.tscn");
+			};
+			_escapeMenu.OnExitGame += () =>
+			{
+				GD.Print("Exiting game...");
+				GetTree().Quit();
+			};
 		}
 		
 		// Wait for physics sync then generate heightmap
@@ -229,51 +257,48 @@ public partial class Main : Node3D
 		}
 	}
 	
-	private void RegisterDummiesInSimulation()
+	private void RegisterEntitiesInSimulation()
 	{
-		if (_simulation == null || _dummyMgr == null) return;
+		if (_simulation == null) return;
 		
 		for (int i = 0; i < 5; i++)
 		{
-			ulong entityId = (ulong)(100 + i); // Dummy IDs: 100-104
-			Vector3 pos = DummyManager.DummyPositions[i];
-			_simulation.Entities[entityId] = (pos, DummyManager.DummyHitRadius, true);
+			ulong entityId = (ulong)(100 + i); // NPC IDs: 100-104
+			if (_npcs[i] != null)
+				_simulation.Entities[entityId] = (_npcs[i]!.GlobalPosition, 1.5f, true);
 		}
 		
-		// Connect hit events from simulation to dummy manager
+		// Connect hit events from simulation to NPCs
 		_simulation.OnEntityHit += (ulong entityId, float damage, float kbX, float kbY, float kbZ) =>
 		{
-			int dummyIndex = (int)(entityId - 100);
-			if (dummyIndex >= 0 && dummyIndex < 5)
+			int npcIndex = (int)(entityId - 100);
+			if (npcIndex >= 0 && npcIndex < 5 && _npcs[npcIndex] != null)
 			{
-				_dummyMgr.DamageDummy(dummyIndex, (int)damage);
+				_npcs[npcIndex]!.NpcTakeDamage((int)damage, new Vector3(kbX, kbY, kbZ));
 			}
 			
-			// Auto-target the first dummy that hits the player
+			// Auto-target the first NPC that hits the player
 			if (entityId == 1 && _unitFrames != null && !_unitFrames.HasTarget())
 			{
-				// Find the attacker (whoever dealt the damage)
-				// For now, auto-target dummy 0 as a test
 				_unitFrames.SetTarget(100);
 			}
 		};
 	}
 	
-	private void RegisterDummyCombatComponents()
+	private void RegisterNpcCombatComponents()
 	{
-		if (_simulation == null || _dummyMgr == null) return;
+		if (_simulation == null) return;
 		
 		for (int i = 0; i < 5; i++)
 		{
+			if (_npcs[i] == null) continue;
 			ulong entityId = (ulong)(100 + i);
-			var dummyCombat = new CombatComponent();
-			dummyCombat.Name = $"DummyCombat_{i}";
-			dummyCombat.Setup(_dummyMgr, _simulation, entityId);
-			_dummyMgr.AddChild(dummyCombat);
-			_simulation.CombatComponents[entityId] = dummyCombat;
+			var combat = _npcs[i]!.GetCombatComponent();
+			if (combat != null)
+				_simulation.CombatComponents[entityId] = combat;
 		}
 		
-		GD.Print("Dummy CombatComponents registered for status testing.");
+		GD.Print("NPC CombatComponents registered.");
 	}
 	
 	private void RegisterPlayerInSimulation()
@@ -364,22 +389,22 @@ public partial class Main : Node3D
 	{
 		if (_targetRing == null) return;
 		
-		if (entityId == 0 || _dummyMgr == null)
+		if (entityId == 0 || entityId < 100 || entityId >= 105)
 		{
 			_targetRing.Visible = false;
 			return;
 		}
 		
-		// Dummy IDs are 100-104
-		int dummyIndex = (int)(entityId - 100);
-		if (dummyIndex < 0 || dummyIndex >= 5 || !_dummyMgr.IsAlive(dummyIndex))
+		// NPC IDs are 100-104
+		int npcIndex = (int)(entityId - 100);
+		if (npcIndex < 0 || npcIndex >= 5 || _npcs[npcIndex] == null || !_npcs[npcIndex]!.IsNpcAlive())
 		{
 			_targetRing.Visible = false;
 			return;
 		}
 		
-		Vector3 pos = DummyManager.DummyPositions[dummyIndex];
-		pos.Y = 0.1f; // Juste au-dessus du sol
+		Vector3 pos = _npcs[npcIndex]!.GlobalPosition;
+		pos.Y = 0.1f;
 		_targetRing.Position = pos;
 		_targetRing.Visible = true;
 	}
@@ -393,11 +418,11 @@ public partial class Main : Node3D
 			if (targetId > 0)
 			{
 				int idx = (int)(targetId - 100);
-				if (idx >= 0 && idx < 5 && _dummyMgr != null)
+				if (idx >= 0 && idx < 5 && _npcs[idx] != null)
 				{
-					if (_dummyMgr.IsAlive(idx))
+					if (_npcs[idx]!.IsNpcAlive())
 					{
-						Vector3 pos = DummyManager.DummyPositions[idx];
+						Vector3 pos = _npcs[idx]!.GlobalPosition;
 						pos.Y = 0.1f;
 						_targetRing.Position = pos;
 						_targetRing.Visible = true;
@@ -441,12 +466,12 @@ public partial class Main : Node3D
 		float speed2D = MathF.Sqrt(velX * velX + velY * velY);
 		
 		string dummyInfo = "";
-		if (_dummyMgr != null)
+		for (int i = 0; i < 5; i++)
 		{
-			for (int i = 0; i < 5; i++)
+			if (_npcs[i] != null)
 			{
-				string status = _dummyMgr.IsAlive(i) ? $"{_dummyMgr.GetHP(i)}/{_dummyMgr.GetMaxHP()}" : "[DEAD]";
-				dummyInfo += $"  D{i+1}: {status}\n";
+				string status = _npcs[i]!.IsNpcAlive() ? $"{_npcs[i]!.GetNpcHP()}/300" : "[DEAD]";
+				dummyInfo += $"  NPC {i+1}: {status}\n";
 			}
 		}
 		
@@ -464,5 +489,56 @@ _label.Text = $"SlopArena Arena Sandbox\n" +
 					  $"1-4, A, E, R : Sorts\n" +
 					  $"B : Spellbook (assigner des sorts)\n" +
 					  $"Escape: Release mouse";
+	}
+	
+	private void CreateCrosshair()
+	{
+		var crosshair = new ColorRect();
+		crosshair.Name = "Crosshair";
+		crosshair.MouseFilter = Control.MouseFilterEnum.Ignore;
+		
+		float center = 960f;
+		float mid = 540f;
+		float size = 8f;
+		float gap = 4f;
+		float thickness = 2f;
+		var white = new Color(1f, 1f, 1f, 0.8f);
+		
+		var top = new ColorRect();
+		top.Color = white;
+		top.Position = new Vector2(center - thickness / 2, mid - gap - size);
+		top.Size = new Vector2(thickness, size);
+		top.MouseFilter = Control.MouseFilterEnum.Ignore;
+		crosshair.AddChild(top);
+		
+		var bottom = new ColorRect();
+		bottom.Color = white;
+		bottom.Position = new Vector2(center - thickness / 2, mid + gap);
+		bottom.Size = new Vector2(thickness, size);
+		bottom.MouseFilter = Control.MouseFilterEnum.Ignore;
+		crosshair.AddChild(bottom);
+		
+		var left = new ColorRect();
+		left.Color = white;
+		left.Position = new Vector2(center - gap - size, mid - thickness / 2);
+		left.Size = new Vector2(size, thickness);
+		left.MouseFilter = Control.MouseFilterEnum.Ignore;
+		crosshair.AddChild(left);
+		
+		var right = new ColorRect();
+		right.Color = white;
+		right.Position = new Vector2(center + gap, mid - thickness / 2);
+		right.Size = new Vector2(size, thickness);
+		right.MouseFilter = Control.MouseFilterEnum.Ignore;
+		crosshair.AddChild(right);
+		
+		var dot = new ColorRect();
+		dot.Color = new Color(1f, 0f, 0f, 0.9f);
+		dot.Position = new Vector2(center - 1.5f, mid - 1.5f);
+		dot.Size = new Vector2(3f, 3f);
+		dot.MouseFilter = Control.MouseFilterEnum.Ignore;
+		crosshair.AddChild(dot);
+		
+		_canvasLayer?.AddChild(crosshair);
 	}
 }

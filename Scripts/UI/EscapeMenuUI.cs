@@ -14,10 +14,10 @@ public partial class EscapeMenuUI : Control
 	// ==========================================
 	
 	public event Action? OnResumePressed;
-	public event Action? OnSpellbookRequested;
 	public event Action? OnSettingsRequested;
 	public event Action? OnExitLobby;
 	public event Action? OnExitGame;
+	public event Action<PlayerController.PlayerClass>? OnClassSelected;
 	
 	// ==========================================
 	// STATE
@@ -81,10 +81,25 @@ public partial class EscapeMenuUI : Control
 		_resumeBtn.Pressed += () => { Close(); OnResumePressed?.Invoke(); };
 		_menuContainer.AddChild(_resumeBtn);
 		
-		// Spellbook
-		_spellbookBtn = MakeMenuButton("Spellbook");
-		_spellbookBtn.Pressed += () => { Close(); OnSpellbookRequested?.Invoke(); };
-		_menuContainer.AddChild(_spellbookBtn);
+		// --- Class selection ---
+		var classTitle = new Label();
+		classTitle.Text = "CLASS";
+		classTitle.HorizontalAlignment = HorizontalAlignment.Center;
+		classTitle.AddThemeFontSizeOverride("font_size", 14);
+		classTitle.Modulate = new Color(0.6f, 0.6f, 0.6f);
+		_menuContainer.AddChild(classTitle);
+		
+		var btnVg = MakeMenuButton("Vanguard");
+		btnVg.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Vanguard); };
+		_menuContainer.AddChild(btnVg);
+		
+		var btnWr = MakeMenuButton("Wraith");
+		btnWr.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Wraith); };
+		_menuContainer.AddChild(btnWr);
+		
+		var btnCh = MakeMenuButton("Channeler");
+		btnCh.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Channeler); };
+		_menuContainer.AddChild(btnCh);
 		
 		// Settings
 		_settingsBtn = MakeMenuButton("Settings");
@@ -122,6 +137,21 @@ public partial class EscapeMenuUI : Control
 		// Start hidden
 		Visible = false;
 		_isOpen = false;
+	}
+	
+	public override void _Notification(int what)
+	{
+		if (what == NotificationResized)
+		{
+			var size = GetViewportRect().Size;
+			Position = Vector2.Zero;
+			Size = size;
+			if (_bg != null)
+			{
+				_bg.Position = Vector2.Zero;
+				_bg.Size = size;
+			}
+		}
 	}
 	
 	private Button MakeMenuButton(string text)

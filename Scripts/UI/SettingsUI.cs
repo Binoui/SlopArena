@@ -35,6 +35,7 @@ public partial class SettingsUI : Control
 		("target_next",   "Target Next"),
 		("trinket",       "Trinket"),
 		("tech",          "Tech Roll"),
+		("fast_fall",     "Fast Fall"),
 	};
 	
 	// ==========================================
@@ -69,7 +70,6 @@ public partial class SettingsUI : Control
 		var viewportSize = GetViewportRect().Size;
 		Position = Vector2.Zero;
 		Size = viewportSize;
-		MouseFilter = MouseFilterEnum.Stop;
 		
 		// Back button (top-left)
 		_backBtn = new Button();
@@ -317,16 +317,16 @@ public partial class SettingsUI : Control
 			Key.N => "N",
 			Key.O => "O",
 			Key.P => "P",
-			Key.Q => "Q (AZERTY) / A (QWERTY)",
+			Key.Q => "Q",
 			Key.R => "R",
 			Key.S => "S",
 			Key.T => "T",
 			Key.U => "U",
 			Key.V => "V",
-			Key.W => "W (AZERTY) / Z (QWERTY)",
+			Key.W => "W",
 			Key.X => "X",
 			Key.Y => "Y",
-			Key.Z => "Z (AZERTY) / W (QWERTY)",
+			Key.Z => "Z",
 			_ => key.ToString()
 		};
 	}
@@ -353,6 +353,7 @@ public partial class SettingsUI : Control
 			"target_next" => "Target Next",
 			"trinket" => "Trinket",
 			"tech" => "Tech Roll",
+			"fast_fall" => "Fast Fall",
 			_ => actionName
 		};
 	}
@@ -360,5 +361,15 @@ public partial class SettingsUI : Control
 	public void Close()
 	{
 		CancelListening();
+	}
+	
+	public override void _Notification(int what)
+	{
+		if (what == NotificationResized)
+		{
+			var size = GetViewportRect().Size;
+			Position = Vector2.Zero;
+			Size = size;
+		}
 	}
 }

@@ -668,7 +668,7 @@ public static class StatusSpells
 	// VISUAL HELPERS
 	// ==========================================
 	
-	private static MeshInstance3D CreateAoEIndicator(Vector3 position, float radius, Color color)
+	public static MeshInstance3D CreateAoEIndicator(Vector3 position, float radius, Color color)
 	{
 		var mesh = new MeshInstance3D();
 		var cyl = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.3f };
@@ -687,7 +687,7 @@ public static class StatusSpells
 		return mesh;
 	}
 	
-	private static void CreateCircleVisual(CombatComponent combat, Vector3 pos, float radius, Color color, float duration)
+	public static void CreateCircleVisual(CombatComponent combat, Vector3 pos, float radius, Color color, float duration)
 	{
 		var mesh = new MeshInstance3D();
 		var cyl = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.2f };
@@ -699,13 +699,36 @@ public static class StatusSpells
 		};
 		cyl.Material = mat;
 		mesh.Mesh = cyl;
-		mesh.GlobalPosition = new Vector3(pos.X, 0.2f, pos.Z);
 		AddToScene(combat, mesh);
+		mesh.GlobalPosition = new Vector3(pos.X, 0.2f, pos.Z);
 		var timer = combat.GetTree().CreateTimer(duration);
 		timer.Timeout += () => mesh.QueueFree();
 	}
 	
-	private static void CreateConeVisual(CombatComponent combat, Vector3 pos, Vector3 forward, float range, float radius, Color color, float duration)
+	/// <summary>
+	/// Cone of Cold: frontal frost cone. Slows enemies. Rewards spacing.
+	/// </summary>
+	public static void ConeOfCold(CombatComponent combat)
+	{
+		Vector3 forward = combat.GetCameraForward();
+		Vector3 pos = combat.GetOwnerPosition();
+		float range = 6f;
+		float radius = 4f;
+		
+		// Frost visual (blue/white)
+		CreateConeVisual(combat, pos, forward, range, radius, new Color(0.4f, 0.7f, 1f, 0.3f), 0.3f);
+		
+		// Hit detection + status
+		var hits = combat.CheckMeleeCone(pos, forward, range, 90f, 12f, 8f, 3f);
+		combat.ApplyStatusToLastHit(StatusType.Slowed, 4f);
+		
+		// Additional freeze particles at impact
+		Vector3 impactPos = pos + forward * (range * 0.6f);
+		impactPos.Y = 0.5f;
+		CreateImpactVisual(combat, impactPos, radius * 0.5f, new Color(0.6f, 0.8f, 1f));
+	}
+	
+	public static void CreateConeVisual(CombatComponent combat, Vector3 pos, Vector3 forward, float range, float radius, Color color, float duration)
 	{
 		var mesh = new MeshInstance3D();
 		var cylinder = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = range };
@@ -733,7 +756,7 @@ public static class StatusSpells
 		timer.Timeout += () => mesh.QueueFree();
 	}
 	
-	private static void CreateBeamVisual(CombatComponent combat, Vector3 origin, Vector3 direction, float length, Color color, float duration)
+	public static void CreateBeamVisual(CombatComponent combat, Vector3 origin, Vector3 direction, float length, Color color, float duration)
 	{
 		var mesh = new MeshInstance3D();
 		var cylinder = new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.3f, Height = length };
@@ -752,14 +775,14 @@ public static class StatusSpells
 		float midZ = origin.Z + direction.Z * length * 0.5f;
 		float yaw = MathF.Atan2(-direction.X, -direction.Z);
 		mesh.Rotation = new Vector3(0f, yaw, 0f);
-		mesh.GlobalPosition = new Vector3(midX, 2f, midZ);
 		AddToScene(combat, mesh);
+		mesh.GlobalPosition = new Vector3(midX, 2f, midZ);
 		
 		var timer = combat.GetTree().CreateTimer(duration);
 		timer.Timeout += () => mesh.QueueFree();
 	}
 	
-	private static void CreateImpactVisual(CombatComponent combat, Vector3 pos, float radius, Color color)
+	public static void CreateImpactVisual(CombatComponent combat, Vector3 pos, float radius, Color color)
 	{
 		var mesh = CreateAoEIndicator(pos, radius, new Color(color.R, color.G, color.B, 0.5f));
 		AddToScene(combat, mesh);

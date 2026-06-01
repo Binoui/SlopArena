@@ -311,6 +311,15 @@ public partial class CombatComponent : Node
 	/// Apply a status to all entities hit in the most recent CheckMeleeCone/CheckCircleHit call.
 	/// This is used by spell effects after dealing damage.
 	/// </summary>
+	public List<ulong> GetTargetsFromLastHit() => _lastHitTargets;
+	
+	public bool HasStatusOnTarget(ulong targetEntityId, StatusType type)
+	{
+		if (_simulation != null && _simulation.CombatComponents.TryGetValue(targetEntityId, out var targetCombat))
+			return targetCombat.HasStatus(type);
+		return false;
+	}
+	
 	public void ApplyStatusToLastHit(StatusType type, float duration)
 	{
 		foreach (ulong targetId in _lastHitTargets)
