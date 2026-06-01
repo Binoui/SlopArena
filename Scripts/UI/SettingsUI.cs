@@ -237,38 +237,6 @@ public partial class SettingsUI : Control
 			GetViewport().SetInputAsHandled();
 		}
 	}
-	{
-		if (!_isListening || _listeningAction == null) return;
-		
-		if (@event is InputEventKey keyEvent && keyEvent.Pressed)
-		{
-			// Escape cancels rebinding
-			if (keyEvent.Keycode == Key.Escape || keyEvent.PhysicalKeycode == Key.Escape)
-			{
-				CancelListening();
-				GetViewport().SetInputAsHandled();
-				return;
-			}
-			
-			// Get the physical key (works with AZERTY/QWERTY)
-			Key key = keyEvent.PhysicalKeycode != Key.None
-				? keyEvent.PhysicalKeycode
-				: keyEvent.Keycode;
-			
-			if (key != Key.None)
-			{
-				ApplyBinding(_listeningAction, key);
-				RebuildBindingList();
-				_isListening = false;
-				_listeningAction = null;
-				
-				if (_listeningHint != null)
-					_listeningHint.Visible = false;
-			}
-			
-			GetViewport().SetInputAsHandled();
-		}
-	}
 	
 	private void CancelListening()
 	{
