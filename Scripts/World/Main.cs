@@ -7,6 +7,7 @@ public partial class Main : Node3D
 	private PlayerController? _player;
 	private PlayerController?[] _npcs = new PlayerController?[5];
 	private LocalSimulation? _simulation;
+	private ArenaManager? _arenaManager;
 	private ProjectileManager? _projectileMgr;
 	private Label? _label;
 	private CanvasLayer? _canvasLayer;
@@ -59,42 +60,39 @@ public partial class Main : Node3D
 		_simulation.ProjectileVisuals = _projectileMgr;
 		AddChild(_simulation);
 		
+		// --- Arena Manager (loads/unloads arena scenes, provides spawns + void) ---
+		_arenaManager = new ArenaManager();
+		_arenaManager.Name = "ArenaManager";
+		AddChild(_arenaManager);
+		_arenaManager.LoadArena("split");
+
 		// --- NPC Enemies (5 PlayerController instances, not player controlled) ---
-		Vector3[] npcPositions = new Vector3[]
-		{
-			new Vector3(60f, 1.5f, 60f),
-			new Vector3(140f, 1.5f, 60f),
-			new Vector3(100f, 1.5f, 80f),
-			new Vector3(60f, 1.5f, 140f),
-			new Vector3(140f, 1.5f, 140f),
-		};
-		
 		for (int i = 0; i < 5; i++)
 		{
 			var npc = new PlayerController();
 			npc.Name = $"NPC_{i}";
-			npc.Position = npcPositions[i];
+			npc.Position = _arenaManager.GetSpawnPosition(i);
 			// Cycle through classes
 			npc.SetClass((CharacterClass)(i % 3));
 			AddChild(npc);
 			npc.SetNPC(true);
-			npc.SetNpcSpawnPosition(npcPositions[i]);
+			npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
 			_npcs[i] = npc;
 		}
-		
-		// --- Targeting Ring (WoW-style circle under target) ---
+
+		// --- Targeting Ring ---
 		_targetRing = CreateTargetRing();
 		AddChild(_targetRing);
 		_targetRing.Visible = false;
-		
+
 		// Register NPCs and player in simulation
 		RegisterEntitiesInSimulation();
-		
-		// --- Player ---
+
+		// --- Player (spawn index 5, the last spawn point) ---
 		_player = new PlayerController();
 		_player.Name = "Player";
 		AddChild(_player);
-		_player.Position = new Vector3(100f, 1.5f, 100f);
+		_player.Position = _arenaManager.GetSpawnPosition(5);
 		
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
@@ -411,6 +409,13 @@ public partial class Main : Node3D
 	
 	public override void _Process(double delta)
 	{
+		// Void death check — respawn player if they fall off the arena
+		if (_arenaManager != null && _player != null && _arenaManager.IsBelowKillHeight(_player.GlobalPosition))
+		{
+			_player.GlobalPosition = _arenaManager.GetSpawnPosition(5);
+			_player.Velocity = Vector3.Zero;
+		}
+
 		// Keep targeting ring on the target (in case dummy respawns or target changes via click)
 		if (_unitFrames != null && _targetRing != null)
 		{

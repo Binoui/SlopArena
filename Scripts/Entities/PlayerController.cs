@@ -322,10 +322,10 @@ public partial class PlayerController : CharacterBody3D
 		if (wasKnocked && _movementComponent.IsGrounded && !_movementComponent.IsInKnockback() && Input.IsActionJustPressed("tech"))
 			_movementComponent.DoTechRoll();
 
-		// Face movement direction
+		// Face movement direction (Z is forward)
 		Vector3 hVel = new Vector3(Velocity.X, 0f, Velocity.Z);
 		if (hVel.LengthSquared() > 0.01f)
-			GlobalRotation = new Vector3(0f, Mathf.Atan2(hVel.X, -hVel.Z), 0f);
+			GlobalRotation = new Vector3(0f, Mathf.Atan2(hVel.X, hVel.Z), 0f);
 
 		// Animation
 		_animationController.ProcessAnimation(dt, new AnimationController.AnimationState
@@ -348,9 +348,10 @@ public partial class PlayerController : CharacterBody3D
 	private InputState BuildInputState()
 	{
 		var input = new InputState();
-		Vector3 cf, cr;
-		if (_wowCamera != null) { cf = _wowCamera.GetForwardDirection(); cr = _wowCamera.GetRightDirection(); }
-		else { cf = (-Transform.Basis.Z with { Y = 0 }).Normalized(); cr = Transform.Basis.X with { Y = 0 }; cr = cr.Normalized(); }
+
+		// World-space movement: ZQSD = fixed directions, camera doesn't matter
+		Vector3 cf = new Vector3(0f, 0f, 1f);  // Z = forward (+Z)
+		Vector3 cr = new Vector3(1f, 0f, 0f);  // D = right (+X)
 
 		_moveDirection = Vector3.Zero;
 		if (Input.IsActionPressed("move_forward"))  _moveDirection += cf;
@@ -529,7 +530,6 @@ public partial class PlayerController : CharacterBody3D
 		pm.Name = "PlayerModel";
 		AddChild(pm);
 		ApplySkinRecursive(pm, GD.Load<Texture2D>("res://assets/characters/Skins/skaterMaleA.png"));
-		pm.RotateY(Mathf.Pi);
 		pm.Scale = new Vector3(0.5f, 0.5f, 0.5f);
 		pm.Position = new Vector3(0f, -1.5f, 0f);
 		return pm;

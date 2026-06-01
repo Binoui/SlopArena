@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://arena_split"]
+
+[ext_resource type="Texture2D" uid="uid://bmeeey57nv2m2" path="res://textures/kenney_prototype/PNG/Orange/texture_01.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://textures/kenney_prototype/PNG/Dark/texture_01.png" id="2"]
+
+[sub_resource type="StandardMaterial3D" id="mat_upper"]
+albedo_texture = ExtResource("1")
+roughness = 0.7
+uv1_scale = Vector3(0.04, 0.04, 0.04)
+uv1_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="mat_lower"]
+albedo_texture = ExtResource("2")
+roughness = 0.8
+uv1_scale = Vector3(0.04, 0.04, 0.04)
+uv1_triplanar = true
+
+; Two-level arena with raised center and lower surrounding ring
+[node name="Arena" type="Node3D"]
+
+; Lower ring (60x60 outer, 30x30 hole in center)
+[node name="Lower_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -2, 15)
+use_collision = true
+size = Vector3(60, 2, 30)
+material = SubResource("mat_lower")
+
+[node name="Lower_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -2, 45)
+use_collision = true
+size = Vector3(60, 2, 30)
+material = SubResource("mat_lower")
+
+[node name="Lower_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, -2, 30)
+use_collision = true
+size = Vector3(30, 2, 30)
+material = SubResource("mat_lower")
+
+[node name="Lower_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, -2, 30)
+use_collision = true
+size = Vector3(30, 2, 30)
+material = SubResource("mat_lower")
+
+; Upper center platform (raised, 20x20)
+[node name="UpperCenter" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 1, 30)
+use_collision = true
+size = Vector3(20, 2, 20)
+material = SubResource("mat_upper")
+
+; Ramps connecting lower to upper (4 corners)
+[node name="Ramp_NW" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, -0.5, 22)
+use_collision = true
+size = Vector3(4, 1, 4)
+material = SubResource("mat_upper")
+
+[node name="Ramp_NE" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, -0.5, 22)
+use_collision = true
+size = Vector3(4, 1, 4)
+material = SubResource("mat_upper")
+
+[node name="Ramp_SW" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, -0.5, 38)
+use_collision = true
+size = Vector3(4, 1, 4)
+material = SubResource("mat_upper")
+
+[node name="Ramp_SE" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, -0.5, 38)
+use_collision = true
+size = Vector3(4, 1, 4)
+material = SubResource("mat_upper")
+
+; Corner pillars for visual reference
+[node name="Pillar_NW" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 6)
+use_collision = true
+size = Vector3(4, 6, 4)
+material = SubResource("mat_upper")
+
+[node name="Pillar_NE" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 6)
+use_collision = true
+size = Vector3(4, 6, 4)
+material = SubResource("mat_upper")
+
+[node name="Pillar_SW" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 54)
+use_collision = true
+size = Vector3(4, 6, 4)
+material = SubResource("mat_upper")
+
+[node name="Pillar_SE" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 54)
+use_collision = true
+size = Vector3(4, 6, 4)
+material = SubResource("mat_upper")

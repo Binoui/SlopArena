@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://b1yscip0heua3"]
+
+[ext_resource type="Texture2D" uid="uid://bq8llkb2y1rqs" path="res://textures/kenney_prototype/PNG/Green/texture_01.png" id="1"]
+
+[sub_resource type="StandardMaterial3D" id="mat_cross"]
+albedo_texture = ExtResource("1")
+roughness = 0.7
+uv1_scale = Vector3(0.04, 0.04, 0.04)
+uv1_triplanar = true
+
+[node name="Arena" type="Node3D" unique_id=1132599325]
+
+[node name="Center" type="CSGBox3D" parent="." unique_id=828270444]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -1, 30)
+use_collision = true
+size = Vector3(20, 2, 20)
+material = SubResource("mat_cross")
+
+[node name="Arm_N" type="CSGBox3D" parent="." unique_id=2097137971]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -1, 12)
+use_collision = true
+size = Vector3(16, 2, 12)
+material = SubResource("mat_cross")
+
+[node name="Arm_S" type="CSGBox3D" parent="." unique_id=750967473]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -1, 48)
+use_collision = true
+size = Vector3(16, 2, 12)
+material = SubResource("mat_cross")
+
+[node name="Arm_W" type="CSGBox3D" parent="." unique_id=38793788]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, -1, 30)
+use_collision = true
+size = Vector3(12, 2, 16)
+material = SubResource("mat_cross")
+
+[node name="Arm_E" type="CSGBox3D" parent="." unique_id=1512951541]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, -1, 30)
+use_collision = true
+size = Vector3(12, 2, 16)
+material = SubResource("mat_cross")
+
+[node name="CenterPillar" type="CSGBox3D" parent="." unique_id=257366482]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 1, 30)
+use_collision = true
+size = Vector3(4, 4, 4)
+material = SubResource("mat_cross")

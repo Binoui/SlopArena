@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://arena_pit"]
+
+[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://textures/kenney_prototype/PNG/Dark/texture_01.png" id="1"]
+
+[sub_resource type="StandardMaterial3D" id="mat_floor"]
+albedo_texture = ExtResource("1")
+roughness = 0.8
+uv1_scale = Vector3(0.04, 0.04, 0.04)
+uv1_triplanar = true
+
+; 80x80 floating platform, 2 units thick, at Y=0
+[node name="Arena" type="Node3D"]
+
+[node name="Platform" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, -1, 40)
+use_collision = true
+size = Vector3(80, 2, 80)
+material = SubResource("mat_floor")
+
+; Low railing to hint at edge (visual only, no collision past platform)
+[node name="Railing_N" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1.5, -0.5)
+use_collision = true
+size = Vector3(80, 1, 1)
+material = SubResource("mat_floor")
+
+[node name="Railing_S" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1.5, 80.5)
+use_collision = true
+size = Vector3(80, 1, 1)
+material = SubResource("mat_floor")
+
+[node name="Railing_W" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.5, 40)
+use_collision = true
+size = Vector3(1, 1, 80)
+material = SubResource("mat_floor")
+
+[node name="Railing_E" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80.5, 1.5, 40)
+use_collision = true
+size = Vector3(1, 1, 80)
+material = SubResource("mat_floor")
