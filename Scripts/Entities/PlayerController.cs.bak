@@ -15,16 +15,56 @@ using SlopArena.Shared;
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
-	private CharacterDefinition _charDef;
-	private CharacterClass _playerClass = CharacterClass.Vanguard;
-	
-	public void SetClass(CharacterClass pc)
+	public enum PlayerClass
 	{
-		_playerClass = pc;
-		_charDef = CharacterRegistry.Get(pc);
+		Vanguard,
+		Wraith,
+		Channeler
 	}
 	
-	public CharacterClass GetClass() => _playerClass;
+	private PlayerClass _playerClass = PlayerClass.Vanguard;
+	
+	public void SetClass(PlayerClass pc)
+	{
+		_playerClass = pc;
+		ApplyClassStats();
+	}
+	
+	public PlayerClass GetClass() => _playerClass;
+	
+	private void ApplyClassStats()
+	{
+		switch (_playerClass)
+		{
+			case PlayerClass.Vanguard:
+				WalkSpeed = 9f;
+				SprintSpeed = 12f;
+				BackwardSpeed = 6f;
+				JumpVelocity = 14f;
+				Gravity = 42f;
+				AirAcceleration = 12f;
+				GroundFriction = 22f;
+				break;
+			case PlayerClass.Wraith:
+				WalkSpeed = 11f;
+				SprintSpeed = 15f;
+				BackwardSpeed = 8f;
+				JumpVelocity = 18f;
+				Gravity = 38f;
+				AirAcceleration = 16f;
+				GroundFriction = 14f;
+				break;
+			case PlayerClass.Channeler:
+				WalkSpeed = 10f;
+				SprintSpeed = 13f;
+				BackwardSpeed = 7f;
+				JumpVelocity = 16f;
+				Gravity = 35f;
+				AirAcceleration = 14f;
+				GroundFriction = 16f;
+				break;
+		}
+	}
 	// ==========================================
 	// EXPORTED VARIABLES (realistic scales)
 	// ==========================================
@@ -86,17 +126,45 @@ public partial class PlayerController : CharacterBody3D
 	private Hurtbox? _hurtbox;
 	
 	// ==========================================
-	// MELEE COMBO (LMB) — loaded from CharacterDefinition
+	// MELEE COMBO (LMB)
 	// ==========================================
+	
+	[Export] public float ComboStepDistance = 0f;      // Base lunge
+	[Export] public float ComboWindow = 0.7f;         // Time to press next hit
+	[Export] public float[] ComboDamage = { 5f, 7f, 12f };
+	[Export] public float[] ComboRange = { 2.5f, 3.0f, 4.0f };
+	[Export] public float[] ComboLunge = { 4f, 6f, 8f }; // Forward lunge multiplier per hit
+	[Export] public float[] ComboKnockback = { 3f, 5f, 15f };
 	
 	private int _comboStage = 0;     // 0=idle, 1=hit1, 2=hit2, 3=hit3
 	private float _comboTimer = 0f;  // Remaining window to press next hit
-private float _comboAnimLock = 0f; // Brief lock after each hit
-
+	private float _comboAnimLock = 0f; // Brief lock after each hit
+	
 	// ==========================================
-	// HEAVY ATTACK (RMB) — loaded from CharacterDefinition
-	// AIR ATTACKS — loaded from CharacterDefinition
+	// HEAVY ATTACK (RMB)
 	// ==========================================
+	
+	[Export] public float HeavyDamage = 10f;
+	[Export] public float HeavyKnockback = 20f;
+	[Export] public float HeavyRange = 4f;
+	[Export] public float HeavyLunge = 6f;
+	[Export] public float HeavyAnimLock = 0.3f;
+	
+	[Export] public float HeavyChargedDamage = 15f;
+	[Export] public float HeavyChargedKnockback = 30f;
+	[Export] public float HeavyChargedRange = 5f;
+	[Export] public float HeavyChargedLunge = 8f;
+	[Export] public float HeavyChargedLock = 0.5f;
+	
+	// ==========================================
+	// AIR ATTACKS
+	// ==========================================
+	
+	[Export] public float AirLightDamage = 4f;
+	[Export] public float AirLightLunge = 5f;
+	[Export] public float AirHeavyDamage = 8f;
+	[Export] public float AirHeavyKnockback = 15f;
+	[Export] public float AirHeavyLunge = 4f;
 	
 	// ==========================================
 	// CHARACTER ROTATION
@@ -263,8 +331,8 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 	
 	public override void _Ready()
 	{
-		// Apply class movement stats from registry
-		_charDef = CharacterRegistry.Get(_playerClass);
+		// Apply class movement stats
+		ApplyClassStats();
 		
 		// --- Input Map setup (AZERTY + QWERTY compatible) ---
 		SetupInputMap();
@@ -534,29 +602,25 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
 		if (_comboAnimLock > 0f) return;
 		
-		// Pick press or charged stage
-		var stages = charged && _charDef.RMB.ChargedStages != null
-			? _charDef.RMB.ChargedStages
-			: _charDef.RMB.Stages;
-		if (stages == null || stages.Length == 0) return;
-		var stage = stages[0];
-		
 		Vector3 forward = -Transform.Basis.Z;
 		forward.Y = 0; forward = forward.Normalized();
-		Vector3 pos = GlobalPosition;
+		
+		float dmg = charged ? HeavyChargedDamage : HeavyDamage;
+		float kb = charged ? HeavyChargedKnockback : HeavyKnockback;
+		float range = charged ? HeavyChargedRange : HeavyRange;
+		float lunge = charged ? HeavyChargedLunge : HeavyLunge;
+		float animLock = charged ? HeavyChargedLock : HeavyAnimLock;
 		
 		// Forward lunge
-		if (stage.LungeForce > 0f)
-		{
-			Velocity = new Vector3(forward.X * stage.LungeForce * 3f,
-				Velocity.Y + 2f,
-				forward.Z * stage.LungeForce * 3f);
-		}
+		Velocity = new Vector3(forward.X * lunge * 3f, Velocity.Y + 2f, forward.Z * lunge * 3f);
 		
 		// Hit detection
 		var simulation = _combatComponent?.GetSimulation();
 		if (simulation == null) return;
+		
 		ulong playerId = _combatComponent!.GetEntityId();
+		float halfAngle = 45f;
+		Vector3 pos = GlobalPosition;
 		
 		foreach (var kvp in simulation.Entities)
 		{
@@ -567,28 +631,19 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 			float dx = epos.X - pos.X;
 			float dz = epos.Z - pos.Z;
 			float dist = MathF.Sqrt(dx * dx + dz * dz);
+			if (dist > range + eradius) continue;
 			
-			if (stage.Shape == AttackShape.CircleAOE)
-			{
-				if (dist > stage.Radius + eradius) continue;
-			}
-			else // MeleeCone
-			{
-				if (dist > stage.Range + eradius) continue;
-				float angle = MathF.Atan2(forward.Z, forward.X);
-				Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
-				float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
-				float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
-				if (diff > stage.HitAngleDeg * Mathf.Pi / 180f) continue;
-			}
+			float angle = MathF.Atan2(forward.Z, forward.X);
+			Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
+			float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
+			float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
+			if (diff > halfAngle * Mathf.Pi / 180f) continue;
 			
-			simulation.OnEntityHit?.Invoke(eid, stage.Damage,
-				forward.X * stage.KnockbackForce,
-				stage.KnockbackUpward,
-				forward.Z * stage.KnockbackForce);
+			simulation.OnEntityHit?.Invoke(eid, dmg, forward.X * kb, kb * 0.5f, forward.Z * kb);
 		}
 		
-		_comboAnimLock = stage.SelfLockTicks / 60f;
+		_comboAnimLock = animLock;
+		//GD.Print(charged ? "Heavy Charged!" : "Heavy!");
 	}
 	
 	private void TryAirLight()
@@ -596,13 +651,9 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 		if (_comboAnimLock > 0f) return;
 		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
 		
-		var stage = _charDef.LMB.Stages?[0];
-		if (stage == null) return;
-		var s = stage.Value;
-		
 		Vector3 forward = -Transform.Basis.Z;
 		forward.Y = 0; forward = forward.Normalized();
-		Velocity = new Vector3(forward.X * s.LungeForce * 3f, Velocity.Y + 2f, forward.Z * s.LungeForce * 3f);
+		Velocity = new Vector3(forward.X * AirLightLunge * 3f, Velocity.Y + 2f, forward.Z * AirLightLunge * 3f);
 		
 		var simulation = _combatComponent?.GetSimulation();
 		if (simulation == null) return;
@@ -616,78 +667,74 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 			var (epos, eradius, active) = kvp.Value;
 			if (!active || eid == playerId) continue;
 			float dx = epos.X - pos.X, dz = epos.Z - pos.Z;
-			if (MathF.Sqrt(dx*dx + dz*dz) > s.Range + eradius) continue;
-			simulation.OnEntityHit?.Invoke(eid, s.Damage,
-				forward.X * s.KnockbackForce,
-				s.KnockbackUpward,
-				forward.Z * s.KnockbackForce);
+			if (MathF.Sqrt(dx*dx + dz*dz) > 3f + eradius) continue;
+			simulation.OnEntityHit?.Invoke(eid, AirLightDamage, forward.X * 5f, 3f, forward.Z * 5f);
 		}
 		
-		_comboAnimLock = s.SelfLockTicks / 60f;
+		_comboAnimLock = 0.15f;
 	}
 	
 	private void TryAirHeavy()
 	{
 		if (_comboAnimLock > 0f) return;
 		if (_knockbackVelocity.LengthSquared() > 0.001f) return;
-
-		var stage = _charDef.RMB.Stages?[0];
-		if (stage == null) return;
-		var s = stage.Value;
-
+		
 		Vector3 forward = -Transform.Basis.Z;
 		forward.Y = 0; forward = forward.Normalized();
-		Velocity = new Vector3(forward.X * s.LungeForce * 3f, -8f, forward.Z * s.LungeForce * 3f); // Slam down
-
+		Velocity = new Vector3(forward.X * AirHeavyLunge * 3f, -8f, forward.Z * AirHeavyLunge * 3f); // Slam down
+		
 		var simulation = _combatComponent?.GetSimulation();
 		if (simulation == null) return;
-
+		
 		ulong playerId = _combatComponent!.GetEntityId();
 		Vector3 pos = GlobalPosition;
-
+		
 		foreach (var kvp in simulation.Entities)
 		{
 			ulong eid = kvp.Key;
 			var (epos, eradius, active) = kvp.Value;
 			if (!active || eid == playerId) continue;
 			float dx = epos.X - pos.X, dz = epos.Z - pos.Z;
-			if (MathF.Sqrt(dx*dx + dz*dz) > s.Range + eradius) continue;
-			simulation.OnEntityHit?.Invoke(eid, s.Damage,
-				forward.X * s.KnockbackForce * 0.5f,
-				-s.KnockbackUpward,
-				forward.Z * s.KnockbackForce * 0.5f);
+			if (MathF.Sqrt(dx*dx + dz*dz) > 4f + eradius) continue;
+			simulation.OnEntityHit?.Invoke(eid, AirHeavyDamage, forward.X * AirHeavyKnockback * 0.5f, -AirHeavyKnockback, forward.Z * AirHeavyKnockback * 0.5f);
 		}
-
-		_comboAnimLock = s.SelfLockTicks / 60f;
+		
+		_comboAnimLock = 0.2f;
 	}
-	/// <summary>
-	/// Mapping from class ability key names to effect methods.
-	/// Add new entries here when adding new character abilities.
-	/// </summary>
-	private static readonly Dictionary<string, Action<CombatComponent>> AbilityEffectMap = new()
-	{
-		{ "VanguardShieldBash", ClassAbilities.VanguardShieldBash },
-		{ "VanguardWarCry", ClassAbilities.VanguardWarCry },
-		{ "VanguardIntervene", ClassAbilities.VanguardIntervene },
-		{ "VanguardThunderclap", ClassAbilities.VanguardThunderclap },
-		{ "WraithViperShot", ClassAbilities.WraithViperShot },
-		{ "WraithShadowStep", ClassAbilities.WraithShadowStep },
-		{ "WraithRapidFire", ClassAbilities.WraithRapidFire },
-		{ "WraithFreezingTrap", ClassAbilities.WraithFreezingTrap },
-		{ "ChannelerFrostbolt", ClassAbilities.ChannelerFrostbolt },
-		{ "ChannelerDragonsBreath", ClassAbilities.ChannelerDragonsBreath },
-		{ "ChannelerIceLance", ClassAbilities.ChannelerIceLance },
-		{ "ChannelerMeteor", ClassAbilities.ChannelerMeteor },
-	};
-	
 	private void TriggerClassAbility(int index)
 	{
 		if (_combatComponent == null) return;
-		if (index < 0 || index >= _charDef.ClassAbilityKeys.Length) return;
 		
-		string key = _charDef.ClassAbilityKeys[index];
-		if (key == null || !AbilityEffectMap.TryGetValue(key, out var effect)) return;
-		effect(_combatComponent);
+		switch (_playerClass)
+		{
+			case PlayerClass.Vanguard:
+				switch (index)
+				{
+					case 0: ClassAbilities.VanguardShieldBash(_combatComponent); break;   // Q
+					case 1: ClassAbilities.VanguardWarCry(_combatComponent); break;      // E
+					case 2: ClassAbilities.VanguardIntervene(_combatComponent); break;    // R
+					case 3: ClassAbilities.VanguardThunderclap(_combatComponent); break;  // F
+				}
+				break;
+			case PlayerClass.Wraith:
+				switch (index)
+				{
+					case 0: ClassAbilities.WraithViperShot(_combatComponent); break;      // Q
+					case 1: ClassAbilities.WraithShadowStep(_combatComponent); break;     // E
+					case 2: ClassAbilities.WraithRapidFire(_combatComponent); break;      // R
+					case 3: ClassAbilities.WraithFreezingTrap(_combatComponent); break;   // F
+				}
+				break;
+			case PlayerClass.Channeler:
+				switch (index)
+				{
+					case 0: ClassAbilities.ChannelerFrostbolt(_combatComponent); break;   // Q
+					case 1: ClassAbilities.ChannelerDragonsBreath(_combatComponent); break; // E
+					case 2: ClassAbilities.ChannelerIceLance(_combatComponent); break;    // R
+					case 3: ClassAbilities.ChannelerMeteor(_combatComponent); break;      // F
+				}
+				break;
+		}
 	}
 	
 	// ==========================================
@@ -811,18 +858,13 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 		if (_comboAnimLock > 0f) return;
 		if (_combatComponent == null) return;
 		
-		var stages = _charDef.LMB.Stages;
-		if (stages == null || stages.Length == 0) return;
-		
-		int maxStage = stages.Length;
-		
 		// If no combo active, start at hit 1
 		// If active and within window, advance to next hit
 		if (_comboStage == 0 || _comboTimer <= 0f)
 		{
 			_comboStage = 1;
 		}
-		else if (_comboStage < maxStage)
+		else if (_comboStage < 3)
 		{
 			_comboStage++;
 		}
@@ -834,27 +876,31 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 		}
 		
 		int hit = _comboStage - 1; // 0-indexed
-		var stage = stages[hit];
-		
 		Vector3 forward = -Transform.Basis.Z;
 		forward.Y = 0;
 		forward = forward.Normalized();
 		Vector3 pos = GlobalPosition;
 		
-		// Forward lunge
-		if (stage.LungeForce > 0f)
-		{
-			Velocity = new Vector3(
-				forward.X * stage.LungeForce * 3f,
-				Velocity.Y + 2f,
-				forward.Z * stage.LungeForce * 3f
-			);
-		}
+		// Forward lunge (per-hit distance for air combo freedom)
+		float lunge = ComboLunge[hit];
+		Velocity = new Vector3(
+			forward.X * lunge * 3f,
+			Velocity.Y + 2f, // Small upward boost to stay airborne
+			forward.Z * lunge * 3f
+		);
 		
-		// Hit detection
+		// Hit detection — use CombatComponent's simulation
+		// We call CheckMeleeCone via the combat component
 		ulong playerId = _combatComponent.GetEntityId();
 		var simulation = _combatComponent.GetSimulation();
 		if (simulation == null) return;
+		
+		// Direct check against simulation entities
+		float range = ComboRange[hit];
+		float halfAngle = 45f; // 90 degree cone
+		float damage = ComboDamage[hit];
+		float kb = ComboKnockback[hit];
+		float stun = 0.3f + hit * 0.15f; // 0.3, 0.45, 0.6
 		
 		foreach (var kvp in simulation.Entities)
 		{
@@ -865,32 +911,25 @@ private float _comboAnimLock = 0f; // Brief lock after each hit
 			float dx = epos.X - pos.X;
 			float dz = epos.Z - pos.Z;
 			float dist = MathF.Sqrt(dx * dx + dz * dz);
-			if (dist > stage.Range + eradius) continue;
+			if (dist > range + eradius) continue;
 			
-			// Check angle for MeleeCone
-			if (stage.Shape == AttackShape.MeleeCone)
-			{
-				float angle = MathF.Atan2(forward.Z, forward.X);
-				Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
-				float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
-				float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
-				if (diff > stage.HitAngleDeg * Mathf.Pi / 180f) continue;
-			}
-			else if (stage.Shape == AttackShape.CircleAOE)
-			{
-				// Already distance-checked above
-			}
+			// Check angle
+			float angle = MathF.Atan2(forward.Z, forward.X);
+			Vector3 toTarget = new Vector3(dx, 0, dz).Normalized();
+			float targetAngle = MathF.Atan2(toTarget.Z, toTarget.X);
+			float diff = MathF.Abs(Mathf.AngleDifference(angle, targetAngle));
+			if (diff > halfAngle * Mathf.Pi / 180f) continue;
 			
 			// Hit!
-			simulation.OnEntityHit?.Invoke(eid, stage.Damage,
-				forward.X * stage.KnockbackForce,
-				stage.StunTicks / 60f * 10f, // Convert ticks to stun frames
-				forward.Z * stage.KnockbackForce);
+			simulation.OnEntityHit?.Invoke(eid, damage, forward.X * kb, stun * 10f, forward.Z * kb);
+			//GD.Print($"Combo hit {hit + 1} on entity {eid} for {damage} damage");
 		}
 		
 		// Combo timing
-		_comboTimer = stage.ChainWindowTicks / 60f; // Convert ticks to seconds
-		_comboAnimLock = stage.SelfLockTicks / 60f;
+		_comboTimer = ComboWindow;
+		_comboAnimLock = 0.15f; // Brief animation lock between hits
+		
+		//GD.Print($"Combo stage {_comboStage}/3");
 	}
 	
 	/// <summary>

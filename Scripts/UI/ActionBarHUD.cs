@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using SlopArena.Shared;
 using System;
 using System.Collections.Generic;
 
@@ -118,9 +119,9 @@ public partial class ActionBarHUD : Control
 		var pc = _player.GetClass();
 		string className = pc switch
 		{
-			PlayerController.PlayerClass.Vanguard => "VANGUARD",
-			PlayerController.PlayerClass.Wraith => "WRAITH",
-			PlayerController.PlayerClass.Channeler => "CHANNELER",
+			CharacterClass.Vanguard => "VANGUARD",
+			CharacterClass.Wraith => "WRAITH",
+			CharacterClass.Channeler => "CHANNELER",
 			_ => "UNKNOWN"
 		};
 		
@@ -129,9 +130,9 @@ public partial class ActionBarHUD : Control
 		
 		string[] nameSet = pc switch
 		{
-			PlayerController.PlayerClass.Vanguard => new[]{ "Combo", "Heavy", "Shield Bash", "War Cry", "Intervene", "Thunderclap" },
-			PlayerController.PlayerClass.Wraith => new[]{ "Combo", "Heavy", "Viper Shot", "Shadow Step", "Rapid Fire", "Freezing Trap" },
-			PlayerController.PlayerClass.Channeler => new[]{ "Combo", "Heavy", "Frostbolt", "Dragon's Breath", "Ice Lance", "Meteor" },
+			CharacterClass.Vanguard => new[]{ "Combo", "Heavy", "Shield Bash", "War Cry", "Intervene", "Thunderclap" },
+			CharacterClass.Wraith => new[]{ "Combo", "Heavy", "Viper Shot", "Shadow Step", "Rapid Fire", "Freezing Trap" },
+			CharacterClass.Channeler => new[]{ "Combo", "Heavy", "Frostbolt", "Dragon's Breath", "Ice Lance", "Meteor" },
 			_ => new[]{ "-", "-", "-", "-", "-", "-" }
 		};
 		

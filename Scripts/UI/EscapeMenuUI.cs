@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using SlopArena.Shared;
 using System;
 using System.Collections.Generic;
 
@@ -17,7 +18,7 @@ public partial class EscapeMenuUI : Control
 	public event Action? OnSettingsRequested;
 	public event Action? OnExitLobby;
 	public event Action? OnExitGame;
-	public event Action<PlayerController.PlayerClass>? OnClassSelected;
+	public event Action<CharacterClass>? OnClassSelected;
 	
 	// ==========================================
 	// STATE
@@ -90,15 +91,15 @@ public partial class EscapeMenuUI : Control
 		_menuContainer.AddChild(classTitle);
 		
 		var btnVg = MakeMenuButton("Vanguard");
-		btnVg.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Vanguard); };
+		btnVg.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Vanguard); };
 		_menuContainer.AddChild(btnVg);
 		
 		var btnWr = MakeMenuButton("Wraith");
-		btnWr.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Wraith); };
+		btnWr.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Wraith); };
 		_menuContainer.AddChild(btnWr);
 		
 		var btnCh = MakeMenuButton("Channeler");
-		btnCh.Pressed += () => { Close(); OnClassSelected?.Invoke(PlayerController.PlayerClass.Channeler); };
+		btnCh.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Channeler); };
 		_menuContainer.AddChild(btnCh);
 		
 		// Settings
