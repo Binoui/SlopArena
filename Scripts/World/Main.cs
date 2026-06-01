@@ -75,7 +75,7 @@ public partial class Main : Node3D
 			npc.Name = $"NPC_{i}";
 			npc.Position = npcPositions[i];
 			// Cycle through classes
-			npc.SetClass((PlayerController.PlayerClass)(i % 3));
+			npc.SetClass((CharacterClass)(i % 3));
 			AddChild(npc);
 			npc.SetNPC(true);
 			npc.SetNpcSpawnPosition(npcPositions[i]);
@@ -221,7 +221,7 @@ public partial class Main : Node3D
 
 			// Connect escape menu events
 			_escapeMenu.OnResumePressed += () => { };
-			_escapeMenu.OnClassSelected += (PlayerController.PlayerClass pc) =>
+			_escapeMenu.OnClassSelected += (CharacterClass pc) =>
 			{
 				if (_player != null)
 				{
