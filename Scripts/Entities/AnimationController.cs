@@ -231,11 +231,6 @@ public partial class AnimationController : Node
 	/// </summary>
 	public AnimationPlayer? GetAnimPlayer() => _animPlayer;
 
-	/// <summary>
-	/// Check if an attack animation is currently active.
-	/// </summary>
-	public bool IsAttacking() => _attackTimer > 0f;
-
 	// ==========================================
 	// ANIMATION LOADING
 	// ==========================================
