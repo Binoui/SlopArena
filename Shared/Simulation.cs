@@ -20,12 +20,16 @@ namespace SlopArena.Shared
     {
         public const float TickDt = 1f / 60f;
 
-        // ── Constants (matched to MovementComponent feel at 60Hz) ──
+        // ── Constants ──
         private const float AirDrag = 0.2f;
         private const float AirDodgeSpeed = 35.0f;
         private const float KnockbackDecayPerTick = 0.1333f; // 8.0/s at 60Hz
         private const float KnockbackMinGravity = 9.8f;
         private const byte MaxAirDodges = 1;
+
+        // Dash duration: 0.25 second = 15 ticks
+        public const ushort DashDurationTicks = 15;
+        private const ushort DashInvincibilityTicks = 30; // full duration invincible
 
         // Tick-duration constants
         private const ushort AirDodgeDurationTicks = 7;     // ~0.117s
@@ -54,7 +58,7 @@ namespace SlopArena.Shared
             // 1. Tick all timers
             TickTimers(ref s);
 
-            // 2. Knockback overrides everything
+            // 2. Knockback overrides everything (but dash invincibility still applies)
             if (HasKnockback(s))
             {
                 ProcessKnockback(ref s, arena);
@@ -63,7 +67,7 @@ namespace SlopArena.Shared
 
             // 3. State machine
             if (s.State == ActionState.Dashing)
-                ProcessDash(ref s, stats, input);
+                ProcessDash(ref s, stats);
             else if (s.State == ActionState.AirDodging)
                 ProcessAirDodge(ref s);
 
@@ -106,6 +110,7 @@ namespace SlopArena.Shared
         {
             if (s.DashCooldownTicks > 0) s.DashCooldownTicks--;
             if (s.DashDurationTicks > 0) s.DashDurationTicks--;
+            if (s.InvincibilityTicks > 0) s.InvincibilityTicks--;
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
             if (s.ComboTimerTicks > 0) s.ComboTimerTicks--;
 
@@ -163,7 +168,7 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // Ground check (flat floor)
+            // Ground check
             bool wasAirborne = !s.IsGrounded;
             s.IsGrounded = s.PY <= FloorHeight + 0.1f;
 
@@ -183,26 +188,21 @@ namespace SlopArena.Shared
 
         // ── DASH ──
 
-        private static void ProcessDash(ref CharacterState s, MovementStats stats, InputState input)
+        private static void ProcessDash(ref CharacterState s, MovementStats stats)
         {
             if (s.DashDurationTicks > 0)
             {
-                // Dash canceled by jump
-                if (input.Jump && s.IsGrounded)
-                {
-                    s.State = ActionState.Idle;
-                    s.VY = stats.JumpForce;
-                }
-                else
-                {
-                    s.VX = s.DashDirX * stats.DashSpeed;
-                    s.VZ = s.DashDirZ * stats.DashSpeed;
-                    s.VY = Math.Max(s.VY, 0f);
-                }
+                // Dash: maintain horizontal speed, stop vertical momentum
+                s.VX = s.DashDirX * stats.DashSpeed;
+                s.VZ = s.DashDirZ * stats.DashSpeed;
+                s.VY = Math.Max(s.VY, 0f); // stop falling during dash (ground & air)
             }
             else
             {
                 s.State = ActionState.Idle;
+                // Stop completely — no slide/momentum after dash
+                s.VX = 0f;
+                s.VZ = 0f;
             }
             UpdateFacing(ref s);
         }
@@ -240,7 +240,7 @@ namespace SlopArena.Shared
             ref CharacterState s, MovementStats stats,
             InputState input, float dirX, float dirZ)
         {
-            // Reset resources on ground each tick we're actually grounded
+            // Reset resources on ground each tick
             s.AirDodgesLeft = MaxAirDodges;
             s.JumpsLeft = stats.MaxJumps;
             s.IsGrounded = true;
@@ -331,10 +331,14 @@ namespace SlopArena.Shared
             s.VX *= (1f - drag);
             s.VZ *= (1f - drag);
 
-            // Air dodge
-            if (input.Dash && s.AirDodgesLeft > 0)
+            // Dash initiation is handled by PlayerController outside of Simulation
+            // (works both ground and air, has cooldown, grants invincibility)
+
+            // Double jump: press space in air to use remaining jump
+            if (input.Jump && s.JumpsLeft > 0)
             {
-                StartAirDodge(ref s, dirX, dirZ);
+                s.VY = stats.JumpForce;
+                s.JumpsLeft--;
             }
 
             UpdateFacing(ref s);
@@ -362,15 +366,17 @@ namespace SlopArena.Shared
             }
         }
 
-        // ── DASH INITIATION (call externally on input) ──
+        // ── DASH INITIATION ──
 
         /// <summary>
-        /// Start a ground dash. Called by PlayerController when dash input is detected.
+        /// Start a dash (ground or air). 1 second duration, grants invincibility.
+        /// Can be used on ground or in air.
         /// </summary>
         public static void StartDash(ref CharacterState s, MovementStats stats, float dirX, float dirZ)
         {
             if (s.DashCooldownTicks > 0) return;
-            if (s.State != ActionState.Idle && s.State != ActionState.Attacking) return;
+            if (s.State != ActionState.Idle && s.State != ActionState.Attacking && s.State != ActionState.Dashing) return;
+            if (s.InvincibilityTicks > 0) return; // already invincible
             if (HasKnockback(s)) return;
 
             // Normalize direction
@@ -389,10 +395,11 @@ namespace SlopArena.Shared
 
             s.DashDirX = dirX;
             s.DashDirZ = dirZ;
-            s.DashDurationTicks = stats.DashDurationTicks;
+            s.DashDurationTicks = DashDurationTicks;
             s.DashCooldownTicks = stats.DashCooldownTicks;
+            s.InvincibilityTicks = DashInvincibilityTicks; // invincible for full dash
             s.State = ActionState.Dashing;
-            s.StateTicks = stats.DashDurationTicks;
+            s.StateTicks = DashDurationTicks;
 
             s.VX = dirX * stats.DashSpeed;
             s.VZ = dirZ * stats.DashSpeed;
@@ -411,17 +418,30 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
-        /// Apply knockback force. Interrupts dash/air-dodge.
+        /// Apply knockback force, scaled by damage percent (Smash-style).
+        /// Knockback = baseForce * (1 + DamagePercent * 0.01)
+        /// So at 0%: 1x, at 100%: 2x, at 200%: 3x, etc.
+        /// If baseForce is ~0 (no-KB moves), knockback stays minimal.
         /// </summary>
         public static void ApplyKnockback(ref CharacterState s, float kbX, float kbY, float kbZ)
         {
-            s.KVX = kbX;
-            s.KVY = kbY;
-            s.KVZ = kbZ;
+            float kbScale = 1f + (s.DamagePercent * 0.01f);
+            s.KVX = kbX * kbScale;
+            s.KVY = kbY * kbScale;
+            s.KVZ = kbZ * kbScale;
             s.State = ActionState.Idle;
             s.DashDurationTicks = 0;
             s.StateTicks = 0;
             s.WasAirborneDuringKnockback = !s.IsGrounded;
+        }
+
+        /// <summary>
+        /// Apply damage and increase damage percentage.
+        /// </summary>
+        public static void ApplyDamage(ref CharacterState s, float damage)
+        {
+            int newPercent = s.DamagePercent + (int)Math.Round(damage);
+            s.DamagePercent = (ushort)Math.Clamp(newPercent, 0, 999);
         }
 
         /// <summary>
@@ -463,7 +483,21 @@ namespace SlopArena.Shared
         {
             if (!s.IsGrounded)
             {
-                s.VY -= stats.Gravity * TickDt;
+                // Float system:
+                // - During attack animation (AnimLockTicks > 0): no gravity, maintain position
+                // - During dash: no gravity, maintains horizontal momentum
+                // - After float ends: gravity resumes naturally from current VY (starts slow)
+                if (s.AnimLockTicks > 0 || s.State == ActionState.Dashing || s.State == ActionState.Attacking)
+                {
+                    // Gentle downward drift during float (not full gravity)
+                    // Attack float: almost zero movement
+                    if (s.VY > -3f)
+                        s.VY -= 6f * TickDt; // ~6 m/s² drift (vs full gravity 35-42)
+                }
+                else
+                {
+                    s.VY -= stats.Gravity * TickDt;
+                }
 
                 // Hard cap on fall speed
                 if (s.VY < -stats.MaxFallSpeed)
@@ -486,9 +520,8 @@ namespace SlopArena.Shared
 
         private static void RespawnCharacter(ref CharacterState s, ArenaDefinition arena)
         {
-            // Use first spawn point
             var spawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : default;
-            s.HP = s.MaxHP;
+            s.DamagePercent = 0;
             s.PX = spawn.X;
             s.PY = spawn.Y;
             s.PZ = spawn.Z;
@@ -504,6 +537,7 @@ namespace SlopArena.Shared
             s.AnimLockTicks = 0;
             s.DashCooldownTicks = 0;
             s.DashDurationTicks = 0;
+            s.InvincibilityTicks = 0;
             s.DirHoldTicks = 0;
             s.IsSprinting = false;
             s.TurnaroundTicks = 0;
@@ -514,11 +548,9 @@ namespace SlopArena.Shared
 
         private static (float dirX, float dirZ) GetInputDirection(InputState input)
         {
-            float dx = 0f, dz = 0f;
-            if (input.Up)    dz -= 1f;  // +Z is forward in this game
-            if (input.Down)  dz += 1f;
-            if (input.Left)  dx -= 1f;
-            if (input.Right) dx += 1f;
+            // Use camera-relative MoveX/MoveY
+            float dx = input.MoveX;
+            float dz = input.MoveY;
 
             float len = MathF.Sqrt(dx * dx + dz * dz);
             if (len > 0.001f)

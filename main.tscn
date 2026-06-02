@@ -33,7 +33,7 @@ shadow_enabled = true
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=89426561]
 
 [node name="Label" type="Label" parent="CanvasLayer" unique_id=1659088413]
-anchors_preset = 2
+anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -620.0

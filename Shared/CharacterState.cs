@@ -19,8 +19,7 @@ namespace SlopArena.Shared
         public ushort StateTicks;       // remaining ticks in current state
 
         // ── Resources ──
-        public float HP;
-        public float MaxHP;
+        public ushort DamagePercent;    // 0-999, Smash-style % (increases when hit, knockback scales with it)
         public byte JumpsLeft;
         public byte AirDodgesLeft;
         public bool IsGrounded;
@@ -30,6 +29,9 @@ namespace SlopArena.Shared
         public ushort DashCooldownTicks;
         public ushort DashDurationTicks; // remaining dash ticks
         public float DashDirX, DashDirZ;
+
+        // ── Invincibility (dash, respawn) ──
+        public ushort InvincibilityTicks; // remaining ticks of invincibility
 
         // ── Combo / Attack ──
         public byte ComboStage;          // 0 = none, 1-3 = stage

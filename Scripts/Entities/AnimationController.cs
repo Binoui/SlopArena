@@ -137,15 +137,20 @@ public partial class AnimationController : Node
 			return;
 		}
 
-		_animLib = new AnimationLibrary();
-		_animPlayer.AddAnimationLibrary("default", _animLib);
+		// Check if an animation library already exists (KayKit loaded its anims)
+		_animLib = _animPlayer.HasAnimationLibrary("default")
+			? _animPlayer.GetAnimationLibrary("default")
+			: null;
 
-		// Load all animations from the Pro Magic Pack directory
-		LoadAllAnimations(_animLib);
+		if (_animLib == null)
+		{
+			_animLib = new AnimationLibrary();
+			_animPlayer.AddAnimationLibrary("default", _animLib);
+		}
 
 		// Log which animations we loaded
 		var loadedAnims = _animLib.GetAnimationList();
-		//GD.Print($"AnimationController: Loaded {loadedAnims.Count} animations");
+		GD.Print($"AnimationController: Loaded {loadedAnims.Count} animations");
 
 		// Play idle if available
 		if (_animLib.HasAnimation("idle"))
@@ -581,9 +586,8 @@ public partial class AnimationController : Node
 
 	/// <summary>
 	/// Recursively find an AnimationPlayer in the given node tree.
-	/// Used internally when loading FBX scenes that contain embedded anim players.
 	/// </summary>
-	private AnimationPlayer? FindAnimationPlayer(Node node)
+	public AnimationPlayer? FindAnimationPlayer(Node node)
 	{
 		if (node is AnimationPlayer ap)
 			return ap;

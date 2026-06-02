@@ -36,6 +36,8 @@ public class MovementComponent
     public float DashCooldownRemaining => State.DashCooldownTicks * Simulation.TickDt;
     public int JumpsLeft => State.JumpsLeft;
     public int AirDodgesLeft => State.AirDodgesLeft;
+    public ushort DamagePercent => State.DamagePercent;
+    public bool IsInvincible => State.InvincibilityTicks > 0;
 
     // ── PRIVATE ──
 
@@ -61,8 +63,7 @@ public class MovementComponent
         _arenaDef = arenaDef;
 
         // Initialize state from character definition
-        State.HP = 100f;
-        State.MaxHP = 100f;
+        State.DamagePercent = 0;
         State.JumpsLeft = charDef.Movement.MaxJumps;
         State.AirDodgesLeft = 1;
         State.IsGrounded = false;
@@ -88,25 +89,21 @@ public class MovementComponent
         State.VX = _body.Velocity.X;
         State.VY = _body.Velocity.Y;
         State.VZ = _body.Velocity.Z;
-        GD.Print($"  PreSim: body_v=({_body.Velocity.X:F1},{_body.Velocity.Y:F1},{_body.Velocity.Z:F1}) state_v=({State.VX:F1},{State.VY:F1},{State.VZ:F1})");
 
         // Authoritative simulation
         Simulation.SimulateTick(ref State, _charDef, input, _arenaDef);
-        GD.Print($"  PostSim: v=({State.VX:F1},{State.VY:F1},{State.VZ:F1}) g={State.IsGrounded} s={State.State} lastDir=({State.LastDirX:F2},{State.LastDirZ:F2})");
 
         // Apply simulation result to Godot body
         _body.Velocity = new Vector3(State.VX, State.VY, State.VZ);
-        GD.Print($"  Tick: vel=({State.VX:F1},{State.VY:F1},{State.VZ:F1}) grounded={State.IsGrounded} state={State.State}");
 
         // Godot collision/rendering step.
         _body.MoveAndSlide();
         bool godotGrounded = _body.IsOnFloor();
-        GD.Print($"  PostSlide: body_vel=({_body.Velocity.X:F1},{_body.Velocity.Y:F1},{_body.Velocity.Z:F1}) floor={godotGrounded}");
 
-        // Sync grounded state back (Godot's collision is more accurate for ground detection)
-        State.IsGrounded = godotGrounded || State.IsGrounded;
+        // Sync grounded state from Godot (authoritative floor detection)
+        State.IsGrounded = godotGrounded;
 
-        // Floor safety (catching edge cases)
+        // Floor safety
         if (_body.GlobalPosition.Y < Simulation.FloorHeight - 1f && State.IsGrounded)
         {
             _body.GlobalPosition = new Vector3(_body.GlobalPosition.X, Simulation.FloorHeight + 0.5f, _body.GlobalPosition.Z);
@@ -119,7 +116,7 @@ public class MovementComponent
     // ── PUBLIC ACTION METHODS ──
 
     /// <summary>
-    /// Start a ground dash. Direction is normalized automatically.
+    /// Start a dash (ground or air). Direction is normalized automatically.
     /// Pass (0, 0) to dash in facing direction.
     /// </summary>
     public void StartDash(float dirX, float dirZ)
@@ -136,13 +133,22 @@ public class MovementComponent
     }
 
     /// <summary>
-    /// Apply knockback force. Interrupts dash/air-dodge.
+    /// Apply knockback force (already scaled by damage%).
+    /// Interrupts dash/air-dodge.
     /// Also sets body velocity immediately so knockback applies this frame.
     /// </summary>
     public void ApplyKnockback(float kbX, float kbY, float kbZ)
     {
         Simulation.ApplyKnockback(ref State, kbX, kbY, kbZ);
-        _body.Velocity = new Vector3(kbX, kbY, kbZ);
+        _body.Velocity = new Vector3(State.KVX, State.KVY, State.KVZ);
+    }
+
+    /// <summary>
+    /// Apply damage and increase damage percentage.
+    /// </summary>
+    public void ApplyDamage(float damage)
+    {
+        Simulation.ApplyDamage(ref State, damage);
     }
 
     /// <summary>
@@ -191,7 +197,6 @@ public class MovementComponent
 
     /// <summary>
     /// Sync the CharacterState position from a Death/Respawn event.
-    /// Called by PlayerController when HP reaches 0.
     /// </summary>
     public void Respawn(Vector3 position)
     {
@@ -205,17 +210,17 @@ public class MovementComponent
         State.JumpsLeft = _charDef.Movement.MaxJumps;
         State.AirDodgesLeft = 1;
         State.IsGrounded = false;
-        State.HP = State.MaxHP;
+        State.DamagePercent = 0;
         State.ComboStage = 0;
         State.ComboTimerTicks = 0;
         State.AnimLockTicks = 0;
         State.DashCooldownTicks = 0;
         State.DashDurationTicks = 0;
+        State.InvincibilityTicks = 0;
     }
 
     /// <summary>
     /// Reset jumping resources (called externally when landing is detected).
-    /// Now handled internally by Simulation, but kept for external callers.
     /// </summary>
     public void ResetJumps()
     {
