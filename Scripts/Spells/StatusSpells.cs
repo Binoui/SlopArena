@@ -22,11 +22,11 @@ public static class StatusSpells
         float range, float radius, Color color, float duration)
     {
         var cone = new MeshInstance3D();
-        var coneMesh = new ConeMesh();
+        var coneMesh = new CylinderMesh();
         coneMesh.BottomRadius = radius;
+        coneMesh.TopRadius = 0f;
         coneMesh.Height = range;
         coneMesh.RadialSegments = 16;
-        coneMesh.Rings = 4;
 
         var mat = new StandardMaterial3D
         {

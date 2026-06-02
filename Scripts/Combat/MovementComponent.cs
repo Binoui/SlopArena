@@ -88,20 +88,22 @@ public class MovementComponent
         State.VX = _body.Velocity.X;
         State.VY = _body.Velocity.Y;
         State.VZ = _body.Velocity.Z;
+        GD.Print($"  PreSim: body_v=({_body.Velocity.X:F1},{_body.Velocity.Y:F1},{_body.Velocity.Z:F1}) state_v=({State.VX:F1},{State.VY:F1},{State.VZ:F1})");
 
         // Authoritative simulation
         Simulation.SimulateTick(ref State, _charDef, input, _arenaDef);
+        GD.Print($"  PostSim: v=({State.VX:F1},{State.VY:F1},{State.VZ:F1}) g={State.IsGrounded} s={State.State} lastDir=({State.LastDirX:F2},{State.LastDirZ:F2})");
 
         // Apply simulation result to Godot body
         _body.Velocity = new Vector3(State.VX, State.VY, State.VZ);
-        _body.GlobalPosition = new Vector3(State.PX, State.PY, State.PZ);
+        GD.Print($"  Tick: vel=({State.VX:F1},{State.VY:F1},{State.VZ:F1}) grounded={State.IsGrounded} state={State.State}");
 
-        // Godot collision step (visual only — authority is in State)
+        // Godot collision/rendering step.
         _body.MoveAndSlide();
         bool godotGrounded = _body.IsOnFloor();
+        GD.Print($"  PostSlide: body_vel=({_body.Velocity.X:F1},{_body.Velocity.Y:F1},{_body.Velocity.Z:F1}) floor={godotGrounded}");
 
-        // If Godot disagrees with Sim about ground state, trust Sim's authority.
-        // But update visual grounded state from Godot for animation purposes.
+        // Sync grounded state back (Godot's collision is more accurate for ground detection)
         State.IsGrounded = godotGrounded || State.IsGrounded;
 
         // Floor safety (catching edge cases)
