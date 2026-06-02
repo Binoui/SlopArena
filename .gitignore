@@ -49,6 +49,7 @@ heightmap.bin
 # Large asset zips (download, don't commit)
 # ==========================================
 Pro Magic Pack*
+assets/characters/ProMagicPack/*.fbx
 
 # ==========================================
 # Unreal Engine 5 artifacts (old migration)
@@ -57,6 +58,8 @@ Binaries/
 Config/
 Intermediate/
 Saved/
+Content/
+DerivedDataCache/
 Makefile
 *.modules
 *.target
