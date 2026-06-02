@@ -101,7 +101,6 @@ The client CAN use Godot physics for rendering/prediction, but the server is the
 - Floats are OK (this is not lockstep, it's server-authoritative CSP)
 - Avoid comparing floats with `==` — use `<= 0` or `> radius * radius` patterns
 - `Math.Clamp()` to avoid NaN from acos/asin with near-1.0 inputs
-- The heightmap binary is the same file on both client and server — load once at startup
 
 ### 5e. Packet Serialization
 
@@ -123,15 +122,22 @@ The client CAN use Godot physics for rendering/prediction, but the server is the
 │   Godot Client       │ ◄──────────►   │   .NET Server       │
 │   Scripts/           │                │   Server/            │
 │   ┌───────────────┐  │  InputPacket  │   ┌───────────────┐  │
-│   │ Prediction    │  │   Character   │   │   SimulateStep│  │
-│   │ + Rendering   │  │   StatePacket │   │   (authority) │  │
+│   │ Prediction    │  │   Character   │   │ SimulateTick  │  │
+│   │ + Rendering   │  │   StatePacket │   │ (authority)   │  │
 │   └───────┬───────┘  │                │   └───────┬───────┘  │
 │           │          │                │           │          │
 │   ┌───────▼───────┐  │                │   ┌───────▼───────┐  │
 │   │   Shared/     │  │                │   │   Shared/     │  │
-│   │   (pure C#)   │  │                │   │   (pure C#)   │  │
+│   │ (pure C#)     │  │                │   │ (pure C#)     │  │
+│   │ Simulation.cs │  │                │   │ Simulation.cs │  │
+│   │ CombatMath.cs │  │                │   │ CombatMath.cs │  │
 │   └───────────────┘  │                │   └───────────────┘  │
 └─────────────────────┘                  └─────────────────────┘
+         │                                        │
+         │ CharacterDefinition.cs (data-driven)   │
+         │ CharacterState.cs (per-tick state)     │
+         │ AttackData.cs (AbilityData/Stage)      │
+         └────────────────────────────────────────┘
 ```
 
 ---

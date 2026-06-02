@@ -28,8 +28,8 @@ namespace SlopArena.Shared
 
     /// <summary>
     /// Complete data-driven definition of a playable character.
-    /// No hardcoded combat values — everything comes from this struct.
-    /// Add new characters by creating a new file in Scripts/Characters/.
+    /// All 6 ability slots (0-5) use the same AbilityData struct.
+    /// Add new characters by creating a new entry in CharacterRegistry.
     /// </summary>
     public struct CharacterDefinition
     {
@@ -58,13 +58,6 @@ namespace SlopArena.Shared
             5 => F,
             _ => throw new ArgumentOutOfRangeException(nameof(slotIndex))
         };
-
-        /// <summary>
-        /// Class ability effect keys for slots 2-5 (Q/E/R/F).
-        /// These are looked up in ClassAbilities.ExecuteStatic().
-        /// Null = no special effect (basic melee/RMB only, used for LMB/RMB).
-        /// </summary>
-        public string[] ClassAbilityKeys; // [Q, E, R, F] effect names
     }
 
     /// <summary>
@@ -99,9 +92,9 @@ namespace SlopArena.Shared
             };
         }
 
-        // ==========================================
+        // ═══════════════════════════════════════
         // VANGUARD — heavy, slow, tanky
-        // ==========================================
+        // ═══════════════════════════════════════
         private static CharacterDefinition BuildVanguard()
         {
             return new CharacterDefinition
@@ -153,22 +146,47 @@ namespace SlopArena.Shared
                     ChargeHoldTicks = 18, // 0.3s
                 },
 
-                // Q — Shield Bash
-                Q = new AbilityData { Name = "Shield Bash", CooldownTicks = 120 },
-                // E — War Cry
-                E = new AbilityData { Name = "War Cry", CooldownTicks = 240 },
-                // R — Intervene
-                R = new AbilityData { Name = "Intervene", CooldownTicks = 180 },
-                // F — Thunderclap
-                F = new AbilityData { Name = "Thunderclap", CooldownTicks = 420 },
+                // Q — Shield Bash: melee strike, bonus if target has a status
+                Q = new AbilityData
+                {
+                    Name = "Shield Bash",
+                    CooldownTicks = 120,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3f, HitAngleDeg = 45f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 14f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "VanguardShieldBash" },
+                },
 
-                ClassAbilityKeys = new[] { "VanguardShieldBash", "VanguardWarCry", "VanguardIntervene", "VanguardThunderclap" },
+                // E — War Cry: self-buff shield + push enemies
+                E = new AbilityData
+                {
+                    Name = "War Cry",
+                    CooldownTicks = 240,
+                    SpecialEffectKeys = new[] { "VanguardWarCry" },
+                },
+
+                // R — Intervene: dash forward + delay AoE slow
+                R = new AbilityData
+                {
+                    Name = "Intervene",
+                    CooldownTicks = 180,
+                    SpecialEffectKeys = new[] { "VanguardIntervene" },
+                },
+
+                // F — Thunderclap: leap + delayed AoE
+                F = new AbilityData
+                {
+                    Name = "Thunderclap",
+                    CooldownTicks = 420,
+                    SpecialEffectKeys = new[] { "VanguardThunderclap" },
+                },
             };
         }
 
-        // ==========================================
+        // ═══════════════════════════════════════
         // WRAITH — fast, light, hit-and-run
-        // ==========================================
+        // ═══════════════════════════════════════
         private static CharacterDefinition BuildWraith()
         {
             return new CharacterDefinition
@@ -218,18 +236,55 @@ namespace SlopArena.Shared
                     ChargeHoldTicks = 18,
                 },
 
-                Q = new AbilityData { Name = "Viper Shot", CooldownTicks = 60 },
-                E = new AbilityData { Name = "Shadow Step", CooldownTicks = 180 },
-                R = new AbilityData { Name = "Rapid Fire", CooldownTicks = 120 },
-                F = new AbilityData { Name = "Freezing Trap", CooldownTicks = 300 },
+                // Q — Viper Shot: projectile that applies Burn
+                Q = new AbilityData
+                {
+                    Name = "Viper Shot",
+                    CooldownTicks = 60,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.Projectile, Damage = 8f, Range = 35f * 2.5f, KnockbackForce = 5f, KnockbackUpward = 3f, Radius = 1.2f, SelfLockTicks = 4, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "WraithViperShot" },
+                },
 
-                ClassAbilityKeys = new[] { "WraithViperShot", "WraithShadowStep", "WraithRapidFire", "WraithFreezingTrap" },
+                // E — Shadow Step: directional teleport dash
+                E = new AbilityData
+                {
+                    Name = "Shadow Step",
+                    CooldownTicks = 180,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.SelfBuff, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "WraithShadowStep" },
+                },
+
+                // R — Rapid Fire: 3 quick projectiles in cone
+                R = new AbilityData
+                {
+                    Name = "Rapid Fire",
+                    CooldownTicks = 120,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.Projectile, Damage = 5f, Range = 50f * 1.5f, KnockbackForce = 3f, KnockbackUpward = 2f, Radius = 0.8f, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "WraithRapidFire" },
+                },
+
+                // F — Freezing Trap: delayed AoE trap, slows
+                F = new AbilityData
+                {
+                    Name = "Freezing Trap",
+                    CooldownTicks = 300,
+                    SpecialEffectKeys = new[] { "WraithFreezingTrap" },
+                },
             };
         }
 
-        // ==========================================
+        // ═══════════════════════════════════════
         // CHANNELER — ranged, control, zone
-        // ==========================================
+        // ═══════════════════════════════════════
         private static CharacterDefinition BuildChanneler()
         {
             return new CharacterDefinition
@@ -279,12 +334,49 @@ namespace SlopArena.Shared
                     ChargeHoldTicks = 18,
                 },
 
-                Q = new AbilityData { Name = "Frostbolt", CooldownTicks = 60 },
-                E = new AbilityData { Name = "Dragon's Breath", CooldownTicks = 180 },
-                R = new AbilityData { Name = "Ice Lance", CooldownTicks = 120 },
-                F = new AbilityData { Name = "Meteor", CooldownTicks = 360 },
+                // Q — Frostbolt: projectile, applies Slow
+                Q = new AbilityData
+                {
+                    Name = "Frostbolt",
+                    CooldownTicks = 60,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.Projectile, Damage = 12f, Range = 40f * 2.5f, KnockbackForce = 8f, KnockbackUpward = 3f, Radius = 1.2f, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "ChannelerFrostbolt" },
+                },
 
-                ClassAbilityKeys = new[] { "ChannelerFrostbolt", "ChannelerDragonsBreath", "ChannelerIceLance", "ChannelerMeteor" },
+                // E — Dragon's Breath: cone fire, applies Burn
+                E = new AbilityData
+                {
+                    Name = "Dragon's Breath",
+                    CooldownTicks = 180,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 5f, HitAngleDeg = 60f, KnockbackForce = 3f, KnockbackUpward = 1f, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "ChannelerDragonsBreath" },
+                },
+
+                // R — Ice Lance: hitscan beam, consumes Slow for bonus
+                R = new AbilityData
+                {
+                    Name = "Ice Lance",
+                    CooldownTicks = 120,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.Beam, Damage = 15f, Range = 12f, KnockbackForce = 12f, KnockbackUpward = 5f, Radius = 2f, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "ChannelerIceLance" },
+                },
+
+                // F — Meteor: mark zone, delayed meteor strike, Burn
+                F = new AbilityData
+                {
+                    Name = "Meteor",
+                    CooldownTicks = 360,
+                    SpecialEffectKeys = new[] { "ChannelerMeteor" },
+                },
             };
         }
     }

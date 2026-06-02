@@ -16,6 +16,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private CharacterDefinition _charDef;
 	private CharacterClass _playerClass = CharacterClass.Vanguard;
+	private ArenaDefinition _arenaDef;
 
 	public void SetClass(CharacterClass pc)
 	{
@@ -29,21 +30,15 @@ public partial class PlayerController : CharacterBody3D
 	// HP / HURTBOX
 	// ==========================================
 
-	private float _hp = 100f;
-	private const float MaxHP = 100f;
 	private Hurtbox? _hurtbox;
 
-	public float GetHP() => _hp;
-	public float GetMaxHP() => MaxHP;
+	public float GetHP() => _movementComponent.State.HP;
+	public float GetMaxHP() => _movementComponent.State.MaxHP;
 
 	// ==========================================
-	// MELEE COMBO (LMB)
+	// COMBAT STATE (now stored in CharacterState via MovementComponent)
 	// ==========================================
 
-	private int _comboStage = 0;
-	private float _comboTimer = 0f;
-	private float _comboAnimLock = 0f;
-	private float _heavyHoldTimer = 0f;
 	private bool _heavyHeld = false;
 
 	// ==========================================
@@ -113,13 +108,13 @@ public partial class PlayerController : CharacterBody3D
 	public CombatComponent? GetCombatComponent() => _combatComponent;
 	public float GetDashCooldown() => _movementComponent.DashCooldownRemaining;
 
-	public void SetupCombat(LocalSimulation simulation)
+	public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef)
 	{
+		_arenaDef = arenaDef;
 		_combatComponent = new CombatComponent();
 		_combatComponent.Name = "CombatComponent";
 		_combatComponent.Setup(this, simulation, 1);
 		AddChild(_combatComponent);
-		_combatComponent.OnSpellCast += (slot) => _animationController.OnSpellCast(slot);
 	}
 
 	// ==========================================
@@ -129,6 +124,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Ready()
 	{
 		_charDef = CharacterRegistry.Get(_playerClass);
+		_arenaDef = ArenaRegistry.Get("pit");
 		SetupInputMap();
 
 		UpDirection = Vector3.Up;
@@ -142,6 +138,7 @@ public partial class PlayerController : CharacterBody3D
 
 		// Components
 		_movementComponent = new MovementComponent(this);
+		_movementComponent.Setup(_charDef, _arenaDef);
 
 		_animationController = new AnimationController { Name = "AnimationController" };
 		AddChild(_animationController);
@@ -165,9 +162,17 @@ public partial class PlayerController : CharacterBody3D
 
 		_hurtbox.OnHit += (Vector3 attackerPos, float damage, Vector3 knockbackForce) =>
 		{
-			_hp -= damage;
-			_movementComponent.ApplyKnockback(knockbackForce);
-			if (_hp <= 0) { _hp = MaxHP; Position = new Vector3(100f, 50f, 100f); Velocity = Vector3.Zero; }
+			var s = _movementComponent.State;
+			s.HP -= damage;
+			if (s.HP <= 0f)
+			{
+				s.HP = s.MaxHP;
+				Position = new Vector3(100f, 50f, 100f);
+				Velocity = Vector3.Zero;
+				s.VX = s.VY = s.VZ = 0f;
+				s.KVX = s.KVY = s.KVZ = 0f;
+			}
+			_movementComponent.ApplyKnockback(knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
 		};
 
 		if (_isPlayerControlled)
@@ -260,14 +265,12 @@ public partial class PlayerController : CharacterBody3D
 	private float _trinketCooldownTimer = 0f;
 	[Export] public float TrinketCooldown = 120f;
 	[Export] public float TrinketPushSpeed = 18.0f;
+	private float _heavyHoldTimer = 0f;
 
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
 		if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
-
-		if (_comboTimer > 0f) { _comboTimer -= dt; if (_comboTimer <= 0f) _comboStage = 0; }
-		if (_comboAnimLock > 0f) _comboAnimLock -= dt;
 
 		if (Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
 		{
@@ -277,6 +280,10 @@ public partial class PlayerController : CharacterBody3D
 				_heavyHeld = true;
 				ExecuteSlot(1, true, !IsOnFloor());
 			}
+		}
+		else
+		{
+			_heavyHoldTimer = 0f;
 		}
 
 		if (_isNPC)
@@ -304,25 +311,25 @@ public partial class PlayerController : CharacterBody3D
 		// NPCs don't read keyboard input — they have their own AI (or stand still)
 		if (!_isPlayerControlled)
 		{
-			_movementComponent.Tick(dt, _charDef, default);
+			_movementComponent.Tick(default);
 			OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
 			return;
 		}
 
 		var input = BuildInputState();
 
-		// Ground dash (air dodge handled by MovementComponent internally)
-		if (input.Dash && IsOnFloor() && _comboAnimLock <= 0f)
-			_movementComponent.StartDash(_moveDirection, _charDef.Movement);
+		// Ground dash (air dodge handled by MovementComponent/Simulation internally)
+		if (input.Dash && IsOnFloor() && _movementComponent.State.AnimLockTicks <= 0)
+			_movementComponent.StartDash(_moveDirection.X, _moveDirection.Z);
 
 		bool wasKnocked = _movementComponent.IsInKnockback();
-		_movementComponent.Tick(dt, _charDef, input);
+		_movementComponent.Tick(input);
 
 		// Tech roll on knockback landing
 		if (wasKnocked && _movementComponent.IsGrounded && !_movementComponent.IsInKnockback() && Input.IsActionJustPressed("tech"))
 			_movementComponent.DoTechRoll();
 
-		// Face movement direction (Z is forward)
+		// Face movement direction (Z is forward) — use CharacterState's facing
 		Vector3 hVel = new Vector3(Velocity.X, 0f, Velocity.Z);
 		if (hVel.LengthSquared() > 0.01f)
 			GlobalRotation = new Vector3(0f, Mathf.Atan2(hVel.X, hVel.Z), 0f);
@@ -332,8 +339,8 @@ public partial class PlayerController : CharacterBody3D
 		{
 			IsOnFloor = _movementComponent.IsGrounded,
 			HorizontalSpeed = hVel.Length(),
-			IsDashing = _movementComponent.CurrentState == MovementComponent.MoveState.Dashing,
-			IsAirDodging = _movementComponent.CurrentState == MovementComponent.MoveState.AirDodging,
+			IsDashing = _movementComponent.CurrentState == ActionState.Dashing,
+			IsAirDodging = _movementComponent.CurrentState == ActionState.AirDodging,
 			IsInKnockback = _movementComponent.IsInKnockback(),
 			CastTimerRemaining = _animationController.GetCastTimer(),
 		});
@@ -345,9 +352,9 @@ public partial class PlayerController : CharacterBody3D
 	// INPUT STATE BUILDER
 	// ==========================================
 
-	private InputState BuildInputState()
+	private SlopArena.Shared.InputState BuildInputState()
 	{
-		var input = new InputState();
+		var input = new SlopArena.Shared.InputState();
 
 		// World-space movement: ZQSD = fixed directions, camera doesn't matter
 		Vector3 cf = new Vector3(0f, 0f, 1f);  // Z = forward (+Z)
@@ -378,36 +385,86 @@ public partial class PlayerController : CharacterBody3D
 	// ==========================================
 
 	/// <summary>
-	/// Execute an ability slot (0-5). Slots 0-1 (LMB/RMB) use AttackStage data.
-	/// Slots 2-5 (Q/E/R/F) delegate to AbilityRegistry.
+	/// Execute any ability slot (0-5) uniformly.
+	/// All 6 slots use the same AbilityData struct with:
+	///   1. Stage resolution (SpellResolver for melee/AoE/beam)
+	///   2. Special effects after stages (status, delayed AoE, self-buff, projectile visuals)
+	/// Slots 2-5 are no longer special — same system as LMB/RMB.
 	/// </summary>
 	private void ExecuteSlot(int slotIndex, bool charged, bool airborne)
 	{
 		if (_combatComponent == null) return;
-		if (_movementComponent.IsInKnockback() || _comboAnimLock > 0f) return;
+		if (_movementComponent.IsInKnockback()) return;
+		if (_movementComponent.State.AnimLockTicks > 0) return;
 
-		// Slots 2-5: class abilities (delegate to registry)
-		if (slotIndex >= 2)
+		var ability = _charDef.GetSlotAbility(slotIndex);
+
+		// Cooldown check
+		ushort slotCd = slotIndex switch
 		{
-			int keyIndex = slotIndex - 2;
-			if (keyIndex < _charDef.ClassAbilityKeys.Length)
-				AbilityRegistry.Execute(_charDef.ClassAbilityKeys[keyIndex], _combatComponent);
-			return;
+			0 => _movementComponent.State.Cooldown0,
+			1 => _movementComponent.State.Cooldown1,
+			2 => _movementComponent.State.Cooldown2,
+			3 => _movementComponent.State.Cooldown3,
+			4 => _movementComponent.State.Cooldown4,
+			5 => _movementComponent.State.Cooldown5,
+			_ => 0
+		};
+		if (slotCd > 0) return;
+		var stages = charged && ability.ChargedStages != null ? ability.ChargedStages : ability.Stages;
+
+		// ── Step 1: Resolve stages (hit detection) ──
+		if (stages != null && stages.Length > 0)
+		{
+			ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
 		}
 
-		// Slots 0-1: LMB / RMB — read from CharacterDefinition
-		var ability = slotIndex == 0 ? _charDef.LMB : _charDef.RMB;
-		var stages = charged && ability.ChargedStages != null ? ability.ChargedStages : ability.Stages;
-		if (stages == null || stages.Length == 0) return;
+		// ── Step 2: Special effects (status, visuals, complex behavior) ──
+		if (ability.SpecialEffectKeys != null)
+		{
+			foreach (var key in ability.SpecialEffectKeys)
+			{
+				AbilityRegistry.Execute(key, _combatComponent);
+			}
+		}
 
-		// LMB combo stage tracking (ground only; air uses stage 0)
+		// ── Step 3: Set cooldown ──
+		if (ability.CooldownTicks > 0)
+		{
+			switch (slotIndex)
+			{
+				case 0: _movementComponent.State.Cooldown0 = ability.CooldownTicks; break;
+				case 1: _movementComponent.State.Cooldown1 = ability.CooldownTicks; break;
+				case 2: _movementComponent.State.Cooldown2 = ability.CooldownTicks; break;
+				case 3: _movementComponent.State.Cooldown3 = ability.CooldownTicks; break;
+				case 4: _movementComponent.State.Cooldown4 = ability.CooldownTicks; break;
+				case 5: _movementComponent.State.Cooldown5 = ability.CooldownTicks; break;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Resolve attack stages against simulation entities via SpellResolver.
+	/// Handles combo tracking, lunge, anim locks, and hit application.
+	/// </summary>
+	private void ResolveAbilityStages(AbilityData ability, AttackStage[] stages, int slotIndex, bool charged, bool airborne)
+	{
+		var sim = _combatComponent?.GetSimulation();
+		if (sim == null) return;
+		ulong pid = _combatComponent.GetEntityId();
+
+		// LMB combo stage tracking via CharacterState (ground only; air uses stage 0)
 		int stageIndex;
+		byte newComboStage = _movementComponent.State.ComboStage;
 		if (slotIndex == 0 && !airborne)
 		{
-			if (_comboStage == 0 || _comboTimer <= 0f) _comboStage = 1;
-			else if (_comboStage < stages.Length) _comboStage++;
-			else { _comboStage = 0; return; }
-			stageIndex = _comboStage - 1;
+			if (_movementComponent.State.ComboStage == 0 || _movementComponent.State.ComboTimerTicks <= 0)
+				newComboStage = 1;
+			else if (_movementComponent.State.ComboStage < stages.Length)
+				newComboStage++;
+			else
+				return;
+			stageIndex = newComboStage - 1;
 		}
 		else
 		{
@@ -425,47 +482,89 @@ public partial class PlayerController : CharacterBody3D
 			Velocity = new Vector3(fwd.X * stage.LungeForce * 3f, upBoost, fwd.Z * stage.LungeForce * 3f);
 		}
 
-		// Hit detection — direct against simulation entities
-		var sim = _combatComponent.GetSimulation();
-		if (sim == null) return;
-		ulong pid = _combatComponent.GetEntityId();
-
+		// Build entity list for SpellResolver
+		var entities = new System.Collections.Generic.List<SpellResolver.EntityData>();
 		foreach (var kvp in sim.Entities)
 		{
-			ulong eid = kvp.Key; var (ep, er, ea) = kvp.Value;
-			if (!ea || eid == pid) continue;
-
-			float dx = ep.X - pos.X, dz = ep.Z - pos.Z, dist = MathF.Sqrt(dx * dx + dz * dz);
-
-			switch (stage.Shape)
+			entities.Add(new SpellResolver.EntityData
 			{
-				case AttackShape.CircleAOE:
-					if (dist > stage.Radius + er) continue;
-					break;
-				case AttackShape.MeleeCone:
-					if (dist > stage.Range + er) continue;
-					float a = MathF.Atan2(fwd.Z, fwd.X);
-					Vector3 tt = new Vector3(dx, 0, dz).Normalized();
-					float ta = MathF.Atan2(tt.Z, tt.X);
-					if (MathF.Abs(Mathf.AngleDifference(a, ta)) > stage.HitAngleDeg * Mathf.Pi / 180f) continue;
-					break;
-				default:
-					if (dist > stage.Range + er) continue;
-					break;
-			}
-
-			// Airborne RMB: downward spike
-			float kbUp = (airborne && slotIndex == 1) ? -stage.KnockbackUpward : stage.KnockbackUpward;
-			float kbMul = (airborne && slotIndex == 1) ? 0.5f : 1f;
-			sim.OnEntityHit?.Invoke(eid, stage.Damage,
-				fwd.X * stage.KnockbackForce * kbMul,
-				kbUp,
-				fwd.Z * stage.KnockbackForce * kbMul);
+				Id = kvp.Key,
+				PosX = kvp.Value.pos.X,
+				PosY = kvp.Value.pos.Y,
+				PosZ = kvp.Value.pos.Z,
+				Radius = kvp.Value.radius,
+				Active = kvp.Value.active
+			});
 		}
 
-		_comboAnimLock = stage.SelfLockTicks / 60f;
-		if (slotIndex == 0 && !airborne)
-			_comboTimer = stage.ChainWindowTicks / 60f;
+		System.Collections.Generic.List<SpellResolver.HitResult> results;
+
+		switch (stage.Shape)
+		{
+			case AttackShape.CircleAOE:
+				results = SpellResolver.ResolveCircleHit(
+					pos.X, pos.Y, pos.Z,
+					stage.Radius,
+					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
+					pid, entities);
+				break;
+
+			case AttackShape.MeleeCone:
+				results = SpellResolver.ResolveConeHit(
+					pos.X, pos.Y, pos.Z,
+					fwd.X, fwd.Z,
+					stage.HitAngleDeg * MathF.PI / 180f,
+					stage.Range,
+					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
+					pid, entities);
+				break;
+
+			case AttackShape.Beam:
+				// Beam uses cone with narrow angle (hitscan approximation)
+				results = SpellResolver.ResolveConeHit(
+					pos.X, pos.Y, pos.Z,
+					fwd.X, fwd.Z,
+					3f * MathF.PI / 180f, // ~3 degrees half-angle
+					stage.Range,
+					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
+					pid, entities);
+				break;
+
+			case AttackShape.Projectile:
+				// Projectile spawning is handled by the special effect (client-side visuals).
+				// For immediate hit detection in the shared sim, use a cone check.
+				// The special effect method creates the Godot projectile visual.
+				results = SpellResolver.ResolveConeHit(
+					pos.X, pos.Y, pos.Z,
+					fwd.X, fwd.Z,
+					15f * MathF.PI / 180f, // wide cone as projectile approximation
+					stage.Range,
+					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
+					pid, entities);
+				break;
+
+			default:
+				results = SpellResolver.ResolveCircleHit(
+					pos.X, pos.Y, pos.Z,
+					stage.Range,
+					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
+					pid, entities);
+				break;
+		}
+
+		// Apply hits — special effects can access via CombatComponent.GetTargetsFromLastHit()
+		foreach (var hit in results)
+		{
+			float kbUp = (airborne && slotIndex == 1) ? -stage.KnockbackUpward : stage.KnockbackUpward;
+			float kbMul = (airborne && slotIndex == 1) ? 0.5f : 1f;
+			sim.OnEntityHit?.Invoke(hit.TargetEntityId, hit.Damage,
+				hit.KnockbackX * kbMul,
+				kbUp,
+				hit.KnockbackZ * kbMul);
+		}
+
+		// Update CharacterState combo/animation ticks
+		_movementComponent.SetComboState(newComboStage, stage.ChainWindowTicks, stage.SelfLockTicks);
 	}
 
 	// ==========================================
@@ -476,7 +575,7 @@ public partial class PlayerController : CharacterBody3D
 	// KNOCKBACK
 	// ==========================================
 
-	public void ApplyKnockback(Vector3 force) => _movementComponent.ApplyKnockback(force);
+	public void ApplyKnockback(Vector3 force) => _movementComponent.ApplyKnockback(force.X, force.Y, force.Z);
 
 	// ==========================================
 	// CLICK → RAYCAST

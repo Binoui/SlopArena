@@ -34,8 +34,10 @@ namespace SlopArena.Shared
     }
 
     /// <summary>
-    /// Full definition of one ability slot (LMB, RMB, Q, E, R, or F).
+    /// Full definition of one ability slot (0-5).
     /// Stages.Length = 1 for single hit, N for combo chains.
+    /// SpecialEffectKeys reference methods in ClassAbilities for
+    /// effects that stages can't express (teleport, self-buff, delayed AoE, status apply).
     /// </summary>
     public struct AbilityData
     {
@@ -49,5 +51,13 @@ namespace SlopArena.Shared
         /// </summary>
         public AttackStage[]? ChargedStages;
         public ushort ChargeHoldTicks; // How many ticks to hold before charged version fires
+
+        /// <summary>
+        /// Optional special effects invoked AFTER stage resolution.
+        /// Access hit targets via CombatComponent.GetTargetsFromLastHit().
+        /// Keys reference methods in AbilityRegistry (same as old ClassAbilityKeys).
+        /// Null/empty = no special effect.
+        /// </summary>
+        public string[]? SpecialEffectKeys;
     }
 }

@@ -6,18 +6,16 @@ using SlopArena.Shared;
 
 /// <summary>
 /// Generic combat component usable by PlayerController, Dummy, or AI bots.
-/// 
+///
 /// Responsibilities:
-/// - Owns the SpellSystem (cooldowns, spell registry, slot assignment)
 /// - Resolves spell effects via Shared/SpellResolver (pure C#)
 /// - Communicates hits back via OnEntityHit
 /// - Handles knockback application
 /// - Manages status effects (apply, tick, consume)
-/// 
+///
 /// Architecture:
 ///   CombatComponent
-///     ├── SpellSystem (cooldowns, slot management)
-///     ├── LocalSimulation (projectile tracking, entity positions)
+///     ├── LocalSimulation (entity positions, hit routing)
 ///     └── SpellResolver (Shared, pure C# math)
 /// </summary>
 public partial class CombatComponent : Node
@@ -25,11 +23,10 @@ public partial class CombatComponent : Node
 	// ==========================================
 	// REFERENCES
 	// ==========================================
-	
+
 	private Node3D? _owner;
 	private LocalSimulation? _simulation;
 	private ulong _entityId = 1;
-	private SpellSystem? _spellSystem;
 	
 	// ==========================================
 	// EVENTS
@@ -63,12 +60,6 @@ public partial class CombatComponent : Node
 	/// </summary>
 	public event Action<StatusType>? OnStatusExpired;
 	
-	/// <summary>
-	/// Fired when a spell is cast (for animations).
-	/// Passes the SlotType that was triggered.
-	/// </summary>
-	public event Action<SlotType>? OnSpellCast;
-	
 	// ==========================================
 	// STATUS EFFECTS
 	// ==========================================
@@ -96,58 +87,19 @@ public partial class CombatComponent : Node
 		_owner = owner;
 		_simulation = simulation;
 		_entityId = entityId;
-		
-		// Create SpellSystem as child
-		_spellSystem = new SpellSystem();
-		_spellSystem.Name = "SpellSystem";
-		AddChild(_spellSystem);
 	}
-	
-	/// <summary>
-	/// Get the SpellSystem for UI/slot management.
-	/// </summary>
-	public SpellSystem? GetSpellSystem() => _spellSystem;
-	
+
 	/// <summary>
 	/// Get the entity ID in the simulation.
 	/// </summary>
 	public ulong GetEntityId() => _entityId;
 	
 	// ==========================================
-	// SPELL CASTING
+	// MELEE HIT DETECTION
 	// ==========================================
-	
-	/// <summary>
-	/// Trigger a spell slot (checks cooldowns, executes effect).
-	/// </summary>
-	public bool TriggerSlot(SlotType slot)
-	{
-		if (_spellSystem == null) return false;
-		bool result = _spellSystem.TriggerSlot(slot, this);
-		if (result)
-		{
-			OnSpellCast?.Invoke(slot);
-			GD.Print($"Spell cast: slot {slot}");
-		}
-		return result;
-	}
-	
-	/// <summary>
-	/// Fire a projectile spell toward the given direction.
-	/// Called by spell effects (RangedSpells, MeleeSpells).
-	/// </summary>
-	public void FireProjectile(ushort spellId, Vector3 origin, Vector3 direction)
-	{
-		if (_simulation == null) return;
-		_simulation.FireSpell(spellId, origin, direction, _entityId);
-	}
-	
+
 	/// <summary>
 	/// Check melee cone hit against all entities in the simulation.
-	/// Uses Shared/SpellResolver for pure C# math.
-	/// Also tracks hit targets for subsequent status application.
-	/// Returns the list of target entity IDs that were hit.
-	/// </summary>
 	public List<ulong> CheckMeleeCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg, float damage, float knockbackForce, float knockbackUpward)
 	{
 		_lastHitTargets.Clear();
