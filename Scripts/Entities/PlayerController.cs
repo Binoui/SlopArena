@@ -370,6 +370,8 @@ public partial class PlayerController : CharacterBody3D
 		if (Input.IsActionPressed("move_right"))    _moveDirection += cr;
 		if (_moveDirection.LengthSquared() > 0f) _moveDirection = _moveDirection.Normalized();
 
+		GD.Print($"Input: fwd={Input.IsActionPressed("move_forward")} left={Input.IsActionPressed("move_left")} dir=({_moveDirection.X:F2},{_moveDirection.Z:F2})");
+
 		input.Up = _moveDirection.Z < -0.3f;
 		input.Down = _moveDirection.Z > 0.3f;
 		input.Left = _moveDirection.X < -0.3f;

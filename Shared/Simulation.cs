@@ -33,7 +33,7 @@ namespace SlopArena.Shared
         private const ushort TurnaroundLagTicks = 6;        // 0.1s
 
         // Floor height (flat arena ground at Y=0)
-        private const float FloorHeight = 0f;
+        public const float FloorHeight = 0f;
 
         // ── MAIN ENTRY POINT ──
 

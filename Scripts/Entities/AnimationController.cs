@@ -222,11 +222,6 @@ public partial class AnimationController : Node
 	}
 
 	/// <summary>
-	/// Update animation state each physics frame.
-	/// Transition between idle, walk/run (sprint), jump, fall, dash, air-dodge, knockback.
-	/// </summary>
-	
-	/// <summary>
 	/// Access the AnimationPlayer so PlayerController can set RootNode, etc.
 	/// </summary>
 	public AnimationPlayer? GetAnimPlayer() => _animPlayer;

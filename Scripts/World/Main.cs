@@ -87,6 +87,8 @@ public partial class Main : Node3D
 		_player.Name = "Player";
 		AddChild(_player);
 		_player.Position = _arenaManager.GetSpawnPosition(5);
+		// Offset player from NPCs and above floor
+		_player.Position += new Vector3(5f, 15f, 0f);
 		
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
