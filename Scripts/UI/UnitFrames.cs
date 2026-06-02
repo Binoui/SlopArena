@@ -245,19 +245,18 @@ public partial class UnitFrames : Control
 	{
 		if (_player == null) return;
 		
-		// --- Update player frame ---
-		float playerHp = _player.GetHP();
-		float playerMaxHp = _player.GetMaxHP();
-		float playerRatio = Mathf.Clamp(playerHp / playerMaxHp, 0f, 1f);
-		
+		// --- Update player frame (Smash-style %) ---
+		float playerDmg = _player.GetDamagePercent();
+		float playerRatio = Mathf.Clamp(playerDmg / 300f, 0f, 1f); // 300% = full
+
 		float barWidth = _playerHpBarBg.Size.X;
 		_playerHpBar.Size = new Vector2(barWidth * playerRatio, BarHeight);
-		_playerHpText.Text = $"{playerHp:F0} / {playerMaxHp:F0}";
-		
-		// Color changes based on HP %
-		if (playerRatio > 0.6f)
+		_playerHpText.Text = $"{playerDmg}%";
+
+		// Color based on damage% (higher = worse)
+		if (playerRatio < 0.3f)
 			_playerHpBar.Color = new Color(0.2f, 0.8f, 0.2f); // Green
-		else if (playerRatio > 0.3f)
+		else if (playerRatio < 0.6f)
 			_playerHpBar.Color = new Color(0.9f, 0.7f, 0.1f); // Yellow
 		else
 			_playerHpBar.Color = new Color(0.9f, 0.2f, 0.1f); // Red

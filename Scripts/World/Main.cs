@@ -471,24 +471,27 @@ public partial class Main : Node3D
 		{
 			if (_npcs[i] != null)
 			{
-				string status = _npcs[i]!.IsNpcAlive() ? $"{_npcs[i]!.GetNpcHP()}/300" : "[DEAD]";
+				string status = _npcs[i]!.IsNpcAlive() ? $"HP: {_npcs[i]!.GetNpcHP()}/300" : "[DEAD]";
 				dummyInfo += $"  NPC {i+1}: {status}\n";
 			}
 		}
 		
+		ushort playerDmg = _player?.GetDamagePercent() ?? 0;
+		
 _label.Text = $"SlopArena Arena Sandbox\n" +
 					  $"---------------------------------\n" +
-					  $"Speed: {speed2D:F1}\n" +
+					  $"Speed: {speed2D:F1}  |  DMG: {playerDmg}%\n" +
 					  $"Position: ({posX:F1}, {posY:F1}, {posZ:F1})\n" +
+					  $"\n" +
+					  $"{dummyInfo}" +
 					  $"\n" +
 					  $"--- CONTROLS ---\n" +
 					  $"Souris : Viser / Tourner\n" +
-					  $"ZQSD : Movement\n" +
-					  $"Space : Saut\n" +
-					  $"Shift : Dash (air dash si en l'air)\n" +
-					  $"Ctrl : Roll (au sol, distance fixe)\n" +
+					  $"ZQSD : Déplacement (relatif à la caméra)\n" +
+					  $"Space : Saut (double saut)\n" +
+					  $"Shift : Dash (sol ou air, 1s, invincible)\n" +
+					  $"LMB/RMB : Attaques\n" +
 					  $"1-4, A, E, R : Sorts\n" +
-					  $"B : Spellbook (assigner des sorts)\n" +
 					  $"Escape: Release mouse";
 	}
 	
