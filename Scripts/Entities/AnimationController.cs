@@ -28,7 +28,7 @@ public partial class AnimationController : Node
 	// ==========================================
 
 	private string _currentAnim = "";
-	private float _castAnimTimer = 0f;
+	private float _attackTimer = 0f;
 
 	// ==========================================
 	// PUBLIC STATE STRUCT
@@ -44,7 +44,6 @@ public partial class AnimationController : Node
 		public bool IsDashing;
 		public bool IsAirDodging;
 		public bool IsInKnockback;
-		public float CastTimerRemaining;
 	}
 
 	// ==========================================
@@ -61,9 +60,70 @@ public partial class AnimationController : Node
 		_skeleton = skeleton;
 		_playerModel = playerModel;
 
-		// Global blend time for smooth animation transitions
 		_animPlayer.PlaybackDefaultBlendTime = 0.15f;
 	}
+
+	/// <summary>
+	/// Play an attack animation for one stage of an ability slot.
+	/// Takes priority over locomotion until the animation finishes or CancelAttack() is called.
+	/// animNames: per-stage animation names from AbilityData (nullable = use fallback).
+	/// stageIndex: which stage of the combo to play (0 for single-stage abilities).
+	/// slotIndex: ability slot (0-5), used for fallback naming.
+	/// </summary>
+	public void PlayAttack(string[]? animNames, int stageIndex, int slotIndex)
+	{
+		_attackTimer = 0.5f; // safety timeout
+
+		string targetAnim;
+
+		if (animNames != null && stageIndex < animNames.Length && !string.IsNullOrEmpty(animNames[stageIndex]))
+		{
+			targetAnim = animNames[stageIndex];
+		}
+		else if (animNames != null && animNames.Length > 0 && !string.IsNullOrEmpty(animNames[0]))
+		{
+			// Single anim name for all stages (or no-stage special effect)
+			targetAnim = animNames[0];
+		}
+		else
+		{
+			// Fallback: generic naming convention
+			targetAnim = stageIndex > 0
+				? $"attack_{slotIndex}_{stageIndex}"
+				: $"attack_{slotIndex}";
+		}
+
+		string fullPath = "default/" + targetAnim;
+		if (_animPlayer != null && _animPlayer.HasAnimation(fullPath))
+		{
+			if (_animPlayer.IsPlaying())
+				_animPlayer.Stop();
+			// Attacks are non-looping
+			var anim = _animPlayer.GetAnimation(fullPath);
+			if (anim != null) anim.LoopMode = Animation.LoopModeEnum.None;
+			_animPlayer.Play(fullPath);
+			_currentAnim = fullPath;
+			_attackTimer = anim?.Length ?? 0.5f;
+		}
+		else
+		{
+			// Fallback: try generic attack names
+			PlayAnimWithFallback(targetAnim);
+		}
+	}
+
+	/// <summary>
+	/// Cancel current attack animation (called on knockback, dash, air dodge).
+	/// </summary>
+	public void CancelAttack()
+	{
+		_attackTimer = 0f;
+	}
+
+	/// <summary>
+	/// Check if an attack animation is currently playing.
+	/// </summary>
+	public bool IsAttacking() => _attackTimer > 0f;
 
 	/// <summary>
 	/// Load all animations from the Pro Magic Pack directory and play idle.
@@ -116,22 +176,24 @@ public partial class AnimationController : Node
 	{
 		if (_animPlayer == null) return;
 
-		// Cast animation timer (decays in _Process)
-		if (_castAnimTimer > 0f)
-			_castAnimTimer -= dt;
-
-		// Cast animation takes priority over movement
-		if (_castAnimTimer > 0f)
+		// Attack animation timer
+		if (_attackTimer > 0f)
 		{
+			_attackTimer -= dt;
 			if (!_animPlayer.IsPlaying())
-				_castAnimTimer = 0f;
+				_attackTimer = 0f;
 			return;
 		}
 
 		string targetAnim;
 
+		// Knockback overrides movement
+		if (state.IsInKnockback)
+		{
+			targetAnim = "hit_large_front";
+		}
 		// Movement state derived from player values
-		if (state.IsDashing)
+		else if (state.IsDashing)
 		{
 			targetAnim = "run";
 		}
@@ -170,9 +232,9 @@ public partial class AnimationController : Node
 	public AnimationPlayer? GetAnimPlayer() => _animPlayer;
 
 	/// <summary>
-	/// Access the internal _castAnimTimer for PlayerController to check.
+	/// Check if an attack animation is currently active.
 	/// </summary>
-	public float GetCastTimer() => _castAnimTimer;
+	public bool IsAttacking() => _attackTimer > 0f;
 
 	// ==========================================
 	// ANIMATION LOADING

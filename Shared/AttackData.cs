@@ -38,6 +38,8 @@ namespace SlopArena.Shared
     /// Stages.Length = 1 for single hit, N for combo chains.
     /// SpecialEffectKeys reference methods in ClassAbilities for
     /// effects that stages can't express (teleport, self-buff, delayed AoE, status apply).
+    /// AnimationNames per stage: "punch", "kick", "supernova" etc.
+    /// Null/empty = use generic fallback ("attack_{slot}_{stage}" / "cast_{slot}").
     /// </summary>
     public struct AbilityData
     {
@@ -45,19 +47,20 @@ namespace SlopArena.Shared
         public ushort CooldownTicks;   // 0 = no cooldown
         public AttackStage[] Stages;
 
-        /// <summary>
-        /// LMB/RMB hold-to-charge variant. If non-null, holding the key
-        /// for ChargeHoldTicks triggers this instead of the press variant.
-        /// </summary>
+        /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
         public AttackStage[]? ChargedStages;
-        public ushort ChargeHoldTicks; // How many ticks to hold before charged version fires
+        /// <summary>Ticks to hold before charged version fires.</summary>
+        public ushort ChargeHoldTicks;
+
+        /// <summary>Special effects (teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
+        public string[]? SpecialEffectKeys;
 
         /// <summary>
-        /// Optional special effects invoked AFTER stage resolution.
-        /// Access hit targets via CombatComponent.GetTargetsFromLastHit().
-        /// Keys reference methods in AbilityRegistry (same as old ClassAbilityKeys).
-        /// Null/empty = no special effect.
+        /// Animation name for each stage (or one element for single-stage / no-stage).
+        /// Each character has their own animation FBX files, loaded by AnimationController.
+        /// Example: LMB = ["punch_jab", "punch_cross", "punch_uppercut"]
+        /// Example: Q = ["supernova_start"] (for special effect with no stages)
         /// </summary>
-        public string[]? SpecialEffectKeys;
+        public string[]? AnimationNames;
     }
 }
