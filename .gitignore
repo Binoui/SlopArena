@@ -49,3 +49,48 @@ heightmap.bin
 # Large asset zips (download, don't commit)
 # ==========================================
 Pro Magic Pack*
+
+# ==========================================
+# Unreal Engine 5 artifacts (old migration)
+# ==========================================
+Binaries/
+Config/
+Intermediate/
+Saved/
+Makefile
+*.modules
+*.target
+*.gen.cpp
+*.generated.h
+*.uhtmanifest
+*.uhtpath
+*.uhtsettings
+CrashReportClient/
+*.udebugsymbols
+UnrealBuildTool/
+*.link.rsp
+*.link.rsp.old
+TargetInfo.json
+SourceFileCache.bin
+XmlConfigCache.bin
+DependencyCache.bin
+EngineMetadata.dat
+ActionHistory.bin
+Makefile.bin
+TargetMetadata.dat
+*.o
+*.o.rsp
+*.d
+*.so
+*.so.rsp
+*.so.rsp.old
+*.so.debug
+*.sym
+*.pth
+merged_requirements.in
+pyreqs_plugins.list
+extra_urls.txt
+PipInstall/
+ShaderAutogen/
+*.sh
+*.cpp.old

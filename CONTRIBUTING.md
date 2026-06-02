@@ -9,7 +9,7 @@ First off, thanks for being here! SlopArena is a community-driven project — ev
 - [Development Setup](#development-setup)
 - [Project Architecture](#project-architecture)
 - [Coding Guidelines](#coding-guidelines)
-- [Spell System Guide](#spell-system-guide)
+- [Adding a New Character](#adding-a-new-character)
 - [How to Contribute](#how-to-contribute)
 - [Pull Request Process](#pull-request-process)
 
@@ -22,7 +22,7 @@ This project is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). By p
 SlopArena is a Godot 4 .NET C# project. You'll need:
 
 - **Godot Engine 4.6+ (.NET version)** — [godotengine.org](https://godotengine.org)
-- **.NET SDK 8.0** — `sudo pacman -S dotnet-sdk-8.0` (Arch/CachyOS) or from [dotnet.microsoft.com](https://dotnet.microsoft.com)
+- **.NET SDK 8.0+** — `sudo pacman -S dotnet-sdk` (Arch/CachyOS) or from [dotnet.microsoft.com](https://dotnet.microsoft.com)
 
 ### Clone and Run
 
@@ -35,34 +35,56 @@ cd SlopArena
 2. Click **Import** → select `project.godot`
 3. Press **F5** to run
 
-> The sandbox runs a local simulation with 5 training dummies, a full spell system, and WoW-style controls. No server required.
+> The sandbox runs a local simulation with 5 training dummies, 3 playable classes, and platform fighter movement. No server required.
 
 ## Project Architecture
 
 ```
 SlopArena/
 ├── Scripts/          # Godot client scripts (C#)
-│   ├── World/        # Entry point, heightmap
-│   ├── Entities/     # PlayerController, DummyManager
-│   ├── Combat/       # Combat simulation, projectiles, hitboxes
-│   ├── Spells/       # Spell definitions and effects
-│   ├── UI/           # Action bar, spellbook, unit frames
+│   ├── World/        # Entry point, arena manager
+│   ├── Entities/     # PlayerController, AnimationController, ClassAbilities
+│   ├── Combat/       # MovementComponent, CombatComponent, LocalSimulation
+│   ├── Characters/   # AbilityRegistry
+│   ├── Spells/       # StatusSpells (visual helpers only)
+│   ├── UI/           # Action bar, unit frames, settings
 │   └── Camera/       # WoW-style camera
-├── Shared/           # Pure C# library (no Godot dependency)
-│   ├── CombatMath.cs # Hit detection, knockback math
-│   ├── SpellResolver.cs # Spell resolution logic
-│   ├── PhysicsConfig.cs # Physics constants and simulation
-│   ├── MovementProfiles.cs # Movement profiles
-│   └── ...           # Packets, enums, data structs
+├── Shared/           # Pure C# library (NO Godot dependency)
+│   ├── Simulation.cs # SimulateTick() — movement + combat in pure C#
+│   ├── CharacterDefinition.cs  # Data-driven character stats + abilities
+│   ├── AttackData.cs           # AbilityData, AttackStage structs
+│   ├── CharacterState.cs       # Per-tick entity state (ushort timers)
+│   ├── CombatMath.cs           # IsInCircle, IsInCone, CalculateKnockback
+│   └── SpellResolver.cs        # ResolveConeHit, ResolveCircleHit
 ├── Server/           # Headless authoritative server (WIP)
 ├── assets/           # 3D models and animations
 └── textures/         # Prototype textures
 ```
 
-**Key design decisions:**
-- `Shared/` has **zero** Godot dependencies — usable from client, server, and AI
-- Combat math is pure C# (no engine physics) for deterministic simulation
-- UDP-based server-authoritative 60Hz tick rate
+### Key Design Decisions
+
+- **`Shared/` has zero Godot dependencies** — compiles standalone, usable from client, server, and AI
+- **Data-driven characters** — All stats and abilities in `CharacterRegistry` (CharacterDefinition.cs). Adding a new character is adding data, not gameplay code.
+- **Tick-based simulation** — All timers are `ushort` ticks decremented at 60Hz. No `float -= delta` for gameplay.
+- **Platform fighter movement** — World-space (camera-independent), instant directional speed on ground, air acceleration + drag, dash/air-dodge with resources
+- **Unified ability system** — All 6 slots (LMB/RMB/Q/E/R/F) use the same `AbilityData` struct. Stages handle hit detection via SpellResolver, SpecialEffectKeys handle complex behavior.
+
+### Data Flow
+
+```
+_PhysicsProcess
+  → BuildInputState() → SlopArena.Shared.InputState
+  → PlayerController.ExecuteSlot(slotIndex, charged, airborne)
+      → _charDef.GetSlotAbility(slotIndex) → AbilityData
+      → Stages → ResolveAbilityStages() → SpellResolver (Shared/)
+      → SpecialEffectKeys → AbilityRegistry.Execute() → ClassAbilities
+      → Set cooldown in CharacterState
+  → MovementComponent.Tick(input)
+      → sync Godot body → CharacterState
+      → Simulation.SimulateTick(ref State, def, input, arena)
+      → apply State → Godot body → MoveAndSlide()
+  → AnimationController.ProcessAnimation()
+```
 
 ## Coding Guidelines
 
@@ -97,54 +119,87 @@ SlopArena/
 ### Project Conventions
 
 - One class per file, filename matches class name
-- Namespace = folder path (e.g., `Scripts.Entities`, `SlopArena.Shared`)
+- No explicit namespace for Godot scripts (global namespace is fine)
+- `SlopArena.Shared` namespace for Shared/ files
 - Keep `Shared/` free of Godot types — use plain C# structs and math
-- Use `readonly struct` for packet and state types
-- XML-doc public APIs
+- XML-doc public APIs, especially in Shared/
 
-### Netcode Rules (Server-Authoritative 60Hz UDP)
+### Netcode Rules (Tick-Based 60Hz)
 
-SlopArena uses a tick-based server-authoritative model. Gameplay code must work deterministically on both client and server.
+SlopArena is built for a server-authoritative model with client-side prediction.
 
-**Shared/ is sacred.** No Godot imports, no `Vector3`, no `GetWorld3D().DirectSpaceState` — EVER in Shared/. All hit detection uses `CombatMath.cs` pure math.
+**Shared/ is sacred.** No Godot imports, no `Vector3`, no `GetWorld3D().DirectSpaceState` — EVER in Shared/. All hit detection uses `CombatMath.cs` + `SpellResolver.cs` pure math.
 
-**Tick-based timers, not delta.** All cooldowns, stuns, cast times are `ushort` tick counts:
+**Tick-based timers, not delta.**
 ```csharp
 ushort cooldownTicks = 90; // 1.5s at 60Hz
 if (cooldownTicks > 0) cooldownTicks--;
 ```
-NOT `float -= delta`.
+NOT `float -= delta`. All durations in `CharacterState` are `ushort`.
 
-**Pure math for server-side combat.** No Godot physics queries on the server. Use `CombatMath.IsInCircle()`, `IsInCone()`, `LineIntersectsCircle()` from Shared/.
+**CharacterState is the authority.** Position, velocity, action state, cooldowns, HP — everything lives in `CharacterState`. The Godot body mirrors it for rendering.
 
-**Packets are primitives only.** `ClientInputPacket` (14 bytes) and `CharacterStatePacket` (31 bytes) serialize with `System.Buffers.Binary.BinaryPrimitives` — no Godot types.
+**Visuals are client-only.** Rendering, particles, sounds, animations never affect game state. State comes from Shared/ simulation and is authoritative on the server.
 
-**Visuals are client-only.** Rendering, particles, sounds, animations never affect game state. State comes from Shared/ logic and is authoritative on the server.
+**Pure math for hit detection.**
+```csharp
+// Server-side: no Godot physics
+var results = SpellResolver.ResolveConeHit(posX, posY, posZ, dirX, dirZ, halfAngle, range, ...);
+```
 
-## Spell System Guide
+## Adding a New Character
 
-Spells are the heart of SlopArena. Here's how they work:
+Characters are defined entirely in `Shared/CharacterDefinition.cs`. Here's the process:
 
-### Spell Definition
+1. **Add enum value** — Add your class to `CharacterClass` enum
+2. **Write factory** — Add a `BuildXxx()` method to `CharacterRegistry`:
+   ```csharp
+   private static CharacterDefinition BuildMyClass()
+   {
+       return new CharacterDefinition
+       {
+           Class = CharacterClass.MyClass,
+           DisplayName = "My Class",
+           Movement = new MovementStats { ... },
+           LMB = new AbilityData { Name = "Combo", Stages = new[] { ... } },
+           RMB = new AbilityData { Name = "Heavy", Stages = new[] { ... }, ChargedStages = new[] { ... } },
+           Q = new AbilityData { Name = "Special", SpecialEffectKeys = new[] { "MySpecialEffect" } },
+           // E, R, F slots...
+       };
+   }
+   ```
+3. **Register** — Add `BuildMyClass()` to `BuildRegistry()`
+4. **Special effects** — If your ability needs complex behavior (teleport, delayed AoE, status apply), add a method to `ClassAbilities.cs` and register it in `AbilityRegistry.cs`
 
-Spells are defined in `Shared/SpellDefinition.cs`. Each spell has:
+### AbilityData Fields
 
-- **ID** — Unique integer identifier
-- **Name** — Display name
-- **Cooldown** — Seconds before reuse
-- **Cast time** — Seconds of channel before effect
-- **Duration** — Seconds the effect lingers
-- **Shape** — How it hits: `FastProjectile`, `SlowProjectile`, `Beam`, `MeleeCone`, `DelayedAoE`, `Trap`
-- **Handler** — Function pointer to the spell effect logic
+```csharp
+public struct AbilityData
+{
+    public string Name;              // Display name
+    public ushort CooldownTicks;     // 0 = no cooldown
+    
+    // Hit detection stages (resolved via SpellResolver)
+    public AttackStage[] Stages;         // Shape, damage, range, knockback, stun, etc.
+    public AttackStage[]? ChargedStages; // Hold-to-charge variant
+    public ushort ChargeHoldTicks;
+    
+    // Complex behavior (called AFTER stage resolution)
+    public string[]? SpecialEffectKeys;  // References AbilityRegistry
+}
+```
 
-### Adding a New Spell
+### AttackStage Fields
 
-1. Add an entry in `SpellSystem.cs` using `Register(id, name, cooldown, castTime, duration, handler)`
-2. Implement the handler in the appropriate file:
-   - `StatusSpells.cs` — Status-application and status-consumption spells
-   - `RangedSpells.cs` — Projectile-based spells
-   - `MeleeSpells.cs` — Melee cone spells
-3. The handler receives `(Vector3 origin, Vector3 targetDir, int targetId, float chargeRatio, CombatComponent caster)` and returns a `SpellResult`
+```csharp
+public struct AttackStage
+{
+    public AttackShape Shape;        // MeleeCone, CircleAOE, Projectile, Beam, SelfBuff
+    public float Damage, Range, HitAngleDeg, Radius;
+    public float KnockbackForce, KnockbackUpward, LungeForce;
+    public ushort StunTicks, SelfLockTicks, ChainWindowTicks;
+}
+```
 
 ## How to Contribute
 
@@ -173,7 +228,7 @@ Open an issue with:
 
 ### Non-Code Contributions
 
-- **Game design** — Propose new spells, balance changes, game modes
+- **Game design** — Propose new characters, abilities, game modes
 - **3D art** — Characters, animations, environment props
 - **UI/UX** — HUD improvements, menu flow
 - **Level design** — Arena layouts

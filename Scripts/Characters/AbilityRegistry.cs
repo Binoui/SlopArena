@@ -5,7 +5,8 @@ using SlopArena.Shared;
 /// <summary>
 /// Registry of all class ability effects. Maps a string key to the actual method.
 /// Add new entries here when creating new character abilities.
-/// Each character's CharacterDefinition.ClassAbilityKeys references these keys.
+/// Each ability's SpecialEffectKeys in CharacterDefinition references these keys.
+/// Called AFTER stage resolution — access hit targets via CombatComponent.GetTargetsFromLastHit().
 /// </summary>
 public static class AbilityRegistry
 {

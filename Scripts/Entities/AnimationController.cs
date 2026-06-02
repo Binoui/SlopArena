@@ -160,48 +160,10 @@ public partial class AnimationController : Node
 	}
 
 	/// <summary>
-	/// Play an attack or cast animation appropriate for the given spell slot.
-	/// Called from CombatComponent spell-cast event.
+	/// Update animation state each physics frame.
+	/// Transition between idle, walk/run (sprint), jump, fall, dash, air-dodge, knockback.
 	/// </summary>
-	public void OnSpellCast(SlotType slot)
-	{
-		if (_animPlayer == null) return;
-
-		// Choose animation list based on slot type
-		string[] castAnims;
-		if (slot == SlotType.Slot8)
-		{
-			// Elite/ultimate spells: dramatic 2H cast
-			castAnims = new[] { "cast_2h", "attack_area_2h", "attack_area_2h_b" };
-		}
-		else if (slot == SlotType.Slot6 || slot == SlotType.Slot7)
-		{
-			// Utility/defense: 1H cast
-			castAnims = new[] { "cast_1h", "attack_1h" };
-		}
-		else
-		{
-			// Regular spells: mix of attacks and casts
-			castAnims = new[] { "attack_1h", "attack_1h_b", "attack_1h_c", "attack_2h", "attack_2h_b", "cast_1h", "cast_2h" };
-		}
-
-		// Pick the first available animation from the list
-		foreach (string anim in castAnims)
-		{
-			string fullPath = "default/" + anim;
-			if (_animPlayer.HasAnimation(fullPath))
-			{
-				_animPlayer.Play(fullPath);
-				_currentAnim = fullPath;
-				_castAnimTimer = 2.0f;
-				GD.Print($"AnimationController: Playing cast anim: {anim} for slot {slot}");
-				return;
-			}
-		}
-
-		GD.Print($"AnimationController: No cast/attack animation found for slot {slot}");
-	}
-
+	
 	/// <summary>
 	/// Access the AnimationPlayer so PlayerController can set RootNode, etc.
 	/// </summary>

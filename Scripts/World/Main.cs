@@ -8,7 +8,6 @@ public partial class Main : Node3D
 	private PlayerController?[] _npcs = new PlayerController?[5];
 	private LocalSimulation? _simulation;
 	private ArenaManager? _arenaManager;
-	private ProjectileManager? _projectileMgr;
 	private Label? _label;
 	private CanvasLayer? _canvasLayer;
 	private ActionBarHUD? _actionBarHUD;
@@ -50,14 +49,9 @@ public partial class Main : Node3D
 		CreateCrosshair();
 		
 		// --- Projectile Manager (Object Pooling) ---
-		_projectileMgr = new ProjectileManager();
-		_projectileMgr.Name = "ProjectileManager";
-		AddChild(_projectileMgr);
-		
-		// --- Local Simulation (pure C# combat logic) ---
+		// --- Local Simulation (entity positions + hit routing) ---
 		_simulation = new LocalSimulation();
 		_simulation.Name = "LocalSimulation";
-		_simulation.ProjectileVisuals = _projectileMgr;
 		AddChild(_simulation);
 		
 		// --- Arena Manager (loads/unloads arena scenes, provides spawns + void) ---
@@ -96,7 +90,7 @@ public partial class Main : Node3D
 		
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
-			_player.SetupCombat(_simulation);
+			_player.SetupCombat(_simulation, ArenaRegistry.Get("split"));
 		
 		// Register player in the simulation's combat component map
 		var playerCombat = _player.GetCombatComponent();

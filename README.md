@@ -2,65 +2,80 @@
 
 **"The Melee of Battle Arenas"** — A high-execution, open-source 3D Arena Brawler.
 
-SlopArena fuses the visceral movement of third-person action games with the tactical positioning and target management of competitive MMORPG PvP. Built with Godot 4 (.NET C#), it features a server-authoritative architecture with client-side prediction.
+SlopArena fuses the visceral movement of platform fighters (Smash Bros, DKO) with
+character kits from hero brawlers. Built with **Godot 4.6 (.NET C#)**, it features
+a data-driven character system with a tick-based simulation shared between client and server.
 
-> **Status:** Early prototype. Core movement, combat, and spell systems are functional in a sandbox environment.
+> **Status:** Early prototype. Core movement, combat, and 3 classes (Vanguard, Wraith, Channeler) are functional in sandbox mode.
 
 ---
 
 ## Core Philosophy
 
-- **PvP First** — No PvE, no farming, no laning. Pure player-vs-player skill.
-- **Load & Play** — Classless system. Pick your abilities from a universal grimoire.
-- **Open Source** — Built by the community, for the community.
+- **PvP First** — Pure player-vs-player skill. No PvE, no farming.
+- **Small Character Kits** — Each class has 6 abilities (LMB, RMB, Q, E, R, F). Every ability is meaningful.
+- **Data-Driven** — All character data (stats, ability stages, hitboxes) lives in `Shared/CharacterDefinition.cs`. Adding a new character means adding a factory function, not writing gameplay code.
+- **Tick-Based Netcode Ready** — The simulation runs at 60Hz. Cooldowns, stuns, and durations are `ushort` ticks. Hit detection uses `CombatMath.cs` pure C# math — no Godot physics.
 
 ---
 
 ## Features
 
-### Movement System
-- Velocity-decoupled air control (WoW-style momentum preservation)
-- Dash with cooldown, chained into ground slides with momentum conservation
-- Heightmap-based terrain with wall-jumping and slope collision
-- Knockback with Directional Influence (DI) during hitstun
-- Action state machine: Idle, Jogging, Dashing, Sliding, Attacking, Hitstun
+### Movement System (Platform Fighter)
+- World-space movement (ZQSD = fixed NSEW, camera-independent)
+- Ground friction, air acceleration with drag
+- Dash (ground) with cooldown, cancelable by jump
+- Air dodge (directional, limited resource)
+- Sprint/dash-dance with turnaround lag
+- Double jump, knockback with DI, tech roll
+- Tick-based timers for all durations
 
-### Combat & Spells
-- **40 spells** in a universal grimoire, divided into 5 roles:
-  - **Starter** — Apply status effects (Slow, Burn, Marked, Electrified, Vulnerable, Shielded)
-  - **Extender** — Fast bridge attacks to keep combos alive
-  - **Finisher** — Consume status effects for bonus damage
-  - **Setup** — Zone control, traps, AoE denial
-  - **Mobility** — Dashes, blinks, parries, cleanses
-- 6 spell shapes: Fast/Slow Projectile, Beam (hitscan), MeleeCone, DelayedAoE, Trap
-- Pure C# hit detection (CombatMath) — no Godot dependency, shared between client and server
-- Damage, knockback, hitstun, and status effect application
+### 3 Playable Classes (Data-Driven)
+| Class | Style | Stats |
+|-------|-------|-------|
+| **Vanguard** | Heavy, slow, tanky | Walk 9, Sprint 12, Dash 30, 2 jumps |
+| **Wraith** | Fast, light, hit-and-run | Walk 11, Sprint 15, Dash 35, 2 jumps |
+| **Channeler** | Ranged, control, zone | Walk 10, Sprint 13, Dash 30, 2 jumps |
+
+Each class has 6 data-defined abilities with:
+- **Stages** — Melee cone, circle AoE, beam, projectile (damage, knockback, stun, chain window)
+- **Charged variants** — Hold RMB for charged version
+- **Special effects** — Status application, teleports, delayed AoE, projectile spawning
+
+### Combat System
+- All 6 ability slots use the same `AbilityData` struct — no distinction between basic attacks and class abilities
+- Hit detection via `SpellResolver` (Shared/, pure C# math) — `ResolveConeHit`, `ResolveCircleHit`
+- Tick-based stun, anim lock, and chain window for combos
+- Airborne modifiers (RMB down spike in air)
+- Status effects: Slowed, Vulnerable, Marked, Shielded, Burn, Electrified
+- Knockback with directional influence
 
 ### UI & Controls
-- WoW-style camera (SpringArm3D with left-click orbit, right-click steer)
-- Action bar with cooldown tracking (8 slots: 1-4, A, E, Shift, R)
-- Spellbook UI for assigning spells to slots (drag & drop)
+- WoW-style camera (SpringArm3D with mouse orbit + zoom)
+- Action bar with tick-based cooldown display
 - Tab targeting / left-click targeting with targeting ring
-- Unit frames (player + target HP bars)
+- Unit frames (player HP bars)
 - Dummy NPCs for sandbox testing (5 training dummies)
+- Escape menu with key rebinding
 
 ### Architecture
 - **3-project .NET solution:** Godot client, Shared library, Headless server
-- UDP-based server-authoritative simulation at 60Hz
-- Client-side prediction with server reconciliation loop
-- Pure C# combat logic in `Shared/` — usable by client, server, and AI
-- Local simulation mode for sandbox testing (no server required)
+- `Shared/` has **zero** Godot dependencies — usable by client, server, and AI
+- `Simulation.SimulateTick()` in Shared/ processes one tick of movement + combat — pure C#
+- `CharacterState` struct holds all entity state (pos, vel, action, cooldowns, HP)
+- Tick-based timers everywhere (`ushort` counters decremented per tick)
+- UDP-based server-authoritative model (server WIP)
 
 ---
 
 ## Dependencies
 
-- **Godot Engine 4.6+ (.NET / Mono version)**
-- **.NET SDK 8.0**
+- **Godot Engine 4.6+ (.NET version)**
+- **.NET SDK 8.0+**
 
 ### Arch Linux / CachyOS
 ```bash
-sudo pacman -S dotnet-sdk-8.0
+sudo pacman -S dotnet-sdk
 ```
 
 Download the .NET version of Godot from [godotengine.org](https://godotengine.org).
@@ -71,60 +86,60 @@ Download the .NET version of Godot from [godotengine.org](https://godotengine.or
 
 ```
 SlopArena/
-├── project.godot          # Godot project config
-├── SlopArena.sln            # .NET solution
-├── SlopArena.csproj         # Godot C# client project
-├── main.tscn              # Main arena scene (CSG-based)
+├── project.godot            # Godot project config
+├── global.json              # .NET SDK version
+├── main.tscn                # Main arena scene
 │
-├── Scripts/
+├── Scripts/                 # Godot client-side scripts
 │   ├── World/
-│   │   ├── Main.cs              # Entry point, wires up all systems
-│   │   └── HeightmapGenerator.cs
+│   │   ├── Main.cs               # Entry point, wires up all systems
+│   │   └── ArenaManager.cs       # Arena loading, spawns, void death
 │   ├── Entities/
-│   │   ├── PlayerController.cs  # CharacterBody3D with WoW-style movement
-│   │   └── DummyManager.cs      # Sandbox training dummies
+│   │   ├── PlayerController.cs   # Thin orchestrator: input → movement → combat → animation
+│   │   ├── AnimationController.cs# FBX loading, Mixamo path remapping, animation state machine
+│   │   ├── ClassAbilities.cs     # Special effects for class abilities (status, projectiles)
+│   │   └── DummyManager.cs       # Sandbox training dummies
 │   ├── Combat/
-│   │   ├── LocalSimulation.cs   # Local combat simulation (projectiles, hit detection)
-│   │   ├── CombatComponent.cs   # Per-entity combat state (HP, statuses, cooldowns)
-│   │   ├── Projectile.cs        # Projectile visual
-│   │   ├── ProjectileManager.cs # Object pool for projectile visuals
-│   │   ├── Hitbox.cs / Hurtbox.cs
-│   │   └── Fireball.cs
+│   │   ├── MovementComponent.cs  # Wraps CharacterState + Simulation for Godot
+│   │   ├── CombatComponent.cs    # Per-entity combat state (HP, statuses, hit detection)
+│   │   └── LocalSimulation.cs    # Entity registry + hit/status routing
+│   ├── Characters/
+│   │   └── AbilityRegistry.cs    # Maps string keys → ClassAbilities methods
 │   ├── Spells/
-│   │   ├── SpellSystem.cs       # Slot binding, cooldown management, casting
-│   │   ├── RangedSpells.cs      # Projectile-based spell effects
-│   │   ├── MeleeSpells.cs       # Melee cone spell effects
-│   │   └── StatusSpells.cs      # Status application effects
+│   │   └── StatusSpells.cs       # Visual helpers only (cone, circle, beam, impact)
 │   ├── UI/
-│   │   ├── ActionBarHUD.cs      # Bottom action bar with cooldowns
-│   │   ├── SpellBookUI.cs       # Full-screen spell browser
-│   │   └── UnitFrames.cs        # Player + target HP bars
-│   └── Camera/
-│       └── WowCamera.cs         # SpringArm3D WoW-style camera
+│   │   ├── ActionBarHUD.cs       # Bottom action bar with cooldowns
+│   │   ├── UnitFrames.cs         # Player + target HP bars
+│   │   ├── SettingsUI.cs         # Key rebinding
+│   │   └── EscapeMenuUI.cs       # Pause menu
+│   ├── Camera/
+│   │   └── WowCamera.cs          # SpringArm3D WoW-style camera
+│   └── Combat/ (additional)
+│       ├── Hurtbox.cs / Hitbox.cs
+│       └── ...
 │
-├── Shared/                      # Shared C# library (no Godot dependency)
+├── Shared/                     # Pure C# library (NO Godot dependency)
 │   ├── SlopArena.Shared.csproj
-│   ├── PhysicsConfig.cs         # Physics constants, heightmap, SimulateStep
-│   ├── MovementProfiles.cs      # Movement profile (Wizard default)
-│   ├── ActionState.cs           # Action state enum
-│   ├── ClientInputPacket.cs     # UDP packet: client → server
-│   ├── CharacterStatePacket.cs  # UDP packet: server → client
-│   ├── SpellDefinition.cs       # Spell catalog (40 spells), SpellCatalog
-│   ├── SpellData.cs             # Runtime spell wrapper
-│   ├── SpellResolver.cs         # Hit detection (projectile, cone, circle AoE)
-│   ├── CombatMath.cs            # Math utilities (line-circle, cone, knockback)
-│   ├── ProjectileState.cs       # Projectile position update (pure math)
-│   ├── HitResult.cs             # Hit result struct
-│   ├── StatusType.cs            # Status effect enum
-│   └── SpellResolver.cs         # Spell resolution logic
+│   ├── CharacterDefinition.cs  # Class stats, ability data, character registry
+│   ├── AttackData.cs           # AbilityData, AttackStage structs
+│   ├── CharacterState.cs       # Full per-tick entity state
+│   ├── InputState.cs           # Bool input struct
+│   ├── Simulation.cs           # SimulateTick() — movement + combat in pure C#
+│   ├── CombatMath.cs           # IsInCircle, IsInCone, CalculateKnockback
+│   ├── SpellResolver.cs        # ResolveConeHit, ResolveCircleHit
+│   ├── ActionState.cs          # Action state enum
+│   ├── StatusType.cs           # Status effect enum
+│   ├── ArenaDefinition.cs      # Arena + spawn points
+│   ├── ClientInputPacket.cs    # UDP packet: 14 bytes (client → server)
+│   └── CharacterStatePacket.cs # UDP packet: 31 bytes (server → client)
 │
-├── Server/                      # Headless authoritative server
+├── Server/                     # Headless authoritative server (WIP)
 │   ├── SlopArena.Server.csproj
-│   └── Program.cs               # UDP server, 60Hz physics loop
+│   └── Program.cs              # UDP server, 60Hz physics loop
 │
-├── assets/                      # 3D models, animations, FBX files
-├── textures/                    # Kenney prototype textures (CC0)
-└── run_server.sh                # Helper to start the server
+├── assets/                     # 3D models, animations, FBX files
+├── textures/                   # Kenney prototype textures (CC0)
+└── run_server.sh               # Helper to start the server
 ```
 
 ---
@@ -136,13 +151,12 @@ SlopArena/
 2. Import the project (`project.godot` at root)
 3. Press **Play** (F5)
 
-The sandbox runs a local simulation with 5 training dummies, a full spell system, and WoW-style controls.
+The sandbox runs a local simulation with 5 training dummies, 3 playable classes, and WoW-style controls.
 
 ### With the Authoritative Server
 ```bash
 # Terminal 1: Start the physics server
 ./run_server.sh
-# or: dotnet run --project Server/SlopArena.Server.csproj
 
 # Terminal 2: Run the Godot client (connects to localhost:7777)
 ```
@@ -153,32 +167,36 @@ The sandbox runs a local simulation with 5 training dummies, a full spell system
 
 | Input | Action |
 |-------|--------|
-| **ZQSD / WASD** | Movement (camera-relative) |
-| **Space** | Jump |
-| **Left Click (hold + drag)** | Orbital camera rotation |
-| **Left Click (tap)** | Target entity under cursor |
-| **Right Click (hold)** | Rotate camera + character |
-| **Right Click (tap)** | Toggle mouse capture |
+| **ZQSD / WASD** | Movement (world-space, camera-independent) |
+| **Space** | Jump (double jump available) |
+| **LMB** | Basic attack (3-hit combo) |
+| **RMB** | Heavy attack (hold to charge) |
+| **Q** | Class ability slot 3 |
+| **E** | Class ability slot 4 |
+| **R** | Class ability slot 5 |
+| **F** | Class ability slot 6 |
+| **Shift** | Dash / Air dodge |
+| **C** | Crouch |
 | **Scroll Wheel** | Zoom in/out |
 | **Tab** | Cycle target (dummies) |
-| **1 / 2 / 3 / 4** | Spell slots 1-4 |
-| **A** | Spell slot 5 (Control) |
-| **E** | Spell slot 6 (Utility) |
-| **Shift** | Dash (Slot 7) |
-| **R** | Spell slot 8 (Ultimate) |
-| **B** | Toggle spellbook |
-| **Escape** | Release mouse |
+| **Escape** | Pause menu / release mouse |
+
+---
+
+## Adding a New Character
+
+1. Add a `CharacterClass` enum value in `Shared/CharacterDefinition.cs`
+2. Write a `BuildXxx()` factory function with `MovementStats` and 6 `AbilityData` slots
+3. Register it in `BuildRegistry()`
+4. If the character has unique special effects, add methods to `ClassAbilities.cs` and register them in `AbilityRegistry.cs`
+
+No changes to `PlayerController`, `MovementComponent`, or `ExecuteSlot` needed — everything is data-driven.
 
 ---
 
 ## Game Design
 
-See [gdd.md](gdd.md) for the full Game Design Document covering:
-- Core philosophy and design heritage
-- Mobility chain mechanics
-- Combo & hitstun architecture
-- Spell typology and counterplay
-- Game modes (FFA Deathmatch, Arena Sockets)
+See [gdd.md](gdd.md) for the full Game Design Document.
 
 ---
 
@@ -186,14 +204,14 @@ See [gdd.md](gdd.md) for the full Game Design Document covering:
 
 SlopArena is a **community-driven project** — everyone is welcome!
 
-- **🐛 Found a bug?** [Open an issue](https://github.com/Binoui/SlopArena/issues/new?template=bug_report.yml)
-- **💡 Have an idea?** [Submit a feature request](https://github.com/Binoui/SlopArena/issues/new?template=feature_request.yml)
+- **🐛 Found a bug?** [Open an issue](https://github.com/Binoui/SlopArena/issues/new)
+- **💡 Have an idea?** Submit a feature request
 - **🛠️ Want to code?** Read the [Contributing Guide](CONTRIBUTING.md) to get started
-- **🎨 Designer / artist / writer?** Non-code contributions are just as valuable — see the guide
+- **🎨 Designer / artist / writer?** Non-code contributions are just as valuable
 
 By participating, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-### Quick Start for Contributors
+### Quick Start
 
 ```bash
 git clone https://github.com/Binoui/SlopArena.git
@@ -201,7 +219,7 @@ cd SlopArena
 # Open project.godot in Godot 4.6+ (.NET version) and press F5
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide on spells, architecture, and coding conventions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ## License
 
