@@ -172,6 +172,7 @@ public partial class PlayerController : CharacterBody3D
 				s.VX = s.VY = s.VZ = 0f;
 				s.KVX = s.KVY = s.KVZ = 0f;
 			}
+			_animationController.CancelAttack();
 			_movementComponent.ApplyKnockback(knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
 		};
 
@@ -320,7 +321,10 @@ public partial class PlayerController : CharacterBody3D
 
 		// Ground dash (air dodge handled by MovementComponent/Simulation internally)
 		if (input.Dash && IsOnFloor() && _movementComponent.State.AnimLockTicks <= 0)
+		{
+			_animationController.CancelAttack();
 			_movementComponent.StartDash(_moveDirection.X, _moveDirection.Z);
+		}
 
 		bool wasKnocked = _movementComponent.IsInKnockback();
 		_movementComponent.Tick(input);
@@ -342,7 +346,6 @@ public partial class PlayerController : CharacterBody3D
 			IsDashing = _movementComponent.CurrentState == ActionState.Dashing,
 			IsAirDodging = _movementComponent.CurrentState == ActionState.AirDodging,
 			IsInKnockback = _movementComponent.IsInKnockback(),
-			CastTimerRemaining = _animationController.GetCastTimer(),
 		});
 
 		OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
@@ -418,6 +421,12 @@ public partial class PlayerController : CharacterBody3D
 		{
 			ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
 		}
+
+		// Play attack animation (stage-aware if stages exist)
+		int animStage = (stages != null && stages.Length > 0)
+			? Math.Clamp(_movementComponent.State.ComboStage - 1, 0, stages.Length - 1)
+			: 0;
+		_animationController.PlayAttack(ability.AnimationNames, animStage, slotIndex);
 
 		// ── Step 2: Special effects (status, visuals, complex behavior) ──
 		if (ability.SpecialEffectKeys != null)
