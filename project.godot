@@ -28,7 +28,7 @@ project/assembly_name="SlopArena"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray()
 
 [godot_ai]
 
