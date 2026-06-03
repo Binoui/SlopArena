@@ -196,6 +196,9 @@ public partial class PlayerController : CharacterBody3D
 		// Load General rig animations (idle, hit, death) and merge into our library
 		LoadKayKitGeneralAnims(_animationController, animPlayer);
 
+		// Load Mixamo greatsword attack animations from the knight directory
+		_animationController.LoadMixamoAnims("res://assets/characters/kaykit/knight/");
+
 		_animationController.Initialize();
 
 		// Hurtbox

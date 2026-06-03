@@ -120,7 +120,7 @@ namespace SlopArena.Shared
                 // LMB — 3-hit combo
                 LMB = new AbilityData
                 {
-                    Name = "Battering Combo",
+                    Name = "Battering Combo", AnimationNames = new[] { "great_sword_slash", "great_sword_slash", "great_sword_high_spin_attack" },
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
@@ -133,7 +133,7 @@ namespace SlopArena.Shared
                 // RMB — heavy, can charge
                 RMB = new AbilityData
                 {
-                    Name = "Piledriver",
+                    Name = "Piledriver", AnimationNames = new[] { "great_sword_attack" },
                     CooldownTicks = 20,
                     Stages = new AttackStage[]
                     {
@@ -149,7 +149,7 @@ namespace SlopArena.Shared
                 // Q — Shield Bash: melee strike, bonus if target has a status
                 Q = new AbilityData
                 {
-                    Name = "Shield Bash",
+                    Name = "Shield Bash", AnimationNames = new[] { "great_sword_blocking" },
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
@@ -161,7 +161,7 @@ namespace SlopArena.Shared
                 // E — War Cry: self-buff shield + push enemies
                 E = new AbilityData
                 {
-                    Name = "War Cry",
+                    Name = "War Cry", AnimationNames = new[] { "great_sword_power_up" },
                     CooldownTicks = 240,
                     SpecialEffectKeys = new[] { "VanguardWarCry" },
                 },
@@ -169,7 +169,7 @@ namespace SlopArena.Shared
                 // R — Intervene: dash forward + delay AoE slow
                 R = new AbilityData
                 {
-                    Name = "Intervene",
+                    Name = "Intervene", AnimationNames = new[] { "great_sword_slide_attack" },
                     CooldownTicks = 180,
                     SpecialEffectKeys = new[] { "VanguardIntervene" },
                 },
@@ -177,7 +177,7 @@ namespace SlopArena.Shared
                 // F — Thunderclap: leap + delayed AoE
                 F = new AbilityData
                 {
-                    Name = "Thunderclap",
+                    Name = "Thunderclap", AnimationNames = new[] { "great_sword_jump_attack" },
                     CooldownTicks = 420,
                     SpecialEffectKeys = new[] { "VanguardThunderclap" },
                 },
