@@ -490,6 +490,19 @@ public partial class AnimationController : Node
 	}
 
 	/// <summary>
+	/// Remap Mixamo FBX animation paths to match the KayKit skeleton hierarchy.
+	/// Mixamo FBX uses "RootNode/Skeleton/bone" track paths.
+	/// The KayKit scene has root node "PlayerModel" with child "Skeleton3D" containing bones.
+	/// So we: strip "RootNode/" prefix, then replace "Skeleton/" with "Skeleton3D/".
+	/// </summary>
+	private Animation StripRigMediumPrefix(Animation anim)
+	{
+		// Knight.glb scene has PlayerModel → Rig_Medium → Skeleton3D:bone hierarchy.
+		// Animation .res files have paths "Rig_Medium/Skeleton3D:bone" — they match as-is.
+		return (Animation)anim.Duplicate();
+	}
+
+	/// <summary>
 	/// Remap bone paths in animation tracks to match our skeleton.
 	/// Our AnimationPlayer's RootNode is set to the skeleton node.
 	/// Mixamo FBX animations have tracks referencing "Root/Skeleton3D" or "Root/Skeleton"
@@ -532,9 +545,10 @@ public partial class AnimationController : Node
 			string path = anim.TrackGetPath(i);
 
 			// Mixamo / Kenney prefixes
-			if (path.Contains("Root/Skeleton3D")) return "Root/Skeleton3D";
-			if (path.Contains("Root/Skeleton"))   return "Root/Skeleton";
-			if (path.Contains("Root|"))           return "Root|";
+			if (path.Contains("RootNode/Skeleton")) return "RootNode/Skeleton";
+			if (path.Contains("Root/Skeleton3D"))   return "Root/Skeleton3D";
+			if (path.Contains("Root/Skeleton"))     return "Root/Skeleton";
+			if (path.Contains("Root|"))             return "Root|";
 
 			// KayKit: detect pattern like "SceneName/Skeleton3D/bone" or "SceneName/Skeleton3D" (bone as subname)
 			string[] segments = path.Split('/');
@@ -576,35 +590,34 @@ public partial class AnimationController : Node
 	}
 
 	// ==========================================
-	// MIXAMO ANIMATION LOADING
+	// ANIMATION LOADING (.res files)
 	// ==========================================
 
 	/// <summary>
-	/// Load all Mixamo greatsword FBX animations from the knight directory
-	/// and add them to the default animation library with normalized names.
-	/// Each FBX contains one animation clip.
+	/// Load all Animation (.res) files from the given directory and add them
+	/// to the default library with normalized names (Idle_A → idle, etc.).
+	/// Stips the "Rig_Medium/" prefix from bone paths to match our scene.
 	/// </summary>
-	public void LoadMixamoAnims(string directoryPath)
+	public void LoadAnimationsFromRes(string directoryPath, Func<string, string>? nameNormalizer = null)
 	{
 		if (_animPlayer == null) return;
-
-		var dir = DirAccess.Open(directoryPath);
-		if (dir == null)
-		{
-			GD.PrintErr($"AnimationController: Cannot open Mixamo directory: {directoryPath}");
-			return;
-		}
 
 		var lib = _animPlayer.HasAnimationLibrary("default")
 			? _animPlayer.GetAnimationLibrary("default")
 			: null;
 		if (lib == null)
 		{
-			GD.PrintErr("AnimationController: No default library to add Mixamo anims");
+			GD.PrintErr("AnimationController: No default library to add animations");
 			return;
 		}
 
-		string kaykitRigPrefix = "Rig_Medium_";
+		var dir = DirAccess.Open(directoryPath);
+		if (dir == null)
+		{
+			GD.PrintErr($"AnimationController: Cannot open animation directory: {directoryPath}");
+			return;
+		}
+
 		dir.ListDirBegin();
 		int loadedCount = 0;
 
@@ -614,92 +627,31 @@ public partial class AnimationController : Node
 			if (string.IsNullOrEmpty(fileName))
 				break;
 
-			// Only process FBX files, skip KayKit rig files and .import
-			if (!fileName.EndsWith(".fbx")) continue;
-			if (fileName.StartsWith("Rig_Medium_")) continue;
+			if (!fileName.EndsWith(".res")) continue;
 			if (fileName.StartsWith(".")) continue;
 
-			string fbxPath = directoryPath + fileName;
-			if (!ResourceLoader.Exists(fbxPath)) continue;
+			string resPath = directoryPath + fileName;
+			if (!ResourceLoader.Exists(resPath)) continue;
 
-			string animKey = NormalizeMixamoName(fileName);
+			var anim = ResourceLoader.Load<Animation>(resPath);
+			if (anim == null) continue;
 
-			// Skip if already loaded
-			if (lib.HasAnimation(animKey)) continue;
+			// Strip "Rig_Medium/" prefix from bone paths
+			var remapped = StripRigMediumPrefix(anim);
 
-			// Load the FBX and extract its animation
-			var scene = ResourceLoader.Load<PackedScene>(fbxPath);
-			if (scene == null) continue;
+			// Get animation key: remove .res extension, pass through normalizer
+			string animKey = fileName.Substring(0, fileName.Length - 4); // remove ".res"
+			if (nameNormalizer != null)
+				animKey = nameNormalizer(animKey);
 
-			var tempInstance = scene.Instantiate<Node>();
-			if (tempInstance == null) continue;
-
-			var animPlayerInScene = FindAnimationPlayer(tempInstance);
-			if (animPlayerInScene != null)
-			{
-				foreach (var libName in animPlayerInScene.GetAnimationLibraryList())
-				{
-					var sourceLib = animPlayerInScene.GetAnimationLibrary(libName);
-					if (sourceLib == null) continue;
-
-					foreach (var animNameInLib in sourceLib.GetAnimationList())
-					{
-						var anim = sourceLib.GetAnimation(animNameInLib);
-						if (anim == null) continue;
-
-						// Strip scene-root prefix from bone paths, then add to our library
-						var remapped = PrepareAnimation(anim);
-						if (!lib.HasAnimation(animKey))
-						{
-							lib.AddAnimation(animKey, remapped);
-							loadedCount++;
-						}
-					}
-				}
-			}
-			else
-			{
-				// Try direct Animation resource
-				var directAnim = ResourceLoader.Load<Animation>(fbxPath);
-				if (directAnim != null)
-				{
-					var remapped = PrepareAnimation(directAnim);
-					if (!lib.HasAnimation(animKey))
-					{
-						lib.AddAnimation(animKey, remapped);
-						loadedCount++;
-					}
-				}
-			}
-
-			tempInstance.QueueFree();
+			if (lib.HasAnimation(animKey))
+				lib.RemoveAnimation(animKey);
+			lib.AddAnimation(animKey, remapped);
+			loadedCount++;
 		}
 
 		dir.ListDirEnd();
-		GD.Print($"AnimationController: Loaded {loadedCount} Mixamo animations from {directoryPath}");
-	}
-
-	/// <summary>
-	/// Normalize Mixamo FBX filename to a clean animation key.
-	/// "great sword slash.fbx" -> "great_sword_slash"
-	/// "draw a great sword 1.fbx" -> "draw_a_great_sword_1"
-	/// </summary>
-	private string NormalizeMixamoName(string fileName)
-	{
-		string name = fileName;
-		// Remove .fbx extension
-		int extIdx = name.LastIndexOf(".fbx", StringComparison.OrdinalIgnoreCase);
-		if (extIdx > 0)
-			name = name.Substring(0, extIdx);
-		// Remove parenthesized numbers: " (2)" -> ""
-		name = System.Text.RegularExpressions.Regex.Replace(name, @"\s*\(\d+\)", "");
-		// Replace spaces with underscores
-		name = name.Replace(" ", "_");
-		// Lowercase
-		name = name.ToLowerInvariant();
-		// Remove any non-alphanumeric prefixes/suffixes
-		name = name.Trim('_', '-');
-		return name;
+		GD.Print($"AnimationController: Loaded {loadedCount} animations from {directoryPath}");
 	}
 
 	// ==========================================

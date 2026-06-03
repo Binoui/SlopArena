@@ -140,47 +140,34 @@ public partial class PlayerController : CharacterBody3D
 		_animationController = new AnimationController { Name = "AnimationController" };
 		AddChild(_animationController);
 
-		// Model + AnimationPlayer (KayKit MovementBasic rig — has mesh + working anims)
+		// Model + AnimationPlayer
 		_playerModel = LoadPlayerModel();
 		AnimationPlayer? animPlayer = null;
 		Skeleton3D? skeleton = null;
 
 		if (_playerModel != null)
 		{
-			// Find the MovementBasic rig's AnimationPlayer and Skeleton (they work natively)
-		    animPlayer = _animationController.FindAnimationPlayer(_playerModel);
-		    skeleton = _animationController.FindSkeleton(_playerModel);
+			skeleton = _animationController.FindSkeleton(_playerModel);
 
-		    if (animPlayer != null)
-		    {
-		        animPlayer.Name = "AnimationPlayer";
-		        if (skeleton != null)
-		            animPlayer.RootNode = _playerModel.GetPath();
+			// Debug: print skeleton info and PlayerModel children
+			if (skeleton != null)
+				GD.Print($"Knight.glb: found skeleton '{skeleton.Name}', {skeleton.GetBoneCount()} bones");
+			else
+				GD.Print("Knight.glb: NO skeleton found!");
+			string children = "";
+			foreach (var c in _playerModel.GetChildren())
+				children += c.Name + " ";
+			GD.Print($"Knight.glb children: {children}");
 
-				// Ensure there's a "default" library with normalized animation names
-				var lib = animPlayer.HasAnimationLibrary("default")
-					? animPlayer.GetAnimationLibrary("default")
-					: new AnimationLibrary();
+			// Create an AnimationPlayer for our model (Knight.glb has no embedded anims)
+			animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
+			_playerModel.AddChild(animPlayer);
+			if (skeleton != null)
+				animPlayer.RootNode = _playerModel.GetPath();
 
-				// Copy all existing animations into default library with normalized names
-				foreach (var libName in animPlayer.GetAnimationLibraryList())
-				{
-					if (libName == "default") continue;
-					var sourceLib = animPlayer.GetAnimationLibrary(libName);
-					if (sourceLib == null) continue;
-					foreach (var animName in sourceLib.GetAnimationList())
-					{
-						var anim = sourceLib.GetAnimation(animName);
-						if (anim == null) continue;
-						string normalized = NormalizeKayKitAnimName(animName);
-						if (!lib.HasAnimation(normalized))
-							lib.AddAnimation(normalized, _animationController.PrepareAnimation(anim));
-					}
-				}
-
-				if (!animPlayer.HasAnimationLibrary("default"))
-					animPlayer.AddAnimationLibrary("default", lib);
-			}
+			// Create "default" library
+			var lib = new AnimationLibrary();
+			animPlayer.AddAnimationLibrary("default", lib);
 		}
 
 		if (animPlayer == null)
@@ -189,15 +176,14 @@ public partial class PlayerController : CharacterBody3D
 			animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
 			(_playerModel ?? this).AddChild(animPlayer);
 			if (skeleton != null) animPlayer.RootNode = _playerModel.GetPath();
+			var lib = new AnimationLibrary();
+			animPlayer.AddAnimationLibrary("default", lib);
 		}
 
 		_animationController.Setup(animPlayer, skeleton, _playerModel);
 
-		// Load General rig animations (idle, hit, death) and merge into our library
-		LoadKayKitGeneralAnims(_animationController, animPlayer);
-
-		// Load Mixamo greatsword attack animations from the knight directory
-		_animationController.LoadMixamoAnims("res://assets/characters/kaykit/knight/");
+		// Load animation .res files from animations/ directory
+		_animationController.LoadAnimationsFromRes("res://animations/", NormalizeKayKitAnimName);
 
 		_animationController.Initialize();
 
@@ -781,25 +767,23 @@ public partial class PlayerController : CharacterBody3D
 
 	private Node3D? LoadPlayerModel()
 	{
-		// Use MovementBasic as the base model (has mesh + skeleton + working movement anims)
-		if (!ResourceLoader.Exists("res://assets/characters/kaykit/knight/Rig_Medium_MovementBasic.fbx"))
-		{ GD.Print("KayKit rig not found, using fallback capsule"); CreateFallbackMesh(); return null; }
+		// Load Knight.glb (KayKit model exported as GLB)
+		if (!ResourceLoader.Exists("res://assets/characters/knight/Knight.glb"))
+		{ GD.Print("Knight.glb not found, using fallback capsule"); CreateFallbackMesh(); return null; }
 
-		var pm = GD.Load<PackedScene>("res://assets/characters/kaykit/knight/Rig_Medium_MovementBasic.fbx")?.Instantiate<Node3D>();
+		var pm = GD.Load<PackedScene>("res://assets/characters/knight/Knight.glb")?.Instantiate<Node3D>();
 		if (pm == null) { CreateFallbackMesh(); return null; }
 
 		pm.Name = "PlayerModel";
 		AddChild(pm);
 
-		// Use default FBX materials (they have correct UV setup)
-		// Skins can be changed by swapping the FBX embedded texture or modifying materials
-		GD.Print($"PlayerModel loaded, using default FBX materials");
+		GD.Print("PlayerModel loaded from Knight.glb");
 
 		// Scale: KayKit models are ~1 unit tall, scale up to match game scale
 		pm.Scale = new Vector3(2.0f, 2.0f, 2.0f);
 		pm.Position = new Vector3(0f, -1.0f, 0f);
 
-		// Attach 2-handed sword to handslot.r
+		// Attach 2-handed sword to hand.r
 		AttachWeaponToHand(pm);
 
 		return pm;
@@ -865,48 +849,6 @@ public partial class PlayerController : CharacterBody3D
 		GD.Print($"KayKit: attached sword to bone '{foundBone}'");
 	}
 
-	/// <summary>
-	/// Load general animations (idle, hit, death) from the KayKit General rig file.
-	/// </summary>
-	private void LoadKayKitGeneralAnims(AnimationController controller, AnimationPlayer? mainAnimPlayer)
-	{
-		if (mainAnimPlayer == null) return;
-
-		string generalPath = "res://assets/characters/kaykit/knight/Rig_Medium_General.fbx";
-		if (!ResourceLoader.Exists(generalPath)) return;
-
-		var genScene = GD.Load<PackedScene>(generalPath)?.Instantiate<Node3D>();
-		if (genScene == null) return;
-
-		var genAnimPlayer = controller.FindAnimationPlayer(genScene);
-		if (genAnimPlayer == null) { genScene.QueueFree(); return; }
-
-		// Copy animations from General rig to main animation library
-		var lib = mainAnimPlayer.GetAnimationLibrary("default");
-		if (lib == null)
-		{
-			lib = new AnimationLibrary();
-			mainAnimPlayer.AddAnimationLibrary("default", lib);
-		}
-
-		foreach (var libName in genAnimPlayer.GetAnimationLibraryList())
-		{
-			var sourceLib = genAnimPlayer.GetAnimationLibrary(libName);
-			if (sourceLib == null) continue;
-
-			foreach (var animName in sourceLib.GetAnimationList())
-			{
-				var anim = sourceLib.GetAnimation(animName);
-				if (anim == null) continue;
-
-				string key = NormalizeKayKitAnimName(animName);
-				if (!lib.HasAnimation(key))
-					lib.AddAnimation(key, controller.PrepareAnimation(anim));
-			}
-		}
-
-		genScene.QueueFree();
-	}
 
 	/// <summary>
 	/// Normalize KayKit animation names to our internal naming.
@@ -921,8 +863,11 @@ public partial class PlayerController : CharacterBody3D
 			{ "Walking_A", "walk" },
 			{ "Walking_B", "walk" },
 			{ "Walking_C", "walk" },
+			{ "Walking_Backwards", "walk_back" },
 			{ "Running_A", "run" },
 			{ "Running_B", "run" },
+			{ "Running_Strafe_Left", "strafe_left" },
+			{ "Running_Strafe_Right", "strafe_right" },
 			{ "Jump_Full_Long", "jump" },
 			{ "Jump_Full_Short", "jump" },
 			{ "Jump_Idle", "jump_idle" },
@@ -932,6 +877,26 @@ public partial class PlayerController : CharacterBody3D
 			{ "Hit_B", "hit_large_front" },
 			{ "Death_A", "death_forward" },
 			{ "Death_B", "death_backward" },
+			{ "Crouching", "crouch" },
+			{ "Crawling", "crawl" },
+			{ "Sneaking", "sneak" },
+			{ "Dodge_Forward", "dodge_forward" },
+			{ "Dodge_Backward", "dodge_backward" },
+			{ "Dodge_Left", "dodge_left" },
+			{ "Dodge_Right", "dodge_right" },
+			{ "Melee_2H_Idle", "melee_idle" },
+			{ "Melee_2H_Attack_Chop", "attack_2h_chop" },
+			{ "Melee_2H_Attack_Slice", "attack_2h_slice" },
+			{ "Melee_2H_Attack_Stab", "attack_2h_stab" },
+			{ "Melee_2H_Attack_Spinning", "attack_2h_spin" },
+			{ "Melee_Block", "block" },
+			{ "Melee_Blocking", "block_idle" },
+			{ "Melee_Block_Hit", "block_hit" },
+			{ "Melee_Block_Attack", "block_attack" },
+			{ "Interact", "interact" },
+			{ "PickUp", "pickup" },
+			{ "Throw", "throw" },
+			{ "Use_Item", "use_item" },
 			{ "T-Pose", "tpose" },
 		};
 
