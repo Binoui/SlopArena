@@ -6,7 +6,8 @@ namespace SlopArena.Shared
     {
         Vanguard,
         Wraith,
-        Channeler
+        Channeler,
+        Knight
     }
 
     [Serializable]
@@ -40,6 +41,9 @@ namespace SlopArena.Shared
         // 6 ability slots: 0=LMB, 1=RMB, 2=Q, 3=E, 4=R, 5=F
         public AbilityData LMB;
         public AbilityData RMB;
+        // Air attacks: separate abilities used when airborne
+        public AbilityData AirLMB;
+        public AbilityData AirRMB;
         public AbilityData Q;
         public AbilityData E;
         public AbilityData R;
@@ -47,15 +51,18 @@ namespace SlopArena.Shared
 
         /// <summary>
         /// Get ability by slot index (0-5).
+        /// When airborne, slots 0 (LMB) and 1 (RMB) return air variants.
         /// </summary>
-        public readonly AbilityData GetSlotAbility(int slotIndex) => slotIndex switch
+        public readonly AbilityData GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
-            0 => LMB,
-            1 => RMB,
-            2 => Q,
-            3 => E,
-            4 => R,
-            5 => F,
+            (0, true) => AirLMB,
+            (1, true) => AirRMB,
+            (0, _) => LMB,
+            (1, _) => RMB,
+            (2, _) => Q,
+            (3, _) => E,
+            (4, _) => R,
+            (5, _) => F,
             _ => throw new ArgumentOutOfRangeException(nameof(slotIndex))
         };
     }
@@ -89,6 +96,7 @@ namespace SlopArena.Shared
                 BuildVanguard(),
                 BuildWraith(),
                 BuildChanneler(),
+                BuildKnight(),
             };
         }
 
@@ -376,6 +384,134 @@ namespace SlopArena.Shared
                     Name = "Meteor",
                     CooldownTicks = 360,
                     SpecialEffectKeys = new[] { "ChannelerMeteor" },
+                },
+            };
+        }
+
+    // ═══════════════════════════════════════
+    // KNIGHT — medium, balanced, based on King Arthur (DKO)
+    // ═══════════════════════════════════════
+    private static CharacterDefinition BuildKnight()
+        {
+            return new CharacterDefinition
+            {
+                Class = CharacterClass.Knight,
+                DisplayName = "Knight",
+                Movement = new MovementStats
+                {
+                    WalkSpeed = 10f,
+                    SprintSpeed = 14f,
+                    DashSpeed = 32f,
+                    AirAcceleration = 14f,
+                    JumpForce = 16f,
+                    Gravity = 38f,
+                    DashDurationTicks = 10,
+                    DashCooldownTicks = 58,
+                    GroundFriction = 18f,
+                    AirFriction = 0.45f,
+                    MaxFallSpeed = 52f,
+                    MaxJumps = 2,
+                },
+
+                // LMB — Royal Combo: 3-hit sword combo
+                LMB = new AbilityData
+                {
+                    Name = "Royal Combo",
+                    CooldownTicks = 0,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 2.8f, HitAngleDeg = 45f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 12f, StunTicks = 12, SelfLockTicks = 8, ChainWindowTicks = 42 },
+                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3.2f, HitAngleDeg = 45f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 18f, StunTicks = 18, SelfLockTicks = 10, ChainWindowTicks = 42 },
+                        new() { Shape = AttackShape.MeleeCone, Damage = 12f, Range = 3.8f, HitAngleDeg = 45f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 24f, StunTicks = 24, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                    }
+                },
+
+                // Air LMB — Rising Slash: upward launch for juggle follow-ups
+                AirLMB = new AbilityData
+                {
+                    Name = "Rising Slash",
+                    CooldownTicks = 0,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                    }
+                },
+
+                // RMB — Heavy Sunder: overhead strike (hold for charged)
+                RMB = new AbilityData
+                {
+                    Name = "Heavy Sunder",
+                    CooldownTicks = 15,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 4f, HitAngleDeg = 45f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 20f, StunTicks = 18, SelfLockTicks = 18, ChainWindowTicks = 0 },
+                    },
+                    ChargedStages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 15f, Range = 5f, HitAngleDeg = 45f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 28f, StunTicks = 24, SelfLockTicks = 30, ChainWindowTicks = 0 },
+                    },
+                    ChargeHoldTicks = 18,
+                },
+
+                // Air RMB — Aerial Slam: spike enemies downward
+                AirRMB = new AbilityData
+                {
+                    Name = "Aerial Slam",
+                    CooldownTicks = 0,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                    }
+                },
+
+                // Q — Blinding Light: frontal cone stun (was King Arthur's R)
+                Q = new AbilityData
+                {
+                    Name = "Blinding Light",
+                    AnimationNames = new[] { "great_sword_high_spin_attack" },
+                    CooldownTicks = 180,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 12f, Range = 4.5f, HitAngleDeg = 35f, KnockbackForce = 10f, KnockbackUpward = 5f, LungeForce = 0f, StunTicks = 75, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                    }
+                },
+
+                // E — Lion's Advance: gap closer lunge strike (replaces Soaring Edge)
+                E = new AbilityData
+                {
+                    Name = "Lion's Advance",
+                    AnimationNames = new[] { "great_sword_slide_attack" },
+                    CooldownTicks = 120,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 35f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                    }
+                },
+
+                // R — Knight's Resolve: parry stance, counter-attack if struck
+                R = new AbilityData
+                {
+                    Name = "Knight's Resolve",
+                    AnimationNames = new[] { "great_sword_blocking" },
+                    CooldownTicks = 240,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.SelfBuff, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "KnightKnightsResolve" },
+                },
+
+                // F — Might of Excalibur (Ult): ground slam + buff duration
+                F = new AbilityData
+                {
+                    Name = "Might of Excalibur",
+                    AnimationNames = new[] { "great_sword_jump_attack" },
+                    CooldownTicks = 420,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Shape = AttackShape.CircleAOE, Damage = 20f, Range = 0f, Radius = 5f, KnockbackForce = 25f, KnockbackUpward = 10f, LungeForce = 0f, StunTicks = 30, SelfLockTicks = 20, ChainWindowTicks = 0 },
+                    },
+                    SpecialEffectKeys = new[] { "KnightMightOfExcalibur" },
                 },
             };
         }

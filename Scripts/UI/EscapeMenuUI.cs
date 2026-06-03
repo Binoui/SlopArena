@@ -1,8 +1,6 @@
 #nullable enable
 using Godot;
-using SlopArena.Shared;
 using System;
-using System.Collections.Generic;
 
 /// <summary>
 /// Escape menu overlay — Resume, Spellbook, Settings, Exit Lobby, Exit Game.
@@ -18,7 +16,6 @@ public partial class EscapeMenuUI : Control
 	public event Action? OnSettingsRequested;
 	public event Action? OnExitLobby;
 	public event Action? OnExitGame;
-	public event Action<CharacterClass>? OnClassSelected;
 	
 	// ==========================================
 	// STATE
@@ -81,26 +78,6 @@ public partial class EscapeMenuUI : Control
 		_resumeBtn = MakeMenuButton("Resume");
 		_resumeBtn.Pressed += () => { Close(); OnResumePressed?.Invoke(); };
 		_menuContainer.AddChild(_resumeBtn);
-		
-		// --- Class selection ---
-		var classTitle = new Label();
-		classTitle.Text = "CLASS";
-		classTitle.HorizontalAlignment = HorizontalAlignment.Center;
-		classTitle.AddThemeFontSizeOverride("font_size", 14);
-		classTitle.Modulate = new Color(0.6f, 0.6f, 0.6f);
-		_menuContainer.AddChild(classTitle);
-		
-		var btnVg = MakeMenuButton("Vanguard");
-		btnVg.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Vanguard); };
-		_menuContainer.AddChild(btnVg);
-		
-		var btnWr = MakeMenuButton("Wraith");
-		btnWr.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Wraith); };
-		_menuContainer.AddChild(btnWr);
-		
-		var btnCh = MakeMenuButton("Channeler");
-		btnCh.Pressed += () => { Close(); OnClassSelected?.Invoke(CharacterClass.Channeler); };
-		_menuContainer.AddChild(btnCh);
 		
 		// Settings
 		_settingsBtn = MakeMenuButton("Settings");
