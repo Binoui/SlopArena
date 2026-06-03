@@ -13,17 +13,18 @@ public partial class Main : Node3D
 	private ActionBarHUD? _actionBarHUD;
 	private UnitFrames? _unitFrames;
 	private EscapeMenuUI? _escapeMenu;
-	
+	private CharacterClass _selectedClass = CharacterClass.Vanguard;
+
 	// Cercle de ciblage (WoW-style ring under target)
 	private MeshInstance3D? _targetRing;
-	
+
 	public override async void _Ready()
 	{
 		GD.Print("SlopArena 3D C# Client Started!");
-		
+
 		// Force fullscreen — UI elements size themselves to viewport on Build()
 		DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
-		
+
 		_canvasLayer = GetNodeOrNull<CanvasLayer>("CanvasLayer");
 		if (_canvasLayer == null)
 		{
@@ -31,7 +32,23 @@ public partial class Main : Node3D
 			_canvasLayer.Name = "CanvasLayer";
 			AddChild(_canvasLayer);
 		}
-		
+
+		// Show class selection screen before spawning anything
+		var classSelect = new ClassSelectUI();
+		_canvasLayer.AddChild(classSelect);
+
+		// Wait for player to pick a class (C# event -> Task pattern)
+		var tcs = new System.Threading.Tasks.TaskCompletionSource<CharacterClass>();
+		classSelect.OnClassConfirmed += (cls) => tcs.TrySetResult(cls);
+		_selectedClass = await tcs.Task;
+		GD.Print($"Player selected class: {_selectedClass}");
+
+		// Now spawn the match
+		SpawnMatch();
+	}
+
+	private async void SpawnMatch()
+	{
 		_label = _canvasLayer.GetNodeOrNull<Label>("Label");
 		if (_label == null)
 		{
@@ -66,8 +83,8 @@ public partial class Main : Node3D
 			var npc = new PlayerController();
 			npc.Name = $"NPC_{i}";
 			npc.Position = _arenaManager.GetSpawnPosition(i);
-			// Cycle through classes
-			npc.SetClass((CharacterClass)(i % 3));
+			// Cycle through classes (4 available: Vanguard, Wraith, Channeler, Knight)
+			npc.SetClass((CharacterClass)(i % 4));
 			AddChild(npc);
 			npc.SetNPC(true);
 			npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
@@ -89,7 +106,8 @@ public partial class Main : Node3D
 		_player.Position = _arenaManager.GetSpawnPosition(5);
 		// Offset player from NPCs and above floor
 		_player.Position += new Vector3(5f, 15f, 0f);
-		
+		_player.SetClass(_selectedClass);
+
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
 			_player.SetupCombat(_simulation, ArenaRegistry.Get("split"));
@@ -215,15 +233,6 @@ public partial class Main : Node3D
 
 			// Connect escape menu events
 			_escapeMenu.OnResumePressed += () => { };
-			_escapeMenu.OnClassSelected += (CharacterClass pc) =>
-			{
-				if (_player != null)
-				{
-					_player.SetClass(pc);
-					_actionBarHUD?.OnClassChanged();
-					GD.Print($"Switched to {pc}");
-				}
-			};
 			_escapeMenu.OnExitLobby += () =>
 			{
 				GD.Print("Exit Lobby - would return to main menu");

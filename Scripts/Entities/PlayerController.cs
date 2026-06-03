@@ -554,7 +554,7 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.IsInKnockback()) return;
 		if (_movementComponent.State.AnimLockTicks > 0) return;
 
-		var ability = _charDef.GetSlotAbility(slotIndex);
+		var ability = _charDef.GetSlotAbility(slotIndex, airborne);
 
 		// Cooldown check
 		ushort slotCd = slotIndex switch
@@ -642,7 +642,7 @@ public partial class PlayerController : CharacterBody3D
 		// Lunge (dans la direction de l'input caméra, pas le facing du perso)
 		if (stage.LungeForce > 0f)
 		{
-			float upBoost = airborne && slotIndex == 1 ? -8f : Velocity.Y + 2f;
+			float upBoost = Velocity.Y + 2f;
 			Velocity = new Vector3(lungeDir.X * stage.LungeForce, upBoost, lungeDir.Z * stage.LungeForce);
 		}
 
@@ -715,9 +715,6 @@ public partial class PlayerController : CharacterBody3D
 		// Apply hits — knockback is scaled by damage% in Simulation.ApplyKnockback
 		foreach (var hit in results)
 		{
-			float kbUp = (airborne && slotIndex == 1) ? -stage.KnockbackUpward : stage.KnockbackUpward;
-			float kbMul = (airborne && slotIndex == 1) ? 0.5f : 1f;
-
 			// Don't hit invincible targets (dashing)
 			ulong targetId = hit.TargetEntityId;
 			bool targetInvincible = false;
@@ -726,9 +723,9 @@ public partial class PlayerController : CharacterBody3D
 			if (targetInvincible) continue;
 
 			sim.OnEntityHit?.Invoke(targetId, hit.Damage,
-				hit.KnockbackX * kbMul,
-				kbUp,
-				hit.KnockbackZ * kbMul);
+				hit.KnockbackX,
+				hit.KnockbackY,
+				hit.KnockbackZ);
 		}
 
 		// Update CharacterState combo/animation ticks

@@ -31,6 +31,10 @@ public static class AbilityRegistry
 		{ "ChannelerDragonsBreath", ChannelerAbilities.DragonsBreath },
 		{ "ChannelerIceLance", ChannelerAbilities.IceLance },
 		{ "ChannelerMeteor", ChannelerAbilities.Meteor },
+
+		// Knight
+		{ "KnightKnightsResolve", KnightAbilities.KnightsResolve },
+		{ "KnightMightOfExcalibur", KnightAbilities.MightOfExcalibur },
 	};
 
 	/// <summary>
