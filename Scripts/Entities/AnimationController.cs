@@ -564,15 +564,142 @@ public partial class AnimationController : Node
 				}
 				else if (isSkeletonNode && segments.Length == 2)
 				{
-					// KayKit path targeting skeleton node directly: "Rig_Medium/Skeleton3D" (bone in subname)
-					// Strip the prefix so it becomes just "" (target RootNode itself, bone via subname)
-					string candidate = segments[0] + "/" + segments[1];
-					GD.Print($"AnimationController: detected KayKit prefix '{candidate}' (skeleton-target), stripping from tracks");
+					// Path targeting skeleton node: "Something/Skeleton3D:bone" or "Something/Skeleton3D"
+					// Build candidate using the clean nodeName (without :subname)
+					string candidate = segments[0] + "/" + nodeName;
+					GD.Print($"AnimationController: detected prefix '{candidate}' (skeleton-target), stripping from tracks");
 					return candidate;
 				}
 			}
 		}
 		return null;
+	}
+
+	// ==========================================
+	// MIXAMO ANIMATION LOADING
+	// ==========================================
+
+	/// <summary>
+	/// Load all Mixamo greatsword FBX animations from the knight directory
+	/// and add them to the default animation library with normalized names.
+	/// Each FBX contains one animation clip.
+	/// </summary>
+	public void LoadMixamoAnims(string directoryPath)
+	{
+		if (_animPlayer == null) return;
+
+		var dir = DirAccess.Open(directoryPath);
+		if (dir == null)
+		{
+			GD.PrintErr($"AnimationController: Cannot open Mixamo directory: {directoryPath}");
+			return;
+		}
+
+		var lib = _animPlayer.HasAnimationLibrary("default")
+			? _animPlayer.GetAnimationLibrary("default")
+			: null;
+		if (lib == null)
+		{
+			GD.PrintErr("AnimationController: No default library to add Mixamo anims");
+			return;
+		}
+
+		string kaykitRigPrefix = "Rig_Medium_";
+		dir.ListDirBegin();
+		int loadedCount = 0;
+
+		while (true)
+		{
+			string fileName = dir.GetNext();
+			if (string.IsNullOrEmpty(fileName))
+				break;
+
+			// Only process FBX files, skip KayKit rig files and .import
+			if (!fileName.EndsWith(".fbx")) continue;
+			if (fileName.StartsWith("Rig_Medium_")) continue;
+			if (fileName.StartsWith(".")) continue;
+
+			string fbxPath = directoryPath + fileName;
+			if (!ResourceLoader.Exists(fbxPath)) continue;
+
+			string animKey = NormalizeMixamoName(fileName);
+
+			// Skip if already loaded
+			if (lib.HasAnimation(animKey)) continue;
+
+			// Load the FBX and extract its animation
+			var scene = ResourceLoader.Load<PackedScene>(fbxPath);
+			if (scene == null) continue;
+
+			var tempInstance = scene.Instantiate<Node>();
+			if (tempInstance == null) continue;
+
+			var animPlayerInScene = FindAnimationPlayer(tempInstance);
+			if (animPlayerInScene != null)
+			{
+				foreach (var libName in animPlayerInScene.GetAnimationLibraryList())
+				{
+					var sourceLib = animPlayerInScene.GetAnimationLibrary(libName);
+					if (sourceLib == null) continue;
+
+					foreach (var animNameInLib in sourceLib.GetAnimationList())
+					{
+						var anim = sourceLib.GetAnimation(animNameInLib);
+						if (anim == null) continue;
+
+						// Strip scene-root prefix from bone paths, then add to our library
+						var remapped = PrepareAnimation(anim);
+						if (!lib.HasAnimation(animKey))
+						{
+							lib.AddAnimation(animKey, remapped);
+							loadedCount++;
+						}
+					}
+				}
+			}
+			else
+			{
+				// Try direct Animation resource
+				var directAnim = ResourceLoader.Load<Animation>(fbxPath);
+				if (directAnim != null)
+				{
+					var remapped = PrepareAnimation(directAnim);
+					if (!lib.HasAnimation(animKey))
+					{
+						lib.AddAnimation(animKey, remapped);
+						loadedCount++;
+					}
+				}
+			}
+
+			tempInstance.QueueFree();
+		}
+
+		dir.ListDirEnd();
+		GD.Print($"AnimationController: Loaded {loadedCount} Mixamo animations from {directoryPath}");
+	}
+
+	/// <summary>
+	/// Normalize Mixamo FBX filename to a clean animation key.
+	/// "great sword slash.fbx" -> "great_sword_slash"
+	/// "draw a great sword 1.fbx" -> "draw_a_great_sword_1"
+	/// </summary>
+	private string NormalizeMixamoName(string fileName)
+	{
+		string name = fileName;
+		// Remove .fbx extension
+		int extIdx = name.LastIndexOf(".fbx", StringComparison.OrdinalIgnoreCase);
+		if (extIdx > 0)
+			name = name.Substring(0, extIdx);
+		// Remove parenthesized numbers: " (2)" -> ""
+		name = System.Text.RegularExpressions.Regex.Replace(name, @"\s*\(\d+\)", "");
+		// Replace spaces with underscores
+		name = name.Replace(" ", "_");
+		// Lowercase
+		name = name.ToLowerInvariant();
+		// Remove any non-alphanumeric prefixes/suffixes
+		name = name.Trim('_', '-');
+		return name;
 	}
 
 	// ==========================================
