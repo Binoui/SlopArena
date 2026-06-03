@@ -155,7 +155,7 @@ public partial class PlayerController : CharacterBody3D
 		    {
 		        animPlayer.Name = "AnimationPlayer";
 		        if (skeleton != null)
-		            animPlayer.RootNode = skeleton.GetPath();
+		            animPlayer.RootNode = _playerModel.GetPath();
 
 				// Ensure there's a "default" library with normalized animation names
 				var lib = animPlayer.HasAnimationLibrary("default")
@@ -174,7 +174,7 @@ public partial class PlayerController : CharacterBody3D
 						if (anim == null) continue;
 						string normalized = NormalizeKayKitAnimName(animName);
 						if (!lib.HasAnimation(normalized))
-							lib.AddAnimation(normalized, (Animation)anim.Duplicate());
+							lib.AddAnimation(normalized, _animationController.PrepareAnimation(anim));
 					}
 				}
 
@@ -188,7 +188,7 @@ public partial class PlayerController : CharacterBody3D
 			// Fallback: create our own AnimationPlayer
 			animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
 			(_playerModel ?? this).AddChild(animPlayer);
-			if (skeleton != null) animPlayer.RootNode = skeleton.GetPath();
+			if (skeleton != null) animPlayer.RootNode = _playerModel.GetPath();
 		}
 
 		_animationController.Setup(animPlayer, skeleton, _playerModel);
@@ -901,7 +901,7 @@ public partial class PlayerController : CharacterBody3D
 
 				string key = NormalizeKayKitAnimName(animName);
 				if (!lib.HasAnimation(key))
-					lib.AddAnimation(key, (Animation)anim.Duplicate());
+					lib.AddAnimation(key, controller.PrepareAnimation(anim));
 			}
 		}
 

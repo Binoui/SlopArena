@@ -148,9 +148,29 @@ public partial class AnimationController : Node
 			_animPlayer.AddAnimationLibrary("default", _animLib);
 		}
 
-		// Log which animations we loaded
-		var loadedAnims = _animLib.GetAnimationList();
-		GD.Print($"AnimationController: Loaded {loadedAnims.Count} animations");
+				// Log which animations we loaded
+				var loadedAnims = _animLib.GetAnimationList();
+				GD.Print($"AnimationController: Loaded {loadedAnims.Count} animations");
+				// Debug: log first few animation names
+				string debugAnims = "";
+				for (int i = 0; i < Mathf.Min(loadedAnims.Count, 5); i++)
+					debugAnims += loadedAnims[i] + ", ";
+				GD.Print($"AnimationController: First anims: {debugAnims}");
+
+				// Debug: check track path of 'idle' if it exists
+				if (_animLib.HasAnimation("idle"))
+				{
+					var idleAnim = _animLib.GetAnimation("idle");
+					if (idleAnim != null)
+					{
+						string trackDebug = "";
+						for (int i = 0; i < Mathf.Min(idleAnim.GetTrackCount(), 3); i++)
+							trackDebug += idleAnim.TrackGetPath(i) + " | ";
+						GD.Print($"AnimationController: idle track paths: {trackDebug}");
+					}
+				}
+				// Check RootNode
+				GD.Print($"AnimationController: RootNode = {_animPlayer.RootNode}");
 
 		// Play idle if available
 		if (_animLib.HasAnimation("idle"))
@@ -456,8 +476,18 @@ public partial class AnimationController : Node
 	}
 
 	// ==========================================
-	// MIXAMO PATH REMAPPING
+	// PATH REMAPPING (Mixamo, Kenney, KayKit)
 	// ==========================================
+
+	/// <summary>
+	/// Public wrapper: duplicate an animation and remap its bone paths to be
+	/// relative to the skeleton (RootNode). Call this when copying animations
+	/// from an FBX source into our default library.
+	/// </summary>
+	public Animation PrepareAnimation(Animation sourceAnim)
+	{
+		return (Animation)sourceAnim.Duplicate(); // paths kept as-is, RootNode=PlayerModel
+	}
 
 	/// <summary>
 	/// Remap bone paths in animation tracks to match our skeleton.
@@ -465,37 +495,20 @@ public partial class AnimationController : Node
 	/// Mixamo FBX animations have tracks referencing "Root/Skeleton3D" or "Root/Skeleton"
 	/// which need to be stripped so paths resolve relative to the skeleton.
 	/// Kenney animations use "Root|" prefix which also gets stripped.
+	/// KayKit uses scene-root prefixes like "Rig_Medium_MovementBasic/Skeleton3D/".
 	/// </summary>
 	private Animation RemapAnimationPaths(Animation anim)
 	{
 		var animCopy = (Animation)anim.Duplicate();
-		int trackCount = animCopy.GetTrackCount();
-
-		// Detect the skeleton path prefix used in this animation
-		// Mixamo: "Root/Skeleton3D" or "Root/Skeleton"
-		// Kenney: "Root|"
-		string? prefixToStrip = null;
-
-		for (int i = 0; i < trackCount && prefixToStrip == null; i++)
-		{
-			string path = animCopy.TrackGetPath(i);
-			if (path.Contains("Root/Skeleton3D"))
-				prefixToStrip = "Root/Skeleton3D";
-			else if (path.Contains("Root/Skeleton"))
-				prefixToStrip = "Root/Skeleton";
-			else if (path.Contains("Root|"))
-				prefixToStrip = "Root|";
-		}
+		string? prefixToStrip = DetectPrefixToStrip(animCopy);
 
 		if (prefixToStrip == null)
 			return animCopy; // No remapping needed
 
-		//GD.Print($"  Remapping paths: stripping '{prefixToStrip}' prefix");
-
+		int trackCount = animCopy.GetTrackCount();
 		for (int i = 0; i < trackCount; i++)
 		{
 			string trackPath = animCopy.TrackGetPath(i);
-
 			if (trackPath.Contains(prefixToStrip))
 			{
 				string newPath = trackPath.Replace(prefixToStrip, "");
@@ -504,6 +517,62 @@ public partial class AnimationController : Node
 		}
 
 		return animCopy;
+	}
+
+	/// <summary>
+	/// Detect the path prefix to strip from animation tracks, supporting
+	/// Mixamo (Root/Skeleton3D), Kenney (Root|), and KayKit (SceneName/Skeleton3D).
+	/// Scans track paths and identifies known prefixes.
+	/// </summary>
+	private string? DetectPrefixToStrip(Animation anim)
+	{
+		int trackCount = anim.GetTrackCount();
+		for (int i = 0; i < trackCount; i++)
+		{
+			string path = anim.TrackGetPath(i);
+
+			// Mixamo / Kenney prefixes
+			if (path.Contains("Root/Skeleton3D")) return "Root/Skeleton3D";
+			if (path.Contains("Root/Skeleton"))   return "Root/Skeleton";
+			if (path.Contains("Root|"))           return "Root|";
+
+			// KayKit: detect pattern like "SceneName/Skeleton3D/bone" or "SceneName/Skeleton3D" (bone as subname)
+			string[] segments = path.Split('/');
+			if (segments.Length >= 2)
+			{
+				// Known skeleton node names
+				// Strip :subname from last segment before checking
+				string nodeName = segments[1].Contains(":") ? segments[1].Substring(0, segments[1].IndexOf(":")) : segments[1];
+				bool isSkeletonNode = nodeName.ToLowerInvariant() is "skeleton3d" or "skeleton" or "armature";
+
+				if (isSkeletonNode && segments.Length >= 3)
+				{
+					// segments[0] = scene root name (e.g., "Rig_Medium")
+					// segments[1] = skeleton node name (e.g., "Skeleton3D")
+					// segments[2] = first bone name (e.g., "root", "hips")
+					string thirdSeg = segments[2].ToLowerInvariant();
+					bool isBoneName = thirdSeg is "root" or "hips" or "pelvis" or "spine_01" or "spine"
+						or "thigh_l" or "thigh_r" or "upper_arm_l" or "upper_arm_r"
+						or "clavicle_l" or "clavicle_r" or "head" or "neck";
+
+					if (isBoneName)
+					{
+						string candidate = segments[0] + "/" + segments[1];
+						GD.Print($"AnimationController: detected prefix '{candidate}', stripping from tracks");
+						return candidate;
+					}
+				}
+				else if (isSkeletonNode && segments.Length == 2)
+				{
+					// KayKit path targeting skeleton node directly: "Rig_Medium/Skeleton3D" (bone in subname)
+					// Strip the prefix so it becomes just "" (target RootNode itself, bone via subname)
+					string candidate = segments[0] + "/" + segments[1];
+					GD.Print($"AnimationController: detected KayKit prefix '{candidate}' (skeleton-target), stripping from tracks");
+					return candidate;
+				}
+			}
+		}
+		return null;
 	}
 
 	// ==========================================
