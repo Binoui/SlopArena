@@ -103,45 +103,31 @@ public partial class CombatComponent : Node
 	public List<ulong> CheckMeleeCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg, float damage, float knockbackForce, float knockbackUpward)
 	{
 		_lastHitTargets.Clear();
-		
 		if (_simulation == null) return _lastHitTargets;
-		
-		float halfAngleRad = halfAngleDeg * MathF.PI / 180f;
-		
-		// Build entity list for SpellResolver
-		var entities = new List<SpellResolver.EntityData>();
-		foreach (var kvp in _simulation.Entities)
+
+		var entities = BuildEntityList();
+		var hb = new SlopArena.Shared.Hitbox
 		{
-			entities.Add(new SpellResolver.EntityData
-			{
-				Id = kvp.Key,
-				PosX = kvp.Value.pos.X,
-				PosY = kvp.Value.pos.Y,
-				PosZ = kvp.Value.pos.Z,
-				Radius = kvp.Value.radius,
-				Active = kvp.Value.active
-			});
-		}
-		
-		var results = SpellResolver.ResolveConeHit(
-			origin.X, origin.Y, origin.Z,
-			forward.X, forward.Z,
-			halfAngleRad, range,
-			damage, knockbackForce, knockbackUpward,
-			_entityId,
-			entities
-		);
-		
+			X = origin.X + forward.X * range * 0.5f, Y = origin.Y + 1f, Z = origin.Z + forward.Z * range * 0.5f,
+			Radius = range * 0.5f,
+			DurationTicks = 5,
+			Damage = damage,
+			KnockbackForce = knockbackForce,
+			KnockbackUpward = knockbackUpward,
+			OwnerId = _entityId,
+		};
+		SpellResolver.Spawn(hb);
+		var results = SpellResolver.Tick(entities);
+
 		foreach (var hit in results)
 		{
 			_lastHitTargets.Add(hit.TargetEntityId);
 			_simulation.OnEntityHit?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
 			OnDealDamage?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
 		}
-		
 		return _lastHitTargets;
 	}
-	
+
 	/// <summary>
 	/// Check circular AoE hit at a position.
 	/// Uses Shared/SpellResolver for pure C# math.
@@ -150,31 +136,21 @@ public partial class CombatComponent : Node
 	public List<ulong> CheckCircleHit(Vector3 center, float radius, float damage, float knockbackForce, float knockbackUpward)
 	{
 		_lastHitTargets.Clear();
-		
 		if (_simulation == null) return _lastHitTargets;
-		
-		var entities = new List<SpellResolver.EntityData>();
-		foreach (var kvp in _simulation.Entities)
+
+		var entities = BuildEntityList();
+		var hb = new SlopArena.Shared.Hitbox
 		{
-			entities.Add(new SpellResolver.EntityData
-			{
-				Id = kvp.Key,
-				PosX = kvp.Value.pos.X,
-				PosY = kvp.Value.pos.Y,
-				PosZ = kvp.Value.pos.Z,
-				Radius = kvp.Value.radius,
-				Active = kvp.Value.active
-			});
-		}
-		
-		var results = SpellResolver.ResolveCircleHit(
-			center.X, center.Y, center.Z,
-			radius,
-			damage, knockbackForce, knockbackUpward,
-			_entityId,
-			entities
-		);
-		
+			X = center.X, Y = center.Y, Z = center.Z,
+			Radius = radius,
+			DurationTicks = 5,
+			Damage = damage,
+			KnockbackForce = knockbackForce,
+			KnockbackUpward = knockbackUpward,
+			OwnerId = _entityId,
+		};
+		SpellResolver.Spawn(hb);
+		var results = SpellResolver.Tick(entities);
 		foreach (var hit in results)
 		{
 			_lastHitTargets.Add(hit.TargetEntityId);
@@ -447,5 +423,24 @@ public partial class CombatComponent : Node
 	public Vector3 GetOwnerPosition()
 	{
 		return _owner?.GlobalPosition ?? Vector3.Zero;
+	}
+
+	private List<SpellResolver.EntityData> BuildEntityList()
+	{
+		var entities = new List<SpellResolver.EntityData>();
+		if (_simulation == null) return entities;
+		foreach (var kvp in _simulation.Entities)
+		{
+			entities.Add(new SpellResolver.EntityData
+			{
+				Id = kvp.Key,
+				PosX = kvp.Value.pos.X,
+				PosY = kvp.Value.pos.Y,
+				PosZ = kvp.Value.pos.Z,
+				Radius = kvp.Value.radius,
+				Active = kvp.Value.active
+			});
+		}
+		return entities;
 	}
 }

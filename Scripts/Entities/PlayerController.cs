@@ -540,6 +540,9 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.IsInKnockback()) return;
 		if (_movementComponent.State.AnimLockTicks > 0) return;
 
+		// Block ALL ability execution while an attack animation plays
+		if (_animationController.IsAttacking()) return;
+
 		var ability = _charDef.GetSlotAbility(slotIndex, airborne);
 
 		// Cooldown check
@@ -562,11 +565,14 @@ public partial class PlayerController : CharacterBody3D
 			ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
 		}
 
-		// Play attack animation
+		// Play attack animation (use SelfLockTicks for duration, not animation length)
 		int animStage = (stages != null && stages.Length > 0)
 			? Math.Clamp(_movementComponent.State.ComboStage - 1, 0, stages.Length - 1)
 			: 0;
-		_animationController.PlayAttack(ability.AnimationNames, animStage, slotIndex);
+		float attackDurationSec = 0.0f;
+		if (stages != null && animStage < stages.Length)
+			attackDurationSec = stages[animStage].SelfLockTicks / 60f;
+		_animationController.PlayAttack(ability.AnimationNames, animStage, slotIndex, attackDurationSec);
 
 		// ── Step 2: Special effects ──
 		if (ability.SpecialEffectKeys != null)
@@ -647,56 +653,24 @@ public partial class PlayerController : CharacterBody3D
 			});
 		}
 
-		System.Collections.Generic.List<SpellResolver.HitResult> results;
-
-		switch (stage.Shape)
+		// Spawn a basic melee hitbox in front of the attacker
+		Vector3 hitDir = lungeDir;
+		Vector3 hitPos = pos + hitDir * 2.0f + Vector3.Up * 1.0f;
+		var hb = new SlopArena.Shared.Hitbox
 		{
-			case AttackShape.CircleAOE:
-				results = SpellResolver.ResolveCircleHit(
-					pos.X, pos.Y, pos.Z,
-					stage.Radius,
-					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
-					pid, entities);
-				break;
+			X = hitPos.X, Y = hitPos.Y, Z = hitPos.Z,
+			Radius = 1.5f,
+			DurationTicks = 5,
+			Damage = stage.Damage,
+			KnockbackForce = stage.KnockbackForce,
+			KnockbackUpward = stage.KnockbackUpward,
+			StunTicks = stage.StunTicks,
+			OwnerId = pid,
+		};
+		SpellResolver.Spawn(hb);
 
-			case AttackShape.MeleeCone:
-				results = SpellResolver.ResolveConeHit(
-					pos.X, pos.Y, pos.Z,
-					fwd.X, fwd.Z,
-					stage.HitAngleDeg * MathF.PI / 180f,
-					stage.Range,
-					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
-					pid, entities);
-				break;
-
-			case AttackShape.Beam:
-				results = SpellResolver.ResolveConeHit(
-					pos.X, pos.Y, pos.Z,
-					fwd.X, fwd.Z,
-					3f * MathF.PI / 180f,
-					stage.Range,
-					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
-					pid, entities);
-				break;
-
-			case AttackShape.Projectile:
-				results = SpellResolver.ResolveConeHit(
-					pos.X, pos.Y, pos.Z,
-					fwd.X, fwd.Z,
-					15f * MathF.PI / 180f,
-					stage.Range,
-					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
-					pid, entities);
-				break;
-
-			default:
-				results = SpellResolver.ResolveCircleHit(
-					pos.X, pos.Y, pos.Z,
-					stage.Range,
-					stage.Damage, stage.KnockbackForce, stage.KnockbackUpward,
-					pid, entities);
-				break;
-		}
+		// Resolve active hitboxes against entities this tick
+		var results = SpellResolver.Tick(entities);
 
 		// Apply hits — knockback is scaled by damage% in Simulation.ApplyKnockback
 		foreach (var hit in results)
@@ -822,29 +796,28 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		// Load the 2-handed sword
-		if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed_color.fbx"))
+		// Load the 2-handed sword (GLTF) — attached via BoneAttachment3D to hand bone
+		if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed_color.gltf"))
 		{
-			// Try the non-colored variant
-			if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed.fbx")) return;
+			if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed.gltf")) return;
 		}
 
-		var sword = GD.Load<PackedScene>("res://assets/characters/weapons/sword_2handed_color.fbx")?.Instantiate<Node3D>();
+		var sword = GD.Load<PackedScene>("res://assets/characters/weapons/sword_2handed_color.gltf")?.Instantiate<Node3D>();
 		if (sword == null) return;
 
 		sword.Name = "Weapon_Sword2H";
-		sword.Scale = new Vector3(2.0f, 2.0f, 2.0f);
+		sword.Scale = Vector3.One; // model scale applies to children
 
-		// Use BoneAttachment3D to follow the bone
+		// Use BoneAttachment3D to follow the hand bone
 		var attachment = new BoneAttachment3D();
 		attachment.Name = "WeaponAttachment_" + foundBone;
 		attachment.BoneName = foundBone;
 		skeleton.AddChild(attachment);
 		attachment.AddChild(sword);
 
-		// Adjust sword position relative to the hand (fine-tune later)
+		// Adjust sword rotation (greatsword GLTF points blade down by default)
+		sword.Rotation = new Vector3(0f, 0f, Mathf.DegToRad(90f));
 		sword.Position = new Vector3(0f, 0f, 0f);
-		sword.Rotation = new Vector3(0f, 0f, 0f);
 
 		GD.Print($"KayKit: attached sword to bone '{foundBone}'");
 	}

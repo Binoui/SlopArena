@@ -132,9 +132,9 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 5f, Range = 2.5f, HitAngleDeg = 45f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 12f, StunTicks = 12, SelfLockTicks = 8, ChainWindowTicks = 42 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 7f, Range = 3f, HitAngleDeg = 45f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 18f, StunTicks = 18, SelfLockTicks = 10, ChainWindowTicks = 42 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 12f, Range = 4f, HitAngleDeg = 45f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 24f, StunTicks = 24, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 5f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 12f, StunTicks = 12, SelfLockTicks = 8, ChainWindowTicks = 42 },
+                        new() { Damage = 7f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 18f, StunTicks = 18, SelfLockTicks = 10, ChainWindowTicks = 42 },
+                        new() { Damage = 12f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 24f, StunTicks = 24, SelfLockTicks = 12, ChainWindowTicks = 0 },
                     }
                 },
 
@@ -145,11 +145,11 @@ namespace SlopArena.Shared
                     CooldownTicks = 20,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 4f, HitAngleDeg = 45f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 20f, StunTicks = 18, SelfLockTicks = 18, ChainWindowTicks = 0 },
+                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 20f, StunTicks = 18, SelfLockTicks = 18, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 15f, Range = 5f, HitAngleDeg = 45f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 28f, StunTicks = 24, SelfLockTicks = 30, ChainWindowTicks = 0 },
+                        new() { Damage = 15f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 28f, StunTicks = 24, SelfLockTicks = 30, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18, // 0.3s
                 },
@@ -161,7 +161,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3f, HitAngleDeg = 45f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 14f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 14f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "VanguardShieldBash" },
                 },
@@ -223,9 +223,9 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 4f, Range = 2f, HitAngleDeg = 40f, KnockbackForce = 2f, KnockbackUpward = 1f, LungeForce = 10f, StunTicks = 10, SelfLockTicks = 6, ChainWindowTicks = 36 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 2.5f, HitAngleDeg = 40f, KnockbackForce = 4f, KnockbackUpward = 2f, LungeForce = 16f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 36 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 3f, HitAngleDeg = 40f, KnockbackForce = 12f, KnockbackUpward = 4f, LungeForce = 22f, StunTicks = 20, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 2f, KnockbackUpward = 1f, LungeForce = 10f, StunTicks = 10, SelfLockTicks = 6, ChainWindowTicks = 36 },
+                        new() { Damage = 6f, KnockbackForce = 4f, KnockbackUpward = 2f, LungeForce = 16f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 36 },
+                        new() { Damage = 10f, KnockbackForce = 12f, KnockbackUpward = 4f, LungeForce = 22f, StunTicks = 20, SelfLockTicks = 10, ChainWindowTicks = 0 },
                     }
                 },
 
@@ -235,11 +235,11 @@ namespace SlopArena.Shared
                     CooldownTicks = 15,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 50f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 13f, Range = 4.5f, HitAngleDeg = 50f, KnockbackForce = 25f, KnockbackUpward = 10f, LungeForce = 26f, StunTicks = 22, SelfLockTicks = 26, ChainWindowTicks = 0 },
+                        new() { Damage = 13f, KnockbackForce = 25f, KnockbackUpward = 10f, LungeForce = 26f, StunTicks = 22, SelfLockTicks = 26, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18,
                 },
@@ -251,7 +251,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 60,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.Projectile, Damage = 8f, Range = 35f * 2.5f, KnockbackForce = 5f, KnockbackUpward = 3f, Radius = 1.2f, SelfLockTicks = 4, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 3f, SelfLockTicks = 4, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "WraithViperShot" },
                 },
@@ -263,7 +263,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.SelfBuff, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                        new() { SelfLockTicks = 6, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "WraithShadowStep" },
                 },
@@ -275,7 +275,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.Projectile, Damage = 5f, Range = 50f * 1.5f, KnockbackForce = 3f, KnockbackUpward = 2f, Radius = 0.8f, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                        new() { Damage = 5f, KnockbackForce = 3f, KnockbackUpward = 2f, SelfLockTicks = 8, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "WraithRapidFire" },
                 },
@@ -321,9 +321,9 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 4f, Range = 2.8f, HitAngleDeg = 50f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 10f, StunTicks = 10, SelfLockTicks = 8, ChainWindowTicks = 36 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3.2f, HitAngleDeg = 50f, KnockbackForce = 5f, KnockbackUpward = 3f, LungeForce = 16f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 36 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 3.8f, HitAngleDeg = 50f, KnockbackForce = 14f, KnockbackUpward = 5f, LungeForce = 22f, StunTicks = 20, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 10f, StunTicks = 10, SelfLockTicks = 8, ChainWindowTicks = 36 },
+                        new() { Damage = 6f, KnockbackForce = 5f, KnockbackUpward = 3f, LungeForce = 16f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 36 },
+                        new() { Damage = 10f, KnockbackForce = 14f, KnockbackUpward = 5f, LungeForce = 22f, StunTicks = 20, SelfLockTicks = 12, ChainWindowTicks = 0 },
                     }
                 },
 
@@ -333,11 +333,11 @@ namespace SlopArena.Shared
                     CooldownTicks = 15,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.CircleAOE, Damage = 8f, Range = 0f, HitAngleDeg = 0f, Radius = 3.5f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.CircleAOE, Damage = 14f, Range = 0f, HitAngleDeg = 0f, Radius = 5f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 0f, StunTicks = 22, SelfLockTicks = 28, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 0f, StunTicks = 22, SelfLockTicks = 28, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18,
                 },
@@ -349,7 +349,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 60,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.Projectile, Damage = 12f, Range = 40f * 2.5f, KnockbackForce = 8f, KnockbackUpward = 3f, Radius = 1.2f, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                        new() { Damage = 12f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 6, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "ChannelerFrostbolt" },
                 },
@@ -361,7 +361,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 5f, HitAngleDeg = 60f, KnockbackForce = 3f, KnockbackUpward = 1f, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 3f, KnockbackUpward = 1f, SelfLockTicks = 12, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "ChannelerDragonsBreath" },
                 },
@@ -373,7 +373,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.Beam, Damage = 15f, Range = 12f, KnockbackForce = 12f, KnockbackUpward = 5f, Radius = 2f, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                        new() { Damage = 15f, KnockbackForce = 12f, KnockbackUpward = 5f, SelfLockTicks = 8, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "ChannelerIceLance" },
                 },
@@ -417,12 +417,13 @@ namespace SlopArena.Shared
                 LMB = new AbilityData
                 {
                     Name = "Royal Combo",
+                    AnimationNames = new[] { "attack_2h_slice", "attack_2h_chop", "attack_2h_spin" },
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 2.8f, HitAngleDeg = 45f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 12f, StunTicks = 12, SelfLockTicks = 8, ChainWindowTicks = 42 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3.2f, HitAngleDeg = 45f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 18f, StunTicks = 18, SelfLockTicks = 10, ChainWindowTicks = 42 },
-                        new() { Shape = AttackShape.MeleeCone, Damage = 12f, Range = 3.8f, HitAngleDeg = 45f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 24f, StunTicks = 24, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 12f, StunTicks = 12, SelfLockTicks = 60, ChainWindowTicks = 80 },
+                        new() { Damage = 6f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 18f, StunTicks = 18, SelfLockTicks = 60, ChainWindowTicks = 80 },
+                        new() { Damage = 12f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 24f, StunTicks = 24, SelfLockTicks = 75, ChainWindowTicks = 90 },
                     }
                 },
 
@@ -430,10 +431,11 @@ namespace SlopArena.Shared
                 AirLMB = new AbilityData
                 {
                     Name = "Rising Slash",
+                    AnimationNames = new[] { "attack_2h_slice" },
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
                     }
                 },
 
@@ -441,14 +443,15 @@ namespace SlopArena.Shared
                 RMB = new AbilityData
                 {
                     Name = "Heavy Sunder",
+                    AnimationNames = new[] { "attack_2h_chop" },
                     CooldownTicks = 15,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 4f, HitAngleDeg = 45f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 20f, StunTicks = 18, SelfLockTicks = 18, ChainWindowTicks = 0 },
+                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 20f, StunTicks = 18, SelfLockTicks = 18, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 15f, Range = 5f, HitAngleDeg = 45f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 28f, StunTicks = 24, SelfLockTicks = 30, ChainWindowTicks = 0 },
+                        new() { Damage = 15f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 28f, StunTicks = 24, SelfLockTicks = 30, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18,
                 },
@@ -457,34 +460,35 @@ namespace SlopArena.Shared
                 AirRMB = new AbilityData
                 {
                     Name = "Aerial Slam",
+                    AnimationNames = new[] { "attack_2h_chop" },
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
                     }
                 },
 
-                // Q — Blinding Light: frontal cone stun (was King Arthur's R)
+                // Q — Blinding Light: frontal cone stun
                 Q = new AbilityData
                 {
                     Name = "Blinding Light",
-                    AnimationNames = new[] { "great_sword_high_spin_attack" },
+                    AnimationNames = new[] { "attack_2h_spin" },
                     CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 12f, Range = 4.5f, HitAngleDeg = 35f, KnockbackForce = 10f, KnockbackUpward = 5f, LungeForce = 0f, StunTicks = 75, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                        new() { Damage = 12f, KnockbackForce = 10f, KnockbackUpward = 5f, LungeForce = 0f, StunTicks = 75, SelfLockTicks = 14, ChainWindowTicks = 0 },
                     }
                 },
 
-                // E — Lion's Advance: gap closer lunge strike (replaces Soaring Edge)
+                // E — Lion's Advance: gap closer lunge strike
                 E = new AbilityData
                 {
                     Name = "Lion's Advance",
-                    AnimationNames = new[] { "great_sword_slide_attack" },
+                    AnimationNames = new[] { "attack_2h_stab" },
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.MeleeCone, Damage = 10f, Range = 5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 35f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                        new() { Damage = 10f, KnockbackForce = 15f, KnockbackUpward = 5f, LungeForce = 35f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
                     }
                 },
 
@@ -492,11 +496,11 @@ namespace SlopArena.Shared
                 R = new AbilityData
                 {
                     Name = "Knight's Resolve",
-                    AnimationNames = new[] { "great_sword_blocking" },
+                    AnimationNames = new[] { "block_idle" },
                     CooldownTicks = 240,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.SelfBuff, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                        new() { SelfLockTicks = 6, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "KnightKnightsResolve" },
                 },
@@ -505,11 +509,11 @@ namespace SlopArena.Shared
                 F = new AbilityData
                 {
                     Name = "Might of Excalibur",
-                    AnimationNames = new[] { "great_sword_jump_attack" },
+                    AnimationNames = new[] { "attack_2h_chop" },
                     CooldownTicks = 420,
                     Stages = new AttackStage[]
                     {
-                        new() { Shape = AttackShape.CircleAOE, Damage = 20f, Range = 0f, Radius = 5f, KnockbackForce = 25f, KnockbackUpward = 10f, LungeForce = 0f, StunTicks = 30, SelfLockTicks = 20, ChainWindowTicks = 0 },
+                        new() { Damage = 20f, KnockbackForce = 25f, KnockbackUpward = 10f, LungeForce = 0f, StunTicks = 30, SelfLockTicks = 20, ChainWindowTicks = 0 },
                     },
                     SpecialEffectKeys = new[] { "KnightMightOfExcalibur" },
                 },
