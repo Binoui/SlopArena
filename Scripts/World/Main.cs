@@ -17,6 +17,7 @@ public partial class Main : Node3D
 
 	// Cercle de ciblage (WoW-style ring under target)
 	private MeshInstance3D? _targetRing;
+	private DebugHitboxDraw? _debugDraw;
 
 	public override async void _Ready()
 	{
@@ -45,6 +46,10 @@ public partial class Main : Node3D
 
 		// Now spawn the match
 		SpawnMatch();
+
+		// Global debug hitbox/hurtbox visualization
+		_debugDraw = new DebugHitboxDraw { Name = "DebugHitboxDraw" };
+		AddChild(_debugDraw);
 	}
 
 	private async void SpawnMatch()
@@ -447,6 +452,19 @@ public partial class Main : Node3D
 			{
 				_targetRing.Visible = false;
 			}
+		}
+
+		// Debug: draw hitboxes (red) and hurtboxes (blue) — world-space
+		if (_debugDraw != null && _simulation != null)
+		{
+			var hitboxes = SpellResolver.GetActiveHitboxes();
+			var hurtboxes = new System.Collections.Generic.List<(float, float, float, float)>();
+			foreach (var kvp in _simulation.Entities)
+			{
+				if (kvp.Value.active)
+					hurtboxes.Add((kvp.Value.pos.X, kvp.Value.pos.Y, kvp.Value.pos.Z, kvp.Value.radius));
+			}
+			_debugDraw.UpdateHitboxes(hitboxes, hurtboxes, Vector3.Zero);
 		}
 	}
 	

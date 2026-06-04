@@ -70,9 +70,9 @@ public partial class AnimationController : Node
 	/// stageIndex: which stage of the combo to play (0 for single-stage abilities).
 	/// slotIndex: ability slot (0-5), used for fallback naming.
 	/// </summary>
-	public void PlayAttack(string[]? animNames, int stageIndex, int slotIndex)
+	public void PlayAttack(string[]? animNames, int stageIndex, int slotIndex, float durationSec = 0.5f)
 	{
-		_attackTimer = 0.5f; // safety timeout
+		_attackTimer = durationSec; // combat-measured duration, not animation length
 
 		string targetAnim;
 

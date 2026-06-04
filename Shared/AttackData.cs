@@ -3,28 +3,13 @@ using System;
 namespace SlopArena.Shared
 {
     /// <summary>
-    /// Shape of an attack hitbox. All resolved via pure math in CombatMath.cs — no Godot physics.
-    /// </summary>
-    public enum AttackShape : byte
-    {
-        MeleeCone,   // Cone from player position in facing direction
-        CircleAOE,   // Circle centered on player or target point
-        Projectile,  // Spawns a projectile (handled by CombatComponent)
-        Beam,        // Continuous beam (client visual + server tick check)
-        SelfBuff,    // Applies a status to self, no hitbox
-    }
-
-    /// <summary>
     /// One stage of an ability. A simple ability has 1 stage.
     /// A combo ability (like LMB) has N stages chained by ChainWindowTicks.
+    /// Hitboxes are spawned by the ability code, not defined in AttackStage.
     /// </summary>
     public struct AttackStage
     {
-        public AttackShape Shape;
         public float Damage;
-        public float Range;            // MeleeCone range / Projectile max distance
-        public float HitAngleDeg;      // MeleeCone: half-angle in degrees
-        public float Radius;           // CircleAOE / Projectile hit radius
         public float KnockbackForce;
         public float KnockbackUpward;
         public float LungeForce;       // Forward burst during attack
@@ -36,10 +21,9 @@ namespace SlopArena.Shared
     /// <summary>
     /// Full definition of one ability slot (0-5).
     /// Stages.Length = 1 for single hit, N for combo chains.
-    /// SpecialEffectKeys reference methods in ClassAbilities for
-    /// effects that stages can't express (teleport, self-buff, delayed AoE, status apply).
-    /// AnimationNames per stage: "punch", "kick", "supernova" etc.
-    /// Null/empty = use generic fallback ("attack_{slot}_{stage}" / "cast_{slot}").
+    /// SpecialEffectKeys reference methods in AbilityRegistry for
+    /// effects that stages can't express (hitbox spawning, teleport, etc.).
+    /// AnimationNames per stage: "attack_2h_slice", "spell_cast", etc.
     /// </summary>
     public struct AbilityData
     {
@@ -52,14 +36,13 @@ namespace SlopArena.Shared
         /// <summary>Ticks to hold before charged version fires.</summary>
         public ushort ChargeHoldTicks;
 
-        /// <summary>Special effects (teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
+        /// <summary>Special effects (hitbox spawning, teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
         public string[]? SpecialEffectKeys;
 
         /// <summary>
-        /// Animation name for each stage (or one element for single-stage / no-stage).
-        /// Each character has their own animation FBX files, loaded by AnimationController.
-        /// Example: LMB = ["punch_jab", "punch_cross", "punch_uppercut"]
-        /// Example: Q = ["supernova_start"] (for special effect with no stages)
+        /// Animation name for each stage.
+        /// Each character defines their own animation keys.
+        /// Example: LMB = ["attack_2h_slice", "attack_2h_chop", "attack_2h_spin"]
         /// </summary>
         public string[]? AnimationNames;
     }

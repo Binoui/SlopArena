@@ -3,187 +3,137 @@ using System.Collections.Generic;
 
 namespace SlopArena.Shared
 {
-	/// <summary>
-	/// Pure C# spell resolution logic.
-	/// No Godot dependency. Can be used by Server, Client, or AI bots.
-	/// 
-	/// Resolves spell effects against a list of entities:
-	/// - Projectile hit detection (line-circle intersection)
-	/// - Cone AoE (melee slash, shockwave)
-	/// - Circle AoE (explosion, ground effects)
-	/// - Knockback calculation
-	/// </summary>
-	public static class SpellResolver
-	{
-		/// <summary>
-		/// Result of a single spell resolution.
-		/// </summary>
-		public struct HitResult
-		{
-			public ulong TargetEntityId;
-			public float Damage;
-			public float KnockbackX;
-			public float KnockbackY;
-			public float KnockbackZ;
-		}
-		
-		/// <summary>
-		/// Entity data needed for hit detection.
-		/// </summary>
-		public struct EntityData
-		{
-			public ulong Id;
-			public float PosX;
-			public float PosY;
-			public float PosZ;
-			public float Radius;
-			public bool Active;
-		}
-		
-		/// <summary>
-		/// Resolve a projectile hit against entities.
-		/// Checks line segment intersection from oldPos to newPos.
-		/// Returns the first entity hit, or null.
-		/// </summary>
-		public static HitResult? ResolveProjectileHit(
-			float oldX, float oldZ,
-			float newX, float newZ,
-			float originX, float originY, float originZ,
-			float damage, float knockbackForce, float knockbackUpward,
-			ulong casterEntityId,
-			List<EntityData> entities)
-		{
-			foreach (var entity in entities)
-			{
-				if (!entity.Active || entity.Id == casterEntityId)
-					continue;
-				
-				bool intersects = CombatMath.LineIntersectsCircle(
-					oldX, oldZ,
-					newX, newZ,
-					entity.PosX, entity.PosZ,
-					entity.Radius
-				);
-				
-				if (intersects)
-				{
-				CombatMath.CalculateKnockback(
-					entity.PosX, entity.PosY, entity.PosZ,
-					originX, originY, originZ,
-					knockbackForce, knockbackUpward,
-					out float kbX, out float kbY, out float kbZ
-				);
-					
-					return new HitResult
-					{
-						TargetEntityId = entity.Id,
-						Damage = damage,
-						KnockbackX = kbX,
-						KnockbackY = kbY,
-						KnockbackZ = kbZ
-					};
-				}
-			}
-			
-			return null;
-		}
-		
-		/// <summary>
-		/// Resolve a circle AoE hit (explosion, ground effect).
-		/// Returns all entities hit.
-		/// </summary>
-		public static List<HitResult> ResolveCircleHit(
-			float centerX, float centerY, float centerZ,
-			float radius,
-			float damage, float knockbackForce, float knockbackUpward,
-			ulong casterEntityId,
-			List<EntityData> entities)
-		{
-			var results = new List<HitResult>();
-			
-			foreach (var entity in entities)
-			{
-				if (!entity.Active || entity.Id == casterEntityId)
-					continue;
-				
-				bool inRange = CombatMath.IsInCircle(
-					entity.PosX, entity.PosY, entity.PosZ,
-					centerX, centerY, centerZ,
-					radius + entity.Radius
-				);
-				
-				if (inRange)
-				{
-					CombatMath.CalculateKnockback(
-						entity.PosX, entity.PosY, entity.PosZ,
-						centerX, centerY, centerZ,
-						knockbackForce, knockbackUpward,
-						out float kbX, out float kbY, out float kbZ
-					);
-					
-					results.Add(new HitResult
-					{
-						TargetEntityId = entity.Id,
-						Damage = damage,
-						KnockbackX = kbX,
-						KnockbackY = kbY,
-						KnockbackZ = kbZ
-					});
-				}
-			}
-			
-			return results;
-		}
-		
-		/// <summary>
-		/// Resolve a cone AoE hit (melee slash, shockwave).
-		/// Returns all entities hit.
-		/// </summary>
-		public static List<HitResult> ResolveConeHit(
-			float originX, float originY, float originZ,
-			float dirX, float dirZ,
-			float halfAngleRad,
-			float range,
-			float damage, float knockbackForce, float knockbackUpward,
-			ulong casterEntityId,
-			List<EntityData> entities)
-		{
-			var results = new List<HitResult>();
-			
-			foreach (var entity in entities)
-			{
-				if (!entity.Active || entity.Id == casterEntityId)
-					continue;
-				
-				bool inCone = CombatMath.IsInCone(
-					entity.PosX, entity.PosY, entity.PosZ,
-					originX, originY, originZ,
-					dirX, dirZ,
-					halfAngleRad,
-					range + entity.Radius
-				);
-				
-				if (inCone)
-				{
-					CombatMath.CalculateKnockback(
-						entity.PosX, entity.PosY, entity.PosZ,
-						originX, originY, originZ,
-						knockbackForce, knockbackUpward,
-						out float kbX, out float kbY, out float kbZ
-					);
-					
-					results.Add(new HitResult
-					{
-						TargetEntityId = entity.Id,
-						Damage = damage,
-						KnockbackX = kbX,
-						KnockbackY = kbY,
-						KnockbackZ = kbZ
-					});
-				}
-			}
-			
-			return results;
-		}
-	}
+    /// <summary>
+    /// Pure C# hitbox management — no Godot dependency.
+    /// Spawn hitboxes via Spawn(), then call Tick() each server tick.
+    /// Handles: movement (projectiles), sphere-sphere collision, aging, knockback.
+    /// </summary>
+    public static class SpellResolver
+    {
+        private static List<Hitbox> _hitboxes = new();
+
+        /// <summary>
+        /// Result of a single hitbox-entity collision.
+        /// </summary>
+        public struct HitResult
+        {
+            public ulong TargetEntityId;
+            public float Damage;
+            public float KnockbackX;
+            public float KnockbackY;
+            public float KnockbackZ;
+            public ushort StunTicks;
+        }
+
+        /// <summary>
+        /// Entity data needed for hit detection.
+        /// </summary>
+        public struct EntityData
+        {
+            public ulong Id;
+            public float PosX;
+            public float PosY;
+            public float PosZ;
+            public float Radius;
+            public bool Active;
+        }
+
+        /// <summary>
+        /// Spawn a new hitbox. Call this from ability code.
+        /// </summary>
+        public static void Spawn(Hitbox hb)
+        {
+            hb.Active = true;
+            hb.AgeTicks = 0;
+            _hitboxes.Add(hb);
+        }
+
+        /// <summary>
+        /// Clear all hitboxes (e.g., on match reset).
+        /// </summary>
+        public static void Clear() => _hitboxes.Clear();
+
+        /// <summary>
+        /// Get a snapshot of all active hitboxes (for debug visualization).
+        /// </summary>
+        public static List<Hitbox> GetActiveHitboxes()
+        {
+            var snapshot = new List<Hitbox>(_hitboxes.Count);
+            foreach (var hb in _hitboxes)
+            {
+                if (hb.Active) snapshot.Add(hb);
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Process one tick: move projectiles, check collisions, age hitboxes.
+        /// Returns all hits this tick (one per entity, first hitbox to connect wins).
+        /// Already-hit entities in this tick are skipped (no double-hit).
+        /// </summary>
+        public static List<HitResult> Tick(List<EntityData> entities)
+        {
+            var results = new List<HitResult>();
+            var hitThisTick = new HashSet<ulong>();
+
+            for (int i = _hitboxes.Count - 1; i >= 0; i--)
+            {
+                var hb = _hitboxes[i];
+                if (!hb.Active) { _hitboxes.RemoveAt(i); continue; }
+
+                // Move projectile
+                hb.X += hb.VX * Simulation.TickDt;
+                hb.Y += hb.VY * Simulation.TickDt;
+                hb.Z += hb.VZ * Simulation.TickDt;
+
+                // Check collision against each entity
+                foreach (var entity in entities)
+                {
+                    if (!entity.Active || entity.Id == hb.OwnerId) continue;
+                    if (hitThisTick.Contains(entity.Id)) continue; // already hit this tick
+
+                    float dx = entity.PosX - hb.X;
+                    float dy = entity.PosY - hb.Y;
+                    float dz = entity.PosZ - hb.Z;
+                    float distSq = dx * dx + dy * dy + dz * dz;
+                    float combinedRadius = hb.Radius + entity.Radius;
+
+                    if (distSq <= combinedRadius * combinedRadius)
+                    {
+                        // Hit! Calculate knockback direction
+                        float dist = MathF.Sqrt(distSq);
+                        float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
+                        float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : hb.KnockbackForce;
+
+                        results.Add(new HitResult
+                        {
+                            TargetEntityId = entity.Id,
+                            Damage = hb.Damage,
+                            KnockbackX = kbX,
+                            KnockbackY = hb.KnockbackUpward,
+                            KnockbackZ = kbZ,
+                            StunTicks = hb.StunTicks,
+                        });
+
+                        hitThisTick.Add(entity.Id);
+                        hb.Active = false; // one-hit per hitbox
+                        break;
+                    }
+                }
+
+                // Age / expire
+                hb.AgeTicks++;
+                if (hb.AgeTicks >= hb.DurationTicks || !hb.Active)
+                {
+                    _hitboxes.RemoveAt(i);
+                }
+                else
+                {
+                    _hitboxes[i] = hb; // write back velocity/age changes
+                }
+            }
+
+            return results;
+        }
+    }
 }
