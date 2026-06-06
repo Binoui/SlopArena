@@ -45,6 +45,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private MovementComponent _movementComponent = null!;
 	private AnimationController _animationController = null!;
+	private StateMachine? _fsm;
 	private WowCamera? _wowCamera;
 	private CombatComponent? _combatComponent;
 	private MeshInstance3D? _firstMesh;
@@ -104,6 +105,7 @@ public partial class PlayerController : CharacterBody3D
 	public float GetVelZ() => Velocity.Y;
 	public CombatComponent? GetCombatComponent() => _combatComponent;
 	public float GetDashCooldown() => _movementComponent.DashCooldownRemaining;
+	public Vector3 MoveDirection => _moveDirection;
 
 	public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef)
 	{
@@ -203,7 +205,19 @@ public partial class PlayerController : CharacterBody3D
 				_animationController.SetupAnimationTree(animTree);
 				GD.Print($"{_playerClass}: AnimationTree connected");
 			}
+
+			// Find FSM in the model scene (manki.tscn)
+			_fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM");
+			if (_fsm == null)
+				GD.PrintErr($"{_playerClass}: No FSM node found in model scene — add StateMachine node named 'FSM'");
 		}
+
+		// Initialize StateMachine deferred (needs AnimationTree to settle in tree)
+		Callable.From(() =>
+		{
+			_fsm?.Initialize(this, _movementComponent);
+			_fsm?.TransitionTo("idle");
+		}).CallDeferred();
 
 		// Hurtbox
 		_hurtbox = new Hurtbox { Name = "Hurtbox", OwnerEntity = this };
@@ -223,7 +237,7 @@ public partial class PlayerController : CharacterBody3D
 			// Scale knockback by damage% and apply
 			_movementComponent.ApplyKnockback(knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
 
-			_animationController.EndAction();
+			_fsm?.TransitionTo("idle");
 		};
 
 		// Ground arrow indicator
@@ -266,19 +280,8 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (_debugLabel == null) return;
 
-		var tree = _playerModel?.GetNodeOrNull<AnimationTree>("AnimationTree");
-		if (tree == null) return;
-
-		float finalBlend = 0f;
-		try { finalBlend = (float)tree.Get("parameters/final/blend_amount"); } catch { }
-
-		float locoBlend = 0f;
-		try { locoBlend = (float)tree.Get("parameters/locomotion/blend_amount"); } catch { }
-
-		string actionState = "?";
-		try { actionState = tree.Get("parameters/action/playback").ToString(); } catch { }
-
-		_debugLabel.Text = $"state: {actionState}  final: {finalBlend:F2}  loco: {locoBlend:F2}  active: {_animationController.IsActionActive()}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
+		string fsmState = _fsm?.CurrentStateName ?? "?";
+		_debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
 	}
 
 	// ==========================================
@@ -491,7 +494,7 @@ public partial class PlayerController : CharacterBody3D
 		// Dash (ground OR air)
 		if (input.Dash && _movementComponent.State.AnimLockTicks <= 0)
 		{
-			_animationController.EndAction();
+			_fsm?.TransitionTo("idle");
 			_movementComponent.StartDash(_moveDirection.X, _moveDirection.Z);
 		}
 
@@ -510,41 +513,8 @@ public partial class PlayerController : CharacterBody3D
 		// Update ground arrow
 		UpdateGroundArrow(_snappedInputDirection.LengthSquared() > 0.001f);
 
-		// Animation — drive AnimationTree (actions: jump/fall/LMB)
-		_animationController.ProcessActionTimer(dt);
-
-		// Jump detection (ground jump + double jump mid-air)
-		if (Input.IsActionJustPressed("jump"))
-		{
-			// Delegate jump-count check to MovementComponent — animation follows input
-			_animationController.StartAction("jump");
-		}
-
-		// Fall detection: airborne, falling downward, not already in a StateMachine action
-		if (!IsOnFloor() && Velocity.Y < -2f && !_animationController.IsActionActive())
-		{
-			_animationController.StartAction("fall");
-		}
-
-		// Landing: any action ends when grounded (only if falling, not jumping)
-		if (IsOnFloor() && Velocity.Y <= 0f && _animationController.IsActionActive())
-		{
-			_animationController.EndAction();
-		}
-
-		// Locomotion blend (idle↔run) only when no action active
-		if (!_animationController.IsActionActive())
-		{
-			float speed01 = 0f;
-			if (_movementComponent.CurrentState == ActionState.Dashing)
-				speed01 = 1f;
-			else
-			{
-				if (hVel.Length() > 1f)
-					speed01 = Mathf.Clamp(hVel.Length() / 14f, 0f, 1f);
-			}
-			_animationController.ProcessLocomotion(speed01);
-		}
+		// Animation handled by FSM states (idle/run/jump/fall/landing)
+		// FSM runs in _Process — no manual Travel calls needed here
 
 		OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
 	}
@@ -628,9 +598,9 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.IsInKnockback()) return;
 		if (_movementComponent.State.AnimLockTicks > 0) return;
 
-		// Slot 0 (LMB) chains into next combo stage via AnimationTree StateMachine.
-		// Other slots are blocked during an active attack.
-		if (slotIndex != 0 && _animationController.IsActionActive()) return;
+		// Slot 0 (LMB) chains into next combo stage.
+		// Other slots are blocked during an active FSM attack state (TODO).
+		//if (slotIndex != 0 && _animationController.IsActionActive()) return;
 
 		var ability = _charDef.GetSlotAbility(slotIndex, airborne);
 
@@ -663,9 +633,8 @@ public partial class PlayerController : CharacterBody3D
 			: null;
 		if (animName != null)
 		{
-			// Enter LMB state in action machine + chain to correct stage
-			_animationController.StartAction("LMB");
-			_animationController.RequestSubAction("LMB", animName);
+			// TODO: route through FSM AttackState
+			_fsm?.TransitionTo("idle");
 		}
 
 		// ── Step 2: Special effects ──

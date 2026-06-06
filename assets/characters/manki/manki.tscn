@@ -2,112 +2,65 @@
 
 [ext_resource type="PackedScene" uid="uid://cm4uo70frn7k4" path="res://assets/characters/manki/anim_monkey.glb" id="1_g38p2"]
 [ext_resource type="AnimationNodeStateMachine" uid="uid://vrdfi6dscwlu" path="res://animations/lmb_state.tres" id="2_foqek"]
+[ext_resource type="Script" uid="uid://cfeofiqt7wjb4" path="res://Scripts/Animation/StateMachine.cs" id="3_jyjdg"]
+[ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="4_t77cg"]
+[ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="5_xfoba"]
+[ext_resource type="Script" uid="uid://do0y2yjskp7fg" path="res://Scripts/Animation/States/JumpState.cs" id="6_gs8io"]
+[ext_resource type="Script" uid="uid://di6tcnes53uc8" path="res://Scripts/Animation/States/FallState.cs" id="7_v4vgh"]
+[ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="8_8obs1"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_nlvqt"]
-animation = &"run"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_fall"]
+animation = &"fall"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_foqek"]
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_idle"]
+animation = &"idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_jump"]
 animation = &"jump"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_j33en"]
-animation = &"fall"
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_land"]
+animation = &"land"
 
-[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_jyjdg"]
-blend_point_0/node = SubResource("AnimationNodeAnimation_foqek")
-blend_point_0/pos = -1.0
-blend_point_1/node = SubResource("AnimationNodeAnimation_j33en")
-blend_point_1/pos = 1.0
-metadata/air_blend = 0.0
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_run"]
+animation = &"run"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hpb6d"]
-animation = &"fall"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_01"]
+xfade_time = 0.1
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_p4nk6"]
-animation = &"backflip"
-advance_on_start = true
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_015"]
+xfade_time = 0.15
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_t77cg"]
-switch_mode = 2
-advance_mode = 2
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_02"]
+xfade_time = 0.2
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_xfoba"]
-advance_mode = 2
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_015"]
+xfade_time = 0.15
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_v4vgh"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_at_end"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_8obs1"]
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_p3a83"]
-switch_mode = 2
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_0pswe"]
-switch_mode = 2
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_gs8io"]
-
-[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_64dmy"]
-allow_transition_to_self = true
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_main"]
+states/End/position = Vector2(1350, 250)
+states/Fall/node = SubResource("AnimationNodeAnimation_anim_fall")
+states/Fall/position = Vector2(688, 333)
+states/Idle/node = SubResource("AnimationNodeAnimation_anim_idle")
+states/Idle/position = Vector2(364, 167)
+states/Jump/node = SubResource("AnimationNodeAnimation_anim_jump")
+states/Jump/position = Vector2(688, 167)
 states/LMB/node = ExtResource("2_foqek")
-states/LMB/position = Vector2(505, 189)
-states/Start/position = Vector2(56, 105.49514)
-states/air/node = SubResource("AnimationNodeBlendSpace1D_jyjdg")
-states/air/position = Vector2(546, -36.504852)
-states/fall/node = SubResource("AnimationNodeAnimation_hpb6d")
-states/fall/position = Vector2(582, 65.49514)
-states/idle/node = SubResource("AnimationNodeAnimation_p4nk6")
-states/idle/position = Vector2(219, 105.49514)
-transitions = ["fall", "End", SubResource("AnimationNodeStateMachineTransition_t77cg"), "Start", "idle", SubResource("AnimationNodeStateMachineTransition_xfoba"), "idle", "LMB", SubResource("AnimationNodeStateMachineTransition_v4vgh"), "idle", "fall", SubResource("AnimationNodeStateMachineTransition_8obs1"), "LMB", "End", SubResource("AnimationNodeStateMachineTransition_p3a83"), "air", "End", SubResource("AnimationNodeStateMachineTransition_0pswe"), "idle", "air", SubResource("AnimationNodeStateMachineTransition_gs8io")]
-graph_offset = Vector2(9, -80.50485)
-
-[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_foqek"]
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_clx38"]
-animation = &"idle"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
-
-[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_nlvqt"]
-
-[sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_j33en"]
-graph_offset = Vector2(-301.4546, 116.62938)
-nodes/output/position = Vector2(800, -40)
-nodes/idle/node = SubResource("AnimationNodeAnimation_clx38")
-nodes/idle/position = Vector2(-220, 20)
-nodes/action/node = SubResource("AnimationNodeStateMachine_64dmy")
-nodes/action/position = Vector2(160, 360)
-nodes/locomotion/node = SubResource("AnimationNodeBlend2_nlvqt")
-nodes/locomotion/position = Vector2(80, 40)
-nodes/final/node = SubResource("AnimationNodeBlend2_foqek")
-nodes/final/position = Vector2(560, -40)
-nodes/Animation/node = SubResource("AnimationNodeAnimation_nlvqt")
-nodes/Animation/position = Vector2(-220, 200)
-node_connections = [&"output", 0, &"final", &"locomotion", 0, &"idle", &"locomotion", 1, &"Animation", &"final", 0, &"locomotion", &"final", 1, &"action"]
+states/LMB/position = Vector2(1024, 500)
+states/Land/node = SubResource("AnimationNodeAnimation_anim_land")
+states/Land/position = Vector2(1024, 250)
+states/Run/node = SubResource("AnimationNodeAnimation_anim_run")
+states/Run/position = Vector2(364, 333)
+states/Start/position = Vector2(100, 250)
+transitions = ["Start", "Idle", SubResource("Transition_immediate_01"), "Idle", "Run", SubResource("Transition_immediate_015"), "Run", "Idle", SubResource("Transition_immediate_015"), "Idle", "Jump", SubResource("Transition_immediate_01"), "Run", "Jump", SubResource("Transition_immediate_01"), "Jump", "Fall", SubResource("Transition_end_02"), "Fall", "Land", SubResource("Transition_end_015"), "Idle", "Fall", SubResource("Transition_end_02"), "Run", "Fall", SubResource("Transition_end_02"), "Land", "Idle", SubResource("Transition_at_end"), "Idle", "LMB", SubResource("Transition_immediate_01"), "Run", "LMB", SubResource("Transition_immediate_01"), "LMB", "End", SubResource("Transition_immediate_015"), "Jump", "LMB", SubResource("Transition_immediate_01"), "Fall", "LMB", SubResource("Transition_immediate_01")]
+graph_offset = Vector2(90, 121)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
 
 [node name="anim_monkey" parent="." unique_id=1010984532 instance=ExtResource("1_g38p2")]
 
-[node name="Skeleton3D" parent="anim_monkey/Armature" parent_id_path=PackedInt32Array(1010984532, 1689389833) index="0" unique_id=474226935]
+[node name="Skeleton3D" parent="anim_monkey/Armature" parent_id_path=PackedInt32Array(1010984532, 1229340792) index="0" unique_id=2032354529]
 bones/0/position = Vector3(-0.18097825, -0.64008904, -47.405556)
 bones/0/rotation = Quaternion(-0.21180724, 0.7206118, -0.62455064, 0.21399264)
 bones/0/scale = Vector3(1.0000001, 1, 1)
@@ -179,10 +132,25 @@ bones/24/rotation = Quaternion(-1.25728565e-08, -2.1568852e-07, -1.4661055e-08, 
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1656529102]
 root_node = NodePath("../anim_monkey")
-tree_root = SubResource("AnimationNodeBlendTree_j33en")
+tree_root = SubResource("AnimationNodeStateMachine_main")
 anim_player = NodePath("../anim_monkey/AnimationPlayer")
-parameters/action/air/blend_position = 0.0
-parameters/locomotion/blend_amount = 0.0
-parameters/final/blend_amount = 1.0
+
+[node name="FSM" type="Node" parent="." unique_id=1796319416]
+script = ExtResource("3_jyjdg")
+
+[node name="idle" type="Node" parent="FSM" unique_id=1557372778]
+script = ExtResource("4_t77cg")
+
+[node name="run" type="Node" parent="FSM" unique_id=494978396]
+script = ExtResource("5_xfoba")
+
+[node name="jump" type="Node" parent="FSM" unique_id=1630159486]
+script = ExtResource("6_gs8io")
+
+[node name="fall" type="Node" parent="FSM" unique_id=150440950]
+script = ExtResource("7_v4vgh")
+
+[node name="landing" type="Node" parent="FSM" unique_id=415177410]
+script = ExtResource("8_8obs1")
 
 [editable path="anim_monkey"]
