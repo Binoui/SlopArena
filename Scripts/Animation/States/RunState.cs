@@ -7,39 +7,39 @@ using Godot;
 /// </summary>
 public sealed partial class RunState : State
 {
-    public RunState()
-    {
-        AnimationName = "Movement/Run";
-    }
+	public RunState()
+	{
+		AnimationName = "Run";
+	}
 
-    public override void Enter()
-    {
-        Movement.ResetJumps();
-        base.Enter();
-    }
+	public override void Enter()
+	{
+		Movement.ResetJumps();
+		base.Enter();
+	}
 
-    public override void OnProcess(float delta)
-    {
-        // Jump
-        if (Input.IsActionJustPressed("jump") && Player.IsOnFloor())
-        {
-            StateMachine.TransitionTo("air");
-            return;
-        }
+	public override void OnProcess(float delta)
+	{
+		// Jump
+		if (Input.IsActionJustPressed("jump") && Player.IsOnFloor())
+		{
+			StateMachine.TransitionTo("air");
+			return;
+		}
 
-        // Ran off edge — go to air blend
-        if (!Player.IsOnFloor() && Player.Velocity.Y < 0f)
-        {
-            StateMachine.TransitionTo("air");
-            return;
-        }
+		// Ran off edge — go to air blend
+		if (!Player.IsOnFloor() && Player.Velocity.Y < 0f)
+		{
+			StateMachine.TransitionTo("air");
+			return;
+		}
 
-        // Idle when stopping
-        var hVel = new Vector3(Player.Velocity.X, 0f, Player.Velocity.Z);
-        if (hVel.Length() < 0.5f)
-        {
-            StateMachine.TransitionTo("idle");
-            return;
-        }
-    }
+		// Idle when stopping
+		var hVel = new Vector3(Player.Velocity.X, 0f, Player.Velocity.Z);
+		if (hVel.Length() < 0.5f)
+		{
+			StateMachine.TransitionTo("idle");
+			return;
+		}
+	}
 }

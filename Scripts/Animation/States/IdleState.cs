@@ -9,7 +9,7 @@ public sealed partial class IdleState : State
 {
 	public IdleState()
 	{
-		AnimationName = "Movement/Idle";
+		AnimationName = "Idle";
 	}
 
 	public override void Enter()
