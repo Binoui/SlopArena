@@ -12,7 +12,7 @@ public partial class ClassSelectUI : Control
 {
     public event Action<CharacterClass>? OnClassConfirmed;
 
-    private CharacterClass _selectedClass = CharacterClass.Vanguard;
+    private CharacterClass _selectedClass = CharacterClass.Manki;
     private bool _confirmed = false;
 
     // UI nodes
@@ -54,14 +54,11 @@ public partial class ClassSelectUI : Control
         _classButtons.AddThemeConstantOverride("separation", 10);
         AddChild(_classButtons);
 
-        AddClassButton(CharacterClass.Vanguard, "Vanguard",   "Heavy brawler. Slow but tanky, shield bash and AoE crowd control.");
-        AddClassButton(CharacterClass.Wraith,   "Wraith",     "Fast assassin. Hit-and-run, poison, shadow step, ranged pressure.");
-        AddClassButton(CharacterClass.Channeler,"Channeler",  "Ranged mage. Frost, fire, beams and zone control.");
-        AddClassButton(CharacterClass.Knight,   "Knight",     "Balanced swordfighter. Stun, gap closer, parry and sword combos.");
+        AddClassButton(CharacterClass.Manki,"Manki",  "Fire monkey. Agile rushdown, flaming fists, rising kicks and inferno burst.");// only Manki for now
 
         // Selected class description
         _description = new Label();
-        _description.Text = GetClassDescription(CharacterClass.Vanguard);
+        _description.Text = GetClassDescription(CharacterClass.Manki);
         _description.HorizontalAlignment = HorizontalAlignment.Center;
         _description.Position = new Vector2(200f, 540f);
         _description.Size = new Vector2(viewportSize.X - 400f, 60f);
@@ -72,7 +69,7 @@ public partial class ClassSelectUI : Control
 
         // Stats display
         _statsLabel = new Label();
-        _statsLabel.Text = GetClassStats(CharacterClass.Vanguard);
+        _statsLabel.Text = GetClassStats(CharacterClass.Manki);
         _statsLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _statsLabel.Position = new Vector2(200f, 600f);
         _statsLabel.Size = new Vector2(viewportSize.X - 400f, 100f);
@@ -122,15 +119,7 @@ public partial class ClassSelectUI : Control
         {
             if (child is Button btn)
             {
-                CharacterClass btnClass = btn.Text switch
-                {
-                    "Vanguard" => CharacterClass.Vanguard,
-                    "Wraith" => CharacterClass.Wraith,
-                    "Channeler" => CharacterClass.Channeler,
-                    "Knight" => CharacterClass.Knight,
-                    _ => CharacterClass.Vanguard
-                };
-                btn.Modulate = btnClass == _selectedClass
+                btn.Modulate = btn.Text == "Manki"
                     ? new Color(0.3f, 0.9f, 0.3f)
                     : new Color(1f, 1f, 1f);
             }
@@ -156,19 +145,13 @@ public partial class ClassSelectUI : Control
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
     {
-        CharacterClass.Vanguard => "A heavy front-line brawler with shield bashes, war cries and thunderous slams. Slow but durable.",
-        CharacterClass.Wraith => "A lightning-fast assassin who strikes from the shadows with poison blades, rapid fire and shadow step.",
-        CharacterClass.Channeler => "A ranged magic user who controls the battlefield with frost, fire and beam attacks from a distance.",
-        CharacterClass.Knight => "A balanced sword-and-shield fighter with a stunning light, a gap-closing lunge, a parry and a devastating Excalibur slam.",
+        CharacterClass.Manki => "A fire monkey who fights with blazing fists and acrobatic kicks. Launches enemies for air combos and finishes with an explosive inferno dance.",
         _ => ""
     };
 
     private static string GetClassStats(CharacterClass cls) => cls switch
     {
-        CharacterClass.Vanguard => "HP: High  |  Speed: Slow  |  Range: Melee  |  Difficulty: Easy",
-        CharacterClass.Wraith => "HP: Low  |  Speed: Fast  |  Range: Mixed  |  Difficulty: Medium",
-        CharacterClass.Channeler => "HP: Medium  |  Speed: Medium  |  Range: Ranged  |  Difficulty: Medium",
-        CharacterClass.Knight => "HP: Medium  |  Speed: Medium  |  Range: Melee  |  Difficulty: Easy",
+        CharacterClass.Manki => "HP: Medium  |  Speed: Fast  |  Range: Melee  |  Difficulty: Medium",
         _ => ""
     };
 }

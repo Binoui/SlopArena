@@ -1,749 +1,185 @@
 #nullable enable
 using Godot;
 using System;
-using System.Collections.Generic;
-using SlopArena.Shared;
 
 /// <summary>
-/// Standalone animation controller extracted from PlayerController.
-/// Handles Mixamo FBX animation loading, path remapping, looping behavior,
-/// state machine transitions (idle/walk/run/jump), and spell cast animations.
+/// Animation controller that drives AnimationTree parameters.
+/// With AnimationTree active, the AnimationPlayer is "owned" by the tree
+/// — never call animPlayer.Play() directly, always use the tree parameters.
 ///
-/// Usage: Create as child of PlayerController, call Setup() in _Ready(),
-/// then call ProcessAnimation() each frame from PostMove().
+/// The user's AnimationTree has:
+///   [final] Blend2 (0=loco, 1=action)
+///         /            \
+///   [loco Blend2]  [action StateMachine]
+///   idle ↔ run      idle → jump → fall → End
+///                       └── LMB combo (external)
+///
+/// Setup:
+///   _animController.Setup(animPlayer, skeleton);
+///   _animController.SetAnimationTree(animTree);
+///
+/// Usage:
+///   _animController.ProcessLocomotion(speed01);  // idle↔run blend
+///   _animController.StartAction("jump");          // action via StateMachine
+///   _animController.EndAction();                  // back to locomotion
 /// </summary>
 public partial class AnimationController : Node
 {
-	// ==========================================
-	// REFERENCES (set by Setup)
-	// ==========================================
-
 	private AnimationPlayer? _animPlayer;
 	private Skeleton3D? _skeleton;
-	private Node3D? _playerModel;
-	private AnimationLibrary? _animLib;
+	private AnimationTree? _animTree;
+	private bool _isInAction = false;
 
-	// ==========================================
-	// ANIMATION STATE
-	// ==========================================
+	private static bool _tracksFixed = false;
 
-	private string _currentAnim = "";
-	private float _attackTimer = 0f;
+	// AnimationTree parameter paths
+	private const string LocoBlendParam = "parameters/locomotion/blend_amount";
+	private const string FinalBlendParam = "parameters/final/blend_amount";
+	private const string ActionPlaybackPath = "parameters/action/playback";
+	private const string LMBPlaybackPath = "parameters/action/LMB/playback";
 
-	// ==========================================
-	// PUBLIC STATE STRUCT
-	// ==========================================
-
-	/// <summary>
-	/// Snapshot of player state passed into ProcessAnimation each frame.
-	/// </summary>
-	public struct AnimationState
+	private AnimationNodeStateMachinePlayback? GetActionPlayback()
 	{
-		public bool IsOnFloor;
-		public float HorizontalSpeed;
-		public bool IsDashing;
-		public bool IsAirDodging;
-		public bool IsInKnockback;
+		if (_animTree == null) return null;
+		var val = _animTree.Get(ActionPlaybackPath);
+		if (val.Obj is AnimationNodeStateMachinePlayback pb)
+			return pb;
+		return null;
 	}
 
-	// ==========================================
-	// PUBLIC API
-	// ==========================================
+	private AnimationNodeStateMachinePlayback? GetLMBPlayback()
+	{
+		if (_animTree == null) return null;
+		var val = _animTree.Get(LMBPlaybackPath);
+		if (val.Obj is AnimationNodeStateMachinePlayback pb)
+			return pb;
+		return null;
+	}
 
-	/// <summary>
-	/// Store references to the animation player, skeleton, and player model.
-	/// Must be called before Initialize() and ProcessAnimation().
-	/// </summary>
-	public void Setup(AnimationPlayer animPlayer, Skeleton3D? skeleton, Node3D? playerModel)
+	public void Setup(AnimationPlayer animPlayer, Skeleton3D? skeleton)
 	{
 		_animPlayer = animPlayer;
 		_skeleton = skeleton;
-		_playerModel = playerModel;
+		if (_animPlayer != null)
+			_animPlayer.PlaybackDefaultBlendTime = 0.15f;
+		if (_animPlayer != null && _skeleton != null)
+			FixAnimationTracks();
+	}
 
-		_animPlayer.PlaybackDefaultBlendTime = 0.15f;
+	public void SetupAnimationTree(AnimationTree animTree)
+	{
+		_animTree = animTree;
+	}
+
+	// ── PUBLIC API ──
+
+	/// <summary>Drive the idle↔run blend. 0=idle, 1=run. Ignored during actions.</summary>
+	public void ProcessLocomotion(float speed01)
+	{
+		if (_animTree == null) return;
+		if (_isInAction) return;
+		_animTree.Set(LocoBlendParam, Math.Clamp(speed01, 0f, 1f));
 	}
 
 	/// <summary>
-	/// Play an attack animation for one stage of an ability slot.
-	/// Takes priority over locomotion until the animation finishes or CancelAttack() is called.
-	/// animNames: per-stage animation names from AbilityData (nullable = use fallback).
-	/// stageIndex: which stage of the combo to play (0 for single-stage abilities).
-	/// slotIndex: ability slot (0-5), used for fallback naming.
+	/// Start an action via StateMachine Travel.
+	/// stateName must match a state in the action StateMachine (e.g. "jump", "LMB").
 	/// </summary>
-	public void PlayAttack(string[]? animNames, int stageIndex, int slotIndex, float durationSec = 0.5f)
+	public void StartAction(string stateName)
 	{
-		_attackTimer = durationSec; // combat-measured duration, not animation length
+		var pb = GetActionPlayback();
+		if (pb == null) return;
 
-		string targetAnim;
+		GD.Print($"[AnimController] Travel → {stateName}");
+		_animTree?.Set(FinalBlendParam, 1.0f);
+		pb.Travel(stateName);
+		_isInAction = true;
+	}
 
-		if (animNames != null && stageIndex < animNames.Length && !string.IsNullOrEmpty(animNames[stageIndex]))
-		{
-			targetAnim = animNames[stageIndex];
-		}
-		else if (animNames != null && animNames.Length > 0 && !string.IsNullOrEmpty(animNames[0]))
-		{
-			// Single anim name for all stages (or no-stage special effect)
-			targetAnim = animNames[0];
-		}
-		else
-		{
-			// Fallback: generic naming convention
-			targetAnim = stageIndex > 0
-				? $"attack_{slotIndex}_{stageIndex}"
-				: $"attack_{slotIndex}";
-		}
-
-		string fullPath = "default/" + targetAnim;
-		if (_animPlayer != null && _animPlayer.HasAnimation(fullPath))
-		{
-			if (_animPlayer.IsPlaying())
-				_animPlayer.Stop();
-			// Attacks are non-looping
-			var anim = _animPlayer.GetAnimation(fullPath);
-			if (anim != null) anim.LoopMode = Animation.LoopModeEnum.None;
-			_animPlayer.Play(fullPath);
-			_currentAnim = fullPath;
-			_attackTimer = anim?.Length ?? 0.5f;
-		}
-		else
-		{
-			// Fallback: try generic attack names
-			PlayAnimWithFallback(targetAnim);
-		}
+	/// <summary>End current action and return to idle.</summary>
+	public void EndAction()
+	{
+		_isInAction = false;
+		var pb = GetActionPlayback();
+		pb?.Travel("idle");
+		_animTree?.Set(FinalBlendParam, 0.0f);
 	}
 
 	/// <summary>
-	/// Cancel current attack animation (called on knockback, dash, air dodge).
+	/// Travel within the LMB sub-machine for combo chaining.
 	/// </summary>
-	public void CancelAttack()
+	public void RequestSubAction(string subMachine, string targetState)
 	{
-		_attackTimer = 0f;
+		var pb = subMachine == "LMB" ? GetLMBPlayback() : null;
+		if (pb == null) return;
+
+		GD.Print($"[AnimController] sub Travel → {targetState}");
+		pb.Travel(targetState);
+		_isInAction = true;
 	}
 
-	/// <summary>
-	/// Check if an attack animation is currently playing.
-	/// </summary>
-	public bool IsAttacking() => _attackTimer > 0f;
+	public bool IsActionActive() => _isInAction;
 
-	/// <summary>
-	/// Load all animations from the Pro Magic Pack directory and play idle.
-	/// Should be called from PlayerController._Ready() after Setup().
-	/// </summary>
-	public void Initialize()
+	/// <summary>No-op — timer removed, StateMachine handles lifecycle.</summary>
+	public void ProcessActionTimer(float _) { }
+
+	// ── INTERNAL ──
+
+	private void FixAnimationTracks()
 	{
-		if (_animPlayer == null)
+		if (_animPlayer == null || _skeleton == null) return;
+
+		_animPlayer.RootNode = _skeleton.GetPath();
+		if (_tracksFixed) return;
+
+		int fixedCount = 0, totalTracks = 0;
+
+		foreach (var animName in _animPlayer.GetAnimationList())
 		{
-			GD.PrintErr("AnimationController.Initialize(): _animPlayer is null. Call Setup() first.");
-			return;
-		}
-
-		// Check if an animation library already exists (KayKit loaded its anims)
-		_animLib = _animPlayer.HasAnimationLibrary("default")
-			? _animPlayer.GetAnimationLibrary("default")
-			: null;
-
-		if (_animLib == null)
-		{
-			_animLib = new AnimationLibrary();
-			_animPlayer.AddAnimationLibrary("default", _animLib);
-		}
-
-				// Log which animations we loaded
-				var loadedAnims = _animLib.GetAnimationList();
-				GD.Print($"AnimationController: Loaded {loadedAnims.Count} animations");
-				// Debug: log first few animation names
-				string debugAnims = "";
-				for (int i = 0; i < Mathf.Min(loadedAnims.Count, 5); i++)
-					debugAnims += loadedAnims[i] + ", ";
-				GD.Print($"AnimationController: First anims: {debugAnims}");
-
-				// Debug: check track path of 'idle' if it exists
-				if (_animLib.HasAnimation("idle"))
-				{
-					var idleAnim = _animLib.GetAnimation("idle");
-					if (idleAnim != null)
-					{
-						string trackDebug = "";
-						for (int i = 0; i < Mathf.Min(idleAnim.GetTrackCount(), 3); i++)
-							trackDebug += idleAnim.TrackGetPath(i) + " | ";
-						GD.Print($"AnimationController: idle track paths: {trackDebug}");
-					}
-				}
-				// Check RootNode
-				GD.Print($"AnimationController: RootNode = {_animPlayer.RootNode}");
-
-		// Play idle if available
-		if (_animLib.HasAnimation("idle"))
-		{
-			_animLib.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
-			_animPlayer.Play("default/idle");
-		}
-		else if (loadedAnims.Count > 0)
-		{
-			string firstAnim = loadedAnims[0];
-			GD.Print($"AnimationController: Playing first available animation: {firstAnim}");
-			var first = _animLib.GetAnimation(firstAnim);
-			if (first != null) first.LoopMode = Animation.LoopModeEnum.Linear;
-			_animPlayer.Play("default/" + firstAnim);
-		}
-		else
-		{
-			GD.Print("AnimationController: WARNING — No animations loaded at all!");
-		}
-	}
-
-	/// <summary>
-	/// Called each physics frame from PlayerController.PostMove().
-	/// Decides which animation to play based on movement state.
-	/// Cast animations take priority over movement animations.
-	/// </summary>
-	public void ProcessAnimation(float dt, AnimationState state)
-	{
-		if (_animPlayer == null) return;
-
-		// Attack animation timer
-		if (_attackTimer > 0f)
-		{
-			_attackTimer -= dt;
-			if (!_animPlayer.IsPlaying())
-				_attackTimer = 0f;
-			return;
-		}
-
-		string targetAnim;
-
-		// Knockback overrides movement
-		if (state.IsInKnockback)
-		{
-			targetAnim = "hit_large_front";
-		}
-		// Movement state derived from player values
-		else if (state.IsDashing)
-		{
-			targetAnim = "run";
-		}
-		else if (state.IsAirDodging)
-		{
-			targetAnim = "jump";
-		}
-		else
-		{
-			bool isGrounded = state.IsOnFloor;
-			float hSpeed = state.HorizontalSpeed;
-			bool isWalking = hSpeed > 1f && hSpeed < 11f;
-			bool isRunning = hSpeed >= 11f;
-
-			if (!isGrounded)
-				targetAnim = "jump";
-			else if (isRunning)
-				targetAnim = "run";
-			else if (isWalking)
-				targetAnim = "walk";
-			else
-				targetAnim = "idle";
-		}
-
-		PlayAnimWithFallback(targetAnim);
-	}
-
-	/// <summary>
-	/// Access the AnimationPlayer so PlayerController can set RootNode, etc.
-	/// </summary>
-	public AnimationPlayer? GetAnimPlayer() => _animPlayer;
-
-	// ==========================================
-	// ANIMATION LOADING
-	// ==========================================
-
-	/// <summary>
-	/// Load ALL FBX animation files from the Pro Magic Pack directory.
-	/// Each FBX file contains one animation clip, named by a standardized key.
-	/// </summary>
-	private void LoadAllAnimations(AnimationLibrary animLib)
-	{
-		string animDir = "res://assets/characters/ProMagicPack/";
-
-		var dir = DirAccess.Open(animDir);
-		if (dir == null)
-		{
-			GD.PrintErr($"AnimationController: Cannot open animation directory: {animDir}");
-			return;
-		}
-
-		dir.ListDirBegin();
-		int loadedCount = 0;
-
-		while (true)
-		{
-			string fileName = dir.GetNext();
-			if (string.IsNullOrEmpty(fileName))
-				break;
-
-			// Only process FBX files (skip .import, directories, etc.)
-			if (!fileName.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
-				continue;
-
-			if (fileName.Equals("characterMedium.fbx", StringComparison.OrdinalIgnoreCase))
-				continue; // Skip the model file itself
-
-			string fbxPath = animDir + fileName;
-			string animKey = NormalizeAnimationName(fileName);
-
-			if (LoadSingleAnimation(animLib, fbxPath, animKey))
-				loadedCount++;
-		}
-
-		dir.ListDirEnd();
-		//GD.Print($"AnimationController: Loaded {loadedCount} animations from {animDir}");
-	}
-
-	/// <summary>
-	/// Convert a filename like "Standing Run Forward.fbx" to "run_forward"
-	/// then apply specific renames to standard keys like "run", "idle", etc.
-	/// </summary>
-	private string NormalizeAnimationName(string fileName)
-	{
-		// Remove .fbx extension
-		string name = fileName;
-		int extIdx = name.LastIndexOf(".fbx", StringComparison.OrdinalIgnoreCase);
-		if (extIdx > 0)
-			name = name.Substring(0, extIdx);
-
-		// Remove common prefixes
-		if (name.StartsWith("Standing ", StringComparison.OrdinalIgnoreCase))
-			name = name.Substring("Standing ".Length);
-		else if (name.StartsWith("standing ", StringComparison.OrdinalIgnoreCase))
-			name = name.Substring("standing ".Length);
-		else if (name.StartsWith("Crouch ", StringComparison.OrdinalIgnoreCase))
-			name = "crouch_" + name.Substring("Crouch ".Length);
-
-		// Replace spaces with underscores, lowercase
-		name = name.Replace(" ", "_").ToLower();
-
-		// Remove leading whitespace only (not digits — "1h" and "2h" matter!)
-		name = name.TrimStart();
-
-		// Specific renames for common animations
-		var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-		{
-			// Idle variants → single "idle"
-			{ "idle", "idle" },
-			{ "idle_02", "idle" },
-			{ "idle_03", "idle" },
-			{ "idle_04", "idle" },
-
-			// Movement
-			{ "run_forward", "run" },
-			{ "walk_forward", "walk" },
-			{ "sprint_forward", "sprint" },
-			{ "jump", "jump" },
-			{ "jump_running", "jump_run" },
-			{ "land_to_standing_idle", "land" },
-			{ "jump_running_landing", "land_run" },
-			{ "idle_to_crouch", "crouch_transition" },
-			{ "crouch_idle", "crouch_idle" },
-			{ "crouch_walk_forward", "crouch_walk" },
-			{ "crouch_to_standing_idle", "stand_transition" },
-
-			// Cast animations
-			{ "1h_cast_spell_01", "cast_1h" },
-			{ "2h_cast_spell_01", "cast_2h" },
-
-			// Attack animations
-			{ "1h_magic_attack_01", "attack_1h" },
-			{ "1h_magic_attack_02", "attack_1h_b" },
-			{ "1h_magic_attack_03", "attack_1h_c" },
-			{ "2h_magic_attack_01", "attack_2h" },
-			{ "2h_magic_attack_02", "attack_2h_b" },
-			{ "2h_magic_attack_03", "attack_2h_c" },
-			{ "2h_magic_attack_04", "attack_2h_d" },
-			{ "2h_magic_attack_05", "attack_2h_e" },
-			{ "2h_magic_area_attack_01", "attack_area_2h" },
-			{ "2h_magic_area_attack_02", "attack_area_2h_b" },
-
-			// Block
-			{ "block_idle", "block_idle" },
-			{ "block_start", "block_start" },
-			{ "block_end", "block_end" },
-			{ "block_react_large", "block_react" },
-
-			// Hit reactions
-			{ "react_small_from_front", "hit_small_front" },
-			{ "react_small_from_back", "hit_small_back" },
-			{ "react_small_from_left", "hit_small_left" },
-			{ "react_small_from_right", "hit_small_right" },
-			{ "react_large_from_front", "hit_large_front" },
-			{ "react_large_from_back", "hit_large_back" },
-			{ "react_large_from_left", "hit_large_left" },
-			{ "react_large_from_right", "hit_large_right" },
-
-			// Death
-			{ "react_death_forward", "death_forward" },
-			{ "react_death_backward", "death_backward" },
-			{ "react_death_left", "death_left" },
-			{ "react_death_right", "death_right" },
-
-			// Turn
-			{ "turn_left_90", "turn_left" },
-			{ "turn_right_90", "turn_right" },
-		};
-
-		if (renames.ContainsKey(name))
-			return renames[name];
-
-		return name;
-	}
-
-	/// <summary>
-	/// Load a single animation from an FBX file and add it to the library.
-	/// Handles both scene-based FBX (with AnimationPlayer) and direct Animation resources.
-	/// </summary>
-	private bool LoadSingleAnimation(AnimationLibrary animLib, string fbxPath, string animKey)
-	{
-		if (!ResourceLoader.Exists(fbxPath))
-		{
-			GD.Print($"AnimationController: File not found: {fbxPath}");
-			return false;
-		}
-
-		// Try loading as PackedScene first (most common for FBX animations)
-		var scene = ResourceLoader.Load<PackedScene>(fbxPath);
-		if (scene != null)
-		{
-			var tempInstance = scene.Instantiate<Node>();
-			if (tempInstance == null) return false;
-
-			var animPlayerInScene = FindAnimationPlayer(tempInstance);
-			if (animPlayerInScene != null)
-			{
-				foreach (var libName in animPlayerInScene.GetAnimationLibraryList())
-				{
-					var lib = animPlayerInScene.GetAnimationLibrary(libName);
-					if (lib == null) continue;
-
-					foreach (var animNameInLib in lib.GetAnimationList())
-					{
-						var anim = lib.GetAnimation(animNameInLib);
-						if (anim == null) continue;
-
-						// Remap bone paths: handle both "Root|" (Kenney) and bare bones (Mixamo)
-						anim = RemapAnimationPaths(anim);
-						if (anim != null && !animLib.HasAnimation(animKey))
-						{
-							animLib.AddAnimation(animKey, anim);
-						}
-					}
-				}
-			}
-			else
-			{
-				// Try loading as direct Animation resource
-				LoadDirectAnimation(animLib, fbxPath, animKey);
-			}
-
-			tempInstance.QueueFree();
-			return true;
-		}
-
-		// Fallback: try direct Animation resource
-		return LoadDirectAnimation(animLib, fbxPath, animKey);
-	}
-
-	/// <summary>
-	/// Try loading an FBX file directly as an Animation resource (fallback).
-	/// </summary>
-	private bool LoadDirectAnimation(AnimationLibrary animLib, string fbxPath, string animKey)
-	{
-		try
-		{
-			var directAnim = ResourceLoader.Load<Animation>(fbxPath);
-			if (directAnim != null)
-			{
-				directAnim = RemapAnimationPaths(directAnim);
-				if (directAnim != null)
-				{
-					animLib.AddAnimation(animKey, directAnim);
-					//GD.Print($"  Loaded direct: {animKey} <- {fbxPath}");
-					return true;
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			GD.Print($"AnimationController: Could not load animation from {fbxPath}: {ex.Message}");
-		}
-		return false;
-	}
-
-	// ==========================================
-	// PATH REMAPPING (Mixamo, Kenney, KayKit)
-	// ==========================================
-
-	/// <summary>
-	/// Public wrapper: duplicate an animation and remap its bone paths to be
-	/// relative to the skeleton (RootNode). Call this when copying animations
-	/// from an FBX source into our default library.
-	/// </summary>
-	public Animation PrepareAnimation(Animation sourceAnim)
-	{
-		return (Animation)sourceAnim.Duplicate(); // paths kept as-is, RootNode=PlayerModel
-	}
-
-	/// <summary>
-	/// Remap Mixamo FBX animation paths to match the KayKit skeleton hierarchy.
-	/// Mixamo FBX uses "RootNode/Skeleton/bone" track paths.
-	/// The KayKit scene has root node "PlayerModel" with child "Skeleton3D" containing bones.
-	/// So we: strip "RootNode/" prefix, then replace "Skeleton/" with "Skeleton3D/".
-	/// </summary>
-	private Animation StripRigMediumPrefix(Animation anim)
-	{
-		// Knight.glb scene has PlayerModel → Rig_Medium → Skeleton3D:bone hierarchy.
-		// Animation .res files have paths "Rig_Medium/Skeleton3D:bone" — they match as-is.
-		return (Animation)anim.Duplicate();
-	}
-
-	/// <summary>
-	/// Remap bone paths in animation tracks to match our skeleton.
-	/// Our AnimationPlayer's RootNode is set to the skeleton node.
-	/// Mixamo FBX animations have tracks referencing "Root/Skeleton3D" or "Root/Skeleton"
-	/// which need to be stripped so paths resolve relative to the skeleton.
-	/// Kenney animations use "Root|" prefix which also gets stripped.
-	/// KayKit uses scene-root prefixes like "Rig_Medium_MovementBasic/Skeleton3D/".
-	/// </summary>
-	private Animation RemapAnimationPaths(Animation anim)
-	{
-		var animCopy = (Animation)anim.Duplicate();
-		string? prefixToStrip = DetectPrefixToStrip(animCopy);
-
-		if (prefixToStrip == null)
-			return animCopy; // No remapping needed
-
-		int trackCount = animCopy.GetTrackCount();
-		for (int i = 0; i < trackCount; i++)
-		{
-			string trackPath = animCopy.TrackGetPath(i);
-			if (trackPath.Contains(prefixToStrip))
-			{
-				string newPath = trackPath.Replace(prefixToStrip, "");
-				animCopy.TrackSetPath(i, new NodePath(newPath));
-			}
-		}
-
-		return animCopy;
-	}
-
-	/// <summary>
-	/// Detect the path prefix to strip from animation tracks, supporting
-	/// Mixamo (Root/Skeleton3D), Kenney (Root|), and KayKit (SceneName/Skeleton3D).
-	/// Scans track paths and identifies known prefixes.
-	/// </summary>
-	private string? DetectPrefixToStrip(Animation anim)
-	{
-		int trackCount = anim.GetTrackCount();
-		for (int i = 0; i < trackCount; i++)
-		{
-			string path = anim.TrackGetPath(i);
-
-			// Mixamo / Kenney prefixes
-			if (path.Contains("RootNode/Skeleton")) return "RootNode/Skeleton";
-			if (path.Contains("Root/Skeleton3D"))   return "Root/Skeleton3D";
-			if (path.Contains("Root/Skeleton"))     return "Root/Skeleton";
-			if (path.Contains("Root|"))             return "Root|";
-
-			// KayKit: detect pattern like "SceneName/Skeleton3D/bone" or "SceneName/Skeleton3D" (bone as subname)
-			string[] segments = path.Split('/');
-			if (segments.Length >= 2)
-			{
-				// Known skeleton node names
-				// Strip :subname from last segment before checking
-				string nodeName = segments[1].Contains(":") ? segments[1].Substring(0, segments[1].IndexOf(":")) : segments[1];
-				bool isSkeletonNode = nodeName.ToLowerInvariant() is "skeleton3d" or "skeleton" or "armature";
-
-				if (isSkeletonNode && segments.Length >= 3)
-				{
-					// segments[0] = scene root name (e.g., "Rig_Medium")
-					// segments[1] = skeleton node name (e.g., "Skeleton3D")
-					// segments[2] = first bone name (e.g., "root", "hips")
-					string thirdSeg = segments[2].ToLowerInvariant();
-					bool isBoneName = thirdSeg is "root" or "hips" or "pelvis" or "spine_01" or "spine"
-						or "thigh_l" or "thigh_r" or "upper_arm_l" or "upper_arm_r"
-						or "clavicle_l" or "clavicle_r" or "head" or "neck";
-
-					if (isBoneName)
-					{
-						string candidate = segments[0] + "/" + segments[1];
-						GD.Print($"AnimationController: detected prefix '{candidate}', stripping from tracks");
-						return candidate;
-					}
-				}
-				else if (isSkeletonNode && segments.Length == 2)
-				{
-					// Path targeting skeleton node: "Something/Skeleton3D:bone" or "Something/Skeleton3D"
-					// Build candidate using the clean nodeName (without :subname)
-					string candidate = segments[0] + "/" + nodeName;
-					GD.Print($"AnimationController: detected prefix '{candidate}' (skeleton-target), stripping from tracks");
-					return candidate;
-				}
-			}
-		}
-		return null;
-	}
-
-	// ==========================================
-	// ANIMATION LOADING (.res files)
-	// ==========================================
-
-	/// <summary>
-	/// Load all Animation (.res) files from the given directory and add them
-	/// to the default library with normalized names (Idle_A → idle, etc.).
-	/// Stips the "Rig_Medium/" prefix from bone paths to match our scene.
-	/// </summary>
-	public void LoadAnimationsFromRes(string directoryPath, Func<string, string>? nameNormalizer = null)
-	{
-		if (_animPlayer == null) return;
-
-		var lib = _animPlayer.HasAnimationLibrary("default")
-			? _animPlayer.GetAnimationLibrary("default")
-			: null;
-		if (lib == null)
-		{
-			GD.PrintErr("AnimationController: No default library to add animations");
-			return;
-		}
-
-		var dir = DirAccess.Open(directoryPath);
-		if (dir == null)
-		{
-			GD.PrintErr($"AnimationController: Cannot open animation directory: {directoryPath}");
-			return;
-		}
-
-		dir.ListDirBegin();
-		int loadedCount = 0;
-
-		while (true)
-		{
-			string fileName = dir.GetNext();
-			if (string.IsNullOrEmpty(fileName))
-				break;
-
-			if (!fileName.EndsWith(".res")) continue;
-			if (fileName.StartsWith(".")) continue;
-
-			string resPath = directoryPath + fileName;
-			if (!ResourceLoader.Exists(resPath)) continue;
-
-			var anim = ResourceLoader.Load<Animation>(resPath);
+			var anim = _animPlayer.GetAnimation(animName);
 			if (anim == null) continue;
 
-			// Strip "Rig_Medium/" prefix from bone paths
-			var remapped = StripRigMediumPrefix(anim);
-
-			// Get animation key: remove .res extension, pass through normalizer
-			string animKey = fileName.Substring(0, fileName.Length - 4); // remove ".res"
-			if (nameNormalizer != null)
-				animKey = nameNormalizer(animKey);
-
-			if (lib.HasAnimation(animKey))
-				lib.RemoveAnimation(animKey);
-			lib.AddAnimation(animKey, remapped);
-			loadedCount++;
-		}
-
-		dir.ListDirEnd();
-		GD.Print($"AnimationController: Loaded {loadedCount} animations from {directoryPath}");
-	}
-
-	// ==========================================
-	// ANIMATION PLAYBACK
-	// ==========================================
-
-	/// <summary>
-	/// Play an animation by key, with fallback to similar names if the exact key
-	/// doesn't exist in the library. Handles crossfade and loop mode.
-	/// </summary>
-	private void PlayAnimWithFallback(string animName)
-	{
-		if (_animPlayer == null) return;
-		string fullPath = "default/" + animName;
-
-		if (_animPlayer.HasAnimation(fullPath) && _currentAnim != fullPath)
-		{
-			SetLoopMode(fullPath, animName);
-			_animPlayer.Play(fullPath);
-			_currentAnim = fullPath;
-		}
-		else if (!_animPlayer.HasAnimation(fullPath))
-		{
-			// Fallback: find any animation that starts with the same prefix
-			foreach (var available in _animPlayer.GetAnimationList())
+			for (int i = 0; i < anim.GetTrackCount(); i++)
 			{
-				if (available.StartsWith(animName) || animName.StartsWith(available))
+				totalTracks++;
+				var oldPath = anim.TrackGetPath(i);
+				string pathStr = oldPath.ToString();
+				int colonIdx = pathStr.LastIndexOf(':');
+				if (colonIdx < 0) continue;
+				string boneSubname = pathStr.Substring(colonIdx);
+				var newPath = new NodePath(boneSubname);
+				if (newPath != oldPath)
 				{
-					string fallbackPath = "default/" + available;
-					if (_currentAnim != fallbackPath)
-					{
-						SetLoopMode(fallbackPath, available);
-						_animPlayer.Play(fallbackPath);
-						_currentAnim = fallbackPath;
-						return;
-					}
+					anim.TrackSetPath(i, newPath);
+					fixedCount++;
 				}
 			}
 		}
+
+		_tracksFixed = true;
+		GD.Print($"[AnimController] Fixed {fixedCount}/{totalTracks} tracks");
 	}
 
-	/// <summary>
-	/// Set loop mode based on animation type.
-	/// Looping: idle, run, walk, crouch (and their variants).
-	/// Non-looping: attacks, casts, hit reactions, death.
-	/// </summary>
-	private void SetLoopMode(string fullPath, string animName)
-	{
-		if (_animPlayer == null) return;
-		var anim = _animPlayer.GetAnimation(fullPath);
-		if (anim == null) return;
+	// ── SCENE HELPERS ──
 
-		// Loop movement / idle animations, not attacks/casts/reacts
-		bool shouldLoop = animName == "idle" || animName == "run" || animName == "walk"
-			|| animName.StartsWith("idle") || animName.StartsWith("run") || animName.StartsWith("walk")
-			|| animName.StartsWith("crouch");
-		anim.LoopMode = shouldLoop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
-	}
-
-	// ==========================================
-	// UTILITY: TREE TRAVERSAL
-	// ==========================================
-
-	/// <summary>
-	/// Recursively find a Skeleton3D in the given node tree.
-	/// Used during setup to set the AnimationPlayer's RootNode.
-	/// </summary>
 	public Skeleton3D? FindSkeleton(Node node)
 	{
-		if (node is Skeleton3D sk)
-			return sk;
-		foreach (var child in node.GetChildren())
+		if (node is Skeleton3D sk) return sk;
+		foreach (var c in node.GetChildren())
 		{
-			var result = FindSkeleton(child);
-			if (result != null)
-				return result;
+			var r = FindSkeleton(c);
+			if (r != null) return r;
 		}
 		return null;
 	}
 
-	/// <summary>
-	/// Recursively find an AnimationPlayer in the given node tree.
-	/// </summary>
 	public AnimationPlayer? FindAnimationPlayer(Node node)
 	{
-		if (node is AnimationPlayer ap)
-			return ap;
-		foreach (var child in node.GetChildren())
+		if (node is AnimationPlayer ap) return ap;
+		foreach (var c in node.GetChildren())
 		{
-			var result = FindAnimationPlayer(child);
-			if (result != null)
-				return result;
+			var r = FindAnimationPlayer(c);
+			if (r != null) return r;
 		}
 		return null;
 	}

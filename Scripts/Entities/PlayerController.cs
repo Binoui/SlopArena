@@ -151,23 +151,35 @@ public partial class PlayerController : CharacterBody3D
 
 			// Debug: print skeleton info and PlayerModel children
 			if (skeleton != null)
-				GD.Print($"Knight.glb: found skeleton '{skeleton.Name}', {skeleton.GetBoneCount()} bones");
+				GD.Print($"{_playerClass}: found skeleton '{skeleton.Name}', {skeleton.GetBoneCount()} bones");
 			else
-				GD.Print("Knight.glb: NO skeleton found!");
+				GD.Print($"{_playerClass}: NO skeleton found!");
 			string children = "";
 			foreach (var c in _playerModel.GetChildren())
 				children += c.Name + " ";
-			GD.Print($"Knight.glb children: {children}");
+			GD.Print($"{_playerClass} children: {children}");
 
-			// Create an AnimationPlayer for our model (Knight.glb has no embedded anims)
-			animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
-			_playerModel.AddChild(animPlayer);
-			if (skeleton != null)
-				animPlayer.RootNode = _playerModel.GetPath();
+			// Check if model already has an AnimationPlayer (embedded anims in GLB)
+			animPlayer = _animationController.FindAnimationPlayer(_playerModel);
+			if (animPlayer != null)
+			{
+				GD.Print($"{_playerClass}: found embedded AnimationPlayer, using it");
+				// Fix RootNode to point to our PlayerModel (paths are relative to this)
+				if (skeleton != null)
+					animPlayer.RootNode = _playerModel.GetPath();
+			}
+			else
+			{
+				// Create an AnimationPlayer for models without embedded anims (Knight.glb)
+				animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
+				_playerModel.AddChild(animPlayer);
+				if (skeleton != null)
+					animPlayer.RootNode = _playerModel.GetPath();
 
-			// Create "default" library
-			var lib = new AnimationLibrary();
-			animPlayer.AddAnimationLibrary("default", lib);
+				// Create "default" library
+				var lib = new AnimationLibrary();
+				animPlayer.AddAnimationLibrary("default", lib);
+			}
 		}
 
 		if (animPlayer == null)
@@ -180,12 +192,18 @@ public partial class PlayerController : CharacterBody3D
 			animPlayer.AddAnimationLibrary("default", lib);
 		}
 
-		_animationController.Setup(animPlayer, skeleton, _playerModel);
+		_animationController.Setup(animPlayer, skeleton);
 
-		// Load animation .res files from animations/ directory
-		_animationController.LoadAnimationsFromRes("res://animations/", NormalizeKayKitAnimName);
-
-		_animationController.Initialize();
+		// Find AnimationTree (created in manki.tscn by the user)
+		if (_playerModel != null)
+		{
+			var animTree = _playerModel.GetNodeOrNull<AnimationTree>("AnimationTree");
+			if (animTree != null)
+			{
+				_animationController.SetupAnimationTree(animTree);
+				GD.Print($"{_playerClass}: AnimationTree connected");
+			}
+		}
 
 		// Hurtbox
 		_hurtbox = new Hurtbox { Name = "Hurtbox", OwnerEntity = this };
@@ -205,7 +223,7 @@ public partial class PlayerController : CharacterBody3D
 			// Scale knockback by damage% and apply
 			_movementComponent.ApplyKnockback(knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
 
-			_animationController.CancelAttack();
+			_animationController.EndAction();
 		};
 
 		// Ground arrow indicator
@@ -218,6 +236,49 @@ public partial class PlayerController : CharacterBody3D
 			AddChild(_wowCamera);
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
+		SetupDebugLabel();
+	}
+
+	// ── DEBUG ──
+
+	private Label? _debugLabel;
+
+	private void SetupDebugLabel()
+	{
+		// Only show debug for the real player (Name set before _Ready)
+		if (Name != "Player") return;
+
+		_debugLabel = new Label();
+		_debugLabel.Name = "DebugLabel";
+		_debugLabel.Position = new Vector2(10, 10);
+		_debugLabel.HorizontalAlignment = HorizontalAlignment.Left;
+		_debugLabel.AddThemeColorOverride("font_color", new Color(0, 1, 0));
+		_debugLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.8f));
+		_debugLabel.AddThemeConstantOverride("shadow_offset_x", 1);
+		_debugLabel.AddThemeConstantOverride("shadow_offset_y", 1);
+
+		var canvas = new CanvasLayer();
+		canvas.AddChild(_debugLabel);
+		AddChild(canvas);
+	}
+
+	private void UpdateDebugLabel()
+	{
+		if (_debugLabel == null) return;
+
+		var tree = _playerModel?.GetNodeOrNull<AnimationTree>("AnimationTree");
+		if (tree == null) return;
+
+		float finalBlend = 0f;
+		try { finalBlend = (float)tree.Get("parameters/final/blend_amount"); } catch { }
+
+		float locoBlend = 0f;
+		try { locoBlend = (float)tree.Get("parameters/locomotion/blend_amount"); } catch { }
+
+		string actionState = "?";
+		try { actionState = tree.Get("parameters/action/playback").ToString(); } catch { }
+
+		_debugLabel.Text = $"state: {actionState}  final: {finalBlend:F2}  loco: {locoBlend:F2}  active: {_animationController.IsActionActive()}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
 	}
 
 	// ==========================================
@@ -378,6 +439,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
+		UpdateDebugLabel();
 		if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
 
 		if (Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
@@ -429,7 +491,7 @@ public partial class PlayerController : CharacterBody3D
 		// Dash (ground OR air)
 		if (input.Dash && _movementComponent.State.AnimLockTicks <= 0)
 		{
-			_animationController.CancelAttack();
+			_animationController.EndAction();
 			_movementComponent.StartDash(_moveDirection.X, _moveDirection.Z);
 		}
 
@@ -448,15 +510,41 @@ public partial class PlayerController : CharacterBody3D
 		// Update ground arrow
 		UpdateGroundArrow(_snappedInputDirection.LengthSquared() > 0.001f);
 
-		// Animation
-		_animationController.ProcessAnimation(dt, new AnimationController.AnimationState
+		// Animation — drive AnimationTree (actions: jump/fall/LMB)
+		_animationController.ProcessActionTimer(dt);
+
+		// Jump detection (ground jump + double jump mid-air)
+		if (Input.IsActionJustPressed("jump"))
 		{
-			IsOnFloor = _movementComponent.IsGrounded,
-			HorizontalSpeed = hVel.Length(),
-			IsDashing = _movementComponent.CurrentState == ActionState.Dashing,
-			IsAirDodging = _movementComponent.CurrentState == ActionState.AirDodging,
-			IsInKnockback = _movementComponent.IsInKnockback(),
-		});
+			// Delegate jump-count check to MovementComponent — animation follows input
+			_animationController.StartAction("jump");
+		}
+
+		// Fall detection: airborne, falling downward, not already in a StateMachine action
+		if (!IsOnFloor() && Velocity.Y < -2f && !_animationController.IsActionActive())
+		{
+			_animationController.StartAction("fall");
+		}
+
+		// Landing: any action ends when grounded (only if falling, not jumping)
+		if (IsOnFloor() && Velocity.Y <= 0f && _animationController.IsActionActive())
+		{
+			_animationController.EndAction();
+		}
+
+		// Locomotion blend (idle↔run) only when no action active
+		if (!_animationController.IsActionActive())
+		{
+			float speed01 = 0f;
+			if (_movementComponent.CurrentState == ActionState.Dashing)
+				speed01 = 1f;
+			else
+			{
+				if (hVel.Length() > 1f)
+					speed01 = Mathf.Clamp(hVel.Length() / 14f, 0f, 1f);
+			}
+			_animationController.ProcessLocomotion(speed01);
+		}
 
 		OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
 	}
@@ -540,8 +628,9 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.IsInKnockback()) return;
 		if (_movementComponent.State.AnimLockTicks > 0) return;
 
-		// Block ALL ability execution while an attack animation plays
-		if (_animationController.IsAttacking()) return;
+		// Slot 0 (LMB) chains into next combo stage via AnimationTree StateMachine.
+		// Other slots are blocked during an active attack.
+		if (slotIndex != 0 && _animationController.IsActionActive()) return;
 
 		var ability = _charDef.GetSlotAbility(slotIndex, airborne);
 
@@ -565,14 +654,19 @@ public partial class PlayerController : CharacterBody3D
 			ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
 		}
 
-		// Play attack animation (use SelfLockTicks for duration, not animation length)
+		// Play attack animation via AnimationTree StateMachine
 		int animStage = (stages != null && stages.Length > 0)
 			? Math.Clamp(_movementComponent.State.ComboStage - 1, 0, stages.Length - 1)
 			: 0;
-		float attackDurationSec = 0.0f;
-		if (stages != null && animStage < stages.Length)
-			attackDurationSec = stages[animStage].SelfLockTicks / 60f;
-		_animationController.PlayAttack(ability.AnimationNames, animStage, slotIndex, attackDurationSec);
+		string? animName = ability.AnimationNames != null && animStage < ability.AnimationNames.Length
+			? ability.AnimationNames[animStage]
+			: null;
+		if (animName != null)
+		{
+			// Enter LMB state in action machine + chain to correct stage
+			_animationController.StartAction("LMB");
+			_animationController.RequestSubAction("LMB", animName);
+		}
 
 		// ── Step 2: Special effects ──
 		if (ability.SpecialEffectKeys != null)
@@ -741,24 +835,47 @@ public partial class PlayerController : CharacterBody3D
 
 	private Node3D? LoadPlayerModel()
 	{
-		// Load Knight.glb (KayKit model exported as GLB)
-		if (!ResourceLoader.Exists("res://assets/characters/knight/Knight.glb"))
-		{ GD.Print("Knight.glb not found, using fallback capsule"); CreateFallbackMesh(); return null; }
+		string modelPath;
+		Vector3 scale;
+		Vector3 position;
+		bool hasWeapon = false;
 
-		var pm = GD.Load<PackedScene>("res://assets/characters/knight/Knight.glb")?.Instantiate<Node3D>();
+		switch (_playerClass)
+		{
+			case CharacterClass.Manki:
+				modelPath = "res://assets/characters/manki/manki.tscn";
+				scale = Vector3.One;
+				position = Vector3.Zero;
+				hasWeapon = false;
+				break;
+			default:
+				modelPath = "res://assets/characters/manki/manki.tscn";
+				scale = Vector3.One;
+				position = Vector3.Zero;
+				hasWeapon = false;
+				break;
+		}
+
+		if (!ResourceLoader.Exists(modelPath))
+		{
+			GD.Print($"{modelPath} not found, using fallback capsule");
+			CreateFallbackMesh();
+			return null;
+		}
+
+		var pm = GD.Load<PackedScene>(modelPath)?.Instantiate<Node3D>();
 		if (pm == null) { CreateFallbackMesh(); return null; }
 
 		pm.Name = "PlayerModel";
 		AddChild(pm);
 
-		GD.Print("PlayerModel loaded from Knight.glb");
+		GD.Print($"PlayerModel loaded from {modelPath}");
 
-		// Scale: KayKit models are ~1 unit tall, scale up to match game scale
-		pm.Scale = new Vector3(2.0f, 2.0f, 2.0f);
-		pm.Position = new Vector3(0f, -1.0f, 0f);
+		pm.Scale = scale;
+		pm.Position = position;
 
-		// Attach 2-handed sword to hand.r
-		AttachWeaponToHand(pm);
+		if (hasWeapon)
+			AttachWeaponToHand(pm);
 
 		return pm;
 	}
