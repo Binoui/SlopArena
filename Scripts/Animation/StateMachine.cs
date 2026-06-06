@@ -150,4 +150,12 @@ public partial class StateMachine : Node
 	}
 
 	public bool CanMove() => CurrentState?.CanMove ?? true;
+
+	/// <summary>
+	/// Get a registered state by name. Returns null if not found.
+	/// </summary>
+	public AttackState? GetAttackState()
+	{
+		return _states.TryGetValue("attack", out var state) ? state as AttackState : null;
+	}
 }

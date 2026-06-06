@@ -599,8 +599,8 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.State.AnimLockTicks > 0) return;
 
 		// Slot 0 (LMB) chains into next combo stage.
-		// Other slots are blocked during an active FSM attack state (TODO).
-		//if (slotIndex != 0 && _animationController.IsActionActive()) return;
+		// Other slots are blocked during an active attack.
+		if (slotIndex != 0 && _fsm != null && _fsm.IsInState("attack")) return;
 
 		var ability = _charDef.GetSlotAbility(slotIndex, airborne);
 
@@ -631,10 +631,19 @@ public partial class PlayerController : CharacterBody3D
 		string? animName = ability.AnimationNames != null && animStage < ability.AnimationNames.Length
 			? ability.AnimationNames[animStage]
 			: null;
-		if (animName != null)
+		if (animName != null && _fsm != null)
 		{
-			// TODO: route through FSM AttackState
-			_fsm?.TransitionTo("idle");
+			var attackState = _fsm.GetAttackState();
+			if (attackState != null)
+			{
+				if (_fsm.IsInState("attack"))
+					attackState.ChainTo(animName);      // combo chain
+				else
+				{
+					attackState.NextAnimName = animName;
+					_fsm.TransitionTo("attack");        // first attack
+				}
+			}
 		}
 
 		// ── Step 2: Special effects ──

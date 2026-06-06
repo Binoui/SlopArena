@@ -111,6 +111,7 @@ public sealed partial class MyState : State
 | `jump` | `Jump` | fall, landing | velocity.Y < 0, on floor |
 | `fall` | `Fall` | landing | on floor |
 | `landing` | `Land` | idle, run | timer expired |
+| `attack` | `melee` | idle, run, fall | AnimLockTicks == 0 |
 
 ### Rules
 
