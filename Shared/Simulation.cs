@@ -338,6 +338,8 @@ namespace SlopArena.Shared
             if (input.Jump && s.JumpsLeft > 0)
             {
                 s.VY = stats.JumpForce;
+                s.VX = dirX * stats.WalkSpeed;
+                s.VZ = dirZ * stats.WalkSpeed;
                 s.JumpsLeft--;
             }
 
