@@ -12,30 +12,14 @@ using SlopArena.Shared;
 /// </summary>
 public static class AbilityRegistry
 {
-	private static readonly Dictionary<string, Action<CombatComponent>> Effects = new()
-	{
-		// Vanguard
-		{ "VanguardShieldBash", VanguardAbilities.ShieldBash },
-		{ "VanguardWarCry", VanguardAbilities.WarCry },
-		{ "VanguardIntervene", VanguardAbilities.Intervene },
-		{ "VanguardThunderclap", VanguardAbilities.Thunderclap },
-
-		// Wraith
-		{ "WraithViperShot", WraithAbilities.ViperShot },
-		{ "WraithShadowStep", WraithAbilities.ShadowStep },
-		{ "WraithRapidFire", WraithAbilities.RapidFire },
-		{ "WraithFreezingTrap", WraithAbilities.FreezingTrap },
-
-		// Manki
-		{ "MankiFireLash", MankiAbilities.FireLash },
-		{ "MankiRisingFlame", MankiAbilities.RisingFlame },
-		{ "MankiEmberBurst", MankiAbilities.EmberBurst },
-		{ "MankiInfernoDance", MankiAbilities.InfernoDance },
-
-		// Knight
-		{ "KnightKnightsResolve", KnightAbilities.KnightsResolve },
-		{ "KnightMightOfExcalibur", KnightAbilities.MightOfExcalibur },
-	};
+		private static readonly Dictionary<string, Action<CombatComponent>> Effects = new()
+		{
+			// Manki
+			{ "MankiFireLash", MankiAbilities.FireLash },
+			{ "MankiRisingFlame", MankiAbilities.RisingFlame },
+			{ "MankiEmberBurst", MankiAbilities.EmberBurst },
+			{ "MankiInfernoDance", MankiAbilities.InfernoDance },
+		};
 
 	/// <summary>
 	/// Execute a special effect by key name.

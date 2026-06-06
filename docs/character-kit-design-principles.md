@@ -18,7 +18,6 @@ No character has everything — each gets 4-6 slots distributed among these role
 - Use: spacing, zone control, chip damage
 - CD: 0.5-3s (or spammable with low damage)
 - In DKO: neutral-B equivalent, or LMB for mages
-- **Rule**: no homing. The projectile travels straight in the character's facing direction.
 
 ### 2. Mobility / Recovery
 - Dash, teleport, sprint boost, grapple, leap
@@ -149,62 +148,56 @@ Examples: Loki (DKO), Izanami (DKO), Croak (Battlerite), Shifu (Battlerite)
 
 ---
 
-## 10 Design Rules
+## 9 Design Rules
 
-### Rule 1: Everything is a skillshot
-- No homing, no auto-aim
-- The **character's facing direction** = the ability's direction
-- The player aims with movement (WASD), not with a crosshair
-- A projectile goes straight in the direction you face at cast time
-
-### Rule 2: Abilities have commitment
+### Rule 1: Abilities have commitment
 - Startup + endlag. The stronger the ability, the more you risk on a whiff
 - Light abilities: startup 0.1-0.2s, endlag 0.1s (you can act almost immediately)
 - Heavy abilities: startup 0.3-0.6s, endlag 0.3s (you're vulnerable on whiff)
 - Ultimates: startup 0.5-1.0s (very telegraphed, opponent can dodge)
 
-### Rule 3: CC is the combat key
+### Rule 2: CC is the combat key
 - Without CC, nobody can punish → chip damage stalemate
 - With too much CC, it's stunlock → not fun
 - **Sweet spot: 1 CC ability per kit** (6-10s CD)
 - Hard CC (stun) lasts 1-2s max in a platform fighter
 
-### Rule 4: One ability = one job
-- Each ability has **one clear job**: poke, move, CC, zone, counter, buff, burst
-- No abilities that "apply effect A + bonus if effect A already present"
-- Synergies between **different slots** are OK
-  (e.g. Q = slow → E = stun if slowed) but not within the same ability
+### Rule 3: Each ability has a general role
+- Every ability has a **primary job**: poke, move, CC, zone, counter, buff, burst, extender, finisher
+- Don't cram 3 jobs into one spell — a finisher can have a small slow attached, a movement ability can have a small hitbox, but a spell that simultaneously zones + heals + silences is overloaded
+- The role is a **design north star**, not a straightjacket
+- Synergies between **different slots** are encouraged
+  (e.g. Q applies slow → E hits harder on slowed targets)
 
-### Rule 5: Recovery abilities must be usable often
+### Rule 4: Recovery abilities must be usable often
 - Short CD (3-6s). This is what makes combat dynamic
 - Without mobility, a character is immobile and predictable
 - The player should be able to use it for both engage **and** disengage
 
-### Rule 6: Counter/parry is optional but powerful
+### Rule 5: Counter/parry is optional but powerful
 - Rewards reads and creates "outplay" moments
 - 1 character per pool max, or reserved for a specific archetype (support/control)
 - Must have a whiff punish — if the player misses the counter window, they're vulnerable
 
-### Rule 7: No mana, cooldowns only
+### Rule 6: No mana, cooldowns only
 - Players manage **timing**, not a resource
 - Cooldowns let opponents read patterns ("he used his Q, I can engage now")
 - Exception: a self-damage character (Thanatos in DKO) works as a trade-off mechanic
 
-### Rule 8: Abilities interact between slots
-- No nested effects within a single ability
-- But **combinations between abilities** are encouraged
+### Rule 7: Abilities interact between slots
+- **Combinations between abilities** are encouraged
 - Classic DKO combo flow:
   1. Q = slow (CC)
   2. E = stun if target has slow (combo extender)
   3. R or F = big damage during stun (burst)
 
-### Rule 9: Every kit must have a clear weakness
+### Rule 8: Every kit must have a clear weakness
 - Rushdown: weak at range, predictable approach
 - Control: weak in close range, vulnerable when rushed
 - Support: weak in 1v1, depends on teammates
 - Assassin: fragile, dead if the burst misses
 
-### Rule 10: All characters have basic attacks
+### Rule 9: All characters have basic attacks
 - LMB = light attack (2-4 hit combo depending on character)
 - RMB = heavy attack (slower, stronger, often has a charge hold variant)
 - In DKO, light attacks deal ~6/6/12 (total 24), heavy attacks deal ~10
@@ -212,43 +205,34 @@ Examples: Loki (DKO), Izanami (DKO), Croak (Battlerite), Shifu (Battlerite)
 
 ---
 
-## Applying to SlopArena's 3 Classes
+## Applying to SlopArena — Current Roster
 
-Using the patterns above to fill out the existing 3 classes:
+Only one character is active in the codebase. Design others from scratch following these patterns.
 
-### Vanguard (Rushdown)
-| Slot | Role | Type | CD |
-|------|------|------|----|
-| LMB | Light combo (3 hits) | Physical | 0s |
-| RMB | Heavy smash | Physical | 0s, with recovery |
-| Q | CC engage (knockup) | Ability | 7s |
-| E | Mobility dash | Ability | 4s |
-| R | Big damage burst | Ability | 25s |
-| Passive | Damage or movespeed on hit | — | — |
+### Manki (Rushdown / Agile Brawler)
 
-### Wraith (Assassin)
-| Slot | Role | Type | CD |
-|------|------|------|----|
-| LMB | Fast light combo (4 hits) | Physical | 0s |
-| RMB | Heavy strike | Physical | 0s |
-| Q | Stealth / teleport | Ability | 8s |
-| E | Combo extender (conditional) | Ability | 6s |
-| R | Single-target burst | Ability | 30s |
-| Passive | Bonus damage from behind or vs isolated | — | — |
+| Slot | Role | Type | Notes |
+|------|------|------|-------|
+| LMB | Light combo (3-4 hits) | Physical | Fire-infused punches, launcher on final hit |
+| AirLMB | Rising uppercut (1-2 hits) | Physical | Launch follow-up, dash-cancelable |
+| RMB | Charged heavy punch | Physical | ~15 dmg charged, ~10 uncharged |
+| AirRMB | Downward fire slam | Physical | Spike, 1 hit per flight |
+| Q | Fire Lash (ground kick) | Ability | CC / engage, medium range |
+| E | Rising Flame (uppercut) | Ability | Recovery / launcher, vertical mobility |
+| R | Ember Burst (explosion) | Ability | Zone / burst, area denial |
+| F | Inferno Dance (ult) | Ability | Big finisher, telegraphed wind-up |
+| Passive | — | — | (None yet) |
 
-### Channeler (Control)
-| Slot | Role | Type | CD |
-|------|------|------|----|
-| LMB | Projectile poke | Ability | 1.5s |
-| RMB | Heavy zone swing | Physical | 0s |
-| Q | Slow / root | Ability | 8s |
-| E | Zone area denial | Ability | 10s |
-| R | Big zone ultimate | Ability | 30s |
-| F | Counter / parry shield | Ability | 10s |
-| Passive | Extended range or AOE on hits | — | — |
+**Gameplan**: rush down → land a CC → air combo → finisher on landing. High mobility, low range. Must commit to engage.
+
+### Future characters
+
+When designing a new character, start from one of the 4 archetypes defined above, then fill the 8 ability slots (LMB, AirLMB, RMB, AirRMB, Q, E, R, F). Document in `docs/characters/<name>.md`.
 
 ---
 
 ## References
 - `docs/research/dko-character-kits.md` — raw DKO data (13 gods, full ability tables)
+- `docs/combat-systems.md` — universal combat mechanics: attack patterns, aerial rules, aiming types, hitbox philosophy, finisher design
 - Research sessions: Battlerite (6 abilities, all skillshots), Supervive (4 abilities + platform fighter movement), Fangs (2 abilities + ult), Rumble (pure movement, no abilities)
+

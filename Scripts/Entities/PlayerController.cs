@@ -20,7 +20,7 @@ public partial class PlayerController : CharacterBody3D
 	// ==========================================
 
 	private CharacterDefinition _charDef;
-	private CharacterClass _playerClass = CharacterClass.Vanguard;
+	private CharacterClass _playerClass = CharacterClass.Manki;
 	private ArenaDefinition _arenaDef;
 
 	public void SetClass(CharacterClass pc)
