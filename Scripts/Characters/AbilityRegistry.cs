@@ -26,11 +26,11 @@ public static class AbilityRegistry
 		{ "WraithRapidFire", WraithAbilities.RapidFire },
 		{ "WraithFreezingTrap", WraithAbilities.FreezingTrap },
 
-		// Channeler
-		{ "ChannelerFrostbolt", ChannelerAbilities.Frostbolt },
-		{ "ChannelerDragonsBreath", ChannelerAbilities.DragonsBreath },
-		{ "ChannelerIceLance", ChannelerAbilities.IceLance },
-		{ "ChannelerMeteor", ChannelerAbilities.Meteor },
+		// Manki
+		{ "MankiFireLash", MankiAbilities.FireLash },
+		{ "MankiRisingFlame", MankiAbilities.RisingFlame },
+		{ "MankiEmberBurst", MankiAbilities.EmberBurst },
+		{ "MankiInfernoDance", MankiAbilities.InfernoDance },
 
 		// Knight
 		{ "KnightKnightsResolve", KnightAbilities.KnightsResolve },

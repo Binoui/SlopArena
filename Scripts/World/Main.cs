@@ -13,7 +13,7 @@ public partial class Main : Node3D
 	private ActionBarHUD? _actionBarHUD;
 	private UnitFrames? _unitFrames;
 	private EscapeMenuUI? _escapeMenu;
-	private CharacterClass _selectedClass = CharacterClass.Vanguard;
+	private CharacterClass _selectedClass = CharacterClass.Manki;
 
 	// Cercle de ciblage (WoW-style ring under target)
 	private MeshInstance3D? _targetRing;
@@ -22,6 +22,9 @@ public partial class Main : Node3D
 	public override async void _Ready()
 	{
 		GD.Print("SlopArena 3D C# Client Started!");
+
+		// Setup input actions for spells (layout-independent physical keys)
+		SetupInputActions();
 
 		// Force fullscreen — UI elements size themselves to viewport on Build()
 		DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
@@ -82,19 +85,19 @@ public partial class Main : Node3D
 		AddChild(_arenaManager);
 		_arenaManager.LoadArena("split");
 
-		// --- NPC Enemies (5 PlayerController instances, not player controlled) ---
-		for (int i = 0; i < 5; i++)
-		{
-			var npc = new PlayerController();
-			npc.Name = $"NPC_{i}";
-			npc.Position = _arenaManager.GetSpawnPosition(i);
-			// Cycle through classes (4 available: Vanguard, Wraith, Channeler, Knight)
-			npc.SetClass((CharacterClass)(i % 4));
-			AddChild(npc);
-			npc.SetNPC(true);
-			npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
-			_npcs[i] = npc;
-		}
+				// --- NPC Enemies (5 PlayerController instances, not player controlled) ---
+				for (int i = 0; i < 5; i++)
+				{
+				var npc = new PlayerController();
+				npc.Name = $"NPC_{i}";
+				npc.Position = _arenaManager.GetSpawnPosition(i);
+				// All NPCs are Manki for now
+				npc.SetClass(CharacterClass.Manki);
+				AddChild(npc);
+				npc.SetNPC(true);
+				npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
+				_npcs[i] = npc;
+				}
 
 		// --- Targeting Ring ---
 		_targetRing = CreateTargetRing();
@@ -107,11 +110,11 @@ public partial class Main : Node3D
 		// --- Player (spawn index 5, the last spawn point) ---
 		_player = new PlayerController();
 		_player.Name = "Player";
+		_player.SetClass(_selectedClass);
 		AddChild(_player);
 		_player.Position = _arenaManager.GetSpawnPosition(5);
 		// Offset player from NPCs and above floor
 		_player.Position += new Vector3(5f, 15f, 0f);
-		_player.SetClass(_selectedClass);
 
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
@@ -571,5 +574,27 @@ _label.Text = $"SlopArena Arena Sandbox\n" +
 		crosshair.AddChild(dot);
 		
 		_canvasLayer?.AddChild(crosshair);
+	}
+
+	private void SetupInputActions()
+	{
+		// Layout-independent physical key bindings for ability slots
+		// Works on QWERTY, AZERTY, and all layouts.
+		RegisterInputAction("spell_slot1", Key.Q);  // top-left letter key
+		RegisterInputAction("spell_slotE", Key.E);
+		RegisterInputAction("spell_slotR", Key.R);
+		RegisterInputAction("spell_slot3", Key.F);
+		RegisterInputAction("jump", Key.Space);
+		RegisterInputAction("dash", Key.Shift);
+	}
+
+	private void RegisterInputAction(string actionName, Key physicalKey)
+	{
+		if (InputMap.HasAction(actionName))
+			InputMap.EraseAction(actionName);
+		InputMap.AddAction(actionName);
+		var ev = new InputEventKey();
+		ev.PhysicalKeycode = physicalKey;
+		InputMap.ActionAddEvent(actionName, ev);
 	}
 }

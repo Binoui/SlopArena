@@ -1,0 +1,31 @@
+[gd_resource type="AnimationNodeStateMachine" format=3 uid="uid://vrdfi6dscwlu"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ftmd0"]
+animation = &"backflip"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_foqek"]
+animation = &"leg_sweep"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hpb6d"]
+animation = &"melee"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_clx38"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_nlvqt"]
+switch_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_p4nk6"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_j33en"]
+switch_mode = 2
+advance_mode = 2
+
+[resource]
+states/Start/position = Vector2(248, 100)
+states/backflip/node = SubResource("AnimationNodeAnimation_ftmd0")
+states/backflip/position = Vector2(765, 100)
+states/leg_sweep/node = SubResource("AnimationNodeAnimation_foqek")
+states/leg_sweep/position = Vector2(583, 100)
+states/melee/node = SubResource("AnimationNodeAnimation_hpb6d")
+states/melee/position = Vector2(403, 100)
+transitions = ["Start", "melee", SubResource("AnimationNodeStateMachineTransition_clx38"), "melee", "leg_sweep", SubResource("AnimationNodeStateMachineTransition_nlvqt"), "leg_sweep", "backflip", SubResource("AnimationNodeStateMachineTransition_p4nk6"), "backflip", "End", SubResource("AnimationNodeStateMachineTransition_j33en")]

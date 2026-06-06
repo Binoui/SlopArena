@@ -6,7 +6,7 @@ namespace SlopArena.Shared
     {
         Vanguard,
         Wraith,
-        Channeler,
+        Manki,
         Knight
     }
 
@@ -95,7 +95,7 @@ namespace SlopArena.Shared
             {
                 BuildVanguard(),
                 BuildWraith(),
-                BuildChanneler(),
+                BuildManki(),
                 BuildKnight(),
             };
         }
@@ -291,104 +291,139 @@ namespace SlopArena.Shared
         }
 
         // ═══════════════════════════════════════
-        // CHANNELER — ranged, control, zone
+        // MANKI — Fire Monkey, agile rushdown/acrobat
         // ═══════════════════════════════════════
-        private static CharacterDefinition BuildChanneler()
+        private static CharacterDefinition BuildManki()
         {
             return new CharacterDefinition
             {
-                Class = CharacterClass.Channeler,
-                DisplayName = "Channeler",
+                Class = CharacterClass.Manki,
+                DisplayName = "Manki",
                 Movement = new MovementStats
                 {
-                    WalkSpeed = 10f,
-                    SprintSpeed = 13f,
-                    DashSpeed = 30f,
-                    AirAcceleration = 14f,
-                    JumpForce = 16f,
-                    Gravity = 35f,
-                    DashDurationTicks = 9,
-                    DashCooldownTicks = 58,
+                    WalkSpeed = 11f,
+                    SprintSpeed = 14f,
+                    DashSpeed = 34f,
+                    AirAcceleration = 16f,
+                    JumpForce = 17f,
+                    Gravity = 37f,
+                    DashDurationTicks = 8,
+                    DashCooldownTicks = 56,
                     GroundFriction = 16f,
                     AirFriction = 0.45f,
-                    MaxFallSpeed = 52f,
+                    MaxFallSpeed = 53f,
                     MaxJumps = 2,
                 },
 
+                // LMB — 3-hit combo: punch, leg sweep, backflip
                 LMB = new AbilityData
                 {
-                    Name = "Arcane Slash",
+                    Name = "Monkey Combo",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 10f, StunTicks = 10, SelfLockTicks = 8, ChainWindowTicks = 36 },
-                        new() { Damage = 6f, KnockbackForce = 5f, KnockbackUpward = 3f, LungeForce = 16f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 36 },
-                        new() { Damage = 10f, KnockbackForce = 14f, KnockbackUpward = 5f, LungeForce = 22f, StunTicks = 20, SelfLockTicks = 12, ChainWindowTicks = 0 },
-                    }
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 8, ChainWindowTicks = 40 },
+                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 40 },
+                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                    },
+                    AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
 
+                // Air LMB — upward kick for air combos
+                AirLMB = new AbilityData
+                {
+                    Name = "Air Kick",
+                    CooldownTicks = 0,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                    },
+                    AnimationNames = new[] { "attack_air_lmb" },
+                },
+
+                // RMB — charged punch
                 RMB = new AbilityData
                 {
-                    Name = "Force Push",
+                    Name = "Fire Fist",
                     CooldownTicks = 15,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 20f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 30f, KnockbackUpward = 12f, LungeForce = 0f, StunTicks = 22, SelfLockTicks = 28, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 26, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18,
+                    AnimationNames = new[] { "attack_heavy_charge" },
                 },
 
-                // Q — Frostbolt: projectile, applies Slow
+                // Air RMB — drop kick spike
+                AirRMB = new AbilityData
+                {
+                    Name = "Drop Kick",
+                    CooldownTicks = 0,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                    },
+                    AnimationNames = new[] { "attack_air_rmb" },
+                },
+
+                // Q — Fire Lash: ground kick, slows on hit
                 Q = new AbilityData
                 {
-                    Name = "Frostbolt",
+                    Name = "Fire Lash",
                     CooldownTicks = 60,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 12f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 6, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 10, ChainWindowTicks = 0 },
                     },
-                    SpecialEffectKeys = new[] { "ChannelerFrostbolt" },
+                    AnimationNames = new[] { "spell_q" },
+                    SpecialEffectKeys = new[] { "MankiFireLash" },
                 },
 
-                // E — Dragon's Breath: cone fire, applies Burn
+                // E — Rising Flame: vertical uppercut, anti-air / recovery
                 E = new AbilityData
                 {
-                    Name = "Dragon's Breath",
-                    CooldownTicks = 180,
-                    Stages = new AttackStage[]
-                    {
-                        new() { Damage = 8f, KnockbackForce = 3f, KnockbackUpward = 1f, SelfLockTicks = 12, ChainWindowTicks = 0 },
-                    },
-                    SpecialEffectKeys = new[] { "ChannelerDragonsBreath" },
-                },
-
-                // R — Ice Lance: hitscan beam, consumes Slow for bonus
-                R = new AbilityData
-                {
-                    Name = "Ice Lance",
+                    Name = "Rising Flame",
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 15f, KnockbackForce = 12f, KnockbackUpward = 5f, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 12, ChainWindowTicks = 0 },
                     },
-                    SpecialEffectKeys = new[] { "ChannelerIceLance" },
+                    AnimationNames = new[] { "spell_e" },
+                    SpecialEffectKeys = new[] { "MankiRisingFlame" },
                 },
 
-                // F — Meteor: mark zone, delayed meteor strike, Burn
+                // R — Ember Burst: AoE explosion around self
+                R = new AbilityData
+                {
+                    Name = "Ember Burst",
+                    CooldownTicks = 150,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                    },
+                    AnimationNames = new[] { "spell_r" },
+                    SpecialEffectKeys = new[] { "MankiEmberBurst" },
+                },
+
+                // F — Inferno Dance (Ult): dash + auto-combo + explosion
                 F = new AbilityData
                 {
-                    Name = "Meteor",
-                    CooldownTicks = 360,
-                    SpecialEffectKeys = new[] { "ChannelerMeteor" },
+                    Name = "Inferno Dance",
+                    CooldownTicks = 420,
+                    Stages = new AttackStage[]
+                    {
+                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 24, ChainWindowTicks = 0 },
+                    },
+                    AnimationNames = new[] { "spell_f" },
+                    SpecialEffectKeys = new[] { "MankiInfernoDance" },
                 },
             };
         }
 
-    // ═══════════════════════════════════════
     // KNIGHT — medium, balanced, based on King Arthur (DKO)
     // ═══════════════════════════════════════
     private static CharacterDefinition BuildKnight()
