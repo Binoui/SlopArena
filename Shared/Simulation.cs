@@ -302,8 +302,13 @@ namespace SlopArena.Shared
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
             }
 
-            // Jump — handled by IdleState.OnPhysicsProcess directly
-            // (kept here for air section which uses a different path)
+            // Jump — applied by simulation (IsGrounded tracks properly)
+            if (input.Jump && s.JumpsLeft > 0)
+            {
+                s.VY = stats.JumpForce;
+                s.JumpsLeft--;
+                s.IsGrounded = false;
+            }
 
             UpdateFacing(ref s);
         }
