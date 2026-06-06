@@ -135,6 +135,18 @@ public partial class PlayerController : CharacterBody3D
 		var capsule = new CapsuleShape3D { Radius = _charDef.CapsuleRadius, Height = _charDef.CapsuleHeight };
 		AddChild(new CollisionShape3D { Shape = capsule });
 
+		// Debug: transparent capsule mesh to visualize collision vs model
+		var debugVis = new MeshInstance3D
+		{
+			Mesh = new CapsuleMesh { Radius = _charDef.CapsuleRadius, Height = _charDef.CapsuleHeight },
+			MaterialOverride = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0f, 1f, 0f, 0.15f),
+				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			}
+		};
+		AddChild(debugVis);
+
 		// Components
 		_movementComponent = new MovementComponent(this);
 		_movementComponent.Setup(_charDef, _arenaDef);
