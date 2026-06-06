@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://do0y2yjskp7fg" path="res://Scripts/Animation/States/JumpState.cs" id="6_gs8io"]
 [ext_resource type="Script" uid="uid://di6tcnes53uc8" path="res://Scripts/Animation/States/FallState.cs" id="7_v4vgh"]
 [ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="8_8obs1"]
+[ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="9_t77cg"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_fall"]
 animation = &"fall"
@@ -34,6 +35,39 @@ animation = &"land"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_run"]
 animation = &"run"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_melee"]
+animation = &"melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_leg_sweep"]
+animation = &"leg_sweep"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_backflip"]
+animation = &"backflip"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_air_lmb"]
+animation = &"attack_air_lmb"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_heavy_charge"]
+animation = &"attack_heavy_charge"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_air_rmb"]
+animation = &"attack_air_rmb"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_q"]
+animation = &"spell_q"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_e"]
+animation = &"spell_e"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_r"]
+animation = &"spell_r"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_f"]
+animation = &"spell_f"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_005"]
+xfade_time = 0.05
+
 [sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_01"]
 xfade_time = 0.1
 
@@ -50,7 +84,7 @@ xfade_time = 0.15
 [sub_resource type="AnimationNodeStateMachineTransition" id="Transition_at_end"]
 
 [sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_main"]
-states/End/position = Vector2(1350, 250)
+states/End/position = Vector2(1500, 250)
 states/Fall/node = SubResource("AnimationNodeAnimation_anim_fall")
 states/Fall/position = Vector2(688, 333)
 states/Idle/node = SubResource("AnimationNodeAnimation_anim_idle")
@@ -64,7 +98,27 @@ states/Land/position = Vector2(1024, 250)
 states/Run/node = SubResource("AnimationNodeAnimation_anim_run")
 states/Run/position = Vector2(364, 333)
 states/Start/position = Vector2(100, 250)
-transitions = ["Start", "Idle", SubResource("Transition_immediate_01"), "Idle", "Run", SubResource("Transition_immediate_015"), "Run", "Idle", SubResource("Transition_immediate_015"), "Idle", "Jump", SubResource("Transition_immediate_01"), "Run", "Jump", SubResource("Transition_immediate_01"), "Jump", "Fall", SubResource("Transition_end_02"), "Fall", "Land", SubResource("Transition_end_015"), "Idle", "Fall", SubResource("Transition_end_02"), "Run", "Fall", SubResource("Transition_end_02"), "Land", "Idle", SubResource("Transition_at_end"), "Idle", "LMB", SubResource("Transition_immediate_01"), "Run", "LMB", SubResource("Transition_immediate_01"), "LMB", "End", SubResource("Transition_immediate_015"), "Jump", "LMB", SubResource("Transition_immediate_01"), "Fall", "LMB", SubResource("Transition_immediate_01")]
+states/melee/node = SubResource("AnimationNodeAnimation_anim_melee")
+states/melee/position = Vector2(200, 500)
+states/leg_sweep/node = SubResource("AnimationNodeAnimation_anim_leg_sweep")
+states/leg_sweep/position = Vector2(400, 500)
+states/backflip/node = SubResource("AnimationNodeAnimation_anim_backflip")
+states/backflip/position = Vector2(600, 500)
+states/attack_air_lmb/node = SubResource("AnimationNodeAnimation_anim_air_lmb")
+states/attack_air_lmb/position = Vector2(200, 650)
+states/attack_heavy_charge/node = SubResource("AnimationNodeAnimation_anim_heavy_charge")
+states/attack_heavy_charge/position = Vector2(400, 650)
+states/attack_air_rmb/node = SubResource("AnimationNodeAnimation_anim_air_rmb")
+states/attack_air_rmb/position = Vector2(600, 650)
+states/spell_q/node = SubResource("AnimationNodeAnimation_anim_spell_q")
+states/spell_q/position = Vector2(200, 800)
+states/spell_e/node = SubResource("AnimationNodeAnimation_anim_spell_e")
+states/spell_e/position = Vector2(400, 800)
+states/spell_r/node = SubResource("AnimationNodeAnimation_anim_spell_r")
+states/spell_r/position = Vector2(600, 800)
+states/spell_f/node = SubResource("AnimationNodeAnimation_anim_spell_f")
+states/spell_f/position = Vector2(800, 800)
+transitions = ["Start", "Idle", SubResource("Transition_immediate_01"), "Idle", "Run", SubResource("Transition_immediate_015"), "Run", "Idle", SubResource("Transition_immediate_015"), "Idle", "Jump", SubResource("Transition_immediate_01"), "Run", "Jump", SubResource("Transition_immediate_01"), "Jump", "Fall", SubResource("Transition_end_02"), "Fall", "Land", SubResource("Transition_end_015"), "Idle", "Fall", SubResource("Transition_end_02"), "Run", "Fall", SubResource("Transition_end_02"), "Land", "Idle", SubResource("Transition_at_end"), "Idle", "LMB", SubResource("Transition_immediate_01"), "Run", "LMB", SubResource("Transition_immediate_01"), "LMB", "End", SubResource("Transition_immediate_015"), "Jump", "LMB", SubResource("Transition_immediate_01"), "Fall", "LMB", SubResource("Transition_immediate_01"), "Idle", "melee", SubResource("Transition_immediate_01"), "Run", "melee", SubResource("Transition_immediate_01"), "Jump", "melee", SubResource("Transition_immediate_01"), "Fall", "melee", SubResource("Transition_immediate_01"), "melee", "leg_sweep", SubResource("Transition_immediate_005"), "leg_sweep", "backflip", SubResource("Transition_immediate_005"), "melee", "End", SubResource("Transition_immediate_015"), "leg_sweep", "End", SubResource("Transition_immediate_015"), "backflip", "End", SubResource("Transition_immediate_015"), "Idle", "attack_air_lmb", SubResource("Transition_immediate_01"), "Run", "attack_air_lmb", SubResource("Transition_immediate_01"), "Jump", "attack_air_lmb", SubResource("Transition_immediate_01"), "Fall", "attack_air_lmb", SubResource("Transition_immediate_01"), "attack_air_lmb", "End", SubResource("Transition_immediate_015"), "Idle", "attack_heavy_charge", SubResource("Transition_immediate_01"), "Run", "attack_heavy_charge", SubResource("Transition_immediate_01"), "attack_heavy_charge", "End", SubResource("Transition_immediate_015"), "Jump", "attack_air_rmb", SubResource("Transition_immediate_01"), "Fall", "attack_air_rmb", SubResource("Transition_immediate_01"), "attack_air_rmb", "End", SubResource("Transition_immediate_015"), "Idle", "spell_q", SubResource("Transition_immediate_01"), "Run", "spell_q", SubResource("Transition_immediate_01"), "Jump", "spell_q", SubResource("Transition_immediate_01"), "Fall", "spell_q", SubResource("Transition_immediate_01"), "spell_q", "End", SubResource("Transition_immediate_015"), "Idle", "spell_e", SubResource("Transition_immediate_01"), "Run", "spell_e", SubResource("Transition_immediate_01"), "Jump", "spell_e", SubResource("Transition_immediate_01"), "Fall", "spell_e", SubResource("Transition_immediate_01"), "spell_e", "End", SubResource("Transition_immediate_015"), "Idle", "spell_r", SubResource("Transition_immediate_01"), "Run", "spell_r", SubResource("Transition_immediate_01"), "Jump", "spell_r", SubResource("Transition_immediate_01"), "Fall", "spell_r", SubResource("Transition_immediate_01"), "spell_r", "End", SubResource("Transition_immediate_015"), "Idle", "spell_f", SubResource("Transition_immediate_01"), "Run", "spell_f", SubResource("Transition_immediate_01"), "Jump", "spell_f", SubResource("Transition_immediate_01"), "Fall", "spell_f", SubResource("Transition_immediate_01"), "spell_f", "End", SubResource("Transition_immediate_015")]
 graph_offset = Vector2(283, 149)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
@@ -163,5 +217,8 @@ script = ExtResource("7_v4vgh")
 
 [node name="landing" type="Node" parent="FSM" unique_id=415177410]
 script = ExtResource("8_8obs1")
+
+[node name="attack" type="Node" parent="FSM" unique_id=881088101]
+script = ExtResource("9_t77cg")
 
 [editable path="anim_monkey"]
