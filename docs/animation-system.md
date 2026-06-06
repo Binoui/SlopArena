@@ -1,63 +1,62 @@
 # SlopArena — Animation & State Machine System
 
-> Architecture du système d'animations et de machine à états custom.
+> Architecture of the custom state machine and animation system.
 
 ---
 
-## Architecture générale
+## Overview
 
-Deux couches indépendantes qui communiquent par `Travel()` :
+Two independent layers that communicate via `Travel()`:
 
 ```
-AnimationTree (StateMachine root)          ← transitions d'animations
+AnimationTree (StateMachine root)          ← animation transitions
     Idle ↔ Run → Jump → Fall → Land → Idle
 
-Custom FSM (StateMachine.cs)                ← logique + transitions
+Custom FSM (StateMachine.cs)                ← game logic + state transitions
     IdleState → RunState → JumpState → FallState → LandingState
 ```
 
-**Principe :** le FSM custom décide QUEL état, l'AnimationTree gère COMMENT l'animation transitionne (blend, xfade).
+**Principle:** the custom FSM decides WHICH state to enter, the AnimationTree handles HOW the animation transitions (blend, xfade).
 
 ---
 
-## Lifecycle d'un State
+## State lifecycle
 
 ```
 Enter()
   ↓
-OnProcess(dt)        ← _Process, pour les checks de transition
+OnProcess(dt)        ← _Process, for transition checks (Input)
   ↓
-OnPhysicsProcess(dt) ← _PhysicsProcess, pour les forces (jump, etc.)
+OnPhysicsProcess(dt) ← _PhysicsProcess, for state-specific forces (jump, landing)
   ↓
 Exit()
 ```
 
-### Ordre d'exécution dans une frame
+### Execution order per frame
 
 ```
-1. _Process sur tous les nodes
+1. _Process on all nodes
    └─ FSM._Process → CurrentState.OnProcess()
-      → ici qu'on checke les Input (jump press, etc.)
-      → transitionne vers le state suivant si condition remplie
+      → check Input (jump press, movement, etc.)
+      → TransitionTo() if conditions met
 
-2. _PhysicsProcess sur tous les nodes
+2. _PhysicsProcess on all nodes
    └─ PlayerController._PhysicsProcess
       ├─ BuildInputState()
       └─ MovementComponent.Tick(input)
-         → simulation tick-based (gravité, friction, dash, knockback)
+         → tick-based sim (gravity, friction, dash, knockback)
          → MoveAndSlide()
 
    └─ FSM._PhysicsProcess → CurrentState.OnPhysicsProcess()
-      → ici qu'on applique les forces state-specific
-      → ex: JumpState met velocity.Y = JumpForce
-      → NE PAS appeler MoveAndSlide() — déjà fait par Tick
+      → state-specific forces (e.g. JumpState sets velocity.Y)
+      → Do NOT call MoveAndSlide() — already done by Tick
 ```
 
 ---
 
-## Créer un nouveau State
+## Creating a new state
 
-1. **Créer le fichier** dans `Scripts/Animation/States/`
+1. **Create the file** in `Scripts/Animation/States/`
 
 ```csharp
 using Godot;
@@ -66,13 +65,13 @@ public sealed partial class MyState : State
 {
     public MyState()
     {
-        AnimationName = "Idle"; // nom dans l'AnimationTree
+        AnimationName = "Idle"; // must match a state in the AnimationTree
     }
 
     public override void Enter()
     {
         // reset, setup
-        base.Enter(); // appelle AnimPlayback.Travel(AnimationName)
+        base.Enter(); // calls AnimPlayback.Travel(AnimationName)
     }
 
     public override void Exit()
@@ -87,39 +86,39 @@ public sealed partial class MyState : State
 
     public override void OnPhysicsProcess(float delta)
     {
-        // forces state-specific (optionnel)
+        // state-specific forces (optional)
     }
 }
 ```
 
-2. **Ajouter le node dans manki.tscn** (éditeur Godot) :
-   - Node enfant de `FSM`
+2. **Add the node in the character's .tscn** (Godot editor):
+   - Child node of `FSM`
    - Script = `Scripts/Animation/States/MyState.cs`
-   - Nom du node = le nom utilisé par `TransitionTo()`
+   - Node name = the key used by `TransitionTo()`
 
-3. **Ajouter l'état dans l'AnimationTree** (éditeur) :
-   - Nouveau state dans le StateMachine root
-   - Animation correspondante
+3. **Add the state to the AnimationTree** (editor):
+   - New state in the root StateMachine
+   - Assign the corresponding animation
 
 ---
 
-## Convention des états
+## State conventions
 
-| State | Animation | Transition vers | Conditions |
-|-------|-----------|----------------|------------|
-| `idle` | `Idle` | run, jump, fall | input.move, jump press, off floor |
+| State | Animation | Transitions to | Triggers |
+|-------|-----------|----------------|----------|
+| `idle` | `Idle` | run, jump, fall | movement input, jump press, off floor |
 | `run` | `Run` | idle, jump, fall | stop, jump press, off floor |
 | `jump` | `Jump` | fall, landing | velocity.Y < 0, on floor |
 | `fall` | `Fall` | landing | on floor |
 | `landing` | `Land` | idle, run | timer expired |
 
-### Règles
+### Rules
 
-- **`OnProcess()`** : lecture des Input, transitions. Pas de modification de velocity.
-- **`OnPhysicsProcess()`** : forces directes sur `Player.Velocity`. Ex: jump applique `velocity.Y = JumpForce`.
-- **Pas de `MoveAndSlide()` dans les States** — déjà fait par `MovementComponent.Tick()`.
-- **Jump force appliquée par JumpState, pas par la simulation** — la simulation gère gravité/friction/dash/knockback.
-- **AnimationName en constructor** : valeur par défaut, peut être overridée dans l'Inspector.
+- **`OnProcess()`** : read Input, trigger transitions. Do not modify velocity.
+- **`OnPhysicsProcess()`** : direct forces on `Player.Velocity`. E.g. jump sets `velocity.Y = JumpForce`.
+- **Do NOT call `MoveAndSlide()` in states** — already done by `MovementComponent.Tick()`.
+- **Jump force is applied by JumpState, not by the simulation** — the sim handles gravity, friction, dash, knockback only.
+- **AnimationName in constructor** : default value, can be overridden in the Inspector.
 
 ---
 
@@ -137,15 +136,14 @@ AnimationNodeStateMachine (root)
 │   └─── LMB (combat) ──0.15s──→ End
 ```
 
-Chaque state = `AnimationNodeAnimation` avec l'anim correspondante.
-Les `xfade_time` sur les transitions donnent les blend entre animations.
+Each state is an `AnimationNodeAnimation` with the corresponding clip. The `xfade_time` on each transition provides the blend.
 
 ---
 
-## Ajouter un nouveau personnage
+## Adding a new character
 
-1. Créer son .tscn (modèle + AnimationPlayer + AnimationTree en StateMachine root)
-2. Ajouter un node `FSM` avec `StateMachine.cs` comme script
-3. Ajouter les enfants State (idle, run, jump, fall, landing, etc.)
-4. Dans `PlayerController.cs`, la ligne `_fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM")` le trouve automatiquement
-5. Chaque State est auto-enregistré par son nom de node (lowercased, suffix "state" retiré)
+1. Create its .tscn (model + AnimationPlayer + AnimationTree as root StateMachine)
+2. Add an `FSM` node with `StateMachine.cs` as its script
+3. Add child State nodes (idle, run, jump, fall, landing, etc.)
+4. In `PlayerController.cs`, the line `_fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM")` finds it automatically
+5. Each State is auto-registered by its node name (lowercased, "state" suffix stripped)
