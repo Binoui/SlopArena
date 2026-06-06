@@ -134,9 +134,9 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 8, ChainWindowTicks = 40 },
-                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 10, ChainWindowTicks = 40 },
-                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 18, ChainWindowTicks = 40 },
+                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 20, ChainWindowTicks = 40 },
+                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 24, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
@@ -148,7 +148,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "attack_air_lmb" },
                 },
@@ -160,11 +160,11 @@ namespace SlopArena.Shared
                     CooldownTicks = 15,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 14, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 20, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 26, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 34, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 18,
                     AnimationNames = new[] { "attack_heavy_charge" },
@@ -177,7 +177,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 16, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "attack_air_rmb" },
                 },
@@ -189,7 +189,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 60,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 22, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_q" },
                     SpecialEffectKeys = new[] { "MankiFireLash" },
@@ -202,7 +202,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 120,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 22, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_e" },
                     SpecialEffectKeys = new[] { "MankiRisingFlame" },
@@ -215,7 +215,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 150,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 12, ChainWindowTicks = 0 },
+                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 24, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_r" },
                     SpecialEffectKeys = new[] { "MankiEmberBurst" },
@@ -228,7 +228,7 @@ namespace SlopArena.Shared
                     CooldownTicks = 420,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 24, ChainWindowTicks = 0 },
+                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 40, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_f" },
                     SpecialEffectKeys = new[] { "MankiInfernoDance" },
