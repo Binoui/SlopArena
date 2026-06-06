@@ -61,7 +61,7 @@ public sealed partial class AttackState : State
         }
         else
         {
-            StateMachine.TransitionTo("fall");
+            StateMachine.TransitionTo("air");
         }
     }
 }

@@ -3,7 +3,7 @@ using Godot;
 
 /// <summary>
 /// Grounded idle state — player stands still.
-/// Transitions to: Run (on movement input), Jump (on jump press), Fall (off edge).
+/// Transitions to: air (on jump or off edge), run (when moving).
 /// </summary>
 public sealed partial class IdleState : State
 {
@@ -24,17 +24,18 @@ public sealed partial class IdleState : State
         // Jump
         if (Input.IsActionJustPressed("jump") && Player.IsOnFloor())
         {
-            StateMachine.TransitionTo("jump");
+            StateMachine.TransitionTo("air");
             return;
         }
 
-        // Run if moving
-        if (!Player.IsOnFloor())
+        // Walked off edge — go to air (blend will handle jump→fall naturally)
+        if (!Player.IsOnFloor() && Player.Velocity.Y < 0f)
         {
-            StateMachine.TransitionTo("fall");
+            StateMachine.TransitionTo("air");
             return;
         }
 
+        // Run when moving
         var hVel = new Vector3(Player.Velocity.X, 0f, Player.Velocity.Z);
         if (hVel.Length() > 0.5f && Player.IsOnFloor())
         {

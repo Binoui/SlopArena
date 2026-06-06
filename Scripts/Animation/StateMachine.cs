@@ -18,6 +18,7 @@ public partial class StateMachine : Node
 {
 	private readonly Dictionary<string, State> _states = new();
 	private AnimationNodeStateMachinePlayback? _animPlayback;
+	private AnimationTree? _animTree;
 	private PlayerController? _player;
 	private MovementComponent? _movement;
 
@@ -39,6 +40,7 @@ public partial class StateMachine : Node
 		var animTree = FindAnimationTree(player);
 		if (animTree != null)
 		{
+			_animTree = animTree;
 			animTree.Active = true;
 			var val = animTree.Get("parameters/playback");
 			if (val.Obj is AnimationNodeStateMachinePlayback pb)
@@ -157,5 +159,13 @@ public partial class StateMachine : Node
 	public AttackState? GetAttackState()
 	{
 		return _states.TryGetValue("attack", out var state) ? state as AttackState : null;
+	}
+
+	/// <summary>
+	/// Set a float parameter on the AnimationTree (for BlendSpaces).
+	/// </summary>
+	public void SetAnimParameter(string path, float value)
+	{
+		_animTree?.Set(path, value);
 	}
 }
