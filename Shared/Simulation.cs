@@ -289,14 +289,6 @@ namespace SlopArena.Shared
                     s.VX = dirX * speed;
                     s.VZ = dirZ * speed;
                 }
-
-                // Jump
-                if (input.Jump && s.JumpsLeft > 0)
-                {
-                    s.VY = stats.JumpForce;
-                    s.JumpsLeft--;
-                    s.IsGrounded = false;
-                }
             }
             else
             {
@@ -309,6 +301,9 @@ namespace SlopArena.Shared
                 s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
             }
+
+            // Jump — handled by IdleState.OnPhysicsProcess directly
+            // (kept here for air section which uses a different path)
 
             UpdateFacing(ref s);
         }

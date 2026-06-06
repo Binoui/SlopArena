@@ -5,10 +5,13 @@ using Godot;
 /// Abstract base class for a player state.
 /// Each state is a child node of StateMachine.
 ///
-/// Lifecycle: Enter() → OnProcess(dt) [every frame] → Exit()
+/// Lifecycle: Enter() → OnProcess(dt) → OnPhysicsProcess(dt) → Exit()
 ///
-/// SlopArena uses a tick-based simulation (MovementComponent handles physics).
-/// States do NOT call MoveAndSlide() — they only handle animation and transition logic.
+/// Physics flow:
+///   1. PlayerController._PhysicsProcess → MovementComponent.Tick() (sim only)
+///   2. StateMachine._PhysicsProcess → CurrentState.OnPhysicsProcess()
+///      States can override velocity for state-specific forces (jump, landing).
+///      MovementComponent already called MoveAndSlide — states do NOT call it.
 /// </summary>
 public abstract partial class State : Node
 {
@@ -55,6 +58,15 @@ public abstract partial class State : Node
 	/// Called every frame (process). Use for transition checks.
 	/// </summary>
 	public virtual void OnProcess(float delta)
+	{
+	}
+
+	/// <summary>
+	/// Called every physics frame, AFTER MovementComponent.Tick().
+	/// States override velocity for state-specific forces (jump, landing dampening).
+	/// Do NOT call MoveAndSlide() — already done by MovementComponent.
+	/// </summary>
+	public virtual void OnPhysicsProcess(float delta)
 	{
 	}
 

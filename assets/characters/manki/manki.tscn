@@ -11,12 +11,22 @@
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_fall"]
 animation = &"fall"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = false
+start_offset = 0.0
+loop_mode = 1
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_idle"]
 animation = &"idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_jump"]
 animation = &"jump"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_land"]
 animation = &"land"
@@ -32,6 +42,7 @@ xfade_time = 0.15
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_02"]
 xfade_time = 0.2
+switch_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_015"]
 xfade_time = 0.15
@@ -54,7 +65,7 @@ states/Run/node = SubResource("AnimationNodeAnimation_anim_run")
 states/Run/position = Vector2(364, 333)
 states/Start/position = Vector2(100, 250)
 transitions = ["Start", "Idle", SubResource("Transition_immediate_01"), "Idle", "Run", SubResource("Transition_immediate_015"), "Run", "Idle", SubResource("Transition_immediate_015"), "Idle", "Jump", SubResource("Transition_immediate_01"), "Run", "Jump", SubResource("Transition_immediate_01"), "Jump", "Fall", SubResource("Transition_end_02"), "Fall", "Land", SubResource("Transition_end_015"), "Idle", "Fall", SubResource("Transition_end_02"), "Run", "Fall", SubResource("Transition_end_02"), "Land", "Idle", SubResource("Transition_at_end"), "Idle", "LMB", SubResource("Transition_immediate_01"), "Run", "LMB", SubResource("Transition_immediate_01"), "LMB", "End", SubResource("Transition_immediate_015"), "Jump", "LMB", SubResource("Transition_immediate_01"), "Fall", "LMB", SubResource("Transition_immediate_01")]
-graph_offset = Vector2(90, 121)
+graph_offset = Vector2(283, 149)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
 

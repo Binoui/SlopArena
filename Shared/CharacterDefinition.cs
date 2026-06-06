@@ -117,7 +117,7 @@ namespace SlopArena.Shared
                     SprintSpeed = 14f,
                     DashSpeed = 34f,
                     AirAcceleration = 16f,
-                    JumpForce = 17f,
+                    JumpForce = 10f,
                     Gravity = 37f,
                     DashDurationTicks = 8,
                     DashCooldownTicks = 56,
