@@ -9,7 +9,7 @@ public sealed partial class RunState : State
 {
     public RunState()
     {
-        AnimationName = "Run";
+        AnimationName = "Movement/Run";
     }
 
     public override void Enter()

@@ -9,7 +9,7 @@ public sealed partial class FallState : State
 {
     public FallState()
     {
-        AnimationName = "Fall";
+        AnimationName = "Movement/Fall";
     }
 
     public override void OnProcess(float delta)

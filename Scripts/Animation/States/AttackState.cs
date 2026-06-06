@@ -6,42 +6,41 @@ using Godot;
 /// PlayerController sets NextAnimName before TransitionTo("attack")
 /// or calls ChainTo() for combo chaining within the same state.
 ///
-/// Lifecycle:
-///   Enter() → plays attack animation
-///   OnProcess() → waits for AnimLockTicks to expire
-///   → combo chain window open → PlayerController calls ChainTo() for next stage
-///   → no combo → transition back to idle/run/fall
+/// Lives inside the "Attacks" sub-StateMachine in the AnimationTree.
+/// Travel paths use the "Attacks/" prefix.
 /// </summary>
 public sealed partial class AttackState : State
 {
     public AttackState()
     {
-        AnimationName = "melee";
+        AnimationName = "Attacks/melee";
     }
+
+    private const string AttackPrefix = "Attacks/";
 
     /// <summary>
     /// Set by PlayerController before TransitionTo("attack").
-    /// Also used by ChainTo() for combo chaining.
+    /// Should be just the state name (e.g. "melee"), without the prefix.
     /// </summary>
     public string NextAnimName { get; set; } = "";
 
     public override void Enter()
     {
         if (!string.IsNullOrEmpty(NextAnimName))
-            AnimationName = NextAnimName;
+            AnimationName = AttackPrefix + NextAnimName;
         base.Enter();
     }
 
     /// <summary>
     /// Chain to the next combo stage without leaving the state.
-    /// Call this from PlayerController when a combo chain is detected.
+    /// Prepends the "Attacks/" prefix automatically.
     /// </summary>
     public void ChainTo(string animName)
     {
         NextAnimName = animName;
-        AnimationName = animName;
+        AnimationName = AttackPrefix + animName;
         if (AnimPlayback != null)
-            AnimPlayback.Travel(animName);
+            AnimPlayback.Travel(AnimationName);
     }
 
     public override void OnProcess(float delta)
@@ -50,8 +49,7 @@ public sealed partial class AttackState : State
         if (Movement.State.AnimLockTicks > 0)
             return;
 
-        // If a combo window is still open, stay — PlayerController will
-        // call ChainTo() if the player presses the button again.
+        // Combo window open — stay, PlayerController may call ChainTo()
         if (Movement.State.ComboTimerTicks > 0)
             return;
 

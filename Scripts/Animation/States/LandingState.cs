@@ -9,7 +9,7 @@ public sealed partial class LandingState : State
 {
     public LandingState()
     {
-        AnimationName = "Land";
+        AnimationName = "Movement/Land";
     }
 
     [Export]

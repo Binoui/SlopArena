@@ -10,7 +10,7 @@ public sealed partial class JumpState : State
 {
 	public JumpState()
 	{
-		AnimationName = "Jump";
+		AnimationName = "Movement/Jump";
 	}
 
 	private bool _hasJumped;

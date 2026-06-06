@@ -10,116 +10,119 @@
 [ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="8_8obs1"]
 [ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="9_t77cg"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_fall"]
-animation = &"fall"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_idle"]
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
 animation = &"idle"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_jump"]
-animation = &"jump"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_land"]
-animation = &"land"
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_run"]
+[sub_resource type="AnimationNodeAnimation" id="anim_run"]
 animation = &"run"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_melee"]
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"jump"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_fall"]
+animation = &"fall"
+loop_mode = 1
+
+[sub_resource type="AnimationNodeAnimation" id="anim_land"]
+animation = &"land"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee"]
 animation = &"melee"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_leg_sweep"]
+[sub_resource type="AnimationNodeAnimation" id="anim_leg_sweep"]
 animation = &"leg_sweep"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_backflip"]
+[sub_resource type="AnimationNodeAnimation" id="anim_backflip"]
 animation = &"backflip"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_air_lmb"]
+[sub_resource type="AnimationNodeAnimation" id="anim_air_lmb"]
 animation = &"attack_air_lmb"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_heavy_charge"]
+[sub_resource type="AnimationNodeAnimation" id="anim_heavy"]
 animation = &"attack_heavy_charge"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_air_rmb"]
+[sub_resource type="AnimationNodeAnimation" id="anim_air_rmb"]
 animation = &"attack_air_rmb"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_q"]
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_q"]
 animation = &"spell_q"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_e"]
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_e"]
 animation = &"spell_e"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_r"]
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_r"]
 animation = &"spell_r"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_anim_spell_f"]
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_f"]
 animation = &"spell_f"
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_005"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_005"]
 xfade_time = 0.05
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_01"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_01"]
 xfade_time = 0.1
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_immediate_015"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_015"]
 xfade_time = 0.15
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_02"]
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_02"]
 xfade_time = 0.2
-switch_mode = 2
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_end_015"]
-xfade_time = 0.15
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_at_end"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="Transition_at_end"]
-
-[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_main"]
-states/End/position = Vector2(1500, 250)
-states/Fall/node = SubResource("AnimationNodeAnimation_anim_fall")
+[sub_resource type="AnimationNodeStateMachine" id="sm_movement"]
+states/End/position = Vector2(1350, 250)
+states/Fall/node = SubResource("anim_fall")
 states/Fall/position = Vector2(688, 333)
-states/Idle/node = SubResource("AnimationNodeAnimation_anim_idle")
+states/Idle/node = SubResource("anim_idle")
 states/Idle/position = Vector2(364, 167)
-states/Jump/node = SubResource("AnimationNodeAnimation_anim_jump")
+states/Jump/node = SubResource("anim_jump")
 states/Jump/position = Vector2(688, 167)
-states/LMB/node = ExtResource("2_foqek")
-states/LMB/position = Vector2(1024, 500)
-states/Land/node = SubResource("AnimationNodeAnimation_anim_land")
+states/Land/node = SubResource("anim_land")
 states/Land/position = Vector2(1024, 250)
-states/Run/node = SubResource("AnimationNodeAnimation_anim_run")
+states/Run/node = SubResource("anim_run")
 states/Run/position = Vector2(364, 333)
 states/Start/position = Vector2(100, 250)
-states/melee/node = SubResource("AnimationNodeAnimation_anim_melee")
-states/melee/position = Vector2(200, 500)
-states/leg_sweep/node = SubResource("AnimationNodeAnimation_anim_leg_sweep")
-states/leg_sweep/position = Vector2(400, 500)
-states/backflip/node = SubResource("AnimationNodeAnimation_anim_backflip")
-states/backflip/position = Vector2(600, 500)
-states/attack_air_lmb/node = SubResource("AnimationNodeAnimation_anim_air_lmb")
-states/attack_air_lmb/position = Vector2(200, 650)
-states/attack_heavy_charge/node = SubResource("AnimationNodeAnimation_anim_heavy_charge")
-states/attack_heavy_charge/position = Vector2(400, 650)
-states/attack_air_rmb/node = SubResource("AnimationNodeAnimation_anim_air_rmb")
-states/attack_air_rmb/position = Vector2(600, 650)
-states/spell_q/node = SubResource("AnimationNodeAnimation_anim_spell_q")
-states/spell_q/position = Vector2(200, 800)
-states/spell_e/node = SubResource("AnimationNodeAnimation_anim_spell_e")
-states/spell_e/position = Vector2(400, 800)
-states/spell_r/node = SubResource("AnimationNodeAnimation_anim_spell_r")
-states/spell_r/position = Vector2(600, 800)
-states/spell_f/node = SubResource("AnimationNodeAnimation_anim_spell_f")
-states/spell_f/position = Vector2(800, 800)
-transitions = ["Start", "Idle", SubResource("Transition_immediate_01"), "Idle", "Run", SubResource("Transition_immediate_015"), "Run", "Idle", SubResource("Transition_immediate_015"), "Idle", "Jump", SubResource("Transition_immediate_01"), "Run", "Jump", SubResource("Transition_immediate_01"), "Jump", "Fall", SubResource("Transition_end_02"), "Fall", "Land", SubResource("Transition_end_015"), "Idle", "Fall", SubResource("Transition_end_02"), "Run", "Fall", SubResource("Transition_end_02"), "Land", "Idle", SubResource("Transition_at_end"), "Idle", "LMB", SubResource("Transition_immediate_01"), "Run", "LMB", SubResource("Transition_immediate_01"), "LMB", "End", SubResource("Transition_immediate_015"), "Jump", "LMB", SubResource("Transition_immediate_01"), "Fall", "LMB", SubResource("Transition_immediate_01"), "Idle", "melee", SubResource("Transition_immediate_01"), "Run", "melee", SubResource("Transition_immediate_01"), "Jump", "melee", SubResource("Transition_immediate_01"), "Fall", "melee", SubResource("Transition_immediate_01"), "melee", "leg_sweep", SubResource("Transition_immediate_005"), "leg_sweep", "backflip", SubResource("Transition_immediate_005"), "melee", "End", SubResource("Transition_immediate_015"), "leg_sweep", "End", SubResource("Transition_immediate_015"), "backflip", "End", SubResource("Transition_immediate_015"), "Idle", "attack_air_lmb", SubResource("Transition_immediate_01"), "Run", "attack_air_lmb", SubResource("Transition_immediate_01"), "Jump", "attack_air_lmb", SubResource("Transition_immediate_01"), "Fall", "attack_air_lmb", SubResource("Transition_immediate_01"), "attack_air_lmb", "End", SubResource("Transition_immediate_015"), "Idle", "attack_heavy_charge", SubResource("Transition_immediate_01"), "Run", "attack_heavy_charge", SubResource("Transition_immediate_01"), "attack_heavy_charge", "End", SubResource("Transition_immediate_015"), "Jump", "attack_air_rmb", SubResource("Transition_immediate_01"), "Fall", "attack_air_rmb", SubResource("Transition_immediate_01"), "attack_air_rmb", "End", SubResource("Transition_immediate_015"), "Idle", "spell_q", SubResource("Transition_immediate_01"), "Run", "spell_q", SubResource("Transition_immediate_01"), "Jump", "spell_q", SubResource("Transition_immediate_01"), "Fall", "spell_q", SubResource("Transition_immediate_01"), "spell_q", "End", SubResource("Transition_immediate_015"), "Idle", "spell_e", SubResource("Transition_immediate_01"), "Run", "spell_e", SubResource("Transition_immediate_01"), "Jump", "spell_e", SubResource("Transition_immediate_01"), "Fall", "spell_e", SubResource("Transition_immediate_01"), "spell_e", "End", SubResource("Transition_immediate_015"), "Idle", "spell_r", SubResource("Transition_immediate_01"), "Run", "spell_r", SubResource("Transition_immediate_01"), "Jump", "spell_r", SubResource("Transition_immediate_01"), "Fall", "spell_r", SubResource("Transition_immediate_01"), "spell_r", "End", SubResource("Transition_immediate_015"), "Idle", "spell_f", SubResource("Transition_immediate_01"), "Run", "spell_f", SubResource("Transition_immediate_01"), "Jump", "spell_f", SubResource("Transition_immediate_01"), "Fall", "spell_f", SubResource("Transition_immediate_01"), "spell_f", "End", SubResource("Transition_immediate_015")]
-graph_offset = Vector2(283, 149)
+transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "Jump", SubResource("xfade_01"), "Run", "Jump", SubResource("xfade_01"), "Jump", "Fall", SubResource("xfade_02"), "Fall", "Land", SubResource("xfade_015"), "Idle", "Fall", SubResource("xfade_02"), "Run", "Fall", SubResource("xfade_02"), "Land", "Idle", SubResource("xfade_at_end")]
+graph_offset = Vector2(0, 0)
+
+[sub_resource type="AnimationNodeStateMachine" id="sm_attacks"]
+states/End/position = Vector2(1350, 250)
+states/Start/position = Vector2(100, 250)
+states/melee/node = SubResource("anim_melee")
+states/melee/position = Vector2(300, 250)
+states/leg_sweep/node = SubResource("anim_leg_sweep")
+states/leg_sweep/position = Vector2(500, 250)
+states/backflip/node = SubResource("anim_backflip")
+states/backflip/position = Vector2(700, 250)
+states/attack_air_lmb/node = SubResource("anim_air_lmb")
+states/attack_air_lmb/position = Vector2(300, 400)
+states/attack_heavy_charge/node = SubResource("anim_heavy")
+states/attack_heavy_charge/position = Vector2(500, 400)
+states/attack_air_rmb/node = SubResource("anim_air_rmb")
+states/attack_air_rmb/position = Vector2(700, 400)
+states/spell_q/node = SubResource("anim_spell_q")
+states/spell_q/position = Vector2(300, 550)
+states/spell_e/node = SubResource("anim_spell_e")
+states/spell_e/position = Vector2(500, 550)
+states/spell_r/node = SubResource("anim_spell_r")
+states/spell_r/position = Vector2(700, 550)
+states/spell_f/node = SubResource("anim_spell_f")
+states/spell_f/position = Vector2(900, 550)
+states/LMB/node = ExtResource("2_foqek")
+states/LMB/position = Vector2(1100, 250)
+transitions = ["Start", "melee", SubResource("xfade_01"), "Start", "attack_air_lmb", SubResource("xfade_01"), "Start", "attack_heavy_charge", SubResource("xfade_01"), "Start", "attack_air_rmb", SubResource("xfade_01"), "Start", "spell_q", SubResource("xfade_01"), "Start", "spell_e", SubResource("xfade_01"), "Start", "spell_r", SubResource("xfade_01"), "Start", "spell_f", SubResource("xfade_01"), "Start", "LMB", SubResource("xfade_01"), "melee", "leg_sweep", SubResource("xfade_005"), "leg_sweep", "backflip", SubResource("xfade_005"), "melee", "End", SubResource("xfade_015"), "leg_sweep", "End", SubResource("xfade_015"), "backflip", "End", SubResource("xfade_015"), "attack_air_lmb", "End", SubResource("xfade_015"), "attack_heavy_charge", "End", SubResource("xfade_015"), "attack_air_rmb", "End", SubResource("xfade_015"), "spell_q", "End", SubResource("xfade_015"), "spell_e", "End", SubResource("xfade_015"), "spell_r", "End", SubResource("xfade_015"), "spell_f", "End", SubResource("xfade_015"), "LMB", "End", SubResource("xfade_015")]
+graph_offset = Vector2(0, 0)
+
+[sub_resource type="AnimationNodeStateMachine" id="sm_root"]
+states/Attacks/node = SubResource("sm_attacks")
+states/Attacks/position = Vector2(900, 250)
+states/End/position = Vector2(1500, 250)
+states/Movement/node = SubResource("sm_movement")
+states/Movement/position = Vector2(400, 250)
+states/Start/position = Vector2(100, 250)
+transitions = ["Start", "Movement", SubResource("xfade_01"), "Movement", "Attacks", SubResource("xfade_01"), "Attacks", "End", SubResource("xfade_015")]
+graph_offset = Vector2(0, 0)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
 
@@ -197,7 +200,7 @@ bones/24/rotation = Quaternion(-1.25728565e-08, -2.1568852e-07, -1.4661055e-08, 
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1656529102]
 root_node = NodePath("../anim_monkey")
-tree_root = SubResource("AnimationNodeStateMachine_main")
+tree_root = SubResource("sm_root")
 anim_player = NodePath("../anim_monkey/AnimationPlayer")
 
 [node name="FSM" type="Node" parent="." unique_id=1796319416]
