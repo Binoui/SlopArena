@@ -8,50 +8,50 @@ using Godot;
 /// </summary>
 public sealed partial class AttackState : State
 {
-    public AttackState()
-    {
-        AnimationName = "melee";
-    }
+	public AttackState()
+	{
+		AnimationName = "melee";
+	}
 
-    /// <summary>
-    /// Set by PlayerController before TransitionTo("attack").
-    /// </summary>
-    public string NextAnimName { get; set; } = "";
+	/// <summary>
+	/// Set by PlayerController before TransitionTo("attack").
+	/// </summary>
+	public string NextAnimName { get; set; } = "";
 
-    public override void Enter()
-    {
-        if (!string.IsNullOrEmpty(NextAnimName))
-            AnimationName = NextAnimName;
-        base.Enter();
-    }
+	public override void Enter()
+	{
+		if (!string.IsNullOrEmpty(NextAnimName))
+			AnimationName = NextAnimName;
+		base.Enter();
+	}
 
-    /// <summary>
-    /// Chain to the next combo stage without leaving the state.
-    /// </summary>
-    public void ChainTo(string animName)
-    {
-        NextAnimName = animName;
-        AnimationName = animName;
-        if (AnimPlayback != null)
-            AnimPlayback.Travel(animName);
-    }
+	/// <summary>
+	/// Chain to the next combo stage without leaving the state.
+	/// </summary>
+	public void ChainTo(string animName)
+	{
+		NextAnimName = animName;
+		AnimationName = animName;
+		if (AnimPlayback != null)
+			AnimPlayback.Travel(animName);
+	}
 
-    public override void OnProcess(float delta)
-    {
-        if (Movement.State.AnimLockTicks > 0)
-            return;
+	public override void OnProcess(float delta)
+	{
+		if (Movement.State.AnimLockTicks > 0)
+			return;
 
-        if (Movement.State.ComboTimerTicks > 0)
-            return;
+		if (Movement.State.ComboTimerTicks > 0)
+			return;
 
-        if (Player.IsOnFloor())
-        {
-            StateMachine.TransitionTo(
-                Player.MoveDirection.LengthSquared() > 0.001f ? "run" : "idle");
-        }
-        else
-        {
-            StateMachine.TransitionTo("air");
-        }
-    }
+		if (Player.IsOnFloor())
+		{
+			StateMachine.TransitionTo(
+				Player.MoveDirection.LengthSquared() > 0.001f ? "run" : "idle");
+		}
+		else
+		{
+			StateMachine.TransitionTo("air");
+		}
+	}
 }
