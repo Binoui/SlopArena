@@ -25,7 +25,17 @@ Superbvonk-style low-poly faceted. Flat bold colors, no textures, vertex-colored
 
 ## Kit
 
-Same as Narodin — fire dancer acrobat. See `docs/characters/narodin.md` for ability details (kit unchanged, only model/name changed).
+Fire monkey acrobat — agile rushdown with fire-infused attacks.
+- **LMB**: 3-4 hit fire punch combo, launcher on final hit
+- **AirLMB**: Rising uppercut, 1-2 hits, dash-cancelable
+- **RMB**: Charged heavy punch (~15 dmg charged, ~10 uncharged)
+- **AirRMB**: Downward fire slam spike
+- **Q**: Fire Lash — ground kick, CC/engage
+- **E**: Rising Flame — uppercut launcher, vertical recovery
+- **R**: Ember Burst — explosion, zone denial
+- **F**: Inferno Dance (ult) — big telegraphed finisher
+
+See `docs/character-kit-design-principles.md` for design patterns and `docs/combat-systems.md` for universal combat mechanics.
 
 ## Files
 

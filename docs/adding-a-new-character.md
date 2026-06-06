@@ -25,11 +25,8 @@ Below is the step-by-step process for each.
 ```csharp
 public enum CharacterClass : byte
 {
-    Vanguard,
-    Wraith,
-    Channeler,
-    Knight,
-    YourNewClass   // ← add here (keep Vanguard=0, sequential)
+    Manki,
+    YourNewClass   // ← add here
 }
 ```
 
@@ -43,11 +40,8 @@ Add a private static method in `CharacterRegistry` (same file), then add it to t
 ```csharp
 return new CharacterDefinition[]
 {
-    BuildVanguard(),   // index 0
-    BuildWraith(),     // index 1
-    BuildChanneler(),  // index 2
-    BuildKnight(),     // index 3
-    BuildYourClass(),  // index 4  ← add here
+    BuildManki(),      // index 0
+    BuildYourClass(),  // index 1  ← add here
 };
 ```
 
@@ -64,7 +58,7 @@ private static CharacterDefinition BuildYourClass()
         // ═══════ MOVEMENT ═══════
         Movement = new MovementStats
         {
-            WalkSpeed = 10f,           // Vanguard=9, Knight=10, Wraith=11
+            WalkSpeed = 10f,           // Manki=11 (medium-fast)
             SprintSpeed = 14f,         // 12-15 range
             DashSpeed = 32f,           // 30-35
             AirAcceleration = 14f,
@@ -333,7 +327,4 @@ Update this switch when adding a new class.
 
 | Class | Weight | Speed | HP feel | Range | Special mechanic |
 |-------|--------|-------|---------|-------|-----------------|
-| Vanguard | Heavy (1.3) | Slowest (9) | Tanky | Melee | Shield, buffs, delayed AoE |
-| Wraith | Light (0.7) | Fastest (11) | Squishy | Mixed | Invisibility, poison, projectiles |
-| Channeler | Medium (0.9) | Medium (10) | Medium | Ranged | Frost/Fire status, beam |
-| Knight | Medium (1.0) | Medium (10) | Medium | Melee | Stun, parry, gap closer |
+| Manki | Medium (1.0) | Fast (11) | Medium | Melee | Fire damage, aerial combos, inferno burst |

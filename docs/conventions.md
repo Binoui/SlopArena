@@ -31,10 +31,7 @@ Each character has **one signature color** plus a neutral secondary. The palette
 
 | Character | Primary | Secondary | Accent |
 |-----------|---------|-----------|--------|
-| Knight    | Gold #B8860B | Navy #1A237E | Bright gold #FFD700 |
-| Narodin   | Orange #FF6F00 | Crimson #8B0000 | Amber #FFD700 |
-| Vanguard  | (TBD) | | |
-| Wraith    | (TBD) | | |
+| Manki     | Burnt orange #D84315 | Charcoal #333333 | Bright red #E53935 |
 
 No more than 5 colors per character total (skin included).
 
@@ -139,7 +136,7 @@ All lower case. Underscores for spaces.
 | `getup` | Standing back up | One-shot |
 | `death` | Death / KO | One-shot |
 
-### Character-specific (Narodin example)
+### Character-specific (Manki example)
 | Key | Animation | Maps to ability |
 |-----|-----------|-----------------|
 | `attack_1` | Punch L | LMB stage 1 |
@@ -158,20 +155,16 @@ Each character defines their own ability animation names in `CharacterDefinition
 
 ## 5. File Structure
 
+
 ```
 assets/
   characters/
-    narodin/
-      narodin.glb            → master file (model + all anims embedded)
-      narodin.glb.import     → Godot import config
-    knight/
-      Knight.glb
-    wraith/
-      (TBD)
-    vanguard/
-      (TBD)
+    manki/
+      anim_monkey.glb           → master file (model + all anims embedded)
+      anim_monkey.glb.import    → Godot import config
     weapons/
       sword_2handed_color.gltf
+```
 
 animations/
   run.res           → extracted per-animation .res files (Godot format)
@@ -190,9 +183,9 @@ tools/
 
 docs/
   characters/
-    narodin.md      → kit, concept, notes per character
-    knight.md
+    manki.md      → kit, concept, notes per character
   character-kit-design-principles.md  → design rules
+  combat-systems.md                    → universal combat mechanics
   conventions.md    → this file
 ```
 
@@ -203,13 +196,12 @@ docs/
 See `docs/character-kit-design-principles.md` for the full guide.
 
 Key rules for SlopArena:
-- **6 ability slots**: LMB, RMB, Q, E, R, F (ult on F, like DKO)
+- **8 ability slots**: LMB, AirLMB, RMB, AirRMB, Q, E, R, F (ult on F, like DKO)
 - **One ability, one job**: poke, move, CC, zone, counter, buff, burst
 - **E = recovery** (vertical or horizontal)
 - **Q = CC / engage**
 - **F = ultimate**
 - **No mana, only cooldowns**
-- **All abilities are skillshots** — no homing
 
 ---
 
@@ -241,10 +233,6 @@ The 3D model should be as clean and simple as possible.
 
 | # | Name | Archetype | Status |
 |---|------|-----------|--------|
-| 1 | Knight (Garen-like) | Tanky melee | Has prototype model (KayKit) |
-| 2 | Narodin | Agile rushdown / fire dancer | Has generated model (Mixamo rig) |
-| 3 | Vanguard | (TBD) | Abilities code exists |
-| 4 | Wraith | (TBD) | Abilities code exists |
+| 1 | Manki | Agile rushdown / fire monkey | In-game prototype |
 
-Narodin replaces the old Channeler (removed).
-Vanguard and Wraith need art direction and models.
+See `docs/characters/manki.md` for details.
