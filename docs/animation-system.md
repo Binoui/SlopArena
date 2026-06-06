@@ -9,11 +9,12 @@
 Two independent layers that communicate via `Travel()`:
 
 ```
-AnimationTree (StateMachine root)          ← animation transitions
-    Idle ↔ Run → Jump → Fall → Land → Idle
+AnimationTree (flat StateMachine root)    ← visual blends only
+    17 states: Idle, Run, air (BlendSpace1D),
+    Land, melee, leg_sweep, backflip, spells...
 
-Custom FSM (StateMachine.cs)                ← game logic + state transitions
-    IdleState → RunState → JumpState → FallState → LandingState
+Custom FSM (StateMachine.cs)               ← game logic + state transitions
+    IdleState → RunState → AirState → LandingState → AttackState
 ```
 
 **Principle:** the custom FSM decides WHICH state to enter, the AnimationTree handles HOW the animation transitions (blend, xfade).
@@ -106,12 +107,11 @@ public sealed partial class MyState : State
 
 | State | Animation | Transitions to | Triggers |
 |-------|-----------|----------------|----------|
-| `idle` | `Idle` | run, jump, fall | movement input, jump press, off floor |
-| `run` | `Run` | idle, jump, fall | stop, jump press, off floor |
-| `jump` | `Jump` | fall, landing | velocity.Y < 0, on floor |
-| `fall` | `Fall` | landing | on floor |
+| `idle` | `Idle` | run, air | movement input, jump press, off floor |
+| `run` | `Run` | idle, air | stop, jump press, off floor |
+| `air` | BlendSpace1D (jump↔fall) | landing | on floor |
 | `landing` | `Land` | idle, run | timer expired |
-| `attack` | `melee` | idle, run, fall | AnimLockTicks == 0 |
+| `attack` | `melee` (configurable) | idle, run, air | AnimLockTicks == 0 |
 
 ### Rules
 
