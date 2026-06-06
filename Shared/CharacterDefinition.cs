@@ -26,7 +26,7 @@ namespace SlopArena.Shared
 
     /// <summary>
     /// Complete data-driven definition of a playable character.
-    /// All 8 ability slots use the same AbilityData struct.
+    /// All 6 ability slots (0-5) use the same AbilityData struct.
     /// Add new characters by creating a new entry in CharacterRegistry.
     /// </summary>
     public struct CharacterDefinition
@@ -34,6 +34,11 @@ namespace SlopArena.Shared
         public CharacterClass Class;
         public string DisplayName;
         public MovementStats Movement;
+
+        // Collision shape
+        public float CapsuleRadius;
+        public float CapsuleHeight;
+        public float HurtboxRadius;
 
         // 8 ability slots: LMB, AirLMB, RMB, AirRMB, Q, E, R, F
         public AbilityData LMB;
@@ -103,6 +108,9 @@ namespace SlopArena.Shared
             {
                 Class = CharacterClass.Manki,
                 DisplayName = "Manki",
+                CapsuleRadius = 0.6f,
+                CapsuleHeight = 1.3f,
+                HurtboxRadius = 1.0f,
                 Movement = new MovementStats
                 {
                     WalkSpeed = 11f,

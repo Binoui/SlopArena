@@ -130,7 +130,7 @@ public partial class PlayerController : CharacterBody3D
 		FloorStopOnSlope = true;
 		FloorMaxAngle = 45.0f;
 
-		var capsule = new CapsuleShape3D { Radius = 1.5f, Height = 3f };
+		var capsule = new CapsuleShape3D { Radius = _charDef.CapsuleRadius, Height = _charDef.CapsuleHeight };
 		AddChild(new CollisionShape3D { Shape = capsule });
 
 		// Components
@@ -207,7 +207,7 @@ public partial class PlayerController : CharacterBody3D
 
 		// Hurtbox
 		_hurtbox = new Hurtbox { Name = "Hurtbox", OwnerEntity = this };
-		var hurtboxSphere = new SphereShape3D { Radius = 2.0f };
+		var hurtboxSphere = new SphereShape3D { Radius = _charDef.HurtboxRadius };
 		_hurtbox.AddChild(new CollisionShape3D { Shape = hurtboxSphere });
 		AddChild(_hurtbox);
 
@@ -845,13 +845,13 @@ public partial class PlayerController : CharacterBody3D
 			case CharacterClass.Manki:
 				modelPath = "res://assets/characters/manki/manki.tscn";
 				scale = Vector3.One;
-				position = Vector3.Zero;
+				position = new Vector3(0, -0.6f, 0);
 				hasWeapon = false;
 				break;
 			default:
 				modelPath = "res://assets/characters/manki/manki.tscn";
 				scale = Vector3.One;
-				position = Vector3.Zero;
+				position = new Vector3(0, -0.6f, 0);
 				hasWeapon = false;
 				break;
 		}
