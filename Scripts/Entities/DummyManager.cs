@@ -409,14 +409,9 @@ public partial class DummyManager : Node3D
 			_hitFlashTimers[index] = duration;
 	}
 
-	public float GetContactRadius() => 2.0f; // matches player hurtbox radius
-	
 	/// <summary>
-	/// Hit radius for simulation hit detection (matches capsule radius).
+	/// Animation loading (copied from PlayerController)
 	/// </summary>
-	public const float DummyHitRadius = 1.5f;
-
-	// ── Animation loading (copied from PlayerController) ──
 	private void LoadAllAnimations(AnimationLibrary animLib)
 	{
 		string animDir = "res://assets/characters/ProMagicPack/";

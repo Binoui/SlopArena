@@ -46,19 +46,4 @@ public partial class LocalSimulation : Node
 	/// Returns true if the status was active and consumed.
 	/// </summary>
 	public Func<ulong, StatusType, bool>? OnStatusConsume;
-
-	/// <summary>
-	/// Update entity positions each frame from the owning Node3Ds.
-	/// Called by Main.cs in _PhysicsProcess.
-	/// </summary>
-	public void SyncEntityPositions(Dictionary<ulong, Node3D> entityNodes)
-	{
-		foreach (var kvp in entityNodes)
-		{
-			if (Entities.TryGetValue(kvp.Key, out var data))
-			{
-				Entities[kvp.Key] = (kvp.Value.GlobalPosition, data.radius, data.active);
-			}
-		}
-	}
 }
