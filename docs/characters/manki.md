@@ -1,16 +1,16 @@
-# Manki — Pyromaniac Inventor (Fire Monkey)
+# Manki — Mad Bomber Monkey
 
-> Status: Design phase (kit redesign)
+> Status: Implemented (prototype — animations placeholder)
 > Replaces: Narodin (removed)
 > Inspired by: Ziggs (LoL) × rushdown brawler — pyromaniac mad inventor monkey
 
 ## Concept
 
-A pyromaniac/inventor macaque monkey. Burnt-orange fur, bright red face, goofy toothy grin. Always tinkering with explosives — bombs, dynamite, aerosols. Wears overalls stained with gunpowder and hole-ridden work gloves. A small yellow hard hat appears during the dive bomb.
+A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs, dynamite, aerosols. Wears overalls stained with gunpowder and hole-ridden work gloves. A small yellow hard hat appears during the dive bomb.
 
 ## Archetype
 
-**Aerial brawler / Acrobatic bombardier** — hybrid between rushdown and explosive artillery.
+**Aerial bombardier / Acrobatic bomber** — hybrid between rushdown and explosive artillery.
 - Uses vertical movement as a resource
 - Poke with bombs, engage with dynamite/dive bomb, finish in melee
 - Gameplan: ground rushdown → launch with Q/E → bombard from above → R dive bomb to return → rushdown
