@@ -48,11 +48,11 @@
 - [ ] Download `hit_large` → save in
 - [ ] Download `death` → save in
 
-### Cascadeur (for custom ability animations)
+### Blender (for custom ability animations)
 - [ ] `attack_1` — first hit of LMB combo
 - [ ] `attack_2` — second hit
 - [ ] `attack_3` — launcher / finisher
-- [ ] `attack_heavy_charge` — RMB charge start
+- [ ] `rmb_loop` — RMB charge start
 - [ ] `attack_heavy_release` — RMB release
 - [ ] `attack_air_lmb` — air attack
 - [ ] `attack_air_rmb` — air spike
