@@ -1,185 +1,384 @@
 [gd_scene format=3 uid="uid://bopuya000rps"]
 
 [ext_resource type="PackedScene" uid="uid://cm4uo70frn7k4" path="res://assets/characters/manki/anim_monkey.glb" id="1_g38p2"]
-[ext_resource type="AnimationNodeStateMachine" uid="uid://vrdfi6dscwlu" path="res://animations/lmb_state.tres" id="2_foqek"]
+[ext_resource type="Script" uid="uid://cfeofiqt7wjb4" path="res://Scripts/Animation/StateMachine.cs" id="3_jyjdg"]
+[ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="4_t77cg"]
+[ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="5_xfoba"]
+[ext_resource type="Script" uid="uid://dyo0kq8c3kkno" path="res://Scripts/Animation/States/AirState.cs" id="6_gs8io"]
+[ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="8_8obs1"]
+[ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="9_t77cg"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_nlvqt"]
-animation = &"run"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
+animation = &"idle"
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hpb6d"]
-animation = &"fall"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeTimeScale" id="ts_idle"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_p4nk6"]
-animation = &"backflip"
-advance_on_start = true
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
+[sub_resource type="AnimationNodeBlendTree" id="bt_idle"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_idle")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_idle")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_j33en"]
+[sub_resource type="AnimationNodeAnimation" id="anim_land"]
 animation = &"jump"
 use_custom_timeline = true
 timeline_length = 1.0
 stretch_time_scale = true
+start_offset = 0.490000000000002
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_land"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_land"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_land")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_land")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_run"]
+animation = &"run"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
 start_offset = 0.0
 loop_mode = 1
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_t77cg"]
-switch_mode = 2
-advance_mode = 2
+[sub_resource type="AnimationNodeTimeScale" id="ts_run"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_xfoba"]
-advance_mode = 2
+[sub_resource type="AnimationNodeBlendTree" id="bt_run"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_run")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_run")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_gs8io"]
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"jump"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = false
+start_offset = 0.0
+loop_mode = 0
 
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_v4vgh"]
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_8obs1"]
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_0pswe"]
-switch_mode = 2
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_p3a83"]
-switch_mode = 2
-advance_mode = 2
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_v8hgj"]
-
-[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_64dmy"]
-allow_transition_to_self = true
-states/LMB/node = ExtResource("2_foqek")
-states/LMB/position = Vector2(562, 149)
-states/Start/position = Vector2(56, 105.49514)
-states/fall/node = SubResource("AnimationNodeAnimation_hpb6d")
-states/fall/position = Vector2(582, 65.49514)
-states/idle/node = SubResource("AnimationNodeAnimation_p4nk6")
-states/idle/position = Vector2(219, 105.49514)
-states/jump/node = SubResource("AnimationNodeAnimation_j33en")
-states/jump/position = Vector2(436, -40)
-transitions = ["fall", "End", SubResource("AnimationNodeStateMachineTransition_t77cg"), "Start", "idle", SubResource("AnimationNodeStateMachineTransition_xfoba"), "idle", "jump", SubResource("AnimationNodeStateMachineTransition_gs8io"), "idle", "LMB", SubResource("AnimationNodeStateMachineTransition_v4vgh"), "idle", "fall", SubResource("AnimationNodeStateMachineTransition_8obs1"), "jump", "fall", SubResource("AnimationNodeStateMachineTransition_0pswe"), "LMB", "End", SubResource("AnimationNodeStateMachineTransition_p3a83"), "fall", "jump", SubResource("AnimationNodeStateMachineTransition_v8hgj")]
-graph_offset = Vector2(-18, -93.50485)
-
-[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_foqek"]
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_clx38"]
-animation = &"idle"
+[sub_resource type="AnimationNodeAnimation" id="anim_fall"]
+animation = &"fall"
 use_custom_timeline = true
 timeline_length = 1.0
 stretch_time_scale = false
 start_offset = 0.0
 loop_mode = 1
 
-[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_nlvqt"]
+[sub_resource type="AnimationNodeBlendSpace1D" id="blend_air"]
+blend_point_0/node = SubResource("anim_jump")
+blend_point_0/pos = -1.0
+blend_point_1/node = SubResource("anim_fall")
+blend_point_1/pos = 1.0
+snap = 0.14
+blend_mode = 1
 
-[sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_j33en"]
-graph_offset = Vector2(-488.1448, -52.086227)
-nodes/output/position = Vector2(800, -40)
-nodes/idle/node = SubResource("AnimationNodeAnimation_clx38")
-nodes/idle/position = Vector2(-220, 20)
-nodes/action/node = SubResource("AnimationNodeStateMachine_64dmy")
-nodes/action/position = Vector2(160, 360)
-nodes/locomotion/node = SubResource("AnimationNodeBlend2_nlvqt")
-nodes/locomotion/position = Vector2(80, 40)
-nodes/final/node = SubResource("AnimationNodeBlend2_foqek")
-nodes/final/position = Vector2(560, -40)
-nodes/Animation/node = SubResource("AnimationNodeAnimation_nlvqt")
-nodes/Animation/position = Vector2(-220, 200)
-node_connections = [&"output", 0, &"final", &"locomotion", 0, &"idle", &"locomotion", 1, &"Animation", &"final", 0, &"locomotion", &"final", 1, &"action"]
+[sub_resource type="AnimationNodeAnimation" id="anim_air_lmb"]
+animation = &"attack_air_lmb"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_attack_air_lmb"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_attack_air_lmb"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_attack_air_lmb")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_air_lmb")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_air_rmb"]
+animation = &"attack_air_rmb"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_attack_air_rmb"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_attack_air_rmb"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_attack_air_rmb")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_air_rmb")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_heavy"]
+animation = &"attack_heavy_charge"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_attack_heavy_charge"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_attack_heavy_charge"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_attack_heavy_charge")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_heavy")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_backflip"]
+animation = &"backflip"
+use_custom_timeline = true
+timeline_length = 1.795
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 1
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_backflip"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_backflip"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_backflip")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_backflip")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_leg_sweep"]
+animation = &"leg_sweep"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_leg_sweep"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_leg_sweep"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_leg_sweep")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_leg_sweep")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_melee"]
+animation = &"melee"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_melee"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_melee"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_melee")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_melee")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_e"]
+animation = &"spell_e"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_spell_e"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_spell_e"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_spell_e")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_spell_e")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_f"]
+animation = &"spell_f"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_spell_f"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_spell_f"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_spell_f")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_spell_f")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_q"]
+animation = &"spell_q"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_spell_q"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_spell_q"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_spell_q")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_spell_q")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_spell_r"]
+animation = &"spell_r"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_spell_r"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_spell_r"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_spell_r")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_spell_r")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_01"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_015"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_at_end"]
+reset = false
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_j33en"]
+reset = false
+
+[sub_resource type="AnimationNodeStateMachine" id="sm_main"]
+states/End/position = Vector2(1600, 250)
+states/Idle/node = SubResource("bt_idle")
+states/Idle/position = Vector2(200, 100)
+states/Land/node = SubResource("bt_land")
+states/Land/position = Vector2(400, 250)
+states/Run/node = SubResource("bt_run")
+states/Run/position = Vector2(400, 100)
+states/Start/position = Vector2(50, 175)
+states/air/node = SubResource("blend_air")
+states/air/position = Vector2(200, 250)
+states/attack_air_lmb/node = SubResource("bt_attack_air_lmb")
+states/attack_air_lmb/position = Vector2(800, 250)
+states/attack_air_rmb/node = SubResource("bt_attack_air_rmb")
+states/attack_air_rmb/position = Vector2(1200, 250)
+states/attack_heavy_charge/node = SubResource("bt_attack_heavy_charge")
+states/attack_heavy_charge/position = Vector2(1000, 250)
+states/backflip/node = SubResource("bt_backflip")
+states/backflip/position = Vector2(1200, 100)
+states/leg_sweep/node = SubResource("bt_leg_sweep")
+states/leg_sweep/position = Vector2(1000, 100)
+states/melee/node = SubResource("bt_melee")
+states/melee/position = Vector2(800, 100)
+states/spell_e/node = SubResource("bt_spell_e")
+states/spell_e/position = Vector2(1000, 400)
+states/spell_f/node = SubResource("bt_spell_f")
+states/spell_f/position = Vector2(1400, 400)
+states/spell_q/node = SubResource("bt_spell_q")
+states/spell_q/position = Vector2(800, 400)
+states/spell_r/node = SubResource("bt_spell_r")
+states/spell_r/position = Vector2(1200, 400)
+transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "air", SubResource("xfade_01"), "Run", "air", SubResource("xfade_01"), "air", "Land", SubResource("xfade_015"), "Land", "Idle", SubResource("xfade_at_end"), "Idle", "melee", SubResource("xfade_01"), "Run", "melee", SubResource("xfade_01"), "air", "melee", SubResource("xfade_01"), "melee", "End", SubResource("xfade_015"), "leg_sweep", "End", SubResource("xfade_015"), "backflip", "End", SubResource("xfade_015"), "Idle", "attack_air_lmb", SubResource("xfade_01"), "Run", "attack_air_lmb", SubResource("xfade_01"), "air", "attack_air_lmb", SubResource("xfade_01"), "attack_air_lmb", "End", SubResource("xfade_015"), "Idle", "attack_heavy_charge", SubResource("xfade_01"), "Run", "attack_heavy_charge", SubResource("xfade_01"), "attack_heavy_charge", "End", SubResource("xfade_015"), "air", "attack_air_rmb", SubResource("xfade_01"), "attack_air_rmb", "End", SubResource("xfade_015"), "Idle", "spell_q", SubResource("xfade_01"), "Run", "spell_q", SubResource("xfade_01"), "air", "spell_q", SubResource("xfade_01"), "spell_q", "End", SubResource("xfade_015"), "Idle", "spell_e", SubResource("xfade_01"), "Run", "spell_e", SubResource("xfade_01"), "air", "spell_e", SubResource("xfade_01"), "spell_e", "End", SubResource("xfade_015"), "Idle", "spell_r", SubResource("xfade_01"), "Run", "spell_r", SubResource("xfade_01"), "air", "spell_r", SubResource("xfade_01"), "spell_r", "End", SubResource("xfade_015"), "Idle", "spell_f", SubResource("xfade_01"), "Run", "spell_f", SubResource("xfade_01"), "air", "spell_f", SubResource("xfade_01"), "spell_f", "End", SubResource("xfade_015"), "air", "End", SubResource("xfade_015"), "Land", "Run", SubResource("AnimationNodeStateMachineTransition_j33en")]
+graph_offset = Vector2(18, 80)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
 
 [node name="anim_monkey" parent="." unique_id=1010984532 instance=ExtResource("1_g38p2")]
 
-[node name="Skeleton3D" parent="anim_monkey/Armature" parent_id_path=PackedInt32Array(1010984532, 1689389833) index="0" unique_id=474226935]
-bones/0/position = Vector3(-0.18097825, -0.64008904, -47.405556)
-bones/0/rotation = Quaternion(-0.21180724, 0.7206118, -0.62455064, 0.21399264)
+[node name="Skeleton3D" parent="anim_monkey/Armature" parent_id_path=PackedInt32Array(1010984532, 1229340792) index="0" unique_id=2032354529]
+bones/0/position = Vector3(0.021032214, -2.1076756, -47.43667)
+bones/0/rotation = Quaternion(0.071989596, 0.81599593, -0.5590022, -0.12839302)
 bones/0/scale = Vector3(1.0000001, 1, 1)
 bones/1/position = Vector3(7.4505806e-08, 8.724874, 1.2133563)
-bones/1/rotation = Quaternion(0.031723242, 0.029162062, -0.039182663, 0.9983025)
+bones/1/rotation = Quaternion(-0.06339528, -0.09065752, 0.013215675, 0.9937744)
 bones/1/scale = Vector3(1, 1, 0.9999999)
-bones/2/position = Vector3(-1.1175871e-07, 10.276973, 7.7485976e-07)
-bones/2/rotation = Quaternion(-0.019568626, 0.012515826, -0.009592465, 0.99968415)
+bones/2/position = Vector3(1.4901161e-07, 10.276965, -1.0356309e-06)
+bones/2/rotation = Quaternion(-0.00998342, -0.025340728, 0.010118025, 0.9995778)
 bones/2/scale = Vector3(0.99999994, 0.99999994, 1)
 bones/3/position = Vector3(1.7881393e-07, 11.745125, -8.9406946e-08)
-bones/3/rotation = Quaternion(-0.019265778, 0.01324913, -0.009242641, 0.9996839)
+bones/3/rotation = Quaternion(-0.01028795, -0.025018657, 0.009897495, 0.99958503)
 bones/3/scale = Vector3(0.99999994, 0.99999994, 0.9999999)
 bones/4/position = Vector3(1.0728836e-06, 13.213242, 2.74701e-06)
-bones/4/rotation = Quaternion(-0.051963754, 0.03249829, 0.004076805, 0.9981117)
+bones/4/rotation = Quaternion(-0.004353637, 0.015023263, 0.011816366, 0.99980783)
 bones/4/scale = Vector3(0.99999994, 0.9999998, 0.99999994)
-bones/5/position = Vector3(6.556511e-07, 4.179368, 0.053185623)
-bones/5/rotation = Quaternion(-0.033875145, 0.16474715, 0.056344308, 0.98414236)
+bones/5/position = Vector3(8.34465e-07, 4.1793594, 0.053186934)
+bones/5/rotation = Quaternion(0.21284421, -0.030622529, -0.04075897, 0.9757553)
 bones/6/position = Vector3(-1.192093e-06, 38.5563, 0.49065357)
 bones/6/rotation = Quaternion(-1.3969832e-09, 1, -5.1222733e-09, 7.456658e-08)
-bones/7/position = Vector3(-7.377926, 11.775347, 0.19225764)
-bones/7/rotation = Quaternion(0.47185105, -0.43124235, 0.63332313, 0.43622077)
+bones/7/position = Vector3(-7.3779263, 11.775354, 0.19225813)
+bones/7/rotation = Quaternion(0.57640326, -0.36419603, 0.65068495, 0.33426002)
 bones/7/scale = Vector3(1, 1, 1.0000001)
-bones/8/position = Vector3(-7.338279e-07, 15.078997, 5.325763e-06)
-bones/8/rotation = Quaternion(0.2143489, -0.38034397, 0.1388975, 0.88887596)
+bones/8/position = Vector3(-1.6927306e-06, 15.078988, -1.6977758e-05)
+bones/8/rotation = Quaternion(0.2642899, -0.12324231, 0.2057584, 0.9341444)
 bones/8/scale = Vector3(1, 1.0000001, 1)
-bones/9/position = Vector3(-3.9863935e-06, 24.34868, 4.9865725e-06)
-bones/9/rotation = Quaternion(0.10546878, -0.13863282, 0.7796667, 0.6014791)
+bones/9/position = Vector3(4.7028243e-07, 24.348673, 3.3798824e-06)
+bones/9/rotation = Quaternion(0.10370682, 0.014815121, 0.7666432, 0.63346946)
 bones/9/scale = Vector3(1, 0.99999994, 0.9999999)
-bones/10/position = Vector3(3.3974645e-06, 17.694149, -2.5033933e-06)
+bones/10/position = Vector3(-3.5762775e-06, 17.694153, 3.2186563e-06)
 bones/10/rotation = Quaternion(4.0806492e-07, -1.7898962e-09, -4.027243e-08, 1)
-bones/11/position = Vector3(7.377926, 11.777437, 0.20738399)
-bones/11/rotation = Quaternion(-0.45974743, -0.48198235, 0.6156454, -0.42107737)
+bones/11/position = Vector3(7.3779263, 11.777444, 0.2073846)
+bones/11/rotation = Quaternion(-0.61515135, -0.3644421, 0.55894405, -0.41994342)
 bones/11/scale = Vector3(0.99999994, 1, 1.0000001)
-bones/12/position = Vector3(2.0750977e-06, 15.078998, 1.7439497e-06)
-bones/12/rotation = Quaternion(0.34775874, 0.19262744, -0.37784293, 0.83617777)
+bones/12/position = Vector3(-1.0032413e-06, 15.078997, 4.967063e-06)
+bones/12/rotation = Quaternion(0.3558742, -0.19625771, 0.3789625, 0.83139884)
 bones/12/scale = Vector3(1, 1, 0.9999999)
-bones/13/position = Vector3(6.721134e-07, 24.35045, -5.0446924e-06)
-bones/13/rotation = Quaternion(0.10955863, 0.14356409, -0.80797625, 0.5608571)
+bones/13/position = Vector3(-1.15085295e-05, 24.350445, 6.2895215e-06)
+bones/13/rotation = Quaternion(0.07282337, -0.009466938, -0.53706104, 0.84034073)
 bones/13/scale = Vector3(0.99999994, 0.9999998, 0.99999994)
-bones/14/position = Vector3(5.945435e-13, 17.701172, 4.0233073e-07)
+bones/14/position = Vector3(-1.8477442e-06, 17.701164, 1.1921173e-07)
 bones/14/rotation = Quaternion(-2.0634617e-07, -1.7811551e-08, -8.093775e-08, 1)
 bones/15/position = Vector3(-12.703752, -4.8395133, -0.11542209)
-bones/15/rotation = Quaternion(0.10318588, -0.39754063, 0.88774765, 0.20789003)
+bones/15/rotation = Quaternion(-0.025926162, -0.16388708, 0.9861362, 0.0020426807)
 bones/15/scale = Vector3(0.99999446, 0.99999726, 0.99999845)
 bones/16/position = Vector3(3.4007733e-06, 22.997522, -3.908243e-06)
-bones/16/rotation = Quaternion(0.4364599, 0.054103553, 0.059645303, 0.8961127)
+bones/16/rotation = Quaternion(0.4520538, 0.065152414, -0.000990039, 0.88960755)
 bones/17/position = Vector3(-4.4121597e-07, 14.938395, -2.5547474e-06)
-bones/17/rotation = Quaternion(-0.0008846147, 0.8336978, -0.54631007, 0.08057632)
+bones/17/rotation = Quaternion(0.043070536, 0.5947786, -0.7990576, 0.076747574)
 bones/17/scale = Vector3(0.9999999, 1, 1.0000001)
 bones/18/position = Vector3(-1.6672514e-07, 21.732086, -2.4187043e-06)
-bones/18/rotation = Quaternion(0.27518368, -0.101254605, 0.029157924, 0.95559996)
+bones/18/rotation = Quaternion(0.3639187, -0.11761047, 0.0294769, 0.9235053)
 bones/18/scale = Vector3(1.0000001, 0.99999976, 0.9999998)
 bones/19/position = Vector3(-1.1058465e-06, 9.124184, 7.555364e-07)
 bones/19/rotation = Quaternion(2.5029363e-09, -5.2875833e-07, 5.035691e-08, 1)
 bones/20/position = Vector3(12.7037525, -4.839512, -0.19028567)
-bones/20/rotation = Quaternion(-0.12114199, -0.011271389, 0.97349834, -0.19364531)
+bones/20/rotation = Quaternion(-0.09118732, -0.5835015, 0.7998259, -0.107188694)
 bones/20/scale = Vector3(1.0000032, 1.0000008, 1.000002)
 bones/21/position = Vector3(-9.964822e-07, 23.008516, -5.3620573e-07)
-bones/21/rotation = Quaternion(0.4173079, 0.02983627, 0.029579634, 0.90779346)
+bones/21/rotation = Quaternion(0.93197536, 0.0003317883, 0.004880048, 0.3624886)
 bones/21/scale = Vector3(0.99999994, 1, 1)
 bones/22/position = Vector3(6.7867046e-07, 14.946561, 1.6186365e-07)
-bones/22/rotation = Quaternion(-0.15275039, -0.67125225, 0.70283806, 0.17918265)
+bones/22/rotation = Quaternion(0.1959959, -0.75430113, 0.62637377, -0.016474068)
 bones/22/scale = Vector3(0.9999999, 1, 0.9999999)
 bones/23/position = Vector3(-9.848995e-07, 21.551746, -4.6870973e-06)
-bones/23/rotation = Quaternion(0.4044167, 0.1302063, -0.030671485, 0.904739)
+bones/23/rotation = Quaternion(0.4645528, 0.24184653, -0.012133699, 0.8517944)
 bones/23/scale = Vector3(0.9999999, 0.9999998, 0.9999998)
-bones/24/position = Vector3(9.037554e-06, 8.826863, -1.7881364e-07)
+bones/24/position = Vector3(6.8433587e-06, 8.8268585, -1.1324888e-06)
 bones/24/rotation = Quaternion(-1.25728565e-08, -2.1568852e-07, -1.4661055e-08, 1)
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1656529102]
 root_node = NodePath("../anim_monkey")
-tree_root = SubResource("AnimationNodeBlendTree_j33en")
+tree_root = SubResource("sm_main")
 anim_player = NodePath("../anim_monkey/AnimationPlayer")
-parameters/locomotion/blend_amount = 0.0
-parameters/final/blend_amount = 1.0
+parameters/Idle/TimeScale/scale = 1.0
+parameters/Land/TimeScale/scale = 1.0
+parameters/Run/TimeScale/scale = 1.0
+parameters/air/blend_position = 0.0
+parameters/attack_air_lmb/TimeScale/scale = 1.0
+parameters/attack_air_rmb/TimeScale/scale = 1.0
+parameters/attack_heavy_charge/TimeScale/scale = 1.0
+parameters/backflip/TimeScale/scale = 1.0
+parameters/leg_sweep/TimeScale/scale = 1.0
+parameters/melee/TimeScale/scale = 1.0
+parameters/spell_e/TimeScale/scale = 1.0
+parameters/spell_f/TimeScale/scale = 1.0
+parameters/spell_q/TimeScale/scale = 1.0
+parameters/spell_r/TimeScale/scale = 1.0
+
+[node name="FSM" type="Node" parent="." unique_id=1796319416]
+script = ExtResource("3_jyjdg")
+
+[node name="idle" type="Node" parent="FSM" unique_id=1557372778]
+script = ExtResource("4_t77cg")
+
+[node name="run" type="Node" parent="FSM" unique_id=494978396]
+script = ExtResource("5_xfoba")
+
+[node name="air" type="Node" parent="FSM" unique_id=1630159486]
+script = ExtResource("6_gs8io")
+
+[node name="landing" type="Node" parent="FSM" unique_id=415177410]
+script = ExtResource("8_8obs1")
+
+[node name="attack" type="Node" parent="FSM" unique_id=881088101]
+script = ExtResource("9_t77cg")
 
 [editable path="anim_monkey"]
