@@ -31,7 +31,8 @@ public partial class StateMachine : Node
 	/// Must be called after adding all states and finding the AnimationTree.
 	/// Binds references to each state and sets up the animation playback.
 	/// </summary>
-	public void Initialize(PlayerController player, MovementComponent movement)
+	public void Initialize(PlayerController player, MovementComponent movement,
+		InputController inputCtrl)
 	{
 		_player = player;
 		_movement = movement;
@@ -63,7 +64,7 @@ public partial class StateMachine : Node
 
 		// Bind references
 		foreach (var kvp in _states)
-			kvp.Value.Setup(this, player, movement, _animPlayback!);
+			kvp.Value.Setup(this, player, movement, _animPlayback!, inputCtrl);
 	}
 
 	/// <summary>

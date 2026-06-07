@@ -46,6 +46,7 @@ public partial class PlayerController : CharacterBody3D
 	private MovementComponent _movementComponent = null!;
 	private AnimationController _animationController = null!;
 	private StateMachine? _fsm;
+	private InputController _inputCtrl = new();
 	private WowCamera? _wowCamera;
 	private CombatComponent? _combatComponent;
 	private MeshInstance3D? _firstMesh;
@@ -215,7 +216,7 @@ public partial class PlayerController : CharacterBody3D
 		// Initialize StateMachine deferred (needs AnimationTree to settle in tree)
 		Callable.From(() =>
 		{
-			_fsm?.Initialize(this, _movementComponent);
+			_fsm?.Initialize(this, _movementComponent, _inputCtrl);
 			_fsm?.TransitionTo("idle");
 		}).CallDeferred();
 
@@ -281,7 +282,9 @@ public partial class PlayerController : CharacterBody3D
 		if (_debugLabel == null) return;
 
 		string fsmState = _fsm?.CurrentStateName ?? "?";
-		_debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
+		var animTree = _playerModel?.GetNodeOrNull<AnimationTree>("AnimationTree");
+		float airBlend = animTree?.Get("parameters/air/blend_position").AsSingle() ?? 0f;
+		_debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  air: {airBlend:F2}  floor: {IsOnFloor()}";
 	}
 
 	// ==========================================
@@ -442,6 +445,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
+		_inputCtrl.Poll();
 		UpdateDebugLabel();
 		if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
 

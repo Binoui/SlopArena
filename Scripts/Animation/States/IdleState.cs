@@ -22,8 +22,7 @@ public sealed partial class IdleState : State
 	public override void OnProcess(float delta)
 	{
 		// Jump — transition immediately when action is pressed
-		// (IsOnFloor() is unreliable here because MoveAndSlide() already moved the body)
-		if (Input.IsActionJustPressed("jump"))
+		if (InputCtrl.JumpJustPressed)
 		{
 			StateMachine.TransitionTo("air");
 			return;

@@ -31,12 +31,12 @@ public sealed partial class LandingState : State
         _timer -= delta;
 
         // Cancel landing on jump or dash
-        if (Input.IsActionJustPressed("jump"))
+        if (InputCtrl.JumpJustPressed)
         {
             StateMachine.TransitionTo("air");
             return;
         }
-        if (Input.IsActionJustPressed("dash"))
+        if (InputCtrl.DashJustPressed)
         {
             StateMachine.TransitionTo("idle");
             return;

@@ -25,17 +25,20 @@ public abstract partial class State : Node
 	protected PlayerController Player { get; private set; } = null!;
 	protected MovementComponent Movement { get; private set; } = null!;
 	protected AnimationNodeStateMachinePlayback AnimPlayback { get; private set; } = null!;
+	protected InputController InputCtrl { get; private set; } = null!;
 
 	/// <summary>
 	/// Called by StateMachine after setting references. Don't call directly.
 	/// </summary>
 	public void Setup(StateMachine stateMachine, PlayerController player,
-		MovementComponent movement, AnimationNodeStateMachinePlayback animPlayback)
+		MovementComponent movement, AnimationNodeStateMachinePlayback animPlayback,
+		InputController inputCtrl)
 	{
 		StateMachine = stateMachine;
 		Player = player;
 		Movement = movement;
 		AnimPlayback = animPlayback;
+		InputCtrl = inputCtrl;
 	}
 
 	/// <summary>
