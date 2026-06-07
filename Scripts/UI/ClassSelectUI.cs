@@ -54,7 +54,7 @@ public partial class ClassSelectUI : Control
         _classButtons.AddThemeConstantOverride("separation", 10);
         AddChild(_classButtons);
 
-        AddClassButton(CharacterClass.Manki,"Manki",  "Fire monkey. Agile rushdown, flaming fists, rising kicks and inferno burst.");// only Manki for now
+        AddClassButton(CharacterClass.Manki, "Manki", "Fire monkey. Agile rushdown, flaming fists, rising kicks and inferno burst.");// only Manki for now
 
         // Selected class description
         _description = new Label();

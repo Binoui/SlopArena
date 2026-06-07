@@ -12,26 +12,26 @@ using SlopArena.Shared;
 /// </summary>
 public static class AbilityRegistry
 {
-		private static readonly Dictionary<string, Action<CombatComponent>> Effects = new()
-		{
+    private static readonly Dictionary<string, Action<CombatComponent>> Effects = new()
+        {
 			// Manki — Mad Bomber Monkey
 			{ "MankiAerosolFlame", MankiAbilities.AerosolFlame },
-			{ "MankiRoundBomb", MankiAbilities.RoundBomb },
-			{ "MankiDynamiteJump", MankiAbilities.DynamiteJump },
-			{ "MankiDiveBomb", MankiAbilities.DiveBomb },
-			{ "MankiBigBoom", MankiAbilities.BigBoom },
-		};
+            { "MankiRoundBomb", MankiAbilities.RoundBomb },
+            { "MankiDynamiteJump", MankiAbilities.DynamiteJump },
+            { "MankiDiveBomb", MankiAbilities.DiveBomb },
+            { "MankiBigBoom", MankiAbilities.BigBoom },
+        };
 
-	/// <summary>
-	/// Execute a special effect by key name.
-	/// Called from PlayerController.ExecuteSlot after stage resolution.
-	/// Returns false if the key was not found.
-	/// </summary>
-	public static bool Execute(string key, CombatComponent combat)
-	{
-		if (key == null || !Effects.TryGetValue(key, out var effect))
-			return false;
-		effect(combat);
-		return true;
-	}
+    /// <summary>
+    /// Execute a special effect by key name.
+    /// Called from PlayerController.ExecuteSlot after stage resolution.
+    /// Returns false if the key was not found.
+    /// </summary>
+    public static bool Execute(string key, CombatComponent combat)
+    {
+        if (key == null || !Effects.TryGetValue(key, out var effect))
+            return false;
+        effect(combat);
+        return true;
+    }
 }
