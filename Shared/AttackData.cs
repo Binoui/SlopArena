@@ -33,18 +33,18 @@ namespace SlopArena.Shared
         public AttackStage[] Stages;
 
         /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
-        public AttackStage[]? ChargedStages;
+        public AttackStage[] ChargedStages;
         /// <summary>Ticks to hold before charged version fires.</summary>
         public ushort ChargeHoldTicks;
 
         /// <summary>Special effects (hitbox spawning, teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
-        public string[]? SpecialEffectKeys;
+        public string[] SpecialEffectKeys;
 
         /// <summary>Animation name for each stage.
         /// Each character defines their own animation keys.
         /// Example: LMB = ["attack_2h_slice", "attack_2h_chop", "attack_2h_spin"]
         /// </summary>
-        public string[]? AnimationNames;
+        public string[] AnimationNames;
 
         /// <summary>Optional aimed-charge config (e.g., RMB cone flamethrower).</summary>
         public AimedChargeData? AimedCharge;

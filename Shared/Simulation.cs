@@ -51,7 +51,7 @@ namespace SlopArena.Shared
             CharacterDefinition def,
             InputState input,
             ArenaDefinition arena,
-            Action<ulong, float, float, float, float>? onHit = null)
+            Action<ulong, float, float, float, float> onHit = null)
         {
             var stats = def.Movement;
 

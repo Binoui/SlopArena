@@ -38,15 +38,15 @@ public sealed partial class AttackState : State
 		_startupTicksRemaining = startupTicks;
 		_hasPendingResolve = true;
 		// Lock during startup so AttackState.OnProcess doesn't transition away
-		// Use ref to modify the struct in-place (CharacterState is a value type)
-		ref var state = ref Movement.State;
-		state.AnimLockTicks = startupTicks;
-	}
+        // Use ref to modify the struct in-place (CharacterState is a value type)
+        ref var state = ref Movement.State;
+        state.AnimLockTicks = startupTicks;
+    }
 
-	public bool HasPendingResolve => _hasPendingResolve;
-	public ushort StartupTicksRemaining => _startupTicksRemaining;
+    public bool HasPendingResolve => _hasPendingResolve;
+    public ushort StartupTicksRemaining => _startupTicksRemaining;
 
-	/// <summary>
+    /// <summary>
 	/// Decrement startup timer. When expired, called by PlayerController's tick.
 	/// Returns true if startup just completed this frame.
 	/// </summary>

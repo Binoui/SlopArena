@@ -15,9 +15,9 @@ namespace SlopArena.Shared
 
         public void Serialize(Span<byte> buffer)
         {
-            if (buffer.Length < Size) 
+            if (buffer.Length < Size)
                 throw new ArgumentException("Buffer too small");
-                
+
             BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(0, 4), TickNumber);
             buffer[4] = MovementFlags;
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(5, 4), MouseWorldX);
@@ -27,9 +27,9 @@ namespace SlopArena.Shared
 
         public static ClientInputPacket Deserialize(ReadOnlySpan<byte> buffer)
         {
-            if (buffer.Length < Size) 
+            if (buffer.Length < Size)
                 throw new ArgumentException("Buffer too small");
-                
+
             var packet = new ClientInputPacket();
             packet.TickNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
             packet.MovementFlags = buffer[4];

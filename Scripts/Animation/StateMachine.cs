@@ -139,12 +139,12 @@ public partial class StateMachine : Node
 
 		if (newState == CurrentState)
 			return;
-		
+
 		GD.Print($"[FSM] state '{CurrentState?.Name}' —> '{newState?.Name}'");
 
 		CurrentState?.Exit();
-		CurrentState = newState;
-		newState.Enter();
+		CurrentState = newState!;
+		newState!.Enter();
 	}
 
 	public bool IsInState(string stateName)

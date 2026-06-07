@@ -169,10 +169,10 @@ public class MovementComponent
     /// </summary>
     public void SetComboState(byte comboStage, ushort chainWindowTicks, ushort selfLockTicks)
     {
-    	ref var s = ref State;
-    	s.ComboStage = comboStage;
-    	s.ComboTimerTicks = chainWindowTicks;
-    	s.AnimLockTicks = selfLockTicks;
+        ref var s = ref State;
+        s.ComboStage = comboStage;
+        s.ComboTimerTicks = chainWindowTicks;
+        s.AnimLockTicks = selfLockTicks;
     }
 
     /// <summary>

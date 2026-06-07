@@ -28,7 +28,7 @@ namespace SlopArena.Shared
     public static class MovementProfiles
     {
         public static MovementProfile Active { get; private set; }
-        
+
         static MovementProfiles()
         {
             Active = Default;
