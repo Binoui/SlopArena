@@ -380,23 +380,21 @@ public partial class PlayerController : CharacterBody3D
 	private void SetupInputMap()
 	{
 		void Add(string n, InputEventKey k) { if (!InputMap.HasAction(n)) InputMap.AddAction(n); InputMap.ActionAddEvent(n, k); }
-		Add("move_forward",  new InputEventKey { PhysicalKeycode = Key.Z });
 		Add("move_forward",  new InputEventKey { PhysicalKeycode = Key.W });
 		Add("move_back",     new InputEventKey { PhysicalKeycode = Key.S });
-		Add("move_left",     new InputEventKey { PhysicalKeycode = Key.Q });
 		Add("move_left",     new InputEventKey { PhysicalKeycode = Key.A });
 		Add("move_right",    new InputEventKey { PhysicalKeycode = Key.D });
 		Add("jump",          new InputEventKey { PhysicalKeycode = Key.Space });
 		Add("dash",          new InputEventKey { PhysicalKeycode = Key.Shift });
 		Add("crouch",        new InputEventKey { PhysicalKeycode = Key.C });
-		Add("ability_q",   new InputEventKey { PhysicalKeycode = Key.Key1 });
-		Add("ability_f",   new InputEventKey { PhysicalKeycode = Key.Key3 });
-		Add("ability_e",   new InputEventKey { Keycode = Key.E });
-		Add("ability_r",   new InputEventKey { Keycode = Key.R });
+		Add("ability_q",     new InputEventKey { PhysicalKeycode = Key.Q });
+		Add("ability_e",     new InputEventKey { PhysicalKeycode = Key.E });
+		Add("ability_r",     new InputEventKey { PhysicalKeycode = Key.R });
+		Add("ability_f",     new InputEventKey { PhysicalKeycode = Key.F });
 		Add("spellbook_toggle", new InputEventKey { Keycode = Key.B });
 		Add("ui_cancel",     new InputEventKey { Keycode = Key.Escape });
 		Add("trinket",       new InputEventKey { Keycode = Key.G });
-		Add("tech",          new InputEventKey { Keycode = Key.F });
+		Add("tech",          new InputEventKey { Keycode = Key.T });
 		SettingsUI.LoadBindings();
 	}
 
