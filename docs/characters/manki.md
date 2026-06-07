@@ -53,7 +53,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | `attack_2` | Roundhouse / leg sweep | LMB stage 2 |
 | `attack_3` | Fire uppercut | LMB stage 3 (launcher) |
 | `attack_air_lmb` | Air punch | Air LMB |
-| `attack_heavy_charge` | Shake aerosol | RMB hold |
+| `rmb_loop` | Shake aerosol | RMB hold |
 | `attack_heavy_release` | Cone flame jet | RMB release |
 | `attack_air_rmb` | Air kick | Air RMB |
 | `spell_q` | Throw round bomb | Q (throw animation) |

@@ -424,8 +424,32 @@ public partial class PlayerController : CharacterBody3D
 
 			if (mb.ButtonIndex == MouseButton.Right && _combatComponent != null)
 			{
-				if (mb.Pressed) { _heavyHoldTimer = 0f; _heavyHeld = false; }
-				else if (!_heavyHeld)
+				if (mb.Pressed)
+				{
+					if (IsOnFloor())
+					{
+						var ability = _charDef.GetSlotAbility(1, false);
+						if (ability.AimedCharge.HasValue && _fsm != null)
+						{
+							var chargeState = _fsm.GetState<AimedChargeState>("aimed_charge");
+							if (chargeState != null)
+							{
+								chargeState.Configure(ability.AimedCharge.Value, 1, false);
+								_fsm.TransitionTo("aimed_charge");
+								GetViewport().SetInputAsHandled(); return;
+							}
+						}
+						// Legacy charge (no AimedCharge config)
+						_heavyHoldTimer = 0f; _heavyHeld = false;
+					}
+					else
+					{
+						// Air RMB: direct attack
+						ExecuteSlot(1, false, true);
+						GetViewport().SetInputAsHandled(); return;
+					}
+				}
+				else if (!_heavyHeld && (_fsm == null || !_fsm.IsInState("aimed_charge")))
 				{
 					ExecuteSlot(1, false, !IsOnFloor());
 					GetViewport().SetInputAsHandled(); return;
@@ -459,7 +483,9 @@ public partial class PlayerController : CharacterBody3D
 		UpdateDebugLabel();
 		if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
 
-		if (Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
+		// Legacy hold timer for RMB charge (only if not using AimedCharge system)
+		if ((_fsm == null || !_fsm.IsInState("aimed_charge")) &&
+		    Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
 		{
 			_heavyHoldTimer += dt;
 			if (_heavyHoldTimer > 0.3f && !_heavyHeld)
@@ -477,7 +503,8 @@ public partial class PlayerController : CharacterBody3D
 		if (_movementComponent.State.BufferedChain > 0 &&
 		    _movementComponent.State.AnimLockTicks == 0)
 		{
-			_movementComponent.State.BufferedChain--;
+			ref var s = ref _movementComponent.State;
+			s.BufferedChain--;
 			ExecuteSlot(0, false, !IsOnFloor());
 		}
 
@@ -522,6 +549,30 @@ public partial class PlayerController : CharacterBody3D
 
 		bool wasKnocked = _movementComponent.IsInKnockback();
 		_movementComponent.Tick(input);
+
+				// Resolve pending attack stages after startup delay
+		if (_fsm != null && _fsm.IsInState("attack"))
+		{
+			var attackState = _fsm.GetAttackState();
+			if (attackState != null && attackState.HasPendingResolve && attackState.TickStartup())
+			{
+				var stages = attackState.PendingStages;
+				if (stages != null)
+				{
+			var ability = _charDef.GetSlotAbility(attackState.PendingSlotIndex, attackState.PendingAirborne);
+			ResolveAbilityStages(ability, stages, attackState.PendingSlotIndex,
+				attackState.PendingCharged, attackState.PendingAirborne);
+
+			// Special effects (only for stage 0, not combo chains)
+			if (attackState.PendingSlotIndex != 0 && ability.SpecialEffectKeys != null)
+			{
+				foreach (var key in ability.SpecialEffectKeys)
+					AbilityRegistry.Execute(key, _combatComponent);
+			}
+				}
+						attackState.ClearPendingResolve();
+					}
+				}
 
 		// Tech roll on knockback landing
 		if (wasKnocked && _movementComponent.IsGrounded && !_movementComponent.IsInKnockback() && Input.IsActionJustPressed("tech"))
@@ -604,6 +655,18 @@ public partial class PlayerController : CharacterBody3D
 		input.Dash = Input.IsActionJustPressed("dash");
 		input.Crouch = Input.IsActionPressed("crouch");
 		input.Attack = Input.IsMouseButtonPressed(MouseButton.Left);
+
+		// Zero movement if FSM state disallows it (e.g., aimed charge, attack)
+		if (_fsm != null && !_fsm.CanMove())
+		{
+			input.MoveX = 0f;
+			input.MoveY = 0f;
+			input.Jump = false;
+			input.Dash = false;
+			_moveDirection = Vector3.Zero;
+			_snappedInputDirection = Vector2.Zero;
+		}
+
 		return input;
 	}
 
@@ -614,7 +677,7 @@ public partial class PlayerController : CharacterBody3D
 	/// <summary>
 	/// Execute any ability slot (0-5) uniformly.
 	/// </summary>
-	private void ExecuteSlot(int slotIndex, bool charged, bool airborne)
+	public void ExecuteSlot(int slotIndex, bool charged, bool airborne)
 	{
 		if (_combatComponent == null) return;
 		if (_movementComponent.IsInKnockback()) return;
@@ -625,7 +688,10 @@ public partial class PlayerController : CharacterBody3D
 
 			// Buffer LMB input in queue (max 2, like souls-like FSM queue)
 			if (_movementComponent.State.BufferedChain < 2)
-				_movementComponent.State.BufferedChain++;
+			{
+				ref var s = ref _movementComponent.State;
+				s.BufferedChain++;
+			}
 			return; // consumed when lock expires
 		}
 
@@ -650,19 +716,16 @@ public partial class PlayerController : CharacterBody3D
 		OnAbilityUsed?.Invoke(slotIndex);
 		var stages = charged && ability.ChargedStages != null ? ability.ChargedStages : ability.Stages;
 
-		// ── Step 1: Resolve stages (hit detection) ──
-		if (stages != null && stages.Length > 0)
-		{
-			ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
-		}
-
-		// Play attack animation via AnimationTree StateMachine
-		int animStage = (stages != null && stages.Length > 0)
-			? Math.Clamp(_movementComponent.State.ComboStage - 1, 0, stages.Length - 1)
-			: 0;
+			// Play attack animation via AnimationTree StateMachine
+			int animStage = (stages != null && stages.Length > 0)
+				? Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1)
+				: 0;
 		string? animName = ability.AnimationNames != null && animStage < ability.AnimationNames.Length
 			? ability.AnimationNames[animStage]
 			: null;
+		// If this ability uses AimedCharge, use the attack anim (not the charge loop)
+		if (animName != null && ability.AimedCharge.HasValue)
+			animName = ability.AimedCharge.Value.AttackAnimName;
 		if (animName != null && _fsm != null)
 		{
 			var attackState = _fsm.GetAttackState();
@@ -670,38 +733,51 @@ public partial class PlayerController : CharacterBody3D
 			{
 				if (_fsm.IsInState("attack"))
 				{
+					// Combo chain: resolve stages immediately (no startup on chain hits)
+					if (stages != null && stages.Length > 0)
+						ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
 					GD.Print("Combo Chain to ", animName);
-					attackState.ChainTo(animName);      // combo chain
+					attackState.ChainTo(animName);
 				}
 				else
 				{
-					GD.Print("First attack ", animName);
-					attackState.NextAnimName = animName;
-					_fsm.TransitionTo("attack");        // first attack
+					// First attack: delay stages if startup > 0
+					ushort startup = (stages != null && stages.Length > 0) ? stages[animStage].StartupTicks : (ushort)0;
+							if (startup > 0 && stages != null && stages.Length > 0)
+								attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
+							else if (stages != null && stages.Length > 0)
+								ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+							GD.Print("First attack ", animName);
+							attackState.NextAnimName = animName;
+							_fsm.TransitionTo("attack");
+						}
+					}
 				}
-			}
-		}
 
-		// ── Step 2: Special effects ──
-		if (ability.SpecialEffectKeys != null)
-		{
-			foreach (var key in ability.SpecialEffectKeys)
-			{
-				AbilityRegistry.Execute(key, _combatComponent);
-			}
-		}
+				// ── Step 2: Special effects ──
+				// Only fire immediately if no startup delay (otherwise fired after delay in _PhysicsProcess)
+				if (ability.SpecialEffectKeys != null)
+				{
+					ushort startup = (stages != null && stages.Length > 0) ? stages[0].StartupTicks : (ushort)0;
+					if (startup == 0)
+					{
+						foreach (var key in ability.SpecialEffectKeys)
+							AbilityRegistry.Execute(key, _combatComponent);
+					}
+				}
 
 		// ── Step 3: Set cooldown ──
 		if (ability.CooldownTicks > 0)
 		{
+			ref var s = ref _movementComponent.State;
 			switch (slotIndex)
 			{
-				case 0: _movementComponent.State.Cooldown0 = ability.CooldownTicks; break;
-				case 1: _movementComponent.State.Cooldown1 = ability.CooldownTicks; break;
-				case 2: _movementComponent.State.Cooldown2 = ability.CooldownTicks; break;
-				case 3: _movementComponent.State.Cooldown3 = ability.CooldownTicks; break;
-				case 4: _movementComponent.State.Cooldown4 = ability.CooldownTicks; break;
-				case 5: _movementComponent.State.Cooldown5 = ability.CooldownTicks; break;
+				case 0: s.Cooldown0 = ability.CooldownTicks; break;
+				case 1: s.Cooldown1 = ability.CooldownTicks; break;
+				case 2: s.Cooldown2 = ability.CooldownTicks; break;
+				case 3: s.Cooldown3 = ability.CooldownTicks; break;
+				case 4: s.Cooldown4 = ability.CooldownTicks; break;
+				case 5: s.Cooldown5 = ability.CooldownTicks; break;
 			}
 		}
 	}
@@ -720,13 +796,14 @@ public partial class PlayerController : CharacterBody3D
 		byte newComboStage = _movementComponent.State.ComboStage;
 		if (slotIndex == 0 && !airborne)
 		{
-			if (_movementComponent.State.ComboStage == 0 || _movementComponent.State.ComboTimerTicks <= 0)
+			if (_movementComponent.State.ComboStage == 0)
 				newComboStage = 1;
 			else if (_movementComponent.State.ComboStage < stages.Length)
 				newComboStage++;
 			else
 			{
-				_movementComponent.State.BufferedChain = 0; // combo maxed, clear queue
+				ref var s = ref _movementComponent.State;
+				s.BufferedChain = 0; // combo maxed, clear queue
 				return;
 			}
 			stageIndex = newComboStage - 1;

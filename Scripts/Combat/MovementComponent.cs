@@ -63,11 +63,12 @@ public class MovementComponent
         _arenaDef = arenaDef;
 
         // Initialize state from character definition
-        State.DamagePercent = 0;
-        State.JumpsLeft = charDef.Movement.MaxJumps;
-        State.AirDodgesLeft = 1;
-        State.IsGrounded = false;
-        State.EntityId = 1;
+        ref var s = ref State;
+        s.DamagePercent = 0;
+        s.JumpsLeft = charDef.Movement.MaxJumps;
+        s.AirDodgesLeft = 1;
+        s.IsGrounded = false;
+        s.EntityId = 1;
 
         _initialized = true;
     }
@@ -83,12 +84,13 @@ public class MovementComponent
         if (!_initialized) return;
 
         // Sync Godot position into state at start of tick
-        State.PX = _body.GlobalPosition.X;
-        State.PY = _body.GlobalPosition.Y;
-        State.PZ = _body.GlobalPosition.Z;
-        State.VX = _body.Velocity.X;
-        State.VY = _body.Velocity.Y;
-        State.VZ = _body.Velocity.Z;
+        ref var s = ref State;
+        s.PX = _body.GlobalPosition.X;
+        s.PY = _body.GlobalPosition.Y;
+        s.PZ = _body.GlobalPosition.Z;
+        s.VX = _body.Velocity.X;
+        s.VY = _body.Velocity.Y;
+        s.VZ = _body.Velocity.Z;
 
         // Authoritative simulation
         Simulation.SimulateTick(ref State, _charDef, input, _arenaDef);
@@ -101,15 +103,17 @@ public class MovementComponent
         bool godotGrounded = _body.IsOnFloor();
 
         // Sync grounded state from Godot (authoritative floor detection)
-        State.IsGrounded = godotGrounded;
+        s = ref State;
+        s.IsGrounded = godotGrounded;
 
         // Floor safety
         if (_body.GlobalPosition.Y < Simulation.FloorHeight - 1f && State.IsGrounded)
         {
             _body.GlobalPosition = new Vector3(_body.GlobalPosition.X, Simulation.FloorHeight + 0.5f, _body.GlobalPosition.Z);
             _body.Velocity = new Vector3(_body.Velocity.X, 0f, _body.Velocity.Z);
-            State.PY = Simulation.FloorHeight + 0.5f;
-            State.VY = 0f;
+            s = ref State;
+            s.PY = Simulation.FloorHeight + 0.5f;
+            s.VY = 0f;
         }
     }
 
@@ -161,12 +165,14 @@ public class MovementComponent
 
     /// <summary>
     /// Set combo stage and attack lock ticks (called by PlayerController after ExecuteSlot).
+    /// Note: uses ref to modify the struct in-place (CharacterState is a value type).
     /// </summary>
     public void SetComboState(byte comboStage, ushort chainWindowTicks, ushort selfLockTicks)
     {
-        State.ComboStage = comboStage;
-        State.ComboTimerTicks = chainWindowTicks;
-        State.AnimLockTicks = selfLockTicks;
+    	ref var s = ref State;
+    	s.ComboStage = comboStage;
+    	s.ComboTimerTicks = chainWindowTicks;
+    	s.AnimLockTicks = selfLockTicks;
     }
 
     /// <summary>
@@ -183,23 +189,24 @@ public class MovementComponent
     /// </summary>
     public void Respawn(Vector3 position)
     {
-        State.PX = position.X;
-        State.PY = position.Y;
-        State.PZ = position.Z;
-        State.VX = State.VY = State.VZ = 0f;
-        State.KVX = State.KVY = State.KVZ = 0f;
-        State.State = ActionState.Idle;
-        State.StateTicks = 0;
-        State.JumpsLeft = _charDef.Movement.MaxJumps;
-        State.AirDodgesLeft = 1;
-        State.IsGrounded = false;
-        State.DamagePercent = 0;
-        State.ComboStage = 0;
-        State.ComboTimerTicks = 0;
-        State.AnimLockTicks = 0;
-        State.DashCooldownTicks = 0;
-        State.DashDurationTicks = 0;
-        State.InvincibilityTicks = 0;
+        ref var s = ref State;
+        s.PX = position.X;
+        s.PY = position.Y;
+        s.PZ = position.Z;
+        s.VX = s.VY = s.VZ = 0f;
+        s.KVX = s.KVY = s.KVZ = 0f;
+        s.State = ActionState.Idle;
+        s.StateTicks = 0;
+        s.JumpsLeft = _charDef.Movement.MaxJumps;
+        s.AirDodgesLeft = 1;
+        s.IsGrounded = false;
+        s.DamagePercent = 0;
+        s.ComboStage = 0;
+        s.ComboTimerTicks = 0;
+        s.AnimLockTicks = 0;
+        s.DashCooldownTicks = 0;
+        s.DashDurationTicks = 0;
+        s.InvincibilityTicks = 0;
     }
 
     /// <summary>
@@ -207,7 +214,8 @@ public class MovementComponent
     /// </summary>
     public void ResetJumps()
     {
-        State.JumpsLeft = _charDef.Movement.MaxJumps;
-        State.AirDodgesLeft = 1;
+        ref var s = ref State;
+        s.JumpsLeft = _charDef.Movement.MaxJumps;
+        s.AirDodgesLeft = 1;
     }
 }

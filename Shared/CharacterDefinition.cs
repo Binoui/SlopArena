@@ -86,9 +86,6 @@ namespace SlopArena.Shared
 
         // ═══════════════════════════════════════
         // MANKI — Mad Bomber Monkey
-        // LMB: rushdown combo | RMB: aerosol flamethrower (charged cone)
-        // Q: Round Bomb (arc projectile) | E: Dynamite Jump (rocket jump)
-        // R: Dive Bomb (head-first AoE) | F: Big Boom (ult)
         // ═══════════════════════════════════════
         private static CharacterDefinition BuildManki()
         {
@@ -115,109 +112,111 @@ namespace SlopArena.Shared
                     MaxJumps = 2,
                 },
 
-                // LMB — Monkey Combo: 3-hit melee (punch → leg sweep → fire uppercut)
+                // LMB — 3-hit combo with startup per stage
                 LMB = new AbilityData
                 {
                     Name = "Monkey Combo",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 10, SelfLockTicks = 66, ChainWindowTicks = 80 },
-                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, StunTicks = 14, SelfLockTicks = 70, ChainWindowTicks = 80 },
-                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, StunTicks = 18, SelfLockTicks = 86, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 10, SelfLockTicks = 46, ChainWindowTicks = 0, StartupTicks = 6 },
+                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, StunTicks = 14, SelfLockTicks = 30, ChainWindowTicks = 0, StartupTicks = 8 },
+                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, StunTicks = 18, SelfLockTicks = 56, ChainWindowTicks = 0, StartupTicks = 10 },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
 
-                // Air LMB — air punch
                 AirLMB = new AbilityData
                 {
                     Name = "Air Punch",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0, StartupTicks = 4 },
                     },
                     AnimationNames = new[] { "attack_air_lmb" },
                 },
 
-                // RMB — Aerosol + Lighter: charged cone flamethrower
+                // RMB — charged cone flamethrower
                 RMB = new AbilityData
                 {
                     Name = "Aerosol + Lighter",
                     CooldownTicks = 30,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 14f, KnockbackUpward = 4f, StunTicks = 14, SelfLockTicks = 50, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 14f, KnockbackUpward = 4f, StunTicks = 14, SelfLockTicks = 50, ChainWindowTicks = 0, StartupTicks = 8 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 24f, KnockbackUpward = 8f, StunTicks = 20, SelfLockTicks = 40, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 24f, KnockbackUpward = 8f, StunTicks = 20, SelfLockTicks = 40, ChainWindowTicks = 0, StartupTicks = 10 },
                     },
                     ChargeHoldTicks = 45,
-                    AnimationNames = new[] { "attack_heavy_charge" },
+                    AnimationNames = new[] { "rmb_loop" },
                     SpecialEffectKeys = new[] { "MankiAerosolFlame" },
+                    AimedCharge = new AimedChargeData
+                    {
+                        ChargeAnimName = "rmb_loop",
+                        AttackAnimName = "rmb_attack",
+                        ConeAngle = 60f,
+                        ConeRange = 5f,
+                        MaxChargeTicks = 45,
+                    },
                 },
 
-                // Air RMB — drop kick spike
                 AirRMB = new AbilityData
                 {
                     Name = "Drop Kick",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 22, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 22, ChainWindowTicks = 0, StartupTicks = 6 },
                     },
                     AnimationNames = new[] { "attack_air_rmb" },
                 },
 
-                // Q — Round Bomb: lob projectile
                 Q = new AbilityData
                 {
                     Name = "Round Bomb",
                     CooldownTicks = 90,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, SelfLockTicks = 20, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, SelfLockTicks = 20, ChainWindowTicks = 0, StartupTicks = 10 },
                     },
                     AnimationNames = new[] { "spell_q" },
                     SpecialEffectKeys = new[] { "MankiRoundBomb" },
                 },
 
-                // E — Dynamite Jump: self-propulsion
                 E = new AbilityData
                 {
                     Name = "Dynamite Jump",
                     CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 5f, KnockbackForce = 4f, KnockbackUpward = 4f, SelfLockTicks = 35, ChainWindowTicks = 0 },
+                        new() { Damage = 5f, KnockbackForce = 4f, KnockbackUpward = 4f, SelfLockTicks = 35, ChainWindowTicks = 0, StartupTicks = 12 },
                     },
                     AnimationNames = new[] { "spell_e" },
                     SpecialEffectKeys = new[] { "MankiDynamiteJump" },
                 },
 
-                // R — Dive Bomb: head-first dive with AoE
                 R = new AbilityData
                 {
                     Name = "Dive Bomb",
                     CooldownTicks = 240,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 18f, KnockbackUpward = 6f, SelfLockTicks = 42, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 18f, KnockbackUpward = 6f, SelfLockTicks = 42, ChainWindowTicks = 0, StartupTicks = 14 },
                     },
                     AnimationNames = new[] { "spell_r" },
                     SpecialEffectKeys = new[] { "MankiDiveBomb" },
                 },
 
-                // F — Big Boom (Ult): large explosive AoE
                 F = new AbilityData
                 {
                     Name = "Big Boom",
                     CooldownTicks = 600,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, SelfLockTicks = 55, ChainWindowTicks = 0 },
+                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, SelfLockTicks = 55, ChainWindowTicks = 0, StartupTicks = 16 },
                     },
                     AnimationNames = new[] { "spell_f" },
                     SpecialEffectKeys = new[] { "MankiBigBoom" },

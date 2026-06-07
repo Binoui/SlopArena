@@ -127,10 +127,6 @@ namespace SlopArena.Shared
                 }
             }
 
-            // Combo expiry
-            if (s.ComboTimerTicks == 0)
-                s.ComboStage = 0;
-
             // Cooldowns
             if (s.Cooldown0 > 0) s.Cooldown0--;
             if (s.Cooldown1 > 0) s.Cooldown1--;

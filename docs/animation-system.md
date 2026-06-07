@@ -138,7 +138,7 @@ AnimationNodeStateMachine (root)
 │                     │
 │                     ├── melee ──0.15s──→ End (LMB stage 1)
 │                     │      └── code ChainTo() → leg_sweep → backflip
-│                     ├── attack_air_lmb, attack_air_rmb, attack_heavy_charge
+│                     ├── attack_air_lmb, attack_air_rmb, lmb_loop
 │                     └── spell_q, spell_e, spell_r, spell_f
 ```
 

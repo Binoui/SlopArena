@@ -44,7 +44,7 @@ No more than 5 colors per character total (skin included).
   ↓
 Blender           → cleanup, rigging, bone naming
   ↓
-Cascadeur         → animation (one file per motion)
+Blender         → animation (one file per motion)
   ↓
 Blender (NLA)     → compose all animations into one master .glb
   ↓
@@ -61,14 +61,14 @@ Godot             → import + wire up
 - Rig: **Mixamo standard** (23 bones, mixamorig: naming)
 - Poly count: ~4000 tris
 
-### Blender (rigging)
+### Mixamo + Blender (rigging)
 
 - Rename bones to match `mixamorig:` convention once, never change after
 - No finger bones, no twist bones
 - Export with **animations embedded** in the .glb when complete
 - Textures: JPEG embedded in .glb (option 1)
 
-### Cascadeur
+### Blender (Animations)
 
 - Import FBX/GLB with the Mixamo rig
 - Block out key poses → let Cascadeor calculate physics
@@ -142,7 +142,7 @@ All lower case. Underscores for spaces.
 | `attack_1` | Punch L | LMB stage 1 |
 | `attack_2` | Punch R | LMB stage 2 |
 | `attack_3` | Backflip kick | LMB stage 3 (launcher) |
-| `attack_heavy_charge` | Charged punch start | RMB hold |
+| `rmb_loop` | Charged punch start | RMB hold |
 | `attack_heavy_release` | Charged punch release | RMB release |
 | `spell_q` | Fire Lash (ground kick) | Q |
 | `spell_e` | Rising Flame (uppercut) | E |
