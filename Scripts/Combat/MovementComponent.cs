@@ -170,23 +170,6 @@ public class MovementComponent
     }
 
     /// <summary>
-    /// Get remaining cooldown ticks for a slot (0-5).
-    /// </summary>
-    public ushort GetSlotCooldown(int slot)
-    {
-        return slot switch
-        {
-            0 => State.Cooldown0,
-            1 => State.Cooldown1,
-            2 => State.Cooldown2,
-            3 => State.Cooldown3,
-            4 => State.Cooldown4,
-            5 => State.Cooldown5,
-            _ => 0
-        };
-    }
-
-    /// <summary>
     /// Check if the entity is currently in knockback.
     /// </summary>
     public bool IsInKnockback()

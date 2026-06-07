@@ -357,19 +357,6 @@ public partial class CombatComponent : Node
 			_statuses.Remove(type);
 			OnStatusExpired?.Invoke(type);
 		}
-		
-// Tick Burn damage
-		if (_statuses.ContainsKey(StatusType.Burn) && _statuses[StatusType.Burn] > 0f)
-		{
-// Burn ticks once per second
-			// We handle this in the simulation for now - just visual/event
-		}
-		
-		// Electrifie stacking
-		if (_statuses.ContainsKey(StatusType.Electrified) && _statuses[StatusType.Electrified] > 0f)
-		{
-			// Electrifie at 2+ stacks stuns - handled by spell effects currently
-		}
 	}
 	
 	// ==========================================

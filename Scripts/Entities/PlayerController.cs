@@ -799,28 +799,6 @@ public partial class PlayerController : CharacterBody3D
 	public void ApplyKnockback(Vector3 force) => _movementComponent.ApplyKnockback(force.X, force.Y, force.Z);
 
 	// ==========================================
-	// CLICK → RAYCAST
-	// ==========================================
-
-	private void DoClickRaycast()
-	{
-		if (_wowCamera?.GetCamera() is not Camera3D cam) return;
-		var from = cam.ProjectRayOrigin(_leftClickPressPosition);
-		var query = new PhysicsRayQueryParameters3D { From = from, To = from + cam.ProjectRayNormal(_leftClickPressPosition) * 2000f, CollisionMask = 2 };
-		var result = GetWorld3D().DirectSpaceState.IntersectRay(query);
-
-		ulong id = 0;
-		if (result.Count > 0)
-		{
-			Node? n = result["collider"].AsGodotObject() as Node;
-			while (n != null && n is not CharacterBody3D) n = n.GetParent();
-			if (n is CharacterBody3D cb && cb.Name.ToString().StartsWith("DummyBody_") && int.TryParse(cb.Name.ToString().AsSpan("DummyBody_".Length), out int idx))
-				id = (ulong)(100 + idx);
-		}
-		OnLeftClickEntity?.Invoke(id);
-	}
-
-	// ==========================================
 	// DIRECTION HELPERS
 	// ==========================================
 
@@ -1001,13 +979,6 @@ public partial class PlayerController : CharacterBody3D
 		return name;
 	}
 
-	/// <summary>
-	/// Strip scene root prefixes from KayKit animation bone paths.
-	/// KayKit FBX imports with paths like "Rig_Medium/hips" but we need "hips".
-	/// </summary>
-	[Obsolete("No longer needed — animations come from the same rig they play on")]
-	private Animation? RemapKayKitAnimation(Animation anim) { return anim; }
-
 	private void ApplySkinRecursive(Node node, Texture2D? tex)
 	{
 		if (node is MeshInstance3D mi)
@@ -1051,6 +1022,5 @@ public partial class PlayerController : CharacterBody3D
 	// ==========================================
 	// CLICK TARGETING STATE
 	// ==========================================
-
-	private Vector2 _leftClickPressPosition = Vector2.Zero;
+	private Vector2 _storedMousePos = Vector2.Zero;
 }

@@ -21,14 +21,4 @@ public sealed class InputController
         JumpJustPressed = Input.IsActionJustPressed("jump");
         DashJustPressed = Input.IsActionJustPressed("dash");
     }
-
-    /// <summary>
-    /// Clear all frame state. Should be called at the end of the frame
-    /// or when input should not persist across frames.
-    /// </summary>
-    public void EndFrame()
-    {
-        JumpJustPressed = false;
-        DashJustPressed = false;
-    }
 }

@@ -9,11 +9,8 @@ using System;
 public partial class EscapeMenuUI : Control
 {
 	// ==========================================
-	// SIGNALS (wired by Main.cs)
-	// ==========================================
 	
 	public event Action? OnResumePressed;
-	public event Action? OnSettingsRequested;
 	public event Action? OnExitLobby;
 	public event Action? OnExitGame;
 	
