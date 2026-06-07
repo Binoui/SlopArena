@@ -1,9 +1,13 @@
+#nullable enable
 using Godot;
 
 /// <summary>
 /// Camera mount — follows a target with orbital rotation.
 /// Uses h/v node hierarchy for rotation (h = yaw, v SpringArm = pitch).
-/// Attached to the player scene. Controls: mouse motion for orbit, scroll for zoom.
+/// Sibling of the player in the world tree (not a child) — multiplayer-safe.
+///
+/// Camera modes allow smooth transitions (Default ↔ Aiming) for skill targeting.
+/// Mouse orbit and scroll zoom override mode targets on interaction.
 /// </summary>
 public partial class CameraMount : Node3D
 {
@@ -12,10 +16,25 @@ public partial class CameraMount : Node3D
 	[Export] public float MinZoom = 5.0f;
 	[Export] public float MaxZoom = 80.0f;
 	[Export] public float ZoomSpeed = 3.0f;
+	[Export] public float TransitionSpeed = 5.0f; // lerp speed for mode transitions
+
+	public enum CameraMode { Default, Aiming }
+
+	private CameraMode _mode = CameraMode.Default;
 
 	private Node3D? _h;           // horizontal yaw node
 	private SpringArm3D? _v;      // vertical pitch + zoom node
 	private Camera3D? _camera;
+
+	// Current lerped values (smooth transitions)
+	private float _currentOffsetY = 1.5f;
+	private float _currentDistance = 60f;
+
+	// Target values (set by mode switch)
+	private float _targetOffsetY = 1.5f;
+	private float _targetDistance = 60f;
+
+	private float _cameraYaw = 0f; // absolute camera yaw in radians, controlled only by mouse
 
 	public override void _Ready()
 	{
@@ -25,7 +44,7 @@ public partial class CameraMount : Node3D
 
 		if (_v != null)
 		{
-			_v.SpringLength = 60f;
+			_v.SpringLength = _currentDistance;
 			_v.Margin = 0.5f;
 		}
 
@@ -37,6 +56,10 @@ public partial class CameraMount : Node3D
 		if (_v != null)
 			_v.Rotation = new Vector3(Mathf.DegToRad(-45f), 0f, 0f);
 
+		// Initialize yaw
+		if (Target != null)
+			_cameraYaw = 0f;
+
 		if (_camera != null)
 			_camera.Current = true;
 	}
@@ -45,50 +68,89 @@ public partial class CameraMount : Node3D
 	{
 		if (Target == null) return;
 
-		// Follow target with eye-level offset
-		Vector3 targetPos = Target.GlobalPosition;
-		GlobalPosition = new Vector3(targetPos.X, targetPos.Y + 1.5f, targetPos.Z);
+		// Smoothly lerp toward mode targets
+		float dt = (float)delta;
+		_currentOffsetY = Mathf.Lerp(_currentOffsetY, _targetOffsetY, dt * TransitionSpeed);
+		_currentDistance = Mathf.Lerp(_currentDistance, _targetDistance, dt * TransitionSpeed);
 
-		// Yaw follows target facing by default, overridden by mouse
+		// Follow target position only — camera yaw is purely mouse-controlled.
+		Vector3 targetPos = Target.GlobalPosition;
+		GlobalPosition = new Vector3(targetPos.X, targetPos.Y + _currentOffsetY, targetPos.Z);
+
+		// Apply distance to SpringArm
+		if (_v != null)
+			_v.SpringLength = _currentDistance;
+
+		// Camera yaw is absolute, controlled ONLY by mouse orbit (not player facing).
 		if (_h != null)
-			_h.Rotation = new Vector3(0f, _h.Rotation.Y, 0f);
+			_h.Rotation = new Vector3(0f, _cameraYaw, 0f);
 	}
 
 	/// <summary>
+	/// Switch camera mode with smooth transition.
+	/// Each mode defines default distance and height offset.
+	/// </summary>
+	public void SetMode(CameraMode mode)
+	{
+		if (mode == _mode) return;
+		_mode = mode;
+
+		switch (mode)
+		{
+			case CameraMode.Default:
+				_targetOffsetY = 1.5f;
+				_targetDistance = 60f;
+				break;
+
+			case CameraMode.Aiming:
+				_targetOffsetY = 2.5f; // higher — better overhead view
+				_targetDistance = 80f; // further back — wider FOV for aiming
+				break;
+		}
+	}
+
+	public CameraMode GetMode() => _mode;
+
+	/// <summary>
 	/// Rotate camera orbit. Called by PlayerController on mouse move.
+	/// Camera yaw is absolute — only modified here, never by player facing.
 	/// </summary>
 	public void RotateCamera(Vector2 relativeMotion)
 	{
-		if (_h == null || _v == null) return;
+		if (_v == null) return;
 
-		// Yaw: rotate the h node around Y
-		_h.Rotation -= new Vector3(0f, relativeMotion.X * Sensitivity, 0f);
+		// Yaw: modify absolute camera yaw directly
+		_cameraYaw -= relativeMotion.X * Sensitivity;
 
-		// Pitch: rotate the v (SpringArm) around X
+		// Pitch: rotate the v (SpringArm) around X directly (not overwritten by _Process)
 		float pitch = _v.Rotation.X - relativeMotion.Y * Sensitivity;
 		pitch = Mathf.Clamp(pitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
 		_v.Rotation = new Vector3(pitch, 0f, 0f);
 	}
 
 	/// <summary>
-	/// Zoom in/out. Called by PlayerController on scroll wheel.
+	/// Zoom in/out. Overrides mode's target distance so scroll doesn't fight with mode transition.
 	/// </summary>
 	public void ZoomCamera(float direction)
 	{
-		if (_v == null) return;
-		_v.SpringLength = Mathf.Clamp(_v.SpringLength + direction * ZoomSpeed, MinZoom, MaxZoom);
+		_currentDistance = Mathf.Clamp(_currentDistance + direction * ZoomSpeed, MinZoom, MaxZoom);
+		_targetDistance = _currentDistance;
 	}
 
 	public Vector3 GetForwardDirection()
 	{
-		Vector3 forward = -GlobalTransform.Basis.Z;
+		// Read from _h whose GlobalTransform carries the camera yaw.
+		// Camera yaw is absolute — mouse-controlled only.
+		if (_h == null) return -Vector3.Forward;
+		Vector3 forward = -_h.GlobalTransform.Basis.Z;
 		forward.Y = 0;
 		return forward.Normalized();
 	}
 
 	public Vector3 GetRightDirection()
 	{
-		Vector3 right = GlobalTransform.Basis.X;
+		if (_h == null) return Vector3.Right;
+		Vector3 right = _h.GlobalTransform.Basis.X;
 		right.Y = 0;
 		return right.Normalized();
 	}
