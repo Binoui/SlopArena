@@ -1,4 +1,4 @@
-# Manki — Pyromane Inventeur (Fire Monkey)
+# Manki — Pyromaniac Inventor (Fire Monkey)
 
 > Status: Design phase (kit redesign)
 > Replaces: Narodin (removed)
@@ -6,14 +6,14 @@
 
 ## Concept
 
-Un singe macaque pyromane/inventeur fou. Burnt-orange fur, bright red face, goofy toothy grin. Toujours en train de bricoler des explosifs — bombes, dynamite, aérosols. Porte une salopette tachée de poudre noire et des gants de chantier troués. Un petit casque jaune de chantier (apparaît pendant le dive bomb).
+A pyromaniac/inventor macaque monkey. Burnt-orange fur, bright red face, goofy toothy grin. Always tinkering with explosives — bombs, dynamite, aerosols. Wears overalls stained with gunpowder and hole-ridden work gloves. A small yellow hard hat appears during the dive bomb.
 
-## Archétype
+## Archetype
 
-**Brawler aérien / Bombardier acrobate** — hybride entre rushdown et artilleur explosif.
-- Utilise le mouvement vertical comme ressource
-- Poke avec bombes, engage avec la dynamite/dive bomb, finit en mêlée
-- Gameplan: rushdown au sol → s'envole avec Q/E → bombarde du ciel → R dive bomb pour revenir → rushdown
+**Aerial brawler / Acrobatic bombardier** — hybrid between rushdown and explosive artillery.
+- Uses vertical movement as a resource
+- Poke with bombs, engage with dynamite/dive bomb, finish in melee
+- Gameplan: ground rushdown → launch with Q/E → bombard from above → R dive bomb to return → rushdown
 
 ## Palette
 
@@ -21,46 +21,46 @@ Un singe macaque pyromane/inventeur fou. Burnt-orange fur, bright red face, goof
 |---------|-------|
 | Fur | Burnt orange #D84315 |
 | Face/butt | Bright red #E53935 |
-| Salopette | Jean bleu #1565C0 |
-| Casque/gants | Jaune #FDD835 |
+| Overalls | Jean blue #1565C0 |
+| Helmet/gloves | Yellow #FDD835 |
 | Horns/claws | Soot black #1A1A1A |
 
 ## Kit
 
-| Slot | Nom | Visuel | Mécanique |
-|------|-----|--------|-----------|
-| **LMB** | Combo singe | 3 coups : poing → coup de pied → uppercut de feu | Rushdown mêlée, launcher sur final hit |
-| **Air LMB** | Coup simple | Coup de poing aérien | Air combo |
-| **RMB** | Aérosol + Briquet | Secoue l'aérosol → flamme en cone | Heavy attack chargeable, zone denial |
-| **Air RMB** | Coup de pied moyen | Simple kick aérien | Knockback moyen |
-| **Q** | Bombe ronde | Lance une bombe ronde en cloche → explose à l'impact | Poke / zone, aimable air + sol |
-| **E** | Dynamite Jump | Balance une dynamite → explosion → auto-propulsion | Rocket jump, mobilité verticale + reset air jump |
-| **R** | Dive Bomb | Met un casque → pique tête première → explosion à l'impact | Retour au sol rapide + AoE |
-| **F** | Big Boom (ult) | Grosse bombe / fût explosif géant | TBD — gros burst explosif |
+| Slot | Name | Visual | Mechanic |
+|------|------|--------|----------|
+| **LMB** | Monkey Combo | 3 hits: punch → kick → fire uppercut | Melee rushdown, launcher on final hit |
+| **Air LMB** | Simple punch | Air punch | Air combo |
+| **RMB** | Aerosol + Lighter | Shake aerosol → cone flame | Charged heavy attack, zone denial |
+| **Air RMB** | Medium kick | Simple air kick | Medium knockback |
+| **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
+| **E** | Dynamite Jump | Throw dynamite → explosion → self-propulsion | Rocket jump, vertical mobility + air jump reset |
+| **R** | Dive Bomb | Put on hard hat → dive head-first → AoE explosion on impact | Fast return to ground + AoE |
+| **F** | Big Boom (ult) | Large bomb / explosive barrel | TBD — large explosive burst |
 
 ## Design Notes
 
-- **RMB** : inspiré d'un lance-flammes artisanal — l'aérosol + briquet. Pendant la charge, Manki secoue frénétiquement la bombe. Au relâchement, jet de flamme en cone.
-- **E** : le rocket jump. Au sol = plante la dynamite, propulsé vers le haut. En l'air = lâche la dynamite sous lui, propulsé vers le haut. Petite hitbox d'explosion pour le visuel (~2-3 unités), dégâts faibles ennemis (~5), le vrai effet c'est la propulsion.
-- **R** : Dive Bomb. Manki arrête son momentum aérien, sort un casque de chantier jaune, pique tête première vers le sol. Explosion AoE à l'impact. Se relève, le casque disparaît.
-- **F** : pas encore défini en détail — grosse bombe, à affiner après implémentation du reste du kit.
+- **RMB**: inspired by improvised flamethrower — aerosol + lighter. During charge, Manki frantically shakes the bomb. On release, cone-shaped flame jet.
+- **E**: rocket jump. On ground = plant dynamite, propelled upward. In air = drop dynamite below, propelled upward. Small explosion hitbox for visuals (~2-3 units), low enemy damage (~5), main effect is propulsion.
+- **R**: Dive Bomb. Manki stops air momentum, pulls out a yellow hard hat, dives head-first toward the ground. AoE explosion on impact. After landing, the helmet disappears.
+- **F**: not fully defined yet — big bomb, to be refined after the rest of the kit is implemented.
 
-## Animation Names (à créer)
+## Animation Names (to create)
 
 | Key | Animation | Maps to |
 |-----|-----------|---------|
 | `attack_1` | Punch | LMB stage 1 |
 | `attack_2` | Roundhouse / leg sweep | LMB stage 2 |
-| `attack_3` | Uppercut feu | LMB stage 3 (launcher) |
+| `attack_3` | Fire uppercut | LMB stage 3 (launcher) |
 | `attack_air_lmb` | Air punch | Air LMB |
-| `attack_heavy_charge` | Secoue aérosol | RMB hold |
-| `attack_heavy_release` | Jet de flamme cone | RMB release |
+| `attack_heavy_charge` | Shake aerosol | RMB hold |
+| `attack_heavy_release` | Cone flame jet | RMB release |
 | `attack_air_rmb` | Air kick | Air RMB |
-| `spell_q` | Lance bombe ronde | Q (throw animation) |
-| `spell_e_ground` | Plante dynamite sol | E ground |
-| `spell_e_air` | Lâche dynamite sous lui | E air |
-| `spell_r` | Dive bomb casque | R |
-| `spell_f` | Grosse bombe / fût | F (ult) |
+| `spell_q` | Throw round bomb | Q (throw animation) |
+| `spell_e_ground` | Plant dynamite on ground | E ground |
+| `spell_e_air` | Drop dynamite below | E air |
+| `spell_r` | Dive bomb helmet | R |
+| `spell_f` | Big bomb / barrel | F (ult) |
 
 ## Files
 
@@ -70,6 +70,6 @@ Un singe macaque pyromane/inventeur fou. Burnt-orange fur, bright red face, goof
 
 ## Previous Design
 
-Ce personnage était initialement conçu comme un **Fire Dancer / rushdown acrobat** (feu pur, tout en mêlée). Le kit a été redessiné en juin 2026 pour le repositionner en **pyromane/inventeur fou** avec des explosifs, tout en gardant une base rushdown. Voir l'historique git pour l'ancienne version du kit.
+This character was initially designed as a **Fire Dancer / rushdown acrobat** (pure fire, full melee). The kit was redesigned in June 2026 to reposition him as a **pyromaniac/mad inventor** with explosives, while keeping a rushdown base. See git history for the old kit version.
 
 See `docs/character-kit-design-principles.md` for design patterns and `docs/combat-systems.md` for universal combat mechanics.

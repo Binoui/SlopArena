@@ -8,21 +8,21 @@
 
 ## Roster Overview — 13 Gods
 
-| # | God | Mythologie | Rôle | Difficulté |
+| # | God | Mythology | Role | Difficulty |
 |---|-----|-----------|------|-----------|
-| 1 | Amaterasu | Japonaise | Fast Launcher / Rushdown | 2/3 |
-| 2 | Athena | Grecque | Long-Range Defender | 3/3 |
-| 3 | Hercules | Grecque | Run and Jumper | 2/3 |
-| 4 | Izanami | Japonaise | Methodical Striker | 1/3 |
-| 5 | King Arthur | Arthurienne | Melee Synergist | 1.5/3 |
-| 6 | Loki | Nordique | Quick Trickster | — |
-| 7 | Sol | Nordique | Escape Artist / Mage | 2/3 |
-| 8 | Sun Wukong | Chinoise | Speedy Attacker | — |
-| 9 | Susano | Japonaise | Ultimate Unleasher | 2.5/3 |
-| 10 | Thanatos | Grecque | High Risk / High Reward | 2/3 |
-| 11 | Thor | Nordique | Big Damage Brawler | 1/3 |
-| 12 | Ymir | Nordique | Zone Control Brawler | — |
-| 13 | Zeus | Grecque | Lightning Mage | — |
+| 1 | Amaterasu | Japanese | Fast Launcher / Rushdown | 2/3 |
+| 2 | Athena | Greek | Long-Range Defender | 3/3 |
+| 3 | Hercules | Greek | Run and Jumper | 2/3 |
+| 4 | Izanami | Japanese | Methodical Striker | 1/3 |
+| 5 | King Arthur | Arthurian | Melee Synergist | 1.5/3 |
+| 6 | Loki | Norse | Quick Trickster | — |
+| 7 | Sol | Norse | Escape Artist / Mage | 2/3 |
+| 8 | Sun Wukong | Chinese | Speedy Attacker | — |
+| 9 | Susano | Japanese | Ultimate Unleasher | 2.5/3 |
+| 10 | Thanatos | Greek | High Risk / High Reward | 2/3 |
+| 11 | Thor | Norse | Big Damage Brawler | 1/3 |
+| 12 | Ymir | Norse | Zone Control Brawler | — |
+| 13 | Zeus | Greek | Lightning Mage | — |
 
 ---
 
