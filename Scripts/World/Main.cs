@@ -102,6 +102,17 @@ public partial class Main : Node3D
 		// Offset player from NPCs and above floor
 		_player.Position += new Vector3(5f, 15f, 0f);
 
+		// --- Camera (sibling, not child of player — multiplayer-safe) ---
+		var camScene = GD.Load<PackedScene>("res://Scenes/CameraMount.tscn");
+		if (camScene != null)
+		{
+			var cameraMount = camScene.Instantiate<CameraMount>();
+			cameraMount.Name = "CameraMount";
+			cameraMount.Target = _player;
+			AddChild(cameraMount);
+			_player.SetCamera(cameraMount);
+		}
+
 		// Setup combat component (for spell hit detection)
 		if (_simulation != null)
 			_player.SetupCombat(_simulation, ArenaRegistry.Get("split"));
