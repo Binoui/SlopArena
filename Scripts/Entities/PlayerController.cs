@@ -459,6 +459,14 @@ public partial class PlayerController : CharacterBody3D
 			_heavyHoldTimer = 0f;
 		}
 
+		// Consume buffered LMB chain when lock expires (queue-based, like souls-like FSM)
+		if (_movementComponent.State.BufferedChain > 0 &&
+		    _movementComponent.State.AnimLockTicks == 0)
+		{
+			_movementComponent.State.BufferedChain--;
+			ExecuteSlot(0, false, !IsOnFloor());
+		}
+
 		if (_isNPC)
 		{
 			if (_npcRespawnTimer > 0f) { _npcRespawnTimer -= dt; if (_npcRespawnTimer <= 0f) NpcRespawn(); }
@@ -596,7 +604,16 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (_combatComponent == null) return;
 		if (_movementComponent.IsInKnockback()) return;
-		if (_movementComponent.State.AnimLockTicks > 0) return;
+		if (_movementComponent.State.AnimLockTicks > 0)
+		{
+			// Non-LMB slots can't be used during lock
+			if (slotIndex != 0) return;
+
+			// Buffer LMB input in queue (max 2, like souls-like FSM queue)
+			if (_movementComponent.State.BufferedChain < 2)
+				_movementComponent.State.BufferedChain++;
+			return; // consumed when lock expires
+		}
 
 		// Slot 0 (LMB) chains into next combo stage.
 		// Other slots are blocked during an active attack.
@@ -637,9 +654,13 @@ public partial class PlayerController : CharacterBody3D
 			if (attackState != null)
 			{
 				if (_fsm.IsInState("attack"))
+				{
+					GD.Print("Combo Chain to ", animName);
 					attackState.ChainTo(animName);      // combo chain
+				}
 				else
 				{
+					GD.Print("First attack ", animName);
 					attackState.NextAnimName = animName;
 					_fsm.TransitionTo("attack");        // first attack
 				}
@@ -689,7 +710,10 @@ public partial class PlayerController : CharacterBody3D
 			else if (_movementComponent.State.ComboStage < stages.Length)
 				newComboStage++;
 			else
+			{
+				_movementComponent.State.BufferedChain = 0; // combo maxed, clear queue
 				return;
+			}
 			stageIndex = newComboStage - 1;
 		}
 		else

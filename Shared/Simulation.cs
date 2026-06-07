@@ -537,6 +537,7 @@ namespace SlopArena.Shared
             s.ComboStage = 0;
             s.ComboTimerTicks = 0;
             s.AnimLockTicks = 0;
+            s.BufferedChain = 0;
             s.DashCooldownTicks = 0;
             s.DashDurationTicks = 0;
             s.InvincibilityTicks = 0;

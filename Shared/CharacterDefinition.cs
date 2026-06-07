@@ -128,20 +128,22 @@ namespace SlopArena.Shared
                 },
 
                 // LMB — 3-hit combo: punch, leg sweep, backflip
+                // Medium commitment (36-56 ticks), chain window generous (40 ticks)
                 LMB = new AbilityData
                 {
                     Name = "Monkey Combo",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 18, ChainWindowTicks = 40 },
-                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 20, ChainWindowTicks = 40 },
-                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 24, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 66, ChainWindowTicks = 80 },
+                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 70, ChainWindowTicks = 80 },
+                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 86, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
 
                 // Air LMB — upward kick for air combos
+                // Quick air-to-air, 16 ticks ≈ 267ms
                 AirLMB = new AbilityData
                 {
                     Name = "Air Kick",
@@ -153,82 +155,89 @@ namespace SlopArena.Shared
                     AnimationNames = new[] { "attack_air_lmb" },
                 },
 
-                // RMB — charged punch
+                // RMB — charged punch (heavy attack)
+                // Uncharged: 33f startup + ~20f endlag ≈ 53f total (SelfLockTicks=50)
+                // Charged:   45f charge hold + 17f startup + ~20f endlag ≈ 82f total
                 RMB = new AbilityData
                 {
                     Name = "Fire Fist",
-                    CooldownTicks = 15,
+                    CooldownTicks = 30,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 20, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 50, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 34, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 40, ChainWindowTicks = 0 },
                     },
-                    ChargeHoldTicks = 18,
+                    ChargeHoldTicks = 45,
                     AnimationNames = new[] { "attack_heavy_charge" },
                 },
 
                 // Air RMB — drop kick spike
+                // Heavier commitment in air (22 ticks ≈ 367ms)
                 AirRMB = new AbilityData
                 {
                     Name = "Drop Kick",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 16, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, LungeForce = 14f, StunTicks = 16, SelfLockTicks = 22, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "attack_air_rmb" },
                 },
 
                 // Q — Fire Lash: ground kick, slows on hit
+                // Ability: medium commitment (30 ticks = 500ms)
                 Q = new AbilityData
                 {
                     Name = "Fire Lash",
-                    CooldownTicks = 60,
+                    CooldownTicks = 90,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 22, ChainWindowTicks = 0 },
+                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 30, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_q" },
                     SpecialEffectKeys = new[] { "MankiFireLash" },
                 },
 
                 // E — Rising Flame: vertical uppercut, anti-air / recovery
+                // Ability: high commitment (35 ticks ≈ 583ms), long cooldown
                 E = new AbilityData
                 {
                     Name = "Rising Flame",
-                    CooldownTicks = 120,
+                    CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 22, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 35, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_e" },
                     SpecialEffectKeys = new[] { "MankiRisingFlame" },
                 },
 
                 // R — Ember Burst: AoE explosion around self
+                // Strong ability: heavy commitment (42 ticks ≈ 700ms)
                 R = new AbilityData
                 {
                     Name = "Ember Burst",
-                    CooldownTicks = 150,
+                    CooldownTicks = 240,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 24, ChainWindowTicks = 0 },
+                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 42, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_r" },
                     SpecialEffectKeys = new[] { "MankiEmberBurst" },
                 },
 
                 // F — Inferno Dance (Ult): dash + auto-combo + explosion
+                // Ultimate: massive commitment (55 ticks ≈ 917ms), 10s cooldown
                 F = new AbilityData
                 {
                     Name = "Inferno Dance",
-                    CooldownTicks = 420,
+                    CooldownTicks = 600,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 40, ChainWindowTicks = 0 },
+                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 55, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_f" },
                     SpecialEffectKeys = new[] { "MankiInfernoDance" },

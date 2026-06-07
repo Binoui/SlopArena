@@ -36,6 +36,13 @@ public sealed partial class AttackState : State
 			AnimPlayback.Travel(animName);
 	}
 
+	public override void Exit()
+	{
+		base.Exit();
+		// Clear queued chains when leaving the state (avoids leftover LMB1)
+		Movement.State.BufferedChain = 0;
+	}
+
 	public override void OnProcess(float delta)
 	{
 		if (Movement.State.AnimLockTicks > 0)
