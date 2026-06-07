@@ -171,7 +171,16 @@ public static class StatusSpells
     {
         if (combat.GetOwnerNode() is Node3D owner)
         {
-            owner.GetTree().CurrentScene?.AddChild(node);
+            var tree = owner.GetTree();
+            if (tree == null) { node.QueueFree(); return; }
+            var current = tree.CurrentScene;
+            if (current == null) { node.QueueFree(); return; }
+            if (!current.IsInsideTree()) { node.QueueFree(); return; }
+            current.AddChild(node);
+        }
+        else
+        {
+            node.QueueFree();
         }
     }
 }

@@ -14,11 +14,12 @@ public static class AbilityRegistry
 {
 		private static readonly Dictionary<string, Action<CombatComponent>> Effects = new()
 		{
-			// Manki
-			{ "MankiFireLash", MankiAbilities.FireLash },
-			{ "MankiRisingFlame", MankiAbilities.RisingFlame },
-			{ "MankiEmberBurst", MankiAbilities.EmberBurst },
-			{ "MankiInfernoDance", MankiAbilities.InfernoDance },
+			// Manki — Mad Bomber Monkey
+			{ "MankiAerosolFlame", MankiAbilities.AerosolFlame },
+			{ "MankiRoundBomb", MankiAbilities.RoundBomb },
+			{ "MankiDynamiteJump", MankiAbilities.DynamiteJump },
+			{ "MankiDiveBomb", MankiAbilities.DiveBomb },
+			{ "MankiBigBoom", MankiAbilities.BigBoom },
 		};
 
 	/// <summary>

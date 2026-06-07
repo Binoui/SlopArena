@@ -98,6 +98,7 @@ public partial class PlayerController : CharacterBody3D
 	public event Action<float, float, float, float, float>? OnStateUpdated;
 	public event Action? OnTargetNextPressed;
 	public event Action<ulong>? OnLeftClickEntity;
+	public event Action<int>? OnAbilityUsed; // slotIndex, for HUD flash
 
 	// ==========================================
 	// PUBLIC GETTERS
@@ -106,6 +107,22 @@ public partial class PlayerController : CharacterBody3D
 	public float GetVelZ() => Velocity.Y;
 	public CombatComponent? GetCombatComponent() => _combatComponent;
 	public float GetDashCooldown() => _movementComponent.DashCooldownRemaining;
+	public float GetSlotCooldown(int slotIndex)
+	{
+		var state = _movementComponent.State;
+		return slotIndex switch
+		{
+			0 => state.Cooldown0,
+			1 => state.Cooldown1,
+			2 => state.Cooldown2,
+			3 => state.Cooldown3,
+			4 => state.Cooldown4,
+			5 => state.Cooldown5,
+			_ => 0
+		};
+	}
+	public byte GetComboStage() => _movementComponent.State.ComboStage;
+	public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
 	public Vector3 MoveDirection => _moveDirection;
 
 	public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef)
@@ -372,13 +389,10 @@ public partial class PlayerController : CharacterBody3D
 		Add("jump",          new InputEventKey { PhysicalKeycode = Key.Space });
 		Add("dash",          new InputEventKey { PhysicalKeycode = Key.Shift });
 		Add("crouch",        new InputEventKey { PhysicalKeycode = Key.C });
-		Add("spell_slot1",   new InputEventKey { PhysicalKeycode = Key.Key1 });
-		Add("spell_slot2",   new InputEventKey { PhysicalKeycode = Key.Key2 });
-		Add("spell_slot3",   new InputEventKey { PhysicalKeycode = Key.Key3 });
-		Add("spell_slot4",   new InputEventKey { PhysicalKeycode = Key.Key4 });
-		Add("spell_slotA",   new InputEventKey { Keycode = Key.A });
-		Add("spell_slotE",   new InputEventKey { Keycode = Key.E });
-		Add("spell_slotR",   new InputEventKey { Keycode = Key.R });
+		Add("ability_q",   new InputEventKey { PhysicalKeycode = Key.Key1 });
+		Add("ability_f",   new InputEventKey { PhysicalKeycode = Key.Key3 });
+		Add("ability_e",   new InputEventKey { Keycode = Key.E });
+		Add("ability_r",   new InputEventKey { Keycode = Key.R });
 		Add("spellbook_toggle", new InputEventKey { Keycode = Key.B });
 		Add("ui_cancel",     new InputEventKey { Keycode = Key.Escape });
 		Add("trinket",       new InputEventKey { Keycode = Key.G });
@@ -424,10 +438,10 @@ public partial class PlayerController : CharacterBody3D
 		if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured)
 			_camera?.RotateCamera(mm.Relative);
 
-		if (Input.IsActionJustPressed("spell_slot1")) ExecuteSlot(2, false, false);
-		if (Input.IsActionJustPressed("spell_slotE")) ExecuteSlot(3, false, false);
-		if (Input.IsActionJustPressed("spell_slotR")) ExecuteSlot(4, false, false);
-		if (Input.IsActionJustPressed("spell_slot3")) ExecuteSlot(5, false, false);
+		if (Input.IsActionJustPressed("ability_q")) ExecuteSlot(2, false, false);
+		if (Input.IsActionJustPressed("ability_e")) ExecuteSlot(3, false, false);
+		if (Input.IsActionJustPressed("ability_r")) ExecuteSlot(4, false, false);
+		if (Input.IsActionJustPressed("ability_f")) ExecuteSlot(5, false, false);
 		if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible;
 	}
 
@@ -635,6 +649,7 @@ public partial class PlayerController : CharacterBody3D
 			_ => 0
 		};
 		if (slotCd > 0) return;
+		OnAbilityUsed?.Invoke(slotIndex);
 		var stages = charged && ability.ChargedStages != null ? ability.ChargedStages : ability.Stages;
 
 		// ── Step 1: Resolve stages (hit detection) ──

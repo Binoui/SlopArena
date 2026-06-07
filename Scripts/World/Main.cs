@@ -196,17 +196,22 @@ public partial class Main : Node3D
 		_canvasLayer.AddChild(_unitFrames);
 		_unitFrames.Setup(_player!, _npcs);
 		
-		// --- Action Bar HUD (bottom bar with cooldowns) ---
-		// Must be added to CanvasLayer (Control nodes need CanvasLayer)
-		_actionBarHUD = new ActionBarHUD();
-		_actionBarHUD.Name = "ActionBarHUD";
-		_canvasLayer.AddChild(_actionBarHUD);
-		
-		// Connect to player for class abilities
-		if (_player != null)
-		{
-			_actionBarHUD.Setup(_player);
-			GD.Print("ActionBarHUD connected!");
+				// --- Action Bar HUD (bottom bar with cooldowns) ---
+				// Must be added to CanvasLayer (Control nodes need CanvasLayer)
+				var hudScene = GD.Load<PackedScene>("res://Scripts/UI/ActionBarHUD.tscn");
+				if (hudScene != null)
+				{
+					_actionBarHUD = hudScene.Instantiate<ActionBarHUD>();
+					_actionBarHUD.Name = "ActionBarHUD";
+					_canvasLayer.AddChild(_actionBarHUD);
+				}
+
+				// Connect to player for class abilities
+				if (_player != null && _actionBarHUD != null)
+				{
+					_actionBarHUD.Setup(_player);
+					_player.OnAbilityUsed += (slot) => _actionBarHUD?.FlashSlot(slot);
+					GD.Print("ActionBarHUD connected!");
 			
 			// --- Status routing ---
 			// Route status application requests through the simulation

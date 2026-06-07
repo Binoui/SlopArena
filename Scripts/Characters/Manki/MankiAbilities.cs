@@ -3,40 +3,83 @@ using Godot;
 using SlopArena.Shared;
 
 /// <summary>
-/// Special effects for Manki (Fire Monkey) abilities.
-/// Called AFTER stage resolution.
-/// Each method maps to a key in AbilityRegistry.
+/// Special effects for Manki (Mad Bomber Monkey) abilities.
+/// Called AFTER stage resolution by AbilityRegistry.
+/// Each method maps to a key in CharacterDefinition's SpecialEffectKeys.
 /// </summary>
 public static class MankiAbilities
 {
-	/// Q — Fire Lash: ground kick, fire arc, slows
-	public static void FireLash(CombatComponent combat)
+	/// RMB — Aerosol + Lighter: cone flame visual
+	public static void AerosolFlame(CombatComponent combat)
 	{
 		Vector3 forward = combat.GetCameraForward();
 		Vector3 pos = combat.GetOwnerPosition();
-		StatusSpells.CreateConeVisual(combat, pos, forward, 4f, 2.5f, new Color(1f, 0.5f, 0f, 0.3f), 0.3f);
+		StatusSpells.CreateConeVisual(combat, pos, forward, 5f, 3f, new Color(1f, 0.6f, 0f, 0.3f), 0.4f);
+		StatusSpells.CreateImpactVisual(combat, pos + forward * 4f, 1.5f, new Color(1f, 0.8f, 0.2f));
 	}
 
-	/// E — Rising Flame: vertical uppercut, anti-air / recovery
-	public static void RisingFlame(CombatComponent combat)
+	/// Q — Round Bomb: spawn projectile that travels forward and explodes
+	public static void RoundBomb(CombatComponent combat)
 	{
-		Vector3 pos = combat.GetOwnerPosition();
-		StatusSpells.CreateImpactVisual(combat, pos + Vector3.Up * 2f, 1.5f, new Color(1f, 0.6f, 0f));
+		Vector3 forward = combat.GetCameraForward();
+		Vector3 pos = combat.GetOwnerPosition() + Vector3.Up * 1.2f;
+
+		// Spawn a visual projectile with slight arc (upward angle)
+		Vector3 arcDir = (forward + Vector3.Up * 0.3f).Normalized();
+		float speed = 18f;
+		float lifetime = 1.2f;
+		SceneTree? tree = combat.GetTree();
+		if (tree == null) return;
+
+		var proj = new MeshInstance3D();
+		var sphere = new SphereMesh { Radius = 0.3f, Height = 0.6f, RadialSegments = 12, Rings = 8 };
+		var mat = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(1f, 0.7f, 0f),
+			EmissionEnabled = true,
+			Emission = new Color(1f, 0.5f, 0f),
+			EmissionEnergyMultiplier = 4f,
+		};
+		proj.Mesh = sphere;
+		proj.MaterialOverride = mat;
+		proj.GlobalPosition = pos;
+		tree.CurrentScene?.AddChild(proj);
+
+		Vector3 targetPos = pos + arcDir * (speed * lifetime) + Vector3.Down * 3f; // arc drops
+		var tween = tree.CreateTween();
+		tween.TweenProperty(proj, "global_position", targetPos, lifetime).SetTrans(Tween.TransitionType.Quad);
+		tween.Finished += () =>
+		{
+			if (GodotObject.IsInstanceValid(proj))
+			{
+				StatusSpells.CreateImpactVisual(combat, proj.GlobalPosition, 2f, new Color(1f, 0.7f, 0f));
+				StatusSpells.CreateCircleVisual(combat, proj.GlobalPosition, 2.5f, new Color(1f, 0.5f, 0f, 0.3f), 0.3f);
+				proj.QueueFree();
+			}
+		};
 	}
 
-	/// R — Ember Burst: small AoE explosion around self, push
-	public static void EmberBurst(CombatComponent combat)
+	/// E — Dynamite Jump: explosion at feet + visual
+	public static void DynamiteJump(CombatComponent combat)
 	{
 		Vector3 pos = combat.GetOwnerPosition();
-		StatusSpells.CreateCircleVisual(combat, pos, 3f, new Color(1f, 0.4f, 0f, 0.3f), 0.4f);
-		StatusSpells.CreateImpactVisual(combat, pos, 2f, new Color(1f, 0.7f, 0f));
+		StatusSpells.CreateImpactVisual(combat, pos + Vector3.Down * 0.5f, 2.5f, new Color(1f, 0.6f, 0f));
+		StatusSpells.CreateCircleVisual(combat, pos, 3f, new Color(1f, 0.4f, 0f, 0.25f), 0.3f);
 	}
 
-	/// F (Ult) — Inferno Dance: dash + auto-combo + explosion finish
-	public static void InfernoDance(CombatComponent combat)
+	/// R — Dive Bomb: impact explosion on landing
+	public static void DiveBomb(CombatComponent combat)
 	{
 		Vector3 pos = combat.GetOwnerPosition();
-		StatusSpells.CreateCircleVisual(combat, pos, 4f, new Color(1f, 0.3f, 0f, 0.4f), 0.8f);
-		StatusSpells.CreateImpactVisual(combat, pos, 3.5f, new Color(1f, 0.8f, 0.2f));
+		StatusSpells.CreateImpactVisual(combat, pos + Vector3.Down * 0.5f, 3f, new Color(1f, 0.7f, 0f));
+		StatusSpells.CreateCircleVisual(combat, pos, 3.5f, new Color(1f, 0.5f, 0f, 0.3f), 0.4f);
+	}
+
+	/// F — Big Boom (Ult): massive AoE explosion
+	public static void BigBoom(CombatComponent combat)
+	{
+		Vector3 pos = combat.GetOwnerPosition();
+		StatusSpells.CreateImpactVisual(combat, pos, 4f, new Color(1f, 0.9f, 0.2f));
+		StatusSpells.CreateCircleVisual(combat, pos, 5f, new Color(1f, 0.6f, 0f, 0.4f), 0.6f);
 	}
 }
