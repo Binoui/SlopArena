@@ -24,26 +24,18 @@ namespace SlopArena.Shared
         public byte MaxJumps;
     }
 
-    /// <summary>
-    /// Complete data-driven definition of a playable character.
-    /// All 6 ability slots (0-5) use the same AbilityData struct.
-    /// Add new characters by creating a new entry in CharacterRegistry.
-    /// </summary>
     public struct CharacterDefinition
     {
         public CharacterClass Class;
         public string DisplayName;
         public MovementStats Movement;
 
-        // Collision shape
         public float CapsuleRadius;
         public float CapsuleHeight;
         public float HurtboxRadius;
 
-        // 8 ability slots: LMB, AirLMB, RMB, AirRMB, Q, E, R, F
         public AbilityData LMB;
         public AbilityData RMB;
-        // Air attacks: separate abilities used when airborne
         public AbilityData AirLMB;
         public AbilityData AirRMB;
         public AbilityData Q;
@@ -51,10 +43,6 @@ namespace SlopArena.Shared
         public AbilityData R;
         public AbilityData F;
 
-        /// <summary>
-        /// Get ability by slot index (0-5).
-        /// When airborne, slots 0 (LMB) and 1 (RMB) return air variants.
-        /// </summary>
         public readonly AbilityData GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
             (0, true) => AirLMB,
@@ -69,9 +57,6 @@ namespace SlopArena.Shared
         };
     }
 
-    /// <summary>
-    /// Registry of all character definitions. Add new characters here.
-    /// </summary>
     public static class CharacterRegistry
     {
         private static CharacterDefinition[]? _definitions;
@@ -100,7 +85,10 @@ namespace SlopArena.Shared
         }
 
         // ═══════════════════════════════════════
-        // MANKI — Fire Monkey, agile rushdown/acrobat
+        // MANKI — Mad Bomber Monkey
+        // LMB: rushdown combo | RMB: aerosol flamethrower (charged cone)
+        // Q: Round Bomb (arc projectile) | E: Dynamite Jump (rocket jump)
+        // R: Dive Bomb (head-first AoE) | F: Big Boom (ult)
         // ═══════════════════════════════════════
         private static CharacterDefinition BuildManki()
         {
@@ -127,26 +115,24 @@ namespace SlopArena.Shared
                     MaxJumps = 2,
                 },
 
-                // LMB — 3-hit combo: punch, leg sweep, backflip
-                // Medium commitment (36-56 ticks), chain window generous (40 ticks)
+                // LMB — Monkey Combo: 3-hit melee (punch → leg sweep → fire uppercut)
                 LMB = new AbilityData
                 {
                     Name = "Monkey Combo",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 10, SelfLockTicks = 66, ChainWindowTicks = 80 },
-                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, LungeForce = 0f, StunTicks = 14, SelfLockTicks = 70, ChainWindowTicks = 80 },
-                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, LungeForce = 0f, StunTicks = 18, SelfLockTicks = 86, ChainWindowTicks = 0 },
+                        new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 10, SelfLockTicks = 66, ChainWindowTicks = 80 },
+                        new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, StunTicks = 14, SelfLockTicks = 70, ChainWindowTicks = 80 },
+                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, StunTicks = 18, SelfLockTicks = 86, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
 
-                // Air LMB — upward kick for air combos
-                // Quick air-to-air, 16 ticks ≈ 267ms
+                // Air LMB — air punch
                 AirLMB = new AbilityData
                 {
-                    Name = "Air Kick",
+                    Name = "Air Punch",
                     CooldownTicks = 0,
                     Stages = new AttackStage[]
                     {
@@ -155,27 +141,25 @@ namespace SlopArena.Shared
                     AnimationNames = new[] { "attack_air_lmb" },
                 },
 
-                // RMB — charged punch (heavy attack)
-                // Uncharged: 33f startup + ~20f endlag ≈ 53f total (SelfLockTicks=50)
-                // Charged:   45f charge hold + 17f startup + ~20f endlag ≈ 82f total
+                // RMB — Aerosol + Lighter: charged cone flamethrower
                 RMB = new AbilityData
                 {
-                    Name = "Fire Fist",
+                    Name = "Aerosol + Lighter",
                     CooldownTicks = 30,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 16f, KnockbackUpward = 6f, LungeForce = 18f, StunTicks = 16, SelfLockTicks = 50, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 14f, KnockbackUpward = 4f, StunTicks = 14, SelfLockTicks = 50, ChainWindowTicks = 0 },
                     },
                     ChargedStages = new AttackStage[]
                     {
-                        new() { Damage = 14f, KnockbackForce = 28f, KnockbackUpward = 10f, LungeForce = 28f, StunTicks = 22, SelfLockTicks = 40, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 24f, KnockbackUpward = 8f, StunTicks = 20, SelfLockTicks = 40, ChainWindowTicks = 0 },
                     },
                     ChargeHoldTicks = 45,
                     AnimationNames = new[] { "attack_heavy_charge" },
+                    SpecialEffectKeys = new[] { "MankiAerosolFlame" },
                 },
 
                 // Air RMB — drop kick spike
-                // Heavier commitment in air (22 ticks ≈ 367ms)
                 AirRMB = new AbilityData
                 {
                     Name = "Drop Kick",
@@ -187,60 +171,56 @@ namespace SlopArena.Shared
                     AnimationNames = new[] { "attack_air_rmb" },
                 },
 
-                // Q — Fire Lash: ground kick, slows on hit
-                // Ability: medium commitment (30 ticks = 500ms)
+                // Q — Round Bomb: lob projectile
                 Q = new AbilityData
                 {
-                    Name = "Fire Lash",
+                    Name = "Round Bomb",
                     CooldownTicks = 90,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 3f, SelfLockTicks = 30, ChainWindowTicks = 0 },
+                        new() { Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, SelfLockTicks = 20, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_q" },
-                    SpecialEffectKeys = new[] { "MankiFireLash" },
+                    SpecialEffectKeys = new[] { "MankiRoundBomb" },
                 },
 
-                // E — Rising Flame: vertical uppercut, anti-air / recovery
-                // Ability: high commitment (35 ticks ≈ 583ms), long cooldown
+                // E — Dynamite Jump: self-propulsion
                 E = new AbilityData
                 {
-                    Name = "Rising Flame",
+                    Name = "Dynamite Jump",
                     CooldownTicks = 180,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 8f, KnockbackForce = 5f, KnockbackUpward = 12f, LungeForce = 6f, StunTicks = 14, SelfLockTicks = 35, ChainWindowTicks = 0 },
+                        new() { Damage = 5f, KnockbackForce = 4f, KnockbackUpward = 4f, SelfLockTicks = 35, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_e" },
-                    SpecialEffectKeys = new[] { "MankiRisingFlame" },
+                    SpecialEffectKeys = new[] { "MankiDynamiteJump" },
                 },
 
-                // R — Ember Burst: AoE explosion around self
-                // Strong ability: heavy commitment (42 ticks ≈ 700ms)
+                // R — Dive Bomb: head-first dive with AoE
                 R = new AbilityData
                 {
-                    Name = "Ember Burst",
+                    Name = "Dive Bomb",
                     CooldownTicks = 240,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 10f, KnockbackForce = 20f, KnockbackUpward = 5f, SelfLockTicks = 42, ChainWindowTicks = 0 },
+                        new() { Damage = 14f, KnockbackForce = 18f, KnockbackUpward = 6f, SelfLockTicks = 42, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_r" },
-                    SpecialEffectKeys = new[] { "MankiEmberBurst" },
+                    SpecialEffectKeys = new[] { "MankiDiveBomb" },
                 },
 
-                // F — Inferno Dance (Ult): dash + auto-combo + explosion
-                // Ultimate: massive commitment (55 ticks ≈ 917ms), 10s cooldown
+                // F — Big Boom (Ult): large explosive AoE
                 F = new AbilityData
                 {
-                    Name = "Inferno Dance",
+                    Name = "Big Boom",
                     CooldownTicks = 600,
                     Stages = new AttackStage[]
                     {
-                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, LungeForce = 30f, StunTicks = 28, SelfLockTicks = 55, ChainWindowTicks = 0 },
+                        new() { Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, SelfLockTicks = 55, ChainWindowTicks = 0 },
                     },
                     AnimationNames = new[] { "spell_f" },
-                    SpecialEffectKeys = new[] { "MankiInfernoDance" },
+                    SpecialEffectKeys = new[] { "MankiBigBoom" },
                 },
             };
         }
