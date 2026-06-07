@@ -115,11 +115,12 @@ public sealed partial class MyState : State
 
 ### Rules
 
-- **`OnProcess()`** : read Input, trigger transitions. Do not modify velocity.
-- **`OnPhysicsProcess()`** : direct forces on `Player.Velocity`. E.g. jump sets `velocity.Y = JumpForce`.
-- **Do NOT call `MoveAndSlide()` in states** — already done by `MovementComponent.Tick()`.
-- **Jump force is applied by JumpState, not by the simulation** — the sim handles gravity, friction, dash, knockback only.
-- **AnimationName in constructor** : default value, can be overridden in the Inspector.
+|- **`OnProcess()`** : read InputCtrl, trigger transitions. Do not modify velocity.
+|- **`OnPhysicsProcess()`** : direct forces on `Player.Velocity`.
+|- **Do NOT call `MoveAndSlide()` in states** — already done by `MovementComponent.Tick()`.
+|- **Jump force is applied by Simulation, not by states** — the sim handles jump, gravity, friction, dash, knockback.
+|- **`InputCtrl` centralizes all input polling** — states never call `Input.Get*()` directly.
+|- **`AnimationName`** in constructor : default value, must match an AnimationTree state name.
 
 ---
 
@@ -128,16 +129,22 @@ public sealed partial class MyState : State
 ```
 AnimationNodeStateMachine (root)
 ├── Start ──0.1s──→ Idle ←──0.15s──→ Run
-│   │  0.1s            │  0.1s
-│   │   └── Jump ──0.2s──→ Fall
-│   │                      │  0.15s
-│   │                      ↓
-│   │                    Land ──at end──→ Idle
-│   │
-│   └─── LMB (combat) ──0.15s──→ End
+│                     │  0.1s
+│                     ├── air_jump (BlendSpace1D)
+│                     │              │
+│                     │         air_fall ←── [jump↔fall blend via velocity curve]
+│                     │              │
+│                     │             Land ──at end──→ Idle
+│                     │
+│                     ├── melee ──0.15s──→ End (LMB stage 1)
+│                     │      └── code ChainTo() → leg_sweep → backflip
+│                     ├── attack_air_lmb, attack_air_rmb, attack_heavy_charge
+│                     └── spell_q, spell_e, spell_r, spell_f
 ```
 
-Each state is an `AnimationNodeAnimation` with the corresponding clip. The `xfade_time` on each transition provides the blend.
+Each state is wrapped in `AnimationNodeBlendTree → TimeScale → AnimationNodeAnimation`
+for runtime speed control. Transitions use `xfade_time` for blends. Combo chaining
+is handled by the AttackState code (ChainTo()), not by AnimationTree auto-transitions.
 
 ---
 
@@ -145,6 +152,10 @@ Each state is an `AnimationNodeAnimation` with the corresponding clip. The `xfad
 
 1. Create its .tscn (model + AnimationPlayer + AnimationTree as root StateMachine)
 2. Add an `FSM` node with `StateMachine.cs` as its script
-3. Add child State nodes (idle, run, jump, fall, landing, etc.)
-4. In `PlayerController.cs`, the line `_fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM")` finds it automatically
-5. Each State is auto-registered by its node name (lowercased, "state" suffix stripped)
+3. Add child State nodes (idle, run, air, landing, attack) each with their C# script
+4. Add corresponding states in the AnimationTree (BlendTree+TimeScale wrappers recommended)
+5. Register the character's abilities in `CharacterDefinition.cs` under `BuildRegistry()`
+6. Add special effects to `AbilityRegistry.cs` if needed
+
+The StateMachine auto-registers states by their Node name. The AnimationTree state names
+must match the `AnimationName` property in each State constructor.
