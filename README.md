@@ -85,7 +85,7 @@ SlopArena/
 │   ├── Entities/            # PlayerController, AnimationController, DummyManager
 │   ├── Combat/              # MovementComponent, CombatComponent, LocalSimulation
 │   ├── InputController.cs   # Centralized input (Jump, Dash)
-│   ├── Camera/              # WowCamera (SpringArm3D)
+│   ├── Camera/              # CameraMount (h/v SpringArm orbit)
 │   ├── UI/                  # ActionBarHUD, UnitFrames, Settings, EscapeMenu
 │   └── World/               # Main.cs entry point, ArenaManager
 ├── Shared/                  # Pure C# library (no Godot)
