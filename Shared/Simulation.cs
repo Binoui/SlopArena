@@ -289,14 +289,6 @@ namespace SlopArena.Shared
                     s.VX = dirX * speed;
                     s.VZ = dirZ * speed;
                 }
-
-                // Jump
-                if (input.Jump && s.JumpsLeft > 0)
-                {
-                    s.VY = stats.JumpForce;
-                    s.JumpsLeft--;
-                    s.IsGrounded = false;
-                }
             }
             else
             {
@@ -308,6 +300,14 @@ namespace SlopArena.Shared
                 float friction = stats.GroundFriction * TickDt;
                 s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
+            }
+
+            // Jump — applied by simulation (IsGrounded tracks properly)
+            if (input.Jump && s.JumpsLeft > 0)
+            {
+                s.VY = stats.JumpForce;
+                s.JumpsLeft--;
+                s.IsGrounded = false;
             }
 
             UpdateFacing(ref s);
@@ -338,6 +338,8 @@ namespace SlopArena.Shared
             if (input.Jump && s.JumpsLeft > 0)
             {
                 s.VY = stats.JumpForce;
+                s.VX = dirX * stats.WalkSpeed;
+                s.VZ = dirZ * stats.WalkSpeed;
                 s.JumpsLeft--;
             }
 
@@ -535,6 +537,7 @@ namespace SlopArena.Shared
             s.ComboStage = 0;
             s.ComboTimerTicks = 0;
             s.AnimLockTicks = 0;
+            s.BufferedChain = 0;
             s.DashCooldownTicks = 0;
             s.DashDurationTicks = 0;
             s.InvincibilityTicks = 0;

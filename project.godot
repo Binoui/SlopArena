@@ -26,6 +26,10 @@ window/stretch/aspect="expand"
 
 project/assembly_name="SlopArena"
 
+[editor]
+
+movie_writer/movie_file="/home/binoui/Videos/sloparena_manki_1.avi"
+
 [editor_plugins]
 
 enabled=PackedStringArray()

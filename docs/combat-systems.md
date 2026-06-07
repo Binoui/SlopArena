@@ -161,3 +161,4 @@ This is the primary risk-reward loop of finisher abilities:
 
 - `character-kit-design-principles.md` — per-character kit design, keybindings, archetypes
 - `conventions.md` — animation naming, bone naming, file structure
+- `research/dko-mechanics.md` — full DKO systems reference (clash, interrupt, super armor, etc.)
