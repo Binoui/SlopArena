@@ -10,6 +10,8 @@
 ### LMB — Light Attack Combo
 
 - Generally a **3–4 hit combo** (varies per character)
+- Combo uses a **queue-based input buffer** (max 2 buffered inputs, like souls-like FSM) for responsive chaining
+- Chain window opens when the animation lock expires — input during the buffer zone is stored and consumed when ready
 - Adds a natural knockdown or knockback on the final hit, creating a reset
 - Range: ~10 units
 - Aim assist: most attacks have **directional snap** to help connect in 3D space
