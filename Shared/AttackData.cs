@@ -16,6 +16,7 @@ namespace SlopArena.Shared
         public ushort StunTicks;       // Hitstun duration in ticks
         public ushort SelfLockTicks;   // Self animation lock in ticks
         public ushort ChainWindowTicks; // 0 = final stage / no chain
+        public ushort StartupTicks;    // Frames before hitbox activates (startup anim)
     }
 
     /// <summary>
@@ -39,11 +40,32 @@ namespace SlopArena.Shared
         /// <summary>Special effects (hitbox spawning, teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
         public string[]? SpecialEffectKeys;
 
-        /// <summary>
-        /// Animation name for each stage.
+        /// <summary>Animation name for each stage.
         /// Each character defines their own animation keys.
         /// Example: LMB = ["attack_2h_slice", "attack_2h_chop", "attack_2h_spin"]
         /// </summary>
         public string[]? AnimationNames;
+
+        /// <summary>Optional aimed-charge config (e.g., RMB cone flamethrower).</summary>
+        public AimedChargeData? AimedCharge;
+    }
+
+    /// <summary>
+    /// Config for an aimed charge ability.
+    /// Player enters a charge state with a ground-projected AoE indicator,
+    /// then releases to fire the attack.
+    /// </summary>
+    public struct AimedChargeData
+    {
+        /// <summary>Animation to loop during charge.</summary>
+        public string ChargeAnimName;
+        /// <summary>Animation to play on release.</summary>
+        public string AttackAnimName;
+        /// <summary>Cone angle in degrees (e.g., 60 = 60° cone).</summary>
+        public float ConeAngle;
+        /// <summary>Cone length/range in world units.</summary>
+        public float ConeRange;
+        /// <summary>Max charge ticks for power scaling (0 = no scaling).</summary>
+        public ushort MaxChargeTicks;
     }
 }

@@ -163,6 +163,14 @@ public partial class StateMachine : Node
 	}
 
 	/// <summary>
+	/// Generic typed state getter.
+	/// </summary>
+	public T? GetState<T>(string name) where T : State
+	{
+		return _states.TryGetValue(name.ToLower(), out var state) ? state as T : null;
+	}
+
+	/// <summary>
 	/// Set a float parameter on the AnimationTree (for BlendSpaces).
 	/// </summary>
 	public void SetAnimParameter(string path, float value)
