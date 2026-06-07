@@ -47,7 +47,7 @@ public partial class PlayerController : CharacterBody3D
 	private AnimationController _animationController = null!;
 	private StateMachine? _fsm;
 	private InputController _inputCtrl = new();
-	private WowCamera? _wowCamera;
+	private CameraMount? _camera;
 	private CombatComponent? _combatComponent;
 	private MeshInstance3D? _firstMesh;
 	private Vector3 _moveDirection = Vector3.Zero;
@@ -247,8 +247,14 @@ public partial class PlayerController : CharacterBody3D
 
 		if (_isPlayerControlled)
 		{
-			_wowCamera = new WowCamera { Name = "WowCamera", Target = this };
-			AddChild(_wowCamera);
+			var camScene = GD.Load<PackedScene>("res://Scenes/CameraMount.tscn");
+			if (camScene != null)
+			{
+				_camera = camScene.Instantiate<CameraMount>();
+				_camera.Name = "CameraMount";
+				_camera.Target = this;
+				AddChild(_camera);
+			}
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 		SetupDebugLabel();
@@ -401,8 +407,8 @@ public partial class PlayerController : CharacterBody3D
 		{
 			if (mb.Pressed)
 			{
-				if (mb.ButtonIndex == MouseButton.WheelUp) { _wowCamera?.ZoomCamera(-1f); return; }
-				if (mb.ButtonIndex == MouseButton.WheelDown) { _wowCamera?.ZoomCamera(1f); return; }
+				if (mb.ButtonIndex == MouseButton.WheelUp) { _camera?.ZoomCamera(-1f); return; }
+				if (mb.ButtonIndex == MouseButton.WheelDown) { _camera?.ZoomCamera(1f); return; }
 				if (Input.MouseMode != Input.MouseModeEnum.Captured) Input.MouseMode = Input.MouseModeEnum.Captured;
 			}
 
@@ -424,7 +430,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured)
-			_wowCamera?.RotateCamera(mm.Relative);
+			_camera?.RotateCamera(mm.Relative);
 
 		if (Input.IsActionJustPressed("spell_slot1")) ExecuteSlot(2, false, false);
 		if (Input.IsActionJustPressed("spell_slotE")) ExecuteSlot(3, false, false);
@@ -542,11 +548,11 @@ public partial class PlayerController : CharacterBody3D
 		// Get camera-relative forward/right (default to world if no camera)
 		Vector3 camForward = Vector3.Forward;
 		Vector3 camRight = Vector3.Right;
-		if (_wowCamera != null)
+		if (_camera != null)
 		{
 			// Z = direction où la caméra regarde = -Basis.Z = vers le centre de l'écran
-			camForward = _wowCamera.GetForwardDirection();
-			camRight = _wowCamera.GetRightDirection();
+			camForward = _camera.GetForwardDirection();
+			camRight = _camera.GetRightDirection();
 		}
 
 		// Build raw camera-relative direction
@@ -803,7 +809,7 @@ public partial class PlayerController : CharacterBody3D
 	// ==========================================
 
 	public Vector3 GetPlayerForward() => (-Transform.Basis.Z with { Y = 0 }).Normalized();
-	public Vector3 GetCameraForward() => _wowCamera?.GetForwardDirection() ?? GetPlayerForward();
+	public Vector3 GetCameraForward() => _camera?.GetForwardDirection() ?? GetPlayerForward();
 	public CharacterDefinition GetCharacterDef() => _charDef;
 
 	// ==========================================
