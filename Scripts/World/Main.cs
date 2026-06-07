@@ -85,19 +85,19 @@ public partial class Main : Node3D
 		AddChild(_arenaManager);
 		_arenaManager.LoadArena("split");
 
-				// --- NPC Enemies (5 PlayerController instances, not player controlled) ---
-				for (int i = 0; i < 5; i++)
-				{
-				var npc = new PlayerController();
-				npc.Name = $"NPC_{i}";
-				npc.Position = _arenaManager.GetSpawnPosition(i);
-				// All NPCs are Manki for now
-				npc.SetClass(CharacterClass.Manki);
-				AddChild(npc);
-				npc.SetNPC(true);
-				npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
-				_npcs[i] = npc;
-				}
+				// // --- NPC Enemies (5 PlayerController instances, not player controlled) ---
+				// for (int i = 0; i < 5; i++)
+				// {
+				// var npc = new PlayerController();
+				// npc.Name = $"NPC_{i}";
+				// npc.Position = _arenaManager.GetSpawnPosition(i);
+				// // All NPCs are Manki for now
+				// npc.SetClass(CharacterClass.Manki);
+				// AddChild(npc);
+				// npc.SetNPC(true);
+				// npc.SetNpcSpawnPosition(_arenaManager.GetSpawnPosition(i));
+				// _npcs[i] = npc;
+				// }
 
 		// --- Targeting Ring ---
 		_targetRing = CreateTargetRing();

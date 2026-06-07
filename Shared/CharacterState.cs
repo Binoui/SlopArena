@@ -36,7 +36,8 @@ namespace SlopArena.Shared
         // ── Combo / Attack ──
         public byte ComboStage;          // 0 = none, 1-3 = stage
         public ushort ComboTimerTicks;   // chain window remaining
-        public ushort AnimLockTicks;     // self-lock from attack
+        public ushort AnimLockTicks;     // self-lock from attack (remaining)
+        public byte BufferedChain;       // buffered LMB chains (max 2, for spam)
         public ushort HeavyHoldTicks;    // ticks holding RMB
         public bool HeavyCharged;        // true when hold threshold reached
 
