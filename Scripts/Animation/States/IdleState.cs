@@ -21,14 +21,15 @@ public sealed partial class IdleState : State
 
 	public override void OnProcess(float delta)
 	{
-		// Jump
-		if (Input.IsActionJustPressed("jump") && Player.IsOnFloor())
+		// Jump — transition immediately when action is pressed
+		// (IsOnFloor() is unreliable here because MoveAndSlide() already moved the body)
+		if (Input.IsActionJustPressed("jump"))
 		{
 			StateMachine.TransitionTo("air");
 			return;
 		}
 
-		// Walked off edge — go to air (blend will handle jump→fall naturally)
+		// Walked off edge — go to air (blend handles jump→fall naturally)
 		if (!Player.IsOnFloor() && Player.Velocity.Y < 0f)
 		{
 			StateMachine.TransitionTo("air");

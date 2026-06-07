@@ -20,8 +20,9 @@ public sealed partial class RunState : State
 
 	public override void OnProcess(float delta)
 	{
-		// Jump
-		if (Input.IsActionJustPressed("jump") && Player.IsOnFloor())
+		// Jump — transition immediately when action is pressed
+		// (IsOnFloor() is unreliable — MoveAndSlide() already moved the body)
+		if (Input.IsActionJustPressed("jump"))
 		{
 			StateMachine.TransitionTo("air");
 			return;
