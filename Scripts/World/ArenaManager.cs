@@ -62,41 +62,10 @@ public partial class ArenaManager : Node3D
 	}
 
 	/// <summary>
-	/// Check if a position is in the void (below VoidHeight).
-	/// </summary>
-	public bool IsInVoid(Vector3 position)
-	{
-		return position.Y < _currentDef.VoidHeight;
-	}
-
-	/// <summary>
 	/// Check if a position is below the instant-kill threshold.
 	/// </summary>
 	public bool IsBelowKillHeight(Vector3 position)
 	{
 		return position.Y < _currentDef.KillHeight;
-	}
-
-	/// <summary>
-	/// Check if a position is within the arena bounds.
-	/// </summary>
-	public bool IsInBounds(Vector3 position)
-	{
-		var d = _currentDef;
-		return position.X >= d.MinX && position.X <= d.MaxX
-			&& position.Z >= d.MinZ && position.Z <= d.MaxZ;
-	}
-
-	/// <summary>
-	/// Clamp a position to arena bounds.
-	/// </summary>
-	public Vector3 ClampToBounds(Vector3 position)
-	{
-		var d = _currentDef;
-		return new Vector3(
-			Mathf.Clamp(position.X, d.MinX, d.MaxX),
-			position.Y,
-			Mathf.Clamp(position.Z, d.MinZ, d.MaxZ)
-		);
 	}
 }
