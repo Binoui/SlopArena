@@ -247,14 +247,6 @@ public partial class PlayerController : CharacterBody3D
 
 		if (_isPlayerControlled)
 		{
-			var camScene = GD.Load<PackedScene>("res://Scenes/CameraMount.tscn");
-			if (camScene != null)
-			{
-				_camera = camScene.Instantiate<CameraMount>();
-				_camera.Name = "CameraMount";
-				_camera.Target = this;
-				AddChild(_camera);
-			}
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 		SetupDebugLabel();
@@ -808,6 +800,7 @@ public partial class PlayerController : CharacterBody3D
 	// DIRECTION HELPERS
 	// ==========================================
 
+	public void SetCamera(CameraMount cam) => _camera = cam;
 	public Vector3 GetPlayerForward() => (-Transform.Basis.Z with { Y = 0 }).Normalized();
 	public Vector3 GetCameraForward() => _camera?.GetForwardDirection() ?? GetPlayerForward();
 	public CharacterDefinition GetCharacterDef() => _charDef;
