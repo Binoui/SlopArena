@@ -145,13 +145,13 @@ public partial class ClassSelectUI : Control
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
     {
-        CharacterClass.Manki => "A fire monkey who fights with blazing fists and acrobatic kicks. Launches enemies for air combos and finishes with an explosive inferno dance.",
+        CharacterClass.Manki => "A pyromaniac monkey who rushes down with melee combos and bombards with explosives. Lobs round bombs, rocket jumps with dynamite, and dive bombs from above for a massive Big Boom finale.",
         _ => ""
     };
 
     private static string GetClassStats(CharacterClass cls) => cls switch
     {
-        CharacterClass.Manki => "HP: Medium  |  Speed: Fast  |  Range: Melee  |  Difficulty: Medium",
+        CharacterClass.Manki => "HP: Medium  |  Speed: Fast  |  Range: Melee + Projectile  |  Difficulty: Medium",
         _ => ""
     };
 }

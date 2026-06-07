@@ -1,0 +1,293 @@
+[gd_scene format=3 uid="uid://b3ao7q2pfxqcl"]
+
+[ext_resource type="Script" uid="uid://dw1a1fmj5oix3" path="res://Scripts/UI/ActionBarHUD.cs" id="1_b7pp0"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
+bg_color = Color(0, 0, 0, 0.5)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="ActionBarHUD" type="Control" unique_id=725876992]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_b7pp0")
+
+[node name="ClassName" type="Label" parent="." unique_id=2013803138]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+offset_bottom = -70.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+
+[node name="ActionBar" type="HBoxContainer" parent="." unique_id=1226570543]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -70.0
+grow_horizontal = 2
+alignment = 1
+
+[node name="Slot0" type="Panel" parent="ActionBar" unique_id=642918763]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "LMB"
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot0" unique_id=651684851]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot0" unique_id=1060508988]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot0" unique_id=1368183283]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot0" unique_id=2100869138]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot1" type="Panel" parent="ActionBar" unique_id=122252089]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "RMB"
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot1" unique_id=1221380905]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot1" unique_id=1162863343]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot1" unique_id=830284648]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot1" unique_id=968967567]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot2" type="Panel" parent="ActionBar" unique_id=1999049759]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "Q"
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot2" unique_id=1858532498]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot2" unique_id=952227013]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot2" unique_id=1138686744]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot2" unique_id=308020858]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot3" type="Panel" parent="ActionBar" unique_id=1747358967]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "E"
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot3" unique_id=641896279]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot3" unique_id=574141973]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot3" unique_id=1518780925]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot3" unique_id=2053500774]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot4" type="Panel" parent="ActionBar" unique_id=1405411749]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "R"
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot4" unique_id=1486151971]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot4" unique_id=813043663]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot4" unique_id=1530643976]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot4" unique_id=1273545963]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Slot5" type="Panel" parent="ActionBar" unique_id=1348881437]
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+metadata/key = "F"
+
+[node name="KeyLabel" type="Label" parent="ActionBar/Slot5" unique_id=567789636]
+modulate = Color(1, 0.8, 0.2, 1)
+layout_mode = 0
+offset_top = 50.0
+offset_right = 140.0
+offset_bottom = 68.0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="ActionBar/Slot5" unique_id=298005435]
+modulate = Color(0.8, 0.8, 0.8, 1)
+layout_mode = 0
+offset_top = 2.0
+offset_right = 140.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="CooldownOverlay" type="ColorRect" parent="ActionBar/Slot5" unique_id=1542564794]
+visible = false
+layout_mode = 0
+offset_right = 140.0
+offset_bottom = 70.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CooldownText" type="Label" parent="ActionBar/Slot5" unique_id=1614262760]
+visible = false
+layout_mode = 0
+offset_top = 15.0
+offset_right = 140.0
+offset_bottom = 50.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+vertical_alignment = 1
