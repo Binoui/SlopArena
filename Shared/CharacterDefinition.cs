@@ -158,7 +158,7 @@ namespace SlopArena.Shared
                         ChargeAnimName = "rmb_loop",
                         AttackAnimName = "rmb_attack",
                         ConeAngle = 60f,
-                        ConeRange = 5f,
+                        ConeRange = 8f,
                         MaxChargeTicks = 45,
                     },
                 },
