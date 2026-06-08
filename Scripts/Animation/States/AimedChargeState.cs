@@ -18,6 +18,8 @@ public sealed partial class AimedChargeState : State
 {
     private AimedChargeData _config;
     private int _slotIndex;
+    private float _aimYaw; // direction du triangle (yaw, radians)
+    private float _groundY; // hauteur du sol projeté
     private int _chargeTicks;
     private bool _attackFired;
     private MeshInstance3D? _coneMesh;
@@ -33,12 +35,13 @@ public sealed partial class AimedChargeState : State
     /// Configure with data from the ability definition.
     /// Must be called before this state is entered.
     /// </summary>
-    public void Configure(AimedChargeData config, int slotIndex, bool airborne)
+    public void Configure(AimedChargeData config, int slotIndex, bool airborne, float aimYaw)
     {
-        _config = config;
-        _slotIndex = slotIndex;
-        _airborne = airborne;
-        AnimationName = config.ChargeAnimName;
+    	_config = config;
+    	_slotIndex = slotIndex;
+    	_airborne = airborne;
+    	_aimYaw = aimYaw;
+    	AnimationName = config.ChargeAnimName;
     }
 
     public override void Enter()
@@ -78,33 +81,38 @@ public sealed partial class AimedChargeState : State
 
         float halfAngle = Mathf.DegToRad(_config.ConeAngle) * 0.5f;
         float range = _config.ConeRange;
-        int segments = 20;
 
-        // Build cone mesh (flat on XZ plane, tip at origin)
+        // Find ground Y: raycast from above player straight down
+        _groundY = Player.GlobalPosition.Y - 0.5f; // fallback: just below player
+        var space = Player.GetWorld3D().DirectSpaceState;
+        var query = new PhysicsRayQueryParameters3D
+        {
+            From = Player.GlobalPosition + Vector3.Up * 10f,
+            To = Player.GlobalPosition + Vector3.Down * 20f,
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+        };
+        var hit = space.IntersectRay(query);
+        if (hit.Count > 0 && hit.ContainsKey("position"))
+            _groundY = ((Vector3)hit["position"]).Y;
+        else
+            _groundY = Player.GlobalPosition.Y - 0.5f;
+
+        // Build a simple triangle: tip at player, projected on ground
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
 
-        // Tip vertex
-        st.SetUV(new Vector2(0.5f, 1f));
+        // Tip at player position
         st.AddVertex(Vector3.Zero);
+        // Left edge
+        st.AddVertex(new Vector3(-Mathf.Sin(halfAngle) * range, 0f, Mathf.Cos(halfAngle) * range));
+        // Right edge
+        st.AddVertex(new Vector3(Mathf.Sin(halfAngle) * range, 0f, Mathf.Cos(halfAngle) * range));
 
-        // Arc vertices: fan around the tip
-        for (int i = 0; i <= segments; i++)
-        {
-            float a = -halfAngle + (float)i / segments * _config.ConeAngle;
-            float x = Mathf.Sin(a) * range;
-            float z = Mathf.Cos(a) * range;
-            st.SetUV(new Vector2((float)i / segments, 0f));
-            st.AddVertex(new Vector3(x, 0f, z));
-        }
-
-        // Triangle fan: tip + arc segment pairs
-        for (int i = 0; i < segments; i++)
-        {
-            st.AddIndex(0);     // tip
-            st.AddIndex(i + 1); // arc point A
-            st.AddIndex(i + 2); // arc point B
-        }
+        // Single triangle (tip, left, right)
+        st.AddIndex(0);
+        st.AddIndex(1);
+        st.AddIndex(2);
 
         // Material (semi-transparent orange)
         var mat = new StandardMaterial3D();
@@ -134,11 +142,11 @@ public sealed partial class AimedChargeState : State
 
         // Follow player position at ground level
         Vector3 pos = Player.GlobalPosition;
-        pos.Y = 0.05f; // slightly above ground to avoid z-fighting
+        pos.Y = _groundY + 0.05f; // slightly above ground to avoid z-fighting
         _coneMesh.GlobalPosition = pos;
 
-        // Face player's facing direction (Y rotation)
-        _coneMesh.GlobalRotation = new Vector3(0f, Player.GlobalRotation.Y, 0f);
+        // Face player's aiming direction
+        _coneMesh.GlobalRotation = new Vector3(0f, _aimYaw, 0f);
     }
 
     private void HideCone()

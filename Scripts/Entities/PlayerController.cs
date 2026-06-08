@@ -431,10 +431,14 @@ public partial class PlayerController : CharacterBody3D
                         var ability = _charDef.GetSlotAbility(1, false);
                         if (ability.AimedCharge.HasValue && _fsm != null)
                         {
+                            // Compute aim direction from camera forward at moment of press
+                            float aimYaw = _camera != null
+                                ? Mathf.Atan2(_camera.GetForwardDirection().X, _camera.GetForwardDirection().Z)
+                                : GlobalRotation.Y;
                             var chargeState = _fsm.GetState<AimedChargeState>("aimed_charge");
                             if (chargeState != null)
                             {
-                                chargeState.Configure(ability.AimedCharge.Value, 1, false);
+                                chargeState.Configure(ability.AimedCharge.Value, 1, false, aimYaw);
                                 _fsm.TransitionTo("aimed_charge");
                                 GetViewport().SetInputAsHandled(); return;
                             }
@@ -457,7 +461,8 @@ public partial class PlayerController : CharacterBody3D
             }
         }
 
-        if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured)
+        if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured
+            && (_fsm == null || !_fsm.IsInState("aimed_charge")))
             _camera?.RotateCamera(mm.Relative);
 
         if (Input.IsActionJustPressed("ability_q")) ExecuteSlot(2, false, false);
@@ -543,8 +548,12 @@ public partial class PlayerController : CharacterBody3D
         // Dash (ground OR air)
         if (input.Dash && _movementComponent.State.AnimLockTicks <= 0)
         {
-            _fsm?.TransitionTo("idle");
-            _movementComponent.StartDash(_moveDirection.X, _moveDirection.Z);
+        	var dashState = _fsm?.GetState<DashState>("dash");
+        	if (dashState != null)
+        	{
+        		dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
+        		_fsm?.TransitionTo("dash");
+        	}
         }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
