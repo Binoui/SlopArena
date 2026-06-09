@@ -1,0 +1,68 @@
+name: Discord Push Notification
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+        if: env.WEBHOOK_URL != ''
+        run: |
+          COMMIT_MSG=$(git log -1 --format="%s" | head -c 200)
+          COMMIT_HASH=$(git log -1 --format="%h")
+          AUTHOR_NAME=$(git log -1 --format="%an")
+          AUTHOR_USERNAME="${{ github.event.head_commit.author.username }}"
+          FILES_CHANGED=$(git diff --name-only HEAD~1..HEAD 2>/dev/null | wc -l)
+
+          jq -n \
+            --arg msg "$COMMIT_MSG" \
+            --arg hash "$COMMIT_HASH" \
+            --arg author "$AUTHOR_NAME" \
+            --arg author_user "$AUTHOR_USERNAME" \
+            --arg files "$FILES_CHANGED" \
+            --arg repo "${{ github.repository }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg ref "${{ github.ref_name }}" \
+            --arg server "${{ github.server_url }}" \
+            --arg timestamp "${{ github.event.head_commit.timestamp }}" \
+            '{
+              username: "SlopArena CI",
+              avatar_url: "https://raw.githubusercontent.com/Binoui/SlopArena/main/branding/icon_v7_pillars_discord.png",
+              embeds: [{
+                title: "✦ New push to main",
+                url: "\($server)/\($repo)/tree/main",
+                color: 16740240,
+                description: "**\($repo)** — `\($ref)`",
+                fields: [
+                  {
+                    name: "Commit",
+                    value: "[`\($hash)`](\($server)/\($repo)/commit/\($sha))",
+                    inline: true
+                  },
+                  {
+                    name: "Files changed",
+                    value: $files,
+                    inline: true
+                  },
+                  {
+                    name: "Message",
+                    value: $msg,
+                    inline: false
+                  }
+                ],
+                footer: {
+                  text: "By \($author)",
+                  icon_url: "https://github.com/\($author_user).png?size=32"
+                },
+                timestamp: $timestamp
+              }]
+            }' | curl -s -H "Content-Type: application/json" -d @- "$WEBHOOK_URL"
