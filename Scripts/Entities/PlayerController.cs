@@ -59,14 +59,14 @@ public partial class PlayerController : CharacterBody3D
     private Vector2 _snappedInputDirection = Vector2.Zero; // camera-relative (X=camRight, Y=camForward)
 
     // ==========================================
-    // NPC STATE
+    // RESPAWN STATE (Smash-style stock system)
     // ==========================================
 
     private bool _isPlayerControlled = true;
     private bool _isNPC = false;
-    private float _npcRespawnTimer = 0f;
-    private const float NpcRespawnDelay = 3.0f;
-    private Vector3 _npcSpawnPosition;
+    private float _respawnTimer = 0f;
+    private const float RespawnDelay = 20.0f; // 20 seconds respawn time
+    private Vector3 _arenaCenter = Vector3.Zero; // Center of arena for respawn
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
@@ -75,11 +75,13 @@ public partial class PlayerController : CharacterBody3D
     {
         _isNPC = isNpc;
         _isPlayerControlled = !isNpc;
-        if (isNpc) _npcSpawnPosition = GlobalPosition;
     }
 
+    public void SetArenaCenter(Vector3 center) => _arenaCenter = center;
+
     public bool IsNPC() => _isNPC;
-    public bool IsNpcAlive() => _npcRespawnTimer <= 0f;
+    public bool IsAlive() => _respawnTimer <= 0f;
+    public float GetRespawnTimeRemaining() => _respawnTimer;
 
     // ==========================================
     // UI STATE
@@ -510,9 +512,16 @@ public partial class PlayerController : CharacterBody3D
             ExecuteSlot(0, false, !IsOnFloor());
         }
 
+        // ── Respawn timer (applies to all characters) ──
+        if (_respawnTimer > 0f)
+        {
+            _respawnTimer -= dt;
+            if (_respawnTimer <= 0f) Respawn();
+        }
+
+        // ── NPC-specific visuals ──
         if (_isNPC)
         {
-            if (_npcRespawnTimer > 0f) { _npcRespawnTimer -= dt; if (_npcRespawnTimer <= 0f) NpcRespawn(); }
             if (_npcHitFlashTimer > 0f)
             {
                 _npcHitFlashTimer -= dt;
@@ -520,8 +529,10 @@ public partial class PlayerController : CharacterBody3D
             }
             else if (_npcMesh?.MaterialOverride is StandardMaterial3D m && !Mathf.IsEqualApprox(m.EmissionEnergyMultiplier, _npcOriginalEmission))
                 m.EmissionEnergyMultiplier = _npcOriginalEmission;
-            Visible = _npcRespawnTimer <= 0f;
         }
+
+        // Hide during respawn (all characters)
+        Visible = _respawnTimer <= 0f;
     }
 
     // ==========================================
@@ -1093,30 +1104,33 @@ public partial class PlayerController : CharacterBody3D
     }
 
     // ==========================================
-    // NPC METHODS
+    // RESPAWN METHODS (Smash-style stock system)
     // ==========================================
 
     /// <summary>
-    /// Called when NPC is knocked out of bounds (like Smash Bros).
-    /// Triggers respawn sequence.
+    /// Called when character is knocked out of bounds (Smash Bros style).
+    /// Triggers 20s respawn sequence at arena center.
     /// </summary>
-    public void NpcKnockOut()
+    public void KnockOut()
     {
-        if (_npcRespawnTimer > 0f) return; // Already respawning
-        _npcRespawnTimer = NpcRespawnDelay;
+        if (_respawnTimer > 0f) return; // Already respawning
+        _respawnTimer = RespawnDelay;
+        Visible = false; // Hide immediately
     }
 
-    private void NpcRespawn()
+    private void Respawn()
     {
-        _npcRespawnTimer = 0f;
-        GlobalPosition = _npcSpawnPosition;
+        _respawnTimer = 0f;
+
+        // Respawn at arena center, high in the air (Smash-style platform respawn)
+        GlobalPosition = _arenaCenter + new Vector3(0f, 15f, 0f);
         Velocity = Vector3.Zero;
 
-        // Reset damage % on respawn (Smash-style stock system)
+        // Reset damage % on respawn (stock system)
         _movementComponent.State.DamagePercent = 0;
-    }
 
-    public void SetNpcSpawnPosition(Vector3 pos) => _npcSpawnPosition = pos;
+        Visible = true;
+    }
 
     // ==========================================
     // CLICK TARGETING STATE
