@@ -1,5 +1,13 @@
 # SlopArena
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Godot-4.6-478CBF?logo=godotengine&logoColor=white" alt="Godot 4.6">
+  <img src="https://img.shields.io/badge/C%23-.NET%208-512BD4?logo=dotnet&logoColor=white" alt="C# .NET 8">
+  <img src="https://img.shields.io/github/actions/workflow/status/Binoui/SlopArena/build.yml?branch=main&logo=github&label=build" alt="Build">
+  <img src="https://img.shields.io/github/license/Binoui/SlopArena" alt="License">
+  <img src="https://img.shields.io/badge/status-playable-2ea043" alt="Status">
+</p>
+
 **"The Melee of Battle Arenas"** — A high-execution, open-source 3D Arena Brawler.
 
 SlopArena fuses the visceral movement of platform fighters (Smash Bros, DKO) with
