@@ -44,6 +44,10 @@ namespace SlopArena.Shared
         // ── Knockback ──
         public float KVX, KVY, KVZ;     // knockback velocity (decays separately)
 
+        // ── Hitstun + DI (Directional Influence) ──
+        public ushort HitstunTicks;     // frames frozen before knockback starts
+        public float DIX, DIY;          // accumulated DI input during hitstun
+
         // ── Facing ──
         public float FacingYaw;          // radians, +Z = 0
 
