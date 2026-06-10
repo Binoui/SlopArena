@@ -12,6 +12,7 @@
     <Compile Remove="Shared/obj/**/*.cs" />
     <Compile Remove="Shared/bin/**/*.cs" />
     <Compile Remove="Server/**/*.cs" />
+    <Compile Remove="MasterServer/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
