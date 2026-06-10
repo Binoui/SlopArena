@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Exclude Shared/obj and Shared/bin from compilation to prevent duplicate assembly attributes -->
+    <Compile Remove="Shared/obj/**/*.cs" />
+    <Compile Remove="Shared/bin/**/*.cs" />
+    <Compile Remove="Server/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Roslynator.Analyzers" Version="4.12.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
