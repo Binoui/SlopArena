@@ -10,7 +10,7 @@
 
 **Brawl your way to the top.** — An open-source 3D Arena Brawler with platform fighter movement.
 
-SlopArena fuses the fluid movement of DKO-style arena brawlers with
+SlopArena fuses platform fighter movement with
 character kits from hero brawlers. Built with **Godot 4.6 (.NET C#)**, it features
 a data-driven character system with a tick-based simulation shared between client and server.
 
