@@ -139,12 +139,13 @@ public partial class CombatComponent : Node
             OwnerId = _entityId,
         };
         SpellResolver.Spawn(hb);
+        GD.Print($"[HITBOX] MeleeCone at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
         var results = SpellResolver.Tick(entities);
 
         foreach (var hit in results)
         {
             _lastHitTargets.Add(hit.TargetEntityId);
-            _simulation.OnEntityHit?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
+            _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
             OnDealDamage?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
         }
         return _lastHitTargets;
@@ -174,11 +175,12 @@ public partial class CombatComponent : Node
             OwnerId = _entityId,
         };
         SpellResolver.Spawn(hb);
+        GD.Print($"[HITBOX] CircleAoE at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
         var results = SpellResolver.Tick(entities);
         foreach (var hit in results)
         {
             _lastHitTargets.Add(hit.TargetEntityId);
-            _simulation.OnEntityHit?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
+            _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
             OnDealDamage?.Invoke(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
         }
 
@@ -349,6 +351,10 @@ public partial class CombatComponent : Node
             RemoveStatus(StatusType.Shielded);
         }
 
+        // Apply damage to movement component
+        if (_owner is PlayerController player)
+            player.ApplyDamageToMovement(finalDamage);
+
         OnTakeDamage?.Invoke(finalDamage, kbX, kbY, kbZ);
         ApplyKnockback(new Vector3(kbX, kbY, kbZ));
     }
@@ -445,7 +451,7 @@ public partial class CombatComponent : Node
     /// Checks target distance and initiates warp if in warp range.
     /// Callback fires after warp completes (or immediately if no warp needed).
     /// </summary>
-    public void ExecuteAttackWithWarp(SlopArena.Shared.AttackStage stage, Action onAttackStart)
+    public void ExecuteAttackWithWarp(SlopArena.Shared.AttackStage stage, float warpSpeed, Action onAttackStart)
     {
         // No target lock system → execute immediately
         if (!stage.UseTargetLock || _targetLock == null || _warpSystem == null)
@@ -473,7 +479,7 @@ public partial class CombatComponent : Node
         {
             // In warp range → dash toward target first
             GD.Print($"[Warp] Target {distToTarget:F1}m away, warping to {stage.AttackRange:F1}m");
-            _warpSystem.StartWarp(stage.AttackRange, stage.WarpSpeed, () =>
+            _warpSystem.StartWarp(stage.AttackRange, warpSpeed, () =>
             {
                 onAttackStart?.Invoke();
             });
@@ -520,15 +526,19 @@ public partial class CombatComponent : Node
         if (_simulation == null) return entities;
         foreach (var kvp in _simulation.Entities)
         {
-            entities.Add(new SpellResolver.EntityData
+            foreach (var (start, end, radius) in kvp.Value)
             {
-                Id = kvp.Key,
-                PosX = kvp.Value.pos.X,
-                PosY = kvp.Value.pos.Y,
-                PosZ = kvp.Value.pos.Z,
-                Radius = kvp.Value.radius,
-                Active = kvp.Value.active
-            });
+                bool isCapsule = (start - end).LengthSquared() > 0.001f;
+                entities.Add(new SpellResolver.EntityData
+                {
+                    Id = kvp.Key,
+                    PosX = start.X, PosY = start.Y, PosZ = start.Z,
+                    Radius = radius,
+                    Shape = isCapsule ? SlopArena.Shared.HitboxShape.Capsule : SlopArena.Shared.HitboxShape.Sphere,
+                    EndX = end.X, EndY = end.Y, EndZ = end.Z,
+                    Active = true
+                });
+            }
         }
         return entities;
     }

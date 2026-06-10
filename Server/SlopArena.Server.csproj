@@ -9,4 +9,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared\SlopArena.Shared.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="server.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

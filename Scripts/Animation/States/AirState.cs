@@ -17,6 +17,7 @@ public sealed partial class AirState : State
 
 	public override void Enter()
 	{
+		Player.SetModelEmission(new Color(0.5f, 0.8f, 1.0f)); // Light blue
 		base.Enter();
 		StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
 	}

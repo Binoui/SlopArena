@@ -349,18 +349,13 @@ public partial class Main : Node3D
         {
             ulong entityId = (ulong)(100 + i); // NPC IDs: 100-104
             if (_npcs[i] != null)
-                _simulation.Entities[entityId] = (_npcs[i]!.GlobalPosition, 1.5f, true);
+                _simulation.Entities[entityId] = _npcs[i]!.GetHurtboxShapes();
         }
 
-        // Connect hit events from simulation to NPCs (Smash-style)
-        // Hits only apply damage % and knockback, no HP system
+        // Connect hit events from simulation (UI only — damage applied by LocalSimulation.RouteHit)
         _simulation.OnEntityHit += (ulong entityId, float damage, float kbX, float kbY, float kbZ) =>
         {
-            // Damage is applied via CombatComponent -> MovementComponent automatically
-            // Knockback is also applied automatically through the combat system
-            // We don't need to do anything here for NPCs - they use the same system as player
-
-            // Auto-target the first NPC that hits the player
+            // Auto-target: when player gets hit, target the first NPC
             if (entityId == 1 && _unitFrames != null && !_unitFrames.HasTarget())
             {
                 _unitFrames.SetTarget(100);
@@ -400,16 +395,12 @@ public partial class Main : Node3D
         if (_simulation == null || _player == null) return;
 
         ulong playerId = 1;
-        _simulation.Entities[playerId] = (_player.GlobalPosition, 2.0f, true);
+        _simulation.Entities[playerId] = _player.GetHurtboxShapes();
 
         // Update player position in simulation each frame
         _player.OnStateUpdated += (float posX, float posZ, float posY, float velX, float velZ) =>
         {
-            _simulation.Entities[playerId] = (
-                new Vector3(posX, posY, posZ),
-                2.0f,
-                true
-            );
+            _simulation.Entities[playerId] = _player.GetHurtboxShapes();
         };
     }
 
@@ -505,6 +496,16 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
+        // Update NPC entity positions in simulation (bone hurtboxes follow animation)
+        if (_simulation != null)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                if (_npcs[i] != null && _npcs[i]!.IsAlive())
+                    _simulation.Entities[(ulong)(100 + i)] = _npcs[i]!.GetHurtboxShapes();
+            }
+        }
+
         // Void death check (Smash-style) — all characters respawn at arena center after 20s
         if (_arenaManager != null)
         {
@@ -574,11 +575,14 @@ public partial class Main : Node3D
         if (_debugDraw != null && _simulation != null)
         {
             var hitboxes = SpellResolver.GetActiveHitboxes();
-            var hurtboxes = new System.Collections.Generic.List<(float, float, float, float)>();
+            var hurtboxes = new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>();
             foreach (var kvp in _simulation.Entities)
             {
-                if (kvp.Value.active)
-                    hurtboxes.Add((kvp.Value.pos.X, kvp.Value.pos.Y, kvp.Value.pos.Z, kvp.Value.radius));
+                foreach (var (start, end, radius) in kvp.Value)
+                {
+                    bool isCapsule = (start - end).LengthSquared() > 0.001f;
+                    hurtboxes.Add((start.X, start.Y, start.Z, end.X, end.Y, end.Z, radius, isCapsule));
+                }
             }
             _debugDraw.UpdateHitboxes(hitboxes, hurtboxes, Vector3.Zero);
         }

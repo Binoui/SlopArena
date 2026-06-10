@@ -15,6 +15,7 @@ public sealed partial class RunState : State
 	public override void Enter()
 	{
 		Movement.ResetJumps();
+		Player.SetModelEmission(new Color(0.2f, 0.5f, 1.0f)); // Blue
 		base.Enter();
 	}
 

@@ -43,6 +43,13 @@ public partial class AttackWarping : Node
     /// </summary>
     public void StartWarp(float attackRange, float warpSpeed, Action onComplete)
     {
+        // Already warping → skip warp for this request, execute immediately
+        if (_isWarping)
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
         if (_targetLock?.CurrentTarget == null || _owner == null)
         {
             onComplete?.Invoke();  // No warp, execute immediately
