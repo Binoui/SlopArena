@@ -8,9 +8,9 @@
   <img src="https://img.shields.io/badge/status-playable-2ea043" alt="Status">
 </p>
 
-**"The Melee of Battle Arenas"** — A high-execution, open-source 3D Arena Brawler.
+**Brawl your way to the top.** — An open-source 3D Arena Brawler with platform fighter movement.
 
-SlopArena fuses the visceral movement of platform fighters (Smash Bros, DKO) with
+SlopArena fuses the fluid movement of DKO-style arena brawlers with
 character kits from hero brawlers. Built with **Godot 4.6 (.NET C#)**, it features
 a data-driven character system with a tick-based simulation shared between client and server.
 
