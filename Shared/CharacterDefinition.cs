@@ -59,7 +59,7 @@ namespace SlopArena.Shared
 
     public static class CharacterRegistry
     {
-        private static CharacterDefinition[] _definitions;
+        private static CharacterDefinition[]? _definitions;
 
         public static CharacterDefinition[] All
         {
