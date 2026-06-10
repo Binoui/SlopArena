@@ -103,7 +103,7 @@ namespace SlopArena.Shared
                         // Hit! Calculate knockback direction
                         float dist = MathF.Sqrt(distSq);
                         float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
-                        float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : hb.KnockbackForce;
+                        float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : 0f;
 
                         results.Add(new HitResult
                         {

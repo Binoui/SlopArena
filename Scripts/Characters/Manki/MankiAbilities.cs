@@ -67,8 +67,8 @@ public static class MankiAbilities
         };
         proj.Mesh = sphere;
         proj.MaterialOverride = mat;
-        proj.GlobalPosition = pos;
         tree.CurrentScene?.AddChild(proj);
+        proj.GlobalPosition = pos;
 
         Vector3 targetPos = pos + arcDir * (speed * lifetime) + Vector3.Down * 3f; // arc drops
         var tween = tree.CreateTween();

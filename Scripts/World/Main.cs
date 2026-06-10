@@ -19,6 +19,7 @@ public partial class Main : Node3D
     // Cercle de ciblage (WoW-style ring under target)
     private MeshInstance3D _targetRing;
     private DebugHitboxDraw _debugDraw;
+    private bool _debugHitboxVisible = true;
     private DamageNumberManager _damageNumbers;
     private SpellVFXManager _spellVFX;
 
@@ -310,6 +311,7 @@ public partial class Main : Node3D
             npc.Name = $"NPC_{i}";
             npc.SetClass(CharacterClass.Manki);
             npc.SetNPC(true);
+            npc.AddToGroup("enemies");  // For target lock system
             AddChild(npc);
 
             Vector3 spawnPos = _arenaManager.GetSpawnPosition(i);
@@ -603,6 +605,14 @@ public partial class Main : Node3D
                     GetViewport().SetInputAsHandled();
                 }
             }
+            else if (key.Keycode == Key.F3 || key.PhysicalKeycode == Key.F3)
+            {
+                // Toggle hitbox/hurtbox debug visualization
+                _debugHitboxVisible = !_debugHitboxVisible;
+                if (_debugDraw != null)
+                    _debugDraw.Visible = _debugHitboxVisible;
+                GD.Print($"Debug Hitboxes: {(_debugHitboxVisible ? "ON" : "OFF")}");
+            }
         }
     }
 
@@ -640,7 +650,8 @@ public partial class Main : Node3D
                               $"LMB/RMB: Attacks\n" +
                               $"Q, E, R, F: Abilities\n" +
                               $"Tab: Target NPC\n" +
-                              $"Escape: Release mouse";
+                              $"Escape: Release mouse\n" +
+                              $"F3: Toggle Hitbox Debug ({(_debugHitboxVisible ? "ON" : "OFF")})";
     }
 
     private void CreateCrosshair()
