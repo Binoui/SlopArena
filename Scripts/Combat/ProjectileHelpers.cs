@@ -50,7 +50,7 @@ public static class ProjectileHelpers
             if (node is CharacterBody3D cb)
             {
                 string nameStr = cb.Name.ToString();
-                if (nameStr.StartsWith("DummyBody_") && int.TryParse(nameStr.AsSpan("DummyBody_".Length), out int idx))
+                if (nameStr.StartsWith("DummyBody_") && int.TryParse(nameStr.Substring("DummyBody_".Length), out int idx))
                 {
                     ulong entityId = (ulong)(100 + idx);
                     combat.GetSimulation()?.OnEntityHit?.Invoke(entityId, damage, knockbackForce.X, knockbackForce.Y, knockbackForce.Z);

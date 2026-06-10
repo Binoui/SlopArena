@@ -64,7 +64,6 @@ public static class HeightmapGenerator
                 }
             }
             GD.Print($"Heightmap generated: {hitCount} hits, saved to {path}!");
-            PhysicsConfig.LoadHeightmap(path);
         }
         catch (Exception ex)
         {

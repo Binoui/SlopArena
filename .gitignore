@@ -52,6 +52,11 @@ Pro Magic Pack*
 assets/characters/ProMagicPack/*.fbx
 
 # ==========================================
+# Branding assets (local only)
+# ==========================================
+branding/
+
+# ==========================================
 # Unreal Engine 5 artifacts (old migration)
 # ==========================================
 Binaries/
