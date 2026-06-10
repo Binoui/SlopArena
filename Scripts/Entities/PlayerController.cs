@@ -81,7 +81,7 @@ public partial class PlayerController : CharacterBody3D
 
     public bool IsNPC() => _isNPC;
     public bool IsAlive() => _respawnTimer <= 0f;
-    public bool IsNpcAlive() => _respawnTimer <= 0f; // Legacy alias for NPCs
+    public bool IsNpcAlive() => IsAlive(); // Alias for external code
     public float GetRespawnTimeRemaining() => _respawnTimer;
     public Vector3 GetDeathPosition() => _deathPosition;
 
@@ -96,11 +96,9 @@ public partial class PlayerController : CharacterBody3D
     // EVENTS
     // ==========================================
 
-#pragma warning disable CS0067
     public event Action<float, float, float, float, float>? OnStateUpdated;
     public event Action? OnTargetNextPressed;
     public event Action<ulong>? OnLeftClickEntity;
-#pragma warning restore CS0067
     public event Action<int>? OnAbilityUsed; // slotIndex, for HUD flash
 
     // ==========================================
@@ -132,8 +130,6 @@ public partial class PlayerController : CharacterBody3D
     {
         _arenaDef = arenaDef;
 
-        GD.Print($"[PlayerController] SetupCombat called, isPlayer: {_isPlayerControlled}, camera: {_camera != null}");
-
         // Create target lock system ONLY for player-controlled entities
         if (_isPlayerControlled)
         {
@@ -146,7 +142,6 @@ public partial class PlayerController : CharacterBody3D
                 UpdateInterval = 0.1f,
             };
             AddChild(_targetLock);
-            GD.Print($"[PlayerController] TargetLockSystem created, Camera set: {_targetLock.Camera != null}");
         }
 
         // Create combat component with target lock
@@ -191,21 +186,10 @@ public partial class PlayerController : CharacterBody3D
         {
             skeleton = _animationController.FindSkeleton(_playerModel);
 
-            // Debug: print skeleton info and PlayerModel children
-            if (skeleton != null)
-                GD.Print($"{_playerClass}: found skeleton '{skeleton.Name}', {skeleton.GetBoneCount()} bones");
-            else
-                GD.Print($"{_playerClass}: NO skeleton found!");
-            string children = "";
-            foreach (var c in _playerModel.GetChildren())
-                children += c.Name + " ";
-            GD.Print($"{_playerClass} children: {children}");
-
             // Check if model already has an AnimationPlayer (embedded anims in GLB)
             animPlayer = _animationController.FindAnimationPlayer(_playerModel);
             if (animPlayer != null)
             {
-                GD.Print($"{_playerClass}: found embedded AnimationPlayer, using it");
                 // Fix RootNode to point to our PlayerModel (paths are relative to this)
                 if (skeleton != null)
                     animPlayer.RootNode = _playerModel.GetPath();
@@ -241,15 +225,12 @@ public partial class PlayerController : CharacterBody3D
         {
             var animTree = _playerModel.GetNodeOrNull<AnimationTree>("AnimationTree");
             if (animTree != null)
-            {
                 _animationController.SetupAnimationTree(animTree);
-                GD.Print($"{_playerClass}: AnimationTree connected");
-            }
 
             // Find FSM in the model scene (manki.tscn)
             _fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM");
             if (_fsm == null)
-                GD.PrintErr($"{_playerClass}: No FSM node found in model scene — add StateMachine node named 'FSM'");
+                GD.PrintErr($"{_playerClass}: No FSM node found — add StateMachine named 'FSM' to model scene");
         }
 
         // Initialize StateMachine deferred (needs AnimationTree to settle in tree)
@@ -827,60 +808,22 @@ public partial class PlayerController : CharacterBody3D
             {
                 if (_fsm.IsInState("attack"))
                 {
-                    // Combo chain: check warp + resolve stages
+                    // Combo chain
                     if (stages != null && stages.Length > 0)
                     {
                         int stageIdx = Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1);
-                        var stage = stages[stageIdx];
-
-                        // Range-based warp check
-                        if (_combatComponent != null && stage.UseTargetLock)
-                        {
-                            _combatComponent.ExecuteAttackWithWarp(stage, () =>
-                            {
-                                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
-                            });
-                        }
-                        else
-                        {
-                            ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
-                        }
+                        ExecuteAttackStage(stages[stageIdx], ability, stages, slotIndex, charged, airborne, isComboChain: true, startup: 0);
                     }
-                    GD.Print("Combo Chain to ", animName);
                     attackState.ChainTo(animName);
                 }
                 else
                 {
-                    // First attack: check warp, then delay stages if startup > 0
+                    // First attack
                     ushort startup = (stages != null && stages.Length > 0) ? stages[animStage].StartupTicks : (ushort)0;
-
                     if (stages != null && stages.Length > 0)
                     {
-                        var stage = stages[animStage];
-
-                        // Range-based warp check
-                        if (_combatComponent != null && stage.UseTargetLock)
-                        {
-                            _combatComponent.ExecuteAttackWithWarp(stage, () =>
-                            {
-                                // After warp, apply startup delay if needed
-                                if (startup > 0)
-                                    attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
-                                else
-                                    ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
-                            });
-                        }
-                        else
-                        {
-                            // No warp, normal flow
-                            if (startup > 0)
-                                attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
-                            else
-                                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
-                        }
+                        ExecuteAttackStage(stages[animStage], ability, stages, slotIndex, charged, airborne, isComboChain: false, startup);
                     }
-
-                    GD.Print("First attack ", animName);
                     attackState.NextAnimName = animName;
                     _fsm.TransitionTo("attack");
                 }
@@ -952,7 +895,7 @@ public partial class PlayerController : CharacterBody3D
         Vector3 lungeDir = _moveDirection.LengthSquared() > 0.001f ? _moveDirection : fwd;
         Vector3 pos = GlobalPosition;
 
-        // Lunge (dans la direction de l'input caméra, pas le facing du perso)
+        // Lunge in camera-relative input direction (not character facing)
         if (stage.LungeForce > 0f)
         {
             float upBoost = Velocity.Y + 2f;
@@ -974,39 +917,8 @@ public partial class PlayerController : CharacterBody3D
             });
         }
 
-        // Spawn melee hitbox using target lock direction if available
-        Vector3 hitDir;
-
-        // Priority 1: Use cached warp direction if we just warped
-        Vector3 warpDir = _combatComponent?.GetFinalWarpDirection() ?? Vector3.Zero;
-        if (stage.UseTargetLock && warpDir.LengthSquared() > 0.001f)
-        {
-            // Use the direction we warped in (ensures hitbox matches warp)
-            hitDir = warpDir;
-            hitDir.Y = 0;
-            hitDir = hitDir.Normalized();
-        }
-        // Priority 2: Active target lock
-        else if (stage.UseTargetLock && _targetLock?.CurrentTarget != null)
-        {
-            // Aim toward target lock
-            hitDir = _targetLock.GetDirectionToTarget();
-            hitDir.Y = 0;
-            hitDir = hitDir.Normalized();
-        }
-        // Priority 3: Input direction
-        else if (_moveDirection.LengthSquared() > 0.001f)
-        {
-            hitDir = _moveDirection;
-        }
-        // Priority 4: Fallback to camera forward
-        else
-        {
-            hitDir = GetCameraForward();
-            hitDir.Y = 0;
-            hitDir = hitDir.Normalized();
-        }
-
+        // Spawn melee hitbox in attack direction
+        Vector3 hitDir = GetAttackDirection(stage);
         Vector3 hitPos = pos + hitDir * 2.0f + Vector3.Up * 1.0f;
         var hb = new SlopArena.Shared.Hitbox
         {
@@ -1104,7 +1016,6 @@ public partial class PlayerController : CharacterBody3D
 
         if (!ResourceLoader.Exists(modelPath))
         {
-            GD.Print($"{modelPath} not found, using fallback capsule");
             CreateFallbackMesh();
             return null;
         }
@@ -1114,9 +1025,6 @@ public partial class PlayerController : CharacterBody3D
 
         pm.Name = "PlayerModel";
         AddChild(pm);
-
-        GD.Print($"PlayerModel loaded from {modelPath}");
-
         pm.Scale = scale;
         pm.Position = position;
 
@@ -1155,7 +1063,6 @@ public partial class PlayerController : CharacterBody3D
 
         if (boneIdx < 0)
         {
-            GD.Print("KayKit: no weapon bone found, skipping sword attachment");
             return;
         }
 
@@ -1182,7 +1089,6 @@ public partial class PlayerController : CharacterBody3D
         sword.Rotation = new Vector3(0f, 0f, Mathf.DegToRad(90f));
         sword.Position = new Vector3(0f, 0f, 0f);
 
-        GD.Print($"KayKit: attached sword to bone '{foundBone}'");
     }
 
 
@@ -1252,7 +1158,6 @@ public partial class PlayerController : CharacterBody3D
             else mat.AlbedoColor = new Color(0.7f, 0.7f, 0.7f);
             mi.MaterialOverride = mat;
             if (_isNPC && _firstMesh == null) { _firstMesh = mi; mat.EmissionEnabled = true; mat.Emission = new Color(0.8f, 0f, 0f); _npcOriginalEmission = mat.EmissionEnergyMultiplier; }
-            GD.Print($"Skin: applied to {mi.Name} (tex={tex != null})");
         }
         foreach (var c in node.GetChildren()) ApplySkinRecursive(c, tex);
     }
@@ -1336,6 +1241,84 @@ public partial class PlayerController : CharacterBody3D
 
         // Make visible again
         Visible = true;
+    }
+
+    // ==========================================
+    // ATTACK EXECUTION HELPERS
+    // ==========================================
+
+    /// <summary>
+    /// Execute an attack stage with optional warp and startup delay.
+    /// Factorizes logic shared between first attack and combo chains.
+    /// </summary>
+    private void ExecuteAttackStage(AttackStage stage, AbilityData ability, AttackStage[] stages, int slotIndex, bool charged, bool airborne, bool isComboChain, ushort startup)
+    {
+        if (_combatComponent == null) return;
+
+        if (stage.UseTargetLock)
+        {
+            _combatComponent.ExecuteAttackWithWarp(stage, () =>
+            {
+                if (isComboChain || startup == 0)
+                {
+                    ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                }
+                else
+                {
+                    var attackState = _fsm?.GetAttackState();
+                    attackState?.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
+                }
+            });
+        }
+        else
+        {
+            if (isComboChain || startup == 0)
+            {
+                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+            }
+            else
+            {
+                var attackState = _fsm?.GetAttackState();
+                attackState?.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get attack direction with priority:
+    /// 1. Cached warp direction (if we just warped)
+    /// 2. Active target lock (if target still locked)
+    /// 3. Input direction (if moving)
+    /// 4. Camera forward (fallback)
+    /// </summary>
+    private Vector3 GetAttackDirection(AttackStage stage)
+    {
+        // Priority 1: Cached warp direction
+        Vector3 warpDir = _combatComponent?.GetFinalWarpDirection() ?? Vector3.Zero;
+        if (stage.UseTargetLock && warpDir.LengthSquared() > 0.001f)
+        {
+            warpDir.Y = 0;
+            return warpDir.Normalized();
+        }
+
+        // Priority 2: Active target lock
+        if (stage.UseTargetLock && _targetLock?.CurrentTarget != null)
+        {
+            Vector3 dir = _targetLock.GetDirectionToTarget();
+            dir.Y = 0;
+            return dir.Normalized();
+        }
+
+        // Priority 3: Input direction
+        if (_moveDirection.LengthSquared() > 0.001f)
+        {
+            return _moveDirection;
+        }
+
+        // Priority 4: Camera forward
+        Vector3 camFwd = GetCameraForward();
+        camFwd.Y = 0;
+        return camFwd.Normalized();
     }
 
     // ==========================================

@@ -322,8 +322,6 @@ public partial class Main : Node3D
             // Setup combat component for this NPC
             if (_simulation != null)
                 npc.SetupCombat(_simulation, ArenaRegistry.Get("split"), _spellVFX);
-
-            GD.Print($"Spawned NPC {i} at {spawnPos}");
         }
     }
 
@@ -340,8 +338,6 @@ public partial class Main : Node3D
             botAI.Name = $"BotAI_{i}";
             botAI.Setup(_npcs[i]!, _player);
             _npcs[i]!.AddChild(botAI);
-
-            GD.Print($"Added AI to NPC {i}");
         }
     }
 
@@ -397,7 +393,6 @@ public partial class Main : Node3D
             }
         }
 
-        GD.Print("NPC CombatComponents registered.");
     }
 
     private void RegisterPlayerInSimulation()
