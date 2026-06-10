@@ -23,6 +23,7 @@ public sealed partial class LandingState : State
     {
         _timer = _landingDuration;
         Movement.ResetJumps();
+        Player.SetModelEmission(new Color(0.9f, 0.9f, 0.2f)); // Yellow
         base.Enter();
     }
 

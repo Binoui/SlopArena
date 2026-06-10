@@ -120,11 +120,11 @@ namespace SlopArena.Shared
                     Stages = new AttackStage[]
                     {
                         new() { Damage = 4f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 10, SelfLockTicks = 46, ChainWindowTicks = 0, StartupTicks = 6,
-                                AttackRange = 4f, WarpRange = 10f, WarpSpeed = 25f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                                AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                         new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, StunTicks = 14, SelfLockTicks = 30, ChainWindowTicks = 0, StartupTicks = 8,
-                                AttackRange = 4f, WarpRange = 10f, WarpSpeed = 25f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                                AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                         new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, StunTicks = 18, SelfLockTicks = 56, ChainWindowTicks = 0, StartupTicks = 10,
-                                AttackRange = 5f, WarpRange = 12f, WarpSpeed = 30f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                                AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
                 },
@@ -136,7 +136,7 @@ namespace SlopArena.Shared
                     Stages = new AttackStage[]
                     {
                         new() { Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 8f, StunTicks = 14, SelfLockTicks = 16, ChainWindowTicks = 0, StartupTicks = 4,
-                                AttackRange = 5f, WarpRange = 12f, WarpSpeed = 28f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                                AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     },
                     AnimationNames = new[] { "attack_air_lmb" },
                 },
@@ -149,12 +149,12 @@ namespace SlopArena.Shared
                     Stages = new AttackStage[]
                     {
                         new() { Damage = 8f, KnockbackForce = 14f, KnockbackUpward = 4f, StunTicks = 14, SelfLockTicks = 50, ChainWindowTicks = 0, StartupTicks = 8,
-                                AttackRange = 6f, WarpRange = 0f, WarpSpeed = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                                AttackRange = 6f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
                     ChargedStages = new AttackStage[]
                     {
                         new() { Damage = 14f, KnockbackForce = 24f, KnockbackUpward = 8f, StunTicks = 20, SelfLockTicks = 40, ChainWindowTicks = 0, StartupTicks = 10,
-                                AttackRange = 8f, WarpRange = 0f, WarpSpeed = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                                AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
                     ChargeHoldTicks = 45,
                     AnimationNames = new[] { "rmb_loop" },

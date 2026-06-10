@@ -48,12 +48,14 @@ public sealed partial class AimedChargeState : State
     {
         _chargeTicks = 0;
         _attackFired = false;
+        Player.SetModelEmission(new Color(1.0f, 0.5f, 0.1f)); // Orange
         base.Enter(); // plays charge loop anim
         ShowCone();
     }
 
     public override void Exit()
     {
+        Player.ClearModelEmission();
         base.Exit();
         HideCone();
     }
