@@ -57,7 +57,7 @@ public partial class BotController : Node
     public override void _PhysicsProcess(double delta)
     {
         if (_npc == null || _target == null) return;
-        if (!_npc.IsAlive()) return; // Don't act while dead
+        if (!_npc.IsNpcAlive()) return; // Don't act while dead
 
         float dt = (float)delta;
 
