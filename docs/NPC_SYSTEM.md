@@ -134,54 +134,56 @@ if (_arenaManager.IsBelowKillHeight(character.GlobalPosition))
 | Target | Not targetable | Targetable (ID 100-104) |
 | UI | Shows own damage % | Shows damage % in target frame |
 
-## Improving the AI
+## AI Input System (Implemented)
 
-### Step 1: Input Injection (TODO)
+### Input Injection
 
-Currently BotController directly manipulates `Velocity`. Better:
+BotController now uses proper input injection instead of manipulating Velocity:
 
 ```csharp
-// In PlayerController.cs, add:
-public void InjectInput(InputState input)
-{
-    if (!_isNPC) return;
-    // Process input like a player
-}
+// PlayerController.cs API:
+public void InjectInput(InputState input)  // Inject synthetic input from AI
+public void UseAbility(int slot)           // Trigger ability slot directly
 
-// In BotController.cs:
-private void SimulateInput(float dt)
+// BotController.cs usage:
+private void InjectInput(float dt)
 {
     var input = new InputState
     {
-        MoveX = calculatedX,
-        MoveY = calculatedZ,
-        Jump = shouldJump,
-        // etc.
+        MoveX = direction.X,
+        MoveY = direction.Z,
+        Jump = _shouldJump,
+        Dash = _shouldDash,
+        Attack = false  // Attacks use UseAbility() instead
     };
     _npc.InjectInput(input);
-}
-```
-
-### Step 2: Ability Usage
-
-```csharp
-// In PlayerController.cs, add:
-public void UseAbility(int slot)
-{
-    ExecuteSlot(slot);
+    
+    // Clear one-shot flags
+    _shouldJump = false;
+    _shouldDash = false;
 }
 
-// In BotController.cs:
 private void ExecuteAttack()
 {
-    _npc?.UseAbility(0); // LMB
-}
-
-private void ExecuteDash()
-{
-    _npc?.UseAbility(1); // Dash ability
+    _npc.UseAbility(0); // Slot 0 = LMB attack
 }
 ```
+
+### How It Works
+
+1. **InputController** supports two modes:
+   - Human: reads from Godot Input
+   - AI: uses injected InputState
+   
+2. **BotController** builds InputState each frame:
+   - Movement: continuous (MoveX, MoveY)
+   - Actions: one-shot flags (Jump, Dash cleared after injection)
+   - Attacks: direct `UseAbility()` calls
+
+3. **PlayerController.BuildInputState()**:
+   - Checks if NPC with AI input
+   - If yes: uses injected input
+   - If no: reads from Godot Input (human player)
 
 ### Step 3: Advanced Behaviors
 
@@ -294,15 +296,15 @@ if (key.Keycode == Key.F1)
 - ✅ Random wandering
 - ✅ Approach player
 - ✅ Circle strafe
-- ✅ Basic attacks
+- ✅ **Proper input injection (clean API)**
+- ✅ **Basic attacks (UseAbility API)**
 - ✅ Occasional jump/dash
 
 ### V1 (Next Steps)
-- [ ] Proper input injection
 - [ ] Ability cooldown tracking
-- [ ] Combo chains (LMB 1-2-3)
-- [ ] Ability usage (Q/E/R/F)
-- [ ] Tactical dash (approach/escape)
+- [ ] Combo chains (LMB 1-2-3 with timing)
+- [ ] Ability usage (Q/E/R/F slots 2-5)
+- [ ] Tactical dash (approach/escape with DI)
 
 ### V2 (Advanced)
 - [ ] Threat management (multi-targets)
