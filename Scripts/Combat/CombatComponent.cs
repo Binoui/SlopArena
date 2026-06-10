@@ -28,6 +28,8 @@ public partial class CombatComponent : Node
     private LocalSimulation? _simulation;
     private ulong _entityId = 1;
     private SpellVFXManager? _spellVFX;
+    private TargetLockSystem? _targetLock;
+    private AttackWarping? _warpSystem;
 
     // ==========================================
     // EVENTS
@@ -84,12 +86,22 @@ public partial class CombatComponent : Node
     /// <param name="simulation">Reference to the local simulation</param>
     /// <param name="entityId">Unique entity ID in the simulation</param>
     /// <param name="spellVFX">Optional reference to spell VFX manager</param>
-    public void Setup(Node3D owner, LocalSimulation simulation, ulong entityId, SpellVFXManager? spellVFX = null)
+    /// <param name="targetLock">Optional target lock system for Range-based attacks</param>
+    public void Setup(Node3D owner, LocalSimulation simulation, ulong entityId, SpellVFXManager? spellVFX = null, TargetLockSystem? targetLock = null)
     {
         _owner = owner;
         _simulation = simulation;
         _entityId = entityId;
         _spellVFX = spellVFX;
+        _targetLock = targetLock;
+
+        // Create warp system if target lock available
+        if (targetLock != null)
+        {
+            _warpSystem = new AttackWarping();
+            _warpSystem.Setup(owner, targetLock);
+            AddChild(_warpSystem);
+        }
     }
 
     /// <summary>
@@ -423,6 +435,84 @@ public partial class CombatComponent : Node
     {
         return _owner?.GlobalPosition ?? Vector3.Zero;
     }
+
+    // ==========================================
+    // DKO-STYLE ATTACK EXECUTION
+    // ==========================================
+
+    /// <summary>
+    /// Execute attack with Range-based range checking + warping.
+    /// Checks target distance and initiates warp if in warp range.
+    /// Callback fires after warp completes (or immediately if no warp needed).
+    /// </summary>
+    public void ExecuteAttackWithWarp(SlopArena.Shared.AttackStage stage, Action onAttackStart)
+    {
+        // No target lock system → execute immediately
+        if (!stage.UseTargetLock || _targetLock == null || _warpSystem == null)
+        {
+            onAttackStart?.Invoke();
+            return;
+        }
+
+        // No valid target → execute immediately
+        if (_targetLock.CurrentTarget == null)
+        {
+            onAttackStart?.Invoke();
+            return;
+        }
+
+        float distToTarget = _targetLock.GetDistanceToTarget();
+
+        // Check ranges
+        if (distToTarget <= stage.AttackRange)
+        {
+            // In attack range → execute immediately
+            onAttackStart?.Invoke();
+        }
+        else if (distToTarget <= stage.WarpRange)
+        {
+            // In warp range → dash toward target first
+            GD.Print($"[Warp] Target {distToTarget:F1}m away, warping to {stage.AttackRange:F1}m");
+            _warpSystem.StartWarp(stage.AttackRange, stage.WarpSpeed, () =>
+            {
+                onAttackStart?.Invoke();
+            });
+        }
+        else
+        {
+            // Out of range → attack in place (will likely miss)
+            onAttackStart?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Cancel active warp (e.g., player got hit during warp startup).
+    /// </summary>
+    public void CancelAttackWarp()
+    {
+        _warpSystem?.CancelWarp();
+    }
+
+    /// <summary>
+    /// Check if currently warping toward target.
+    /// </summary>
+    public bool IsWarping()
+    {
+        return _warpSystem?.IsWarping ?? false;
+    }
+
+    /// <summary>
+    /// Get the final warp direction (for hitbox spawning after warp completes).
+    /// Returns Vector3.Zero if no warp system or no warp occurred.
+    /// </summary>
+    public Vector3 GetFinalWarpDirection()
+    {
+        return _warpSystem?.GetFinalWarpDirection() ?? Vector3.Zero;
+    }
+
+    // ==========================================
+    // HELPERS
+    // ==========================================
 
     private List<SpellResolver.EntityData> BuildEntityList()
     {

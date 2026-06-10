@@ -157,6 +157,7 @@ public partial class DummyManager : Node3D
         body.FloorStopOnSlope = true;
         body.FloorMaxAngle = 45.0f;
         body.Position = pos;
+        body.AddToGroup("enemies");  // For target lock system
         AddChild(body);
         _bodies[index] = body;
 
