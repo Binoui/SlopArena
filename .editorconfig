@@ -54,3 +54,40 @@ csharp_new_line_before_catch = true
 csharp_new_line_before_finally = true
 csharp_new_line_before_members_in_object_initializers = true
 csharp_new_line_before_members_in_anonymous_types = true
+
+# Code quality rules
+dotnet_diagnostic.CA1031.severity = warning  # Do not catch general exception types
+dotnet_diagnostic.CA1806.severity = warning  # Do not ignore method results
+dotnet_diagnostic.CA1822.severity = suggestion  # Mark members as static
+dotnet_diagnostic.CA2007.severity = none  # Do not directly await a Task (not needed for Unity/Godot)
+
+# Roslynator rules for code quality
+dotnet_diagnostic.RCS1021.severity = warning  # Convert lambda to method group
+dotnet_diagnostic.RCS1036.severity = warning  # Remove redundant empty line
+dotnet_diagnostic.RCS1037.severity = warning  # Remove trailing white-space
+dotnet_diagnostic.RCS1074.severity = warning  # Remove redundant constructor
+dotnet_diagnostic.RCS1097.severity = warning  # Remove redundant 'ToString' call
+dotnet_diagnostic.RCS1118.severity = warning  # Mark local variable as const
+dotnet_diagnostic.RCS1123.severity = warning  # Add parentheses when necessary
+dotnet_diagnostic.RCS1124.severity = warning  # Inline local variable
+dotnet_diagnostic.RCS1138.severity = warning  # Add summary to documentation comment
+dotnet_diagnostic.RCS1163.severity = warning  # Unused parameter
+dotnet_diagnostic.RCS1168.severity = warning  # Parameter name differs from base name
+dotnet_diagnostic.RCS1169.severity = warning  # Make field read-only
+dotnet_diagnostic.RCS1175.severity = warning  # Unused 'this' parameter
+dotnet_diagnostic.RCS1181.severity = warning  # Convert comment to documentation comment
+dotnet_diagnostic.RCS1186.severity = warning  # Use Regex instance instead of static method
+dotnet_diagnostic.RCS1197.severity = warning  # Optimize StringBuilder.Append call
+dotnet_diagnostic.RCS1214.severity = warning  # Unnecessary interpolated string
+
+# Style rules
+dotnet_diagnostic.IDE0001.severity = warning  # Simplify name
+dotnet_diagnostic.IDE0002.severity = warning  # Simplify member access
+dotnet_diagnostic.IDE0004.severity = warning  # Remove unnecessary cast
+dotnet_diagnostic.IDE0005.severity = warning  # Remove unnecessary using directives
+dotnet_diagnostic.IDE0051.severity = warning  # Remove unused private members
+dotnet_diagnostic.IDE0052.severity = warning  # Remove unread private members
+dotnet_diagnostic.IDE0058.severity = none  # Expression value is never used (too noisy in Godot)
+dotnet_diagnostic.IDE0059.severity = warning  # Unnecessary assignment of a value
+dotnet_diagnostic.IDE0060.severity = warning  # Remove unused parameter
+dotnet_diagnostic.IDE0080.severity = warning  # Remove unnecessary suppression operator

@@ -1,0 +1,84 @@
+#!/bin/bash
+# Pre-commit hook for SlopArena
+# Catches quality issues before commit
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# 1. Check for debug logs in staged files
+echo "   Checking for debug spam..."
+STAGED_CS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.cs$' || true)
+
+if [ -n "$STAGED_CS_FILES" ]; then
+    # Count GD.Print in staged changes (excluding GD.PrintErr)
+    DEBUG_LOGS=$(git diff --cached -U0 | grep -E '^\+.*GD\.Print\(' | grep -v 'GD\.PrintErr' || true)
+
+    if [ -n "$DEBUG_LOGS" ]; then
+        echo ""
+        echo "⚠️  Warning: Found debug logs in staged changes:"
+        echo "$DEBUG_LOGS" | head -5
+        COUNT=$(echo "$DEBUG_LOGS" | wc -l)
+        if [ "$COUNT" -gt 5 ]; then
+            echo "   ... and $((COUNT - 5)) more"
+        fi
+        echo ""
+        echo "   Consider removing temporary debug logs before committing."
+        echo "   Use visual debug tools (F3 hitbox toggle) instead."
+        echo ""
+        read -p "   Continue anyway? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "❌ Commit aborted."
+            exit 1
+        fi
+    fi
+fi
+
+# 2. Build check
+echo "   Building project..."
+if ! dotnet build --nologo --verbosity quiet 2>&1 | grep -q "Build succeeded"; then
+    echo ""
+    echo "❌ Build failed! Fix errors before committing:"
+    dotnet build --nologo
+    exit 1
+fi
+
+# 3. Check for French comments in staged files
+if [ -n "$STAGED_CS_FILES" ]; then
+    FRENCH_COMMENTS=$(git diff --cached -U0 $STAGED_CS_FILES | grep -E '^\+.*//' | grep -iE 'je|tu|il|elle|nous|vous|ils|elles|le|la|les|un|une|des|dans|pour|avec|ça|très' || true)
+
+    if [ -n "$FRENCH_COMMENTS" ]; then
+        echo ""
+        echo "⚠️  Warning: Possible French comments detected:"
+        echo "$FRENCH_COMMENTS" | head -3
+        echo ""
+        echo "   All comments should be in English (open-source project)."
+        echo ""
+        read -p "   Continue anyway? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "❌ Commit aborted."
+            exit 1
+        fi
+    fi
+fi
+
+# 4. Check for Godot types in Shared/
+SHARED_FILES=$(echo "$STAGED_CS_FILES" | grep '^Shared/' || true)
+if [ -n "$SHARED_FILES" ]; then
+    GODOT_TYPES=$(git diff --cached -U0 $SHARED_FILES | grep -E '^\+' | grep -E 'Godot\.|Vector3|Transform3D|Node|PackedScene' || true)
+
+    if [ -n "$GODOT_TYPES" ]; then
+        echo ""
+        echo "❌ ERROR: Godot types found in Shared/:"
+        echo "$GODOT_TYPES"
+        echo ""
+        echo "   Shared/ must remain pure C# (no Godot dependencies)."
+        echo "   This is enforced by SlopArena.Shared.csproj."
+        exit 1
+    fi
+fi
+
+echo "✅ All checks passed!"
+exit 0
