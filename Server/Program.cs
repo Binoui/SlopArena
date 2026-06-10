@@ -13,39 +13,47 @@ namespace SlopArena.Server
         private static IPEndPoint _clientEndPoint;
         private static bool _running = true;
 
-        // Player state variables (spawn at arena center 5000x5000)
+        // Server tick counter
         private static uint _serverTick = 0;
-        private static float _posX = 2500f;
-        private static float _posY = 2500f;
-        private static float _posZ = 0f;
-        private static float _velX = 0f;
-        private static float _velY = 0f;
-        private static float _velZ = 0f;
 
-        private static ActionState _actionState = ActionState.Idle;
-        private static ushort _stateTicksRemaining = 0;
-        private static ushort _dashCooldownTicks = 0;
-        private static float _dashDirX = 0f;
-        private static float _dashDirY = 0f;
-        private static ushort _combatLockoutTicks = 0;
-        private static bool _slideMomentumActive = false;
+        // Player state (using CharacterState from Shared/)
+        private static CharacterState _playerState;
+        private static CharacterDefinition _playerDef;
+        private static ArenaDefinition _arena;
 
         // Input buffering queue
-        private static readonly System.Collections.Generic.List<ClientInputPacket> _inputQueue = new System.Collections.Generic.List<ClientInputPacket>();
+        private static readonly System.Collections.Generic.List<ClientInputPacket> _inputQueue = new();
 
         static void Main(string[] args)
         {
-            Console.WriteLine("=== SlopArena Authoritative Physics Server ===");
+            Console.WriteLine("=== SlopArena Authoritative Server ===");
+            Console.WriteLine("Using Simulation.cs (tick-based, server-authoritative)");
 
-            PhysicsConfig.Initialize();
-            _posZ = PhysicsConfig.GetGroundHeight(_posX, _posY);
+            // Initialize arena and character
+            _arena = ArenaRegistry.Get("pit");
+            _playerDef = CharacterRegistry.Get(CharacterClass.Manki);
+
+            // Spawn player at first spawn point
+            var spawn = _arena.SpawnPoints.Length > 0 ? _arena.SpawnPoints[0] : new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = 0f };
+            _playerState = new CharacterState
+            {
+                PX = spawn.X,
+                PY = spawn.Y,
+                PZ = spawn.Z,
+                FacingYaw = spawn.Yaw,
+                State = ActionState.Idle,
+                IsGrounded = true,
+                JumpsLeft = _playerDef.Movement.MaxJumps,
+                AirDodgesLeft = 1,
+                DamagePercent = 0,
+            };
 
             int port = 7777;
             try
             {
                 _udpServer = new UdpClient(port);
                 _udpServer.Client.Blocking = false;
-                Console.WriteLine($"Server started on port {port} (UDP)");
+                Console.WriteLine($"Server listening on port {port} (UDP)");
             }
             catch (Exception ex)
             {
@@ -55,9 +63,9 @@ namespace SlopArena.Server
 
             var stopwatch = Stopwatch.StartNew();
             double nextTickTime = 0;
-            double tickDurationMs = 1000.0 / PhysicsConfig.TickRate;
+            const double tickDurationMs = 1000.0 / 60.0; // 60Hz
 
-            Console.WriteLine($"Simulation running at {PhysicsConfig.TickRate}Hz. Press Ctrl+C to stop.");
+            Console.WriteLine("Simulation running at 60Hz. Press Ctrl+C to stop.");
 
             while (_running)
             {
@@ -68,6 +76,7 @@ namespace SlopArena.Server
                     Tick();
                     nextTickTime += tickDurationMs;
 
+                    // Catch-up limit: if we're >10 ticks behind, skip forward
                     if (currentTime > nextTickTime + tickDurationMs * 10)
                     {
                         nextTickTime = currentTime;
@@ -151,14 +160,33 @@ namespace SlopArena.Server
                 _inputQueue.Sort((a, b) => a.TickNumber.CompareTo(b.TickNumber));
 
                 int simulatedCount = 0;
-                foreach (var input in _inputQueue)
+                foreach (var inputPacket in _inputQueue)
                 {
-                    if (input.TickNumber > _serverTick)
+                    if (inputPacket.TickNumber > _serverTick)
                     {
-                        _serverTick = input.TickNumber;
-                        SimulatePhysics(input);
+                        _serverTick = inputPacket.TickNumber;
+
+                        // Convert ClientInputPacket to InputState
+                        var input = new InputState
+                        {
+                            Up = (inputPacket.MovementFlags & 0x01) != 0,
+                            Left = (inputPacket.MovementFlags & 0x02) != 0,
+                            Down = (inputPacket.MovementFlags & 0x04) != 0,
+                            Right = (inputPacket.MovementFlags & 0x08) != 0,
+                            Jump = (inputPacket.MovementFlags & 0x10) != 0,
+                            Dash = (inputPacket.MovementFlags & 0x20) != 0,
+                            Crouch = (inputPacket.MovementFlags & 0x80) != 0,
+                            Attack = (inputPacket.ActionFlags & 0x01) != 0,
+                            // Compute normalized movement direction from flags
+                            MoveX = ((inputPacket.MovementFlags & 0x08) != 0 ? 1f : 0f) - ((inputPacket.MovementFlags & 0x02) != 0 ? 1f : 0f),
+                            MoveY = ((inputPacket.MovementFlags & 0x01) != 0 ? 1f : 0f) - ((inputPacket.MovementFlags & 0x04) != 0 ? 1f : 0f),
+                        };
+
+                        // Simulate one tick using Simulation.SimulateTick
+                        Simulation.SimulateTick(ref _playerState, _playerDef, input, _arena, onHit: null);
+
                         simulatedCount++;
-                        if (simulatedCount >= 120) // Cap to prevent packet-burst exploit/freezing
+                        if (simulatedCount >= 120) // Cap to prevent packet-burst exploit
                         {
                             break;
                         }
@@ -170,37 +198,26 @@ namespace SlopArena.Server
             }
         }
 
-        private static void SimulatePhysics(ClientInputPacket input)
-        {
-            PhysicsConfig.SimulateStep(
-                ref _posX, ref _posY, ref _posZ,
-                ref _velX, ref _velY, ref _velZ,
-                ref _actionState, ref _stateTicksRemaining, ref _dashCooldownTicks,
-                ref _dashDirX, ref _dashDirY,
-                ref _combatLockoutTicks, ref _slideMomentumActive,
-                input
-            );
-        }
-
         private static void SendState()
         {
             if (_udpServer == null || _clientEndPoint == null) return;
 
-            var state = new CharacterStatePacket
+            // Convert CharacterState to CharacterStatePacket
+            var packet = new CharacterStatePacket
             {
                 TickNumber = _serverTick,
-                PositionX = _posX,
-                PositionY = _posY,
-                PositionZ = _posZ,
-                VelocityX = _velX,
-                VelocityY = _velY,
-                VelocityZ = _velZ,
-                CurrentActionState = (byte)_actionState,
-                StateDurationFrames = _stateTicksRemaining
+                PositionX = _playerState.PX,
+                PositionY = _playerState.PZ, // note: PZ in CharacterState = Y in packet (world up)
+                PositionZ = _playerState.PY, // note: PY in CharacterState = Z in packet (forward)
+                VelocityX = _playerState.VX,
+                VelocityY = _playerState.VZ,
+                VelocityZ = _playerState.VY,
+                CurrentActionState = (byte)_playerState.State,
+                StateDurationFrames = _playerState.StateTicks
             };
 
             Span<byte> buffer = stackalloc byte[CharacterStatePacket.Size];
-            state.Serialize(buffer);
+            packet.Serialize(buffer);
 
             try
             {

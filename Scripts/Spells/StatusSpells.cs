@@ -36,10 +36,10 @@ public static class StatusSpells
         };
         cone.Mesh = coneMesh;
         cone.MaterialOverride = mat;
-        cone.GlobalPosition = origin + direction * (range * 0.5f);
-        cone.LookAt(origin + direction * range, Vector3.Up);
 
         AddToScene(combat, cone);
+        cone.GlobalPosition = origin + direction * (range * 0.5f);
+        cone.LookAt(origin + direction * range, Vector3.Up);
         var timer = combat.GetTree().CreateTimer(duration);
         timer.Timeout += () => { if (GodotObject.IsInstanceValid(cone)) cone.QueueFree(); };
     }
@@ -65,9 +65,9 @@ public static class StatusSpells
         };
         circle.Mesh = circleMesh;
         circle.MaterialOverride = mat;
-        circle.GlobalPosition = new Vector3(center.X, 0.2f, center.Z);
 
         AddToScene(combat, circle);
+        circle.GlobalPosition = new Vector3(center.X, 0.2f, center.Z);
         var timer = combat.GetTree().CreateTimer(duration);
         timer.Timeout += () => { if (GodotObject.IsInstanceValid(circle)) circle.QueueFree(); };
     }
@@ -95,9 +95,9 @@ public static class StatusSpells
         };
         impact.Mesh = impactMesh;
         impact.MaterialOverride = mat;
-        impact.GlobalPosition = position;
 
         AddToScene(combat, impact);
+        impact.GlobalPosition = position;
 
         // Fade out and remove
         var timer = combat.GetTree().CreateTimer(0.3f);
@@ -131,10 +131,10 @@ public static class StatusSpells
         };
         beam.Mesh = beamMesh;
         beam.MaterialOverride = mat;
-        beam.GlobalPosition = origin + direction * (distance * 0.5f);
-        beam.LookAt(origin + direction * distance, Vector3.Up);
 
         AddToScene(combat, beam);
+        beam.GlobalPosition = origin + direction * (distance * 0.5f);
+        beam.LookAt(origin + direction * distance, Vector3.Up);
         var timer = combat.GetTree().CreateTimer(duration);
         timer.Timeout += () => { if (GodotObject.IsInstanceValid(beam)) beam.QueueFree(); };
     }
