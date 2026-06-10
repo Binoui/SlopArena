@@ -12,6 +12,13 @@ namespace SlopArena.Shared
     /// <summary>
     /// Pure data definition of an arena. No Godot types.
     /// Used by both client (ArenaManager) and server (for bounds/spawning).
+    ///
+    /// Blast Zone Design:
+    /// - KillHeight defines the blast zone (Y coordinate below which = elimination)
+    /// - Each map can have different blast zones for balance
+    /// - Smaller stages typically have closer blast zones (easier to KO)
+    /// - Larger stages can have farther blast zones (longer survival, more comeback potential)
+    /// - Example: Final Destination (flat) vs Battlefield (platforms) in Smash
     /// </summary>
     [Serializable]
     public struct ArenaDefinition
@@ -19,10 +26,9 @@ namespace SlopArena.Shared
         public string Name;           // machine-readable key
         public string DisplayName;    // human-readable
         public string ScenePath;      // res://assets/arenas/xxx.tscn
-        public float VoidHeight;      // Y below this = out of bounds (death/respawn)
-        public float KillHeight;      // Y below this = instant kill (no save)
-        public float MinX, MaxX;      // arena bounds X
-        public float MinZ, MaxZ;      // arena bounds Z
+        public float KillHeight;      // Y below this = BLAST ZONE (instant elimination)
+        public float MinX, MaxX;      // arena bounds X (used for camera/mechanics)
+        public float MinZ, MaxZ;      // arena bounds Z (used for camera/mechanics)
         public SpawnPoint[] SpawnPoints;
     }
 
@@ -41,13 +47,13 @@ namespace SlopArena.Shared
         {
             return new[]
             {
+                // The Pit: Large stage → deeper blast zone for longer matches
                 new ArenaDefinition
                 {
                     Name = "pit",
                     DisplayName = "The Pit",
                     ScenePath = "res://assets/arenas/arena_pit.tscn",
-                    VoidHeight = -2f,
-                    KillHeight = -10f,
+                    KillHeight = -15f,  // Deep blast zone (80x80 large stage)
                     MinX = 0f, MaxX = 80f,
                     MinZ = 0f, MaxZ = 80f,
                     SpawnPoints = new[]
@@ -60,13 +66,13 @@ namespace SlopArena.Shared
                         new SpawnPoint { X = 40f, Y = 0.5f, Z = 65f, Yaw = MathF.PI },
                     }
                 },
+                // Crossroads: Medium stage → balanced blast zone
                 new ArenaDefinition
                 {
                     Name = "cross",
                     DisplayName = "Crossroads",
                     ScenePath = "res://assets/arenas/arena_cross.tscn",
-                    VoidHeight = -2f,
-                    KillHeight = -10f,
+                    KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]
@@ -79,13 +85,13 @@ namespace SlopArena.Shared
                         new SpawnPoint { X = 22f, Y = 0.5f, Z = 22f, Yaw = 0f },
                     }
                 },
+                // The Split: Small competitive stage → shallow blast zone for fast KOs
                 new ArenaDefinition
                 {
                     Name = "split",
                     DisplayName = "The Split",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
-                    VoidHeight = -3f,
-                    KillHeight = -10f,
+                    KillHeight = -7f,   // Shallow blast zone (60x60 small competitive stage)
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]

@@ -10,14 +10,35 @@ using SlopArena.Shared;
 public static class MankiAbilities
 {
     /// <summary>
-    /// RMB — Aerosol + Lighter: cone flame visual
+    /// RMB — Aerosol + Lighter: homemade flamethrower
     /// </summary>
     public static void AerosolFlame(CombatComponent combat)
     {
         Vector3 forward = combat.GetCameraForward();
-        Vector3 pos = combat.GetOwnerPosition();
-        StatusSpells.CreateConeVisual(combat, pos, forward, 5f, 3f, new Color(1f, 0.6f, 0f, 0.3f), 0.4f);
-        StatusSpells.CreateImpactVisual(combat, pos + forward * 4f, 1.5f, new Color(1f, 0.8f, 0.2f));
+        Vector3 pos = combat.GetOwnerPosition() + Vector3.Up * 1.2f; // Hand height
+
+        var vfxManager = combat.GetSpellVFX();
+        if (vfxManager != null)
+        {
+            // Spawn flamethrower VFX (briquet + aérosol burst)
+            var flame = vfxManager.SpawnFlamethrower(pos, forward);
+
+            // Auto-stop after 0.4s (same duration as attack)
+            if (flame != null)
+            {
+                var tree = combat.GetTree();
+                if (tree != null)
+                {
+                    tree.CreateTimer(0.4).Timeout += () => flame.StopFlame();
+                }
+            }
+        }
+        else
+        {
+            // Fallback: old cone visual if VFX manager not available
+            StatusSpells.CreateConeVisual(combat, pos, forward, 5f, 3f, new Color(1f, 0.6f, 0f, 0.3f), 0.4f);
+            StatusSpells.CreateImpactVisual(combat, pos + forward * 4f, 1.5f, new Color(1f, 0.8f, 0.2f));
+        }
     }
 
     /// <summary>

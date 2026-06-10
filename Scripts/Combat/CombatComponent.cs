@@ -27,6 +27,7 @@ public partial class CombatComponent : Node
     private Node3D? _owner;
     private LocalSimulation? _simulation;
     private ulong _entityId = 1;
+    private SpellVFXManager? _spellVFX;
 
     // ==========================================
     // EVENTS
@@ -82,12 +83,19 @@ public partial class CombatComponent : Node
     /// <param name="owner">The owning Node3D (player, dummy, etc.)</param>
     /// <param name="simulation">Reference to the local simulation</param>
     /// <param name="entityId">Unique entity ID in the simulation</param>
-    public void Setup(Node3D owner, LocalSimulation simulation, ulong entityId)
+    /// <param name="spellVFX">Optional reference to spell VFX manager</param>
+    public void Setup(Node3D owner, LocalSimulation simulation, ulong entityId, SpellVFXManager? spellVFX = null)
     {
         _owner = owner;
         _simulation = simulation;
         _entityId = entityId;
+        _spellVFX = spellVFX;
     }
+
+    /// <summary>
+    /// Get the spell VFX manager (for abilities).
+    /// </summary>
+    public SpellVFXManager? GetSpellVFX() => _spellVFX;
 
     /// <summary>
     /// Get the entity ID in the simulation.

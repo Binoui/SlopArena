@@ -12,12 +12,15 @@ public partial class Main : Node3D
     private CanvasLayer _canvasLayer;
     private ActionBarHUD _actionBarHUD;
     private UnitFrames _unitFrames;
+    private RespawnTimerUI _respawnTimerUI;
     private EscapeMenuUI _escapeMenu;
     private CharacterClass _selectedClass = CharacterClass.Manki;
 
     // Cercle de ciblage (WoW-style ring under target)
     private MeshInstance3D _targetRing;
     private DebugHitboxDraw _debugDraw;
+    private DamageNumberManager _damageNumbers;
+    private SpellVFXManager _spellVFX;
 
     public override async void _Ready()
     {
@@ -53,6 +56,14 @@ public partial class Main : Node3D
         // Global debug hitbox/hurtbox visualization
         _debugDraw = new DebugHitboxDraw { Name = "DebugHitboxDraw" };
         AddChild(_debugDraw);
+
+        // Damage numbers manager
+        _damageNumbers = new DamageNumberManager { Name = "DamageNumbers" };
+        AddChild(_damageNumbers);
+
+        // Spell VFX manager
+        _spellVFX = new SpellVFXManager { Name = "SpellVFX" };
+        AddChild(_spellVFX);
     }
 
     private async void SpawnMatch()
@@ -118,13 +129,22 @@ public partial class Main : Node3D
 
         // Setup combat component (for spell hit detection)
         if (_simulation != null)
-            _player.SetupCombat(_simulation, ArenaRegistry.Get("split"));
+            _player.SetupCombat(_simulation, ArenaRegistry.Get("split"), _spellVFX);
 
         // Register player in the simulation's combat component map
         var playerCombat = _player.GetCombatComponent();
         if (playerCombat != null && _simulation != null)
         {
             _simulation.CombatComponents[1] = playerCombat;
+
+            // Subscribe to damage events for floating numbers
+            playerCombat.OnTakeDamage += (damage, kbX, kbY, kbZ) =>
+            {
+                if (_damageNumbers != null && _player != null)
+                {
+                    _damageNumbers.SpawnDamageNumber(damage, _player.GlobalPosition + Vector3.Up * 1.5f);
+                }
+            };
         }
 
         // Register player in the simulation
@@ -201,6 +221,11 @@ public partial class Main : Node3D
         _unitFrames.Name = "UnitFrames";
         _canvasLayer.AddChild(_unitFrames);
         _unitFrames.Setup(_player!, _npcs);
+
+        // --- Respawn Timer (center screen) ---
+        _respawnTimerUI = new RespawnTimerUI();
+        _respawnTimerUI.Name = "RespawnTimerUI";
+        _canvasLayer.AddChild(_respawnTimerUI);
 
         // --- Action Bar HUD (bottom bar with cooldowns) ---
         // Must be added to CanvasLayer (Control nodes need CanvasLayer)
@@ -294,7 +319,7 @@ public partial class Main : Node3D
 
             // Setup combat component for this NPC
             if (_simulation != null)
-                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"));
+                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"), _spellVFX);
 
             GD.Print($"Spawned NPC {i} at {spawnPos}");
         }
@@ -355,7 +380,19 @@ public partial class Main : Node3D
             ulong entityId = (ulong)(100 + i);
             var combat = _npcs[i]!.GetCombatComponent();
             if (combat != null)
+            {
                 _simulation.CombatComponents[entityId] = combat;
+
+                // Subscribe to damage events for floating numbers
+                int npcIndex = i; // Capture for closure
+                combat.OnTakeDamage += (damage, kbX, kbY, kbZ) =>
+                {
+                    if (_damageNumbers != null && _npcs[npcIndex] != null)
+                    {
+                        _damageNumbers.SpawnDamageNumber(damage, _npcs[npcIndex]!.GlobalPosition + Vector3.Up * 1.5f);
+                    }
+                };
+            }
         }
 
         GD.Print("NPC CombatComponents registered.");
@@ -486,6 +523,24 @@ public partial class Main : Node3D
                 if (_npcs[i] != null && _npcs[i]!.IsAlive() && _arenaManager.IsBelowKillHeight(_npcs[i]!.GlobalPosition))
                 {
                     _npcs[i]!.TriggerRespawn(); // 20s respawn at center
+                }
+            }
+        }
+
+        // Update respawn timer UI and freeze camera on death position
+        if (_player != null && _respawnTimerUI != null)
+        {
+            float remainingTime = _player.GetRespawnTimeRemaining();
+            _respawnTimerUI.UpdateTimer(remainingTime);
+
+            // Freeze camera at death position during respawn
+            if (remainingTime > 0f)
+            {
+                var camera = GetViewport()?.GetCamera3D();
+                if (camera != null && camera.GetParent() is SpringArm3D springArm)
+                {
+                    // Move spring arm to death position instead of following player
+                    springArm.GlobalPosition = _player.GetDeathPosition();
                 }
             }
         }
