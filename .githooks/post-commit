@@ -1,0 +1,21 @@
+#!/bin/bash
+# Post-commit hook: Show quick quality summary
+
+# Count lines of code
+LOC=$(find Scripts Shared -name "*.cs" | xargs wc -l | tail -1 | awk '{print $1}')
+
+# Count debug logs
+DEBUG_LOGS=$(grep -r "GD\.Print(" Scripts --include="*.cs" | wc -l)
+
+# Count files
+FILES=$(find Scripts Shared -name "*.cs" | wc -l)
+
+# Last 5 commits
+COMMITS=$(git log --oneline -5 | wc -l)
+
+echo ""
+echo "📊 Quick Stats"
+echo "  Code: $LOC lines across $FILES files"
+echo "  Debug logs: $DEBUG_LOGS statements"
+echo "  Last 5 commits: $(git log --oneline -5 --format='%s' | head -1 | cut -c1-50)..."
+echo ""
