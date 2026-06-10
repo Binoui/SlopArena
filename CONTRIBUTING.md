@@ -116,6 +116,28 @@ _PhysicsProcess
 - Prefer `GD.Print()` over `Console.WriteLine()`
 - Keep `_Process()` lightweight — use `_PhysicsProcess()` for physics
 
+### Debug Logging
+
+**Use sparingly.** Too many logs hurt performance and make debugging harder.
+
+**When to log:**
+- Critical errors (`GD.PrintErr()`)
+- Gameplay events (respawn, death, level transitions)
+- Missing FSM/AnimationTree setup (once per entity)
+
+**When NOT to log:**
+- Per-frame or per-tick operations
+- Successful initialization ("Camera acquired!", "Loaded model")
+- Attack execution ("First attack melee", "Combo chain to X")
+- Target lock updates ("Locked onto NPC_4")
+
+**Instead of logs, use:**
+- Visual debug tools (`DebugHitboxDraw`, F3 toggle)
+- In-game UI (damage numbers, status icons)
+- Godot debugger breakpoints
+
+**Before committing:** Review your diffs and remove temporary debug logs.
+
 ### Project Conventions
 
 - One class per file, filename matches class name
