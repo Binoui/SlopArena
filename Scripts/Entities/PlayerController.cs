@@ -49,6 +49,7 @@ public partial class PlayerController : CharacterBody3D
     private InputController _inputCtrl = new();
     private CameraMount? _camera;
     private CombatComponent? _combatComponent;
+    private TargetLockSystem? _targetLock;
     private MeshInstance3D? _firstMesh;
     private Vector3 _moveDirection = Vector3.Zero;
     private Node3D? _playerModel;
@@ -130,9 +131,28 @@ public partial class PlayerController : CharacterBody3D
     public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef, SpellVFXManager? spellVFX = null)
     {
         _arenaDef = arenaDef;
+
+        GD.Print($"[PlayerController] SetupCombat called, isPlayer: {_isPlayerControlled}, camera: {_camera != null}");
+
+        // Create target lock system ONLY for player-controlled entities
+        if (_isPlayerControlled)
+        {
+            _targetLock = new TargetLockSystem
+            {
+                Name = "TargetLockSystem",
+                Camera = _camera?.GetCamera(),
+                LockRange = 20f,
+                LockAngle = 45f,
+                UpdateInterval = 0.1f,
+            };
+            AddChild(_targetLock);
+            GD.Print($"[PlayerController] TargetLockSystem created, Camera set: {_targetLock.Camera != null}");
+        }
+
+        // Create combat component with target lock
         _combatComponent = new CombatComponent();
         _combatComponent.Name = "CombatComponent";
-        _combatComponent.Setup(this, simulation, 1, spellVFX);
+        _combatComponent.Setup(this, simulation, 1, spellVFX, _targetLock);
         AddChild(_combatComponent);
     }
 
@@ -807,20 +827,59 @@ public partial class PlayerController : CharacterBody3D
             {
                 if (_fsm.IsInState("attack"))
                 {
-                    // Combo chain: resolve stages immediately (no startup on chain hits)
+                    // Combo chain: check warp + resolve stages
                     if (stages != null && stages.Length > 0)
-                        ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                    {
+                        int stageIdx = Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1);
+                        var stage = stages[stageIdx];
+
+                        // Range-based warp check
+                        if (_combatComponent != null && stage.UseTargetLock)
+                        {
+                            _combatComponent.ExecuteAttackWithWarp(stage, () =>
+                            {
+                                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                            });
+                        }
+                        else
+                        {
+                            ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                        }
+                    }
                     GD.Print("Combo Chain to ", animName);
                     attackState.ChainTo(animName);
                 }
                 else
                 {
-                    // First attack: delay stages if startup > 0
+                    // First attack: check warp, then delay stages if startup > 0
                     ushort startup = (stages != null && stages.Length > 0) ? stages[animStage].StartupTicks : (ushort)0;
-                    if (startup > 0 && stages != null && stages.Length > 0)
-                        attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
-                    else if (stages != null && stages.Length > 0)
-                        ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+
+                    if (stages != null && stages.Length > 0)
+                    {
+                        var stage = stages[animStage];
+
+                        // Range-based warp check
+                        if (_combatComponent != null && stage.UseTargetLock)
+                        {
+                            _combatComponent.ExecuteAttackWithWarp(stage, () =>
+                            {
+                                // After warp, apply startup delay if needed
+                                if (startup > 0)
+                                    attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
+                                else
+                                    ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                            });
+                        }
+                        else
+                        {
+                            // No warp, normal flow
+                            if (startup > 0)
+                                attackState.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
+                            else
+                                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                        }
+                    }
+
                     GD.Print("First attack ", animName);
                     attackState.NextAnimName = animName;
                     _fsm.TransitionTo("attack");
@@ -915,16 +974,47 @@ public partial class PlayerController : CharacterBody3D
             });
         }
 
-        // Spawn a basic melee hitbox in front of the attacker
-        Vector3 hitDir = lungeDir;
+        // Spawn melee hitbox using target lock direction if available
+        Vector3 hitDir;
+
+        // Priority 1: Use cached warp direction if we just warped
+        Vector3 warpDir = _combatComponent?.GetFinalWarpDirection() ?? Vector3.Zero;
+        if (stage.UseTargetLock && warpDir.LengthSquared() > 0.001f)
+        {
+            // Use the direction we warped in (ensures hitbox matches warp)
+            hitDir = warpDir;
+            hitDir.Y = 0;
+            hitDir = hitDir.Normalized();
+        }
+        // Priority 2: Active target lock
+        else if (stage.UseTargetLock && _targetLock?.CurrentTarget != null)
+        {
+            // Aim toward target lock
+            hitDir = _targetLock.GetDirectionToTarget();
+            hitDir.Y = 0;
+            hitDir = hitDir.Normalized();
+        }
+        // Priority 3: Input direction
+        else if (_moveDirection.LengthSquared() > 0.001f)
+        {
+            hitDir = _moveDirection;
+        }
+        // Priority 4: Fallback to camera forward
+        else
+        {
+            hitDir = GetCameraForward();
+            hitDir.Y = 0;
+            hitDir = hitDir.Normalized();
+        }
+
         Vector3 hitPos = pos + hitDir * 2.0f + Vector3.Up * 1.0f;
         var hb = new SlopArena.Shared.Hitbox
         {
             X = hitPos.X,
             Y = hitPos.Y,
             Z = hitPos.Z,
-            Radius = 1.5f,
-            DurationTicks = 5,
+            Radius = 2.5f,  // Generous for 3D combat
+            DurationTicks = 15,  // ~250ms (longer for visibility)
             Damage = stage.Damage,
             KnockbackForce = stage.KnockbackForce,
             KnockbackUpward = stage.KnockbackUpward,
@@ -966,9 +1056,16 @@ public partial class PlayerController : CharacterBody3D
     // DIRECTION HELPERS
     // ==========================================
 
-    public void SetCamera(CameraMount cam) => _camera = cam;
+    public void SetCamera(CameraMount cam)
+    {
+        _camera = cam;
+        // Update target lock system with camera (if already created)
+        if (_targetLock != null)
+            _targetLock.SetCamera(cam.GetCamera());
+    }
     public Vector3 GetPlayerForward() => (-Transform.Basis.Z with { Y = 0 }).Normalized();
     public Vector3 GetCameraForward() => _camera?.GetForwardDirection() ?? GetPlayerForward();
+    public CameraMount? GetCamera() => _camera;
     public CharacterDefinition GetCharacterDef() => _charDef;
 
     // ==========================================

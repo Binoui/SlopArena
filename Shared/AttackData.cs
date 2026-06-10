@@ -5,7 +5,7 @@ namespace SlopArena.Shared
     /// <summary>
     /// One stage of an ability. A simple ability has 1 stage.
     /// A combo ability (like LMB) has N stages chained by ChainWindowTicks.
-    /// Hitboxes are spawned by the ability code, not defined in AttackStage.
+    /// Range-based: supports attack range, warp range, and target tracking.
     /// </summary>
     public struct AttackStage
     {
@@ -17,6 +17,14 @@ namespace SlopArena.Shared
         public ushort SelfLockTicks;   // Self animation lock in ticks
         public ushort ChainWindowTicks; // 0 = final stage / no chain
         public ushort StartupTicks;    // Frames before hitbox activates (startup anim)
+
+        // Range-based range system
+        public float AttackRange;      // Distance where attack can hit immediately (e.g., 5m)
+        public float WarpRange;        // Distance where auto-dash triggers (e.g., 12m)
+        public float WarpSpeed;        // Dash speed during warp (e.g., 25 m/s)
+        public bool UseTargetLock;     // true = use soft lock system for this attack
+        public bool RotateTowardTarget; // true = auto-rotate toward target during attack
+        public float TrackingStrength; // 0-1: rotation lerp toward target per frame (0.8 = strong tracking)
     }
 
     /// <summary>
