@@ -51,7 +51,7 @@ namespace SlopArena.Shared
             CharacterDefinition def,
             InputState input,
             ArenaDefinition arena,
-            Action<ulong, float, float, float, float> onHit = null)
+            Action<ulong, float, float, float, float>? onHit = null)
         {
             var stats = def.Movement;
 
@@ -285,7 +285,7 @@ namespace SlopArena.Shared
             {
                 // Detect direction change
                 bool hadDir = (s.LastDirX * s.LastDirX + s.LastDirZ * s.LastDirZ) > 0.0001f;
-                bool dirChanged = hadDir && (dirX * s.LastDirX + dirZ * s.LastDirZ) < 0.5f;
+                bool dirChanged = hadDir && ((dirX * s.LastDirX + dirZ * s.LastDirZ) < 0.5f);
 
                 if (dirChanged)
                 {
@@ -361,7 +361,7 @@ namespace SlopArena.Shared
             s.VZ = MoveToward(s.VZ, targetVZ, airAccel);
 
             // Air drag
-            float drag = AirDrag * TickDt;
+            const float drag = AirDrag * TickDt;
             s.VX *= (1f - drag);
             s.VZ *= (1f - drag);
 
