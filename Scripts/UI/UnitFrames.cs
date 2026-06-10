@@ -268,13 +268,13 @@ public partial class UnitFrames : Control
             int npcIndex = (int)(_targetEntityId - 100);
             if (npcIndex >= 0 && npcIndex < 5 && _npcs[npcIndex] != null)
             {
-                int targetHp = _npcs[npcIndex]!.GetNpcHP();
-                int targetMaxHp = 300;
-                float targetRatio = Mathf.Clamp((float)targetHp / targetMaxHp, 0f, 1f);
+                // Smash-style: show damage % instead of HP
+                ushort targetDmg = _npcs[npcIndex]!.GetDamagePercent();
+                float targetRatio = 1f - Mathf.Clamp((float)targetDmg / 300f, 0f, 1f); // Bar drains as % increases
 
                 float targetBarWidth = _targetHpBarBg.Size.X;
                 _targetHpBar.Size = new Vector2(targetBarWidth * targetRatio, BarHeight);
-                _targetHpText.Text = $"{targetHp} / {targetMaxHp}";
+                _targetHpText.Text = $"{targetDmg}%";
                 _targetNameLabel.Text = $"NPC {npcIndex + 1}";
 
                 // Color
