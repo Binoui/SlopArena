@@ -53,7 +53,7 @@ public static class ProjectileHelpers
                 if (nameStr.StartsWith("DummyBody_") && int.TryParse(nameStr.Substring("DummyBody_".Length), out int idx))
                 {
                     ulong entityId = (ulong)(100 + idx);
-                    combat.GetSimulation()?.OnEntityHit?.Invoke(entityId, damage, knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
+                    combat.GetSimulation()?.RouteHit(entityId, damage, knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
                     if (status.HasValue)
                         combat.ApplyStatusToEntity(entityId, status.Value, statusDuration);
                     StatusSpells.CreateImpactVisual(combat, proj.GlobalPosition, 1.5f, color);

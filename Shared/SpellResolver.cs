@@ -27,14 +27,15 @@ namespace SlopArena.Shared
 
         /// <summary>
         /// Entity data needed for hit detection.
+        /// Supports Sphere and Capsule shapes.
         /// </summary>
         public struct EntityData
         {
             public ulong Id;
-            public float PosX;
-            public float PosY;
-            public float PosZ;
+            public float PosX, PosY, PosZ;
             public float Radius;
+            public HitboxShape Shape;       // Sphere or Capsule
+            public float EndX, EndY, EndZ;   // Capsule end (0 = sphere)
             public bool Active;
         }
 
@@ -90,18 +91,33 @@ namespace SlopArena.Shared
                 foreach (var entity in entities)
                 {
                     if (!entity.Active || entity.Id == hb.OwnerId) continue;
-                    if (hitThisTick.Contains(entity.Id)) continue; // already hit this tick
+                    if (hitThisTick.Contains(entity.Id)) continue;
 
-                    float dx = entity.PosX - hb.X;
-                    float dy = entity.PosY - hb.Y;
-                    float dz = entity.PosZ - hb.Z;
-                    float distSq = dx * dx + dy * dy + dz * dz;
-                    float combinedRadius = hb.Radius + entity.Radius;
+                    bool hit = false;
+                    float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
 
-                    if (distSq <= combinedRadius * combinedRadius)
+                    if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
                     {
-                        // Hit! Calculate knockback direction
-                        float dist = MathF.Sqrt(distSq);
+                        hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz);
+                    }
+                    else
+                    {
+                        // Sphere-sphere (original)
+                        dx = entity.PosX - hb.X;
+                        dy = entity.PosY - hb.Y;
+                        dz = entity.PosZ - hb.Z;
+                        float distSq = dx * dx + dy * dy + dz * dz;
+                        float combinedRadius = hb.Radius + entity.Radius;
+                        if (distSq <= combinedRadius * combinedRadius)
+                        {
+                            dist = MathF.Sqrt(distSq);
+                            hit = true;
+                        }
+                    }
+
+                    if (hit)
+                    {
+                        // Calculate knockback direction
                         float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
                         float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : 0f;
 
@@ -134,6 +150,118 @@ namespace SlopArena.Shared
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Capsule vs Entity collision (handles all shape combos).
+        /// Capsule = segment from (X,Y,Z) to (EndX,EndY,EndZ) with radius.
+        /// Returns true if collision, with distance and direction vector.
+        /// </summary>
+        private static bool CapsuleCollision(Hitbox hb, EntityData entity,
+            out float dist, out float dx, out float dy, out float dz)
+        {
+            // Get capsule endpoints for hitbox
+            float hbStartX = hb.X, hbStartY = hb.Y, hbStartZ = hb.Z;
+            float hbEndX = hb.Shape == HitboxShape.Capsule ? hb.EndX : hb.X;
+            float hbEndY = hb.Shape == HitboxShape.Capsule ? hb.EndY : hb.Y;
+            float hbEndZ = hb.Shape == HitboxShape.Capsule ? hb.EndZ : hb.Z;
+
+            // Get capsule endpoints for entity
+            float entStartX = entity.PosX, entStartY = entity.PosY, entStartZ = entity.PosZ;
+            float entEndX = entity.Shape == HitboxShape.Capsule ? entity.EndX : entity.PosX;
+            float entEndY = entity.Shape == HitboxShape.Capsule ? entity.EndY : entity.PosY;
+            float entEndZ = entity.Shape == HitboxShape.Capsule ? entity.EndZ : entity.PosZ;
+
+            // Find closest points between two segments
+            ClosestPointsSegmentSegment(
+                hbStartX, hbStartY, hbStartZ, hbEndX, hbEndY, hbEndZ,
+                entStartX, entStartY, entStartZ, entEndX, entEndY, entEndZ,
+                out float cx1, out float cy1, out float cz1,
+                out float cx2, out float cy2, out float cz2);
+
+            dx = cx2 - cx1;
+            dy = cy2 - cy1;
+            dz = cz2 - cz1;
+            float distSq = dx * dx + dy * dy + dz * dz;
+            float combinedRadius = hb.Radius + entity.Radius;
+
+            if (distSq <= combinedRadius * combinedRadius)
+            {
+                dist = MathF.Sqrt(distSq);
+                // Direction: from hitbox toward entity
+                dx = entity.PosX - hb.X;
+                dy = entity.PosY - hb.Y;
+                dz = entity.PosZ - hb.Z;
+                return true;
+            }
+
+            dist = 0f;
+            return false;
+        }
+
+        /// <summary>
+        /// Find closest points between two line segments.
+        /// Uses the standard algorithm for segment-segment distance.
+        /// </summary>
+        private static void ClosestPointsSegmentSegment(
+            float a0x, float a0y, float a0z, float a1x, float a1y, float a1z,
+            float b0x, float b0y, float b0z, float b1x, float b1y, float b1z,
+            out float cx, out float cy, out float cz,
+            out float dx, out float dy, out float dz)
+        {
+            float d1x = a1x - a0x, d1y = a1y - a0y, d1z = a1z - a0z;
+            float d2x = b1x - b0x, d2y = b1y - b0y, d2z = b1z - b0z;
+            float rx = a0x - b0x, ry = a0y - b0y, rz = a0z - b0z;
+
+            float a = d1x * d1x + d1y * d1y + d1z * d1z; // |d1|²
+            float e = d2x * d2x + d2y * d2y + d2z * d2z; // |d2|²
+            float f = d2x * rx + d2y * ry + d2z * rz;
+
+            float t = 0f, u = 0f;
+
+            if (a <= 1e-6f && e <= 1e-6f)
+            {
+                // Both degenerate to points
+                t = 0f; u = 0f;
+            }
+            else if (a <= 1e-6f)
+            {
+                // Segment 1 is a point
+                u = Math.Clamp(f / e, 0f, 1f);
+            }
+            else
+            {
+                float c = d1x * rx + d1y * ry + d1z * rz;
+
+                if (e <= 1e-6f)
+                {
+                    // Segment 2 is a point
+                    t = Math.Clamp(-c / a, 0f, 1f);
+                }
+                else
+                {
+                    float b = d1x * d2x + d1y * d2y + d1z * d2z;
+                    float denom = a * e - b * b;
+
+                    if (MathF.Abs(denom) > 1e-6f)
+                    {
+                        t = Math.Clamp((b * f - c * e) / denom, 0f, 1f);
+                        u = Math.Clamp((b * t + f) / e, 0f, 1f);
+                    }
+                    else
+                    {
+                        t = 0f;
+                        u = Math.Clamp(f / e, 0f, 1f);
+                    }
+                }
+            }
+
+            cx = a0x + d1x * t;
+            cy = a0y + d1y * t;
+            cz = a0z + d1z * t;
+            dx = b0x + d2x * u;
+            dy = b0y + d2y * u;
+            dz = b0z + d2z * u;
         }
     }
 }

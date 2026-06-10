@@ -1,0 +1,12 @@
+{
+  "server_name": "SlopArena Local Dev",
+  "region": "EU",
+  "port": 7777,
+  "max_concurrent_matches": 15,
+  "master_server_url": "http://localhost:5000",
+  "is_official": false,
+  "custom_rules": {
+    "allowed_characters": ["Manki"],
+    "allowed_maps": ["pit"]
+  }
+}

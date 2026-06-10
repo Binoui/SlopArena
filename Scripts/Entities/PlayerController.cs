@@ -53,6 +53,7 @@ public partial class PlayerController : CharacterBody3D
     private MeshInstance3D? _firstMesh;
     private Vector3 _moveDirection = Vector3.Zero;
     private Node3D? _playerModel;
+    private BoneHurtboxSetup? _boneHurtboxes;
     private bool _heavyHeld = false;
 
     // Ground arrow indicator
@@ -71,7 +72,7 @@ public partial class PlayerController : CharacterBody3D
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
-    private float _hitstunFlashTimer = 0f; // Visual feedback during hitstun
+    private float _hitFlashTimer = 0f; // Brief white flash on hit impact
 
     public void SetNPC(bool isNpc)
     {
@@ -148,7 +149,28 @@ public partial class PlayerController : CharacterBody3D
         _combatComponent = new CombatComponent();
         _combatComponent.Name = "CombatComponent";
         _combatComponent.Setup(this, simulation, 1, spellVFX, _targetLock);
+        _combatComponent.OnTakeDamage += OnCombatTakeDamage;
         AddChild(_combatComponent);
+    }
+
+    /// <summary>Visual feedback when this entity takes damage (hit flash + reaction).</summary>
+    private void OnCombatTakeDamage(float damage, float kbX, float kbY, float kbZ)
+    {
+        // Hit flash
+        _hitFlashTimer = 0.15f;
+        if (_isNPC) _npcHitFlashTimer = 0.15f;
+
+        // Hit reaction animation
+        float kbMag = Mathf.Sqrt(kbX * kbX + kbY * kbY + kbZ * kbZ);
+        string hitAnim = kbMag < 10f ? "hit_small" : kbMag < 20f ? "hit_medium" : "hit_hard";
+        var hitState = _fsm?.GetState<HitReactionState>("hit_reaction");
+        if (hitState != null)
+        {
+            hitState.HitAnimName = hitAnim;
+            ref var s = ref _movementComponent.State;
+            s.AnimLockTicks = 30;
+        }
+        _fsm?.TransitionTo("hit_reaction");
     }
 
     // ==========================================
@@ -240,26 +262,16 @@ public partial class PlayerController : CharacterBody3D
             _fsm?.TransitionTo("idle");
         }).CallDeferred();
 
-        // Hurtbox
-        _hurtbox = new Hurtbox { Name = "Hurtbox", OwnerEntity = this };
-        var hurtboxSphere = new SphereShape3D { Radius = _charDef.HurtboxRadius };
-        _hurtbox.AddChild(new CollisionShape3D { Shape = hurtboxSphere });
-        AddChild(_hurtbox);
-
-        // Hit handler: Smash-style % system
-        _hurtbox.OnHit += (Vector3 attackerPos, float damage, Vector3 knockbackForce) =>
+        // Bone-attached hurtboxes (Smash-style — multiple spheres on skeleton bones)
+        if (skeleton != null)
         {
-            // Can't be hit while invincible (dash)
-            if (_movementComponent.IsInvincible) return;
+            _boneHurtboxes = new BoneHurtboxSetup { Name = "BoneHurtboxes" };
+            AddChild(_boneHurtboxes);
+            _boneHurtboxes.Build(skeleton, BoneHurtboxSetup.DefaultHumanoid());
+        }
 
-            // Increase damage percentage
-            _movementComponent.ApplyDamage(damage);
-
-            // Scale knockback by damage% and apply
-            _movementComponent.ApplyKnockback(knockbackForce.X, knockbackForce.Y, knockbackForce.Z);
-
-            _fsm?.TransitionTo("idle");
-        };
+        // Visual feedback on damage (hit flash + hit reaction)
+        // Subscribed in SetupCombat via OnCombatTakeDamage
 
         // Ground arrow indicator
         _groundArrow = CreateGroundArrow();
@@ -524,37 +536,11 @@ public partial class PlayerController : CharacterBody3D
             }
         }
 
-        // Hitstun visual feedback (white flash during freeze frames)
-        if (_movementComponent.State.State == SlopArena.Shared.ActionState.Hitstun)
-        {
-            _hitstunFlashTimer = 0.1f; // Flash for duration of hitstun
+        // Hit flash timer (ticked independently)
+        if (_hitFlashTimer > 0f)
+            _hitFlashTimer -= dt;
 
-            // Apply white overlay to all meshes
-            foreach (var child in GetChildren())
-            {
-                if (child is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D mat)
-                {
-                    mat.AlbedoColor = new Color(1.5f, 1.5f, 1.5f, mat.AlbedoColor.A); // Brighten
-                }
-            }
-        }
-        else if (_hitstunFlashTimer > 0f)
-        {
-            _hitstunFlashTimer -= dt;
-            if (_hitstunFlashTimer <= 0f)
-            {
-                // Reset colors after hitstun
-                foreach (var child in GetChildren())
-                {
-                    if (child is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D mat)
-                    {
-                        mat.AlbedoColor = new Color(1f, 1f, 1f, mat.AlbedoColor.A); // Normal color
-                    }
-                }
-            }
-        }
-
-        // NPC visual feedback
+        // NPC emission flash (red glow on hit) — complements state color
         if (_isNPC)
         {
             if (_npcHitFlashTimer > 0f)
@@ -902,19 +888,24 @@ public partial class PlayerController : CharacterBody3D
             Velocity = new Vector3(lungeDir.X * stage.LungeForce, upBoost, lungeDir.Z * stage.LungeForce);
         }
 
-        // Build entity list for SpellResolver
+        // Build entity list for SpellResolver (capsule hurtboxes)
         var entities = new System.Collections.Generic.List<SpellResolver.EntityData>();
         foreach (var kvp in sim.Entities)
         {
-            entities.Add(new SpellResolver.EntityData
+            foreach (var (start, end, radius) in kvp.Value)
             {
-                Id = kvp.Key,
-                PosX = kvp.Value.pos.X,
-                PosY = kvp.Value.pos.Y,
-                PosZ = kvp.Value.pos.Z,
-                Radius = kvp.Value.radius,
-                Active = kvp.Value.active
-            });
+                bool isCapsule = (start - end).LengthSquared() > 0.001f;
+                var e = new SpellResolver.EntityData
+                {
+                    Id = kvp.Key,
+                    PosX = start.X, PosY = start.Y, PosZ = start.Z,
+                    Radius = radius,
+                    Shape = isCapsule ? SlopArena.Shared.HitboxShape.Capsule : SlopArena.Shared.HitboxShape.Sphere,
+                    EndX = end.X, EndY = end.Y, EndZ = end.Z,
+                    Active = true
+                };
+                entities.Add(e);
+            }
         }
 
         // Spawn melee hitbox in attack direction
@@ -934,21 +925,30 @@ public partial class PlayerController : CharacterBody3D
             OwnerId = pid,
         };
         SpellResolver.Spawn(hb);
+        GD.Print($"[HITBOX] Spawned at ({hitPos.X:F1}, {hitPos.Y:F1}, {hitPos.Z:F1}) R={hb.Radius:F1} " +
+                 $"DMG={stage.Damage} KB={stage.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1}) " +
+                 $"vs {entities.Count} entities");
 
         // Resolve active hitboxes against entities this tick
         var results = SpellResolver.Tick(entities);
+
+        if (results.Count == 0)
+            GD.Print("[HITBOX] No hits — check distance to targets");
+        else
+            GD.Print($"[HITBOX] Hit {results.Count} target(s)!");
 
         // Apply hits — knockback is scaled by damage% in Simulation.ApplyKnockback
         foreach (var hit in results)
         {
             // Don't hit invincible targets (dashing)
             ulong targetId = hit.TargetEntityId;
+            GD.Print($"[HITBOX] → Entity {targetId}: DMG={hit.Damage} KB=({hit.KnockbackX:F1},{hit.KnockbackY:F1},{hit.KnockbackZ:F1}) Stun={hit.StunTicks}t");
             bool targetInvincible = false;
             if (_movementComponent.State.InvincibilityTicks > 0 && targetId == _movementComponent.State.EntityId)
                 targetInvincible = true;
             if (targetInvincible) continue;
 
-            sim.OnEntityHit?.Invoke(targetId, hit.Damage,
+            sim.RouteHit(targetId, hit.Damage,
                 hit.KnockbackX,
                 hit.KnockbackY,
                 hit.KnockbackZ);
@@ -963,6 +963,67 @@ public partial class PlayerController : CharacterBody3D
     // ==========================================
 
     public void ApplyKnockback(Vector3 force) => _movementComponent.ApplyKnockback(force.X, force.Y, force.Z);
+
+    /// <summary>Called by CombatComponent.TakeDamage to increase damage percent.</summary>
+    public void ApplyDamageToMovement(float damage) => _movementComponent.ApplyDamage(damage);
+
+    /// <summary>Get all bone-attached hurtbox capsules for hit detection.</summary>
+    public List<(Vector3 start, Vector3 end, float radius)> GetHurtboxShapes()
+    {
+        if (_boneHurtboxes != null && _boneHurtboxes.Count > 0)
+            return _boneHurtboxes.GetWorldCapsules();
+        // Fallback: single sphere (degenerate capsule)
+        return new List<(Vector3, Vector3, float)> { (GlobalPosition, GlobalPosition, _charDef.HurtboxRadius) };
+    }
+
+    // ==========================================
+    // VISUAL FEEDBACK (called by FSM states in Enter/Exit)
+    // ==========================================
+
+    /// <summary>Set emission glow on the character model. Called by states in Enter().</summary>
+    public void SetModelEmission(Color color, float energy = 1.5f)
+    {
+        if (_playerModel != null)
+            ApplyEmissionRecursive(_playerModel, color, energy);
+    }
+
+    /// <summary>Remove emission glow. Called by states in Exit().</summary>
+    public void ClearModelEmission()
+    {
+        if (_playerModel != null)
+            ApplyEmissionRecursive(_playerModel, new Color(1, 1, 1), 0f, clear: true);
+    }
+
+    /// <summary>Hitstun emission gradient: Yellow (0%) → Red (150%+).</summary>
+    public Color GetHitstunColor()
+    {
+        float t = Mathf.Clamp(_movementComponent.DamagePercent / 150f, 0f, 1f);
+        return new Color(1f, 1f - t * 0.9f, 0.2f - t * 0.1f);
+    }
+
+    private static void ApplyEmissionRecursive(Node node, Color color, float energy, bool clear = false)
+    {
+        if (node is MeshInstance3D mesh)
+        {
+            if (clear)
+            {
+                mesh.MaterialOverride = null; // Restore original material
+            }
+            else
+            {
+                if (mesh.MaterialOverride is not StandardMaterial3D mat)
+                {
+                    mat = new StandardMaterial3D();
+                    mesh.MaterialOverride = mat;
+                }
+                mat.EmissionEnabled = true;
+                mat.Emission = color;
+                mat.EmissionEnergyMultiplier = energy;
+            }
+        }
+        foreach (var child in node.GetChildren())
+            ApplyEmissionRecursive(child, color, energy, clear);
+    }
 
     // ==========================================
     // DIRECTION HELPERS
@@ -996,7 +1057,6 @@ public partial class PlayerController : CharacterBody3D
         string modelPath;
         Vector3 scale;
         Vector3 position;
-        bool hasWeapon = false;
 
         switch (_playerClass)
         {
@@ -1004,13 +1064,11 @@ public partial class PlayerController : CharacterBody3D
                 modelPath = "res://assets/characters/manki/manki.tscn";
                 scale = Vector3.One;
                 position = new Vector3(0, -0.6f, 0);
-                hasWeapon = false;
                 break;
             default:
                 modelPath = "res://assets/characters/manki/manki.tscn";
                 scale = Vector3.One;
                 position = new Vector3(0, -0.6f, 0);
-                hasWeapon = false;
                 break;
         }
 
@@ -1028,123 +1086,7 @@ public partial class PlayerController : CharacterBody3D
         pm.Scale = scale;
         pm.Position = position;
 
-        if (hasWeapon)
-            AttachWeaponToHand(pm);
-
         return pm;
-    }
-
-    /// <summary>
-    /// Find the handslot.r bone in the skeleton and attach a 2-handed sword via BoneAttachment3D.
-    /// </summary>
-    private void AttachWeaponToHand(Node3D model)
-    {
-        var skeleton = _animationController?.FindSkeleton(model);
-        if (skeleton == null) return;
-
-        // Find the weapon hand bone
-        string[] possibleBones = { "hand.r", "handslot.r", "hand_r", "Hand_Right", "weapon_bone" };
-        int boneIdx = -1;
-        string foundBone = "";
-        for (int i = 0; i < skeleton.GetBoneCount(); i++)
-        {
-            string boneName = skeleton.GetBoneName(i);
-            foreach (var candidate in possibleBones)
-            {
-                if (boneName == candidate)
-                {
-                    boneIdx = i;
-                    foundBone = boneName;
-                    break;
-                }
-            }
-            if (boneIdx >= 0) break;
-        }
-
-        if (boneIdx < 0)
-        {
-            return;
-        }
-
-        // Load the 2-handed sword (GLTF) — attached via BoneAttachment3D to hand bone
-        if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed_color.gltf"))
-        {
-            if (!ResourceLoader.Exists("res://assets/characters/weapons/sword_2handed.gltf")) return;
-        }
-
-        var sword = GD.Load<PackedScene>("res://assets/characters/weapons/sword_2handed_color.gltf")?.Instantiate<Node3D>();
-        if (sword == null) return;
-
-        sword.Name = "Weapon_Sword2H";
-        sword.Scale = Vector3.One; // model scale applies to children
-
-        // Use BoneAttachment3D to follow the hand bone
-        var attachment = new BoneAttachment3D();
-        attachment.Name = "WeaponAttachment_" + foundBone;
-        attachment.BoneName = foundBone;
-        skeleton.AddChild(attachment);
-        attachment.AddChild(sword);
-
-        // Adjust sword rotation (greatsword GLTF points blade down by default)
-        sword.Rotation = new Vector3(0f, 0f, Mathf.DegToRad(90f));
-        sword.Position = new Vector3(0f, 0f, 0f);
-
-    }
-
-
-    /// <summary>
-    /// Normalize KayKit animation names to our internal naming.
-    /// Idle_A → idle, Walking_A → walk, Running_A → run, etc.
-    /// </summary>
-    private string NormalizeKayKitAnimName(string name)
-    {
-        var map = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "Idle_A", "idle" },
-            { "Idle_B", "idle" },
-            { "Walking_A", "walk" },
-            { "Walking_B", "walk" },
-            { "Walking_C", "walk" },
-            { "Walking_Backwards", "walk_back" },
-            { "Running_A", "run" },
-            { "Running_B", "run" },
-            { "Running_Strafe_Left", "strafe_left" },
-            { "Running_Strafe_Right", "strafe_right" },
-            { "Jump_Full_Long", "jump" },
-            { "Jump_Full_Short", "jump" },
-            { "Jump_Idle", "jump_idle" },
-            { "Jump_Land", "land" },
-            { "Jump_Start", "jump_start" },
-            { "Hit_A", "hit_small_front" },
-            { "Hit_B", "hit_large_front" },
-            { "Death_A", "death_forward" },
-            { "Death_B", "death_backward" },
-            { "Crouching", "crouch" },
-            { "Crawling", "crawl" },
-            { "Sneaking", "sneak" },
-            { "Dodge_Forward", "dodge_forward" },
-            { "Dodge_Backward", "dodge_backward" },
-            { "Dodge_Left", "dodge_left" },
-            { "Dodge_Right", "dodge_right" },
-            { "Melee_2H_Idle", "melee_idle" },
-            { "Melee_2H_Attack_Chop", "attack_2h_chop" },
-            { "Melee_2H_Attack_Slice", "attack_2h_slice" },
-            { "Melee_2H_Attack_Stab", "attack_2h_stab" },
-            { "Melee_2H_Attack_Spinning", "attack_2h_spin" },
-            { "Melee_Block", "block" },
-            { "Melee_Blocking", "block_idle" },
-            { "Melee_Block_Hit", "block_hit" },
-            { "Melee_Block_Attack", "block_attack" },
-            { "Interact", "interact" },
-            { "PickUp", "pickup" },
-            { "Throw", "throw" },
-            { "Use_Item", "use_item" },
-            { "T-Pose", "tpose" },
-        };
-
-        if (map.TryGetValue(name, out string? mapped))
-            return mapped;
-        return name;
     }
 
     private void ApplySkinRecursive(Node node, Texture2D? tex)
@@ -1257,7 +1199,7 @@ public partial class PlayerController : CharacterBody3D
 
         if (stage.UseTargetLock)
         {
-            _combatComponent.ExecuteAttackWithWarp(stage, () =>
+            _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, () =>
             {
                 if (isComboChain || startup == 0)
                 {
@@ -1315,10 +1257,9 @@ public partial class PlayerController : CharacterBody3D
             return _moveDirection;
         }
 
-        // Priority 4: Camera forward
-        Vector3 camFwd = GetCameraForward();
-        camFwd.Y = 0;
-        return camFwd.Normalized();
+        // Priority 4: Player forward (character facing, not camera — camera looks at player)
+        Vector3 fwd = GetPlayerForward();
+        return fwd;
     }
 
     // ==========================================

@@ -16,6 +16,7 @@ public sealed partial class IdleState : State
 	{
 		Movement.State.ComboStage = 0;
 		Movement.ResetJumps();
+		Player.ClearModelEmission(); // Debug: normal
 		base.Enter();
 	}
 

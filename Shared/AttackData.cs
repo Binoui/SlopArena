@@ -21,7 +21,7 @@ namespace SlopArena.Shared
         // Range-based range system
         public float AttackRange;      // Distance where attack can hit immediately (e.g., 5m)
         public float WarpRange;        // Distance where auto-dash triggers (e.g., 12m)
-        public float WarpSpeed;        // Dash speed during warp (e.g., 25 m/s)
+        // Warp speed now driven by character Movement.SprintSpeed (not per-stage)
         public bool UseTargetLock;     // true = use soft lock system for this attack
         public bool RotateTowardTarget; // true = auto-rotate toward target during attack
         public float TrackingStrength; // 0-1: rotation lerp toward target per frame (0.8 = strong tracking)

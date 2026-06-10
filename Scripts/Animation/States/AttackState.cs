@@ -78,6 +78,7 @@ public sealed partial class AttackState : State
 	{
 		if (!string.IsNullOrEmpty(NextAnimName))
 			AnimationName = NextAnimName;
+		Player.SetModelEmission(new Color(1.0f, 0.2f, 0.2f), 2.0f); // Red
 		base.Enter();
 	}
 
@@ -94,6 +95,7 @@ public sealed partial class AttackState : State
 
 	public override void Exit()
 	{
+		Player.ClearModelEmission();
 		base.Exit();
 		_hasPendingResolve = false;
 		_pendingStages = null;
