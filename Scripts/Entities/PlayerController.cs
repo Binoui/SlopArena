@@ -64,8 +64,6 @@ public partial class PlayerController : CharacterBody3D
 
     private bool _isPlayerControlled = true;
     private bool _isNPC = false;
-    private int _npcHP = 300;
-    private const int NpcMaxHP = 300;
     private float _npcRespawnTimer = 0f;
     private const float NpcRespawnDelay = 3.0f;
     private Vector3 _npcSpawnPosition;
@@ -81,8 +79,7 @@ public partial class PlayerController : CharacterBody3D
     }
 
     public bool IsNPC() => _isNPC;
-    public int GetNpcHP() => _npcHP;
-    public bool IsNpcAlive() => _npcRespawnTimer <= 0f && _npcHP > 0;
+    public bool IsNpcAlive() => _npcRespawnTimer <= 0f;
 
     // ==========================================
     // UI STATE
@@ -1099,22 +1096,24 @@ public partial class PlayerController : CharacterBody3D
     // NPC METHODS
     // ==========================================
 
-    public void NpcTakeDamage(int damage, Vector3 knockbackForce)
+    /// <summary>
+    /// Called when NPC is knocked out of bounds (like Smash Bros).
+    /// Triggers respawn sequence.
+    /// </summary>
+    public void NpcKnockOut()
     {
-        if (_npcRespawnTimer > 0f) return;
-        _npcHP -= damage;
-        _npcHitFlashTimer = 0.3f;
-        _npcMesh = _firstMesh;
-        Velocity = knockbackForce;
-        if (_npcHP <= 0) { _npcHP = 0; _npcRespawnTimer = NpcRespawnDelay; }
+        if (_npcRespawnTimer > 0f) return; // Already respawning
+        _npcRespawnTimer = NpcRespawnDelay;
     }
 
     private void NpcRespawn()
     {
-        _npcHP = NpcMaxHP;
         _npcRespawnTimer = 0f;
         GlobalPosition = _npcSpawnPosition;
         Velocity = Vector3.Zero;
+
+        // Reset damage % on respawn (Smash-style stock system)
+        _movementComponent.State.DamagePercent = 0;
     }
 
     public void SetNpcSpawnPosition(Vector3 pos) => _npcSpawnPosition = pos;

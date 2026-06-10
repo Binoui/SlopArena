@@ -330,14 +330,13 @@ public partial class Main : Node3D
                 _simulation.Entities[entityId] = (_npcs[i]!.GlobalPosition, 1.5f, true);
         }
 
-        // Connect hit events from simulation to NPCs
+        // Connect hit events from simulation to NPCs (Smash-style)
+        // Hits only apply damage % and knockback, no HP system
         _simulation.OnEntityHit += (ulong entityId, float damage, float kbX, float kbY, float kbZ) =>
         {
-            int npcIndex = (int)(entityId - 100);
-            if (npcIndex >= 0 && npcIndex < 5 && _npcs[npcIndex] != null)
-            {
-                _npcs[npcIndex]!.NpcTakeDamage((int)damage, new Vector3(kbX, kbY, kbZ));
-            }
+            // Damage is applied via CombatComponent -> MovementComponent automatically
+            // Knockback is also applied automatically through the combat system
+            // We don't need to do anything here for NPCs - they use the same system as player
 
             // Auto-target the first NPC that hits the player
             if (entityId == 1 && _unitFrames != null && !_unitFrames.HasTarget())
@@ -473,11 +472,29 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
-        // Void death check — respawn player if they fall off the arena
+        // Void death check (Smash-style) — respawn player if they fall off the arena
         if (_arenaManager != null && _player != null && _arenaManager.IsBelowKillHeight(_player.GlobalPosition))
         {
             _player.GlobalPosition = _arenaManager.GetSpawnPosition(5);
             _player.Velocity = Vector3.Zero;
+            // Reset damage % on respawn (stock system)
+            if (_player.GetType().GetProperty("DamagePercent") != null)
+            {
+                // Player uses MovementComponent.DamagePercent
+                // Reset is handled in PlayerController
+            }
+        }
+
+        // NPC void death check (Smash-style knockout)
+        if (_arenaManager != null)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                if (_npcs[i] != null && _npcs[i]!.IsNpcAlive() && _arenaManager.IsBelowKillHeight(_npcs[i]!.GlobalPosition))
+                {
+                    _npcs[i]!.NpcKnockOut(); // Triggers respawn sequence
+                }
+            }
         }
 
         // Keep targeting ring on the target (in case dummy respawns or target changes via click)
@@ -552,7 +569,8 @@ public partial class Main : Node3D
         {
             if (_npcs[i] != null)
             {
-                string status = _npcs[i]!.IsNpcAlive() ? $"HP: {_npcs[i]!.GetNpcHP()}/300" : "[DEAD]";
+                ushort npcDmg = _npcs[i]!.GetDamagePercent();
+                string status = _npcs[i]!.IsNpcAlive() ? $"{npcDmg}%" : "[RESPAWNING]";
                 dummyInfo += $"  NPC {i + 1}: {status}\n";
             }
         }
