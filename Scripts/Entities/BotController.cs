@@ -41,6 +41,10 @@ public partial class BotController : Node
 
     private float _circleAngle = 0f;
 
+    // One-shot action flags (cleared each frame after injection)
+    private bool _shouldJump = false;
+    private bool _shouldDash = false;
+
     public void Setup(PlayerController npc, PlayerController target)
     {
         _npc = npc;
@@ -82,8 +86,8 @@ public partial class BotController : Node
             DoWanderBehavior(dt);
         }
 
-        // Simulate input for the NPC (this drives PlayerController)
-        SimulateInput(dt);
+        // Build and inject input for the NPC
+        InjectInput(dt);
     }
 
     private void DoCombatBehavior(Vector3 toTarget, float distance, float dt)
@@ -167,10 +171,10 @@ public partial class BotController : Node
     }
 
     // ══════════════════════════════════════════════════════════════
-    // INPUT SIMULATION
+    // INPUT INJECTION (proper AI → PlayerController interface)
     // ══════════════════════════════════════════════════════════════
 
-    private void SimulateInput(float dt)
+    private void InjectInput(float dt)
     {
         if (_npc == null) return;
 
@@ -179,70 +183,50 @@ public partial class BotController : Node
         toWander.Y = 0f; // Flatten to horizontal plane
         float distToWander = toWander.Length();
 
+        // Build input state
+        var input = new SlopArena.Shared.InputState();
+
         if (distToWander > 0.5f) // Only move if not at target
         {
             Vector3 direction = toWander.Normalized();
 
-            // Convert world direction to ZQSD input (relative to fixed camera direction)
-            // Assuming camera looks down -Z axis (north)
-            // Z = forward (negative Z), Q = left (negative X), S = back (positive Z), D = right (positive X)
-
-            float inputZ = -direction.Z; // Forward/backward (Z/S keys)
-            float inputX = direction.X;   // Left/right (Q/D keys)
-
-            // Normalize to prevent diagonal speed boost
-            float len = Mathf.Sqrt(inputX * inputX + inputZ * inputZ);
-            if (len > 0.01f)
-            {
-                inputX /= len;
-                inputZ /= len;
-            }
-
-            // Set movement input
-            SetMovementInput(inputX, inputZ);
+            // Convert world direction to input axes
+            // World space: X = right, Z = forward (camera-relative is handled by PlayerController)
+            input.MoveX = direction.X;
+            input.MoveY = direction.Z;
         }
         else
         {
             // Stop moving
-            SetMovementInput(0f, 0f);
+            input.MoveX = 0f;
+            input.MoveY = 0f;
         }
-    }
 
-    private void SetMovementInput(float x, float z)
-    {
-        if (_npc == null) return;
+        // One-shot actions (cleared after injection)
+        input.Jump = _shouldJump;
+        input.Dash = _shouldDash;
 
-        // This would need to interface with PlayerController's input system
-        // For now, we directly manipulate velocity (hack for MVP)
-        // TODO: Add proper input injection API to PlayerController
+        // Inject the input into PlayerController
+        _npc.InjectInput(input);
 
-        float speed = 9f; // Match character walk speed
-        Vector3 velocity = new Vector3(x * speed, _npc.Velocity.Y, z * speed);
-        _npc.Velocity = velocity;
+        // Clear one-shot flags
+        _shouldJump = false;
+        _shouldDash = false;
     }
 
     private void ExecuteAttack()
     {
-        // TODO: Call PlayerController.ExecuteSlot(0) for LMB
-        // Needs public API on PlayerController
+        if (_npc == null) return;
+        _npc.UseAbility(0); // Slot 0 = LMB attack
     }
 
     private void ExecuteJump()
     {
-        if (_npc == null) return;
-
-        // Check if grounded and apply jump
-        if (_npc.IsOnFloor())
-        {
-            Vector3 vel = _npc.Velocity;
-            vel.Y = 10f; // Jump force
-            _npc.Velocity = vel;
-        }
+        _shouldJump = true; // Will be injected in next InjectInput() call
     }
 
     private void ExecuteDash()
     {
-        // TODO: Call PlayerController dash ability
-        // Needs public API
+        _shouldDash = true; // Will be injected in next InjectInput() call
     }
 }

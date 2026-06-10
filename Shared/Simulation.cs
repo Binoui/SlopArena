@@ -84,20 +84,14 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 6. Ground collision (flat floor at VoidHeight)
+            // 6. Ground collision (flat floor at Y=0)
             if (s.IsGrounded && s.PY <= FloorHeight + 0.1f)
             {
                 s.PY = FloorHeight;
                 s.VY = 0f;
             }
 
-            // 7. Void death check
-            if (s.PY < arena.KillHeight)
-            {
-                RespawnCharacter(ref s, arena);
-            }
-
-            // 8. Landing cleanup
+            // 7. Landing cleanup
             if (s.State == ActionState.AirDodging && s.IsGrounded)
             {
                 s.State = ActionState.Idle;
@@ -514,34 +508,6 @@ namespace SlopArena.Shared
             }
         }
 
-        // ── RESPAWN ──
-
-        private static void RespawnCharacter(ref CharacterState s, ArenaDefinition arena)
-        {
-            var spawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : default;
-            s.DamagePercent = 0;
-            s.PX = spawn.X;
-            s.PY = spawn.Y;
-            s.PZ = spawn.Z;
-            s.VX = s.VY = s.VZ = 0f;
-            s.KVX = s.KVY = s.KVZ = 0f;
-            s.State = ActionState.Idle;
-            s.StateTicks = 0;
-            s.JumpsLeft = 2;
-            s.AirDodgesLeft = MaxAirDodges;
-            s.IsGrounded = false;
-            s.ComboStage = 0;
-            s.ComboTimerTicks = 0;
-            s.AnimLockTicks = 0;
-            s.BufferedChain = 0;
-            s.DashCooldownTicks = 0;
-            s.DashDurationTicks = 0;
-            s.InvincibilityTicks = 0;
-            s.DirHoldTicks = 0;
-            s.IsSprinting = false;
-            s.TurnaroundTicks = 0;
-            s.FacingYaw = spawn.Yaw;
-        }
 
         // ── INPUT HELPERS ──
 

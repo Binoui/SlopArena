@@ -6,7 +6,7 @@ using SlopArena.Shared;
 /// Added as a child of Main (Node3D). Handles:
 /// - Loading arena PackedScene into the world
 /// - Providing spawn points for players/NPCs
-/// - Void death detection (Y < VoidHeight)
+/// - Blast zone detection (Y < KillHeight)
 /// - Arena bounds for camera/mechanics
 /// </summary>
 public partial class ArenaManager : Node3D

@@ -66,6 +66,7 @@ public partial class PlayerController : CharacterBody3D
     private bool _isNPC = false;
     private float _respawnTimer = 0f;
     private const float RespawnDelay = 20.0f; // 20 seconds for both player and NPCs
+    private Vector3 _deathPosition = Vector3.Zero; // Camera target during respawn
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
@@ -80,6 +81,7 @@ public partial class PlayerController : CharacterBody3D
     public bool IsAlive() => _respawnTimer <= 0f;
     public bool IsNpcAlive() => _respawnTimer <= 0f; // Legacy alias for NPCs
     public float GetRespawnTimeRemaining() => _respawnTimer;
+    public Vector3 GetDeathPosition() => _deathPosition;
 
     // ==========================================
     // UI STATE
@@ -124,12 +126,12 @@ public partial class PlayerController : CharacterBody3D
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
     public Vector3 MoveDirection => _moveDirection;
 
-    public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef)
+    public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef, SpellVFXManager? spellVFX = null)
     {
         _arenaDef = arenaDef;
         _combatComponent = new CombatComponent();
         _combatComponent.Name = "CombatComponent";
-        _combatComponent.Setup(this, simulation, 1);
+        _combatComponent.Setup(this, simulation, 1, spellVFX);
         AddChild(_combatComponent);
     }
 
@@ -618,6 +620,29 @@ public partial class PlayerController : CharacterBody3D
     {
         var input = new SlopArena.Shared.InputState();
 
+        // If NPC with AI-injected input, use that directly
+        if (_isNPC && _inputCtrl.IsAIControlled())
+        {
+            var (moveX, moveY) = _inputCtrl.GetMovement();
+            input.MoveX = moveX;
+            input.MoveY = moveY;
+            input.Up = moveY < -0.3f;
+            input.Down = moveY > 0.3f;
+            input.Left = moveX < -0.3f;
+            input.Right = moveX > 0.3f;
+            input.Jump = _inputCtrl.JumpJustPressed;
+            input.Dash = _inputCtrl.DashJustPressed;
+            input.Attack = _inputCtrl.IsAttackPressed();
+            input.Crouch = false; // NPCs don't crouch for now
+
+            // Set move direction for animations
+            _moveDirection = new Vector3(moveX, 0f, moveY).Normalized();
+            _snappedInputDirection = new Vector2(moveX, moveY);
+
+            return input;
+        }
+
+        // Human player: read from Godot Input
         // Get camera-relative forward/right (default to world if no camera)
         Vector3 camForward = Vector3.Forward;
         Vector3 camRight = Vector3.Right;
@@ -1105,6 +1130,30 @@ public partial class PlayerController : CharacterBody3D
     }
 
     // ==========================================
+    // AI INPUT INJECTION (for NPCs)
+    // ==========================================
+
+    /// <summary>
+    /// Inject synthetic input from AI controller (for NPCs).
+    /// Must be called every frame before _Process() if AI-controlled.
+    /// </summary>
+    public void InjectInput(InputState input)
+    {
+        if (!_isNPC) return; // Only NPCs can have injected input
+        _inputCtrl.InjectAI(input);
+    }
+
+    /// <summary>
+    /// Trigger an ability by slot index (for NPCs).
+    /// 0 = LMB, 1-5 = Q/E/R/F/etc.
+    /// </summary>
+    public void UseAbility(int slot)
+    {
+        if (!_isNPC) return; // Only NPCs can have direct ability calls
+        ExecuteSlot(slot, charged: false, airborne: !IsOnFloor());
+    }
+
+    // ==========================================
     // RESPAWN METHODS (Player + NPC)
     // ==========================================
 
@@ -1116,6 +1165,16 @@ public partial class PlayerController : CharacterBody3D
     {
         if (_respawnTimer > 0f) return; // Already respawning
         _respawnTimer = RespawnDelay;
+
+        // Save death position for camera (so camera stays at blast zone point)
+        _deathPosition = GlobalPosition;
+
+        // Hide character and stop physics during respawn
+        Visible = false;
+        Velocity = Vector3.Zero;
+
+        // Move way below the map so no collisions happen during respawn
+        GlobalPosition = new Vector3(0f, -1000f, 0f);
     }
 
     /// <summary>
