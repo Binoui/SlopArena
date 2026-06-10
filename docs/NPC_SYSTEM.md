@@ -73,7 +73,6 @@ WanderRadius = 10f   // Random wander area
 
 ```csharp
 private bool _isNPC = false;           // NPC mode enabled
-private int _npcHP = 300;              // Separate HP from %
 private float _npcRespawnTimer = 0f;   // Respawn timer
 private Vector3 _npcSpawnPosition;     // Spawn position
 ```
@@ -83,26 +82,35 @@ private Vector3 _npcSpawnPosition;     // Spawn position
 ```csharp
 void SetNPC(bool isNpc)               // Enable/disable NPC mode
 bool IsNPC()                          // Check if NPC
-int GetNpcHP()                        // Current HP
-bool IsNpcAlive()                     // Check if alive
-void NpcTakeDamage(int dmg, Vector3 kb) // Apply damage
-void SetNpcSpawnPosition(Vector3 pos)    // Set spawn
+bool IsNpcAlive()                     // Check if alive (not respawning)
+void NpcKnockOut()                    // Trigger respawn (called when out-of-bounds)
+void SetNpcSpawnPosition(Vector3 pos) // Set spawn position
+ushort GetDamagePercent()             // Get current damage % (via MovementComponent)
 ```
 
-### Damage System
+### Damage System (Smash-Style)
 
-NPCs have 2 health systems:
-1. **Classic HP** (300 HP) - for death/respawn
-2. **Smash Damage %** - for knockback scaling
+NPCs use the **same** system as players:
+- **No HP system** - only Damage %
+- Hits increase Damage % (stored in `CharacterState.DamagePercent`)
+- Higher % = bigger knockback (Smash Bros formula)
+- Eliminated by going **out-of-bounds** (below kill height)
+- Respawn after 3s with 0% damage
 
 ```csharp
-// On hit
-npc.NpcTakeDamage(damage, knockbackForce);
+// On hit (automatic via CombatComponent)
+// 1. Damage % increases
+// 2. Knockback scales with current %
+// 3. No HP system
 
-// NpcTakeDamage does:
-// 1. HP -= damage
-// 2. Apply knockback
-// 3. If HP <= 0: start respawn (3s)
+// On knockout (void/out-of-bounds)
+npc.NpcKnockOut(); // Triggers 3s respawn
+
+// In Main.cs _Process:
+if (_arenaManager.IsBelowKillHeight(npc.GlobalPosition))
+{
+    npc.NpcKnockOut(); // Smash-style elimination
+}
 ```
 
 ## Player vs NPC Differences
@@ -111,10 +119,11 @@ npc.NpcTakeDamage(damage, knockbackForce);
 |---------|--------|-----|
 | Input | Keyboard/Mouse | BotController |
 | Camera | Attached | None |
-| HP System | Damage % only | HP + Damage % |
-| Respawn | Instant teleport | 3s timer |
+| Damage System | Damage % only (Smash) | Damage % only (Smash) |
+| Elimination | Out-of-bounds → instant respawn | Out-of-bounds → 3s respawn timer |
 | Visual | Normal mesh | Mesh + red emission |
 | Target | Not targetable | Targetable (ID 100-104) |
+| UI | Shows own damage % | Shows damage % in target frame |
 
 ## Improving the AI
 
@@ -244,7 +253,7 @@ foreach (var npc in _npcs)
 {
     if (npc != null)
     {
-        GD.Print($"{npc.Name}: HP={npc.GetNpcHP()}, Pos={npc.GlobalPosition}");
+        GD.Print($"{npc.Name}: Dmg={npc.GetDamagePercent()}%, Pos={npc.GlobalPosition}, Alive={npc.IsNpcAlive()}");
     }
 }
 ```
@@ -264,7 +273,7 @@ if (key.Keycode == Key.F1)
     {
         if (_npcs[i] != null)
         {
-            GD.Print($"NPC {i}: HP={_npcs[i].GetNpcHP()}, Alive={_npcs[i].IsNpcAlive()}");
+            GD.Print($"NPC {i}: Dmg={_npcs[i].GetDamagePercent()}%, Alive={_npcs[i].IsNpcAlive()}");
         }
     }
 }
