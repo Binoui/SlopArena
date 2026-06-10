@@ -69,36 +69,35 @@ WanderRadius = 10f   // Random wander area
 
 ## NPC Mode in PlayerController
 
-### Respawn Properties (All Characters)
+### Respawn Properties (Player + NPC)
 
 ```csharp
 private bool _isNPC = false;           // NPC mode enabled
-private float _respawnTimer = 0f;      // Respawn timer (20s countdown)
-private Vector3 _arenaCenter;          // Center of arena for respawn
+private float _respawnTimer = 0f;      // Respawn timer (20s for all)
+private const float RespawnDelay = 20.0f; // 20 seconds for everyone
 ```
 
 ### Public API
 
 ```csharp
 void SetNPC(bool isNpc)               // Enable/disable NPC mode
-void SetArenaCenter(Vector3 center)   // Set respawn location
 bool IsNPC()                          // Check if NPC
 bool IsAlive()                        // Check if alive (not respawning)
-float GetRespawnTimeRemaining()       // Get respawn countdown (0 = alive)
-void KnockOut()                       // Trigger respawn (called when out-of-bounds)
+bool IsNpcAlive()                     // Legacy alias for IsAlive()
+void TriggerRespawn()                 // Trigger 20s respawn (both player & NPC)
+void NpcKnockOut()                    // Legacy alias for TriggerRespawn()
+float GetRespawnTimeRemaining()       // Get respawn countdown (0 if alive)
 ushort GetDamagePercent()             // Get current damage % (via MovementComponent)
 ```
 
 ### Damage System (Smash-Style)
 
-All characters (player AND NPCs) use the **same** system:
+Player AND NPCs use the **same** system:
 - **No HP system** - only Damage %
 - Hits increase Damage % (stored in `CharacterState.DamagePercent`)
 - Higher % = bigger knockback (Smash Bros formula: `1 + dmg% * 0.01`)
 - Eliminated by going **out-of-bounds** (below kill height)
-- **20 second respawn** at arena center, 15m in air
-- Damage % reset to 0 on respawn (stock system)
-- Character is hidden during respawn (`Visible = false`)
+- Respawn after **20 seconds** at **arena center, in the air** with 0% damage
 
 ```csharp
 // On hit (automatic via CombatComponent)
@@ -106,19 +105,19 @@ All characters (player AND NPCs) use the **same** system:
 // 2. Knockback scales with current %
 // 3. No HP system
 
-// On knockout (void/out-of-bounds) - applies to ALL characters
-character.KnockOut(); // Triggers 20s respawn
+// On knockout (void/out-of-bounds) - same for player and NPCs
+character.TriggerRespawn(); // Triggers 20s respawn at center
 
 // In Main.cs _Process:
 if (_arenaManager.IsBelowKillHeight(character.GlobalPosition))
 {
-    character.KnockOut(); // Smash-style elimination
+    character.TriggerRespawn(); // 20s delay, respawn at center in air
 }
 
-// Respawn happens automatically after 20s:
-// - Position set to arena center + Vector3(0, 15, 0)
+// Respawn location:
+// - Arena center (average of spawn points)
+// - 20 units above ground (spawns in air)
 // - Damage % reset to 0
-// - Visible set to true
 ```
 
 ## Player vs NPC Differences
@@ -129,11 +128,11 @@ if (_arenaManager.IsBelowKillHeight(character.GlobalPosition))
 | Camera | Attached | None |
 | Damage System | Damage % only (Smash) | Damage % only (Smash) |
 | Elimination | Out-of-bounds → 20s respawn | Out-of-bounds → 20s respawn |
-| Respawn Location | Arena center, 15m in air | Arena center, 15m in air |
+| Respawn Location | Arena center, in air (+20Y) | Arena center, in air (+20Y) |
 | Visual | Normal mesh | Mesh + red emission |
-| Visual During Respawn | Hidden (Visible = false) | Hidden (Visible = false) |
+| Visibility | Always visible | Hidden during respawn timer |
 | Target | Not targetable | Targetable (ID 100-104) |
-| UI | Shows own damage % + respawn timer | Shows damage % or respawn timer |
+| UI | Shows own damage % | Shows damage % in target frame |
 
 ## Improving the AI
 

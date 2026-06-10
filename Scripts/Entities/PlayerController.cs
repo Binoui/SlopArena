@@ -59,14 +59,13 @@ public partial class PlayerController : CharacterBody3D
     private Vector2 _snappedInputDirection = Vector2.Zero; // camera-relative (X=camRight, Y=camForward)
 
     // ==========================================
-    // RESPAWN STATE (Smash-style stock system)
+    // RESPAWN STATE (Player + NPC)
     // ==========================================
 
     private bool _isPlayerControlled = true;
     private bool _isNPC = false;
     private float _respawnTimer = 0f;
-    private const float RespawnDelay = 20.0f; // 20 seconds respawn time
-    private Vector3 _arenaCenter = Vector3.Zero; // Center of arena for respawn
+    private const float RespawnDelay = 20.0f; // 20 seconds for both player and NPCs
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
@@ -77,10 +76,9 @@ public partial class PlayerController : CharacterBody3D
         _isPlayerControlled = !isNpc;
     }
 
-    public void SetArenaCenter(Vector3 center) => _arenaCenter = center;
-
     public bool IsNPC() => _isNPC;
     public bool IsAlive() => _respawnTimer <= 0f;
+    public bool IsNpcAlive() => _respawnTimer <= 0f; // Legacy alias for NPCs
     public float GetRespawnTimeRemaining() => _respawnTimer;
 
     // ==========================================
@@ -512,14 +510,17 @@ public partial class PlayerController : CharacterBody3D
             ExecuteSlot(0, false, !IsOnFloor());
         }
 
-        // ── Respawn timer (applies to all characters) ──
+        // Respawn timer (both player and NPCs)
         if (_respawnTimer > 0f)
         {
             _respawnTimer -= dt;
-            if (_respawnTimer <= 0f) Respawn();
+            if (_respawnTimer <= 0f)
+            {
+                DoRespawn();
+            }
         }
 
-        // ── NPC-specific visuals ──
+        // NPC visual feedback
         if (_isNPC)
         {
             if (_npcHitFlashTimer > 0f)
@@ -529,10 +530,10 @@ public partial class PlayerController : CharacterBody3D
             }
             else if (_npcMesh?.MaterialOverride is StandardMaterial3D m && !Mathf.IsEqualApprox(m.EmissionEnergyMultiplier, _npcOriginalEmission))
                 m.EmissionEnergyMultiplier = _npcOriginalEmission;
-        }
 
-        // Hide during respawn (all characters)
-        Visible = _respawnTimer <= 0f;
+            // Hide while respawning
+            Visible = _respawnTimer <= 0f;
+        }
     }
 
     // ==========================================
@@ -1104,31 +1105,49 @@ public partial class PlayerController : CharacterBody3D
     }
 
     // ==========================================
-    // RESPAWN METHODS (Smash-style stock system)
+    // RESPAWN METHODS (Player + NPC)
     // ==========================================
 
     /// <summary>
-    /// Called when character is knocked out of bounds (Smash Bros style).
-    /// Triggers 20s respawn sequence at arena center.
+    /// Called when knocked out of bounds (like Smash Bros).
+    /// Triggers 20s respawn sequence for both player and NPCs.
     /// </summary>
-    public void KnockOut()
+    public void TriggerRespawn()
     {
         if (_respawnTimer > 0f) return; // Already respawning
         _respawnTimer = RespawnDelay;
-        Visible = false; // Hide immediately
     }
 
-    private void Respawn()
+    /// <summary>
+    /// Legacy method for NPC knockout (calls TriggerRespawn internally).
+    /// </summary>
+    public void NpcKnockOut() => TriggerRespawn();
+
+    private void DoRespawn()
     {
         _respawnTimer = 0f;
 
-        // Respawn at arena center, high in the air (Smash-style platform respawn)
-        GlobalPosition = _arenaCenter + new Vector3(0f, 15f, 0f);
+        // Respawn at arena center, 20 units above ground (in air)
+        if (_arenaDef.SpawnPoints.Length > 0)
+        {
+            // Use center spawn point if available, otherwise calculate center
+            var centerSpawn = _arenaDef.SpawnPoints[_arenaDef.SpawnPoints.Length / 2];
+            GlobalPosition = new Vector3(centerSpawn.X, centerSpawn.Y + 20f, centerSpawn.Z);
+        }
+        else
+        {
+            // Fallback: arena center
+            float centerX = (_arenaDef.MinX + _arenaDef.MaxX) / 2f;
+            float centerZ = (_arenaDef.MinZ + _arenaDef.MaxZ) / 2f;
+            GlobalPosition = new Vector3(centerX, 20f, centerZ);
+        }
+
         Velocity = Vector3.Zero;
 
-        // Reset damage % on respawn (stock system)
+        // Reset damage % on respawn (Smash-style stock system)
         _movementComponent.State.DamagePercent = 0;
 
+        // Make visible again
         Visible = true;
     }
 

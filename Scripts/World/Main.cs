@@ -97,18 +97,9 @@ public partial class Main : Node3D
         RegisterEntitiesInSimulation();
 
         // --- Player (spawn index 5, the last spawn point) ---
-        // Get arena center for respawn (Smash-style)
-        var arenaDef = ArenaRegistry.Get("split");
-        Vector3 arenaCenter = new Vector3(
-            (arenaDef.MinX + arenaDef.MaxX) / 2f,
-            0f,
-            (arenaDef.MinZ + arenaDef.MaxZ) / 2f
-        );
-
         _player = new PlayerController();
         _player.Name = "Player";
         _player.SetClass(_selectedClass);
-        _player.SetArenaCenter(arenaCenter); // Set respawn location
         AddChild(_player);
         _player.Position = _arenaManager.GetSpawnPosition(5);
         // Offset player from NPCs and above floor
@@ -184,7 +175,7 @@ public partial class Main : Node3D
                         string name = collider.Name;
                         if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
                         {
-                            if (idx >= 0 && idx < _npcs.Length && _npcs[idx] != null && _npcs[idx]!.IsAlive())
+                            if (idx >= 0 && idx < _npcs.Length && _npcs[idx] != null && _npcs[idx]!.IsNpcAlive())
                             {
                                 ulong targetId = (ulong)(100 + idx);
                                 _unitFrames.SetTarget(targetId);
@@ -287,14 +278,6 @@ public partial class Main : Node3D
 
     private void SpawnNPCs()
     {
-        // Get arena center for respawn (Smash-style)
-        var arenaDef = ArenaRegistry.Get("split");
-        Vector3 arenaCenter = new Vector3(
-            (arenaDef.MinX + arenaDef.MaxX) / 2f,
-            0f,
-            (arenaDef.MinZ + arenaDef.MaxZ) / 2f
-        );
-
         // Spawn 5 Manki NPCs at the first 5 spawn points
         for (int i = 0; i < 5; i++)
         {
@@ -302,7 +285,6 @@ public partial class Main : Node3D
             npc.Name = $"NPC_{i}";
             npc.SetClass(CharacterClass.Manki);
             npc.SetNPC(true);
-            npc.SetArenaCenter(arenaCenter); // Set respawn location
             AddChild(npc);
 
             Vector3 spawnPos = _arenaManager.GetSpawnPosition(i);
@@ -475,7 +457,7 @@ public partial class Main : Node3D
 
         // NPC IDs are 100-104
         int npcIndex = (int)(entityId - 100);
-        if (npcIndex < 0 || npcIndex >= 5 || _npcs[npcIndex] == null || !_npcs[npcIndex]!.IsAlive())
+        if (npcIndex < 0 || npcIndex >= 5 || _npcs[npcIndex] == null || !_npcs[npcIndex]!.IsNpcAlive())
         {
             _targetRing.Visible = false;
             return;
@@ -489,13 +471,13 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
-        // Void death check (Smash-style) — 20s respawn for all characters
+        // Void death check (Smash-style) — all characters respawn at arena center after 20s
         if (_arenaManager != null)
         {
             // Check player
             if (_player != null && _player.IsAlive() && _arenaManager.IsBelowKillHeight(_player.GlobalPosition))
             {
-                _player.KnockOut(); // Triggers 20s respawn at arena center
+                _player.TriggerRespawn(); // 20s respawn at center
             }
 
             // Check NPCs
@@ -503,7 +485,7 @@ public partial class Main : Node3D
             {
                 if (_npcs[i] != null && _npcs[i]!.IsAlive() && _arenaManager.IsBelowKillHeight(_npcs[i]!.GlobalPosition))
                 {
-                    _npcs[i]!.KnockOut(); // Triggers 20s respawn at arena center
+                    _npcs[i]!.TriggerRespawn(); // 20s respawn at center
                 }
             }
         }
@@ -517,7 +499,7 @@ public partial class Main : Node3D
                 int idx = (int)(targetId - 100);
                 if (idx >= 0 && idx < 5 && _npcs[idx] != null)
                 {
-                    if (_npcs[idx]!.IsAlive())
+                    if (_npcs[idx]!.IsNpcAlive())
                     {
                         Vector3 pos = _npcs[idx]!.GlobalPosition;
                         pos.Y = 0.1f;
@@ -580,34 +562,18 @@ public partial class Main : Node3D
         {
             if (_npcs[i] != null)
             {
-                if (_npcs[i]!.IsAlive())
-                {
-                    ushort npcDmg = _npcs[i]!.GetDamagePercent();
-                    dummyInfo += $"  NPC {i + 1}: {npcDmg}%\n";
-                }
-                else
-                {
-                    float respawnTime = _npcs[i]!.GetRespawnTimeRemaining();
-                    dummyInfo += $"  NPC {i + 1}: [RESPAWNING {respawnTime:F1}s]\n";
-                }
+                ushort npcDmg = _npcs[i]!.GetDamagePercent();
+                string status = _npcs[i]!.IsNpcAlive() ? $"{npcDmg}%" : "[RESPAWNING]";
+                dummyInfo += $"  NPC {i + 1}: {status}\n";
             }
         }
 
         ushort playerDmg = _player?.GetDamagePercent() ?? 0;
 
-        // Player respawn status
-        string playerStatus = "";
-        if (_player != null && !_player.IsAlive())
-        {
-            float playerRespawn = _player.GetRespawnTimeRemaining();
-            playerStatus = $"\n[YOU ARE RESPAWNING IN {playerRespawn:F1}s]";
-        }
-
         _label.Text = $"SlopArena Arena Sandbox\n" +
                               $"---------------------------------\n" +
                               $"Speed: {speed2D:F1}  |  DMG: {playerDmg}%\n" +
                               $"Position: ({posX:F1}, {posY:F1}, {posZ:F1})\n" +
-                              $"{playerStatus}\n" +
                               $"\n" +
                               $"{dummyInfo}" +
                               $"\n" +
