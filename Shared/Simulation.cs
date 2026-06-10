@@ -58,14 +58,21 @@ namespace SlopArena.Shared
             // 1. Tick all timers
             TickTimers(ref s);
 
-            // 2. Knockback overrides everything (but dash invincibility still applies)
+            // 2. Hitstun overrides everything (DI window)
+            if (s.State == ActionState.Hitstun)
+            {
+                ProcessHitstun(ref s, input);
+                return;
+            }
+
+            // 3. Knockback overrides everything (but dash invincibility still applies)
             if (HasKnockback(s))
             {
                 ProcessKnockback(ref s, arena);
                 return;
             }
 
-            // 3. State machine
+            // 4. State machine
             if (s.State == ActionState.Dashing)
                 ProcessDash(ref s, stats);
             else if (s.State == ActionState.AirDodging)
@@ -76,22 +83,22 @@ namespace SlopArena.Shared
                 ProcessNormalMovement(ref s, stats, input);
             }
 
-            // 4. Gravity
+            // 5. Gravity
             ApplyGravity(ref s, stats);
 
-            // 5. Position update (Euler integration)
+            // 6. Position update (Euler integration)
             s.PX += s.VX * TickDt;
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 6. Ground collision (flat floor at Y=0)
+            // 7. Ground collision (flat floor at Y=0)
             if (s.IsGrounded && s.PY <= FloorHeight + 0.1f)
             {
                 s.PY = FloorHeight;
                 s.VY = 0f;
             }
 
-            // 7. Landing cleanup
+            // 8. Landing cleanup
             if (s.State == ActionState.AirDodging && s.IsGrounded)
             {
                 s.State = ActionState.Idle;
@@ -107,6 +114,7 @@ namespace SlopArena.Shared
             if (s.InvincibilityTicks > 0) s.InvincibilityTicks--;
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
             if (s.ComboTimerTicks > 0) s.ComboTimerTicks--;
+            if (s.HitstunTicks > 0) s.HitstunTicks--;
 
             // Turnaround ticks
             if (s.TurnaroundTicks > 0) s.TurnaroundTicks--;
@@ -128,6 +136,42 @@ namespace SlopArena.Shared
             if (s.Cooldown3 > 0) s.Cooldown3--;
             if (s.Cooldown4 > 0) s.Cooldown4--;
             if (s.Cooldown5 > 0) s.Cooldown5--;
+        }
+
+        // ── HITSTUN + DI (Directional Influence) ──
+
+        /// <summary>
+        /// Process hitstun state: freeze victim for a few frames, then apply knockback with DI.
+        /// DI (Directional Influence) = held input direction at END of hitstun modifies knockback.
+        /// </summary>
+        private static void ProcessHitstun(ref CharacterState s, InputState input)
+        {
+            // Victim is frozen in place during hitstun
+            s.VX = 0f;
+            s.VZ = 0f;
+            // Keep vertical velocity (gravity still applies if airborne)
+
+            // Store current input (will use the LAST frame's input for DI)
+            // Player has the full hitstun window to react and hold a direction
+            s.DIX = input.MoveX;
+            s.DIY = input.MoveY;
+
+            // When hitstun ends, apply knockback modified by held direction
+            if (s.HitstunTicks == 0)
+            {
+                // Apply DI influence to knockback direction
+                // DI modifies trajectory based on held direction at end of hitstun
+                const float DIStrength = 3.5f; // Strong influence
+                s.KVX += s.DIX * DIStrength;
+                s.KVZ += s.DIY * DIStrength; // MoveY maps to Z in world space
+
+                // Reset DI
+                s.DIX = 0f;
+                s.DIY = 0f;
+
+                // Exit hitstun, enter knockback state
+                s.State = ActionState.Idle; // Will transition to knockback via HasKnockback check
+            }
         }
 
         // ── KNOCKBACK ──
@@ -414,14 +458,36 @@ namespace SlopArena.Shared
         /// Knockback = baseForce * (1 + DamagePercent * 0.01)
         /// So at 0%: 1x, at 100%: 2x, at 200%: 3x, etc.
         /// If baseForce is ~0 (no-KB moves), knockback stays minimal.
+        /// Triggers hitstun first (freeze + DI window), then knockback applies.
         /// </summary>
         public static void ApplyKnockback(ref CharacterState s, float kbX, float kbY, float kbZ)
         {
             float kbScale = 1f + (s.DamagePercent * 0.01f);
+
+            // Store scaled knockback (will be applied after hitstun)
             s.KVX = kbX * kbScale;
             s.KVY = kbY * kbScale;
             s.KVZ = kbZ * kbScale;
-            s.State = ActionState.Idle;
+
+            // Calculate hitstun duration based on knockback strength
+            float kbMagnitude = MathF.Sqrt(s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ);
+
+            // Hitstun formula: 8-20 frames depending on knockback strength
+            // Weak hits: 8 frames, Strong hits: 20+ frames
+            ushort hitstunFrames = (ushort)Math.Clamp(8 + (int)(kbMagnitude * 0.5f), 8, 25);
+
+            // Only apply hitstun if knockback is significant (not weak jabs)
+            if (kbMagnitude > 3f)
+            {
+                s.HitstunTicks = hitstunFrames;
+                s.State = ActionState.Hitstun;
+            }
+            else
+            {
+                // Weak hit: skip hitstun, apply knockback immediately
+                s.State = ActionState.Idle;
+            }
+
             s.DashDurationTicks = 0;
             s.StateTicks = 0;
             s.WasAirborneDuringKnockback = !s.IsGrounded;
