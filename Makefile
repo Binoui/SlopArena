@@ -1,10 +1,11 @@
-.PHONY: help build clean check format lint test
+.PHONY: help build clean check format lint test report
 
 help:
 	@echo "SlopArena Development Commands"
 	@echo "=============================="
 	@echo "  make build     - Build the project"
 	@echo "  make check     - Run all quality checks"
+	@echo "  make report    - Show code quality report"
 	@echo "  make format    - Auto-format code"
 	@echo "  make lint      - Run code analysis"
 	@echo "  make clean     - Clean build artifacts"
@@ -48,3 +49,6 @@ lint:
 test:
 	@echo "🧪 Running tests..."
 	@echo "  (No tests implemented yet)"
+
+report:
+	@./scripts/quality-report.sh
