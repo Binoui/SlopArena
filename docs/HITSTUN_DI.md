@@ -1,0 +1,203 @@
+# Hitstun + DI System
+
+Smash Bros-style hitstun with Directional Influence (DI) for competitive depth.
+
+## How It Works
+
+### Hit Sequence
+```
+Attack lands → Hitstun (8-25 frames) → Knockback (influenced by DI)
+```
+
+**1. Hitstun Phase** (ActionState.Hitstun)
+- Victim is **frozen in place** (VX = VZ = 0)
+- Duration: 8-25 frames based on knockback strength
+  - Weak jabs (<3 KB): No hitstun (instant knockback)
+  - Medium hits (3-10 KB): 8-12 frames
+  - Strong hits (10-20 KB): 12-18 frames
+  - Kill moves (>20 KB): 18-25 frames
+- **Visual:** White flash on victim
+
+**2. DI Window**
+- During hitstun, player can **hold a direction** (WASD)
+- The **held direction at the END** of hitstun modifies knockback
+- NOT accumulated (no button mashing needed)
+- Just hold the stick where you want to go
+
+**3. Knockback Application**
+- Base knockback scales with damage % (Smash formula: 1 + dmg% * 0.01)
+- DI influence applied: `KBX += DIX * 3.5`, `KBZ += DIY * 3.5`
+- Victim enters knockback state
+
+## DI Strategy
+
+### Survival DI
+**Goal:** Live longer at high %
+
+- **Knocked horizontally:** Hold UP (increase vertical angle)
+- **Knocked diagonally up:** Hold AWAY from stage center
+- **Knocked straight up:** Hold horizontal (spread out trajectory)
+
+**Why it works:** DI perpendicular to knockback maximizes distance from blast zone.
+
+### Combo DI
+**Goal:** Escape combos at low %
+
+- **Upward launcher:** Hold DOWN (reduce height, faster landing)
+- **Horizontal hit:** Hold UP (pop out of combo range)
+- **Multi-hit moves:** Alternate DI each hit (SDI-like escape)
+
+### No DI
+- **At ledge, high %:** Sometimes best to NOT DI (opponent expects it)
+- **Tech situations:** Save inputs for tech timing
+
+## Technical Details
+
+### Code Flow
+
+**CharacterState.cs:**
+```csharp
+public ushort HitstunTicks;  // Remaining freeze frames
+public float DIX, DIY;       // Held direction (updated each frame)
+```
+
+**Simulation.cs ProcessHitstun():**
+```csharp
+// Each frame during hitstun:
+s.VX = 0; s.VZ = 0;          // Freeze victim
+s.DIX = input.MoveX;         // Store held direction
+s.DIY = input.MoveY;
+
+// Last frame of hitstun:
+s.KVX += s.DIX * 3.5f;       // Apply DI to knockback
+s.KVZ += s.DIY * 3.5f;
+s.State = ActionState.Idle;  // Exit to knockback
+```
+
+**Simulation.cs ApplyKnockback():**
+```csharp
+// Calculate hitstun duration
+float kbMagnitude = sqrt(KVX² + KVY² + KVZ²);
+ushort frames = clamp(8 + kbMagnitude * 0.5, 8, 25);
+
+if (kbMagnitude > 3f)
+{
+    s.HitstunTicks = frames;
+    s.State = ActionState.Hitstun;  // Enter freeze
+}
+else
+{
+    // Weak hit: skip hitstun
+}
+```
+
+### Constants (Tweakable)
+
+**Simulation.cs:**
+```csharp
+const float DIStrength = 3.5f;           // DI multiplier (line 157)
+const float MinHitstun = 8f;             // Min frames (line 475)
+const float MaxHitstun = 25f;            // Max frames (line 475)
+const float HitstunThreshold = 3f;       // KB magnitude to trigger hitstun (line 478)
+const float HitstunScaling = 0.5f;       // KB → frames conversion (line 475)
+```
+
+**To increase DI influence:** Raise `DIStrength` (default 3.5)
+**To make hitstun longer:** Raise `HitstunScaling` or `MaxHitstun`
+**To make weak hits have hitstun:** Lower `HitstunThreshold`
+
+## Balancing
+
+### Current Values (v1.0)
+- **DIStrength:** 3.5 (strong influence, rewards good DI)
+- **Hitstun range:** 8-25 frames (0.13-0.42 seconds at 60Hz)
+- **Threshold:** 3 KB (most moves trigger hitstun)
+
+### Competitive Considerations
+
+**If DI feels too weak:**
+- Increase `DIStrength` to 4.5-5.0
+- Players can't escape kill moves
+
+**If DI feels too strong:**
+- Decrease `DIStrength` to 2.5-3.0
+- Players survive everything
+
+**If hitstun feels unresponsive:**
+- Decrease `MinHitstun` to 5-6 frames
+- Faster reaction window
+
+**If combos are too easy:**
+- Increase `MinHitstun` to 10-12 frames
+- Longer DI window = easier escapes
+
+## Visual Feedback
+
+**During Hitstun:**
+- White flash on victim (PlayerController.cs line 528-543)
+- Victim frozen in place
+- **Duration indicator:** Flash brightness = remaining hitstun
+
+**Future Enhancements:**
+- Input display during hitstun (show held direction)
+- DI trajectory preview (arrow showing modified angle)
+- Hitstun sound effect (metal clang)
+
+## Testing
+
+**Test scenarios:**
+
+1. **Weak jab spam:**
+   - Should NOT freeze victim (instant knockback)
+   - Fast, responsive combos
+
+2. **Strong smash attack at 100%:**
+   - 15-20 frame freeze
+   - Victim can DI perpendicular to survive
+
+3. **Mid % combo:**
+   - 8-12 frame hitstun
+   - Attacker can react, victim can DI out
+
+4. **DI survival test:**
+   - Hit at 150% near ledge
+   - Good DI = survive, no DI = death
+
+## Comparison to Smash Bros
+
+**Similarities:**
+- ✅ Hitstun scales with knockback
+- ✅ DI modifies trajectory
+- ✅ Perpendicular DI is optimal
+- ✅ Visual freeze on strong hits
+
+**Differences:**
+- ❌ No SDI (Smash DI) - single DI input only
+- ❌ No ASDI (Automatic SDI) - input must be during hitstun
+- ❌ Simpler formula (Smash has complex frame data per move)
+
+**Design choice:** Keep it simple but deep. One DI input per hit is easier to learn but still rewards skill.
+
+## FAQ
+
+**Q: Can I mash during hitstun to get out faster?**
+A: No. Hitstun duration is fixed. Use the time to input DI.
+
+**Q: Does DI work on grabs/throws?**
+A: Not yet implemented. Future feature.
+
+**Q: Can I DI while in knockback?**
+A: No. DI only works during the hitstun freeze window.
+
+**Q: What if I input DI too early (before hit)?**
+A: Doesn't matter. System reads held direction at END of hitstun.
+
+**Q: Does DI affect damage taken?**
+A: No. DI only affects knockback trajectory, not damage.
+
+## References
+
+- **CharacterState.cs:** Line 47-48 (HitstunTicks, DIX, DIY)
+- **ActionState.cs:** Line 7 (Hitstun enum)
+- **Simulation.cs:** Line 61-67 (ProcessHitstun call), Line 141-176 (ProcessHitstun function), Line 462-495 (ApplyKnockback with hitstun)
+- **PlayerController.cs:** Line 526-547 (Visual white flash)

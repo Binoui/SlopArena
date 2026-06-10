@@ -70,6 +70,7 @@ public partial class PlayerController : CharacterBody3D
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
+    private float _hitstunFlashTimer = 0f; // Visual feedback during hitstun
 
     public void SetNPC(bool isNpc)
     {
@@ -519,6 +520,36 @@ public partial class PlayerController : CharacterBody3D
             if (_respawnTimer <= 0f)
             {
                 DoRespawn();
+            }
+        }
+
+        // Hitstun visual feedback (white flash during freeze frames)
+        if (_movementComponent.State.State == SlopArena.Shared.ActionState.Hitstun)
+        {
+            _hitstunFlashTimer = 0.1f; // Flash for duration of hitstun
+
+            // Apply white overlay to all meshes
+            foreach (var child in GetChildren())
+            {
+                if (child is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D mat)
+                {
+                    mat.AlbedoColor = new Color(1.5f, 1.5f, 1.5f, mat.AlbedoColor.A); // Brighten
+                }
+            }
+        }
+        else if (_hitstunFlashTimer > 0f)
+        {
+            _hitstunFlashTimer -= dt;
+            if (_hitstunFlashTimer <= 0f)
+            {
+                // Reset colors after hitstun
+                foreach (var child in GetChildren())
+                {
+                    if (child is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D mat)
+                    {
+                        mat.AlbedoColor = new Color(1f, 1f, 1f, mat.AlbedoColor.A); // Normal color
+                    }
+                }
             }
         }
 
