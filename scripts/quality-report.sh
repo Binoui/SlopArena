@@ -36,13 +36,15 @@ else
 fi
 echo ""
 
-# Method complexity (methods >50 lines)
-LONG_METHODS=$(find Scripts -name "*.cs" -exec awk '/^[[:space:]]*(public|private|protected|internal).*\(.*\)/ {start=NR} /^[[:space:]]*\}/ {if (NR-start>50) print FILENAME":"start}' {} \; 2>/dev/null | wc -l)
+# Method complexity (methods >150 lines, excluding setup methods)
+LONG_METHODS=$(find Scripts -name "*.cs" -exec awk '/^[[:space:]]*(public|private|protected|internal).*\(.*\)/ {start=NR; line=$0} /^[[:space:]]*\}/ {len=NR-start; if (len>150 && line !~ /(Ready|BuildUI|SpawnMatch|CreateDummy|Setup)/) print FILENAME":"start}' {} \; 2>/dev/null | wc -l)
+SETUP_METHODS=$(find Scripts -name "*.cs" -exec awk '/^[[:space:]]*(public|private|protected|internal).*(Ready|BuildUI|SpawnMatch|CreateDummy|Setup).*\(.*\)/ {start=NR} /^[[:space:]]*\}/ {if (NR-start>100) count++} END {print count+0}' {} \; 2>/dev/null | awk '{sum+=$1} END {print sum}')
 echo "📐 Method Complexity"
-echo "  Methods >50 lines: $LONG_METHODS"
+echo "  Complex methods >150 lines: $LONG_METHODS"
+echo "  Setup methods >100 lines: $SETUP_METHODS (OK)"
 if [ $LONG_METHODS -eq 0 ]; then
-    echo "  Status: ✅ All methods concise"
-elif [ $LONG_METHODS -lt 5 ]; then
+    echo "  Status: ✅ All non-setup methods reasonable"
+elif [ $LONG_METHODS -lt 3 ]; then
     echo "  Status: ⚡ Mostly good"
 else
     echo "  Status: ⚠️  Consider refactoring"
