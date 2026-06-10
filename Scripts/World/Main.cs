@@ -90,6 +90,9 @@ public partial class Main : Node3D
         AddChild(_targetRing);
         _targetRing.Visible = false;
 
+        // --- Spawn NPCs first (they need to be registered before player) ---
+        SpawnNPCs();
+
         // Register NPCs and player in simulation
         RegisterEntitiesInSimulation();
 
@@ -129,6 +132,9 @@ public partial class Main : Node3D
 
         // Register NPC combat components
         RegisterNpcCombatComponents();
+
+        // Add AI to NPCs (must be after player is spawned)
+        AddBotAI();
 
         // Wire up HUD
         if (_player != null)
@@ -267,6 +273,49 @@ public partial class Main : Node3D
         catch (Exception ex)
         {
             GD.PrintErr($"Heightmap generation failed: {ex.Message}");
+        }
+    }
+
+    private void SpawnNPCs()
+    {
+        // Spawn 5 Manki NPCs at the first 5 spawn points
+        for (int i = 0; i < 5; i++)
+        {
+            var npc = new PlayerController();
+            npc.Name = $"NPC_{i}";
+            npc.SetClass(CharacterClass.Manki);
+            npc.SetNPC(true);
+            AddChild(npc);
+
+            Vector3 spawnPos = _arenaManager.GetSpawnPosition(i);
+            npc.Position = spawnPos + new Vector3(0f, 1f, 0f); // Slight offset above ground
+            npc.SetNpcSpawnPosition(spawnPos);
+
+            _npcs[i] = npc;
+
+            // Setup combat component for this NPC
+            if (_simulation != null)
+                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"));
+
+            GD.Print($"Spawned NPC {i} at {spawnPos}");
+        }
+    }
+
+    private void AddBotAI()
+    {
+        // Add AI controller to each NPC after player is spawned
+        if (_player == null) return;
+
+        for (int i = 0; i < 5; i++)
+        {
+            if (_npcs[i] == null) continue;
+
+            var botAI = new BotController();
+            botAI.Name = $"BotAI_{i}";
+            botAI.Setup(_npcs[i]!, _player);
+            _npcs[i]!.AddChild(botAI);
+
+            GD.Print($"Added AI to NPC {i}");
         }
     }
 
@@ -518,12 +567,13 @@ public partial class Main : Node3D
                               $"{dummyInfo}" +
                               $"\n" +
                               $"--- CONTROLS ---\n" +
-                              $"Souris : Viser / Tourner\n" +
-                              $"ZQSD : Déplacement (relatif à la caméra)\n" +
-                              $"Space : Saut (double saut)\n" +
-                              $"Shift : Dash (sol ou air, 1s, invincible)\n" +
-                              $"LMB/RMB : Attaques\n" +
-                              $"1-4, A, E, R : Sorts\n" +
+                              $"Mouse: Aim / Turn\n" +
+                              $"WASD: Movement (camera-relative)\n" +
+                              $"Space: Jump (double jump)\n" +
+                              $"Shift: Dash (ground or air, 1s, invincible)\n" +
+                              $"LMB/RMB: Attacks\n" +
+                              $"Q, E, R, F: Abilities\n" +
+                              $"Tab: Target NPC\n" +
                               $"Escape: Release mouse";
     }
 
