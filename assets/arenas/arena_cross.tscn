@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b1yscip0heua3"]
 
-[ext_resource type="Texture2D" uid="uid://bq8llkb2y1rqs" path="res://textures/kenney_prototype/PNG/Green/texture_01.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://bq8llkb2y1rqs" path="res://assets/textures/kenney_prototype/PNG/Green/texture_01.png" id="1"]
 
 [sub_resource type="StandardMaterial3D" id="mat_cross"]
 albedo_texture = ExtResource("1")
