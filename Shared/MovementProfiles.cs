@@ -54,7 +54,7 @@ namespace SlopArena.Shared
             PostAttackSlideLockoutTicks = 20,
         };
 
-        public static void SetActive(int profileId)
+        public static void SetActive(int _) // profileId — stub, unused for now
         {
             // Only one profile for now
             Active = Default;
@@ -65,7 +65,7 @@ namespace SlopArena.Shared
             // No profile switching via flags anymore
         }
 
-        public static byte EncodeProfileBits(int profileId)
+        public static byte EncodeProfileBits(int _) // profileId — stub, unused for now
         {
             return 0;
         }

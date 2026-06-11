@@ -159,7 +159,7 @@ public partial class EscapeMenuUI : Control
         }
     }
 
-    public void Open(PlayerController player)
+    public void Open(PlayerController _) // player — unused, kept for API consistency
     {
         _isOpen = true;
         _settingsOpen = false;

@@ -20,6 +20,9 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Format check
+        run: dotnet format SlopArena.sln --verify-no-changes --verbosity diagnostic
+
       - name: Build
         run: dotnet build --no-restore --verbosity minimal
 

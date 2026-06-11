@@ -1,5 +1,7 @@
 using System;
 
+#nullable enable
+
 namespace SlopArena.Shared
 {
     /// <summary>
