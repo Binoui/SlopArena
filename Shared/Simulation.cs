@@ -567,7 +567,6 @@ namespace SlopArena.Shared
             }
         }
 
-
         // ── INPUT HELPERS ──
 
         private static (float dirX, float dirZ) GetInputDirection(InputState input)
