@@ -95,10 +95,3 @@ TargetMetadata.dat
 *.so.debug
 *.sym
 *.pth
-merged_requirements.in
-pyreqs_plugins.list
-extra_urls.txt
-PipInstall/
-ShaderAutogen/
-*.sh
-*.cpp.old
