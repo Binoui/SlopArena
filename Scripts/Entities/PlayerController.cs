@@ -148,7 +148,7 @@ public partial class PlayerController : CharacterBody3D
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
     public Vector3 MoveDirection => _moveDirection;
 
-    public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef, SpellVFXManager? spellVFX = null)
+    public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
     {
         _arenaDef = arenaDef;
 
@@ -169,7 +169,7 @@ public partial class PlayerController : CharacterBody3D
         // Create combat component with target lock
         _combatComponent = new CombatComponent();
         _combatComponent.Name = "CombatComponent";
-        _combatComponent.Setup(this, simulation, 1, spellVFX, _targetLock);
+        _combatComponent.Setup(this, simulation, entityId, spellVFX, _targetLock);
         _combatComponent.OnTakeDamage += OnCombatTakeDamage;
         AddChild(_combatComponent);
     }
@@ -584,10 +584,17 @@ public partial class PlayerController : CharacterBody3D
     {
         float dt = (float)delta;
 
-        // NPCs don't read keyboard input
+        // NPCs: read injected AI input instead of keyboard
         if (!_isPlayerControlled)
         {
-            _movementComponent.Tick(default);
+            var npcInput = BuildInputState();
+            _movementComponent.Tick(npcInput);
+
+            // Face movement direction (same as player path below)
+            Vector3 npcHVel = new Vector3(Velocity.X, 0f, Velocity.Z);
+            if (npcHVel.LengthSquared() > 0.01f)
+                GlobalRotation = new Vector3(0f, Mathf.Atan2(npcHVel.X, npcHVel.Z), 0f);
+
             OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
             return;
         }
