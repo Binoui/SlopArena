@@ -128,7 +128,7 @@ namespace SlopArena.Shared
                                 AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                         new() { Damage = 5f, KnockbackForce = 5f, KnockbackUpward = 2f, StunTicks = 14, SelfLockTicks = 30, ChainWindowTicks = 0, StartupTicks = 8,
                                 AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
-                        new() { Damage = 10f, KnockbackForce = 10f, KnockbackUpward = 8f, StunTicks = 18, SelfLockTicks = 56, ChainWindowTicks = 0, StartupTicks = 10,
+                        new() { Damage = 10f, KnockbackForce = 16f, KnockbackUpward = 4f, StunTicks = 18, SelfLockTicks = 56, ChainWindowTicks = 0, StartupTicks = 10,
                                 AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     },
                     AnimationNames = new[] { "melee", "leg_sweep", "backflip" },

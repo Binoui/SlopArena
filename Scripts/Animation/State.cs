@@ -15,20 +15,20 @@ using Godot;
 /// </summary>
 public abstract partial class State : Node
 {
-	[Export]
-	public string AnimationName { get; set; } = "";
+    [Export]
+    public string AnimationName { get; set; } = "";
 
-	[Export]
-	public bool CanMove { get; set; } = true;
+    [Export]
+    public bool CanMove { get; set; } = true;
 
-	protected StateMachine StateMachine { get; private set; } = null!;
-	protected PlayerController Player { get; private set; } = null!;
-	protected MovementComponent Movement { get; private set; } = null!;
-	protected AnimationNodeStateMachinePlayback AnimPlayback { get; private set; } = null!;
-	protected InputController InputCtrl { get; private set; } = null!;
+    protected StateMachine StateMachine { get; private set; } = null!;
+    protected PlayerController Player { get; private set; } = null!;
+    protected MovementComponent Movement { get; private set; } = null!;
+    protected AnimationNodeStateMachinePlayback AnimPlayback { get; private set; } = null!;
+    protected InputController InputCtrl { get; private set; } = null!;
 
-	/// <summary>
-	/// Called by StateMachine after setting references. Don't call directly.
+    /// <summary>
+    /// Called by StateMachine after setting references. Don't call directly.
     /// </summary>
     public void Setup(StateMachine stateMachine, PlayerController player,
         MovementComponent movement, AnimationNodeStateMachinePlayback animPlayback,
