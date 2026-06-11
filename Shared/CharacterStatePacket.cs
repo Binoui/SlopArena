@@ -12,10 +12,19 @@ namespace SlopArena.Shared
         public float VelocityX;
         public float VelocityY;
         public float VelocityZ;
-        public byte CurrentActionState;      // Idle, Dashing, Hitstun, WallCling, Sliding
-        public ushort StateDurationFrames;   // Number of physics frames remaining in this state
+        /// <summary>
+        /// Idle, Dashing, Hitstun, WallCling, Sliding
+        /// </summary>
+        public byte CurrentActionState;
+        /// <summary>
+        /// Number of physics frames remaining in this state
+        /// </summary>
+        public ushort StateDurationFrames;
 
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 2; // 31 bytes
+        /// <summary>
+        /// 31 bytes
+        /// </summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 2;
 
         public void Serialize(Span<byte> buffer)
         {

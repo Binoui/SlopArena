@@ -16,7 +16,9 @@ public partial class Main : Node3D
     private EscapeMenuUI _escapeMenu;
     private CharacterClass _selectedClass = CharacterClass.Manki;
 
-    // Cercle de ciblage (WoW-style ring under target)
+    /// <summary>
+    /// Cercle de ciblage (WoW-style ring under target)
+    /// </summary>
     private MeshInstance3D _targetRing;
     private DebugHitboxDraw _debugDraw;
     private bool _debugHitboxVisible = true;
@@ -139,11 +141,11 @@ public partial class Main : Node3D
             _simulation.CombatComponents[1] = playerCombat;
 
             // Subscribe to damage events for floating numbers
-            playerCombat.OnTakeDamage += (damage, kbX, kbY, kbZ) =>
+            playerCombat.OnTakeDamage += (damage, _, _, _) =>
             {
                 if (_damageNumbers != null && _player != null)
                 {
-                    _damageNumbers.SpawnDamageNumber(damage, _player.GlobalPosition + Vector3.Up * 1.5f);
+                    _damageNumbers.SpawnDamageNumber(damage, _player.GlobalPosition + (Vector3.Up * 1.5f));
                 }
             };
         }
@@ -176,7 +178,7 @@ public partial class Main : Node3D
                 var center = viewport.GetVisibleRect().Size / 2;
                 var from = camera.ProjectRayOrigin(center);
                 var dir = camera.ProjectRayNormal(center);
-                var to = from + dir * 100f;
+                var to = from + (dir * 100f);
 
                 var query = PhysicsRayQueryParameters3D.Create(from, to);
                 query.CollisionMask = 2; // Layer 2 = entities (dummies)
@@ -353,7 +355,7 @@ public partial class Main : Node3D
         }
 
         // Connect hit events from simulation (UI only — damage applied by LocalSimulation.RouteHit)
-        _simulation.OnEntityHit += (ulong entityId, float damage, float kbX, float kbY, float kbZ) =>
+        _simulation.OnEntityHit += (entityId, _, _, _, _) =>
         {
             // Auto-target: when player gets hit, target the first NPC
             if (entityId == 1 && _unitFrames != null && !_unitFrames.HasTarget())
@@ -378,11 +380,11 @@ public partial class Main : Node3D
 
                 // Subscribe to damage events for floating numbers
                 int npcIndex = i; // Capture for closure
-                combat.OnTakeDamage += (damage, kbX, kbY, kbZ) =>
+                combat.OnTakeDamage += (damage, _, _, _) =>
                 {
                     if (_damageNumbers != null && _npcs[npcIndex] != null)
                     {
-                        _damageNumbers.SpawnDamageNumber(damage, _npcs[npcIndex]!.GlobalPosition + Vector3.Up * 1.5f);
+                        _damageNumbers.SpawnDamageNumber(damage, _npcs[npcIndex]!.GlobalPosition + (Vector3.Up * 1.5f));
                     }
                 };
             }
@@ -394,14 +396,11 @@ public partial class Main : Node3D
     {
         if (_simulation == null || _player == null) return;
 
-        ulong playerId = 1;
+        const ulong playerId = 1;
         _simulation.Entities[playerId] = _player.GetHurtboxShapes();
 
         // Update player position in simulation each frame
-        _player.OnStateUpdated += (float posX, float posZ, float posY, float velX, float velZ) =>
-        {
-            _simulation.Entities[playerId] = _player.GetHurtboxShapes();
-        };
+        _player.OnStateUpdated += (_, _, _, _, _) => _simulation.Entities[playerId] = _player.GetHurtboxShapes();
     }
 
     /// <summary>
@@ -424,9 +423,9 @@ public partial class Main : Node3D
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
 
-        float innerRadius = 0.8f;
-        float outerRadius = 2.2f;
-        int segments = 32;
+        const float innerRadius = 0.8f;
+        const float outerRadius = 2.2f;
+        const int segments = 32;
 
         for (int i = 0; i < segments; i++)
         {
@@ -453,7 +452,7 @@ public partial class Main : Node3D
         ring.Mesh = st.Commit();
 
         // Yellowish emissive material
-        var mat = new StandardMaterial3D
+        ring.MaterialOverride = new StandardMaterial3D
         {
             AlbedoColor = new Color(1f, 0.85f, 0.2f),
             EmissionEnabled = true,
@@ -462,7 +461,6 @@ public partial class Main : Node3D
             Metallic = 0.3f,
             Roughness = 0.5f,
         };
-        ring.MaterialOverride = mat;
 
         return ring;
     }
@@ -619,7 +617,7 @@ public partial class Main : Node3D
     {
         if (_label == null) return;
 
-        float speed2D = MathF.Sqrt(velX * velX + velY * velY);
+        float speed2D = MathF.Sqrt((velX * velX) + (velY * velY));
 
         string dummyInfo = "";
         for (int i = 0; i < 5; i++)
@@ -634,22 +632,22 @@ public partial class Main : Node3D
 
         ushort playerDmg = _player?.GetDamagePercent() ?? 0;
 
-        _label.Text = $"SlopArena Arena Sandbox\n" +
-                              $"---------------------------------\n" +
+        _label.Text = "SlopArena Arena Sandbox\n" +
+                              "---------------------------------\n" +
                               $"Speed: {speed2D:F1}  |  DMG: {playerDmg}%\n" +
                               $"Position: ({posX:F1}, {posY:F1}, {posZ:F1})\n" +
-                              $"\n" +
+                              "\n" +
                               $"{dummyInfo}" +
-                              $"\n" +
-                              $"--- CONTROLS ---\n" +
-                              $"Mouse: Aim / Turn\n" +
-                              $"WASD: Movement (camera-relative)\n" +
-                              $"Space: Jump (double jump)\n" +
-                              $"Shift: Dash (ground or air, 1s, invincible)\n" +
-                              $"LMB/RMB: Attacks\n" +
-                              $"Q, E, R, F: Abilities\n" +
-                              $"Tab: Target NPC\n" +
-                              $"Escape: Release mouse\n" +
+                              "\n" +
+                              "--- CONTROLS ---\n" +
+                              "Mouse: Aim / Turn\n" +
+                              "WASD: Movement (camera-relative)\n" +
+                              "Space: Jump (double jump)\n" +
+                              "Shift: Dash (ground or air, 1s, invincible)\n" +
+                              "LMB/RMB: Attacks\n" +
+                              "Q, E, R, F: Abilities\n" +
+                              "Tab: Target NPC\n" +
+                              "Escape: Release mouse\n" +
                               $"F3: Toggle Hitbox Debug ({(_debugHitboxVisible ? "ON" : "OFF")})";
     }
 
@@ -659,37 +657,37 @@ public partial class Main : Node3D
         crosshair.Name = "Crosshair";
         crosshair.MouseFilter = Control.MouseFilterEnum.Ignore;
 
-        float center = 960f;
-        float mid = 540f;
-        float size = 8f;
-        float gap = 4f;
-        float thickness = 2f;
+        const float center = 960f;
+        const float mid = 540f;
+        const float size = 8f;
+        const float gap = 4f;
+        const float thickness = 2f;
         var white = new Color(1f, 1f, 1f, 0.8f);
 
         var top = new ColorRect();
         top.Color = white;
-        top.Position = new Vector2(center - thickness / 2, mid - gap - size);
+        top.Position = new Vector2(center - (thickness / 2), mid - gap - size);
         top.Size = new Vector2(thickness, size);
         top.MouseFilter = Control.MouseFilterEnum.Ignore;
         crosshair.AddChild(top);
 
         var bottom = new ColorRect();
         bottom.Color = white;
-        bottom.Position = new Vector2(center - thickness / 2, mid + gap);
+        bottom.Position = new Vector2(center - (thickness / 2), mid + gap);
         bottom.Size = new Vector2(thickness, size);
         bottom.MouseFilter = Control.MouseFilterEnum.Ignore;
         crosshair.AddChild(bottom);
 
         var left = new ColorRect();
         left.Color = white;
-        left.Position = new Vector2(center - gap - size, mid - thickness / 2);
+        left.Position = new Vector2(center - gap - size, mid - (thickness / 2));
         left.Size = new Vector2(size, thickness);
         left.MouseFilter = Control.MouseFilterEnum.Ignore;
         crosshair.AddChild(left);
 
         var right = new ColorRect();
         right.Color = white;
-        right.Position = new Vector2(center + gap, mid - thickness / 2);
+        right.Position = new Vector2(center + gap, mid - (thickness / 2));
         right.Size = new Vector2(size, thickness);
         right.MouseFilter = Control.MouseFilterEnum.Ignore;
         crosshair.AddChild(right);

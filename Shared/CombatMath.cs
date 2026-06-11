@@ -5,7 +5,7 @@ namespace SlopArena.Shared
     /// <summary>
     /// Pure math functions for combat calculations.
     /// No Godot dependencies - usable by Server and Client.
-    /// 
+    ///
     /// All positions are in 3D space (X, Y, Z).
     /// Y is the up axis.
     /// </summary>
@@ -16,13 +16,13 @@ namespace SlopArena.Shared
         /// Used for AoE circle hits and projectile proximity checks.
         /// </summary>
         public static bool IsInCircle(
-            float targetX, float targetY, float targetZ,
-            float centerX, float centerY, float centerZ,
+            float targetX, float targetZ,
+            float centerX, float centerZ,
             float radius)
         {
             float dx = targetX - centerX;
             float dz = targetZ - centerZ;
-            float distSq = dx * dx + dz * dz;
+            float distSq = (dx * dx) + (dz * dz);
             return distSq <= radius * radius;
         }
 
@@ -31,14 +31,14 @@ namespace SlopArena.Shared
         /// The cone is defined by its origin, direction, angle (half-angle in radians), and range.
         /// </summary>
         public static bool IsInCone(
-            float targetX, float targetY, float targetZ,
-            float originX, float originY, float originZ,
+            float targetX, float targetZ,
+            float originX, float originZ,
             float dirX, float dirZ,
             float halfAngleRad, float range)
         {
             float dx = targetX - originX;
             float dz = targetZ - originZ;
-            float distSq = dx * dx + dz * dz;
+            float distSq = (dx * dx) + (dz * dz);
 
             if (distSq > range * range)
                 return false;
@@ -47,7 +47,7 @@ namespace SlopArena.Shared
                 return true; // At origin
 
             float dist = MathF.Sqrt(distSq);
-            float dot = (dx * dirX + dz * dirZ) / dist; // Normalized dot product
+            float dot = ((dx * dirX) + (dz * dirZ)) / dist; // Normalized dot product
 
             // Clamp to avoid NaN from floating point
             dot = Math.Clamp(dot, -1f, 1f);
@@ -71,11 +71,11 @@ namespace SlopArena.Shared
             float fx = lineStartX - circleX;
             float fz = lineStartZ - circleZ;
 
-            float a = dx * dx + dz * dz;
-            float b = 2f * (fx * dx + fz * dz);
-            float c = fx * fx + fz * fz - radius * radius;
+            float a = (dx * dx) + (dz * dz);
+            float b = 2f * ((fx * dx) + (fz * dz));
+            float c = (fx * fx) + (fz * fz) - (radius * radius);
 
-            float discriminant = b * b - 4f * a * c;
+            float discriminant = (b * b) - (4f * a * c);
             if (discriminant < 0)
                 return false;
 
@@ -91,14 +91,14 @@ namespace SlopArena.Shared
         /// Calculate knockback direction from attacker to target (horizontal only).
         /// </summary>
         public static void CalculateKnockback(
-            float targetX, float targetY, float targetZ,
-            float attackerX, float attackerY, float attackerZ,
+            float targetX, float targetZ,
+            float attackerX, float attackerZ,
             float force, float upward,
             out float kbX, out float kbY, out float kbZ)
         {
             float dx = targetX - attackerX;
             float dz = targetZ - attackerZ;
-            float distSq = dx * dx + dz * dz;
+            float distSq = (dx * dx) + (dz * dz);
 
             if (distSq > 0.001f)
             {
@@ -122,7 +122,7 @@ namespace SlopArena.Shared
         {
             float dx = x2 - x1;
             float dz = z2 - z1;
-            return MathF.Sqrt(dx * dx + dz * dz);
+            return MathF.Sqrt((dx * dx) + (dz * dz));
         }
     }
 }

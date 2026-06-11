@@ -2,7 +2,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Status effect identifiers that spells can apply or consume.
-    /// Each status has a clear gameplay meaning; spells check HasStatus(type) 
+    /// Each status has a clear gameplay meaning; spells check HasStatus(type)
     /// for conditional bonuses and ConsumeStatus(type) for one-shot effects.
     /// </summary>
     public enum StatusType : byte

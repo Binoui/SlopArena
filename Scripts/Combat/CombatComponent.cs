@@ -120,15 +120,15 @@ public partial class CombatComponent : Node
 
     /// <summary>
     /// Check melee cone hit against all entities in the simulation.
-    public List<ulong> CheckMeleeCone(Vector3 origin, Vector3 forward, float range, float halfAngleDeg, float damage, float knockbackForce, float knockbackUpward)
+    public List<ulong> CheckMeleeCone(Vector3 origin, Vector3 forward, float range, float damage, float knockbackForce, float knockbackUpward)
     {
         _lastHitTargets.Clear();
         if (_simulation == null) return _lastHitTargets;
 
         var entities = BuildEntityList();
-        var hb = new SlopArena.Shared.Hitbox
+        var hb = new Hitbox
         {
-            X = origin.X + forward.X * range * 0.5f,
+            X = origin.X + (forward.X * range * 0.5f),
             Y = origin.Y + 1f,
             Z = origin.Z + forward.Z * range * 0.5f,
             Radius = range * 0.5f,
@@ -140,9 +140,7 @@ public partial class CombatComponent : Node
         };
         SpellResolver.Spawn(hb);
         GD.Print($"[HITBOX] MeleeCone at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
-        var results = SpellResolver.Tick(entities);
-
-        foreach (var hit in results)
+        foreach (var hit in SpellResolver.Tick(entities))
         {
             _lastHitTargets.Add(hit.TargetEntityId);
             _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
@@ -162,7 +160,7 @@ public partial class CombatComponent : Node
         if (_simulation == null) return _lastHitTargets;
 
         var entities = BuildEntityList();
-        var hb = new SlopArena.Shared.Hitbox
+        var hb = new Hitbox
         {
             X = center.X,
             Y = center.Y,
@@ -176,8 +174,7 @@ public partial class CombatComponent : Node
         };
         SpellResolver.Spawn(hb);
         GD.Print($"[HITBOX] CircleAoE at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
-        var results = SpellResolver.Tick(entities);
-        foreach (var hit in results)
+        foreach (var hit in SpellResolver.Tick(entities))
         {
             _lastHitTargets.Add(hit.TargetEntityId);
             _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
@@ -297,7 +294,7 @@ public partial class CombatComponent : Node
     }
 
     /// <summary>
-    /// Check if the entity this is attached to has a specific status 
+    /// Check if the entity this is attached to has a specific status
     /// and can consume it. Used by spells on the caster (self-buffs, etc.)
     /// </summary>
     public bool ConsumeStatusOnTarget(ulong targetEntityId, StatusType type)
@@ -451,7 +448,7 @@ public partial class CombatComponent : Node
     /// Checks target distance and initiates warp if in warp range.
     /// Callback fires after warp completes (or immediately if no warp needed).
     /// </summary>
-    public void ExecuteAttackWithWarp(SlopArena.Shared.AttackStage stage, float warpSpeed, Action onAttackStart)
+    public void ExecuteAttackWithWarp(AttackStage stage, float warpSpeed, Action onAttackStart)
     {
         // No target lock system → execute immediately
         if (!stage.UseTargetLock || _targetLock == null || _warpSystem == null)
@@ -479,10 +476,7 @@ public partial class CombatComponent : Node
         {
             // In warp range → dash toward target first
             GD.Print($"[Warp] Target {distToTarget:F1}m away, warping to {stage.AttackRange:F1}m");
-            _warpSystem.StartWarp(stage.AttackRange, warpSpeed, () =>
-            {
-                onAttackStart?.Invoke();
-            });
+            _warpSystem.StartWarp(stage.AttackRange, warpSpeed, () => onAttackStart?.Invoke());
         }
         else
         {
@@ -532,10 +526,14 @@ public partial class CombatComponent : Node
                 entities.Add(new SpellResolver.EntityData
                 {
                     Id = kvp.Key,
-                    PosX = start.X, PosY = start.Y, PosZ = start.Z,
+                    PosX = start.X,
+                    PosY = start.Y,
+                    PosZ = start.Z,
                     Radius = radius,
-                    Shape = isCapsule ? SlopArena.Shared.HitboxShape.Capsule : SlopArena.Shared.HitboxShape.Sphere,
-                    EndX = end.X, EndY = end.Y, EndZ = end.Z,
+                    Shape = isCapsule ? HitboxShape.Capsule : HitboxShape.Sphere,
+                    EndX = end.X,
+                    EndY = end.Y,
+                    EndZ = end.Z,
                     Active = true
                 });
             }
