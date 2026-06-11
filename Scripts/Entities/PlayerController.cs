@@ -1003,9 +1003,13 @@ public partial class PlayerController : CharacterBody3D
     // VISUAL FEEDBACK (called by FSM states in Enter/Exit)
     // ==========================================
 
+    /// <summary>When true, state colors show on the model (toggled by F3 debug).</summary>
+    public bool DebugEmissionEnabled { get; set; }
+
     /// <summary>Set emission glow on the character model. Called by states in Enter().</summary>
     public void SetModelEmission(Color color, float energy = 1.5f)
     {
+        if (!DebugEmissionEnabled) return;
         if (_playerModel != null)
             ApplyEmissionRecursive(_playerModel, color, energy);
     }
@@ -1013,6 +1017,7 @@ public partial class PlayerController : CharacterBody3D
     /// <summary>Remove emission glow. Called by states in Exit().</summary>
     public void ClearModelEmission()
     {
+        if (!DebugEmissionEnabled) return;
         if (_playerModel != null)
             ApplyEmissionRecursive(_playerModel, new Color(1, 1, 1), 0f, clear: true);
     }
