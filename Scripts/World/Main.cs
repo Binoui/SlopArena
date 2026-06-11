@@ -132,7 +132,7 @@ public partial class Main : Node3D
 
         // Setup combat component (for spell hit detection)
         if (_simulation != null)
-            _player.SetupCombat(_simulation, ArenaRegistry.Get("split"), _spellVFX);
+            _player.SetupCombat(_simulation, ArenaRegistry.Get("split"), 1, _spellVFX);
 
         // Register player in the simulation's combat component map
         var playerCombat = _player.GetCombatComponent();
@@ -323,7 +323,7 @@ public partial class Main : Node3D
 
             // Setup combat component for this NPC
             if (_simulation != null)
-                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"), _spellVFX);
+                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"), (ulong)(100 + i), _spellVFX);
         }
     }
 

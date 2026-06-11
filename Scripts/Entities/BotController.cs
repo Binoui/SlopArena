@@ -65,6 +65,9 @@ public partial class BotController : Node
         _npc = npc;
         _target = target;
 
+        // Process before parent (PlayerController) so AI input is ready when parent reads it
+        ProcessPriority = -1;
+
         // Start with random wander position
         _wanderTarget = _npc.GlobalPosition + new Vector3(
             (GD.Randf() * WanderRadius) - (WanderRadius / 2),
