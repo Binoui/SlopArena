@@ -130,7 +130,7 @@ public partial class CombatComponent : Node
         {
             X = origin.X + (forward.X * range * 0.5f),
             Y = origin.Y + 1f,
-            Z = origin.Z + forward.Z * range * 0.5f,
+            Z = origin.Z + (forward.Z * range * 0.5f),
             Radius = range * 0.5f,
             DurationTicks = 5,
             Damage = damage,
