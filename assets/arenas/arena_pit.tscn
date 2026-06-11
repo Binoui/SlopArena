@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://d0ji8nj4w0dr7"]
 
-[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://textures/kenney_prototype/PNG/Dark/texture_01.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://assets/textures/kenney_prototype/PNG/Dark/texture_01.png" id="1"]
 [ext_resource type="PackedScene" uid="uid://dqyy1q5715r4q" path="res://main.tscn" id="2_5wk7m"]
 
 [sub_resource type="StandardMaterial3D" id="mat_floor"]

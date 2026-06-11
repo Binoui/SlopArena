@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bkf257ntfo22b"]
 
-[ext_resource type="Texture2D" uid="uid://bmeeey57nv2m2" path="res://textures/kenney_prototype/PNG/Orange/texture_01.png" id="1"]
-[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://textures/kenney_prototype/PNG/Dark/texture_01.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bmeeey57nv2m2" path="res://assets/textures/kenney_prototype/PNG/Orange/texture_01.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://nc51s5ehdnvy" path="res://assets/textures/kenney_prototype/PNG/Dark/texture_01.png" id="2"]
 
 [sub_resource type="StandardMaterial3D" id="mat_lower"]
 albedo_texture = ExtResource("2")
