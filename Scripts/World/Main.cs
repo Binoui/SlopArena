@@ -569,7 +569,7 @@ public partial class Main : Node3D
         }
 
         // Debug: draw hitboxes (red) and hurtboxes (blue) — world-space
-        if (_debugDraw != null && _simulation != null)
+        if (_debugDraw != null && _simulation != null && _debugHitboxVisible)
         {
             var hitboxes = SpellResolver.GetActiveHitboxes();
             var hurtboxes = new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>();
@@ -607,6 +607,14 @@ public partial class Main : Node3D
                 _debugHitboxVisible = !_debugHitboxVisible;
                 if (_debugDraw != null)
                     _debugDraw.Visible = _debugHitboxVisible;
+                if (_player != null)
+                    _player.DebugEmissionEnabled = _debugHitboxVisible;
+                // Also toggle emission on NPCs
+                for (int i = 0; i < 5; i++)
+                {
+                    if (_npcs[i] != null)
+                        _npcs[i]!.DebugEmissionEnabled = _debugHitboxVisible;
+                }
                 GD.Print($"Debug Hitboxes: {(_debugHitboxVisible ? "ON" : "OFF")}");
             }
         }
