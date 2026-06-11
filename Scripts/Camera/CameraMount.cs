@@ -16,25 +16,41 @@ public partial class CameraMount : Node3D
 	[Export] public float MinZoom = 5.0f;
 	[Export] public float MaxZoom = 80.0f;
 	[Export] public float ZoomSpeed = 3.0f;
-	[Export] public float TransitionSpeed = 5.0f; // lerp speed for mode transitions
+	/// <summary>
+	/// lerp speed for mode transitions
+	/// </summary>
+	[Export] public float TransitionSpeed = 5.0f;
 
 	public enum CameraMode { Default, Aiming }
 
 	private CameraMode _mode = CameraMode.Default;
 
-	private Node3D? _h;           // horizontal yaw node
-	private SpringArm3D? _v;      // vertical pitch + zoom node
+	/// <summary>
+	/// horizontal yaw node
+	/// </summary>
+	private Node3D? _h;
+	/// <summary>
+	/// vertical pitch + zoom node
+	/// </summary>
+	private SpringArm3D? _v;
 	private Camera3D? _camera;
 
-	// Current lerped values (smooth transitions)
+	/// <summary>
+	/// Current lerped values (smooth transitions)
+	/// </summary>
 	private float _currentOffsetY = 1.5f;
 	private float _currentDistance = 60f;
 
-	// Target values (set by mode switch)
+	/// <summary>
+	/// Target values (set by mode switch)
+	/// </summary>
 	private float _targetOffsetY = 1.5f;
 	private float _targetDistance = 60f;
 
-	private float _cameraYaw = 0f; // absolute camera yaw in radians, controlled only by mouse
+	/// <summary>
+	/// absolute camera yaw in radians, controlled only by mouse
+	/// </summary>
+	private float _cameraYaw = 0f;
 
 	public override void _Ready()
 	{
@@ -123,7 +139,7 @@ public partial class CameraMount : Node3D
 		_cameraYaw -= relativeMotion.X * Sensitivity;
 
 		// Pitch: rotate the v (SpringArm) around X directly (not overwritten by _Process)
-		float pitch = _v.Rotation.X - relativeMotion.Y * Sensitivity;
+		float pitch = _v.Rotation.X - (relativeMotion.Y * Sensitivity);
 		pitch = Mathf.Clamp(pitch, Mathf.DegToRad(-85f), Mathf.DegToRad(-5f));
 		_v.Rotation = new Vector3(pitch, 0f, 0f);
 	}
@@ -133,7 +149,7 @@ public partial class CameraMount : Node3D
 	/// </summary>
 	public void ZoomCamera(float direction)
 	{
-		_currentDistance = Mathf.Clamp(_currentDistance + direction * ZoomSpeed, MinZoom, MaxZoom);
+		_currentDistance = Mathf.Clamp(_currentDistance + (direction * ZoomSpeed), MinZoom, MaxZoom);
 		_targetDistance = _currentDistance;
 	}
 

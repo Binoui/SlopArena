@@ -11,7 +11,7 @@ namespace SlopArena.Shared
     /// Architecture:
     ///   SimulateTick() processes ONE tick (1/60s) of movement + combat
     ///   for a single character. It takes the current CharacterState,
-    ///   mutates it to the next tick, and fires hit events via callback.
+    ///   mutates it to the next tick.
     ///
     ///   Hit detection uses SpellResolver (Shared/) — pure math.
     ///
@@ -22,23 +22,38 @@ namespace SlopArena.Shared
     {
         public const float TickDt = 1f / 60f;
 
-        // ── Constants ──
+        /// <summary>
+        /// ── Constants ──
+        /// </summary>
         private const float AirDrag = 0.2f;
-        private const float AirDodgeSpeed = 35.0f;
-        private const float KnockbackDecayPerTick = 0.1333f; // 8.0/s at 60Hz
+        /// <summary>
+        /// 8.0/s at 60Hz
+        /// </summary>
+        private const float KnockbackDecayPerTick = 0.1333f;
         private const float KnockbackMinGravity = 9.8f;
         private const byte MaxAirDodges = 1;
 
-        // Dash duration: 0.25 second = 15 ticks
+        /// <summary>
+        /// Dash duration: 0.25 second = 15 ticks
+        /// </summary>
         public const ushort DashDurationTicks = 15;
-        private const ushort DashInvincibilityTicks = 30; // full duration invincible
+        /// <summary>
+        /// full duration invincible
+        /// </summary>
+        private const ushort DashInvincibilityTicks = 30;
 
-        // Tick-duration constants
-        private const ushort AirDodgeDurationTicks = 7;     // ~0.117s
-        private const ushort SprintThresholdTicks = 12;     // 0.2s
-        private const ushort TurnaroundLagTicks = 6;        // 0.1s
+        /// <summary>
+        /// 0.2s
+        /// </summary>
+        private const ushort SprintThresholdTicks = 12;
+        /// <summary>
+        /// 0.1s
+        /// </summary>
+        private const ushort TurnaroundLagTicks = 6;
 
-        // Floor height (flat arena ground at Y=0)
+        /// <summary>
+        /// Floor height (flat arena ground at Y=0)
+        /// </summary>
         public const float FloorHeight = 0f;
 
         // ── MAIN ENTRY POINT ──
@@ -46,14 +61,12 @@ namespace SlopArena.Shared
         /// <summary>
         /// Process one simulation tick for a character.
         /// Mutates state in-place.
-        /// When combat hits occur, calls onHit for each entity hit.
         /// </summary>
         public static void SimulateTick(
             ref CharacterState s,
             CharacterDefinition def,
             InputState input,
-            ArenaDefinition arena,
-            Action<ulong, float, float, float, float>? onHit = null)
+            ArenaDefinition arena)
         {
             var stats = def.Movement;
 
@@ -78,7 +91,7 @@ namespace SlopArena.Shared
             if (s.State == ActionState.Dashing)
                 ProcessDash(ref s, stats);
             else if (s.State == ActionState.AirDodging)
-                ProcessAirDodge(ref s);
+                ProcessAirDodge();
 
             if (s.State == ActionState.Idle || s.State == ActionState.Attacking)
             {
@@ -180,10 +193,10 @@ namespace SlopArena.Shared
 
         private static bool HasKnockback(CharacterState s)
         {
-            return (s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ) > 0.0001f;
+            return ((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ)) > 0.0001f;
         }
 
-        private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena)
+        private static void ProcessKnockback(ref CharacterState s, ArenaDefinition _)
         {
             // Decay knockback
             s.KVX -= s.KVX * KnockbackDecayPerTick;
@@ -245,7 +258,7 @@ namespace SlopArena.Shared
 
         // ── AIR DODGE ──
 
-        private static void ProcessAirDodge(ref CharacterState s)
+        private static void ProcessAirDodge()
         {
             // Air dodge maintains its velocity (set once when initiated)
             // Natural drift/end handled by state tick expiry
@@ -281,13 +294,13 @@ namespace SlopArena.Shared
             s.JumpsLeft = stats.MaxJumps;
             s.IsGrounded = true;
 
-            bool hasInput = (dirX * dirX + dirZ * dirZ) > 0.0001f;
+            bool hasInput = ((dirX * dirX) + (dirZ * dirZ)) > 0.0001f;
 
             if (hasInput)
             {
                 // Detect direction change
-                bool hadDir = (s.LastDirX * s.LastDirX + s.LastDirZ * s.LastDirZ) > 0.0001f;
-                bool dirChanged = hadDir && ((dirX * s.LastDirX + dirZ * s.LastDirZ) < 0.5f);
+                bool hadDir = ((s.LastDirX * s.LastDirX) + (s.LastDirZ * s.LastDirZ)) > 0.0001f;
+                bool dirChanged = hadDir && (((dirX * s.LastDirX) + (dirZ * s.LastDirZ)) < 0.5f);
 
                 if (dirChanged)
                 {
@@ -382,28 +395,6 @@ namespace SlopArena.Shared
             UpdateFacing(ref s);
         }
 
-        // ── AIR DODGE INITIATION ──
-
-        private static void StartAirDodge(ref CharacterState s, float dirX, float dirZ)
-        {
-            s.State = ActionState.AirDodging;
-            s.StateTicks = AirDodgeDurationTicks;
-            s.AirDodgesLeft--;
-
-            float len = MathF.Sqrt(dirX * dirX + dirZ * dirZ);
-            if (len > 0.001f)
-            {
-                s.VX = (dirX / len) * AirDodgeSpeed;
-                s.VZ = (dirZ / len) * AirDodgeSpeed;
-            }
-            else
-            {
-                // No input = backward dodge (relative to facing)
-                s.VX = 0f;
-                s.VZ = -AirDodgeSpeed * 0.5f;
-            }
-        }
-
         // ── DASH INITIATION ──
 
         /// <summary>
@@ -418,7 +409,7 @@ namespace SlopArena.Shared
             if (HasKnockback(s)) return;
 
             // Normalize direction
-            float len = MathF.Sqrt(dirX * dirX + dirZ * dirZ);
+            float len = MathF.Sqrt((dirX * dirX) + (dirZ * dirZ));
             if (len < 0.01f)
             {
                 // No input: dash forward (based on facing)
@@ -472,7 +463,7 @@ namespace SlopArena.Shared
             s.KVZ = kbZ * kbScale;
 
             // Calculate hitstun duration based on knockback strength
-            float kbMagnitude = MathF.Sqrt(s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ);
+            float kbMagnitude = MathF.Sqrt((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
 
             // Hitstun formula: 8-20 frames depending on knockback strength
             // Weak hits: 8 frames, Strong hits: 20+ frames
@@ -513,7 +504,7 @@ namespace SlopArena.Shared
 
             float dirX = s.LastDirX;
             float dirZ = s.LastDirZ;
-            float len = MathF.Sqrt(dirX * dirX + dirZ * dirZ);
+            float len = MathF.Sqrt((dirX * dirX) + (dirZ * dirZ));
             if (len < 0.01f)
             {
                 // No input: forward
@@ -569,7 +560,7 @@ namespace SlopArena.Shared
 
         private static void UpdateFacing(ref CharacterState s)
         {
-            float hSpeedSq = s.VX * s.VX + s.VZ * s.VZ;
+            float hSpeedSq = (s.VX * s.VX) + (s.VZ * s.VZ);
             if (hSpeedSq > 0.01f)
             {
                 s.FacingYaw = MathF.Atan2(s.VX, s.VZ);
@@ -585,7 +576,7 @@ namespace SlopArena.Shared
             float dx = input.MoveX;
             float dz = input.MoveY;
 
-            float len = MathF.Sqrt(dx * dx + dz * dz);
+            float len = MathF.Sqrt((dx * dx) + (dz * dz));
             if (len > 0.001f)
             {
                 dx /= len;
@@ -601,7 +592,7 @@ namespace SlopArena.Shared
         {
             if (Math.Abs(to - from) <= delta)
                 return to;
-            return from + Math.Sign(to - from) * delta;
+            return from + (Math.Sign(to - from) * delta);
         }
     }
 }

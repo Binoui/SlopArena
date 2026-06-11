@@ -10,7 +10,7 @@ namespace SlopArena.Shared
     /// </summary>
     public static class SpellResolver
     {
-        private static List<Hitbox> _hitboxes = new();
+        private static readonly List<Hitbox> _hitboxes = new();
 
         /// <summary>
         /// Result of a single hitbox-entity collision.
@@ -34,8 +34,14 @@ namespace SlopArena.Shared
             public ulong Id;
             public float PosX, PosY, PosZ;
             public float Radius;
-            public HitboxShape Shape;       // Sphere or Capsule
-            public float EndX, EndY, EndZ;   // Capsule end (0 = sphere)
+            /// <summary>
+            /// Sphere or Capsule
+            /// </summary>
+            public HitboxShape Shape;
+            /// <summary>
+            /// Capsule end (0 = sphere)
+            /// </summary>
+            public float EndX, EndY, EndZ;
             public bool Active;
         }
 
@@ -106,7 +112,7 @@ namespace SlopArena.Shared
                         dx = entity.PosX - hb.X;
                         dy = entity.PosY - hb.Y;
                         dz = entity.PosZ - hb.Z;
-                        float distSq = dx * dx + dy * dy + dz * dz;
+                        float distSq = (dx * dx) + (dy * dy) + (dz * dz);
                         float combinedRadius = hb.Radius + entity.Radius;
                         if (distSq <= combinedRadius * combinedRadius)
                         {
@@ -182,7 +188,7 @@ namespace SlopArena.Shared
             dx = cx2 - cx1;
             dy = cy2 - cy1;
             dz = cz2 - cz1;
-            float distSq = dx * dx + dy * dy + dz * dz;
+            float distSq = (dx * dx) + (dy * dy) + (dz * dz);
             float combinedRadius = hb.Radius + entity.Radius;
 
             if (distSq <= combinedRadius * combinedRadius)
@@ -213,9 +219,9 @@ namespace SlopArena.Shared
             float d2x = b1x - b0x, d2y = b1y - b0y, d2z = b1z - b0z;
             float rx = a0x - b0x, ry = a0y - b0y, rz = a0z - b0z;
 
-            float a = d1x * d1x + d1y * d1y + d1z * d1z; // |d1|²
-            float e = d2x * d2x + d2y * d2y + d2z * d2z; // |d2|²
-            float f = d2x * rx + d2y * ry + d2z * rz;
+            float a = (d1x * d1x) + (d1y * d1y) + (d1z * d1z); // |d1|²
+            float e = (d2x * d2x) + (d2y * d2y) + (d2z * d2z); // |d2|²
+            float f = (d2x * rx) + (d2y * ry) + (d2z * rz);
 
             float t = 0f, u = 0f;
 
@@ -231,7 +237,7 @@ namespace SlopArena.Shared
             }
             else
             {
-                float c = d1x * rx + d1y * ry + d1z * rz;
+                float c = (d1x * rx) + (d1y * ry) + (d1z * rz);
 
                 if (e <= 1e-6f)
                 {
@@ -240,13 +246,13 @@ namespace SlopArena.Shared
                 }
                 else
                 {
-                    float b = d1x * d2x + d1y * d2y + d1z * d2z;
-                    float denom = a * e - b * b;
+                    float b = (d1x * d2x) + (d1y * d2y) + (d1z * d2z);
+                    float denom = (a * e) - (b * b);
 
                     if (MathF.Abs(denom) > 1e-6f)
                     {
-                        t = Math.Clamp((b * f - c * e) / denom, 0f, 1f);
-                        u = Math.Clamp((b * t + f) / e, 0f, 1f);
+                        t = Math.Clamp(((b * f) - (c * e)) / denom, 0f, 1f);
+                        u = Math.Clamp(((b * t) + f) / e, 0f, 1f);
                     }
                     else
                     {
@@ -256,12 +262,12 @@ namespace SlopArena.Shared
                 }
             }
 
-            cx = a0x + d1x * t;
-            cy = a0y + d1y * t;
-            cz = a0z + d1z * t;
-            dx = b0x + d2x * u;
-            dy = b0y + d2y * u;
-            dz = b0z + d2z * u;
+            cx = a0x + (d1x * t);
+            cy = a0y + (d1y * t);
+            cz = a0z + (d1z * t);
+            dx = b0x + (d2x * u);
+            dy = b0y + (d2y * u);
+            dz = b0z + (d2z * u);
         }
     }
 }

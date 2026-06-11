@@ -4,7 +4,7 @@ using System;
 /// <summary>
 /// Hurtbox component (Area3D) - pure marker on entities that can take damage.
 /// No collision detection logic here - that's handled by LocalSimulation.
-/// 
+///
 /// Collision layers:
 ///   Layer 2: Entities (this)
 /// </summary>

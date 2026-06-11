@@ -56,9 +56,14 @@ public partial class PlayerController : CharacterBody3D
     private BoneHurtboxSetup? _boneHurtboxes;
     private bool _heavyHeld = false;
 
-    // Ground arrow indicator
+    /// <summary>
+    /// Ground arrow indicator
+    /// </summary>
     private MeshInstance3D? _groundArrow;
-    private Vector2 _snappedInputDirection = Vector2.Zero; // camera-relative (X=camRight, Y=camForward)
+    /// <summary>
+    /// camera-relative (X=camRight, Y=camForward)
+    /// </summary>
+    private Vector2 _snappedInputDirection = Vector2.Zero;
 
     // ==========================================
     // RESPAWN STATE (Player + NPC)
@@ -67,12 +72,21 @@ public partial class PlayerController : CharacterBody3D
     private bool _isPlayerControlled = true;
     private bool _isNPC = false;
     private float _respawnTimer = 0f;
-    private const float RespawnDelay = 20.0f; // 20 seconds for both player and NPCs
-    private Vector3 _deathPosition = Vector3.Zero; // Camera target during respawn
+    /// <summary>
+    /// 20 seconds for both player and NPCs
+    /// </summary>
+    private const float RespawnDelay = 20.0f;
+    /// <summary>
+    /// Camera target during respawn
+    /// </summary>
+    private Vector3 _deathPosition = Vector3.Zero;
     private float _npcHitFlashTimer = 0f;
     private MeshInstance3D? _npcMesh;
     private float _npcOriginalEmission = 1.5f;
-    private float _hitFlashTimer = 0f; // Brief white flash on hit impact
+    /// <summary>
+    /// Brief white flash on hit impact
+    /// </summary>
+    private float _hitFlashTimer = 0f;
 
     public void SetNPC(bool isNpc)
     {
@@ -82,7 +96,11 @@ public partial class PlayerController : CharacterBody3D
 
     public bool IsNPC() => _isNPC;
     public bool IsAlive() => _respawnTimer <= 0f;
-    public bool IsNpcAlive() => IsAlive(); // Alias for external code
+    /// <summary>
+    /// Alias for external code
+    /// </summary>
+    /// <returns></returns>
+    public bool IsNpcAlive() => IsAlive();
     public float GetRespawnTimeRemaining() => _respawnTimer;
     public Vector3 GetDeathPosition() => _deathPosition;
 
@@ -100,7 +118,10 @@ public partial class PlayerController : CharacterBody3D
     public event Action<float, float, float, float, float>? OnStateUpdated;
     public event Action? OnTargetNextPressed;
     public event Action<ulong>? OnLeftClickEntity;
-    public event Action<int>? OnAbilityUsed; // slotIndex, for HUD flash
+    /// <summary>
+    /// slotIndex, for HUD flash
+    /// </summary>
+    public event Action<int>? OnAbilityUsed;
 
     // ==========================================
     // PUBLIC GETTERS
@@ -161,7 +182,7 @@ public partial class PlayerController : CharacterBody3D
         if (_isNPC) _npcHitFlashTimer = 0.15f;
 
         // Hit reaction animation
-        float kbMag = Mathf.Sqrt(kbX * kbX + kbY * kbY + kbZ * kbZ);
+        float kbMag = Mathf.Sqrt((kbX * kbX) + (kbY * kbY) + (kbZ * kbZ));
         string hitAnim = kbMag < 10f ? "hit_small" : kbMag < 20f ? "hit_medium" : "hit_hard";
         var hitState = _fsm?.GetState<HitReactionState>("hit_reaction");
         if (hitState != null)
@@ -331,7 +352,7 @@ public partial class PlayerController : CharacterBody3D
         st.Begin(Mesh.PrimitiveType.Triangles);
 
         // Arrow shape: triangle pointing forward (Z+)
-        float size = 0.8f;
+        const float size = 0.8f;
 
         // Tip
         st.AddVertex(new Vector3(0f, 0f, size));
@@ -344,7 +365,7 @@ public partial class PlayerController : CharacterBody3D
         arrow.Mesh = st.Commit();
 
         // Semi-transparent white material
-        var mat = new StandardMaterial3D
+        arrow.MaterialOverride = new StandardMaterial3D
         {
             AlbedoColor = new Color(1f, 1f, 1f, 0.6f),
             EmissionEnabled = true,
@@ -355,7 +376,6 @@ public partial class PlayerController : CharacterBody3D
             DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelDither,
             DistanceFadeMaxDistance = 50f,
         };
-        arrow.MaterialOverride = mat;
 
         arrow.Visible = false;
         return arrow;
@@ -577,12 +597,12 @@ public partial class PlayerController : CharacterBody3D
         // Dash (ground OR air)
         if (input.Dash && _movementComponent.State.AnimLockTicks <= 0)
         {
-        	var dashState = _fsm?.GetState<DashState>("dash");
-        	if (dashState != null)
-        	{
-        		dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
-        		_fsm?.TransitionTo("dash");
-        	}
+            var dashState = _fsm?.GetState<DashState>("dash");
+            if (dashState != null)
+            {
+                dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
+                _fsm?.TransitionTo("dash");
+            }
         }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
@@ -598,8 +618,7 @@ public partial class PlayerController : CharacterBody3D
                 if (stages != null)
                 {
                     var ability = _charDef.GetSlotAbility(attackState.PendingSlotIndex, attackState.PendingAirborne);
-                    ResolveAbilityStages(ability, stages, attackState.PendingSlotIndex,
-                        attackState.PendingCharged, attackState.PendingAirborne);
+                    ResolveAbilityStages(stages, attackState.PendingSlotIndex, attackState.PendingAirborne);
 
                     // Special effects (only for stage 0, not combo chains)
                     if (attackState.PendingSlotIndex != 0 && ability.SpecialEffectKeys != null)
@@ -634,9 +653,9 @@ public partial class PlayerController : CharacterBody3D
     // INPUT STATE BUILDER (camera-relative, 8-direction)
     // ==========================================
 
-    private SlopArena.Shared.InputState BuildInputState()
+    private InputState BuildInputState()
     {
-        var input = new SlopArena.Shared.InputState();
+        var input = new InputState();
 
         // If NPC with AI-injected input, use that directly
         if (_isNPC && _inputCtrl.IsAIControlled())
@@ -702,7 +721,7 @@ public partial class PlayerController : CharacterBody3D
             _snappedInputDirection = new Vector2(rgt, fwd);
 
             // Convert from camera-relative to world space
-            _moveDirection = camForward * fwd + camRight * rgt;
+            _moveDirection = (camForward * fwd) + (camRight * rgt);
             _moveDirection = _moveDirection.Normalized();
         }
 
@@ -798,7 +817,7 @@ public partial class PlayerController : CharacterBody3D
                     if (stages != null && stages.Length > 0)
                     {
                         int stageIdx = Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1);
-                        ExecuteAttackStage(stages[stageIdx], ability, stages, slotIndex, charged, airborne, isComboChain: true, startup: 0);
+                        ExecuteAttackStage(stages[stageIdx], stages, slotIndex, charged, airborne, isComboChain: true, startup: 0);
                     }
                     attackState.ChainTo(animName);
                 }
@@ -808,7 +827,7 @@ public partial class PlayerController : CharacterBody3D
                     ushort startup = (stages != null && stages.Length > 0) ? stages[animStage].StartupTicks : (ushort)0;
                     if (stages != null && stages.Length > 0)
                     {
-                        ExecuteAttackStage(stages[animStage], ability, stages, slotIndex, charged, airborne, isComboChain: false, startup);
+                        ExecuteAttackStage(stages[animStage], stages, slotIndex, charged, airborne, isComboChain: false, startup);
                     }
                     attackState.NextAnimName = animName;
                     _fsm.TransitionTo("attack");
@@ -847,7 +866,7 @@ public partial class PlayerController : CharacterBody3D
     /// <summary>
     /// Resolve attack stages against simulation entities via SpellResolver.
     /// </summary>
-    private void ResolveAbilityStages(AbilityData ability, AttackStage[] stages, int slotIndex, bool charged, bool airborne)
+    private void ResolveAbilityStages(AttackStage[] stages, int slotIndex, bool airborne)
     {
         var sim = _combatComponent?.GetSimulation();
         if (sim == null || _combatComponent == null) return;
@@ -889,7 +908,7 @@ public partial class PlayerController : CharacterBody3D
         }
 
         // Build entity list for SpellResolver (capsule hurtboxes)
-        var entities = new System.Collections.Generic.List<SpellResolver.EntityData>();
+        var entities = new List<SpellResolver.EntityData>();
         foreach (var kvp in sim.Entities)
         {
             foreach (var (start, end, radius) in kvp.Value)
@@ -898,10 +917,14 @@ public partial class PlayerController : CharacterBody3D
                 var e = new SpellResolver.EntityData
                 {
                     Id = kvp.Key,
-                    PosX = start.X, PosY = start.Y, PosZ = start.Z,
+                    PosX = start.X,
+                    PosY = start.Y,
+                    PosZ = start.Z,
                     Radius = radius,
-                    Shape = isCapsule ? SlopArena.Shared.HitboxShape.Capsule : SlopArena.Shared.HitboxShape.Sphere,
-                    EndX = end.X, EndY = end.Y, EndZ = end.Z,
+                    Shape = isCapsule ? HitboxShape.Capsule : HitboxShape.Sphere,
+                    EndX = end.X,
+                    EndY = end.Y,
+                    EndZ = end.Z,
                     Active = true
                 };
                 entities.Add(e);
@@ -910,8 +933,8 @@ public partial class PlayerController : CharacterBody3D
 
         // Spawn melee hitbox in attack direction
         Vector3 hitDir = GetAttackDirection(stage);
-        Vector3 hitPos = pos + hitDir * 2.0f + Vector3.Up * 1.0f;
-        var hb = new SlopArena.Shared.Hitbox
+        Vector3 hitPos = pos + (hitDir * 2.0f) + (Vector3.Up * 1.0f);
+        var hb = new Hitbox
         {
             X = hitPos.X,
             Y = hitPos.Y,
@@ -998,7 +1021,7 @@ public partial class PlayerController : CharacterBody3D
     public Color GetHitstunColor()
     {
         float t = Mathf.Clamp(_movementComponent.DamagePercent / 150f, 0f, 1f);
-        return new Color(1f, 1f - t * 0.9f, 0.2f - t * 0.1f);
+        return new Color(1f, 1f - (t * 0.9f), 0.2f - (t * 0.1f));
     }
 
     private static void ApplyEmissionRecursive(Node node, Color color, float energy, bool clear = false)
@@ -1193,7 +1216,7 @@ public partial class PlayerController : CharacterBody3D
     /// Execute an attack stage with optional warp and startup delay.
     /// Factorizes logic shared between first attack and combo chains.
     /// </summary>
-    private void ExecuteAttackStage(AttackStage stage, AbilityData ability, AttackStage[] stages, int slotIndex, bool charged, bool airborne, bool isComboChain, ushort startup)
+    private void ExecuteAttackStage(AttackStage stage, AttackStage[] stages, int slotIndex, bool charged, bool airborne, bool isComboChain, ushort startup)
     {
         if (_combatComponent == null) return;
 
@@ -1203,7 +1226,7 @@ public partial class PlayerController : CharacterBody3D
             {
                 if (isComboChain || startup == 0)
                 {
-                    ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                    ResolveAbilityStages(stages, slotIndex, airborne);
                 }
                 else
                 {
@@ -1216,7 +1239,7 @@ public partial class PlayerController : CharacterBody3D
         {
             if (isComboChain || startup == 0)
             {
-                ResolveAbilityStages(ability, stages, slotIndex, charged, airborne);
+                ResolveAbilityStages(stages, slotIndex, airborne);
             }
             else
             {
@@ -1258,12 +1281,13 @@ public partial class PlayerController : CharacterBody3D
         }
 
         // Priority 4: Player forward (character facing, not camera — camera looks at player)
-        Vector3 fwd = GetPlayerForward();
-        return fwd;
+        return GetPlayerForward();
     }
 
-    // ==========================================
-    // CLICK TARGETING STATE
-    // ==========================================
+    /// <summary>
+    /// ==========================================
+    /// CLICK TARGETING STATE
+    /// ==========================================
+    /// </summary>
     private Vector2 _storedMousePos = Vector2.Zero;
 }

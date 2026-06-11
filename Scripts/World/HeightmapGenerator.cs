@@ -1,6 +1,5 @@
 using Godot;
 using System;
-using SlopArena.Shared;
 
 public static class HeightmapGenerator
 {
@@ -10,7 +9,7 @@ public static class HeightmapGenerator
     /// </summary>
     public static void Generate(World3D world)
     {
-        int gridCount = 100;
+        const int gridCount = 100;
         float spacing = 200f / (gridCount - 1);
         float[] heights = new float[gridCount * gridCount];
 
@@ -40,12 +39,12 @@ public static class HeightmapGenerator
                 if (result.Count > 0)
                 {
                     Vector3 position = (Vector3)result["position"];
-                    heights[y * gridCount + x] = position.Y;
+                    heights[(y * gridCount) + x] = position.Y;
                     hitCount++;
                 }
                 else
                 {
-                    heights[y * gridCount + x] = 0f;
+                    heights[(y * gridCount) + x] = 0f;
                 }
             }
         }

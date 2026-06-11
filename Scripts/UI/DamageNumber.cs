@@ -1,6 +1,5 @@
 #nullable enable
 using Godot;
-using System;
 
 /// <summary>
 /// Floating damage number that appears on hit (like fighting games).
@@ -9,8 +8,14 @@ using System;
 public partial class DamageNumber : Label3D
 {
     private float _lifetime = 0f;
-    private const float TotalLifetime = 1.2f; // 1.2 seconds
-    private const float RiseSpeed = 3f; // Units per second
+    /// <summary>
+    /// 1.2 seconds
+    /// </summary>
+    private const float TotalLifetime = 1.2f;
+    /// <summary>
+    /// Units per second
+    /// </summary>
+    private const float RiseSpeed = 3f;
     private Vector3 _velocity = Vector3.Zero;
 
     public void Setup(float damage, Vector3 position, bool isCritical = false)
@@ -65,7 +70,7 @@ public partial class DamageNumber : Label3D
         _velocity *= 0.95f;
 
         // Fade out in last 0.5s
-        float fadeStart = TotalLifetime - 0.5f;
+        const float fadeStart = TotalLifetime - 0.5f;
         if (_lifetime > fadeStart)
         {
             float fadeProgress = (_lifetime - fadeStart) / 0.5f;

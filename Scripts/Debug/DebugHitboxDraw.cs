@@ -16,7 +16,7 @@ public partial class DebugHitboxDraw : MeshInstance3D
     {
         _mesh = new ImmediateMesh();
         Mesh = _mesh;
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        CastShadow = ShadowCastingSetting.Off;
 
         var mat = new StandardMaterial3D();
         mat.VertexColorUseAsAlbedo = true;
@@ -125,14 +125,14 @@ public partial class DebugHitboxDraw : MeshInstance3D
             float a1 = Mathf.Tau * i / rings;
             float a2 = Mathf.Tau * (i + 1) / rings;
             // XZ ring
-            mesh.SurfaceAddVertex(new Vector3(cx + Mathf.Cos(a1) * radius, cy, cz + Mathf.Sin(a1) * radius));
-            mesh.SurfaceAddVertex(new Vector3(cx + Mathf.Cos(a2) * radius, cy, cz + Mathf.Sin(a2) * radius));
+            mesh.SurfaceAddVertex(new Vector3(cx + (Mathf.Cos(a1) * radius), cy, cz + (Mathf.Sin(a1) * radius)));
+            mesh.SurfaceAddVertex(new Vector3(cx + (Mathf.Cos(a2) * radius), cy, cz + (Mathf.Sin(a2) * radius)));
             // XY ring
-            mesh.SurfaceAddVertex(new Vector3(cx + Mathf.Cos(a1) * radius, cy + Mathf.Sin(a1) * radius, cz));
-            mesh.SurfaceAddVertex(new Vector3(cx + Mathf.Cos(a2) * radius, cy + Mathf.Sin(a2) * radius, cz));
+            mesh.SurfaceAddVertex(new Vector3(cx + (Mathf.Cos(a1) * radius), cy + (Mathf.Sin(a1) * radius), cz));
+            mesh.SurfaceAddVertex(new Vector3(cx + (Mathf.Cos(a2) * radius), cy + (Mathf.Sin(a2) * radius), cz));
             // YZ ring
-            mesh.SurfaceAddVertex(new Vector3(cx, cy + Mathf.Cos(a1) * radius, cz + Mathf.Sin(a1) * radius));
-            mesh.SurfaceAddVertex(new Vector3(cx, cy + Mathf.Cos(a2) * radius, cz + Mathf.Sin(a2) * radius));
+            mesh.SurfaceAddVertex(new Vector3(cx, cy + (Mathf.Cos(a1) * radius), cz + (Mathf.Sin(a1) * radius)));
+            mesh.SurfaceAddVertex(new Vector3(cx, cy + (Mathf.Cos(a2) * radius), cz + (Mathf.Sin(a2) * radius)));
         }
     }
 
@@ -158,8 +158,8 @@ public partial class DebugHitboxDraw : MeshInstance3D
         {
             float a1 = Mathf.Tau * i / segments;
             float a2 = Mathf.Tau * (i + 1) / segments;
-            Vector3 p1 = start + perp1 * Mathf.Cos(a1) * radius + perp2 * Mathf.Sin(a1) * radius;
-            Vector3 p2 = start + perp1 * Mathf.Cos(a2) * radius + perp2 * Mathf.Sin(a2) * radius;
+            Vector3 p1 = start + (perp1 * Mathf.Cos(a1) * radius) + (perp2 * Mathf.Sin(a1) * radius);
+            Vector3 p2 = start + (perp1 * Mathf.Cos(a2) * radius) + (perp2 * Mathf.Sin(a2) * radius);
             mesh.SurfaceAddVertex(p1); mesh.SurfaceAddVertex(p2);
         }
         // End cap ring
@@ -167,15 +167,15 @@ public partial class DebugHitboxDraw : MeshInstance3D
         {
             float a1 = Mathf.Tau * i / segments;
             float a2 = Mathf.Tau * (i + 1) / segments;
-            Vector3 p1 = end + perp1 * Mathf.Cos(a1) * radius + perp2 * Mathf.Sin(a1) * radius;
-            Vector3 p2 = end + perp1 * Mathf.Cos(a2) * radius + perp2 * Mathf.Sin(a2) * radius;
+            Vector3 p1 = end + (perp1 * Mathf.Cos(a1) * radius) + (perp2 * Mathf.Sin(a1) * radius);
+            Vector3 p2 = end + (perp1 * Mathf.Cos(a2) * radius) + (perp2 * Mathf.Sin(a2) * radius);
             mesh.SurfaceAddVertex(p1); mesh.SurfaceAddVertex(p2);
         }
         // 4 connecting lines
         for (int i = 0; i < 4; i++)
         {
             float a = Mathf.Tau * i / 4;
-            Vector3 off = perp1 * Mathf.Cos(a) * radius + perp2 * Mathf.Sin(a) * radius;
+            Vector3 off = (perp1 * Mathf.Cos(a) * radius) + (perp2 * Mathf.Sin(a) * radius);
             mesh.SurfaceAddVertex(start + off);
             mesh.SurfaceAddVertex(end + off);
         }

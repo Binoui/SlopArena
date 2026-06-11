@@ -6,12 +6,21 @@ namespace SlopArena.Shared
     public struct ClientInputPacket
     {
         public uint TickNumber;
-        public byte MovementFlags; // Bit 0: Z, Bit 1: Q, Bit 2: S, Bit 3: D, Bit 4: Space (Jump), Bit 5: Shift (Dash), Bit 6: E (Respawn), Bit 7: Ctrl/C (Crouch)
+        /// <summary>
+        /// Bit 0: Z, Bit 1: Q, Bit 2: S, Bit 3: D, Bit 4: Space (Jump), Bit 5: Shift (Dash), Bit 6: E (Respawn), Bit 7: Ctrl/C (Crouch)
+        /// </summary>
+        public byte MovementFlags;
         public float MouseWorldX;
         public float MouseWorldY;
-        public byte ActionFlags;   // Bit 0: Attack (LMB), Bit 1: Parry (R), Bits 2-3: movement profile 0-3
+        /// <summary>
+        /// Bit 0: Attack (LMB), Bit 1: Parry (R), Bits 2-3: movement profile 0-3
+        /// </summary>
+        public byte ActionFlags;
 
-        public const int Size = 4 + 1 + 4 + 4 + 1; // 14 bytes
+        /// <summary>
+        /// 14 bytes
+        /// </summary>
+        public const int Size = 4 + 1 + 4 + 4 + 1;
 
         public void Serialize(Span<byte> buffer)
         {

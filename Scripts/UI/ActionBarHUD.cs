@@ -1,7 +1,6 @@
 #nullable enable
 using Godot;
 using SlopArena.Shared;
-using System;
 
 /// <summary>
 /// Action Bar HUD — shows 6 class abilities with key icons, names, cooldowns,
@@ -22,7 +21,9 @@ public partial class ActionBarHUD : Control
 	private static readonly string[] SlotNames = { "Slot0", "Slot1", "Slot2", "Slot3", "Slot4", "Slot5" };
 	private static readonly Color ComboBorder = new Color(0.9f, 0.7f, 0.1f, 1f);
 
-	// Maps slot index to Kenney input prompt texture path
+	/// <summary>
+	/// Maps slot index to Kenney input prompt texture path
+	/// </summary>
 	private static readonly string[] KeyTexturePaths = new[]
 	{
 		"res://assets/ui/keys/mouse_left.png",
@@ -56,7 +57,7 @@ public partial class ActionBarHUD : Control
 			icon.CustomMinimumSize = new Vector2(24f, 24f);
 			icon.Position = new Vector2(58f, -12f);
 			icon.Size = new Vector2(24f, 24f);
-			icon.MouseFilter = Control.MouseFilterEnum.Ignore;
+			icon.MouseFilter = MouseFilterEnum.Ignore;
 			_slots[i]?.AddChild(icon);
 			_keyIcons[i] = icon;
 
@@ -119,11 +120,11 @@ public partial class ActionBarHUD : Control
 	public void FlashSlot(int slotIndex)
 	{
 		if (slotIndex < 0 || slotIndex >= 6) return;
-		if (_slots[slotIndex] == null || !GodotObject.IsInstanceValid(_slots[slotIndex])) return;
+		if (_slots[slotIndex] == null || !IsInstanceValid(_slots[slotIndex])) return;
 
 		var flash = new ColorRect();
 		flash.Color = new Color(1f, 1f, 1f, 0.4f);
-		flash.MouseFilter = Control.MouseFilterEnum.Ignore;
+		flash.MouseFilter = MouseFilterEnum.Ignore;
 		flash.Size = _slots[slotIndex]!.Size;
 		flash.Position = Vector2.Zero;
 		_slots[slotIndex]!.AddChild(flash);
@@ -132,7 +133,7 @@ public partial class ActionBarHUD : Control
 		tween.TweenProperty(flash, "modulate", new Color(1f, 1f, 1f, 0f), 0.12f);
 		tween.Finished += () =>
 		{
-			if (GodotObject.IsInstanceValid(flash))
+			if (IsInstanceValid(flash))
 				flash.QueueFree();
 		};
 	}

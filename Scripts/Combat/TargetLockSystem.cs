@@ -1,6 +1,5 @@
 #nullable enable
 using Godot;
-using System;
 
 /// <summary>
 /// Range-based soft lock system.
@@ -10,14 +9,29 @@ using System;
 public partial class TargetLockSystem : Node3D
 {
     [Export] public Camera3D? Camera;
-    [Export] public float LockRange = 20f;           // Max lock distance
-    [Export] public float LockAngle = 45f;           // Half-angle cone (45° = 90° total)
-    [Export] public float UpdateInterval = 0.1f;     // Update every 100ms
-    [Export] public float StickyMultiplier = 1.2f;   // Hysteresis: keep current target if within 120% range
+    /// <summary>
+    /// Max lock distance
+    /// </summary>
+    [Export] public float LockRange = 20f;
+    /// <summary>
+    /// Half-angle cone (45° = 90° total)
+    /// </summary>
+    [Export] public float LockAngle = 45f;
+    /// <summary>
+    /// Update every 100ms
+    /// </summary>
+    [Export] public float UpdateInterval = 0.1f;
+    /// <summary>
+    /// Hysteresis: keep current target if within 120% range
+    /// </summary>
+    [Export] public float StickyMultiplier = 1.2f;
 
     private Node3D? _currentTarget;
     private float _updateTimer = 0f;
-    private MeshInstance3D? _targetIndicator;        // Visual reticle
+    /// <summary>
+    /// Visual reticle
+    /// </summary>
+    private MeshInstance3D? _targetIndicator;
     private Node3D? _ownerEntity;
 
     public Node3D? CurrentTarget => _currentTarget;
@@ -90,9 +104,7 @@ public partial class TargetLockSystem : Node3D
         float bestScore = float.MaxValue;
 
         // Find all enemies in range
-        var enemies = GetTree().GetNodesInGroup("enemies");
-
-        foreach (var node in enemies)
+        foreach (var node in (Godot.Collections.Array<Node>)GetTree().GetNodesInGroup("enemies"))
         {
             if (node is not Node3D enemy || enemy == _ownerEntity)
                 continue;
@@ -112,7 +124,7 @@ public partial class TargetLockSystem : Node3D
                     continue;
 
                 // Score: prefer close + centered in camera view
-                float score = dist + angleDeg * 0.5f;
+                float score = dist + (angleDeg * 0.5f);
                 if (score < bestScore)
                 {
                     bestScore = score;
@@ -122,7 +134,7 @@ public partial class TargetLockSystem : Node3D
         }
 
         // Sticky lock: keep current target if still valid (hysteresis)
-        if (_currentTarget != null && GodotObject.IsInstanceValid(_currentTarget))
+        if (_currentTarget != null && IsInstanceValid(_currentTarget))
         {
             Vector3 toCurrent = _currentTarget.GlobalPosition - origin;
             float currentDist = toCurrent.Length();
@@ -135,7 +147,7 @@ public partial class TargetLockSystem : Node3D
                 if (currentDist < LockRange * StickyMultiplier && currentAngle < LockAngle * StickyMultiplier)
                 {
                     // Only switch if new target is MUCH better
-                    float currentScore = currentDist + currentAngle * 0.5f;
+                    float currentScore = currentDist + (currentAngle * 0.5f);
                     if (bestScore > currentScore * 0.7f)  // 30% threshold
                         return;
                 }
@@ -159,7 +171,7 @@ public partial class TargetLockSystem : Node3D
         if (_targetIndicator == null)
             return;
 
-        if (_currentTarget != null && GodotObject.IsInstanceValid(_currentTarget))
+        if (_currentTarget != null && IsInstanceValid(_currentTarget))
         {
             _targetIndicator.Visible = true;
             // Place ring at ground level (Y=0.05 to avoid z-fighting)
@@ -182,7 +194,7 @@ public partial class TargetLockSystem : Node3D
     /// </summary>
     public float GetDistanceToTarget()
     {
-        if (_currentTarget == null || !GodotObject.IsInstanceValid(_currentTarget) || _ownerEntity == null)
+        if (_currentTarget == null || !IsInstanceValid(_currentTarget) || _ownerEntity == null)
             return float.MaxValue;
 
         return _ownerEntity.GlobalPosition.DistanceTo(_currentTarget.GlobalPosition);
@@ -194,7 +206,7 @@ public partial class TargetLockSystem : Node3D
     /// </summary>
     public Vector3 GetDirectionToTarget()
     {
-        if (_currentTarget == null || !GodotObject.IsInstanceValid(_currentTarget) || _ownerEntity == null)
+        if (_currentTarget == null || !IsInstanceValid(_currentTarget) || _ownerEntity == null)
             return -_ownerEntity?.GlobalTransform.Basis.Z ?? Vector3.Forward;
 
         Vector3 dir = _currentTarget.GlobalPosition - _ownerEntity.GlobalPosition;
@@ -206,7 +218,7 @@ public partial class TargetLockSystem : Node3D
     /// </summary>
     public Vector3 GetTargetPosition()
     {
-        if (_currentTarget == null || !GodotObject.IsInstanceValid(_currentTarget))
+        if (_currentTarget == null || !IsInstanceValid(_currentTarget))
             return _ownerEntity?.GlobalPosition ?? Vector3.Zero;
 
         return _currentTarget.GlobalPosition;

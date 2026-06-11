@@ -79,7 +79,7 @@ public class MovementComponent
     /// Process one tick: delegates to Simulation.SimulateTick(),
     /// then applies velocity to Godot body and calls MoveAndSlide.
     /// </summary>
-    public void Tick(SlopArena.Shared.InputState input)
+    public void Tick(InputState input)
     {
         if (!_initialized) return;
 
@@ -180,7 +180,7 @@ public class MovementComponent
     /// </summary>
     public bool IsInKnockback()
     {
-        float sq = State.KVX * State.KVX + State.KVY * State.KVY + State.KVZ * State.KVZ;
+        float sq = (State.KVX * State.KVX) + (State.KVY * State.KVY) + (State.KVZ * State.KVZ);
         return sq > 0.0001f;
     }
 

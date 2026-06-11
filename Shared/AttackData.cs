@@ -1,5 +1,3 @@
-using System;
-
 namespace SlopArena.Shared
 {
     /// <summary>
@@ -12,19 +10,47 @@ namespace SlopArena.Shared
         public float Damage;
         public float KnockbackForce;
         public float KnockbackUpward;
-        public float LungeForce;       // Forward burst during attack
-        public ushort StunTicks;       // Hitstun duration in ticks
-        public ushort SelfLockTicks;   // Self animation lock in ticks
-        public ushort ChainWindowTicks; // 0 = final stage / no chain
-        public ushort StartupTicks;    // Frames before hitbox activates (startup anim)
+        /// <summary>
+        /// Forward burst during attack
+        /// </summary>
+        public float LungeForce;
+        /// <summary>
+        /// Hitstun duration in ticks
+        /// </summary>
+        public ushort StunTicks;
+        /// <summary>
+        /// Self animation lock in ticks
+        /// </summary>
+        public ushort SelfLockTicks;
+        /// <summary>
+        /// 0 = final stage / no chain
+        /// </summary>
+        public ushort ChainWindowTicks;
+        /// <summary>
+        /// Frames before hitbox activates (startup anim)
+        /// </summary>
+        public ushort StartupTicks;
 
-        // Range-based range system
+        /// <summary>
+        /// Range-based range system
+        /// </summary>
         public float AttackRange;      // Distance where attack can hit immediately (e.g., 5m)
-        public float WarpRange;        // Distance where auto-dash triggers (e.g., 12m)
-        // Warp speed now driven by character Movement.SprintSpeed (not per-stage)
+        /// <summary>
+        /// Distance where auto-dash triggers (e.g., 12m)
+        /// </summary>
+        public float WarpRange;
+        /// <summary>
+        /// Warp speed now driven by character Movement.SprintSpeed (not per-stage)
+        /// </summary>
         public bool UseTargetLock;     // true = use soft lock system for this attack
-        public bool RotateTowardTarget; // true = auto-rotate toward target during attack
-        public float TrackingStrength; // 0-1: rotation lerp toward target per frame (0.8 = strong tracking)
+        /// <summary>
+        /// true = auto-rotate toward target during attack
+        /// </summary>
+        public bool RotateTowardTarget;
+        /// <summary>
+        /// 0-1: rotation lerp toward target per frame (0.8 = strong tracking)
+        /// </summary>
+        public float TrackingStrength;
     }
 
     /// <summary>
@@ -37,7 +63,10 @@ namespace SlopArena.Shared
     public struct AbilityData
     {
         public string Name;
-        public ushort CooldownTicks;   // 0 = no cooldown
+        /// <summary>
+        /// 0 = no cooldown
+        /// </summary>
+        public ushort CooldownTicks;
         public AttackStage[] Stages;
 
         /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>

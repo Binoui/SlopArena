@@ -1,5 +1,3 @@
-using System;
-
 namespace SlopArena.Shared
 {
     public readonly struct MovementProfile
@@ -54,18 +52,27 @@ namespace SlopArena.Shared
             PostAttackSlideLockoutTicks = 20,
         };
 
-        public static void SetActive(int _) // profileId — stub, unused for now
+        /// <summary>
+        /// profileId — stub, unused for now
+        /// </summary>
+        /// <param name="_"></param>
+        public static void SetActive(int _)
         {
             // Only one profile for now
             Active = Default;
         }
 
-        public static void ApplyFromActionFlags(byte actionFlags)
+        public static void ApplyFromActionFlags(byte _)
         {
             // No profile switching via flags anymore
         }
 
-        public static byte EncodeProfileBits(int _) // profileId — stub, unused for now
+        /// <summary>
+        /// profileId — stub, unused for now
+        /// </summary>
+        /// <param name="_"></param>
+        /// <returns></returns>
+        public static byte EncodeProfileBits(int _)
         {
             return 0;
         }

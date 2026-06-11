@@ -1,11 +1,12 @@
-using System;
-
 namespace SlopArena.Shared
 {
     public enum HitboxShape : byte
     {
         Sphere = 0,
-        Capsule = 1  // segment from (X,Y,Z) to (EndX,EndY,EndZ), radius = Radius
+        /// <summary>
+        /// segment from (X,Y,Z) to (EndX,EndY,EndZ), radius = Radius
+        /// </summary>
+        Capsule = 1
     }
 
     /// <summary>
@@ -23,11 +24,18 @@ namespace SlopArena.Shared
         public ushort DurationTicks;
         public ushort AgeTicks;
 
-        // Capsule support
+        /// <summary>
+        /// Capsule support
+        /// </summary>
         public HitboxShape Shape;
-        public float EndX, EndY, EndZ;   // Capsule end point (ignored for Sphere)
+        /// <summary>
+        /// Capsule end point (ignored for Sphere)
+        /// </summary>
+        public float EndX, EndY, EndZ;
 
-        // Damage data
+        /// <summary>
+        /// Damage data
+        /// </summary>
         public float Damage;
         public float KnockbackForce;
         public float KnockbackUpward;

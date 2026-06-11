@@ -109,7 +109,7 @@ public partial class SettingsUI : Control
         _controlsPanel.AddChild(scrollContainer);
 
         _controlList = new VBoxContainer();
-        _controlList.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _controlList.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _controlList.AddThemeConstantOverride("separation", 4);
         scrollContainer.AddChild(_controlList);
 

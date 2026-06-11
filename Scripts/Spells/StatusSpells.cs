@@ -1,8 +1,5 @@
 #nullable enable
 using Godot;
-using System;
-using System.Collections.Generic;
-using SlopArena.Shared;
 
 /// <summary>
 /// Visual helper methods for class ability special effects.
@@ -38,8 +35,8 @@ public static class StatusSpells
         cone.MaterialOverride = mat;
 
         AddToScene(combat, cone);
-        cone.GlobalPosition = origin + direction * (range * 0.5f);
-        cone.LookAt(origin + direction * range, Vector3.Up);
+        cone.GlobalPosition = origin + (direction * (range * 0.5f));
+        cone.LookAt(origin + (direction * range), Vector3.Up);
         var timer = combat.GetTree().CreateTimer(duration);
         timer.Timeout += () => { if (GodotObject.IsInstanceValid(cone)) cone.QueueFree(); };
     }
@@ -133,8 +130,8 @@ public static class StatusSpells
         beam.MaterialOverride = mat;
 
         AddToScene(combat, beam);
-        beam.GlobalPosition = origin + direction * (distance * 0.5f);
-        beam.LookAt(origin + direction * distance, Vector3.Up);
+        beam.GlobalPosition = origin + (direction * (distance * 0.5f));
+        beam.LookAt(origin + (direction * distance), Vector3.Up);
         var timer = combat.GetTree().CreateTimer(duration);
         timer.Timeout += () => { if (GodotObject.IsInstanceValid(beam)) beam.QueueFree(); };
     }

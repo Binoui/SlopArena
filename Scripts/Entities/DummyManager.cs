@@ -31,7 +31,9 @@ public partial class DummyManager : Node3D
     private const float Gravity = 50.0f;
     private const float VelocityMaxY = 50.0f;
 
-    // Skins cycled across dummies
+    /// <summary>
+    /// Skins cycled across dummies
+    /// </summary>
     private static readonly string[] SkinPaths = new[]
     {
         "res://assets/characters/Skins/skaterMaleA.png",
@@ -40,7 +42,9 @@ public partial class DummyManager : Node3D
         "res://assets/characters/Skins/cyborgFemaleA.png",
     };
 
-    // ── Per-dummy state ────────────────────────────────────────
+    /// <summary>
+    /// ── Per-dummy state ────────────────────────────────────────
+    /// </summary>
     private int[] _hp = new int[DummyCount];
     private float[] _respawnTimers = new float[DummyCount];
     private float[] _hitFlashTimers = new float[DummyCount];
@@ -62,7 +66,10 @@ public partial class DummyManager : Node3D
         }
     }
 
-    // ── Physics ────────────────────────────────────────────────
+    /// <summary>
+    /// ── Physics ────────────────────────────────────────────────
+    /// </summary>
+    /// <param name="delta"></param>
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
@@ -106,7 +113,10 @@ public partial class DummyManager : Node3D
         }
     }
 
-    // ── Visual flash + respawn timer ───────────────────────────
+    /// <summary>
+    /// ── Visual flash + respawn timer ───────────────────────────
+    /// </summary>
+    /// <param name="delta"></param>
     public override void _Process(double delta)
     {
         float dt = (float)delta;
@@ -143,7 +153,10 @@ public partial class DummyManager : Node3D
         }
     }
 
-    // ── Create one dummy ───────────────────────────────────────
+    /// <summary>
+    /// ── Create one dummy ───────────────────────────────────────
+    /// </summary>
+    /// <param name="index"></param>
     private void CreateDummy(int index)
     {
         Vector3 pos = _spawnPositions[index];
@@ -183,10 +196,7 @@ public partial class DummyManager : Node3D
         body.AddChild(hurtbox);
         _hurtboxes[index] = hurtbox;
 
-        hurtbox.OnHit += (Vector3 attackerPos, float damage, Vector3 knockbackForce) =>
-        {
-            DamageDummy(capturedIndex, (int)damage, knockbackForce);
-        };
+        hurtbox.OnHit += (Vector3 _, float damage, Vector3 knockbackForce) => DamageDummy(capturedIndex, (int)damage, knockbackForce);
 
         // ── Model (characterMedium.fbx) ──
         var model = LoadModel(index);
@@ -253,10 +263,14 @@ public partial class DummyManager : Node3D
         _animPlayers[index] = animPlayer;
     }
 
-    // ── Model loading (mirrors PlayerController.LoadPlayerModel) ──
+    /// <summary>
+    /// ── Model loading (mirrors PlayerController.LoadPlayerModel) ──
+    /// </summary>
+    /// <param name="index"></param>
+    /// <returns></returns>
     private Node3D LoadModel(int index)
     {
-        string modelPath = "res://assets/characters/Model/characterMedium.fbx";
+        const string modelPath = "res://assets/characters/Model/characterMedium.fbx";
         if (!ResourceLoader.Exists(modelPath))
             return null;
 
@@ -344,7 +358,11 @@ public partial class DummyManager : Node3D
         return null;
     }
 
-    // ── Color for fallback capsules ──
+    /// <summary>
+    /// ── Color for fallback capsules ──
+    /// </summary>
+    /// <param name="index"></param>
+    /// <returns></returns>
     private static Color GetSkinColor(int index)
     {
         return index switch
@@ -357,7 +375,13 @@ public partial class DummyManager : Node3D
         };
     }
 
-    // ── Damage & knockback ──
+    /// <summary>
+    /// ── Damage & knockback ──
+    /// </summary>
+    /// <param name="index"></param>
+    /// <param name="damage"></param>
+    /// <param name="knockbackForce"></param>
+    /// <returns></returns>
     public bool DamageDummy(int index, int damage, Vector3 knockbackForce)
     {
         if (index < 0 || index >= DummyCount) return false;
@@ -415,7 +439,7 @@ public partial class DummyManager : Node3D
     /// </summary>
     private void LoadAllAnimations(AnimationLibrary animLib)
     {
-        string animDir = "res://assets/characters/ProMagicPack/";
+        const string animDir = "res://assets/characters/ProMagicPack/";
         var dir = DirAccess.Open(animDir);
         if (dir == null)
         {

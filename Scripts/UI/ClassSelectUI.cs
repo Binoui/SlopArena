@@ -15,7 +15,9 @@ public partial class ClassSelectUI : Control
     private CharacterClass _selectedClass = CharacterClass.Manki;
     private bool _confirmed = false;
 
-    // UI nodes
+    /// <summary>
+    /// UI nodes
+    /// </summary>
     private ColorRect? _bg;
     private Label? _title;
     private Label? _description;
@@ -49,12 +51,12 @@ public partial class ClassSelectUI : Control
 
         // Class buttons (horizontal or vertical)
         _classButtons = new VBoxContainer();
-        _classButtons.Position = new Vector2(viewportSize.X / 2f - 250f, 160f);
+        _classButtons.Position = new Vector2((viewportSize.X / 2f) - 250f, 160f);
         _classButtons.Size = new Vector2(500f, 350f);
         _classButtons.AddThemeConstantOverride("separation", 10);
         AddChild(_classButtons);
 
-        AddClassButton(CharacterClass.Manki, "Manki", "Fire monkey. Agile rushdown, flaming fists, rising kicks and inferno burst.");// only Manki for now
+        AddClassButton(CharacterClass.Manki, "Manki");// only Manki for now
 
         // Selected class description
         _description = new Label();
@@ -80,7 +82,7 @@ public partial class ClassSelectUI : Control
         // Ready button
         _readyBtn = new Button();
         _readyBtn.Text = "FIGHT!";
-        _readyBtn.Position = new Vector2(viewportSize.X / 2f - 120f, 720f);
+        _readyBtn.Position = new Vector2((viewportSize.X / 2f) - 120f, 720f);
         _readyBtn.CustomMinimumSize = new Vector2(240f, 60f);
         _readyBtn.AddThemeFontSizeOverride("font_size", 28);
         _readyBtn.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
@@ -92,18 +94,18 @@ public partial class ClassSelectUI : Control
         HighlightSelected();
     }
 
-    private void AddClassButton(CharacterClass cls, string name, string desc)
+    private void AddClassButton(CharacterClass cls, string name)
     {
         var btn = new Button();
         btn.Text = name;
         btn.CustomMinimumSize = new Vector2(500f, 50f);
         btn.AddThemeFontSizeOverride("font_size", 22);
         btn.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        btn.Pressed += () => SelectClass(cls, btn);
+        btn.Pressed += () => SelectClass(cls);
         _classButtons!.AddChild(btn);
     }
 
-    private void SelectClass(CharacterClass cls, Button source)
+    private void SelectClass(CharacterClass cls)
     {
         if (_confirmed) return;
         _selectedClass = cls;

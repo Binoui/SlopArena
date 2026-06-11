@@ -20,7 +20,9 @@ public sealed partial class AttackState : State
 	/// <summary>Set by PlayerController before TransitionTo("attack").</summary>
 	public string NextAnimName { get; set; } = "";
 
-	// ── Pending stage resolution (startup delay) ──
+	/// <summary>
+	/// ── Pending stage resolution (startup delay) ──
+	/// </summary>
 	private AttackStage[]? _pendingStages;
 	private int _pendingSlotIndex;
 	private bool _pendingCharged;
@@ -68,7 +70,9 @@ public sealed partial class AttackState : State
 		_pendingStages = null;
 	}
 
-	// ── Stage data access for PlayerController ──
+	/// <summary>
+	/// ── Stage data access for PlayerController ──
+	/// </summary>
 	public AttackStage[]? PendingStages => _pendingStages;
 	public int PendingSlotIndex => _pendingSlotIndex;
 	public bool PendingCharged => _pendingCharged;

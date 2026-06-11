@@ -6,7 +6,10 @@ namespace SlopArena.Shared
     public struct SpawnPoint
     {
         public float X, Y, Z;
-        public float Yaw; // facing direction in radians
+        /// <summary>
+        /// facing direction in radians
+        /// </summary>
+        public float Yaw;
     }
 
     /// <summary>
@@ -23,12 +26,30 @@ namespace SlopArena.Shared
     [Serializable]
     public struct ArenaDefinition
     {
-        public string Name;           // machine-readable key
-        public string DisplayName;    // human-readable
-        public string ScenePath;      // res://assets/arenas/xxx.tscn
-        public float KillHeight;      // Y below this = BLAST ZONE (instant elimination)
-        public float MinX, MaxX;      // arena bounds X (used for camera/mechanics)
-        public float MinZ, MaxZ;      // arena bounds Z (used for camera/mechanics)
+        /// <summary>
+        /// machine-readable key
+        /// </summary>
+        public string Name;
+        /// <summary>
+        /// human-readable
+        /// </summary>
+        public string DisplayName;
+        /// <summary>
+        /// res://assets/arenas/xxx.tscn
+        /// </summary>
+        public string ScenePath;
+        /// <summary>
+        /// Y below this = BLAST ZONE (instant elimination)
+        /// </summary>
+        public float KillHeight;
+        /// <summary>
+        /// arena bounds X (used for camera/mechanics)
+        /// </summary>
+        public float MinX, MaxX;
+        /// <summary>
+        /// arena bounds Z (used for camera/mechanics)
+        /// </summary>
+        public float MinZ, MaxZ;
         public SpawnPoint[] SpawnPoints;
     }
 

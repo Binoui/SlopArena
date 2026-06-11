@@ -14,8 +14,11 @@ public sealed partial class LandingState : State
         AnimationName = "Land";
     }
 
+    /// <summary>
+    /// ~10 frames at 60fps
+    /// </summary>
     [Export]
-    private float _landingDuration = 0.167f; // ~10 frames at 60fps
+    private float _landingDuration = 0.167f;
 
     private float _timer;
 

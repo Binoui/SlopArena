@@ -1,11 +1,9 @@
 #nullable enable
 using Godot;
-using System;
-using SlopArena.Shared;
 
 /// <summary>
 /// WoW-style Unit Frames — top-left of the screen.
-/// 
+///
 /// Layout:
 /// ┌─────────────────────────────────────┐
 /// │ [Player Portrait]  Player Name      │
@@ -14,7 +12,7 @@ using SlopArena.Shared;
 /// │ [Target Portrait]  Target Name      │
 /// │ ████████████░░░░░░░░  HP: 60/100    │
 /// └─────────────────────────────────────┘
-/// 
+///
 /// Player frame is always visible.
 /// Target frame appears when a target is selected.
 /// </summary>
@@ -67,8 +65,10 @@ public partial class UnitFrames : Control
     private const float Padding = 8f;
     private const float FrameSpacing = 10f;
 
-    // ==========================================
-    // INIT
+    /// <summary>
+    /// ==========================================
+    /// INIT
+    /// </summary>
     private PlayerController?[]? _npcs;
 
     public void Setup(PlayerController player, PlayerController?[] npcs)
@@ -84,7 +84,7 @@ public partial class UnitFrames : Control
         // Position the whole control in the top-left
         SetAnchorsPreset(LayoutPreset.TopLeft);
         Position = new Vector2(20f, 20f);
-        Size = new Vector2(FrameWidth * 2 + FrameSpacing, FrameHeight + Padding * 2);
+        Size = new Vector2((FrameWidth * 2) + FrameSpacing, FrameHeight + (Padding * 2));
 
         // ==========================================
         // PLAYER FRAME
@@ -105,13 +105,12 @@ public partial class UnitFrames : Control
 
         // Portrait (colored square for now — could be a class icon later)
         _playerPortrait = new TextureRect();
-        _playerPortrait.Position = new Vector2(Padding + 2f, (FrameHeight - PortraitSize) / 2f + 2f);
+        _playerPortrait.Position = new Vector2(Padding + 2f, ((FrameHeight - PortraitSize) / 2f) + 2f);
         _playerPortrait.Size = new Vector2(PortraitSize - 4f, PortraitSize - 4f);
         // Create a simple colored placeholder
         var portraitImage = Image.CreateEmpty((int)(PortraitSize - 4), (int)(PortraitSize - 4), false, Image.Format.Rgba8);
         portraitImage.Fill(new Color(0.2f, 0.5f, 1.0f)); // Blue for player
-        var portraitTexture = ImageTexture.CreateFromImage(portraitImage);
-        _playerPortrait.Texture = portraitTexture;
+        _playerPortrait.Texture = ImageTexture.CreateFromImage(portraitImage);
         _playerFrame.AddChild(_playerPortrait);
 
         // Player name
@@ -124,8 +123,8 @@ public partial class UnitFrames : Control
         _playerFrame.AddChild(_playerNameLabel);
 
         // HP bar background
-        float barX = Padding + PortraitSize + 8f;
-        float barY = 30f;
+        const float barX = Padding + PortraitSize + 8f;
+        const float barY = 30f;
         _playerHpBarBg = new ColorRect();
         _playerHpBarBg.Position = new Vector2(barX, barY);
         _playerHpBarBg.Size = new Vector2(FrameWidth - barX - Padding, BarHeight);
@@ -170,12 +169,11 @@ public partial class UnitFrames : Control
 
         // Portrait
         _targetPortrait = new TextureRect();
-        _targetPortrait.Position = new Vector2(Padding + 2f, (FrameHeight - PortraitSize) / 2f + 2f);
+        _targetPortrait.Position = new Vector2(Padding + 2f, ((FrameHeight - PortraitSize) / 2f) + 2f);
         _targetPortrait.Size = new Vector2(PortraitSize - 4f, PortraitSize - 4f);
         var targetPortraitImage = Image.CreateEmpty((int)(PortraitSize - 4), (int)(PortraitSize - 4), false, Image.Format.Rgba8);
         targetPortraitImage.Fill(new Color(1.0f, 0.2f, 0.2f)); // Red for target
-        var targetPortraitTexture = ImageTexture.CreateFromImage(targetPortraitImage);
-        _targetPortrait.Texture = targetPortraitTexture;
+        _targetPortrait.Texture = ImageTexture.CreateFromImage(targetPortraitImage);
         _targetFrame.AddChild(_targetPortrait);
 
         // Target name
@@ -270,7 +268,7 @@ public partial class UnitFrames : Control
             {
                 // Smash-style: show damage % instead of HP
                 ushort targetDmg = _npcs[npcIndex]!.GetDamagePercent();
-                float targetRatio = 1f - Mathf.Clamp((float)targetDmg / 300f, 0f, 1f); // Bar drains as % increases
+                float targetRatio = 1f - Mathf.Clamp(targetDmg / 300f, 0f, 1f); // Bar drains as % increases
 
                 float targetBarWidth = _targetHpBarBg.Size.X;
                 _targetHpBar.Size = new Vector2(targetBarWidth * targetRatio, BarHeight);

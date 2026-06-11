@@ -1,8 +1,6 @@
 #nullable enable
-using Godot;
 using System;
 using System.Collections.Generic;
-using SlopArena.Shared;
 
 /// <summary>
 /// Registry of all class ability special effects. Maps a string key to the actual method.
