@@ -145,6 +145,16 @@ Full guide: [`docs/adding-a-new-character.md`](docs/adding-a-new-character.md)
 
 ---
 
+## AI Usage
+
+The name *SlopArena* is obviously ironic, but I don't intend for this to be a low quality project.
+
+**Code.** I've been a software developer for years. I wrote code before AI assistants existed, and I still do. At work, ~90% of my output is agent-written, reviewed, and shipped, and it's quality code. I don't think I'm an exception — this is the state of the industry as of today. Agentic coding is a powerful tool, especially when you know what you're doing. SlopArena is built exactly the way I work: using agents to think, plan, document, and write code. That's how I've been able to build a scalable game architecture while actively learning game development at the same time.
+
+**Assets.** I used a few platforms to generate art assets. I'm busy with code, I've never had any artistic talent, and although I've tried, it's really not my thing. I don't think AI-generated assets are *better* — they're often unoptimized, generic, and soulless. But they're a quick and cheap way to get something on screen, and I don't have a problem with that tradeoff.
+
+---
+
 ## Contributing
 
 SlopArena is a **community-driven project** — everyone is welcome!
