@@ -120,7 +120,7 @@ public partial class Main : Node3D
         _player.Position += new Vector3(5f, 15f, 0f);
 
         // --- Camera (sibling, not child of player — multiplayer-safe) ---
-        var camScene = GD.Load<PackedScene>("res://Scenes/CameraMount.tscn");
+        var camScene = GD.Load<PackedScene>("res://scenes/CameraMount.tscn");
         if (camScene != null)
         {
             var cameraMount = camScene.Instantiate<CameraMount>();
