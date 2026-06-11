@@ -57,6 +57,11 @@ public partial class PlayerController : CharacterBody3D
     private bool _heavyHeld = false;
 
     /// <summary>
+    /// Persistent damage % label above the character (Smash-style)
+    /// </summary>
+    private Label3D? _damagePercentLabel;
+
+    /// <summary>
     /// Ground arrow indicator
     /// </summary>
     private MeshInstance3D? _groundArrow;
@@ -303,6 +308,7 @@ public partial class PlayerController : CharacterBody3D
             Input.MouseMode = Input.MouseModeEnum.Captured;
         }
         SetupDebugLabel();
+        SetupDamageLabel();
     }
 
     // ── DEBUG ──
@@ -336,6 +342,31 @@ public partial class PlayerController : CharacterBody3D
         var animTree = _playerModel?.GetNodeOrNull<AnimationTree>("AnimationTree");
         float airBlend = animTree?.Get("parameters/air/blend_position").AsSingle() ?? 0f;
         _debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  air: {airBlend:F2}  floor: {IsOnFloor()}";
+    }
+
+    // ── DAMAGE % LABEL (Smash-style, above everyone) ──
+
+    private void SetupDamageLabel()
+    {
+        _damagePercentLabel = new Label3D();
+        _damagePercentLabel.Name = "DamagePercentLabel";
+        _damagePercentLabel.PixelSize = 0.012f;
+        _damagePercentLabel.Billboard = BaseMaterial3D.BillboardModeEnum.Enabled;
+        _damagePercentLabel.OutlineSize = 4;
+        _damagePercentLabel.OutlineModulate = new Color(0f, 0f, 0f, 0.9f);
+        _damagePercentLabel.Modulate = Colors.White;
+        _damagePercentLabel.Position = new Vector3(0f, 5f, 0f);
+        _damagePercentLabel.Text = "0%";
+        AddChild(_damagePercentLabel);
+    }
+
+    private void UpdateDamageLabel()
+    {
+        if (_damagePercentLabel == null) return;
+        ushort pct = _movementComponent.DamagePercent;
+        _damagePercentLabel.Text = $"{pct}%";
+        float t = Mathf.Clamp(pct / 150f, 0f, 1f);
+        _damagePercentLabel.Modulate = new Color(1f, 1f - (t * 0.7f), 0.2f - (t * 0.1f));
     }
 
     // ==========================================
@@ -519,6 +550,7 @@ public partial class PlayerController : CharacterBody3D
         float dt = (float)delta;
         _inputCtrl.Poll();
         UpdateDebugLabel();
+        UpdateDamageLabel();
         if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
 
         // Legacy hold timer for RMB charge (only if not using AimedCharge system)
