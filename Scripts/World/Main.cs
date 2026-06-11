@@ -140,14 +140,8 @@ public partial class Main : Node3D
         {
             _simulation.CombatComponents[1] = playerCombat;
 
-            // Subscribe to damage events for floating numbers
-            playerCombat.OnTakeDamage += (damage, _, _, _) =>
-            {
-                if (_damageNumbers != null && _player != null)
-                {
-                    _damageNumbers.SpawnDamageNumber(damage, _player.GlobalPosition + (Vector3.Up * 1.5f));
-                }
-            };
+            // Damage % shown via persistent labels above characters
+            // (no additional handler needed here)
         }
 
         // Register player in the simulation
@@ -378,15 +372,7 @@ public partial class Main : Node3D
             {
                 _simulation.CombatComponents[entityId] = combat;
 
-                // Subscribe to damage events for floating numbers
-                int npcIndex = i; // Capture for closure
-                combat.OnTakeDamage += (damage, _, _, _) =>
-                {
-                    if (_damageNumbers != null && _npcs[npcIndex] != null)
-                    {
-                        _damageNumbers.SpawnDamageNumber(damage, _npcs[npcIndex]!.GlobalPosition + (Vector3.Up * 1.5f));
-                    }
-                };
+                // Damage % shown via persistent labels above characters
             }
         }
     }
