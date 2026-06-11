@@ -10,7 +10,7 @@ public static class HeightmapGenerator
     public static void Generate(World3D world)
     {
         const int gridCount = 100;
-        float spacing = 200f / (gridCount - 1);
+        const float spacing = 200f / (gridCount - 1);
         float[] heights = new float[gridCount * gridCount];
 
         var spaceState = world.DirectSpaceState;

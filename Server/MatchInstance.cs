@@ -207,8 +207,8 @@ namespace SlopArena.Server
 
         private void Tick()
         {
-            var p1Input = FlushQueue(_p1Queue, out int p1Count);
-            var p2Input = FlushQueue(_p2Queue, out int p2Count);
+            var p1Input = FlushQueue(_p1Queue, out _);
+            var p2Input = FlushQueue(_p2Queue, out _);
 
             if (p1Input.HasValue)
             {
