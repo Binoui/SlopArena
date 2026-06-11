@@ -13,11 +13,15 @@ using SlopArena.Shared;
 /// </summary>
 public sealed class InputController
 {
-    // ── Frame state ──
+    /// <summary>
+    /// ── Frame state ──
+    /// </summary>
     public bool JumpJustPressed { get; set; }
     public bool DashJustPressed { get; set; }
 
-    // ── AI injection ──
+    /// <summary>
+    /// ── AI injection ──
+    /// </summary>
     private bool _aiControlled = false;
     private InputState _aiInput;
 

@@ -1,6 +1,5 @@
 #nullable enable
 using Godot;
-using System;
 
 /// <summary>
 /// Simple AI controller for NPC bots.
@@ -19,7 +18,10 @@ using System;
 public partial class BotController : Node
 {
     private PlayerController? _npc;
-    private PlayerController? _target; // Usually the human player
+    /// <summary>
+    /// Usually the human player
+    /// </summary>
+    private PlayerController? _target;
 
     private float _actionTimer = 0f;
     private float _nextActionTime = 1f;
@@ -33,15 +35,28 @@ public partial class BotController : Node
     private Vector3 _wanderTarget = Vector3.Zero;
     private float _wanderTimer = 0f;
 
-    // Behavior parameters
+    /// <summary>
+    /// Behavior parameters
+    /// </summary>
     private const float EngageRange = 15f;    // Start approaching player
-    private const float AttackRange = 3f;     // Start attacking
-    private const float CircleRadius = 5f;    // Circle player at this distance
-    private const float WanderRadius = 10f;   // Random wander area
+    /// <summary>
+    /// Start attacking
+    /// </summary>
+    private const float AttackRange = 3f;
+    /// <summary>
+    /// Circle player at this distance
+    /// </summary>
+    private const float CircleRadius = 5f;
+    /// <summary>
+    /// Random wander area
+    /// </summary>
+    private const float WanderRadius = 10f;
 
     private float _circleAngle = 0f;
 
-    // One-shot action flags (cleared each frame after injection)
+    /// <summary>
+    /// One-shot action flags (cleared each frame after injection)
+    /// </summary>
     private bool _shouldJump = false;
     private bool _shouldDash = false;
 
@@ -52,9 +67,9 @@ public partial class BotController : Node
 
         // Start with random wander position
         _wanderTarget = _npc.GlobalPosition + new Vector3(
-            GD.Randf() * WanderRadius - WanderRadius / 2,
+            (GD.Randf() * WanderRadius) - (WanderRadius / 2),
             0f,
-            GD.Randf() * WanderRadius - WanderRadius / 2
+            (GD.Randf() * WanderRadius) - (WanderRadius / 2)
         );
     }
 
@@ -83,11 +98,11 @@ public partial class BotController : Node
         else
         {
             // Wander mode: move randomly
-            DoWanderBehavior(dt);
+            DoWanderBehavior();
         }
 
         // Build and inject input for the NPC
-        InjectInput(dt);
+        InjectInput();
     }
 
     private void DoCombatBehavior(Vector3 toTarget, float distance, float dt)
@@ -100,7 +115,7 @@ public partial class BotController : Node
             // Basic attack (LMB)
             ExecuteAttack();
             _attackTimer = 0f;
-            _nextAttackTime = GD.Randf() * 1f + 0.5f; // 0.5-1.5s between attacks
+            _nextAttackTime = (GD.Randf() * 1f) + 0.5f; // 0.5-1.5s between attacks
         }
 
         // Circle strafe around player
@@ -126,7 +141,7 @@ public partial class BotController : Node
         {
             // Too close: back away slightly
             Vector3 away = -toTarget.Normalized();
-            _wanderTarget = _npc.GlobalPosition + away * 2f;
+            _wanderTarget = _npc.GlobalPosition + (away * 2f);
         }
 
         // Dash occasionally to close distance or escape
@@ -137,7 +152,7 @@ public partial class BotController : Node
                 // Dash toward player
                 ExecuteDash();
                 _dashTimer = 0f;
-                _nextDashTime = GD.Randf() * 3f + 2f; // 2-5s between dashes
+                _nextDashTime = (GD.Randf() * 3f) + 2f; // 2-5s between dashes
             }
         }
 
@@ -148,7 +163,7 @@ public partial class BotController : Node
         }
     }
 
-    private void DoWanderBehavior(float dt)
+    private void DoWanderBehavior()
     {
         if (_npc == null) return;
 
@@ -156,9 +171,9 @@ public partial class BotController : Node
         if (_wanderTimer >= 3f)
         {
             _wanderTarget = _npc.GlobalPosition + new Vector3(
-                GD.Randf() * WanderRadius - WanderRadius / 2,
+                (GD.Randf() * WanderRadius) - (WanderRadius / 2),
                 0f,
-                GD.Randf() * WanderRadius - WanderRadius / 2
+                (GD.Randf() * WanderRadius) - (WanderRadius / 2)
             );
             _wanderTimer = 0f;
         }
@@ -174,7 +189,7 @@ public partial class BotController : Node
     // INPUT INJECTION (proper AI → PlayerController interface)
     // ══════════════════════════════════════════════════════════════
 
-    private void InjectInput(float dt)
+    private void InjectInput()
     {
         if (_npc == null) return;
 

@@ -20,7 +20,6 @@ public partial class StateMachine : Node
 	private AnimationNodeStateMachinePlayback? _animPlayback;
 	private AnimationTree? _animTree;
 	private PlayerController? _player;
-	private MovementComponent? _movement;
 
 	public State? CurrentState { get; private set; }
 	public string CurrentStateName => CurrentState?.Name ?? "";
@@ -35,7 +34,6 @@ public partial class StateMachine : Node
 		InputController inputCtrl)
 	{
 		_player = player;
-		_movement = movement;
 
 		// Find AnimationTree with a StateMachine root (parameters/playback)
 		var animTree = FindAnimationTree(player);

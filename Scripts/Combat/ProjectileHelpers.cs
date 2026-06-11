@@ -30,7 +30,7 @@ public static class ProjectileHelpers
         proj.GlobalPosition = origin;
         tree.CurrentScene.AddChild(proj);
 
-        Vector3 targetPos = origin + direction * (speed * lifetime);
+        Vector3 targetPos = origin + (direction * (speed * lifetime));
         var tween = tree.CreateTween();
         tween.TweenProperty(proj, "global_position", targetPos, lifetime).SetTrans(Tween.TransitionType.Linear);
         tween.Finished += () => { if (GodotObject.IsInstanceValid(proj)) proj.QueueFree(); };

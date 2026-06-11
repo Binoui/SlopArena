@@ -11,16 +11,23 @@ public partial class AttackWarping : Node
     private Node3D? _owner;
     private TargetLockSystem? _targetLock;
 
-    // Warp state
+    /// <summary>
+    /// Warp state
+    /// </summary>
     private bool _isWarping = false;
     private Vector3 _warpDirection;
     private float _warpSpeed;
     private float _warpDistanceRemaining;
     private float _warpTimeElapsed = 0f;
-    private float _maxWarpDuration = 0.5f;  // Safety timeout
+    /// <summary>
+    /// Safety timeout
+    /// </summary>
+    private float _maxWarpDuration = 0.5f;
     private Action? _onWarpComplete;
 
-    // Cache final warp direction for hitbox spawning (survives target lock loss)
+    /// <summary>
+    /// Cache final warp direction for hitbox spawning (survives target lock loss)
+    /// </summary>
     private Vector3 _finalWarpDirection;
 
     public bool IsWarping => _isWarping;

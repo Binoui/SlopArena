@@ -86,9 +86,12 @@ namespace SlopArena.Shared
             };
         }
 
-        // ═══════════════════════════════════════
-        // MANKI — Mad Bomber Monkey
-        // ═══════════════════════════════════════
+        /// <summary>
+        /// ═══════════════════════════════════════
+        /// MANKI — Mad Bomber Monkey
+        /// ═══════════════════════════════════════
+        /// </summary>
+        /// <returns></returns>
         private static CharacterDefinition BuildManki()
         {
             return new CharacterDefinition

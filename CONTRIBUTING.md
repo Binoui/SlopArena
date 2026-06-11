@@ -29,6 +29,7 @@ SlopArena is a Godot 4 .NET C# project. You'll need:
 ```bash
 git clone https://github.com/Binoui/SlopArena.git
 cd SlopArena
+git config core.hooksPath .githooks  # Enable pre-commit format check
 ```
 
 1. Open Godot (.NET version)

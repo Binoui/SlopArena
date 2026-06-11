@@ -8,7 +8,10 @@ using Godot;
 /// </summary>
 public sealed partial class AirState : State
 {
-	private const float FallBlendSpeed = 20f; // |VY| at which fall blend = 100%
+	/// <summary>
+	/// |VY| at which fall blend = 100%
+	/// </summary>
+	private const float FallBlendSpeed = 20f;
 
 	public AirState()
 	{

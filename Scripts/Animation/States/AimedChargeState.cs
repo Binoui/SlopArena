@@ -18,8 +18,14 @@ public sealed partial class AimedChargeState : State
 {
     private AimedChargeData _config;
     private int _slotIndex;
-    private float _aimYaw; // direction du triangle (yaw, radians)
-    private float _groundY; // hauteur du sol projeté
+    /// <summary>
+    /// direction du triangle (yaw, radians)
+    /// </summary>
+    private float _aimYaw;
+    /// <summary>
+    /// hauteur du sol projeté
+    /// </summary>
+    private float _groundY;
     private int _chargeTicks;
     private bool _attackFired;
     private MeshInstance3D? _coneMesh;
@@ -37,11 +43,11 @@ public sealed partial class AimedChargeState : State
     /// </summary>
     public void Configure(AimedChargeData config, int slotIndex, bool airborne, float aimYaw)
     {
-    	_config = config;
-    	_slotIndex = slotIndex;
-    	_airborne = airborne;
-    	_aimYaw = aimYaw;
-    	AnimationName = config.ChargeAnimName;
+        _config = config;
+        _slotIndex = slotIndex;
+        _airborne = airborne;
+        _aimYaw = aimYaw;
+        AnimationName = config.ChargeAnimName;
     }
 
     public override void Enter()
@@ -89,8 +95,8 @@ public sealed partial class AimedChargeState : State
         var space = Player.GetWorld3D().DirectSpaceState;
         var query = new PhysicsRayQueryParameters3D
         {
-            From = Player.GlobalPosition + Vector3.Up * 10f,
-            To = Player.GlobalPosition + Vector3.Down * 20f,
+            From = Player.GlobalPosition + (Vector3.Up * 10f),
+            To = Player.GlobalPosition + (Vector3.Down * 20f),
             CollideWithAreas = false,
             CollideWithBodies = true,
         };

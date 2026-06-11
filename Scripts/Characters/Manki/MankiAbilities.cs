@@ -1,6 +1,5 @@
 #nullable enable
 using Godot;
-using SlopArena.Shared;
 
 /// <summary>
 /// Special effects for Manki (Mad Bomber Monkey) abilities.
@@ -15,7 +14,7 @@ public static class MankiAbilities
     public static void AerosolFlame(CombatComponent combat)
     {
         Vector3 forward = combat.GetCameraForward();
-        Vector3 pos = combat.GetOwnerPosition() + Vector3.Up * 1.2f; // Hand height
+        Vector3 pos = combat.GetOwnerPosition() + (Vector3.Up * 1.2f); // Hand height
 
         var vfxManager = combat.GetSpellVFX();
         if (vfxManager != null)
@@ -37,7 +36,7 @@ public static class MankiAbilities
         {
             // Fallback: old cone visual if VFX manager not available
             StatusSpells.CreateConeVisual(combat, pos, forward, 5f, 3f, new Color(1f, 0.6f, 0f, 0.3f), 0.4f);
-            StatusSpells.CreateImpactVisual(combat, pos + forward * 4f, 1.5f, new Color(1f, 0.8f, 0.2f));
+            StatusSpells.CreateImpactVisual(combat, pos + (forward * 4f), 1.5f, new Color(1f, 0.8f, 0.2f));
         }
     }
 
@@ -47,12 +46,12 @@ public static class MankiAbilities
     public static void RoundBomb(CombatComponent combat)
     {
         Vector3 forward = combat.GetCameraForward();
-        Vector3 pos = combat.GetOwnerPosition() + Vector3.Up * 1.2f;
+        Vector3 pos = combat.GetOwnerPosition() + (Vector3.Up * 1.2f);
 
         // Spawn a visual projectile with slight arc (upward angle)
-        Vector3 arcDir = (forward + Vector3.Up * 0.3f).Normalized();
-        float speed = 18f;
-        float lifetime = 1.2f;
+        Vector3 arcDir = (forward + (Vector3.Up * 0.3f)).Normalized();
+        const float speed = 18f;
+        const float lifetime = 1.2f;
         SceneTree? tree = combat.GetTree();
         if (tree == null) return;
 
@@ -70,7 +69,7 @@ public static class MankiAbilities
         tree.CurrentScene?.AddChild(proj);
         proj.GlobalPosition = pos;
 
-        Vector3 targetPos = pos + arcDir * (speed * lifetime) + Vector3.Down * 3f; // arc drops
+        Vector3 targetPos = pos + (arcDir * (speed * lifetime)) + (Vector3.Down * 3f); // arc drops
         var tween = tree.CreateTween();
         tween.TweenProperty(proj, "global_position", targetPos, lifetime).SetTrans(Tween.TransitionType.Quad);
         tween.Finished += () =>
@@ -90,7 +89,7 @@ public static class MankiAbilities
     public static void DynamiteJump(CombatComponent combat)
     {
         Vector3 pos = combat.GetOwnerPosition();
-        StatusSpells.CreateImpactVisual(combat, pos + Vector3.Down * 0.5f, 2.5f, new Color(1f, 0.6f, 0f));
+        StatusSpells.CreateImpactVisual(combat, pos + (Vector3.Down * 0.5f), 2.5f, new Color(1f, 0.6f, 0f));
         StatusSpells.CreateCircleVisual(combat, pos, 3f, new Color(1f, 0.4f, 0f, 0.25f), 0.3f);
     }
 
@@ -100,7 +99,7 @@ public static class MankiAbilities
     public static void DiveBomb(CombatComponent combat)
     {
         Vector3 pos = combat.GetOwnerPosition();
-        StatusSpells.CreateImpactVisual(combat, pos + Vector3.Down * 0.5f, 3f, new Color(1f, 0.7f, 0f));
+        StatusSpells.CreateImpactVisual(combat, pos + (Vector3.Down * 0.5f), 3f, new Color(1f, 0.7f, 0f));
         StatusSpells.CreateCircleVisual(combat, pos, 3.5f, new Color(1f, 0.5f, 0f, 0.3f), 0.4f);
     }
 

@@ -19,15 +19,15 @@ public partial class FlamethrowerVFX : Node3D
 
             // Orange/red gradient material
             float t = i / 12f;
-            Color flameColor = new Color(1f, 0.8f - t * 0.5f, 0.1f - t * 0.1f);
+            Color flameColor = new Color(1f, 0.8f - (t * 0.5f), 0.1f - (t * 0.1f));
 
             var mat = new StandardMaterial3D
             {
                 Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                AlbedoColor = new Color(flameColor.R, flameColor.G, flameColor.B, 0.6f - t * 0.3f),
+                AlbedoColor = new Color(flameColor.R, flameColor.G, flameColor.B, 0.6f - (t * 0.3f)),
                 EmissionEnabled = true,
                 Emission = flameColor,
-                EmissionEnergyMultiplier = 3.0f - t * 1.5f,
+                EmissionEnergyMultiplier = 3.0f - (t * 1.5f),
                 BlendMode = BaseMaterial3D.BlendModeEnum.Add,
                 BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled
             };

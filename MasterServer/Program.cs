@@ -1,14 +1,6 @@
-using System;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using MasterServer.Data;
 using MasterServer.DTOs;
 

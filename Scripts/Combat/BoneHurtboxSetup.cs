@@ -1,7 +1,6 @@
 #nullable enable
 using Godot;
 using System.Collections.Generic;
-using SlopArena.Shared;
 
 /// <summary>
 /// Defines a hurtbox attached to a bone chain (capsule between start→end bone).
