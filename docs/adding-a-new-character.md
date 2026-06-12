@@ -271,11 +271,15 @@ AnimationNames = new[] { "sword_slash", "sword_spin", "sword_uppercut" }
 The `AnimationController` loads animations by name from the character's animation library.
 If `AnimationNames` is null/empty, it falls back to generic names (`attack_{slot}_{stage}`).
 
-### 3d. Animation path remapping
+### 3d. GLB animation binding
 
-Mixamo uses path conventions like `RootNodeL/Skeleton:bone`.
-KayKit models use `PlayerModel/Rig_Medium/Skeleton3D:bone`.
-The system auto-remaps between them — see `AnimationController.DetectPrefixToStrip()`.
+With GLB, Godot's `AnimationPlayer` reads animation tracks by bone **path** (e.g., `mixamorig:Hips:rotation_quaternion`). The skeleton layout is baked into the GLB — no manual remapping needed.
+
+**Key points:**
+- Animations are **embedded in the GLB file** — no separate FBX files
+- `AnimationNames` in `AbilityData` must match the animation names inside the GLB
+- The `AnimationTree` root StateMachine state names must match `AnimationNames`
+- Godot handles bone remapping between different skeletons automatically via `AnimationMixer` if needed
 
 ---
 
