@@ -43,6 +43,10 @@ namespace SlopArena.Shared
         /// </summary>
         public float KillHeight;
         /// <summary>
+        /// Y coordinate of the floor surface (for ground collision)
+        /// </summary>
+        public float FloorHeight;
+        /// <summary>
         /// arena bounds X (used for camera/mechanics)
         /// </summary>
         public float MinX, MaxX;
@@ -75,6 +79,7 @@ namespace SlopArena.Shared
                     DisplayName = "The Pit",
                     ScenePath = "res://assets/arenas/arena_pit.tscn",
                     KillHeight = -15f,  // Deep blast zone (80x80 large stage)
+                    FloorHeight = -1f,
                     MinX = 0f, MaxX = 80f,
                     MinZ = 0f, MaxZ = 80f,
                     SpawnPoints = new[]
@@ -94,6 +99,7 @@ namespace SlopArena.Shared
                     DisplayName = "Crossroads",
                     ScenePath = "res://assets/arenas/arena_cross.tscn",
                     KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
+                    FloorHeight = -1f,
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]
@@ -113,6 +119,7 @@ namespace SlopArena.Shared
                     DisplayName = "The Split",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
                     KillHeight = -7f,   // Shallow blast zone (60x60 small competitive stage)
+                    FloorHeight = -1f,
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]

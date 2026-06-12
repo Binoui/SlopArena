@@ -83,7 +83,7 @@ namespace SlopArena.Shared
             // 3. Knockback overrides everything (but dash invincibility still applies)
             if (HasKnockback(s))
             {
-                ProcessKnockback(ref s, arena);
+                ProcessKnockback(ref s, arena, def);
                 return;
             }
 
@@ -106,11 +106,17 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 7. Ground collision (flat floor at Y=0)
-            if (s.IsGrounded && s.PY <= FloorHeight + 0.1f)
+            // 7. Ground collision (flat floor)
+            float groundY = arena.FloorHeight + def.CapsuleHeight * 0.5f;
+            if (s.PY <= groundY + 0.1f)
             {
-                s.PY = FloorHeight;
+                s.IsGrounded = true;
+                s.PY = groundY;
                 s.VY = 0f;
+            }
+            else
+            {
+                s.IsGrounded = false;
             }
 
             // 8. Landing cleanup
@@ -196,7 +202,7 @@ namespace SlopArena.Shared
             return ((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ)) > 0.0001f;
         }
 
-        private static void ProcessKnockback(ref CharacterState s, ArenaDefinition _)
+        private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
         {
             // Decay knockback
             s.KVX -= s.KVX * KnockbackDecayPerTick;
@@ -219,11 +225,12 @@ namespace SlopArena.Shared
 
             // Ground check
             bool wasAirborne = !s.IsGrounded;
-            s.IsGrounded = s.PY <= FloorHeight + 0.1f;
+            float groundY = arena.FloorHeight + def.CapsuleHeight * 0.5f;
+            s.IsGrounded = s.PY <= groundY + 0.1f;
 
             if (s.IsGrounded)
             {
-                s.PY = FloorHeight;
+                s.PY = groundY;
                 s.VY = 0f;
             }
 

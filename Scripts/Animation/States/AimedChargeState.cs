@@ -72,6 +72,10 @@ public sealed partial class AimedChargeState : State
 
         _chargeTicks++;
 
+        // Sync charge progress to CharacterState so hitbox can scale
+        ref var state = ref Player.GetState();
+        state.ChargeTicks = (ushort)_chargeTicks;
+
         // Clamp charge ticks to MaxChargeTicks for scaling
         if (_config.MaxChargeTicks > 0 && _chargeTicks > _config.MaxChargeTicks)
             _chargeTicks = _config.MaxChargeTicks;
