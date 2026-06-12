@@ -1,43 +1,45 @@
 namespace SlopArena.Shared
 {
     /// <summary>
-    /// One stage of an ability. A simple ability has 1 stage.
-    /// A combo ability (like LMB) has N stages chained by ChainWindowTicks.
-    /// Range-based: supports attack range, warp range, and target tracking.
+    /// A hitbox spawned during an attack at a specific tick.
     /// </summary>
-    public struct AttackStage
+    public struct HitboxEvent
     {
+        /// <summary>Tick from attack start when this hitbox spawns (0 = frame 1).</summary>
+        public ushort TriggerTick;
+        /// <summary>How many frames the hitbox stays active.</summary>
+        public ushort DurationTicks;
+        /// <summary>Hitbox radius.</summary>
+        public float Radius;
+        /// <summary>Offset from attacker center (rotated by facing yaw).</summary>
+        public float OffX, OffY, OffZ;
         public float Damage;
         public float KnockbackForce;
         public float KnockbackUpward;
-        /// <summary>
-        /// Forward burst during attack
-        /// </summary>
+        public ushort StunTicks;
+        /// <summary>If false: persists even if attacker is hit during startup.</summary>
+        public bool Interruptible;
+    }
+
+    /// <summary>
+    /// One stage of an ability. A simple ability has 1 stage.
+    /// A combo ability (like LMB) has N stages chained by ChainWindowTicks.
+    /// </summary>
+    public struct AttackStage
+    {
+        /// <summary>Total animation lock duration in ticks.</summary>
+        public ushort DurationTicks;
+        /// <summary>Hitbox events triggered during this stage.</summary>
+        public HitboxEvent[] HitboxEvents;
+        /// <summary>Forward burst during attack.</summary>
         public float LungeForce;
         /// <summary>
-        /// Hitstun duration in ticks
-        /// </summary>
-        public ushort StunTicks;
-        /// <summary>
-        /// Self animation lock in ticks
-        /// </summary>
-        public ushort SelfLockTicks;
-        /// <summary>
-        /// 0 = final stage / no chain
+        /// 0 = final stage / no chain. Non-zero = frames to buffer next input.
         /// </summary>
         public ushort ChainWindowTicks;
-        /// <summary>
-        /// Frames before hitbox activates (startup anim)
-        /// </summary>
-        public ushort StartupTicks;
 
-        /// <summary>
-        /// Range-based range system
-        /// </summary>
-        public float AttackRange;      // Distance where attack can hit immediately (e.g., 5m)
-        /// <summary>
-        /// Distance where auto-dash triggers (e.g., 12m)
-        /// </summary>
+        /// <summary>Distance where auto-dash triggers (e.g., 12m)</summary>
+        public float AttackRange;
         public float WarpRange;
         /// <summary>
         /// Warp speed now driven by character Movement.SprintSpeed (not per-stage)

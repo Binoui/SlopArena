@@ -14,6 +14,7 @@
     <Compile Remove="Shared/bin/**/*.cs" />
     <Compile Remove="Server/**/*.cs" />
     <Compile Remove="MasterServer/**/*.cs" />
+    <Compile Remove="ServerApp/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

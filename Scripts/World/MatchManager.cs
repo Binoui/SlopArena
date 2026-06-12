@@ -3,19 +3,30 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using SlopArena.Shared;
-using SlopArena.Server;
 
 /// <summary>
-/// Manages the match lifecycle: spawn, game loop (via LocalServerBridge), targeting.
-/// The bridge runs a pure C# ServerSimulation each frame.
-/// PlayerControllers receive authoritative states and render them.
+/// Manages the match with proper client-side prediction + server reconciliation.
+///
+/// Flow per frame:
+///   _PhysicsProcess (60Hz):
+///     1. Build input, assign tick
+///     2. Store input in buffer
+///     3. LocalSim.Tick(input) → predicted state
+///     4. Store predicted state in buffer
+///     5. Send input (with tick) to server
+///     6. Apply predicted state → render
+///
+///   _Process (as soon as data arrives):
+///     7. Receive server states
+///     8. For each: compare predicted vs server
+///     9. If mismatch: rollback (re-simulate from safe tick)
+///     10. Apply corrected states
 /// </summary>
 public partial class MatchManager : Node3D
 {
     public PlayerController Player { get; private set; } = null!;
     public PlayerController[] NPCs { get; private set; } = new PlayerController[5];
-    public LocalServerBridge Bridge { get; private set; } = null!;
-    public ArenaManager Arena { get; private set; } = null!;
+    public NetworkClient Net { get; private set; } = null!;
 
     private MeshInstance3D _targetRing = null!;
     public event Action<ulong>? OnTargetChanged;
@@ -24,87 +35,72 @@ public partial class MatchManager : Node3D
     private const int NpcCount = 5;
     private ArenaDefinition _arenaDef = ArenaRegistry.Get("split");
 
-    // ── START MATCH ──
+    // ── Local prediction ──
+    private ServerSimulation _localSim = null!;
+    private CharacterDefinition _charDef;
+    private ulong _playerEntityId = 1;
+
+    // ── Tick + rollback ──
+    private const int RollbackFrames = 10;
+    private uint _sendTick;
+    private readonly InputState[] _inputBuffer = new InputState[RollbackFrames];
+    private readonly CharacterState[] _stateBuffer = new CharacterState[RollbackFrames];
+    private uint _lastConfirmedTick;
 
     public async void StartMatch(CharacterClass playerClass, SpellVFXManager? spellVFX)
     {
         _spellVFX = spellVFX;
+        _charDef = CharacterRegistry.Get(playerClass);
 
-        // Bridge (runs pure C# server simulation)
-        Bridge = new LocalServerBridge(_arenaDef);
-        Bridge.Name = "LocalServerBridge";
-        AddChild(Bridge);
+        // Local simulation
+        _localSim = new ServerSimulation(_arenaDef);
+        var spawn = _arenaDef.SpawnPoints[5];
+        var initialState = new CharacterState
+        {
+            PX = spawn.X, PY = spawn.Y + 5f, PZ = spawn.Z,
+            FacingYaw = spawn.Yaw,
+            JumpsLeft = _charDef.Movement.MaxJumps,
+        };
+        _localSim.RegisterEntity(_playerEntityId, _charDef, initialState);
+        for (int i = 0; i < NpcCount; i++)
+        {
+            var npcSpawn = _arenaDef.SpawnPoints[i];
+            _localSim.RegisterEntity((ulong)(100 + i), _charDef, new CharacterState
+            {
+                PX = npcSpawn.X, PY = npcSpawn.Y + 1f, PZ = npcSpawn.Z,
+                FacingYaw = npcSpawn.Yaw,
+                JumpsLeft = _charDef.Movement.MaxJumps,
+            });
+        }
 
-        // Arena
-        Arena = new ArenaManager { Name = "ArenaManager" };
-        AddChild(Arena);
-        Arena.LoadArena(_arenaDef.Name);
+        // Network client
+        Net = new NetworkClient { Name = "NetworkClient" };
+        AddChild(Net);
+        Net.Connect(_playerEntityId);
+
+        // Init tick buffer with initial state
+        _stateBuffer[0] = initialState;
+        _lastConfirmedTick = 0;
+
+        // Arena visual
+        var arenaNode = new ArenaManager { Name = "ArenaManager" };
+        AddChild(arenaNode);
+        arenaNode.LoadArena(_arenaDef.Name);
 
         // Targeting ring
         _targetRing = CreateTargetRing();
         AddChild(_targetRing);
         _targetRing.Visible = false;
 
-        // Spawn NPCs
+        // Spawn NPCs (visual)
         SpawnNPCs();
 
         // Spawn player
         Player = new PlayerController { Name = "Player" };
         Player.SetClass(playerClass);
         AddChild(Player);
-        Player.Position = _arenaDef.SpawnPoints[5].ToGodot() + new Vector3(5f, 15f, 0f);
-        Player.SetupCombat(Bridge, _arenaDef, 1, _spellVFX);
-
-        // Register player in bridge
-        var playerDef = Player.GetCharacterDef();
-        var playerState = new CharacterState
-        {
-            PX = Player.Position.X, PY = Player.Position.Y, PZ = Player.Position.Z,
-            FacingYaw = Player.GlobalRotation.Y,
-            JumpsLeft = playerDef.Movement.MaxJumps,
-            AirDodgesLeft = 1,
-        };
-        // Load GLB for bone-accurate hurtboxes
-        byte[]? glbData = LoadGlbBytes("res://assets/characters/manki/manki.glb");
-        Bridge.RegisterEntity(1, playerDef, playerState, glbData);
-        Bridge.StoreDef(1, playerDef);
-        if (Player.GetCombatComponent() != null)
-            Bridge.CombatComponents[1] = Player.GetCombatComponent();
-
-        // Auto-target on hit
-        Bridge.OnEntityHit += (entityId, _, _, _, _) =>
-        {
-            if (entityId == 1 && _targetRing != null && !_targetRing.Visible)
-                SetTarget(100);
-        };
-
-        // Void death → trigger Godot respawn
-        Bridge.OnEntityOutOfBounds += (id) =>
-        {
-            if (id == 1) Player?.TriggerRespawn();
-            else
-            {
-                int idx = (int)(id - 100);
-                if (idx >= 0 && idx < NpcCount && NPCs[idx] != null)
-                    NPCs[idx]!.TriggerRespawn();
-            }
-        };
-
-        // Status routing
-        Bridge.OnStatusApply += (ulong targetId, StatusType type, float duration, ulong sourceId) =>
-        {
-            if (Bridge.CombatComponents.TryGetValue(targetId, out var tc))
-                tc.ApplyStatus(type, duration, sourceId);
-        };
-        Bridge.OnStatusConsume += (ulong targetId, StatusType type) =>
-        {
-            if (Bridge.CombatComponents.TryGetValue(targetId, out var tc))
-                return tc.ConsumeStatus(type);
-            return false;
-        };
-
-        // AI
-        AddBotAI();
+        Player.Position = spawn.ToGodot() + new Vector3(5f, 15f, 0f);
+        Player.SetupCombat(null!, _arenaDef, _playerEntityId, _spellVFX);
 
         // Heightmap
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -114,11 +110,8 @@ public partial class MatchManager : Node3D
         catch (Exception ex) { GD.PrintErr($"Heightmap failed: {ex.Message}"); }
     }
 
-    // ── SPAWN ──
-
     private void SpawnNPCs()
     {
-        var npcDef = CharacterRegistry.Get(CharacterClass.Manki);
         for (int i = 0; i < NpcCount; i++)
         {
             var npc = new PlayerController { Name = $"NPC_{i}" };
@@ -126,76 +119,102 @@ public partial class MatchManager : Node3D
             npc.SetNPC(true);
             npc.AddToGroup("enemies");
             AddChild(npc);
-
-            var spawn = _arenaDef.SpawnPoints[i];
-            npc.Position = new Vector3(spawn.X, spawn.Y + 1f, spawn.Z);
-            npc.SetupCombat(Bridge, _arenaDef, (ulong)(100 + i), _spellVFX);
-
-            var state = new CharacterState
-            {
-                PX = spawn.X, PY = spawn.Y + 1f, PZ = spawn.Z,
-                FacingYaw = spawn.Yaw,
-                JumpsLeft = npcDef.Movement.MaxJumps,
-                AirDodgesLeft = 1,
-            };
-            byte[]? glb = LoadGlbBytes("res://assets/characters/manki/manki.glb");
-            Bridge.RegisterEntity((ulong)(100 + i), npcDef, state, glb);
-            Bridge.StoreDef((ulong)(100 + i), npcDef);
-
-            var combat = npc.GetCombatComponent();
-            if (combat != null)
-                Bridge.CombatComponents[(ulong)(100 + i)] = combat;
-
+            npc.Position = _arenaDef.SpawnPoints[i].ToGodot() + new Vector3(0f, 1f, 0f);
             NPCs[i] = npc;
         }
     }
 
-    private void AddBotAI()
-    {
-        for (int i = 0; i < NpcCount; i++)
-        {
-            if (NPCs[i] == null) continue;
-            var bot = new BotController { Name = $"BotAI_{i}" };
-            bot.Setup(NPCs[i]!, Player);
-            NPCs[i]!.AddChild(bot);
-        }
-    }
-
-    // ── GAME LOOP (60Hz, autoritaire) ──
+    // ── PHYSICS TICK: predict + send ──
 
     public override void _PhysicsProcess(double delta)
     {
-        // Collect inputs from all entities
-        var inputs = new Dictionary<ulong, InputState>();
-        if (Player != null && Player.IsAlive())
-            inputs[1] = Player.GetCurrentInput();
+        if (Player == null || _localSim == null) return;
+
+        // 1. Build & buffer input
+        var input = Player.GetCurrentInput();
+        _sendTick++;
+        _inputBuffer[_sendTick % RollbackFrames] = input;
+
+        // 2. Local prediction
+        _localSim.Tick(new Dictionary<ulong, InputState> { { _playerEntityId, input } });
+
+        // 3. Store predicted state
+        var predicted = _localSim.GetState(_playerEntityId);
+        _stateBuffer[_sendTick % RollbackFrames] = predicted;
+
+        // 4. Send input + tick to server
+        Net.SendInput(input, _sendTick);
+
+        // 5. Render predicted state
+        Player.ApplyServerState(predicted);
+
+        // NPCs: just gravity (no AI yet)
         for (int i = 0; i < NpcCount; i++)
         {
-            if (NPCs[i] != null && NPCs[i]!.IsAlive())
-                inputs[(ulong)(100 + i)] = NPCs[i]!.GetCurrentInput();
-        }
-
-        // Server tick (authoritative, pure C#)
-        Bridge.Tick(inputs);
-
-        // Apply authoritative states back to Godot bodies
-        if (Player != null && Player.IsAlive())
-        {
-            var state = Bridge.GetState(1);
-            Player.ApplyServerState(state);
-        }
-        for (int i = 0; i < NpcCount; i++)
-        {
-            if (NPCs[i] != null && NPCs[i]!.IsAlive())
-            {
-                var state = Bridge.GetState((ulong)(100 + i));
-                NPCs[i]!.ApplyServerState(state);
-            }
+            ulong eid = (ulong)(100 + i);
+            var npcState = _localSim.GetState(eid);
+            NPCs[i].ApplyServerState(npcState);
         }
     }
 
+    // ── RENDER: reconcile with server ──
+
     public override void _Process(double delta)
     {
+        if (Net == null) return;
+
+        var serverStates = Net.ReceiveStates();
+
+        // Player: reconcile
+        if (serverStates.TryGetValue(_playerEntityId, out var server))
+        {
+            uint serverTick = server.tick;
+            CharacterState serverState = server.state;
+
+            if (serverTick > _lastConfirmedTick)
+            {
+                _lastConfirmedTick = serverTick;
+
+                // Look up predicted state for this tick
+                int idx = (int)(serverTick % RollbackFrames);
+                var predicted = _stateBuffer[idx];
+
+                // Compare server vs predicted
+                float dy = predicted.PY - serverState.PY;
+                if (MathF.Abs(dy) > 0.01f)
+                {
+                    // ── ROLLBACK ──
+                    GD.Print($"[Rollback] Tick {serverTick}: dy={dy:F3}m, resimulating...");
+
+                    // Reset local sim to the server's confirmed state
+                    var safeState = serverState;
+                    _localSim = new ServerSimulation(_arenaDef);
+                    _localSim.RegisterEntity(_playerEntityId, _charDef, safeState);
+
+                    // Re-simulate from serverTick+1 to currentTick
+                    uint currentTick = _sendTick;
+                    for (uint t = serverTick + 1; t <= currentTick; t++)
+                    {
+                        var pastInput = _inputBuffer[t % RollbackFrames];
+                        _localSim.Tick(new Dictionary<ulong, InputState> { { _playerEntityId, pastInput } });
+                    }
+
+                    // Apply corrected state
+                    var corrected = _localSim.GetState(_playerEntityId);
+                    _stateBuffer[currentTick % RollbackFrames] = corrected;
+                    Player.ApplyServerState(corrected);
+                }
+            }
+        }
+
+        // NPCs: apply server state directly (authority)
+        for (int i = 0; i < NpcCount; i++)
+        {
+            ulong eid = (ulong)(100 + i);
+            if (serverStates.TryGetValue(eid, out var npcServer))
+                NPCs[i].ApplyServerState(npcServer.state);
+        }
+
         // Target ring follow
         if (_targetRing != null && _targetRing.Visible)
         {
@@ -203,7 +222,7 @@ public partial class MatchManager : Node3D
             if (tid >= 100 && tid < 100 + NpcCount)
             {
                 int idx = (int)(tid - 100);
-                if (idx >= 0 && idx < NpcCount && NPCs[idx] != null && NPCs[idx]!.IsNpcAlive())
+                if (idx >= 0 && idx < NpcCount && NPCs[idx] != null)
                 {
                     Vector3 pos = NPCs[idx]!.GlobalPosition;
                     pos.Y = 0.1f;
@@ -217,7 +236,6 @@ public partial class MatchManager : Node3D
     // ── TARGET ──
 
     private ulong _targetId = 0;
-
     public ulong GetTarget() => _targetId;
     public bool HasTarget() => _targetId > 0;
 
@@ -230,7 +248,7 @@ public partial class MatchManager : Node3D
             if (valid)
             {
                 int idx = (int)(entityId - 100);
-                if (idx >= 0 && idx < NpcCount && NPCs[idx] != null && NPCs[idx]!.IsNpcAlive())
+                if (idx >= 0 && idx < NpcCount && NPCs[idx] != null)
                 {
                     Vector3 pos = NPCs[idx]!.GlobalPosition;
                     pos.Y = 0.1f;
@@ -276,17 +294,7 @@ public partial class MatchManager : Node3D
         return ring;
     }
 
-    // ── ACCESSORS ──
-
-    public LocalServerBridge GetBridge() => Bridge;
-
-    /// <summary>Read a GLB file from res:// path as raw bytes (for server skeleton).</summary>
-    private static byte[]? LoadGlbBytes(string resPath)
-    {
-        using var file = Godot.FileAccess.Open(resPath, Godot.FileAccess.ModeFlags.Read);
-        if (file == null) return null;
-        return file.GetBuffer((long)file.GetLength());
-    }
+    public NetworkClient GetNet() => Net;
 }
 
 internal static class SpawnPointExtensions

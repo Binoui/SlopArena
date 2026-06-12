@@ -21,10 +21,42 @@ namespace SlopArena.Shared
         /// </summary>
         public ushort StateDurationFrames;
 
-        /// <summary>
-        /// 31 bytes
-        /// </summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 2;
+        /// <summary>IsGrounded flag from server.</summary>
+        public bool IsGrounded;
+
+        /// <summary>32 bytes (position + velocity + action state + grounded + state ticks)</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2;
+
+        /// <summary>Convert from CharacterState to serializable packet.</summary>
+        public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
+        {
+            return new CharacterStatePacket
+            {
+                TickNumber = tick,
+                PositionX = s.PX,
+                PositionY = s.PY,
+                PositionZ = s.PZ,
+                VelocityX = s.VX,
+                VelocityY = s.VY,
+                VelocityZ = s.VZ,
+                CurrentActionState = (byte)s.State,
+                IsGrounded = s.IsGrounded,
+                StateDurationFrames = s.StateTicks,
+            };
+        }
+
+        /// <summary>Convert back to CharacterState.</summary>
+        public CharacterState ToState()
+        {
+            return new CharacterState
+            {
+                PX = PositionX, PY = PositionY, PZ = PositionZ,
+                VX = VelocityX, VY = VelocityY, VZ = VelocityZ,
+                State = (ActionState)CurrentActionState,
+                IsGrounded = IsGrounded,
+                StateTicks = StateDurationFrames,
+            };
+        }
 
         public void Serialize(Span<byte> buffer)
         {
@@ -39,7 +71,8 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(20, 4), VelocityY);
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(24, 4), VelocityZ);
             buffer[28] = CurrentActionState;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(29, 2), StateDurationFrames);
+            buffer[29] = IsGrounded ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(30, 2), StateDurationFrames);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -56,7 +89,8 @@ namespace SlopArena.Shared
             packet.VelocityY = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(20, 4));
             packet.VelocityZ = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(24, 4));
             packet.CurrentActionState = buffer[28];
-            packet.StateDurationFrames = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(29, 2));
+            packet.IsGrounded = buffer[29] != 0;
+            packet.StateDurationFrames = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(30, 2));
             return packet;
         }
     }

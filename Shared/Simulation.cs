@@ -92,7 +92,67 @@ namespace SlopArena.Shared
                 ProcessDash(ref s, stats);
             else if (s.State == ActionState.AirDodging)
                 ProcessAirDodge();
+            else if (s.State == ActionState.Attacking)
+                ProcessAttack(ref s, def, input);
 
+            // 5. Input-driven actions (only when not locked by animation)
+            if (s.AnimLockTicks == 0)
+            {
+                // Jump
+                if (input.Jump && s.IsGrounded)
+                {
+                    ApplyJump(ref s, stats.JumpForce);
+                }
+
+                // Dash
+                if (input.Dash && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0)
+                {
+                    StartDash(ref s, stats, input.MoveX, 0f);
+                }
+
+                // Attack via ActiveSlot (1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F)
+                if (input.ActiveSlot > 0)
+                {
+                    // Combo chain: same slot pressed during chain window
+                    if (s.State == ActionState.Attacking && s.AnimLockTicks == 0 && s.ComboTimerTicks > 0 &&
+                        input.ActiveSlot == s.AttackSlot)
+                    {
+                        var ability = s.AttackSlot switch
+                        {
+                            1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                            _ => def.LMB,
+                        };
+                        if (s.ComboStage < ability.Stages.Length - 1)
+                        {
+                            s.ComboStage++;
+                            var stage = ability.Stages[s.ComboStage];
+                            s.AnimLockTicks = stage.DurationTicks;
+                            s.AttackElapsedTicks = 0;
+                            s.ComboTimerTicks = 0; // close chain window
+                        }
+                    }
+                    // Fresh attack
+                    else if (s.State == ActionState.Idle)
+                    {
+                        var ability = input.ActiveSlot switch
+                        {
+                            1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                            _ => def.LMB,
+                        };
+                        if (ability.Stages.Length > 0)
+                        {
+                            var stage = ability.Stages[0];
+                            s.State = ActionState.Attacking;
+                            s.AnimLockTicks = stage.DurationTicks;
+                            s.ComboStage = 0;
+                            s.AttackElapsedTicks = 0;
+                            s.AttackSlot = input.ActiveSlot;
+                        }
+                    }
+                }
+            }
+
+            // 6. ProcessNormalMovement (always applicable)
             if (s.State == ActionState.Idle || s.State == ActionState.Attacking)
             {
                 ProcessNormalMovement(ref s, stats, input);
@@ -136,6 +196,7 @@ namespace SlopArena.Shared
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
             if (s.ComboTimerTicks > 0) s.ComboTimerTicks--;
             if (s.HitstunTicks > 0) s.HitstunTicks--;
+            if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
 
             // Turnaround ticks
             if (s.TurnaroundTicks > 0) s.TurnaroundTicks--;
@@ -402,7 +463,33 @@ namespace SlopArena.Shared
             UpdateFacing(ref s);
         }
 
-        // ── DASH INITIATION ──
+        // ── ATTACK PROCESSING ──
+
+        private static void ProcessAttack(ref CharacterState s, CharacterDefinition def, InputState input)
+        {
+            if (s.AnimLockTicks == 0)
+            {
+                // Check if combo chain window should open
+                var ability = s.AttackSlot switch
+                {
+                    1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                    _ => def.LMB,
+                };
+                if (s.ComboStage < ability.Stages.Length - 1 &&
+                    ability.Stages[s.ComboStage].ChainWindowTicks > 0)
+                {
+                    // Open chain window — stay in Attacking state
+                    s.ComboTimerTicks = ability.Stages[s.ComboStage].ChainWindowTicks;
+                    return;
+                }
+
+                // No more chaining → back to idle
+                s.State = ActionState.Idle;
+                s.ComboStage = 0;
+                s.AttackSlot = 0;
+                s.AttackElapsedTicks = 0;
+            }
+        }
 
         /// <summary>
         /// Start a dash (ground or air). 1 second duration, grants invincibility.
