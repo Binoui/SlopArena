@@ -38,6 +38,10 @@ namespace SlopArena.Tools
             "mixamorig_LeftHand",
             "mixamorig_RightFoot",
             "mixamorig_LeftFoot",
+            "mixamorig_RightToeBase",
+            "mixamorig_LeftToeBase",
+            "mixamorig_RightToe_End",
+            "mixamorig_LeftToe_End",
         };
 
         public override void _Ready()
