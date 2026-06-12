@@ -25,7 +25,7 @@ public partial class CombatComponent : Node
     // ==========================================
 
     private Node3D? _owner;
-    private LocalSimulation? _simulation;
+    private LocalServerBridge? _simulation;
     private ulong _entityId = 1;
     private SpellVFXManager? _spellVFX;
     private TargetLockSystem? _targetLock;
@@ -87,7 +87,7 @@ public partial class CombatComponent : Node
     /// <param name="entityId">Unique entity ID in the simulation</param>
     /// <param name="spellVFX">Optional reference to spell VFX manager</param>
     /// <param name="targetLock">Optional target lock system for Range-based attacks</param>
-    public void Setup(Node3D owner, LocalSimulation simulation, ulong entityId, SpellVFXManager? spellVFX = null, TargetLockSystem? targetLock = null)
+    public void Setup(Node3D owner, LocalServerBridge simulation, ulong entityId, SpellVFXManager? spellVFX = null, TargetLockSystem? targetLock = null)
     {
         _owner = owner;
         _simulation = simulation;
@@ -398,7 +398,7 @@ public partial class CombatComponent : Node
     /// <summary>
     /// Get the simulation reference.
     /// </summary>
-    public LocalSimulation? GetSimulation() => _simulation;
+    public LocalServerBridge? GetSimulation() => _simulation;
 
     // ==========================================
     // POSITION HELPERS
@@ -518,25 +518,17 @@ public partial class CombatComponent : Node
     {
         var entities = new List<SpellResolver.EntityData>();
         if (_simulation == null) return entities;
-        foreach (var kvp in _simulation.Entities)
+        var capsules = _simulation.GetHurtboxCapsules();
+        foreach (var (sx, sy, sz, ex, ey, ez, radius, isCap) in capsules)
         {
-            foreach (var (start, end, radius) in kvp.Value)
+            entities.Add(new SpellResolver.EntityData
             {
-                bool isCapsule = (start - end).LengthSquared() > 0.001f;
-                entities.Add(new SpellResolver.EntityData
-                {
-                    Id = kvp.Key,
-                    PosX = start.X,
-                    PosY = start.Y,
-                    PosZ = start.Z,
-                    Radius = radius,
-                    Shape = isCapsule ? HitboxShape.Capsule : HitboxShape.Sphere,
-                    EndX = end.X,
-                    EndY = end.Y,
-                    EndZ = end.Z,
-                    Active = true
-                });
-            }
+                PosX = sx, PosY = sy, PosZ = sz,
+                Radius = radius,
+                Shape = isCap ? HitboxShape.Capsule : HitboxShape.Sphere,
+                EndX = ex, EndY = ey, EndZ = ez,
+                Active = true
+            });
         }
         return entities;
     }

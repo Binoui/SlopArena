@@ -153,7 +153,7 @@ public partial class PlayerController : CharacterBody3D
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
     public Vector3 MoveDirection => _moveDirection;
 
-    public void SetupCombat(LocalSimulation simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
+    public void SetupCombat(LocalServerBridge simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
     {
         _arenaDef = arenaDef;
 
@@ -233,6 +233,14 @@ public partial class PlayerController : CharacterBody3D
         if (_playerModel != null)
         {
             skeleton = _animationController.FindSkeleton(_playerModel);
+
+            // Bone-attached props (aerosol + lighter) for Manki
+            if (_playerClass == CharacterClass.Manki && skeleton != null)
+            {
+                var weaponAttach = new MankiWeaponAttach { Name = "MankiWeaponAttach" };
+                AddChild(weaponAttach);
+                weaponAttach.Setup(skeleton);
+            }
 
             // Check if model already has an AnimationPlayer (embedded anims in GLB)
             animPlayer = _animationController.FindAnimationPlayer(_playerModel);
@@ -482,7 +490,7 @@ public partial class PlayerController : CharacterBody3D
 
             if (mb.ButtonIndex == MouseButton.Left && mb.Pressed && _combatComponent != null)
             {
-                ExecuteSlot(0, false, !IsOnFloor());
+                ExecuteSlot(0, false, !_movementComponent.IsGrounded);
                 GetViewport().SetInputAsHandled(); return;
             }
 
@@ -490,15 +498,13 @@ public partial class PlayerController : CharacterBody3D
             {
                 if (mb.Pressed)
                 {
-                    if (IsOnFloor())
+                    if (_movementComponent.IsGrounded)
                     {
                         var ability = _charDef.GetSlotAbility(1, false);
                         if (ability.AimedCharge.HasValue && _fsm != null)
                         {
-                            // Compute aim direction from camera forward at moment of press
-                            float aimYaw = _camera != null
-                                ? Mathf.Atan2(_camera.GetForwardDirection().X, _camera.GetForwardDirection().Z)
-                                : GlobalRotation.Y;
+                            // Fire in character's current facing direction, not camera-relative
+                            float aimYaw = GlobalRotation.Y;
                             var chargeState = _fsm.GetState<AimedChargeState>("aimed_charge");
                             if (chargeState != null)
                             {
@@ -519,7 +525,7 @@ public partial class PlayerController : CharacterBody3D
                 }
                 else if (!_heavyHeld && (_fsm == null || !_fsm.IsInState("aimed_charge")))
                 {
-                    ExecuteSlot(1, false, !IsOnFloor());
+                    ExecuteSlot(1, false, !_movementComponent.IsGrounded);
                     GetViewport().SetInputAsHandled(); return;
                 }
             }
@@ -561,7 +567,7 @@ public partial class PlayerController : CharacterBody3D
             if (_heavyHoldTimer > 0.3f && !_heavyHeld)
             {
                 _heavyHeld = true;
-                ExecuteSlot(1, true, !IsOnFloor());
+                ExecuteSlot(1, true, !_movementComponent.IsGrounded);
             }
         }
         else
@@ -575,7 +581,7 @@ public partial class PlayerController : CharacterBody3D
         {
             ref var s = ref _movementComponent.State;
             s.BufferedChain--;
-            ExecuteSlot(0, false, !IsOnFloor());
+            ExecuteSlot(0, false, !_movementComponent.IsGrounded);
         }
 
         // Respawn timer (both player and NPCs)
@@ -620,12 +626,7 @@ public partial class PlayerController : CharacterBody3D
         if (!_isPlayerControlled)
         {
             var npcInput = BuildInputState();
-            _movementComponent.Tick(npcInput);
-
-            // Face movement direction (same as player path below)
-            Vector3 npcHVel = new Vector3(Velocity.X, 0f, Velocity.Z);
-            if (npcHVel.LengthSquared() > 0.01f)
-                GlobalRotation = new Vector3(0f, Mathf.Atan2(npcHVel.X, npcHVel.Z), 0f);
+            // Movement simulation handled by ServerSimulation (in MatchManager._PhysicsProcess)
 
             OnStateUpdated?.Invoke(GlobalPosition.X, GlobalPosition.Z, GlobalPosition.Y, Velocity.X, Velocity.Z);
             return;
@@ -645,7 +646,8 @@ public partial class PlayerController : CharacterBody3D
         }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
-        _movementComponent.Tick(input);
+        // Movement simulation handled by ServerSimulation (in MatchManager._PhysicsProcess)
+        // _movementComponent.Tick(input);
 
         // Resolve pending attack stages after startup delay
         if (_fsm != null && _fsm.IsInState("attack"))
@@ -673,11 +675,6 @@ public partial class PlayerController : CharacterBody3D
         // Tech roll on knockback landing
         if (wasKnocked && _movementComponent.IsGrounded && !_movementComponent.IsInKnockback() && Input.IsActionJustPressed("tech"))
             _movementComponent.DoTechRoll();
-
-        // Face movement direction
-        Vector3 hVel = new Vector3(Velocity.X, 0f, Velocity.Z);
-        if (hVel.LengthSquared() > 0.01f)
-            GlobalRotation = new Vector3(0f, Mathf.Atan2(hVel.X, hVel.Z), 0f);
 
         // Update ground arrow
         UpdateGroundArrow(_snappedInputDirection.LengthSquared() > 0.001f);
@@ -934,6 +931,9 @@ public partial class PlayerController : CharacterBody3D
         }
 
         var stage = stages[stageIndex];
+        // Look up full ability data for aimed-charge / cone detection
+        var ability = _charDef.GetSlotAbility(slotIndex, airborne);
+        bool isConeAttack = ability.AimedCharge.HasValue;
         // Use camera-relative input direction for lunge, fall back to character facing
         Vector3 fwd = (-Transform.Basis.Z with { Y = 0 }).Normalized();
         Vector3 lungeDir = _moveDirection.LengthSquared() > 0.001f ? _moveDirection : fwd;
@@ -946,75 +946,58 @@ public partial class PlayerController : CharacterBody3D
             Velocity = new Vector3(lungeDir.X * stage.LungeForce, upBoost, lungeDir.Z * stage.LungeForce);
         }
 
-        // Build entity list for SpellResolver (capsule hurtboxes)
-        var entities = new List<SpellResolver.EntityData>();
-        foreach (var kvp in sim.Entities)
-        {
-            foreach (var (start, end, radius) in kvp.Value)
-            {
-                bool isCapsule = (start - end).LengthSquared() > 0.001f;
-                var e = new SpellResolver.EntityData
-                {
-                    Id = kvp.Key,
-                    PosX = start.X,
-                    PosY = start.Y,
-                    PosZ = start.Z,
-                    Radius = radius,
-                    Shape = isCapsule ? HitboxShape.Capsule : HitboxShape.Sphere,
-                    EndX = end.X,
-                    EndY = end.Y,
-                    EndZ = end.Z,
-                    Active = true
-                };
-                entities.Add(e);
-            }
-        }
-
         // Spawn melee hitbox in attack direction
         Vector3 hitDir = GetAttackDirection(stage);
+        Vector3 handPos = pos + (Vector3.Up * 1.2f); // Hand height
         Vector3 hitPos = pos + (hitDir * 2.0f) + (Vector3.Up * 1.0f);
-        var hb = new Hitbox
+
+        Hitbox hb;
+        if (isConeAttack)
         {
-            X = hitPos.X,
-            Y = hitPos.Y,
-            Z = hitPos.Z,
-            Radius = 2.5f,  // Generous for 3D combat
-            DurationTicks = 15,  // ~250ms (longer for visibility)
-            Damage = stage.Damage,
-            KnockbackForce = stage.KnockbackForce,
-            KnockbackUpward = stage.KnockbackUpward,
-            StunTicks = stage.StunTicks,
-            OwnerId = pid,
-        };
-        SpellResolver.Spawn(hb);
-        GD.Print($"[HITBOX] Spawned at ({hitPos.X:F1}, {hitPos.Y:F1}, {hitPos.Z:F1}) R={hb.Radius:F1} " +
-                 $"DMG={stage.Damage} KB={stage.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1}) " +
-                 $"vs {entities.Count} entities");
-
-        // Resolve active hitboxes against entities this tick
-        var results = SpellResolver.Tick(entities);
-
-        if (results.Count == 0)
-            GD.Print("[HITBOX] No hits — check distance to targets");
-        else
-            GD.Print($"[HITBOX] Hit {results.Count} target(s)!");
-
-        // Apply hits — knockback is scaled by damage% in Simulation.ApplyKnockback
-        foreach (var hit in results)
-        {
-            // Don't hit invincible targets (dashing)
-            ulong targetId = hit.TargetEntityId;
-            GD.Print($"[HITBOX] → Entity {targetId}: DMG={hit.Damage} KB=({hit.KnockbackX:F1},{hit.KnockbackY:F1},{hit.KnockbackZ:F1}) Stun={hit.StunTicks}t");
-            bool targetInvincible = false;
-            if (_movementComponent.State.InvincibilityTicks > 0 && targetId == _movementComponent.State.EntityId)
-                targetInvincible = true;
-            if (targetInvincible) continue;
-
-            sim.RouteHit(targetId, hit.Damage,
-                hit.KnockbackX,
-                hit.KnockbackY,
-                hit.KnockbackZ);
+            // Capsule (tube) hitbox for flamethrower-like abilities
+            float maxRange = ability.AimedCharge!.Value.ConeRange;
+            // Scale range by charge: 10m (uncharged) → 15m (full)
+            ushort ct = _movementComponent.State.ChargeTicks;
+            ushort maxCt = ability.AimedCharge!.Value.MaxChargeTicks;
+            float t = maxCt > 0 ? Math.Clamp((float)ct / maxCt, 0f, 1f) : 0f;
+            float coneRange = 10f + (t * (maxRange - 10f));
+            // TEMP: negate direction — GLB model faces +Z (Mixamo), not Godot -Z
+            Vector3 tipPos = handPos + (-hitDir * coneRange);
+            hb = new Hitbox
+            {
+                X = handPos.X, Y = handPos.Y, Z = handPos.Z,
+                EndX = tipPos.X, EndY = tipPos.Y, EndZ = tipPos.Z,
+                Shape = HitboxShape.Capsule,
+                Radius = 0.6f,  // Narrow tube
+                DurationTicks = 12,  // ~200ms burst
+                Damage = stage.Damage,
+                KnockbackForce = stage.KnockbackForce,
+                KnockbackUpward = stage.KnockbackUpward,
+                StunTicks = stage.StunTicks,
+                OwnerId = pid,
+            };
         }
+        else
+        {
+            // Default sphere hitbox for melee attacks
+            hb = new Hitbox
+            {
+                X = hitPos.X, Y = hitPos.Y, Z = hitPos.Z,
+                Radius = 2.5f,
+                DurationTicks = 15,
+                Damage = stage.Damage,
+                KnockbackForce = stage.KnockbackForce,
+                KnockbackUpward = stage.KnockbackUpward,
+                StunTicks = stage.StunTicks,
+                OwnerId = pid,
+            };
+        }
+        SpellResolver.Spawn(hb);
+        if (isConeAttack)
+            GD.Print($"[HITBOX] Capsule R={hb.Radius:F1} RNG={ability.AimedCharge!.Value.ConeRange} DMG={stage.Damage} KB={stage.KnockbackForce}");
+        else
+            GD.Print($"[HITBOX] Sphere at ({hitPos.X:F1},{hitPos.Y:F1},{hitPos.Z:F1}) R={hb.Radius:F1} " +
+                     $"DMG={stage.Damage} KB={stage.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1})");
 
         // Update CharacterState combo/animation ticks
         _movementComponent.SetComboState(newComboStage, stage.ChainWindowTicks, stage.SelfLockTicks);
@@ -1108,6 +1091,9 @@ public partial class PlayerController : CharacterBody3D
     public CameraMount? GetCamera() => _camera;
     public CharacterDefinition GetCharacterDef() => _charDef;
 
+    /// <summary>Expose CharacterState for external code (e.g. FSM states).</summary>
+    public ref CharacterState GetState() => ref _movementComponent.State;
+
     // ==========================================
     // MODEL LOADING
     // ==========================================
@@ -1130,12 +1116,12 @@ public partial class PlayerController : CharacterBody3D
             case CharacterClass.Manki:
                 modelPath = "res://assets/characters/manki/manki.tscn";
                 scale = Vector3.One;
-                position = new Vector3(0, -0.6f, 0);
+                position = new Vector3(0, 0, 0);
                 break;
             default:
                 modelPath = "res://assets/characters/manki/manki.tscn";
                 scale = Vector3.One;
-                position = new Vector3(0, -0.6f, 0);
+                position = new Vector3(0, 0, 0);
                 break;
         }
 
@@ -1185,6 +1171,27 @@ public partial class PlayerController : CharacterBody3D
         _inputCtrl.InjectAI(input);
     }
 
+    /// <summary>Return the current input state (read by server bridge).</summary>
+    public InputState GetCurrentInput()
+    {
+        return BuildInputState();
+    }
+
+    /// <summary>Apply authoritative state from the server simulation.</summary>
+    public void ApplyServerState(CharacterState state)
+    {
+        // Sync movement component state (struct copy)
+        _movementComponent.State = state;
+
+        // Apply to Godot body (authoritative position from server)
+        GlobalPosition = new Vector3(state.PX, state.PY, state.PZ);
+        Velocity = new Vector3(state.VX, state.VY, state.VZ);
+        GlobalRotation = new Vector3(0f, state.FacingYaw, 0f);
+
+        // MoveAndSlide collides with actual arena geometry
+        MoveAndSlide();
+    }
+
     /// <summary>
     /// Trigger an ability by slot index (for NPCs).
     /// 0 = LMB, 1-5 = Q/E/R/F/etc.
@@ -1192,7 +1199,7 @@ public partial class PlayerController : CharacterBody3D
     public void UseAbility(int slot)
     {
         if (!_isNPC) return; // Only NPCs can have direct ability calls
-        ExecuteSlot(slot, charged: false, airborne: !IsOnFloor());
+        ExecuteSlot(slot, charged: false, airborne: !_movementComponent.IsGrounded);
     }
 
     // ==========================================

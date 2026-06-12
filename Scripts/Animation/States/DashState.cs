@@ -44,7 +44,7 @@ public sealed partial class DashState : State
             return;
 
         // Dash ended — transition to appropriate state
-        if (Player.IsOnFloor())
+        if (Movement.IsGrounded)
         {
             StateMachine.TransitionTo(
                 Player.MoveDirection.LengthSquared() > 0.001f ? "run" : "idle");

@@ -18,6 +18,7 @@ namespace SlopArena.Shared
         public struct HitResult
         {
             public ulong TargetEntityId;
+            public ulong OwnerEntityId;
             public float Damage;
             public float KnockbackX;
             public float KnockbackY;
@@ -130,6 +131,7 @@ namespace SlopArena.Shared
                         results.Add(new HitResult
                         {
                             TargetEntityId = entity.Id,
+                            OwnerEntityId = hb.OwnerId,
                             Damage = hb.Damage,
                             KnockbackX = kbX,
                             KnockbackY = hb.KnockbackUpward,

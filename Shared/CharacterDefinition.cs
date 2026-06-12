@@ -36,6 +36,17 @@ namespace SlopArena.Shared
         public float CapsuleHeight;
         public float HurtboxRadius;
 
+        /// <summary>
+        /// World-space offset from character position (legacy, used when no skeleton)
+        /// </summary>
+        public HurtboxCapsule[] HurtboxCapsules;
+
+        /// <summary>
+        /// Bone-attached hurtboxes (ServerSkeleton-based). Replaces HurtboxCapsules when loaded.
+        /// Each entry defines a sphere at a bone position with an offset.
+        /// </summary>
+        public HurtboxBoneDef[] HurtboxBoneDefs;
+
         public AbilityData LMB;
         public AbilityData RMB;
         public AbilityData AirLMB;
@@ -117,6 +128,34 @@ namespace SlopArena.Shared
                     MaxJumps = 2,
                 },
 
+                HurtboxCapsules = new HurtboxCapsule[]
+                {
+                    // Torso: hips → upper chest
+                    new(0f, 0.2f, 0f, 0f, 1.0f, 0f, 0.35f),
+                    // Head: sphere at neck level
+                    new(0f, 1.4f, 0f, 0f, 1.4f, 0f, 0.25f),
+                    // Right arm: shoulder → hand
+                    new(0.35f, 0.9f, 0f, 0.7f, 0.7f, 0.2f, 0.14f),
+                    // Left arm: shoulder → hand
+                    new(-0.35f, 0.9f, 0f, -0.7f, 0.7f, 0.2f, 0.14f),
+                    // Right leg: hip → foot
+                    new(0.15f, 0f, 0f, 0.15f, -0.9f, 0f, 0.18f),
+                    // Left leg: hip → foot
+                    new(-0.15f, 0f, 0f, -0.15f, -0.9f, 0f, 0.18f),
+                },
+
+                // ── Bone-attached hurtboxes (ServerSkeleton-based) ──
+                // Follows same pattern as BoneHurtboxSetup.DefaultHumanoid()
+                HurtboxBoneDefs = new HurtboxBoneDef[]
+                {
+                    new("mixamorig:Head", 0, 0, 0, 0.25f),
+                    new("mixamorig:Spine2", 0, 0, 0, 0.3f),
+                    new("mixamorig:Hips", 0, 0, 0, 0.3f),
+                    new("mixamorig:RightHand", 0, 0, 0, 0.14f),
+                    new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
+                    new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
+                    new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
+                },
                 // LMB — 3-hit combo with startup per stage (Range-based ranges)
                 LMB = new AbilityData
                 {
@@ -169,7 +208,7 @@ namespace SlopArena.Shared
                         ChargeAnimName = "rmb_loop",
                         AttackAnimName = "rmb_attack",
                         ConeAngle = 60f,
-                        ConeRange = 8f,
+                        ConeRange = 15f,
                         MaxChargeTicks = 45,
                     },
                 },

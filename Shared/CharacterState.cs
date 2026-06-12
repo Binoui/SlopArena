@@ -71,6 +71,10 @@ namespace SlopArena.Shared
         /// true when hold threshold reached
         /// </summary>
         public bool HeavyCharged;
+        /// <summary>
+        /// aimed charge progress (0 = none, >0 = charging)
+        /// </summary>
+        public ushort ChargeTicks;
 
         /// <summary>
         /// ── Knockback ──
