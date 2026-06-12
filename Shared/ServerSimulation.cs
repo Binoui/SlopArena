@@ -40,6 +40,79 @@ namespace SlopArena.Shared
         /// <summary>Entity data from last Tick (for debug visualization).</summary>
         public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
 
+        /// <summary>
+        /// Build hurtbox entity list from a single CharacterState + definition.
+        /// Static — usable from client code to reconstruct the server's entity view.
+        /// </summary>
+        public static List<SpellResolver.EntityData> BuildEntitiesFromState(
+            CharacterState state, CharacterDefinition def, BakedAnimationData? baked,
+            string targetAnim, int animFrame)
+        {
+            var list = new List<SpellResolver.EntityData>();
+
+            if (baked != null && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
+            {
+                int animIdx = baked.FindAnimIndex(targetAnim);
+                if (animIdx >= 0)
+                {
+                    // Clamp frame
+                    int fc = baked.Animations[animIdx].FrameCount;
+                    if (animFrame >= fc) animFrame = fc - 1;
+
+                    float px = state.PX, py = state.PY, pz = state.PZ;
+                    float yaw = state.FacingYaw;
+                    float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
+                    float scale = def.HurtboxBoneScale;
+
+                    for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
+                    {
+                        var hbd = def.HurtboxBoneDefs[bi];
+                        if (!baked.GetBonePosition(targetAnim, animFrame, bi, out float bx, out float by, out float bz))
+                            continue;
+
+                        bx *= scale; by *= scale; bz *= scale;
+                        float wx = px + (bx * cos + bz * sin);
+                        float wy = py + by;
+                        float wz = pz + (-bx * sin + bz * cos);
+
+                        list.Add(new SpellResolver.EntityData
+                        {
+                            Id = 0, PosX = wx, PosY = wy, PosZ = wz,
+                            Radius = hbd.Radius,
+                            Shape = HitboxShape.Sphere,
+                            EndX = wx, EndY = wy, EndZ = wz,
+                            Active = true,
+                        });
+                    }
+                }
+            }
+            else
+            {
+                // Fallback: fixed capsules
+                float cos = MathF.Cos(state.FacingYaw);
+                float sin = MathF.Sin(state.FacingYaw);
+                foreach (var cap in def.HurtboxCapsules)
+                {
+                    float sx = state.PX + cap.Sx * cos + cap.Sz * sin;
+                    float sy = state.PY + cap.Sy;
+                    float sz = state.PZ + (-cap.Sx * sin + cap.Sz * cos);
+                    float ex = state.PX + cap.Ex * cos + cap.Ez * sin;
+                    float ey = state.PY + cap.Ey;
+                    float ez = state.PZ + (-cap.Ex * sin + cap.Ez * cos);
+                    list.Add(new SpellResolver.EntityData
+                    {
+                        PosX = sx, PosY = sy, PosZ = sz,
+                        Radius = cap.Radius,
+                        Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
+                        EndX = ex, EndY = ey, EndZ = ez,
+                        Active = true,
+                    });
+                }
+            }
+
+            return list;
+        }
+
         public void Tick(Dictionary<ulong, InputState> inputs)
         {
             // ── Step 1: Simulate each entity ──
@@ -68,8 +141,17 @@ namespace SlopArena.Shared
                     string targetAnim;
                     if (state.State == ActionState.Dashing)
                         targetAnim = "dash";
-                    else if (state.State == ActionState.Attacking)
-                        targetAnim = "melee";
+                    else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+                    {
+                        // Look up animation from the actual ability (respects airborne)
+                        bool airborne = !state.IsGrounded;
+                        var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                        int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                        if (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length)
+                            targetAnim = ability.AnimationNames[stageIdx];
+                        else
+                            targetAnim = "melee";
+                    }
                     else if (state.State == ActionState.Hitstun)
                         targetAnim = "small_hit";
                     else if (!state.IsGrounded)
@@ -82,6 +164,8 @@ namespace SlopArena.Shared
                     int animIdx = baked.FindAnimIndex(targetAnim);
                     if (animIdx >= 0)
                     {
+                        int fc = baked.Animations[animIdx].FrameCount;
+
                         // Track frame (1 tick = 1 frame at 60fps)
                         int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
                         int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
@@ -90,7 +174,11 @@ namespace SlopArena.Shared
                             frame = 0;
                             _prevAnimIndex[id] = animIdx;
                         }
-                        _animFrames[id] = frame + 1;
+
+                        // Advance frame, wrapping for looping animations
+                        int nextFrame = frame + 1;
+                        if (nextFrame >= fc) nextFrame = 0;
+                        _animFrames[id] = nextFrame;
 
                         float px = state.PX, py = state.PY, pz = state.PZ;
                         float yaw = state.FacingYaw;
@@ -158,11 +246,8 @@ namespace SlopArena.Shared
                 var def = _defs[id];
                 if (state.State == ActionState.Attacking && state.AttackSlot > 0)
                 {
-                    var ability = state.AttackSlot switch
-                    {
-                        1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
-                        _ => def.LMB,
-                    };
+                    bool airborne = !state.IsGrounded;
+                    var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
                     int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
                     if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
                     {
