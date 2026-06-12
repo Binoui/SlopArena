@@ -1180,8 +1180,43 @@ public partial class PlayerController : CharacterBody3D
     /// <summary>Apply authoritative state from the server simulation.</summary>
     public void ApplyServerState(CharacterState state)
     {
+        // Keep client-side state fields (server doesn't track attacks/dash properly yet)
+        var currentAction = _movementComponent.State.State;
+        ushort currentLock = _movementComponent.State.AnimLockTicks;
+        ushort currentDash = _movementComponent.State.DashDurationTicks;
+        ushort currentInvuln = _movementComponent.State.InvincibilityTicks;
+        ushort currentDashCd = _movementComponent.State.DashCooldownTicks;
+        float currentVX = _movementComponent.State.VX;
+        float currentVZ = _movementComponent.State.VZ;
+
         // Sync movement component state (struct copy)
         _movementComponent.State = state;
+
+        // When server has no specific state (Idle), preserve client-side timers
+        if (state.State == ActionState.Idle)
+        {
+            // Restore attack/dash state
+            if (currentAction != ActionState.Idle)
+                _movementComponent.State.State = currentAction;
+
+            // Preserve AnimLockTicks (attack startup + self-lock)
+            if (currentLock > 1)
+                _movementComponent.State.AnimLockTicks = (ushort)(currentLock - 1);
+            else if (currentLock == 1)
+                _movementComponent.State.AnimLockTicks = 0;
+
+            // Preserve DashDurationTicks
+            if (currentDash > 0)
+            {
+                _movementComponent.State.DashDurationTicks = (ushort)(currentDash - 1);
+                // Preserve dash velocity (server doesn't process dash movement)
+                _movementComponent.State.VX = currentVX;
+                _movementComponent.State.VZ = currentVZ;
+                _movementComponent.State.InvincibilityTicks = currentInvuln > 0
+                    ? (ushort)(currentInvuln - 1) : (ushort)0;
+                _movementComponent.State.DashCooldownTicks = currentDashCd;
+            }
+        }
 
         // Apply to Godot body (authoritative position from server)
         GlobalPosition = new Vector3(state.PX, state.PY, state.PZ);
