@@ -152,14 +152,8 @@ public partial class Main : Node3D
         // (hitboxes are on the server process, not the client)
         if (_debugDraw != null && _debugHitboxVisible && _matchManager != null)
         {
-            var (hitboxes, entities) = _matchManager.GetDebugData();
-            var hurtboxList = new List<(float sx, float sy, float sz, float ex, float ey, float ez, float radius, bool capsule)>();
-            foreach (var e in entities)
-            {
-                bool isCapsule = e.Shape == SlopArena.Shared.HitboxShape.Capsule;
-                hurtboxList.Add((e.PosX, e.PosY, e.PosZ, e.EndX, e.EndY, e.EndZ, e.Radius, isCapsule));
-            }
-            _debugDraw.UpdateHitboxes(hitboxes, hurtboxList, Vector3.Zero);
+            var (hitboxes, localEntities, serverEntities) = _matchManager.GetDebugData();
+            _debugDraw.UpdateHitboxes(hitboxes, localEntities, serverEntities, Vector3.Zero);
         }
     }
 

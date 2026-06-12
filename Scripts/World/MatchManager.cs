@@ -41,6 +41,12 @@ public partial class MatchManager : Node3D
     private ulong _playerEntityId = 1;
     private BakedAnimationData _playerBakedData = null!;
 
+    // ── Server ghost (confirmed state from server, drawn in green) ──
+    private readonly Dictionary<ulong, CharacterState> _serverConfirmedStates = new();
+    private readonly Dictionary<ulong, int> _serverAnimFrames = new();
+    private readonly Dictionary<ulong, int> _serverPrevAnimIdx = new();
+    private uint _lastServerTick;
+
     // ── Tick + rollback ──
     private const int RollbackFrames = 10;
     private uint _sendTick;
@@ -209,6 +215,13 @@ public partial class MatchManager : Node3D
 
         var serverStates = Net.ReceiveStates();
 
+        // Store confirmed server states for ghost visualization
+        foreach (var kvp in serverStates)
+        {
+            _serverConfirmedStates[kvp.Key] = kvp.Value.state;
+            _lastServerTick = kvp.Value.tick;
+        }
+
         // Player: reconcile
         if (serverStates.TryGetValue(_playerEntityId, out var server))
         {
@@ -342,13 +355,72 @@ public partial class MatchManager : Node3D
     public NetworkClient GetNet() => Net;
 
     /// <summary>Get debug hitbox/hurtbox data from the local simulation.</summary>
-    public (List<Hitbox> hitboxes, List<SpellResolver.EntityData> entities) GetDebugData()
+    public (List<Hitbox> hitboxes, List<SpellResolver.EntityData> localEntities, List<SpellResolver.EntityData> serverEntities) GetDebugData()
     {
         var hitboxes = SpellResolver.GetActiveHitboxes();
-        var entities = new List<SpellResolver.EntityData>();
-        if (_localSim != null)
-            entities = _localSim.GetLastEntityData();
-        return (hitboxes, entities);
+        var localEntities = _localSim?.GetLastEntityData() ?? new();
+        var serverEntities = BuildServerGhostEntities();
+        return (hitboxes, localEntities, serverEntities);
+    }
+
+    /// <summary>Build server ghost entity data from last confirmed states.</summary>
+    private List<SpellResolver.EntityData> BuildServerGhostEntities()
+    {
+        var result = new List<SpellResolver.EntityData>();
+        if (_localSim == null) return result;
+
+        foreach (var kvp in _serverConfirmedStates)
+        {
+            ulong id = kvp.Key;
+            var state = kvp.Value;
+            var def = CharacterRegistry.Get(CharacterClass.Manki); // TODO: per-character
+            var baked = _playerBakedData; // TODO: per-character
+
+            // Determine animation (same logic as ServerSimulation)
+            string targetAnim;
+            if (state.State == ActionState.Dashing)
+                targetAnim = "dash";
+            else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+            {
+                bool airborne = !state.IsGrounded;
+                var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                targetAnim = stageIdx >= 0 && stageIdx < ability.AnimationNames.Length
+                    ? ability.AnimationNames[stageIdx] : "melee";
+            }
+            else if (state.State == ActionState.Hitstun)
+                targetAnim = "small_hit";
+            else if (!state.IsGrounded)
+                targetAnim = state.VY > 0 ? "jump" : "fall";
+            else if (state.VX * state.VX + state.VZ * state.VZ > 1f)
+                targetAnim = "run";
+            else
+                targetAnim = "idle";
+
+            // Track animation frame (same loop/wrap logic as ServerSimulation)
+            int animIdx = baked?.FindAnimIndex(targetAnim) ?? -1;
+            int frame = _serverAnimFrames.GetValueOrDefault(id, 0);
+            int prevIdx = _serverPrevAnimIdx.GetValueOrDefault(id, -1);
+            if (prevIdx != animIdx)
+            {
+                frame = 0;
+                _serverPrevAnimIdx[id] = animIdx;
+            }
+            int fc = (animIdx >= 0 && baked != null) ? baked.Animations[animIdx].FrameCount : 1;
+            int nextFrame = frame + 1;
+            if (nextFrame >= fc) nextFrame = 0;
+            _serverAnimFrames[id] = nextFrame;
+
+            var rawEntities = ServerSimulation.BuildEntitiesFromState(state, def, baked, targetAnim, frame);
+            for (int i = 0; i < rawEntities.Count; i++)
+            {
+                var e = rawEntities[i];
+                e.Id = id;
+                rawEntities[i] = e;
+                result.Add(e);
+            }
+        }
+        return result;
     }
 }
 

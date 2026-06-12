@@ -1,6 +1,7 @@
 #nullable enable
 using Godot;
 using System.Collections.Generic;
+using SlopArena.Shared;
 
 /// <summary>
 /// Debug visualization for hitboxes (red) and hurtboxes (blue).
@@ -27,7 +28,8 @@ public partial class DebugHitboxDraw : MeshInstance3D
 
     public void UpdateHitboxes(
         List<SlopArena.Shared.Hitbox> hitboxes,
-        List<(float sx, float sy, float sz, float ex, float ey, float ez, float radius, bool capsule)> hurtboxes,
+        List<SpellResolver.EntityData> localEntities,
+        List<SpellResolver.EntityData> serverEntities,
         Vector3 worldOffset)
     {
         _mesh.ClearSurfaces();
@@ -55,38 +57,44 @@ public partial class DebugHitboxDraw : MeshInstance3D
             _mesh.SurfaceEnd();
         }
 
-        // ── Hurtboxes (blue spheres or capsules) ──
-        if (hurtboxes.Count > 0)
-        {
-            _mesh.SurfaceBegin(Mesh.PrimitiveType.Lines);
-            _mesh.SurfaceSetColor(new Color(0.2f, 0.5f, 1f, 0.8f));
-            foreach (var (sx, sy, sz, ex, ey, ez, radius, capsule) in hurtboxes)
-            {
-                float lx = sx - worldOffset.X;
-                float ly = sy - worldOffset.Y;
-                float lz = sz - worldOffset.Z;
+        // ── Local hurtboxes (blue — client prediction) ──
+        DrawHurtboxList(localEntities, worldOffset, new Color(0.2f, 0.5f, 1f, 0.8f), "LOCAL", ref labelIndex);
 
-                if (capsule)
-                {
-                    float lex = ex - worldOffset.X;
-                    float ley = ey - worldOffset.Y;
-                    float lez = ez - worldOffset.Z;
-                    DrawWireCapsule(_mesh, lx, ly, lz, lex, ley, lez, radius, 12);
-                }
-                else
-                {
-                    DrawWireSphere(_mesh, lx, ly, lz, radius, 12);
-                }
-
-                string labelText = $"HURT\nR:{radius:F1}";
-                UpdateLabel(labelIndex++, new Vector3(lx, ly + radius + 0.3f, lz), labelText, new Color(0.3f, 0.6f, 1f));
-            }
-            _mesh.SurfaceEnd();
-        }
+        // ── Server ghost hurtboxes (green — server authority) ──
+        DrawHurtboxList(serverEntities, worldOffset, new Color(0.2f, 1f, 0.3f, 0.6f), "SRV", ref labelIndex);
 
         // Hide unused labels
         for (int i = labelIndex; i < _labelPoolSize; i++)
             _labels[i].Visible = false;
+    }
+
+    private void DrawHurtboxList(List<SpellResolver.EntityData> entities, Vector3 worldOffset, Color color, string prefix, ref int labelIndex)
+    {
+        if (entities.Count == 0) return;
+
+        _mesh.SurfaceBegin(Mesh.PrimitiveType.Lines);
+        _mesh.SurfaceSetColor(color);
+        foreach (var e in entities)
+        {
+            float lx = e.PosX - worldOffset.X;
+            float ly = e.PosY - worldOffset.Y;
+            float lz = e.PosZ - worldOffset.Z;
+
+            if (e.Shape == SlopArena.Shared.HitboxShape.Capsule)
+            {
+                float lex = e.EndX - worldOffset.X;
+                float ley = e.EndY - worldOffset.Y;
+                float lez = e.EndZ - worldOffset.Z;
+                DrawWireCapsule(_mesh, lx, ly, lz, lex, ley, lez, e.Radius, 12);
+            }
+            else
+            {
+                DrawWireSphere(_mesh, lx, ly, lz, e.Radius, 12);
+            }
+
+            UpdateLabel(labelIndex++, new Vector3(lx, ly + e.Radius + 0.3f, lz), $"{prefix}\nR:{e.Radius:F1}\n{e.Id}", color);
+        }
+        _mesh.SurfaceEnd();
     }
 
     private void UpdateLabel(int index, Vector3 position, string text, Color color)
