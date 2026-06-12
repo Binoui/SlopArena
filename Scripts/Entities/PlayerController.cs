@@ -809,6 +809,12 @@ public partial class PlayerController : CharacterBody3D
         // Consume pending slot press (sim handles buffering via InputBufferWindow)
         input.ActiveSlot = _pendingSlotPress;
         _pendingSlotPress = 0;
+        // Send facing yaw (degrees * 100, clamp to short range)
+        float deg = Mathf.RadToDeg(GlobalRotation.Y);
+        input.FacingYaw = (short)Math.Clamp(deg * 100f, -32768, 32767);
+        // Send aim yaw from camera (combat facing)
+        float aimDeg = _camera != null ? Mathf.RadToDeg(_camera.GetCameraYaw()) : deg;
+        input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768, 32767);
 
         // Zero movement if FSM state disallows it (e.g., aimed charge, attack)
         if (_fsm != null && !_fsm.CanMove())
