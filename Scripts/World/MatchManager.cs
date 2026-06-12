@@ -179,9 +179,10 @@ public partial class MatchManager : Node3D
                 int idx = (int)(serverTick % RollbackFrames);
                 var predicted = _stateBuffer[idx];
 
-                // Compare server vs predicted
+                // Compare server vs predicted — use generous threshold on localhost
+                // Server is 1-2 frames behind, small differences are expected
                 float dy = predicted.PY - serverState.PY;
-                if (MathF.Abs(dy) > 0.01f)
+                if (MathF.Abs(dy) > 0.5f)
                 {
                     // ── ROLLBACK ──
                     GD.Print($"[Rollback] Tick {serverTick}: dy={dy:F3}m, resimulating...");
