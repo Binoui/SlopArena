@@ -10,8 +10,8 @@
 ### LMB — Light Attack Combo
 
 - Generally a **3–4 hit combo** (varies per character)
-- Combo uses per-stage **DurationTicks** (total animation lock) and **ChainWindowTicks** (input buffer window after DurationTicks elapse)
-- When DurationTicks expire, a ChainWindowTicks-wide input window opens — pressing LMB during this window chains to the next stage; the combo system is entirely simulation-driven via the sim's HitboxEvent queue (no client-side buffering or old ExecuteSlot approach)
+- Combo uses per-stage **DurationTicks** (total animation lock). Input during the attack is buffered via `BufferedSlot` and auto-consumed when the current stage ends.
+- The same-slot buffer works during the **entire attack**, not just a post-attack window. Additional clicks are captured by the `InputBufferWindow` general buffer (6 frames).
 - Attack data (damage, knockback, radius, stun) lives in each **HitboxEvent** within the stage, not on AttackStage itself
 - Adds a natural knockdown or knockback on the final hit, creating a reset
 - Range: ~10 units

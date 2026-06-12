@@ -39,8 +39,6 @@ public sealed partial class AttackState : State
 	{
 		Player.ClearModelEmission();
 		base.Exit();
-		ref var s = ref Movement.State;
-		s.BufferedChain = 0;
 	}
 
 	public override void OnProcess(float delta)

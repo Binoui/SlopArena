@@ -20,6 +20,8 @@ namespace SlopArena.Shared
     /// </summary>
     public static class Simulation
     {
+        /// <summary>Input buffer window in ticks. Inputs within this many frames of unlock are buffered.</summary>
+        public const ushort InputBufferWindow = 6;
         public const float TickDt = 1f / 60f;
 
         /// <summary>
@@ -93,7 +95,16 @@ namespace SlopArena.Shared
             else if (s.State == ActionState.AirDodging)
                 ProcessAirDodge();
             else if (s.State == ActionState.Attacking)
-                ProcessAttack(ref s, def, input);
+                ProcessAttack(ref s, def, ref input);
+
+            // 4.5 Consume buffered input (any lock just expired)
+            if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
+                s.State == ActionState.Idle && !input.Jump && !input.Dash)
+            {
+                byte slot = s.BufferedSlot;
+                s.BufferedSlot = 0;
+                StartAttackFromSlot(ref s, def, slot);
+            }
 
             // 5. Input-driven actions (only when not locked by animation)
             if (s.AnimLockTicks == 0)
@@ -111,44 +122,42 @@ namespace SlopArena.Shared
                 }
 
                 // Attack via ActiveSlot (1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F)
-                if (input.ActiveSlot > 0)
+                if (input.ActiveSlot > 0 && s.State == ActionState.Idle)
                 {
-                    // Combo chain: same slot pressed during chain window
-                    if (s.State == ActionState.Attacking && s.AnimLockTicks == 0 && s.ComboTimerTicks > 0 &&
-                        input.ActiveSlot == s.AttackSlot)
+                    StartAttackFromSlot(ref s, def, input.ActiveSlot);
+                }
+            }
+            // Buffer input if locked within window
+            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0) && s.BufferedSlot == 0)
+            {
+                // Combo chain: same slot during attack → always buffer
+                // Don't buffer the click that STARTED the attack (elapsed==0)
+                if (s.State == ActionState.Attacking && input.ActiveSlot == s.AttackSlot &&
+                    s.AttackElapsedTicks > 0)
+                {
+                    var ability = input.ActiveSlot switch
                     {
-                        var ability = s.AttackSlot switch
-                        {
-                            1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
-                            _ => def.LMB,
-                        };
-                        if (s.ComboStage < ability.Stages.Length - 1)
-                        {
-                            s.ComboStage++;
-                            var stage = ability.Stages[s.ComboStage];
-                            s.AnimLockTicks = stage.DurationTicks;
-                            s.AttackElapsedTicks = 0;
-                            s.ComboTimerTicks = 0; // close chain window
-                        }
-                    }
-                    // Fresh attack
-                    else if (s.State == ActionState.Idle)
+                        1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                        _ => def.LMB,
+                    };
+                    if (s.ComboStage < ability.Stages.Length - 1)
                     {
-                        var ability = input.ActiveSlot switch
-                        {
-                            1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
-                            _ => def.LMB,
-                        };
-                        if (ability.Stages.Length > 0)
-                        {
-                            var stage = ability.Stages[0];
-                            s.State = ActionState.Attacking;
-                            s.AnimLockTicks = stage.DurationTicks;
-                            s.ComboStage = 0;
-                            s.AttackElapsedTicks = 0;
-                            s.AttackSlot = input.ActiveSlot;
-                        }
+                        // Can't GD.Print here (shared lib), but buffer IS set
+                        s.BufferedSlot = input.ActiveSlot;
                     }
+                }
+                // General buffer: within window of unlock
+                else if ((s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
+                         (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
+                {
+                    ushort cd = input.ActiveSlot switch
+                    {
+                        1 => s.Cooldown0, 2 => s.Cooldown1, 3 => s.Cooldown2,
+                        4 => s.Cooldown3, 5 => s.Cooldown4, 6 => s.Cooldown5,
+                        _ => 0,
+                    };
+                    if (cd == 0)
+                        s.BufferedSlot = input.ActiveSlot;
                 }
             }
 
@@ -194,7 +203,6 @@ namespace SlopArena.Shared
             if (s.DashDurationTicks > 0) s.DashDurationTicks--;
             if (s.InvincibilityTicks > 0) s.InvincibilityTicks--;
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
-            if (s.ComboTimerTicks > 0) s.ComboTimerTicks--;
             if (s.HitstunTicks > 0) s.HitstunTicks--;
             if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
 
@@ -465,29 +473,84 @@ namespace SlopArena.Shared
 
         // ── ATTACK PROCESSING ──
 
-        private static void ProcessAttack(ref CharacterState s, CharacterDefinition def, InputState input)
+        private static void ProcessAttack(ref CharacterState s, CharacterDefinition def, ref InputState input)
         {
-            if (s.AnimLockTicks == 0)
-            {
-                // Check if combo chain window should open
-                var ability = s.AttackSlot switch
-                {
-                    1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
-                    _ => def.LMB,
-                };
-                if (s.ComboStage < ability.Stages.Length - 1 &&
-                    ability.Stages[s.ComboStage].ChainWindowTicks > 0)
-                {
-                    // Open chain window — stay in Attacking state
-                    s.ComboTimerTicks = ability.Stages[s.ComboStage].ChainWindowTicks;
-                    return;
-                }
+            if (s.AnimLockTicks > 0)
+                return;
 
-                // No more chaining → back to idle
-                s.State = ActionState.Idle;
-                s.ComboStage = 0;
-                s.AttackSlot = 0;
+            var ability = s.AttackSlot switch
+            {
+                1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                _ => def.LMB,
+            };
+
+            // 1. Buffered chain (click during lock, set by buffer section)
+            if (s.BufferedSlot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
+            {
+                s.BufferedSlot = 0;
+                s.ComboStage++;
+                var nextStage = ability.Stages[s.ComboStage];
+                s.AnimLockTicks = nextStage.DurationTicks;
                 s.AttackElapsedTicks = 0;
+                return;
+            }
+
+            // 2. Immediate chain (click on same frame lock expired)
+            if (input.ActiveSlot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
+            {
+                input.ActiveSlot = 0; // consumed, prevent re-buffer below
+                s.ComboStage++;
+                var nextStage = ability.Stages[s.ComboStage];
+                s.AnimLockTicks = nextStage.DurationTicks;
+                s.AttackElapsedTicks = 0;
+                return;
+            }
+
+            // 3. No chaining → back to idle, keep BufferedSlot for consumption step 4.5
+            s.State = ActionState.Idle;
+            s.ComboStage = 0;
+            s.AttackSlot = 0;
+            s.AttackElapsedTicks = 0;
+        }
+
+        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.</summary>
+        private static void StartAttackFromSlot(ref CharacterState s, CharacterDefinition def, byte slot)
+        {
+            var ability = slot switch
+            {
+                1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                _ => def.LMB,
+            };
+
+            // Cooldown check
+            ushort cd = slot switch
+            {
+                1 => s.Cooldown0, 2 => s.Cooldown1, 3 => s.Cooldown2,
+                4 => s.Cooldown3, 5 => s.Cooldown4, 6 => s.Cooldown5,
+                _ => 0,
+            };
+            if (cd > 0) return;
+
+            // Combo chain: same slot, next stage exists
+            if (slot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
+            {
+                s.ComboStage++;
+                var stage = ability.Stages[s.ComboStage];
+                s.State = ActionState.Attacking;
+                s.AnimLockTicks = stage.DurationTicks;
+                s.AttackElapsedTicks = 0;
+                return;
+            }
+
+            // Fresh attack
+            if (ability.Stages.Length > 0)
+            {
+                var stage = ability.Stages[0];
+                s.State = ActionState.Attacking;
+                s.AnimLockTicks = stage.DurationTicks;
+                s.ComboStage = 0;
+                s.AttackElapsedTicks = 0;
+                s.AttackSlot = slot;
             }
         }
 
