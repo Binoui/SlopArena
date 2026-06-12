@@ -2,572 +2,156 @@ using Godot;
 using System;
 using SlopArena.Shared;
 
+/// <summary>
+/// Thin orchestrator: creates MatchManager + UI, delegates game loop to MatchManager.
+/// </summary>
 public partial class Main : Node3D
 {
-    private PlayerController _player;
-    private PlayerController[] _npcs = new PlayerController[5];
-    private LocalSimulation _simulation;
-    private ArenaManager _arenaManager;
-    private Label _label;
-    private CanvasLayer _canvasLayer;
-    private ActionBarHUD _actionBarHUD;
-    private UnitFrames _unitFrames;
-    private RespawnTimerUI _respawnTimerUI;
-    private EscapeMenuUI _escapeMenu;
-    private CharacterClass _selectedClass = CharacterClass.Manki;
-
-    /// <summary>
-    /// Cercle de ciblage (WoW-style ring under target)
-    /// </summary>
-    private MeshInstance3D _targetRing;
-    private DebugHitboxDraw _debugDraw;
+    private MatchManager _matchManager = null!;
+    private CanvasLayer _canvasLayer = null!;
+    private ActionBarHUD _actionBarHUD = null!;
+    private UnitFrames _unitFrames = null!;
+    private RespawnTimerUI _respawnTimerUI = null!;
+    private EscapeMenuUI _escapeMenu = null!;
+    private DebugHitboxDraw _debugDraw = null!;
+    private SpellVFXManager _spellVFX = null!;
     private bool _debugHitboxVisible = true;
-    private DamageNumberManager _damageNumbers;
-    private SpellVFXManager _spellVFX;
 
     public override async void _Ready()
     {
         GD.Print("SlopArena 3D C# Client Started!");
-
-        // Setup input actions for spells (layout-independent physical keys)
         SetupInputActions();
-
-        // Force fullscreen — UI elements size themselves to viewport on Build()
         DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
 
-        _canvasLayer = GetNodeOrNull<CanvasLayer>("CanvasLayer");
-        if (_canvasLayer == null)
-        {
-            _canvasLayer = new CanvasLayer();
-            _canvasLayer.Name = "CanvasLayer";
-            AddChild(_canvasLayer);
-        }
+        _canvasLayer = new CanvasLayer { Name = "CanvasLayer" };
+        AddChild(_canvasLayer);
 
-        // Show class selection screen before spawning anything
+        // Class select
         var classSelect = new ClassSelectUI();
         _canvasLayer.AddChild(classSelect);
-
-        // Wait for player to pick a class (C# event -> Task pattern)
         var tcs = new System.Threading.Tasks.TaskCompletionSource<CharacterClass>();
         classSelect.OnClassConfirmed += (cls) => tcs.TrySetResult(cls);
-        _selectedClass = await tcs.Task;
-        GD.Print($"Player selected class: {_selectedClass}");
+        var selectedClass = await tcs.Task;
 
-        // Now spawn the match
-        SpawnMatch();
+        // Crosshair
+        CreateCrosshair();
 
-        // Global debug hitbox/hurtbox visualization
+        // Debug draw
         _debugDraw = new DebugHitboxDraw { Name = "DebugHitboxDraw" };
         AddChild(_debugDraw);
 
-        // Damage numbers manager
-        _damageNumbers = new DamageNumberManager { Name = "DamageNumbers" };
-        AddChild(_damageNumbers);
-
-        // Spell VFX manager
+        // Spell VFX
         _spellVFX = new SpellVFXManager { Name = "SpellVFX" };
         AddChild(_spellVFX);
-    }
 
-    private async void SpawnMatch()
-    {
-        _label = _canvasLayer.GetNodeOrNull<Label>("Label");
-        if (_label == null)
+        // Match manager (spawns everything, runs game loop)
+        _matchManager = new MatchManager { Name = "MatchManager" };
+        AddChild(_matchManager);
+        _matchManager.StartMatch(selectedClass, _spellVFX);
+
+        // HUD label (top-right info)
+        var label = new Label { Name = "Label", Size = new Vector2(600f, 200f) };
+        label.AddThemeFontSizeOverride("font_size", 18);
+        label.HorizontalAlignment = HorizontalAlignment.Right;
+        _canvasLayer.AddChild(label);
+        _matchManager.Player.OnStateUpdated += (px, pz, py, vx, vz) =>
         {
-            _label = new Label();
-            _label.Name = "Label";
-            _label.Size = new Vector2(600f, 200f);
-            _canvasLayer.AddChild(_label);
-        }
+            float speed = MathF.Sqrt((vx * vx) + (vz * vz));
+            // Simple HUD: damage % + speed
+            label.Text = $"DMG: {_matchManager.Player.GetDamagePercent()}%  SPD: {speed:F1}";
+        };
 
-        // Toujours appliquer le positionnement quoi qu'il arrive
-        _label.AddThemeFontSizeOverride("font_size", 18);
-        _label.HorizontalAlignment = HorizontalAlignment.Right;
-
-        // --- Crosshair (TPS aiming reticle) ---
-        CreateCrosshair();
-
-        // --- Projectile Manager (Object Pooling) ---
-        // --- Local Simulation (entity positions + hit routing) ---
-        _simulation = new LocalSimulation();
-        _simulation.Name = "LocalSimulation";
-        AddChild(_simulation);
-
-        // --- Arena Manager (loads/unloads arena scenes, provides spawns + void) ---
-        _arenaManager = new ArenaManager();
-        _arenaManager.Name = "ArenaManager";
-        AddChild(_arenaManager);
-        _arenaManager.LoadArena("split");
-
-        // --- Targeting Ring ---
-        _targetRing = CreateTargetRing();
-        AddChild(_targetRing);
-        _targetRing.Visible = false;
-
-        // --- Spawn NPCs first (they need to be registered before player) ---
-        SpawnNPCs();
-
-        // Register NPCs and player in simulation
-        RegisterEntitiesInSimulation();
-
-        // --- Player (spawn index 5, the last spawn point) ---
-        _player = new PlayerController();
-        _player.Name = "Player";
-        _player.SetClass(_selectedClass);
-        AddChild(_player);
-        _player.Position = _arenaManager.GetSpawnPosition(5);
-        // Offset player from NPCs and above floor
-        _player.Position += new Vector3(5f, 15f, 0f);
-
-        // --- Camera (sibling, not child of player — multiplayer-safe) ---
-        var camScene = GD.Load<PackedScene>("res://scenes/CameraMount.tscn");
-        if (camScene != null)
-        {
-            var cameraMount = camScene.Instantiate<CameraMount>();
-            cameraMount.Name = "CameraMount";
-            cameraMount.Target = _player;
-            AddChild(cameraMount);
-            _player.SetCamera(cameraMount);
-        }
-
-        // Setup combat component (for spell hit detection)
-        if (_simulation != null)
-            _player.SetupCombat(_simulation, ArenaRegistry.Get("split"), 1, _spellVFX);
-
-        // Register player in the simulation's combat component map
-        var playerCombat = _player.GetCombatComponent();
-        if (playerCombat != null && _simulation != null)
-        {
-            _simulation.CombatComponents[1] = playerCombat;
-
-            // Damage % shown via persistent labels above characters
-            // (no additional handler needed here)
-        }
-
-        // Register player in the simulation
-        RegisterPlayerInSimulation();
-
-        // Register NPC combat components
-        RegisterNpcCombatComponents();
-
-        // Add AI to NPCs (must be after player is spawned)
-        AddBotAI();
-
-        // Wire up HUD
-        if (_player != null)
-        {
-            _player.OnStateUpdated += UpdateHUD;
-
-            // Tab targeting: soft lock — raycast from camera center
-            _player.OnTargetNextPressed += () =>
-            {
-                if (_unitFrames == null) return;
-
-                var viewport = GetViewport();
-                if (viewport == null) return;
-
-                var camera = viewport.GetCamera3D();
-                if (camera == null) return;
-
-                var center = viewport.GetVisibleRect().Size / 2;
-                var from = camera.ProjectRayOrigin(center);
-                var dir = camera.ProjectRayNormal(center);
-                var to = from + (dir * 100f);
-
-                var query = PhysicsRayQueryParameters3D.Create(from, to);
-                query.CollisionMask = 2; // Layer 2 = entities (dummies)
-                var result = GetWorld3D().DirectSpaceState.IntersectRay(query);
-
-                if (result.Count > 0 && result.ContainsKey("collider"))
-                {
-                    var collider = (Node)result["collider"];
-                    while (collider != null)
-                    {
-                        if (collider is not CharacterBody3D)
-                        {
-                            collider = collider.GetParent();
-                            continue;
-                        }
-                        // Check if it's an NPC
-                        string name = collider.Name;
-                        if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
-                        {
-                            if (idx >= 0 && idx < _npcs.Length && _npcs[idx] != null && _npcs[idx]!.IsNpcAlive())
-                            {
-                                ulong targetId = (ulong)(100 + idx);
-                                _unitFrames.SetTarget(targetId);
-                                UpdateTargetRing(targetId);
-                            }
-                        }
-                        break;
-                    }
-                }
-            };
-
-            // Click targeting: left-click on a dummy to target it
-            _player.OnLeftClickEntity += (ulong entityId) =>
-            {
-                if (_unitFrames == null) return;
-                _unitFrames.SetTarget(entityId);
-                UpdateTargetRing(entityId);
-            };
-        }
-
-        // --- Unit Frames (top-left player + target HP bars) ---
-        _unitFrames = new UnitFrames();
-        _unitFrames.Name = "UnitFrames";
+        // Unit frames
+        _unitFrames = new UnitFrames { Name = "UnitFrames" };
         _canvasLayer.AddChild(_unitFrames);
-        _unitFrames.Setup(_player!, _npcs);
+        _unitFrames.Setup(_matchManager.Player, _matchManager.NPCs);
 
-        // --- Respawn Timer (center screen) ---
-        _respawnTimerUI = new RespawnTimerUI();
-        _respawnTimerUI.Name = "RespawnTimerUI";
+        // Respawn timer
+        _respawnTimerUI = new RespawnTimerUI { Name = "RespawnTimerUI" };
         _canvasLayer.AddChild(_respawnTimerUI);
 
-        // --- Action Bar HUD (bottom bar with cooldowns) ---
-        // Must be added to CanvasLayer (Control nodes need CanvasLayer)
+        // Action bar
         var hudScene = GD.Load<PackedScene>("res://Scripts/UI/ActionBarHUD.tscn");
         if (hudScene != null)
         {
             _actionBarHUD = hudScene.Instantiate<ActionBarHUD>();
             _actionBarHUD.Name = "ActionBarHUD";
             _canvasLayer.AddChild(_actionBarHUD);
+            _actionBarHUD.Setup(_matchManager.Player);
+            _matchManager.Player.OnAbilityUsed += (slot) => _actionBarHUD?.FlashSlot(slot);
         }
 
-        // Connect to player for class abilities
-        if (_player != null && _actionBarHUD != null)
+        // Camera
+        var camScene = GD.Load<PackedScene>("res://scenes/CameraMount.tscn");
+        if (camScene != null)
         {
-            _actionBarHUD.Setup(_player);
-            _player.OnAbilityUsed += (slot) => _actionBarHUD?.FlashSlot(slot);
-            GD.Print("ActionBarHUD connected!");
+            var cameraMount = camScene.Instantiate<CameraMount>();
+            cameraMount.Name = "CameraMount";
+            cameraMount.Target = _matchManager.Player;
+            AddChild(cameraMount);
+            _matchManager.Player.SetCamera(cameraMount);
+        }
 
-            // --- Status routing ---
-            // Route status application requests through the simulation
-            if (_simulation != null)
+        // Escape menu
+        _escapeMenu = new EscapeMenuUI { Name = "EscapeMenuUI" };
+        _canvasLayer.AddChild(_escapeMenu);
+        _escapeMenu.Build();
+        _escapeMenu.OnExitLobby += () => GetTree().ChangeSceneToFile("res://main.tscn");
+        _escapeMenu.OnExitGame += () => GetTree().Quit();
+
+        // Tab targeting
+        _matchManager.Player.OnTargetNextPressed += () =>
+        {
+            var viewport = GetViewport();
+            if (viewport == null) return;
+            var camera = viewport.GetCamera3D();
+            if (camera == null) return;
+            var center = viewport.GetVisibleRect().Size / 2;
+            var from = camera.ProjectRayOrigin(center);
+            var dir = camera.ProjectRayNormal(center);
+            var query = PhysicsRayQueryParameters3D.Create(from, from + (dir * 100f));
+            query.CollisionMask = 2;
+            var result = GetWorld3D().DirectSpaceState.IntersectRay(query);
+            if (result.Count > 0 && result.ContainsKey("collider"))
             {
-                _simulation.OnStatusApply += (ulong targetId, StatusType type, float duration, ulong sourceId) =>
+                var collider = (Node)result["collider"];
+                while (collider != null)
                 {
-                    if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
+                    if (collider is not CharacterBody3D) { collider = collider.GetParent(); continue; }
+                    string name = collider.Name;
+                    if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
                     {
-                        targetCombat.ApplyStatus(type, duration, sourceId);
+                        if (idx >= 0 && idx < _matchManager.NPCs.Length && _matchManager.NPCs[idx]?.IsNpcAlive() == true)
+                            _matchManager.SetTarget((ulong)(100 + idx));
                     }
-                };
-
-                _simulation.OnStatusConsume += (ulong targetId, StatusType type) =>
-                {
-                    if (_simulation.CombatComponents.TryGetValue(targetId, out var targetCombat))
-                    {
-                        return targetCombat.ConsumeStatus(type);
-                    }
-                    return false;
-                };
-            }
-
-            // --- Escape Menu (pause overlay) ---
-            _escapeMenu = new EscapeMenuUI();
-            _escapeMenu.Name = "EscapeMenuUI";
-            _canvasLayer.AddChild(_escapeMenu);
-            _escapeMenu.Build();
-
-            // Connect escape menu events
-            _escapeMenu.OnResumePressed += () => { };
-            _escapeMenu.OnExitLobby += () =>
-            {
-                GD.Print("Exit Lobby - would return to main menu");
-                GetTree().ChangeSceneToFile("res://main.tscn");
-            };
-            _escapeMenu.OnExitGame += () =>
-            {
-                GD.Print("Exiting game...");
-                GetTree().Quit();
-            };
-        }
-
-        // Wait for physics sync then generate heightmap
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-
-        try
-        {
-            HeightmapGenerator.Generate(GetWorld3D());
-        }
-        catch (Exception ex)
-        {
-            GD.PrintErr($"Heightmap generation failed: {ex.Message}");
-        }
-    }
-
-    private void SpawnNPCs()
-    {
-        // Spawn 5 Manki NPCs at the first 5 spawn points
-        for (int i = 0; i < 5; i++)
-        {
-            var npc = new PlayerController();
-            npc.Name = $"NPC_{i}";
-            npc.SetClass(CharacterClass.Manki);
-            npc.SetNPC(true);
-            npc.AddToGroup("enemies");  // For target lock system
-            AddChild(npc);
-
-            Vector3 spawnPos = _arenaManager.GetSpawnPosition(i);
-            npc.Position = spawnPos + new Vector3(0f, 1f, 0f); // Slight offset above ground
-
-            _npcs[i] = npc;
-
-            // Setup combat component for this NPC
-            if (_simulation != null)
-                npc.SetupCombat(_simulation, ArenaRegistry.Get("split"), (ulong)(100 + i), _spellVFX);
-        }
-    }
-
-    private void AddBotAI()
-    {
-        // Add AI controller to each NPC after player is spawned
-        if (_player == null) return;
-
-        for (int i = 0; i < 5; i++)
-        {
-            if (_npcs[i] == null) continue;
-
-            var botAI = new BotController();
-            botAI.Name = $"BotAI_{i}";
-            botAI.Setup(_npcs[i]!, _player);
-            _npcs[i]!.AddChild(botAI);
-        }
-    }
-
-    private void RegisterEntitiesInSimulation()
-    {
-        if (_simulation == null) return;
-
-        for (int i = 0; i < 5; i++)
-        {
-            ulong entityId = (ulong)(100 + i); // NPC IDs: 100-104
-            if (_npcs[i] != null)
-                _simulation.Entities[entityId] = _npcs[i]!.GetHurtboxShapes();
-        }
-
-        // Connect hit events from simulation (UI only — damage applied by LocalSimulation.RouteHit)
-        _simulation.OnEntityHit += (entityId, _, _, _, _) =>
-        {
-            // Auto-target: when player gets hit, target the first NPC
-            if (entityId == 1 && _unitFrames != null && !_unitFrames.HasTarget())
-            {
-                _unitFrames.SetTarget(100);
+                    break;
+                }
             }
         };
-    }
 
-    private void RegisterNpcCombatComponents()
-    {
-        if (_simulation == null) return;
-
-        for (int i = 0; i < 5; i++)
+        // Respawn timer in _Process
+        var respawnTimer = 0f;
+        SetProcess(true);
+        // Override _Process via a simple timer approach isn't great, use a handler
+        _matchManager.Player.OnStateUpdated += (_, _, _, _, _) =>
         {
-            if (_npcs[i] == null) continue;
-            ulong entityId = (ulong)(100 + i);
-            var combat = _npcs[i]!.GetCombatComponent();
-            if (combat != null)
-            {
-                _simulation.CombatComponents[entityId] = combat;
-
-                // Damage % shown via persistent labels above characters
-            }
-        }
-    }
-
-    private void RegisterPlayerInSimulation()
-    {
-        if (_simulation == null || _player == null) return;
-
-        const ulong playerId = 1;
-        _simulation.Entities[playerId] = _player.GetHurtboxShapes();
-
-        // Update player position in simulation each frame
-        _player.OnStateUpdated += (_, _, _, _, _) => _simulation.Entities[playerId] = _player.GetHurtboxShapes();
-    }
-
-    /// <summary>
-    /// Get the simulation instance (for spells to use).
-    /// </summary>
-    public LocalSimulation GetSimulation() => _simulation;
-
-    // ==========================================
-    // TARGETING RING (WoW-style)
-    // ==========================================
-
-    /// <summary>
-    /// Create a flat ring mesh under the target (yellow-ish, emissive).
-    /// </summary>
-    private MeshInstance3D CreateTargetRing()
-    {
-        var ring = new MeshInstance3D();
-
-        // Create a flat ring with SurfaceTool
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-
-        const float innerRadius = 0.8f;
-        const float outerRadius = 2.2f;
-        const int segments = 32;
-
-        for (int i = 0; i < segments; i++)
-        {
-            float a1 = (float)i / segments * Mathf.Tau;
-            float a2 = (float)(i + 1) / segments * Mathf.Tau;
-
-            float c1 = Mathf.Cos(a1), s1 = Mathf.Sin(a1);
-            float c2 = Mathf.Cos(a2), s2 = Mathf.Sin(a2);
-
-            Vector3 in1 = new Vector3(c1 * innerRadius, 0, s1 * innerRadius);
-            Vector3 in2 = new Vector3(c2 * innerRadius, 0, s2 * innerRadius);
-            Vector3 out1 = new Vector3(c1 * outerRadius, 0, s1 * outerRadius);
-            Vector3 out2 = new Vector3(c2 * outerRadius, 0, s2 * outerRadius);
-
-            st.AddVertex(in1);
-            st.AddVertex(out1);
-            st.AddVertex(in2);
-            st.AddVertex(in2);
-            st.AddVertex(out1);
-            st.AddVertex(out2);
-        }
-
-        st.GenerateNormals();
-        ring.Mesh = st.Commit();
-
-        // Yellowish emissive material
-        ring.MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(1f, 0.85f, 0.2f),
-            EmissionEnabled = true,
-            Emission = new Color(1f, 0.8f, 0.1f),
-            EmissionEnergyMultiplier = 3f,
-            Metallic = 0.3f,
-            Roughness = 0.5f,
+            if (_respawnTimerUI != null)
+                _respawnTimerUI.UpdateTimer(_matchManager.Player.GetRespawnTimeRemaining());
         };
-
-        return ring;
-    }
-
-    /// <summary>
-    /// Show/hide and position the targeting ring under the given entity.
-    /// </summary>
-    private void UpdateTargetRing(ulong entityId)
-    {
-        if (_targetRing == null) return;
-
-        if (entityId == 0 || entityId < 100 || entityId >= 105)
-        {
-            _targetRing.Visible = false;
-            return;
-        }
-
-        // NPC IDs are 100-104
-        int npcIndex = (int)(entityId - 100);
-        if (npcIndex < 0 || npcIndex >= 5 || _npcs[npcIndex] == null || !_npcs[npcIndex]!.IsNpcAlive())
-        {
-            _targetRing.Visible = false;
-            return;
-        }
-
-        Vector3 pos = _npcs[npcIndex]!.GlobalPosition;
-        pos.Y = 0.1f;
-        _targetRing.Position = pos;
-        _targetRing.Visible = true;
     }
 
     public override void _Process(double delta)
     {
-        // Update NPC entity positions in simulation (bone hurtboxes follow animation)
-        if (_simulation != null)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                if (_npcs[i] != null && _npcs[i]!.IsAlive())
-                    _simulation.Entities[(ulong)(100 + i)] = _npcs[i]!.GetHurtboxShapes();
-            }
-        }
-
-        // Void death check (Smash-style) — all characters respawn at arena center after 20s
-        if (_arenaManager != null)
-        {
-            // Check player
-            if (_player != null && _player.IsAlive() && _arenaManager.IsBelowKillHeight(_player.GlobalPosition))
-            {
-                _player.TriggerRespawn(); // 20s respawn at center
-            }
-
-            // Check NPCs
-            for (int i = 0; i < 5; i++)
-            {
-                if (_npcs[i] != null && _npcs[i]!.IsAlive() && _arenaManager.IsBelowKillHeight(_npcs[i]!.GlobalPosition))
-                {
-                    _npcs[i]!.TriggerRespawn(); // 20s respawn at center
-                }
-            }
-        }
-
-        // Update respawn timer UI and freeze camera on death position
-        if (_player != null && _respawnTimerUI != null)
-        {
-            float remainingTime = _player.GetRespawnTimeRemaining();
-            _respawnTimerUI.UpdateTimer(remainingTime);
-
-            // Freeze camera at death position during respawn
-            if (remainingTime > 0f)
-            {
-                var camera = GetViewport()?.GetCamera3D();
-                if (camera != null && camera.GetParent() is SpringArm3D springArm)
-                {
-                    // Move spring arm to death position instead of following player
-                    springArm.GlobalPosition = _player.GetDeathPosition();
-                }
-            }
-        }
-
-        // Keep targeting ring on the target (in case dummy respawns or target changes via click)
-        if (_unitFrames != null && _targetRing != null)
-        {
-            ulong targetId = _unitFrames.GetTarget();
-            if (targetId > 0)
-            {
-                int idx = (int)(targetId - 100);
-                if (idx >= 0 && idx < 5 && _npcs[idx] != null)
-                {
-                    if (_npcs[idx]!.IsNpcAlive())
-                    {
-                        Vector3 pos = _npcs[idx]!.GlobalPosition;
-                        pos.Y = 0.1f;
-                        _targetRing.Position = pos;
-                        _targetRing.Visible = true;
-                    }
-                    else
-                    {
-                        _targetRing.Visible = false;
-                    }
-                }
-            }
-            else
-            {
-                _targetRing.Visible = false;
-            }
-        }
-
-        // Debug: draw hitboxes (red) and hurtboxes (blue) — world-space
-        if (_debugDraw != null && _simulation != null && _debugHitboxVisible)
+        // Keep target ring visible (MatchManager handles position)
+        if (_debugDraw != null && _matchManager?.GetBridge() != null && _debugHitboxVisible)
         {
             var hitboxes = SpellResolver.GetActiveHitboxes();
-            var hurtboxes = new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>();
-            foreach (var kvp in _simulation.Entities)
-            {
-                foreach (var (start, end, radius) in kvp.Value)
-                {
-                    bool isCapsule = (start - end).LengthSquared() > 0.001f;
-                    hurtboxes.Add((start.X, start.Y, start.Z, end.X, end.Y, end.Z, radius, isCapsule));
-                }
-            }
-            _debugDraw.UpdateHitboxes(hitboxes, hurtboxes, Vector3.Zero);
+            var hurtboxes = _matchManager.GetBridge().GetHurtboxCapsules();
+            // Convert to the format DebugHitboxDraw expects (same tuple shape)
+            var hurtboxList = new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>();
+            foreach (var h in hurtboxes)
+                hurtboxList.Add((h.sx, h.sy, h.sz, h.ex, h.ey, h.ez, h.radius, h.isCapsule));
+            _debugDraw.UpdateHitboxes(hitboxes, hurtboxList, Vector3.Zero);
         }
     }
 
@@ -577,143 +161,59 @@ public partial class Main : Node3D
         {
             if (key.Keycode == Key.Escape || key.PhysicalKeycode == Key.Escape)
             {
-                if (_escapeMenu != null && _player != null)
+                if (_escapeMenu != null && _matchManager?.Player != null)
                 {
-                    _escapeMenu.Toggle(_player);
+                    _escapeMenu.Toggle(_matchManager.Player);
                     if (_escapeMenu.IsOpen())
-                        _player.IsEscapeMenuOpen = true;
+                        _matchManager.Player.IsEscapeMenuOpen = true;
                     else
-                        _player.IsEscapeMenuOpen = false;
+                        _matchManager.Player.IsEscapeMenuOpen = false;
                     GetViewport().SetInputAsHandled();
                 }
             }
             else if (key.Keycode == Key.F3 || key.PhysicalKeycode == Key.F3)
             {
-                // Toggle hitbox/hurtbox debug visualization
                 _debugHitboxVisible = !_debugHitboxVisible;
-                if (_debugDraw != null)
-                    _debugDraw.Visible = _debugHitboxVisible;
-                if (_player != null)
-                    _player.DebugEmissionEnabled = _debugHitboxVisible;
-                // Also toggle emission on NPCs
-                for (int i = 0; i < 5; i++)
+                if (_debugDraw != null) _debugDraw.Visible = _debugHitboxVisible;
+                if (_matchManager?.Player != null) _matchManager.Player.DebugEmissionEnabled = _debugHitboxVisible;
+                foreach (var npc in _matchManager?.NPCs ?? Array.Empty<PlayerController>())
                 {
-                    if (_npcs[i] != null)
-                        _npcs[i]!.DebugEmissionEnabled = _debugHitboxVisible;
+                    if (npc != null) npc.DebugEmissionEnabled = _debugHitboxVisible;
                 }
                 GD.Print($"Debug Hitboxes: {(_debugHitboxVisible ? "ON" : "OFF")}");
             }
         }
     }
 
-    private void UpdateHUD(float posX, float posY, float posZ, float velX, float velY)
+    private void SetupInputActions()
     {
-        if (_label == null) return;
-
-        float speed2D = MathF.Sqrt((velX * velX) + (velY * velY));
-
-        string dummyInfo = "";
-        for (int i = 0; i < 5; i++)
-        {
-            if (_npcs[i] != null)
-            {
-                ushort npcDmg = _npcs[i]!.GetDamagePercent();
-                string status = _npcs[i]!.IsNpcAlive() ? $"{npcDmg}%" : "[RESPAWNING]";
-                dummyInfo += $"  NPC {i + 1}: {status}\n";
-            }
-        }
-
-        ushort playerDmg = _player?.GetDamagePercent() ?? 0;
-
-        _label.Text = "SlopArena Arena Sandbox\n" +
-                              "---------------------------------\n" +
-                              $"Speed: {speed2D:F1}  |  DMG: {playerDmg}%\n" +
-                              $"Position: ({posX:F1}, {posY:F1}, {posZ:F1})\n" +
-                              "\n" +
-                              $"{dummyInfo}" +
-                              "\n" +
-                              "--- CONTROLS ---\n" +
-                              "Mouse: Aim / Turn\n" +
-                              "WASD: Movement (camera-relative)\n" +
-                              "Space: Jump (double jump)\n" +
-                              "Shift: Dash (ground or air, 1s, invincible)\n" +
-                              "LMB/RMB: Attacks\n" +
-                              "Q, E, R, F: Abilities\n" +
-                              "Tab: Target NPC\n" +
-                              "Escape: Release mouse\n" +
-                              $"F3: Toggle Hitbox Debug ({(_debugHitboxVisible ? "ON" : "OFF")})";
+        void Add(string n, InputEventKey k) { if (!InputMap.HasAction(n)) InputMap.AddAction(n); InputMap.ActionAddEvent(n, k); }
+        Add("move_forward", new InputEventKey { PhysicalKeycode = Key.W });
+        Add("move_back", new InputEventKey { PhysicalKeycode = Key.S });
+        Add("move_left", new InputEventKey { PhysicalKeycode = Key.A });
+        Add("move_right", new InputEventKey { PhysicalKeycode = Key.D });
+        Add("jump", new InputEventKey { PhysicalKeycode = Key.Space });
+        Add("dash", new InputEventKey { PhysicalKeycode = Key.Shift });
+        Add("crouch", new InputEventKey { PhysicalKeycode = Key.C });
+        Add("ability_q", new InputEventKey { PhysicalKeycode = Key.Q });
+        Add("ability_e", new InputEventKey { PhysicalKeycode = Key.E });
+        Add("ability_r", new InputEventKey { PhysicalKeycode = Key.R });
+        Add("ability_f", new InputEventKey { PhysicalKeycode = Key.F });
+        Add("spellbook_toggle", new InputEventKey { Keycode = Key.B });
+        Add("ui_cancel", new InputEventKey { Keycode = Key.Escape });
+        Add("trinket", new InputEventKey { Keycode = Key.G });
+        Add("tech", new InputEventKey { Keycode = Key.T });
+        SettingsUI.LoadBindings();
     }
 
     private void CreateCrosshair()
     {
         var crosshair = new ColorRect();
         crosshair.Name = "Crosshair";
+        crosshair.Size = new Vector2(8f, 8f);
+        crosshair.Color = new Color(1f, 1f, 1f, 0.6f);
         crosshair.MouseFilter = Control.MouseFilterEnum.Ignore;
-
-        const float center = 960f;
-        const float mid = 540f;
-        const float size = 8f;
-        const float gap = 4f;
-        const float thickness = 2f;
-        var white = new Color(1f, 1f, 1f, 0.8f);
-
-        var top = new ColorRect();
-        top.Color = white;
-        top.Position = new Vector2(center - (thickness / 2), mid - gap - size);
-        top.Size = new Vector2(thickness, size);
-        top.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.AddChild(top);
-
-        var bottom = new ColorRect();
-        bottom.Color = white;
-        bottom.Position = new Vector2(center - (thickness / 2), mid + gap);
-        bottom.Size = new Vector2(thickness, size);
-        bottom.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.AddChild(bottom);
-
-        var left = new ColorRect();
-        left.Color = white;
-        left.Position = new Vector2(center - gap - size, mid - (thickness / 2));
-        left.Size = new Vector2(size, thickness);
-        left.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.AddChild(left);
-
-        var right = new ColorRect();
-        right.Color = white;
-        right.Position = new Vector2(center + gap, mid - (thickness / 2));
-        right.Size = new Vector2(size, thickness);
-        right.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.AddChild(right);
-
-        var dot = new ColorRect();
-        dot.Color = new Color(1f, 0f, 0f, 0.9f);
-        dot.Position = new Vector2(center - 1.5f, mid - 1.5f);
-        dot.Size = new Vector2(3f, 3f);
-        dot.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.AddChild(dot);
-
-        _canvasLayer?.AddChild(crosshair);
-    }
-
-    private void SetupInputActions()
-    {
-        // Layout-independent physical key bindings for ability slots
-        // Works on QWERTY, AZERTY, and all layouts.
-        RegisterInputAction("spell_slot1", Key.Q);  // top-left letter key
-        RegisterInputAction("spell_slotE", Key.E);
-        RegisterInputAction("spell_slotR", Key.R);
-        RegisterInputAction("spell_slot3", Key.F);
-        RegisterInputAction("jump", Key.Space);
-        RegisterInputAction("dash", Key.Shift);
-    }
-
-    private void RegisterInputAction(string actionName, Key physicalKey)
-    {
-        if (InputMap.HasAction(actionName))
-            InputMap.EraseAction(actionName);
-        InputMap.AddAction(actionName);
-        var ev = new InputEventKey();
-        ev.PhysicalKeycode = physicalKey;
-        InputMap.ActionAddEvent(actionName, ev);
+        crosshair.Position = GetViewport().GetVisibleRect().Size / 2 - new Vector2(4f, 4f);
+        _canvasLayer.AddChild(crosshair);
     }
 }

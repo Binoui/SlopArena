@@ -13,7 +13,8 @@ public static class MankiAbilities
     /// </summary>
     public static void AerosolFlame(CombatComponent combat)
     {
-        Vector3 forward = combat.GetCameraForward();
+        // TEMP: negate forward — GLB model faces +Z (Mixamo), not Godot -Z
+        Vector3 forward = -combat.GetOwnerForward();
         Vector3 pos = combat.GetOwnerPosition() + (Vector3.Up * 1.2f); // Hand height
 
         var vfxManager = combat.GetSpellVFX();

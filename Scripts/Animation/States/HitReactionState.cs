@@ -51,7 +51,7 @@ public sealed partial class HitReactionState : State
         if (Movement.State.AnimLockTicks > 0)
             return;
 
-        if (Player.IsOnFloor())
+        if (Movement.IsGrounded)
             StateMachine.TransitionTo("idle");
         else
             StateMachine.TransitionTo("air");
