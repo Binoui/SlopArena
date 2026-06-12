@@ -7,12 +7,13 @@
 
 ## Overview
 
-Adding a new character involves **4 domains**:
+Adding a new character involves **5 domains**:
 
 1. **Data** — Define the character in `CharacterDefinition` (stats, abilities, animations)
 2. **Code** — Implement special effects (if abilities need custom logic beyond the data)
-3. **Model** — FBX from Kenney + Mixamo animations
-4. **Icon** — UI icon for class select (placeholder for now)
+3. **Model** — GLB from Mixamo / Blender / professional animator
+4. **Bake** — Run `BakeSkeletonTool` to generate skeleton .bin for hurtbox positions
+5. **Icon** — UI icon for class select (placeholder for now)
 
 Below is the step-by-step process for each.
 
@@ -214,7 +215,7 @@ The key string must match `SpecialEffectKeys` in your `CharacterDefinition`.
 
 ---
 
-## 3. Model & Animations — FBX Pipeline
+## 3. Model & Animations — GLB Pipeline
 
 ### 3a. Character mesh
 
@@ -232,7 +233,7 @@ Sources for CC0/royalty-free models:
 **Process:**
 1. Upload your FBX to [Mixamo](https://www.mixamo.com)
 2. Auto-rig with the Mixamo skeleton
-3. Download as **FBX Binary** with skin
+3. Download as **GLB** with skin + animations
 4. The skeleton mapping is handled automatically by `AnimationController`
 
 ### 3b. Animation files
@@ -278,7 +279,64 @@ The system auto-remaps between them — see `AnimationController.DetectPrefixToS
 
 ---
 
-## 4. Icon — UI
+## 4. Bake — Skeleton .bin Generation
+
+After importing your character's GLB and setting up animations, generate the pre-baked bone position file for runtime hurtbox positioning.
+
+### 4a. Add BakedDataPath to CharacterDefinition
+
+```csharp
+BakedDataPath = "res://data/yourclass_skeleton.bin",
+HurtboxBoneScale = 0.01f,  // 0.01 for Mixamo (cm→m), 1.0 for native meters
+```
+
+### 4b. Define which bones become hurtboxes
+
+```csharp
+HurtboxBoneDefs = new HurtboxBoneDef[]
+{
+    new("mixamorig:Head", 0, 0, 0, 0.25f),
+    new("mixamorig:Spine2", 0, 0, 0, 0.3f),
+    new("mixamorig:Hips", 0, 0, 0, 0.3f),
+    new("mixamorig:RightHand", 0, 0, 0, 0.14f),
+    new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
+    new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
+    new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
+};
+```
+
+- **Bone names**: use Mixamo/Godot format (`mixamorig:Head` in definition, Godot converts to `mixamorig_Head`)
+- **Offsets**: (OffX, OffY, OffZ) are additive adjustments to the baked bone position (usually 0)
+- **Radius**: hurtbox sphere radius in meters
+- Order must match the `BoneNames` array in `BakeSkeletonTool.cs`
+
+### 4c. Run the bake tool
+
+1. Open Godot editor
+2. Open `tools/bake_skeleton.tscn`
+3. Set `CharacterScenePath` to your character's .tscn
+4. Set `OutputPath` to `res://data/yourclass_skeleton.bin`
+5. Update the `BoneNames` array in `Scripts/Tools/BakeSkeletonTool.cs` to match your character's bones
+6. Select the `BakeSkeletonTool` node → in the inspector, check **TriggerBake**
+7. The console will print progress per animation
+
+**What the tool does:**
+- Loads your character scene (Skeleton3D + AnimationPlayer)
+- For each animation, samples bone positions at 60fps
+- Transforms positions into Hips local space via `AffineInverse()`
+- Writes a compact binary file (≈170KB for 7 bones × 19 anims)
+
+### 4d. Integration checklist
+
+- [ ] `BakedDataPath` points to the generated .bin
+- [ ] `HurtboxBoneScale` matches your GLB's unit system
+- [ ] `HurtboxBoneDefs` bone names match the skeleton
+- [ ] `.bin` file is committed to the repo (it's small and deterministic)
+- [ ] The `.bin` is regenerated whenever animations change
+
+---
+
+## 5. Icon — UI
 
 Icons are **not yet implemented** in the class select screen.
 Currently `ClassSelectUI` shows class names and text descriptions only.
@@ -315,9 +373,11 @@ Update this switch when adding a new class.
 - [ ] `F` — ultimate ability
 - [ ] Special effect code — if needed, created in `Scripts/Characters/{Name}/`
 - [ ] `AbilityRegistry` — keys registered
-- [ ] FBX files — in `assets/characters/{Name}/`
+- [ ] GLB file — in `assets/characters/{Name}/`
 - [ ] Animations — all 8 slots + locomotion (idle/run/jump/fall)
 - [ ] `AnimationNames` — set in each AbilityData
+- [ ] Bake skeleton — run `BakeSkeletonTool` → check `.bin` in `data/`
+- [ ] `BakedDataPath` + `HurtboxBoneScale` set in `CharacterDefinition`
 - [ ] `ClassSelectUI` — add to class switch if needed
 - [ ] Build & test — `dotnet build`, 0 errors
 

@@ -71,8 +71,13 @@ namespace SlopArena.Shared
             ArenaDefinition arena)
         {
             var stats = def.Movement;
-
-            // 1. Tick all timers
+    
+            // Apply combat aim yaw from input (degrees * 100 → radians)
+            // FacingYaw (movement-facing) is handled by ProcessNormalMovement via Atan2
+            float aimDeg = input.AimYaw * 0.01f;
+            s.AimYaw = aimDeg * (MathF.PI / 180f);
+    
+            // 1. Tick timers
             TickTimers(ref s);
 
             // 2. Hitstun overrides everything (DI window)

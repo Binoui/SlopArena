@@ -20,6 +20,24 @@ class Program
         var sim = new ServerSimulation(arena);
         var charDef = CharacterRegistry.Get(CharacterClass.Manki);
 
+        // Load baked skeleton data
+        BakedAnimationData? bakedData = null;
+        if (!string.IsNullOrEmpty(charDef.BakedDataPath))
+        {
+            try
+            {
+                string sysPath = charDef.BakedDataPath.Replace("res://", "");
+                var binData = System.IO.File.ReadAllBytes(sysPath);
+                bakedData = BakedAnimationData.LoadFromBin(binData);
+                Console.WriteLine($"[Server] Loaded baked data: {sysPath} ({binData.Length} bytes, {bakedData.Animations.Length} anims)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Server] Failed to load baked data: {ex.Message}");
+                Console.WriteLine($"[Server] Will use fallback capsules");
+            }
+        }
+
         sim.RegisterEntity(1, charDef, new CharacterState
         {
             PX = arena.SpawnPoints[5].X,
@@ -28,11 +46,16 @@ class Program
             FacingYaw = arena.SpawnPoints[5].Yaw,
             JumpsLeft = charDef.Movement.MaxJumps,
             AirDodgesLeft = 1,
-        });
+            Cooldown0 = charDef.LMB.CooldownTicks,
+            Cooldown1 = charDef.RMB.CooldownTicks,
+            Cooldown2 = charDef.Q.CooldownTicks,
+            Cooldown3 = charDef.E.CooldownTicks,
+            Cooldown4 = charDef.R.CooldownTicks,
+            Cooldown5 = charDef.F.CooldownTicks,
+        }, bakedData);
 
         var clients = new Dictionary<ulong, IPEndPoint>();
         var inputBuffer = new Dictionary<ulong, (uint tick, InputState input)>();
-
         var tickInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
         var nextTick = DateTime.UtcNow + tickInterval;
 

@@ -35,16 +35,10 @@ public partial class LocalServerBridge : Node
     }
 
     /// <summary>Register an entity in the server simulation.</summary>
-    public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, byte[]? glbData = null)
+    public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? bakedData = null)
     {
-        ServerSkeleton? skel = null;
-        if (glbData != null)
-        {
-            try { skel = ServerSkeleton.LoadFromGlb(glbData); }
-            catch (Exception ex) { GD.PrintErr($"[Bridge] Failed to load skeleton for {id}: {ex.Message}"); }
-        }
-        _server.RegisterEntity(id, def, initialState, skel);
-        if (skel != null) StoreDef(id, def);
+        _server.RegisterEntity(id, def, initialState, bakedData);
+        StoreDef(id, def);
     }
 
     public void RemoveEntity(ulong id)

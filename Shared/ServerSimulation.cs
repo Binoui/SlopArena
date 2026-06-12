@@ -9,30 +9,36 @@ namespace SlopArena.Shared
         private readonly ArenaDefinition _arena;
         private readonly Dictionary<ulong, CharacterState> _states = new();
         private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
-        private readonly Dictionary<ulong, ServerSkeleton> _skeletons = new();
-        private readonly Dictionary<ulong, (string anim, float time)> _animState = new();
+        private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
+        private readonly Dictionary<ulong, int> _animFrames = new(); // current frame per entity
+        private readonly Dictionary<ulong, int> _prevAnimIndex = new(); // for edge detection
         private readonly Dictionary<ulong, bool> _prevAttack = new(); // for edge detection
+        private List<SpellResolver.EntityData> _lastEntityList = new(); // cached for debug
 
         public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
-        public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, ServerSkeleton? skeleton = null)
+        public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
         {
             _defs[id] = def;
             _states[id] = initialState;
-            if (skeleton != null) _skeletons[id] = skeleton;
-            _animState[id] = ("idle", 0);
+            if (baked != null) _bakedData[id] = baked;
+            _animFrames[id] = 0;
+            _prevAnimIndex[id] = -1;
         }
 
         public void RemoveEntity(ulong id)
         {
             _states.Remove(id);
             _defs.Remove(id);
-            _skeletons.Remove(id);
-            _animState.Remove(id);
+            _bakedData.Remove(id);
+            _animFrames.Remove(id);
+            _prevAnimIndex.Remove(id);
         }
 
         public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
         public Dictionary<ulong, CharacterState> GetAllStates() => _states;
+        /// <summary>Entity data from last Tick (for debug visualization).</summary>
+        public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
 
         public void Tick(Dictionary<ulong, InputState> inputs)
         {
@@ -55,8 +61,8 @@ namespace SlopArena.Shared
                 var state = kvp.Value;
                 var def = _defs[id];
 
-                // Use skeleton-based hurtboxes if available (precise bone positions)
-                if (_skeletons.TryGetValue(id, out var skel) && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
+                // Use baked skeleton data for precise bone positions
+                if (_bakedData.TryGetValue(id, out var baked) && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
                 {
                     // Determine animation from action state
                     string targetAnim;
@@ -73,52 +79,49 @@ namespace SlopArena.Shared
                     else
                         targetAnim = "idle";
 
-                    // Handle specific attacks via slot data is too complex for now
-                    // For RMB attacks: "rmb_attack"
-                    // For LMB chain: "jab" → "melee" → "flying_kick"
-
-                    // Advance animation time
-                    var anState = _animState[id];
-                    if (anState.anim != targetAnim)
-                    {
-                        anState = (targetAnim, 0); // reset on transition
-                    }
-                    anState.time += Simulation.TickDt;
-                    _animState[id] = anState;
-
-                    // Sample skeleton at current animation time
-                    int animIdx = FindAnimIndex(skel, anState.anim);
+                    int animIdx = baked.FindAnimIndex(targetAnim);
                     if (animIdx >= 0)
                     {
-                        skel.SampleAnimation(animIdx, anState.time);
-                        skel.ComputeWorldTransforms();
-                    }
-                    float px = state.PX, py = state.PY, pz = state.PZ;
-                    float yaw = state.FacingYaw;
-                    float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
-
-                    foreach (var hbd in def.HurtboxBoneDefs)
-                    {
-                        if (!skel.GetBoneWorldPosition(hbd.BoneName, out float bx, out float by, out float bz))
-                            continue;
-
-                        // Bone → world: rotate by yaw, then add character position
-                        float wx = px + (bx * cos - bz * sin);
-                        float wy = py + by;
-                        float wz = pz + (bx * sin + bz * cos);
-
-                        // Apply local-space offset
-                        wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
-
-                        entityList.Add(new SpellResolver.EntityData
+                        // Track frame (1 tick = 1 frame at 60fps)
+                        int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
+                        int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
+                        if (prevAnim != animIdx)
                         {
-                            Id = id,
-                            PosX = wx, PosY = wy, PosZ = wz,
-                            Radius = hbd.Radius,
-                            Shape = HitboxShape.Sphere,
-                            EndX = wx, EndY = wy, EndZ = wz,
-                            Active = true,
-                        });
+                            frame = 0;
+                            _prevAnimIndex[id] = animIdx;
+                        }
+                        _animFrames[id] = frame + 1;
+
+                        float px = state.PX, py = state.PY, pz = state.PZ;
+                        float yaw = state.FacingYaw;
+                        float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
+
+                        for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
+                        {
+                            var hbd = def.HurtboxBoneDefs[bi];
+                            if (!baked.GetBonePosition(targetAnim, frame, bi, out float bx, out float by, out float bz))
+                                continue;
+
+                            // Apply bone scale (Mixamo cm → m = 0.01, native m = 1.0)
+                            float scale = def.HurtboxBoneScale;
+                            bx *= scale; by *= scale; bz *= scale;
+
+                            // Bone → world: rotate by yaw, then add character position
+                            float wx = px + (bx * cos + bz * sin);
+                            float wy = py + by;
+                            float wz = pz + (-bx * sin + bz * cos);
+                            wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
+
+                            entityList.Add(new SpellResolver.EntityData
+                            {
+                                Id = id,
+                                PosX = wx, PosY = wy, PosZ = wz,
+                                Radius = hbd.Radius,
+                                Shape = HitboxShape.Sphere,
+                                EndX = wx, EndY = wy, EndZ = wz,
+                                Active = true,
+                            });
+                        }
                     }
                 }
                 else
@@ -128,12 +131,12 @@ namespace SlopArena.Shared
                     float sin = MathF.Sin(state.FacingYaw);
                     foreach (var cap in def.HurtboxCapsules)
                     {
-                        float sx = state.PX + cap.Sx * cos - cap.Sz * sin;
+                        float sx = state.PX + cap.Sx * cos + cap.Sz * sin;
                         float sy = state.PY + cap.Sy;
-                        float sz = state.PZ + cap.Sx * sin + cap.Sz * cos;
-                        float ex = state.PX + cap.Ex * cos - cap.Ez * sin;
+                        float sz = state.PZ + (-cap.Sx * sin + cap.Sz * cos);
+                        float ex = state.PX + cap.Ex * cos + cap.Ez * sin;
                         float ey = state.PY + cap.Ey;
-                        float ez = state.PZ + cap.Ex * sin + cap.Ez * cos;
+                        float ez = state.PZ + (-cap.Ex * sin + cap.Ez * cos);
                         entityList.Add(new SpellResolver.EntityData
                         {
                             Id = id,
@@ -172,15 +175,18 @@ namespace SlopArena.Shared
                             {
                                 if (state.AttackElapsedTicks == evt.TriggerTick)
                                 {
-                                    float hx = state.PX + (evt.OffX * cos - evt.OffZ * sin);
+                                    float hx = state.PX + (evt.OffX * cos + evt.OffZ * sin);
                                     float hy = state.PY + evt.OffY;
-                                    float hz = state.PZ + (evt.OffX * sin + evt.OffZ * cos);
+                                    float hz = state.PZ + (-evt.OffX * sin + evt.OffZ * cos);
+                                    float hex = hx + (evt.EndOffX * cos + evt.EndOffZ * sin);
+                                    float hey = hy + evt.EndOffY;
+                                    float hez = hz + (-evt.EndOffX * sin + evt.EndOffZ * cos);
                                     SpellResolver.Spawn(new Hitbox
                                     {
                                         X = hx, Y = hy, Z = hz,
                                         Radius = evt.Radius,
-                                        Shape = HitboxShape.Sphere,
-                                        EndX = hx, EndY = hy, EndZ = hz,
+                                        Shape = evt.Shape,
+                                        EndX = hex, EndY = hey, EndZ = hez,
                                         Damage = evt.Damage,
                                         KnockbackForce = evt.KnockbackForce,
                                         KnockbackUpward = evt.KnockbackUpward,
@@ -196,6 +202,7 @@ namespace SlopArena.Shared
             }
 
             // ── Step 3: Resolve hitboxes ──
+            _lastEntityList = entityList;
             var hits = SpellResolver.Tick(entityList);
             foreach (var hit in hits)
             {
@@ -230,14 +237,6 @@ namespace SlopArena.Shared
                 };
                 _states[id] = reset;
             }
-        }
-
-        private static int FindAnimIndex(ServerSkeleton skel, string name)
-        {
-            for (int i = 0; i < (skel.Animations?.Length ?? 0); i++)
-                if (skel.Animations[i].Name == name)
-                    return i;
-            return -1;
         }
     }
 }

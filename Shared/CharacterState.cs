@@ -99,6 +99,8 @@ namespace SlopArena.Shared
         /// ── Facing ──
         /// </summary>
         public float FacingYaw;          // radians, +Z = 0
+        /// <summary>Combat aim yaw in radians — sent by client, used for hitboxes/hurtboxes.</summary>
+        public float AimYaw;
 
         /// <summary>
         /// ── Sprint / Dash-dance ──
