@@ -92,7 +92,7 @@ private static CharacterDefinition BuildYourClass()
                     KnockbackUpward = 2f,
                     LungeForce = 12f,      // Forward burst
                     StunTicks = 12,        // Hitstun in 16.6ms ticks
-                    SelfLockTicks = 8,     // Self animation lock
+                    DurationTicks = 8,      // Total animation lock
                     ChainWindowTicks = 42, // 0 = last hit, use for combo chain window
                 },
                 // ... more stages for multi-hit combos
@@ -115,7 +115,7 @@ private static CharacterDefinition BuildYourClass()
             CooldownTicks = 0,
             Stages = new AttackStage[]
             {
-                new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, SelfLockTicks = 8, ChainWindowTicks = 0 },
+                new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, DurationTicks = 8, ChainWindowTicks = 0 },
             }
         },
 
@@ -126,7 +126,7 @@ private static CharacterDefinition BuildYourClass()
             CooldownTicks = 0,
             Stages = new AttackStage[]
             {
-                new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, SelfLockTicks = 10, ChainWindowTicks = 0 },
+                new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, DurationTicks = 10, ChainWindowTicks = 0 },
             }
         },
 
@@ -151,7 +151,7 @@ private static CharacterDefinition BuildYourClass()
 | `KnockbackUpward` | float | Vertical knockback | Negative = spike downward |
 | `LungeForce` | float | Self-forward burst | Moves attacker forward |
 | `StunTicks` | ushort | Hitstun duration on target | 1 tick = 16.6ms |
-| `SelfLockTicks` | ushort | Self animation lock duration | Prevents other actions |
+| `DurationTicks` | ushort | Total animation lock duration | Prevents other actions |
 | `ChainWindowTicks` | ushort | Combo chain window | 0 = final/no chain |
 
 ---

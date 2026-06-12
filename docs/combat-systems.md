@@ -10,8 +10,9 @@
 ### LMB — Light Attack Combo
 
 - Generally a **3–4 hit combo** (varies per character)
-- Combo uses a **queue-based input buffer** (max 2 buffered inputs, like souls-like FSM) for responsive chaining
-- Chain window opens when the animation lock expires — input during the buffer zone is stored and consumed when ready
+- Combo uses per-stage **DurationTicks** (total animation lock) and **ChainWindowTicks** (input buffer window after DurationTicks elapse)
+- When DurationTicks expire, a ChainWindowTicks-wide input window opens — pressing LMB during this window chains to the next stage; the combo system is entirely simulation-driven via the sim's HitboxEvent queue (no client-side buffering or old ExecuteSlot approach)
+- Attack data (damage, knockback, radius, stun) lives in each **HitboxEvent** within the stage, not on AttackStage itself
 - Adds a natural knockdown or knockback on the final hit, creating a reset
 - Range: ~10 units
 - Aim assist: most attacks have **directional snap** to help connect in 3D space

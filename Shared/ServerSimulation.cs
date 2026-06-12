@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SlopArena.Shared;
 
-namespace SlopArena.Server
+namespace SlopArena.Shared
 {
     public class ServerSimulation
     {
@@ -11,6 +11,7 @@ namespace SlopArena.Server
         private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
         private readonly Dictionary<ulong, ServerSkeleton> _skeletons = new();
         private readonly Dictionary<ulong, (string anim, float time)> _animState = new();
+        private readonly Dictionary<ulong, bool> _prevAttack = new(); // for edge detection
 
         public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
@@ -142,6 +143,54 @@ namespace SlopArena.Server
                             EndX = ex, EndY = ey, EndZ = ez,
                             Active = true,
                         });
+                    }
+                }
+            }
+
+            // ── Spawn hitbox events for all attacking entities ──
+            foreach (var kvp in _states)
+            {
+                ulong id = kvp.Key;
+                var state = kvp.Value;
+                var def = _defs[id];
+                if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+                {
+                    var ability = state.AttackSlot switch
+                    {
+                        1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                        _ => def.LMB,
+                    };
+                    int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                    if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                    {
+                        var stage = ability.Stages[stageIdx];
+                        if (stage.HitboxEvents != null)
+                        {
+                            float cos = MathF.Cos(state.FacingYaw);
+                            float sin = MathF.Sin(state.FacingYaw);
+                            foreach (var evt in stage.HitboxEvents)
+                            {
+                                if (state.AttackElapsedTicks == evt.TriggerTick)
+                                {
+                                    float hx = state.PX + (evt.OffX * cos - evt.OffZ * sin);
+                                    float hy = state.PY + evt.OffY;
+                                    float hz = state.PZ + (evt.OffX * sin + evt.OffZ * cos);
+                                    SpellResolver.Spawn(new Hitbox
+                                    {
+                                        X = hx, Y = hy, Z = hz,
+                                        Radius = evt.Radius,
+                                        Shape = HitboxShape.Sphere,
+                                        EndX = hx, EndY = hy, EndZ = hz,
+                                        Damage = evt.Damage,
+                                        KnockbackForce = evt.KnockbackForce,
+                                        KnockbackUpward = evt.KnockbackUpward,
+                                        StunTicks = evt.StunTicks,
+                                        DurationTicks = evt.DurationTicks,
+                                        OwnerId = id,
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }

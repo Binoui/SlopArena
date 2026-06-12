@@ -1,12 +1,14 @@
 using Godot;
 using System;
+using System.Diagnostics;
 using SlopArena.Shared;
 
 /// <summary>
-/// Thin orchestrator: creates MatchManager + UI, delegates game loop to MatchManager.
+/// Thin orchestrator: creates MatchManager + UI, starts local server, delegates game loop.
 /// </summary>
 public partial class Main : Node3D
 {
+    private Process? _serverProcess;
     private MatchManager _matchManager = null!;
     private CanvasLayer _canvasLayer = null!;
     private ActionBarHUD _actionBarHUD = null!;
@@ -43,6 +45,9 @@ public partial class Main : Node3D
         // Spell VFX
         _spellVFX = new SpellVFXManager { Name = "SpellVFX" };
         AddChild(_spellVFX);
+
+        // Start the local server process
+        StartLocalServer();
 
         // Match manager (spawns everything, runs game loop)
         _matchManager = new MatchManager { Name = "MatchManager" };
@@ -142,16 +147,15 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
-        // Keep target ring visible (MatchManager handles position)
-        if (_debugDraw != null && _matchManager?.GetBridge() != null && _debugHitboxVisible)
+        // Debug hitbox visualization disabled with network server
+        // (hitboxes are on the server process, not the client)
+        if (_debugDraw != null && _debugHitboxVisible)
         {
-            var hitboxes = SpellResolver.GetActiveHitboxes();
-            var hurtboxes = _matchManager.GetBridge().GetHurtboxCapsules();
-            // Convert to the format DebugHitboxDraw expects (same tuple shape)
-            var hurtboxList = new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>();
-            foreach (var h in hurtboxes)
-                hurtboxList.Add((h.sx, h.sy, h.sz, h.ex, h.ey, h.ez, h.radius, h.isCapsule));
-            _debugDraw.UpdateHitboxes(hitboxes, hurtboxList, Vector3.Zero);
+            // Show empty data for now
+            _debugDraw.UpdateHitboxes(
+                new System.Collections.Generic.List<Hitbox>(),
+                new System.Collections.Generic.List<(float, float, float, float, float, float, float, bool)>(),
+                Vector3.Zero);
         }
     }
 
@@ -215,5 +219,38 @@ public partial class Main : Node3D
         crosshair.MouseFilter = Control.MouseFilterEnum.Ignore;
         crosshair.Position = GetViewport().GetVisibleRect().Size / 2 - new Vector2(4f, 4f);
         _canvasLayer.AddChild(crosshair);
+    }
+
+    private void StartLocalServer()
+    {
+        var projectDir = ProjectSettings.GlobalizePath("res://");
+        var serverDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(projectDir, "ServerApp"));
+        var dllPath = System.IO.Path.Combine(serverDir, "bin", "Debug", "net8.0", "ServerApp.dll");
+        if (System.IO.File.Exists(dllPath))
+        {
+            _serverProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"\"{dllPath}\"",
+                    WorkingDirectory = serverDir,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                }
+            };
+            _serverProcess.Start();
+            GD.Print("[Main] Local server started");
+        }
+        else
+        {
+            GD.PrintErr($"[Main] Server DLL not found at {dllPath}");
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        _serverProcess?.Kill();
+        _serverProcess?.Dispose();
     }
 }

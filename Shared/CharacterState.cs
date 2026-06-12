@@ -50,6 +50,9 @@ namespace SlopArena.Shared
         /// <summary>
         /// ── Combo / Attack ──
         /// </summary>
+        public ushort AttackElapsedTicks;  // elapsed ticks since attack start
+        /// <summary>Which ability slot this attack uses (1-6). 0 = none.</summary>
+        public byte AttackSlot;
         public byte ComboStage;          // 0 = none, 1-3 = stage
         /// <summary>
         /// chain window remaining

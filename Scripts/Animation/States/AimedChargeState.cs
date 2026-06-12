@@ -176,7 +176,8 @@ public sealed partial class AimedChargeState : State
         // Determine if fully charged
         bool fullyCharged = _config.MaxChargeTicks > 0 && _chargeTicks >= _config.MaxChargeTicks;
 
-        // Execute the ability slot — this transitions the C# FSM to "attack"
-        Player.ExecuteSlot(_slotIndex, fullyCharged, _airborne);
+        // Signal the sim to start the attack via pending slot press
+        // _slotIndex is 0-5, map to 1-6 for ActiveSlot
+        Player._pendingSlotPress = (byte)(_slotIndex + 1);
     }
 }

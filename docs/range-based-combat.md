@@ -76,7 +76,7 @@ Player presses attack button:
 │  └─> Execute attack immediately
 │
 ├─ AttackRange < distance ≤ WarpRange (4-12m)
-│  ├─> Dash toward target at WarpSpeed
+│  ├─> Dash toward target at warp speed
 │  ├─> Stop at AttackRange distance
 │  └─> Execute attack
 │
@@ -108,20 +108,44 @@ _warpSystem.CancelWarp();
 
 **File**: `Shared/AttackData.cs`
 
-### New Fields
+### Current Fields
+
+Damage, knockback, and stun now live in `HitboxEvent[]` (not `AttackStage` directly).
+Timing uses `DurationTicks` for total animation lock.
+
 ```csharp
 public struct AttackStage
 {
-    // Existing fields (damage, stun, etc.)
-    // ...
+    public ushort DurationTicks;          // Total animation lock duration in ticks
+    public HitboxEvent[] HitboxEvents;    // Damage/hitbox events triggered during this stage
+    public float LungeForce;              // Forward burst during attack
+    public ushort ChainWindowTicks;       // Ticks to buffer next input (0 = final/no chain)
 
     // Range-Based-style range system
     public float AttackRange;       // Distance where attack hits immediately (e.g., 4m)
     public float WarpRange;         // Distance where auto-dash triggers (e.g., 12m)
-    public float WarpSpeed;         // Dash speed during warp (e.g., 25 m/s)
+
+    // WarpSpeed now driven by character Movement.SprintSpeed (not per-stage)
     public bool UseTargetLock;      // true = use soft lock for this attack
-    public bool RotateTowardTarget; // true = auto-rotate during attack (future)
-    public float TrackingStrength;  // 0-1: rotation lerp strength (future)
+    public bool RotateTowardTarget; // true = auto-rotate during attack
+    public float TrackingStrength;  // 0-1: rotation lerp strength toward target
+}
+```
+
+`HitboxEvent` contains the old AttackStage damage fields:
+
+```csharp
+public struct HitboxEvent
+{
+    public ushort TriggerTick;       // Tick from attack start when hitbox spawns
+    public ushort DurationTicks;     // How many frames the hitbox stays active
+    public float Radius;
+    public float OffX, OffY, OffZ;   // Offset from attacker center
+    public float Damage;
+    public float KnockbackForce;
+    public float KnockbackUpward;
+    public ushort StunTicks;
+    public bool Interruptible;       // false = persists even if attacker is hit
 }
 ```
 
@@ -131,16 +155,26 @@ public struct AttackStage
 ```csharp
 new AttackStage
 {
-    Damage = 12f,
-    KnockbackForce = 25f,
-    StunTicks = 30,
-    SelfLockTicks = 40,
-    StartupTicks = 8,
-    
+    DurationTicks = 48,        // Total animation lock
+    LungeForce = 5f,
+    ChainWindowTicks = 8,      // 8 ticks to buffer next input
+
+    // Hitbox event (damage data lives here, not on AttackStage)
+    HitboxEvents = new[]
+    {
+        new HitboxEvent
+        {
+            TriggerTick = 8, DurationTicks = 2, Radius = 0.5f,
+            OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
+            Damage = 12f, KnockbackForce = 25f,
+            KnockbackUpward = 5f, StunTicks = 30,
+            Interruptible = true,
+        },
+    },
+
     // Range-Based ranges
     AttackRange = 4f,      // Hit within 4m
     WarpRange = 10f,       // Warp if 4-10m away
-    WarpSpeed = 25f,       // Fast dash (25 m/s)
     UseTargetLock = true,
     RotateTowardTarget = true,
     TrackingStrength = 0.9f,  // Strong tracking
@@ -151,16 +185,25 @@ new AttackStage
 ```csharp
 new AttackStage
 {
-    Damage = 25f,
-    KnockbackForce = 50f,
-    StunTicks = 60,
-    SelfLockTicks = 80,
-    StartupTicks = 20,
-    
+    DurationTicks = 80,        // Slower attack
+    LungeForce = 8f,
+    ChainWindowTicks = 0,      // No chain (heavy attack is standalone)
+
+    HitboxEvents = new[]
+    {
+        new HitboxEvent
+        {
+            TriggerTick = 20, DurationTicks = 3, Radius = 0.8f,
+            OffX = 2.5f, OffY = 1.0f, OffZ = 0f,
+            Damage = 25f, KnockbackForce = 50f,
+            KnockbackUpward = 10f, StunTicks = 60,
+            Interruptible = true,
+        },
+    },
+
     // Range-Based ranges
     AttackRange = 6f,      // Longer reach
     WarpRange = 15f,       // Longer warp range
-    WarpSpeed = 18f,       // Slower warp (more telegraphed)
     UseTargetLock = true,
     RotateTowardTarget = true,
     TrackingStrength = 0.5f,  // Less tracking (dodgeable)
@@ -171,13 +214,25 @@ new AttackStage
 ```csharp
 new AttackStage
 {
-    Damage = 8f,
-    // ...
-    
+    DurationTicks = 30,        // Quick cast
+    LungeForce = 0f,
+    ChainWindowTicks = 0,
+
+    HitboxEvents = new[]
+    {
+        new HitboxEvent
+        {
+            TriggerTick = 5, DurationTicks = 1, Radius = 2f,
+            OffX = 3f, OffY = 1.5f, OffZ = 0f,
+            Damage = 8f, KnockbackForce = 5f,
+            KnockbackUpward = 0f, StunTicks = 10,
+            Interruptible = true,
+        },
+    },
+
     // No warp
     AttackRange = 8f,      // Range check only
     WarpRange = 0f,        // No warp
-    WarpSpeed = 0f,
     UseTargetLock = false, // No target lock
 }
 ```
@@ -252,15 +307,26 @@ new AbilityData
     Stages = new AttackStage[]
     {
         // Stage 1: Light punch
-        new() { 
-            Damage = 4f, 
-            KnockbackForce = 3f, 
-            StunTicks = 10, 
-            SelfLockTicks = 46, 
-            StartupTicks = 6,
+        new()
+        {
+            DurationTicks = 52,
+            LungeForce = 4f,
+            ChainWindowTicks = 8,
+
+            HitboxEvents = new[]
+            {
+                new HitboxEvent
+                {
+                    TriggerTick = 6, DurationTicks = 2, Radius = 0.5f,
+                    OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
+                    Damage = 4f, KnockbackForce = 3f,
+                    KnockbackUpward = 2f, StunTicks = 10,
+                    Interruptible = true,
+                },
+            },
+
             AttackRange = 4f,     // Hit within 4m
             WarpRange = 10f,      // Warp if 4-10m away
-            WarpSpeed = 25f,      // Fast dash
             UseTargetLock = true,
             RotateTowardTarget = true,
             TrackingStrength = 0.9f,
@@ -327,11 +393,11 @@ Warp system prints debug messages:
 **Warp not triggering:**
 - Verify `UseTargetLock = true` in `AttackStage`
 - Check `WarpRange > AttackRange`
-- Check `WarpSpeed > 0`
+- Check character's `Movement.SprintSpeed > 0` (warp speed)
 - Verify `CombatComponent.Setup()` received `TargetLockSystem`
 
 **Warp overshooting:**
-- Reduce `WarpSpeed` (try 15-20 m/s)
+- Reduce character `Movement.SprintSpeed` (try 15-20 m/s equivalent)
 - Increase `AttackRange` (stop sooner)
 
 ---
@@ -371,13 +437,13 @@ Warp system prints debug messages:
 **Light attacks** (jabs, quick hits):
 - `AttackRange`: 3-5m (short reach)
 - `WarpRange`: 8-12m (long dash for mobility)
-- `WarpSpeed`: 25-30 m/s (fast, responsive)
+- Warp speed: 25-30 m/s (fast, responsive; set via character `Movement.SprintSpeed`)
 - `TrackingStrength`: 0.8-1.0 (strong tracking)
 
 **Heavy attacks** (smashes, slams):
 - `AttackRange`: 5-7m (longer reach)
 - `WarpRange`: 10-15m (moderate dash)
-- `WarpSpeed`: 15-20 m/s (slower, more telegraphed)
+- Warp speed: 15-20 m/s (slower, more telegraphed; set via character `Movement.SprintSpeed`)
 - `TrackingStrength`: 0.4-0.6 (less tracking, dodgeable)
 
 **Projectiles/AoE**:
