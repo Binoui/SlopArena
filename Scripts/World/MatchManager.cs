@@ -39,6 +39,7 @@ public partial class MatchManager : Node3D
     private ServerSimulation _localSim = null!;
     private CharacterDefinition _charDef;
     private ulong _playerEntityId = 1;
+    private BakedAnimationData _playerBakedData = null!;
 
     // ── Tick + rollback ──
     private const int RollbackFrames = 10;
@@ -55,13 +56,44 @@ public partial class MatchManager : Node3D
         // Local simulation
         _localSim = new ServerSimulation(_arenaDef);
         var spawn = _arenaDef.SpawnPoints[5];
+
+        // Load skeleton from GLB
+        // Load baked skeleton data
+        if (!string.IsNullOrEmpty(_charDef.BakedDataPath))
+        {
+            try
+            {
+                using var f = FileAccess.Open(_charDef.BakedDataPath, FileAccess.ModeFlags.Read);
+                if (f == null)
+                {
+                    GD.PrintErr($"[Match] Cannot open baked data: {_charDef.BakedDataPath}");
+                }
+                else
+                {
+                    var binData = f.GetBuffer((long)f.GetLength());
+                    _playerBakedData = BakedAnimationData.LoadFromBin(binData);
+                    GD.Print($"[Match] Loaded baked data: {_charDef.BakedDataPath} ({binData.Length} bytes, {_playerBakedData.Animations.Length} anims)");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[Match] Failed to load baked data: {ex.Message}");
+                GD.PrintErr($"[Match] Will use fallback capsules");
+            }
+        }
+        else
+        {
+            GD.Print($"[Match] No baked data path set, using fallback capsules");
+        }
+
         var initialState = new CharacterState
         {
             PX = spawn.X, PY = spawn.Y + 5f, PZ = spawn.Z,
             FacingYaw = spawn.Yaw,
             JumpsLeft = _charDef.Movement.MaxJumps,
         };
-        _localSim.RegisterEntity(_playerEntityId, _charDef, initialState);
+        _localSim.RegisterEntity(_playerEntityId, _charDef, initialState, _playerBakedData);
+        // NPCs use the same baked data (same character class)
         for (int i = 0; i < NpcCount; i++)
         {
             var npcSpawn = _arenaDef.SpawnPoints[i];
@@ -70,7 +102,7 @@ public partial class MatchManager : Node3D
                 PX = npcSpawn.X, PY = npcSpawn.Y + 1f, PZ = npcSpawn.Z,
                 FacingYaw = npcSpawn.Yaw,
                 JumpsLeft = _charDef.Movement.MaxJumps,
-            });
+            }, _playerBakedData);
         }
 
         // Network client
@@ -141,6 +173,18 @@ public partial class MatchManager : Node3D
         // 3. Store predicted state
         var predicted = _localSim.GetState(_playerEntityId);
         _stateBuffer[_sendTick % RollbackFrames] = predicted;
+        
+        // Debug: first batch of entity data
+        if (_sendTick == 10)
+        {
+            var ents = _localSim.GetLastEntityData();
+            GD.Print($"========== [Sim] Entity list: {ents.Count} entries ==========");
+            for (int i = 0; i < Math.Min(ents.Count, 8); i++)
+            {
+                var e = ents[i];
+                GD.Print($"  [{i}] id={e.Id} pos=({e.PosX:F2},{e.PosY:F2},{e.PosZ:F2}) r={e.Radius:F2} active={e.Active}");
+            }
+        }
 
         // 4. Send input + tick to server
         Net.SendInput(input, _sendTick);
@@ -190,7 +234,7 @@ public partial class MatchManager : Node3D
                     // Reset local sim to the server's confirmed state
                     var safeState = serverState;
                     _localSim = new ServerSimulation(_arenaDef);
-                    _localSim.RegisterEntity(_playerEntityId, _charDef, safeState);
+                    _localSim.RegisterEntity(_playerEntityId, _charDef, safeState, _playerBakedData);
 
                     // Re-simulate from serverTick+1 to currentTick
                     uint currentTick = _sendTick;
@@ -296,6 +340,16 @@ public partial class MatchManager : Node3D
     }
 
     public NetworkClient GetNet() => Net;
+
+    /// <summary>Get debug hitbox/hurtbox data from the local simulation.</summary>
+    public (List<Hitbox> hitboxes, List<SpellResolver.EntityData> entities) GetDebugData()
+    {
+        var hitboxes = SpellResolver.GetActiveHitboxes();
+        var entities = new List<SpellResolver.EntityData>();
+        if (_localSim != null)
+            entities = _localSim.GetLastEntityData();
+        return (hitboxes, entities);
+    }
 }
 
 internal static class SpawnPointExtensions

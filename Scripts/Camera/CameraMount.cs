@@ -131,6 +131,8 @@ public partial class CameraMount : Node3D
 	/// Rotate camera orbit. Called by PlayerController on mouse move.
 	/// Camera yaw is absolute — only modified here, never by player facing.
 	/// </summary>
+	public float GetCameraYaw() => _cameraYaw;
+
 	public void RotateCamera(Vector2 relativeMotion)
 	{
 		if (_v == null) return;

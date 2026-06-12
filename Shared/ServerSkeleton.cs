@@ -228,9 +228,26 @@ namespace SlopArena.Shared
         /// </summary>
         public bool GetBoneWorldPosition(string name, out float px, out float py, out float pz)
         {
+            // Try exact match, then strip common prefixes to match Godot/Mixamo naming
             for (int i = 0; i < Nodes.Length; i++)
             {
                 if (Nodes[i].Name == name || Nodes[i].Name.EndsWith(":" + name))
+                {
+                    px = _worldPos[i][0];
+                    py = _worldPos[i][1];
+                    pz = _worldPos[i][2];
+                    return true;
+                }
+            }
+            // Try stripping "mixamorig_" prefix: "mixamorig_Head" → "Head"
+            for (int i = 0; i < Nodes.Length; i++)
+            {
+                string stripped = name;
+                int colonIdx = stripped.IndexOf(':');
+                if (colonIdx >= 0) stripped = stripped.Substring(colonIdx + 1);
+                int uscoreIdx = stripped.IndexOf('_');
+                if (uscoreIdx >= 0) stripped = stripped.Substring(uscoreIdx + 1);
+                if (Nodes[i].Name == stripped || Nodes[i].Name == "mixamorig_" + stripped)
                 {
                     px = _worldPos[i][0];
                     py = _worldPos[i][1];
@@ -277,6 +294,11 @@ namespace SlopArena.Shared
             {
                 uint chunkLen = BitConverter.ToUInt32(glbData, pos);
                 uint chunkType = BitConverter.ToUInt32(glbData, pos + 4);
+                if (chunkLen > 100_000_000)
+                {
+                    System.Console.WriteLine($"[Skeleton] Invalid chunkLen={chunkLen} at pos={pos}, fileLen={glbData.Length}");
+                    break;
+                }
                 byte[] chunkData = new byte[chunkLen];
                 Array.Copy(glbData, pos + 8, chunkData, 0, chunkLen);
                 pos += 8 + (int)Align4(chunkLen + 8);

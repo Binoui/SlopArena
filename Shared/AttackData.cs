@@ -3,16 +3,20 @@ namespace SlopArena.Shared
     /// <summary>
     /// A hitbox spawned during an attack at a specific tick.
     /// </summary>
+    /// <summary>Hitbox event triggered by an attack stage at a specific tick.</summary>
     public struct HitboxEvent
     {
-        /// <summary>Tick from attack start when this hitbox spawns (0 = frame 1).</summary>
+        /// <summary>Frame offset (in ticks) from the start of the stage.</summary>
         public ushort TriggerTick;
-        /// <summary>How many frames the hitbox stays active.</summary>
+        /// <summary>Lifetime of the spawned hitbox in ticks.</summary>
         public ushort DurationTicks;
-        /// <summary>Hitbox radius.</summary>
+        /// <summary>Hitbox shape (Sphere or Capsule).</summary>
+        public HitboxShape Shape;
         public float Radius;
         /// <summary>Offset from attacker center (rotated by facing yaw).</summary>
         public float OffX, OffY, OffZ;
+        /// <summary>Capsule end offset (relative to OffX/Y/Z, rotated by facing yaw).</summary>
+        public float EndOffX, EndOffY, EndOffZ;
         public float Damage;
         public float KnockbackForce;
         public float KnockbackUpward;
