@@ -31,16 +31,20 @@ public struct HitboxEvent
 }
 ```
 
-### AttackStage (simplified)
+### AttackStage
 
 ```csharp
 public struct AttackStage
 {
     public ushort DurationTicks;           // Total animation lock duration
     public HitboxEvent[] HitboxEvents;     // Events during this stage
-    public ushort ChainWindowTicks;        // Window to advance to the next stage
-                                          // (0 = no combo)
-    // Knockback & damage are in HitboxEvents now
+    public ushort ChainWindowTicks;        // Legacy — not used for timing
+    public float LungeForce;               // Forward burst during attack
+    public float AttackRange;
+    public float WarpRange;
+    public bool UseTargetLock;
+    public bool RotateTowardTarget;
+    public float TrackingStrength;
 }
 ```
 
@@ -51,19 +55,19 @@ public struct AttackStage
 ```
 Ability LMB:
   Stages[0] (jab):
-    DurationTicks: 12
-    HitboxEvents: [{ TriggerTick: 6, DurationTicks: 2, Radius: 0.5, Damage: 4, ... }]
-    ChainWindowTicks: 8    ← 8 ticks to buffer the next input
+    DurationTicks: 52
+    HitboxEvents: [{ TriggerTick: 6, DurationTicks: 3, Radius: 0.5, Damage: 4, ... }]
+    LungeForce: 0
     
-  Stages[1] (melee):
-    DurationTicks: 14
-    HitboxEvents: [{ TriggerTick: 8, DurationTicks: 2, Radius: 0.7, Damage: 6, ... }]
-    ChainWindowTicks: 6
+  Stages[1] (leg_sweep):
+    DurationTicks: 38
+    HitboxEvents: [{ TriggerTick: 8, DurationTicks: 3, Radius: 0.6, Damage: 5, ... }]
+    LungeForce: 0
     
-  Stages[2] (flying kick):
-    DurationTicks: 20
-    HitboxEvents: [{ TriggerTick: 8, DurationTicks: 3, Radius: 0.8, Damage: 12, ... }]
-    ChainWindowTicks: 0    ← last stage, no chain
+  Stages[2] (backflip):
+    DurationTicks: 66
+    HitboxEvents: [{ TriggerTick: 10, DurationTicks: 4, Radius: 0.7, Damage: 10, ... }]
+    LungeForce: 0
 ```
 
 ## 3. Flow in the Simulation
@@ -77,47 +81,62 @@ SimulateTick:
   1. InputState.Attack ∧ State == Idle → Stage = Stages[0]
   2. State = Attacking
   3. s.AnimLockTicks = Stage.DurationTicks
-  4. Queue all Stage.HitboxEvents into s.ActiveHitboxEvents[]
+### Buffer Input
+
+```csharp
+// Buffer section (end of SimulateTick):
+if input.ActiveSlot > 0 && AnimLockTicks > 0 && BufferedSlot == 0:
+  // Combo chain: same slot → always buffer (after first frame)
+  if State == Attacking && ActiveSlot == AttackSlot && AttackElapsedTicks > 0:
+    BufferedSlot = ActiveSlot
+
+  // General buffer: within InputBufferWindow (6 frames) of unlock
+  else if AnimLockTicks <= InputBufferWindow || HitstunTicks <= InputBufferWindow:
+    if cooldown == 0:
+      BufferedSlot = ActiveSlot
 ```
 
 ### Tick During Attack
 
-```
-SimulateTick (State == Attacking):
-  For each HitboxEvent in s.ActiveHitboxEvents:
-    event.ElapsedTicks++
-    if ElapsedTicks == TriggerTick:
-      SpawnHitbox(event)  → added to SpellResolver for this tick
-    if ElapsedTicks >= TriggerTick + DurationTicks:
-      Remove event (expired)
+```csharp
+ProcessAttack (when AnimLockTicks reaches 0):
+  // 1. Buffered chain (click during previous frames)
+  if BufferedSlot == AttackSlot && ComboStage < Stages.Length - 1:
+    -> Advance to next stage
+    AnimLockTicks = nextStage.DurationTicks
   
-  if s.AnimLockTicks == 0:
-    // Animation finished
-    if Stage.ChainWindowTicks > 0 ∧ input.Attack buffered:
-      → Next Stage (combo)
-    else:
-      → Idle
+  // 2. Immediate chain (click on this same frame)
+  else if ActiveSlot == AttackSlot && ComboStage < Stages.Length - 1:
+    ActiveSlot = 0  // consumed, prevent re-buffer
+    -> Advance to next stage
+  
+  // 3. No combo -> idle
+  else:
+    State = Idle, clear AttackSlot/ComboStage
 ```
 
 ### Cancel on Hitstun
 
-```
-SimulateTick (State == Hitstun):
-  Clear s.ActiveHitboxEvents (all interruptible events)
-  Clear s.ComboBuffer
+```csharp
+When State == Hitstun:
+  Clear BufferedSlot (cancels interruptible hitbox events)
 ```
 
-### Combo Chaining
+### Combo Chaining Mechanism
 
-```
-When AnimLockTicks == 0:
-  If Stage.ChainWindowTicks > 0:
-    Opens a chain window of ChainWindowTicks
-    If input.Attack during this window:
-      → Next Stage
-      Reset AnimLockTicks = Stage.DurationTicks
-      Queue the hitbox events of the new stage
-```
+The combo uses a **buffer-slot** system, not a timing window:
+
+1. During an attack, if the player clicks the **same slot** (`ActiveSlot == AttackSlot`), the sim sets `BufferedSlot = ActiveSlot`
+2. The click that **started** the current attack is not buffered (`AttackElapsedTicks > 0` guard)
+3. When the current stage ends (`AnimLockTicks == 0`), `ProcessAttack` checks:
+   - `BufferedSlot` first (click arrived during earlier frames)
+   - `ActiveSlot` second (click arrived on the same frame)
+4. If either matches the current `AttackSlot` and a next stage exists, **advance**:
+   - `ComboStage++`, set `AnimLockTicks = nextStage.DurationTicks`
+5. The client detects the `ComboStage` change and calls `ChainTo(nextAnimName)` to play the next animation without leaving the FSM "attack" state
+6. If no buffer and no input, **idle**: `State = Idle`, `AttackSlot = 0`
+
+The general input buffer (`InputBufferWindow = 6`) catches any slot input within the last 6 frames of any lock state (attack, hitstun). This is separate from the combo buffer which catches same-slot inputs during the entire attack.
 
 ## 4. Advantages
 
@@ -125,5 +144,5 @@ When AnimLockTicks == 0:
 - **No desync** — the client only renders
 - **Natural cancel** — hitstun → clear queue
 - **Flexible** — N hitboxes per attack, variable positions, arbitrary timings
-- **Simple combo** — chain window ticks + input buffer on the sim side
+- **Combo** — buffer-slot system works for any multi-stage ability (not just LMB)
 - **Works for all abilities** — projectile, burst, multi-hit, everything

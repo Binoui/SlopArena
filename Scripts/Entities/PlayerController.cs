@@ -56,6 +56,7 @@ public partial class PlayerController : CharacterBody3D
     private BoneHurtboxSetup? _boneHurtboxes;
     private bool _heavyHeld = false;
     public byte _pendingSlotPress; // set by _UnhandledInput, consumed by BuildInputState
+    private byte _lastComboStage; // track animation changes during combo chain
 
     /// <summary>
     /// Persistent damage % label above the character (Smash-style)
@@ -630,18 +631,43 @@ public partial class PlayerController : CharacterBody3D
 
         var input = BuildInputState();
 
+        var simState = _movementComponent.State.State;
+        var slot = _movementComponent.State.AttackSlot;
+
         // React to sim's ActionState for FSM transitions
         if (_fsm != null)
         {
-            var simState = _movementComponent.State.State;
+            var simComboStage = _movementComponent.State.ComboStage;
+
+            // Combo chain: animation changed (same "attack" state, next stage)
+            if (simState == ActionState.Attacking && _fsm.IsInState("attack") &&
+                simComboStage != _lastComboStage && simComboStage > 0)
+            {
+                var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
+                string animName = ability.AnimationNames != null && ability.AnimationNames.Length > 0
+                    ? ability.AnimationNames[simComboStage % ability.AnimationNames.Length] : "melee";
+                if (ability.AimedCharge.HasValue)
+                    animName = ability.AimedCharge.Value.AttackAnimName;
+                var attackState = _fsm.GetAttackState();
+                if (attackState != null)
+                {
+                    attackState.ChainTo(animName);
+                }
+            }
+
+            // First attack: transition FSM to "attack"
             if (simState == ActionState.Attacking && !_fsm.IsInState("attack"))
             {
                 // Sim started an attack — play the FSM animation
-                byte slot = _movementComponent.State.AttackSlot;
+                byte comboStage = simComboStage;
                 var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
                 string animName = "melee";
                 if (ability.AnimationNames != null && ability.AnimationNames.Length > 0)
-                    animName = ability.AnimationNames[_movementComponent.State.ComboStage % ability.AnimationNames.Length];
+                {
+                    animName = ability.AnimationNames[comboStage % ability.AnimationNames.Length];
+                    if (ability.AimedCharge.HasValue)
+                        animName = ability.AimedCharge.Value.AttackAnimName;
+                }
                 var attackState = _fsm.GetAttackState();
                 if (attackState != null)
                 {
@@ -660,7 +686,13 @@ public partial class PlayerController : CharacterBody3D
                     }
                 }
             }
-            else if (simState == ActionState.Dashing && !_fsm.IsInState("dash"))
+
+            // Track combo stage for animation chaining
+            _lastComboStage = _movementComponent.State.ComboStage;
+        }
+
+        // Dash FSM transition
+        if (_fsm != null && simState == ActionState.Dashing && !_fsm.IsInState("dash"))
             {
                 var dashState = _fsm.GetState<DashState>("dash");
                 if (dashState != null)
@@ -669,7 +701,6 @@ public partial class PlayerController : CharacterBody3D
                     _fsm.TransitionTo("dash");
                 }
             }
-        }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
         // Movement simulation handled by ServerSimulation (in MatchManager._PhysicsProcess)
@@ -773,8 +804,9 @@ public partial class PlayerController : CharacterBody3D
         input.Jump = Input.IsActionJustPressed("jump");
         input.Dash = Input.IsActionJustPressed("dash");
         input.Crouch = Input.IsActionPressed("crouch");
-        input.Attack = Input.IsMouseButtonPressed(MouseButton.Left);
-        // Consume pending slot press (set by _UnhandledInput)
+        // ActiveSlot replaces the old Attack flag — sim handles everything
+        input.Attack = false;
+        // Consume pending slot press (sim handles buffering via InputBufferWindow)
         input.ActiveSlot = _pendingSlotPress;
         _pendingSlotPress = 0;
 
@@ -803,19 +835,7 @@ public partial class PlayerController : CharacterBody3D
     {
         if (_combatComponent == null) return;
         if (_movementComponent.IsInKnockback()) return;
-        if (_movementComponent.State.AnimLockTicks > 0)
-        {
-            // Non-LMB slots can't be used during lock
-            if (slotIndex != 0) return;
-
-            // Buffer LMB input in queue (max 2, like souls-like FSM queue)
-            if (_movementComponent.State.BufferedChain < 2)
-            {
-                ref var s = ref _movementComponent.State;
-                s.BufferedChain++;
-            }
-            return; // consumed when lock expires
-        }
+        if (_movementComponent.State.AnimLockTicks > 0) return; // sim handles buffering
 
         // Slot 0 (LMB) chains into next combo stage.
         // Other slots are blocked during an active attack.
@@ -1209,11 +1229,6 @@ public partial class PlayerController : CharacterBody3D
     /// <summary>Apply authoritative state from the simulation.</summary>
     public void ApplyServerState(CharacterState state)
     {
-        bool wasAttacking = _movementComponent.State.State == ActionState.Attacking;
-        bool nowAttacking = state.State == ActionState.Attacking;
-        if (wasAttacking && !nowAttacking)
-            GD.Print($"[Client] Attack ended at tick {state.AttackElapsedTicks}, AnimLockTicks={state.AnimLockTicks}");
-
         // Sync position, velocity, grounded, state — sim is authority on everything now
         _movementComponent.State = state;
 
