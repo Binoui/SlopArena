@@ -184,6 +184,15 @@ public partial class Main : Node3D
                 }
                 GD.Print($"Debug Hitboxes: {(_debugHitboxVisible ? "ON" : "OFF")}");
             }
+            else if (key.Keycode == Key.F4 || key.PhysicalKeycode == Key.F4)
+            {
+                if (_matchManager?.Player != null)
+                {
+                    _matchManager.Player.DebugYPositions();
+                    foreach (var npc in _matchManager?.NPCs ?? Array.Empty<PlayerController>())
+                        npc?.DebugYPositions();
+                }
+            }
         }
     }
 

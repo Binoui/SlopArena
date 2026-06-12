@@ -57,6 +57,19 @@ namespace SlopArena.Shared
         /// Blender/Maya exports with meters are 1.0. Default: 1.0
         /// </summary>
         public float HurtboxBoneScale;
+        /// <summary>
+        /// Y offset for the visual model relative to capsule center.
+        /// Aligns the model's feet with the capsule bottom.
+        /// Calculated as: -(footY * HurtboxBoneScale + CapsuleHeight * 0.5f)
+        /// For Mixamo: ≈ -0.52 (Manki), adjust per character.
+        /// 0 = model origin at capsule center (if model is already centered).
+        /// </summary>
+        public float ModelYOffset;
+        /// <summary>
+        /// If true, ModelYOffset is computed from the baked skeleton data
+        /// (foot bone position at idle frame 0) instead of using the manual value.
+        /// </summary>
+        public bool AutoModelYOffset;
 
         public AbilityData LMB;
         public AbilityData RMB;
@@ -170,6 +183,7 @@ namespace SlopArena.Shared
                 GlbPath = "res://assets/characters/manki/manki.glb",
                 BakedDataPath = "res://data/manki_skeleton.bin",
                 HurtboxBoneScale = 0.01f,
+                AutoModelYOffset = true,
                 LMB = new AbilityData
                 {
                     Name = "Monkey Combo",

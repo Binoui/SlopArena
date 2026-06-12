@@ -136,6 +136,7 @@ public partial class MatchManager : Node3D
         // Spawn player
         Player = new PlayerController { Name = "Player" };
         Player.SetClass(playerClass);
+        Player.SetBakedData(_playerBakedData); // for auto model Y offset
         AddChild(Player);
         Player.Position = spawn.ToGodot() + new Vector3(5f, 15f, 0f);
         Player.SetupCombat(null!, _arenaDef, _playerEntityId, _spellVFX);

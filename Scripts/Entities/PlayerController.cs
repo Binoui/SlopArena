@@ -22,6 +22,7 @@ public partial class PlayerController : CharacterBody3D
     private CharacterDefinition _charDef;
     private CharacterClass _playerClass = CharacterClass.Manki;
     private ArenaDefinition _arenaDef;
+    private BakedAnimationData? _bakedData;
 
     public void SetClass(CharacterClass pc)
     {
@@ -1174,27 +1175,43 @@ public partial class PlayerController : CharacterBody3D
 
         pm.Name = "PlayerModel";
         pm.Scale = scale;
-        pm.Position = position;
+        pm.Position = new Vector3(position.X, ComputeModelYOffset(), position.Z);
         AddChild(pm);
 
-        // Auto-calculate visual Y offset from skeleton feet position
-        if (_animationController != null)
+        return pm;
+    }
+
+    /// <summary>
+    /// Compute the Y offset that aligns the visual model's feet with the capsule bottom.
+    /// Uses the baked skeleton data (foot position relative to Hips at idle frame 0).
+    /// Falls back to CharacterDefinition.ModelYOffset if auto-compute fails.
+    /// </summary>
+    private float ComputeModelYOffset()
+    {
+        // Try auto-compute from baked data
+        if (_charDef.AutoModelYOffset && _bakedData != null)
         {
-            var sk = _animationController.FindSkeleton(pm);
-            if (sk != null)
+            // Scan ALL bones at idle frame 0, find the lowest Y (closest to ground)
+            float lowestY = float.MaxValue;
+            int found = 0;
+            for (int bi = 0; bi < _bakedData.BoneNames.Length; bi++)
             {
-                int footBone = sk.FindBone("mixamorig:LeftFoot");
-                if (footBone >= 0)
+                if (_bakedData.GetBonePosition("idle", 0, bi, out _, out float by, out _))
                 {
-                    var footPos = sk.GetBoneGlobalPose(footBone).Origin;
-                    float offset = -(footPos.Y + _charDef.CapsuleHeight * 0.5f);
-                    pm.Position = new Vector3(pm.Position.X, offset, pm.Position.Z);
-                    GD.Print($"[Model] Auto-offset footY={footPos.Y:F3} → offset={offset:F3}");
+                    if (by < lowestY) lowestY = by;
+                    found++;
                 }
             }
+            if (found > 0 && lowestY < float.MaxValue)
+            {
+                float footWorldY = lowestY * _charDef.HurtboxBoneScale;
+                float offset = -(footWorldY + _charDef.CapsuleHeight * 0.5f);
+                GD.Print($"[Model] Auto-offset: lowestBoneY={lowestY:F4} → {offset:F4}m ({found}/{_bakedData.BoneNames.Length} bones)");
+                return offset;
+            }
+            GD.Print("[Model] No 'idle' animation or bones in baked data, using fallback");
         }
-
-        return pm;
+        return _charDef.ModelYOffset;
     }
 
     private void ApplySkinRecursive(Node node, Texture2D? tex)
@@ -1230,6 +1247,29 @@ public partial class PlayerController : CharacterBody3D
     public InputState GetCurrentInput()
     {
         return BuildInputState();
+    }
+
+    /// <summary>Pass baked skeleton data for auto-computing visual model Y offset.</summary>
+    public void SetBakedData(BakedAnimationData? baked) => _bakedData = baked;
+
+    /// <summary>Log current Y positions for debug alignment check.</summary>
+    public void DebugYPositions()
+    {
+        if (_bakedData == null) return;
+        float py = _movementComponent.State.PY;
+        float capsuleBottom = py - _charDef.CapsuleHeight * 0.5f;
+        float modelY = _playerModel?.Position.Y ?? 0f;
+        // LeftToe_End world Y (index 10 in baked data)
+        _bakedData.GetBonePosition("idle", 0, 10, out _, out float toeY, out _);
+        float toeWorld = py + modelY + toeY * _charDef.HurtboxBoneScale;
+        // Hips world Y (bone index 2, always 0 in baked)
+        float hipsWorld = py + modelY;
+        // LeftFoot hurtbox world Y (bone index 6)
+        _bakedData.GetBonePosition("idle", 0, 6, out _, out float footY, out _);
+        float footWorld = py + modelY + footY * _charDef.HurtboxBoneScale;
+        GD.Print($"[Y] state.PY={py:F4} capsuleBottom={capsuleBottom:F4} floor={Simulation.FloorHeight} " +
+                 $"modelOff={modelY:F4} | " +
+                 $"Hips_world={hipsWorld:F4} Foot_world={footWorld:F4} Toe_world={toeWorld:F4}");
     }
 
     /// <summary>Apply authoritative state from the simulation.</summary>
