@@ -55,6 +55,7 @@ public partial class PlayerController : CharacterBody3D
     private Node3D? _playerModel;
     private BoneHurtboxSetup? _boneHurtboxes;
     private bool _heavyHeld = false;
+    public byte _pendingSlotPress; // set by _UnhandledInput, consumed by BuildInputState
 
     /// <summary>
     /// Persistent damage % label above the character (Smash-style)
@@ -153,7 +154,7 @@ public partial class PlayerController : CharacterBody3D
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
     public Vector3 MoveDirection => _moveDirection;
 
-    public void SetupCombat(LocalServerBridge simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
+    public void SetupCombat(LocalServerBridge? simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
     {
         _arenaDef = arenaDef;
 
@@ -490,7 +491,8 @@ public partial class PlayerController : CharacterBody3D
 
             if (mb.ButtonIndex == MouseButton.Left && mb.Pressed && _combatComponent != null)
             {
-                ExecuteSlot(0, false, !_movementComponent.IsGrounded);
+                // Let the sim handle LMB via ActiveSlot in next BuildInputState
+                _pendingSlotPress = 1;
                 GetViewport().SetInputAsHandled(); return;
             }
 
@@ -503,7 +505,7 @@ public partial class PlayerController : CharacterBody3D
                         var ability = _charDef.GetSlotAbility(1, false);
                         if (ability.AimedCharge.HasValue && _fsm != null)
                         {
-                            // Fire in character's current facing direction, not camera-relative
+                            // Start AimedCharge FSM state (visual indicator)
                             float aimYaw = GlobalRotation.Y;
                             var chargeState = _fsm.GetState<AimedChargeState>("aimed_charge");
                             if (chargeState != null)
@@ -513,19 +515,18 @@ public partial class PlayerController : CharacterBody3D
                                 GetViewport().SetInputAsHandled(); return;
                             }
                         }
-                        // Legacy charge (no AimedCharge config)
-                        _heavyHoldTimer = 0f; _heavyHeld = false;
                     }
-                    else
-                    {
-                        // Air RMB: direct attack
-                        ExecuteSlot(1, false, true);
-                        GetViewport().SetInputAsHandled(); return;
-                    }
+                    // Direct attack (air RMB or no AimedCharge)
+                    _pendingSlotPress = 2;
+                    GetViewport().SetInputAsHandled(); return;
                 }
-                else if (!_heavyHeld && (_fsm == null || !_fsm.IsInState("aimed_charge")))
+                else
                 {
-                    ExecuteSlot(1, false, !_movementComponent.IsGrounded);
+                    // Release — if in AimedCharge, fire
+                    if (_fsm != null && _fsm.IsInState("aimed_charge"))
+                    {
+                        _pendingSlotPress = 2;
+                    }
                     GetViewport().SetInputAsHandled(); return;
                 }
             }
@@ -535,10 +536,10 @@ public partial class PlayerController : CharacterBody3D
             && (_fsm == null || !_fsm.IsInState("aimed_charge")))
             _camera?.RotateCamera(mm.Relative);
 
-        if (Input.IsActionJustPressed("ability_q")) ExecuteSlot(2, false, false);
-        if (Input.IsActionJustPressed("ability_e")) ExecuteSlot(3, false, false);
-        if (Input.IsActionJustPressed("ability_r")) ExecuteSlot(4, false, false);
-        if (Input.IsActionJustPressed("ability_f")) ExecuteSlot(5, false, false);
+        if (Input.IsActionJustPressed("ability_q")) _pendingSlotPress = 3;
+        if (Input.IsActionJustPressed("ability_e")) _pendingSlotPress = 4;
+        if (Input.IsActionJustPressed("ability_r")) _pendingSlotPress = 5;
+        if (Input.IsActionJustPressed("ability_f")) _pendingSlotPress = 6;
         if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
@@ -567,7 +568,7 @@ public partial class PlayerController : CharacterBody3D
             if (_heavyHoldTimer > 0.3f && !_heavyHeld)
             {
                 _heavyHeld = true;
-                ExecuteSlot(1, true, !_movementComponent.IsGrounded);
+                _pendingSlotPress = 2;
             }
         }
         else
@@ -576,13 +577,8 @@ public partial class PlayerController : CharacterBody3D
         }
 
         // Consume buffered LMB chain when lock expires (queue-based, like souls-like FSM)
-        if (_movementComponent.State.BufferedChain > 0 &&
-            _movementComponent.State.AnimLockTicks == 0)
-        {
-            ref var s = ref _movementComponent.State;
-            s.BufferedChain--;
-            ExecuteSlot(0, false, !_movementComponent.IsGrounded);
-        }
+        // LMB buffering is handled by the sim now — no client-side execution needed
+        // The old code consumed via ExecuteSlot(0) which is now removed
 
         // Respawn timer (both player and NPCs)
         if (_respawnTimer > 0f)
@@ -634,43 +630,50 @@ public partial class PlayerController : CharacterBody3D
 
         var input = BuildInputState();
 
-        // Dash (ground OR air)
-        if (input.Dash && _movementComponent.State.AnimLockTicks <= 0)
+        // React to sim's ActionState for FSM transitions
+        if (_fsm != null)
         {
-            var dashState = _fsm?.GetState<DashState>("dash");
-            if (dashState != null)
+            var simState = _movementComponent.State.State;
+            if (simState == ActionState.Attacking && !_fsm.IsInState("attack"))
             {
-                dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
-                _fsm?.TransitionTo("dash");
+                // Sim started an attack — play the FSM animation
+                byte slot = _movementComponent.State.AttackSlot;
+                var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
+                string animName = "melee";
+                if (ability.AnimationNames != null && ability.AnimationNames.Length > 0)
+                    animName = ability.AnimationNames[_movementComponent.State.ComboStage % ability.AnimationNames.Length];
+                var attackState = _fsm.GetAttackState();
+                if (attackState != null)
+                {
+                    attackState.NextAnimName = animName;
+                    _fsm.TransitionTo("attack");
+                }
+
+                // Trigger special effects for this ability slot (projectiles, etc.)
+                if (slot > 0)
+                {
+                    var spellAbility = _charDef.GetSlotAbility(slot - 1, !_movementComponent.IsGrounded);
+                    if (spellAbility.SpecialEffectKeys != null)
+                    {
+                        foreach (var key in spellAbility.SpecialEffectKeys)
+                            AbilityRegistry.Execute(key, _combatComponent!);
+                    }
+                }
+            }
+            else if (simState == ActionState.Dashing && !_fsm.IsInState("dash"))
+            {
+                var dashState = _fsm.GetState<DashState>("dash");
+                if (dashState != null)
+                {
+                    dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
+                    _fsm.TransitionTo("dash");
+                }
             }
         }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
         // Movement simulation handled by ServerSimulation (in MatchManager._PhysicsProcess)
         // _movementComponent.Tick(input);
-
-        // Resolve pending attack stages after startup delay
-        if (_fsm != null && _fsm.IsInState("attack"))
-        {
-            var attackState = _fsm.GetAttackState();
-            if (attackState != null && attackState.HasPendingResolve && attackState.TickStartup())
-            {
-                var stages = attackState.PendingStages;
-                if (stages != null)
-                {
-                    var ability = _charDef.GetSlotAbility(attackState.PendingSlotIndex, attackState.PendingAirborne);
-                    ResolveAbilityStages(stages, attackState.PendingSlotIndex, attackState.PendingAirborne);
-
-                    // Special effects (only for stage 0, not combo chains)
-                    if (attackState.PendingSlotIndex != 0 && ability.SpecialEffectKeys != null)
-                    {
-                        foreach (var key in ability.SpecialEffectKeys)
-                            AbilityRegistry.Execute(key, _combatComponent!);
-                    }
-                }
-                attackState.ClearPendingResolve();
-            }
-        }
 
         // Tech roll on knockback landing
         if (wasKnocked && _movementComponent.IsGrounded && !_movementComponent.IsInKnockback() && Input.IsActionJustPressed("tech"))
@@ -771,6 +774,9 @@ public partial class PlayerController : CharacterBody3D
         input.Dash = Input.IsActionJustPressed("dash");
         input.Crouch = Input.IsActionPressed("crouch");
         input.Attack = Input.IsMouseButtonPressed(MouseButton.Left);
+        // Consume pending slot press (set by _UnhandledInput)
+        input.ActiveSlot = _pendingSlotPress;
+        _pendingSlotPress = 0;
 
         // Zero movement if FSM state disallows it (e.g., aimed charge, attack)
         if (_fsm != null && !_fsm.CanMove())
@@ -860,7 +866,7 @@ public partial class PlayerController : CharacterBody3D
                 else
                 {
                     // First attack
-                    ushort startup = (stages != null && stages.Length > 0) ? stages[animStage].StartupTicks : (ushort)0;
+                    ushort startup = (stages != null && stages.Length > 0 && stages[animStage].HitboxEvents?.Length > 0) ? stages[animStage].HitboxEvents[0].TriggerTick : (ushort)0;
                     if (stages != null && stages.Length > 0)
                     {
                         ExecuteAttackStage(stages[animStage], stages, slotIndex, charged, airborne, isComboChain: false, startup);
@@ -875,7 +881,7 @@ public partial class PlayerController : CharacterBody3D
         // Only fire immediately if no startup delay (otherwise fired after delay in _PhysicsProcess)
         if (ability.SpecialEffectKeys != null)
         {
-            ushort startup = (stages != null && stages.Length > 0) ? stages[0].StartupTicks : (ushort)0;
+            ushort startup = (stages != null && stages.Length > 0 && stages[0].HitboxEvents?.Length > 0) ? stages[0].HitboxEvents[0].TriggerTick : (ushort)0;
             if (startup == 0)
             {
                 foreach (var key in ability.SpecialEffectKeys)
@@ -929,8 +935,14 @@ public partial class PlayerController : CharacterBody3D
         {
             stageIndex = 0;
         }
+        // ── Stage resolution (hitbox spawning) ──
+        // Sim handles LMB hitbox spawning (triggered by HitboxEvent.TriggerTick)
+        // Client still handles other slots (RMB, Q, E, R, F) via AbilityRegistry effects
 
         var stage = stages[stageIndex];
+        var hitEvent = stage.HitboxEvents != null && stage.HitboxEvents.Length > 0
+            ? stage.HitboxEvents[0] : default;
+
         // Look up full ability data for aimed-charge / cone detection
         var ability = _charDef.GetSlotAbility(slotIndex, airborne);
         bool isConeAttack = ability.AimedCharge.HasValue;
@@ -970,10 +982,10 @@ public partial class PlayerController : CharacterBody3D
                 Shape = HitboxShape.Capsule,
                 Radius = 0.6f,  // Narrow tube
                 DurationTicks = 12,  // ~200ms burst
-                Damage = stage.Damage,
-                KnockbackForce = stage.KnockbackForce,
-                KnockbackUpward = stage.KnockbackUpward,
-                StunTicks = stage.StunTicks,
+                Damage = hitEvent.Damage,
+                KnockbackForce = hitEvent.KnockbackForce,
+                KnockbackUpward = hitEvent.KnockbackUpward,
+                StunTicks = hitEvent.StunTicks,
                 OwnerId = pid,
             };
         }
@@ -985,22 +997,22 @@ public partial class PlayerController : CharacterBody3D
                 X = hitPos.X, Y = hitPos.Y, Z = hitPos.Z,
                 Radius = 2.5f,
                 DurationTicks = 15,
-                Damage = stage.Damage,
-                KnockbackForce = stage.KnockbackForce,
-                KnockbackUpward = stage.KnockbackUpward,
-                StunTicks = stage.StunTicks,
+                Damage = hitEvent.Damage,
+                KnockbackForce = hitEvent.KnockbackForce,
+                KnockbackUpward = hitEvent.KnockbackUpward,
+                StunTicks = hitEvent.StunTicks,
                 OwnerId = pid,
             };
         }
         SpellResolver.Spawn(hb);
         if (isConeAttack)
-            GD.Print($"[HITBOX] Capsule R={hb.Radius:F1} RNG={ability.AimedCharge!.Value.ConeRange} DMG={stage.Damage} KB={stage.KnockbackForce}");
+            GD.Print($"[HITBOX] Capsule R={hb.Radius:F1} RNG={ability.AimedCharge!.Value.ConeRange} DMG={hitEvent.Damage} KB={hitEvent.KnockbackForce}");
         else
             GD.Print($"[HITBOX] Sphere at ({hitPos.X:F1},{hitPos.Y:F1},{hitPos.Z:F1}) R={hb.Radius:F1} " +
-                     $"DMG={stage.Damage} KB={stage.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1})");
+                     $"DMG={hitEvent.Damage} KB={hitEvent.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1})");
 
         // Update CharacterState combo/animation ticks
-        _movementComponent.SetComboState(newComboStage, stage.ChainWindowTicks, stage.SelfLockTicks);
+        _movementComponent.SetComboState(newComboStage, stage.ChainWindowTicks, stage.DurationTicks);
     }
 
     // ==========================================
@@ -1135,9 +1147,26 @@ public partial class PlayerController : CharacterBody3D
         if (pm == null) { CreateFallbackMesh(); return null; }
 
         pm.Name = "PlayerModel";
-        AddChild(pm);
         pm.Scale = scale;
         pm.Position = position;
+        AddChild(pm);
+
+        // Auto-calculate visual Y offset from skeleton feet position
+        if (_animationController != null)
+        {
+            var sk = _animationController.FindSkeleton(pm);
+            if (sk != null)
+            {
+                int footBone = sk.FindBone("mixamorig:LeftFoot");
+                if (footBone >= 0)
+                {
+                    var footPos = sk.GetBoneGlobalPose(footBone).Origin;
+                    float offset = -(footPos.Y + _charDef.CapsuleHeight * 0.5f);
+                    pm.Position = new Vector3(pm.Position.X, offset, pm.Position.Z);
+                    GD.Print($"[Model] Auto-offset footY={footPos.Y:F3} → offset={offset:F3}");
+                }
+            }
+        }
 
         return pm;
     }
@@ -1177,53 +1206,21 @@ public partial class PlayerController : CharacterBody3D
         return BuildInputState();
     }
 
-    /// <summary>Apply authoritative state from the server simulation.</summary>
+    /// <summary>Apply authoritative state from the simulation.</summary>
     public void ApplyServerState(CharacterState state)
     {
-        // Keep client-side state fields (server doesn't track attacks/dash properly yet)
-        var currentAction = _movementComponent.State.State;
-        ushort currentLock = _movementComponent.State.AnimLockTicks;
-        ushort currentDash = _movementComponent.State.DashDurationTicks;
-        ushort currentInvuln = _movementComponent.State.InvincibilityTicks;
-        ushort currentDashCd = _movementComponent.State.DashCooldownTicks;
-        float currentVX = _movementComponent.State.VX;
-        float currentVZ = _movementComponent.State.VZ;
+        bool wasAttacking = _movementComponent.State.State == ActionState.Attacking;
+        bool nowAttacking = state.State == ActionState.Attacking;
+        if (wasAttacking && !nowAttacking)
+            GD.Print($"[Client] Attack ended at tick {state.AttackElapsedTicks}, AnimLockTicks={state.AnimLockTicks}");
 
-        // Sync movement component state (struct copy)
+        // Sync position, velocity, grounded, state — sim is authority on everything now
         _movementComponent.State = state;
 
-        // When server has no specific state (Idle), preserve client-side timers
-        if (state.State == ActionState.Idle)
-        {
-            // Restore attack/dash state
-            if (currentAction != ActionState.Idle)
-                _movementComponent.State.State = currentAction;
-
-            // Preserve AnimLockTicks (attack startup + self-lock)
-            if (currentLock > 1)
-                _movementComponent.State.AnimLockTicks = (ushort)(currentLock - 1);
-            else if (currentLock == 1)
-                _movementComponent.State.AnimLockTicks = 0;
-
-            // Preserve DashDurationTicks
-            if (currentDash > 0)
-            {
-                _movementComponent.State.DashDurationTicks = (ushort)(currentDash - 1);
-                // Preserve dash velocity (server doesn't process dash movement)
-                _movementComponent.State.VX = currentVX;
-                _movementComponent.State.VZ = currentVZ;
-                _movementComponent.State.InvincibilityTicks = currentInvuln > 0
-                    ? (ushort)(currentInvuln - 1) : (ushort)0;
-                _movementComponent.State.DashCooldownTicks = currentDashCd;
-            }
-        }
-
-        // Apply to Godot body (authoritative position from server)
+        // Apply to Godot body
         GlobalPosition = new Vector3(state.PX, state.PY, state.PZ);
         Velocity = new Vector3(state.VX, state.VY, state.VZ);
         GlobalRotation = new Vector3(0f, state.FacingYaw, 0f);
-
-        // MoveAndSlide collides with actual arena geometry
         MoveAndSlide();
     }
 
@@ -1300,39 +1297,13 @@ public partial class PlayerController : CharacterBody3D
 
     /// <summary>
     /// Execute an attack stage with optional warp and startup delay.
-    /// Factorizes logic shared between first attack and combo chains.
+    /// (Legacy — all abilities now go through _pendingSlotPress → sim)
     /// </summary>
     private void ExecuteAttackStage(AttackStage stage, AttackStage[] stages, int slotIndex, bool charged, bool airborne, bool isComboChain, ushort startup)
     {
-        if (_combatComponent == null) return;
-
-        if (stage.UseTargetLock)
-        {
-            _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, () =>
-            {
-                if (isComboChain || startup == 0)
-                {
-                    ResolveAbilityStages(stages, slotIndex, airborne);
-                }
-                else
-                {
-                    var attackState = _fsm?.GetAttackState();
-                    attackState?.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
-                }
-            });
-        }
-        else
-        {
-            if (isComboChain || startup == 0)
-            {
-                ResolveAbilityStages(stages, slotIndex, airborne);
-            }
-            else
-            {
-                var attackState = _fsm?.GetAttackState();
-                attackState?.SetPendingResolve(stages, slotIndex, charged, airborne, startup);
-            }
-        }
+        // All abilities handled by sim now. Keep the warp logic for now.
+        if (_combatComponent == null || !stage.UseTargetLock) return;
+        _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, null);
     }
 
     /// <summary>

@@ -3,7 +3,6 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using SlopArena.Shared;
-using SlopArena.Server;
 
 /// <summary>
 /// Bridges the pure C# ServerSimulation to the Godot scene.

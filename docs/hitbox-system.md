@@ -2,14 +2,16 @@
 
 ## 🎯 Overview
 
-SlopArena uses a **server-authoritative** system with **sphere-sphere pure math collision detection** (no Godot physics queries on the server).
+SlopArena uses a **sim-authoritative** hitbox system driven by **HitboxEvent** data. Hitboxes are spawned by `ServerSimulation.Tick()` when the elapsed attack time matches a `HitboxEvent.TriggerTick`, using pure math collision detection (no Godot physics queries on the server).
 
 ### Key concepts
 
-- **Hitbox** = attack zone (red in debug view)
-- **Hurtbox** = entity vulnerable zone (blue in debug view)
-- **Detection** = sphere-sphere collision check in `SpellResolver.Tick()` (Shared/)
+- **HitboxEvent** = data struct describing when/where/what a hitbox does (defined in `AttackStage.HitboxEvents[]`)
+- **Hitbox** = runtime collision volume (spawned into `SpellResolver` by the simulation)
+- **Hurtbox** = entity vulnerable zone (built per tick from skeleton bones or fixed capsules)
+- **Detection** = sphere-sphere / capsule-sphere / capsule-capsule collision check in `SpellResolver.Tick()` (Shared/)
 - **Tick-based** = everything in ticks (60Hz), not floating point seconds
+- **Sim-authoritative** = the same `ServerSimulation.Tick()` that computes movement also spawns hitboxes — no client-side spawning for standard attacks
 
 ---
 
@@ -17,109 +19,225 @@ SlopArena uses a **server-authoritative** system with **sphere-sphere pure math 
 
 ```
 SlopArena/
-├── Shared/
-│   ├── Hitbox.cs              ← Pure C# struct (netcode-ready)
-│   ├── SpellResolver.cs       ← Collision engine (pure math)
-│   └── AttackData.cs          ← Attack definitions (stages)
+├── Shared/                          ← Pure C#, no Godot dependency
+│   ├── Hitbox.cs                    ← Hitbox struct + HitboxShape enum
+│   ├── AttackData.cs                ← HitboxEvent, AttackStage, AbilityData
+│   ├── SpellResolver.cs             ← Collision engine (pure math)
+│   ├── ServerSimulation.cs          ← Server tick: spawns hitboxes from HitboxEvents
+│   └── Simulation.cs                ← Per-entity tick (movement, attack state)
 │
 ├── Scripts/
 │   ├── Combat/
-│   │   ├── Hurtbox.cs         ← Area3D client-side (visual marker)
-│   │   └── CombatComponent.cs ← Spawn hitboxes, apply damage
+│   │   ├── Hurtbox.cs               ← Area3D client-side (visual marker only)
+│   │   └── CombatComponent.cs       ← Legacy melee helpers (CheckMeleeCone, etc.)
 │   │
 │   └── Debug/
-│       └── DebugHitboxDraw.cs ← Wireframe spheres + labels (F3 to toggle)
+│       └── DebugHitboxDraw.cs       ← Wireframe spheres + labels (F3 to toggle)
+│
+└── docs/
+    ├── hitbox-system.md             ← This file
+    └── attack-hitbox-system.md      ← French design doc (historical reference)
 ```
 
 ---
 
-## 🔴 Hitbox (attack)
+## 🔴 Hitbox (runtime collision volume)
 
 ### Definition — `Shared/Hitbox.cs`
 
 ```csharp
 public struct Hitbox
 {
-    public float X, Y, Z;           // Absolute position (world space)
-    public float VX, VY, VZ;        // Velocity (0,0,0 = static melee, ≠0 = projectile)
-    public float Radius;            // Sphere radius
-    public ushort DurationTicks;    // Lifetime in ticks (60Hz)
-    public ushort AgeTicks;         // Current age (incremented each tick)
+    public float X, Y, Z;             // Absolute position (world space)
+    public float VX, VY, VZ;          // Velocity (0,0,0 = static melee, ≠0 = projectile)
+    public float Radius;              // Sphere radius
+    public ushort DurationTicks;      // Lifetime in ticks (60Hz)
+    public ushort AgeTicks;           // Current age (incremented each tick)
 
-    public float Damage;            // Damage amount
-    public float KnockbackForce;    // Horizontal knockback force
-    public float KnockbackUpward;   // Vertical knockback force
-    public ushort StunTicks;        // Stun duration in ticks
-    public ulong OwnerId;           // Attacker's ID (to skip self-hit)
+    public HitboxShape Shape;         // Sphere or Capsule
+    public float EndX, EndY, EndZ;    // Capsule end point (ignored for Sphere)
 
-    public bool Active;             // false = hitbox destroyed (after impact or expiration)
+    public float Damage;              // Damage amount
+    public float KnockbackForce;      // Horizontal knockback force
+    public float KnockbackUpward;     // Vertical knockback force
+    public ushort StunTicks;          // Stun duration in ticks
+    public ulong OwnerId;             // Attacker's ID (to skip self-hit)
+
+    public bool Active;               // false = hitbox destroyed (after impact or expiration)
 }
 ```
 
-### Spawning — Two methods
-
-#### 1. Direct method (melee/cone attacks)
+### HitboxShape enum
 
 ```csharp
-// In CombatComponent.cs
-public List<ulong> CheckMeleeCone(Vector3 origin, Vector3 forward, float range, ...)
+public enum HitboxShape : byte
 {
-    var hb = new Hitbox
-    {
-        X = origin.X + forward.X * range * 0.5f,
-        Y = origin.Y + 1f,
-        Z = origin.Z + forward.Z * range * 0.5f,
-        Radius = range * 0.5f,
-        DurationTicks = 5,          // ~83ms lifetime
-        Damage = damage,
-        KnockbackForce = knockbackForce,
-        KnockbackUpward = knockbackUpward,
-        OwnerId = _entityId,
-    };
-    SpellResolver.Spawn(hb);
-    var results = SpellResolver.Tick(entities);
-    // Process hits...
+    Sphere = 0,
+    Capsule = 1    // segment from (X,Y,Z) to (EndX,EndY,EndZ), radius = Radius
 }
 ```
 
-#### 2. Via `AttackStage` (combos/abilities)
+---
+
+## 📦 HitboxEvent — Data-driven hitbox definition
+
+### Definition — `Shared/AttackData.cs`
 
 ```csharp
-// In CharacterDefinition.cs — attack declaration
+public struct HitboxEvent
+{
+    public ushort TriggerTick;         // Tick from attack start when this hitbox spawns
+    public ushort DurationTicks;       // How many frames the hitbox stays active
+    public float Radius;               // Hitbox radius
+    public float OffX, OffY, OffZ;     // Offset from attacker center (rotated by facing yaw)
+    public float Damage;
+    public float KnockbackForce;
+    public float KnockbackUpward;
+    public ushort StunTicks;
+    public bool Interruptible;         // If false: persists even if attacker is hit during startup
+}
+```
+
+### AttackStage (simplified — damage data lives in HitboxEvents)
+
+```csharp
+public struct AttackStage
+{
+    public ushort DurationTicks;        // Total animation lock duration in ticks
+    public HitboxEvent[] HitboxEvents;  // Hitbox events triggered during this stage
+    public float LungeForce;            // Forward burst during attack
+    public ushort ChainWindowTicks;     // Frames to buffer next input (0 = final/no chain)
+    public float AttackRange;           // Distance where auto-dash triggers
+    public float WarpRange;
+    public bool UseTargetLock;
+    public bool RotateTowardTarget;
+    public float TrackingStrength;      // 0-1 rotation lerp toward target per frame
+}
+```
+
+### Example: Manki LMB (3-hit combo)
+
+```csharp
 new AbilityData
 {
-    Name = "Basic Attack",
+    Name = "LMB Combo",
     Stages = new[]
     {
+        // Stage 0: Jab
         new AttackStage
         {
-            Damage = 20f,
-            KnockbackForce = 15f,
-            KnockbackUpward = 5f,
-            StunTicks = 30,         // 0.5s
-            SelfLockTicks = 40,     // 0.67s animation lock
-            StartupTicks = 10,      // 0.17s startup frames
+            DurationTicks = 12,
+            HitboxEvents = new[]
+            {
+                new HitboxEvent
+                {
+                    TriggerTick = 6, DurationTicks = 2, Radius = 0.5f,
+                    OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
+                    Damage = 4, KnockbackForce = 8, KnockbackUpward = 3,
+                    StunTicks = 10, Interruptible = true
+                }
+            },
+            ChainWindowTicks = 8,    // 8 ticks to buffer next input
+        },
+        // Stage 1: Melee
+        new AttackStage
+        {
+            DurationTicks = 14,
+            HitboxEvents = new[]
+            {
+                new HitboxEvent
+                {
+                    TriggerTick = 8, DurationTicks = 2, Radius = 0.7f,
+                    OffX = 2.0f, OffY = 1.0f, OffZ = 0f,
+                    Damage = 6, KnockbackForce = 12, KnockbackUpward = 5,
+                    StunTicks = 15, Interruptible = true
+                }
+            },
+            ChainWindowTicks = 6,
+        },
+        // Stage 2: Flying Kick (final)
+        new AttackStage
+        {
+            DurationTicks = 20,
+            HitboxEvents = new[]
+            {
+                new HitboxEvent
+                {
+                    TriggerTick = 8, DurationTicks = 3, Radius = 0.8f,
+                    OffX = 2.5f, OffY = 0.5f, OffZ = 0f,
+                    Damage = 12, KnockbackForce = 20, KnockbackUpward = 10,
+                    StunTicks = 20, Interruptible = true
+                }
+            },
+            ChainWindowTicks = 0,  // Final stage — no chain
         }
     }
 }
-
-// In PlayerController.cs — spawn hitbox based on stage data
-var stage = ability.Stages[_currentStage];
-var hb = new Hitbox
-{
-    X = attackerPos.X + forward.X * 2f,
-    Y = attackerPos.Y + 1f,
-    Z = attackerPos.Z + forward.Z * 2f,
-    Radius = 2f,                    // Hardcoded for now
-    DurationTicks = 5,
-    Damage = stage.Damage,
-    KnockbackForce = stage.KnockbackForce,
-    KnockbackUpward = stage.KnockbackUpward,
-    StunTicks = stage.StunTicks,
-    OwnerId = pid,
-};
-SpellResolver.Spawn(hb);
 ```
+
+---
+
+## ⚙️ Sim-authoritative spawning flow
+
+Hitboxes are **not** spawned by the client. `ServerSimulation.Tick()` reads `HitboxEvents` from the current `AttackStage` and spawns hitboxes into `SpellResolver` when the elapsed attack time matches `TriggerTick`.
+
+### Spawning in `ServerSimulation.Tick()` (Shared/ServerSimulation.cs)
+
+```csharp
+// ── Spawn hitbox events for all attacking entities ──
+foreach (var kvp in _states)
+{
+    ulong id = kvp.Key;
+    var state = kvp.Value;
+    var def = _defs[id];
+    if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+    {
+        var ability = GetAbility(def, state.AttackSlot);
+        int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+        if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+        {
+            var stage = ability.Stages[stageIdx];
+            if (stage.HitboxEvents != null)
+            {
+                float cos = MathF.Cos(state.FacingYaw);
+                float sin = MathF.Sin(state.FacingYaw);
+                foreach (var evt in stage.HitboxEvents)
+                {
+                    if (state.AttackElapsedTicks == evt.TriggerTick)
+                    {
+                        // Position = entityPos + rotate(OffX, OffY, OffZ) by facing yaw
+                        float hx = state.PX + (evt.OffX * cos - evt.OffZ * sin);
+                        float hy = state.PY + evt.OffY;
+                        float hz = state.PZ + (evt.OffX * sin + evt.OffZ * cos);
+
+                        SpellResolver.Spawn(new Hitbox
+                        {
+                            X = hx, Y = hy, Z = hz,
+                            Radius = evt.Radius,
+                            Shape = HitboxShape.Sphere,
+                            EndX = hx, EndY = hy, EndZ = hz,
+                            Damage = evt.Damage,
+                            KnockbackForce = evt.KnockbackForce,
+                            KnockbackUpward = evt.KnockbackUpward,
+                            StunTicks = evt.StunTicks,
+                            DurationTicks = evt.DurationTicks,
+                            OwnerId = id,
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Key points about the spawn flow
+
+- **Positioning**: `entityPos + rotate(OffX, OffY, OffZ) by facing yaw` — offsets are in local space, rotated into world space by the entity's facing direction
+- **Timing**: `state.AttackElapsedTicks` increments each tick from attack start — when it matches `TriggerTick`, the hitbox is spawned
+- **Duration**: hitbox lifetime is `HitboxEvent.DurationTicks` (set on the spawned `Hitbox`)
+- **Interruptible**: currently handled at the SpellResolver level (future: hitstun clears interruptible events)
+- **Client role**: client only renders the animation FSM (ActionState) — does not spawn hitboxes for standard attacks
 
 ---
 
@@ -152,12 +270,15 @@ public struct EntityData
     public ulong Id;
     public float PosX, PosY, PosZ;
     public float Radius;        // Hurtbox radius
+    public HitboxShape Shape;   // Sphere or Capsule
+    public float EndX, EndY, EndZ; // Capsule end point
     public bool Active;
 }
 ```
 
-- Built via `BuildEntityList()` in `CombatComponent.cs`
-- Passed to `SpellResolver.Tick()` for collision check
+Built by `ServerSimulation.Tick()` from:
+1. **Skeleton bones** (precise): samples character skeleton at current animation time, transforms bone positions into world space by entity yaw + position
+2. **Fixed capsules** (fallback): uses `HurtboxCapsules` from `CharacterDefinition` rotated by entity yaw
 
 ---
 
@@ -171,8 +292,11 @@ public static List<HitResult> Tick(List<EntityData> entities)
     var results = new List<HitResult>();
     var hitThisTick = new HashSet<ulong>();  // Anti double-hit
 
-    foreach (var hb in _hitboxes)
+    for (int i = _hitboxes.Count - 1; i >= 0; i--)
     {
+        var hb = _hitboxes[i];
+        if (!hb.Active) { _hitboxes.RemoveAt(i); continue; }
+
         // 1. Move projectiles
         hb.X += hb.VX * Simulation.TickDt;
         hb.Y += hb.VY * Simulation.TickDt;
@@ -181,25 +305,50 @@ public static List<HitResult> Tick(List<EntityData> entities)
         // 2. Check collision vs all entities
         foreach (var entity in entities)
         {
-            if (entity.Id == hb.OwnerId) continue;          // Skip self-hit
+            if (!entity.Active || entity.Id == hb.OwnerId) continue;
             if (hitThisTick.Contains(entity.Id)) continue;  // Already hit this tick
 
-            float dx = entity.PosX - hb.X;
-            float dy = entity.PosY - hb.Y;
-            float dz = entity.PosZ - hb.Z;
-            float distSq = dx*dx + dy*dy + dz*dz;
-            float combinedRadius = hb.Radius + entity.Radius;
+            bool hit = false;
+            float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
 
-            if (distSq <= combinedRadius * combinedRadius)
+            if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
             {
-                // HIT! Calculate knockback direction
-                float dist = MathF.Sqrt(distSq);
+                hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz);
+            }
+            else
+            {
+                // Sphere-sphere (original)
+                dx = entity.PosX - hb.X;
+                dy = entity.PosY - hb.Y;
+                dz = entity.PosZ - hb.Z;
+                float distSq = (dx * dx) + (dy * dy) + (dz * dz);
+                float combinedRadius = hb.Radius + entity.Radius;
+                if (distSq <= combinedRadius * combinedRadius)
+                {
+                    dist = MathF.Sqrt(distSq);
+                    hit = true;
+                }
+            }
+
+            if (hit)
+            {
+                // Calculate knockback direction
                 float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
                 float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : 0f;
 
-                results.Add(new HitResult { ... });
+                results.Add(new HitResult
+                {
+                    TargetEntityId = entity.Id,
+                    OwnerEntityId = hb.OwnerId,
+                    Damage = hb.Damage,
+                    KnockbackX = kbX,
+                    KnockbackY = hb.KnockbackUpward,
+                    KnockbackZ = kbZ,
+                    StunTicks = hb.StunTicks,
+                });
+
                 hitThisTick.Add(entity.Id);
-                hb.Active = false;  // One-hit-per-hitbox
+                hb.Active = false; // one-hit per hitbox
                 break;
             }
         }
@@ -207,7 +356,13 @@ public static List<HitResult> Tick(List<EntityData> entities)
         // 3. Age / expire
         hb.AgeTicks++;
         if (hb.AgeTicks >= hb.DurationTicks || !hb.Active)
+        {
             _hitboxes.RemoveAt(i);
+        }
+        else
+        {
+            _hitboxes[i] = hb; // write back velocity/age changes
+        }
     }
 
     return results;
@@ -217,10 +372,24 @@ public static List<HitResult> Tick(List<EntityData> entities)
 ### Key points
 
 - **Sphere-sphere collision**: `distSq <= (r1 + r2)²`
+- **Capsule collision**: closest-points-between-segments algorithm (handles sphere-sphere, sphere-capsule, capsule-capsule)
 - **One-hit-per-hitbox**: `hb.Active = false` after impact
 - **No double-hit in the same tick**: `hitThisTick` HashSet
 - **Knockback direction**: normalized toward target (dx/dist, dz/dist)
-- **Edge case fixed**: if `dist < 0.001f` (perfect overlap), knockback = 0 (before: bug where kbZ = raw KnockbackForce)
+- **Edge case fixed**: if `dist < 0.001f` (perfect overlap), knockback = 0
+
+### HitResult
+
+```csharp
+public struct HitResult
+{
+    public ulong TargetEntityId;
+    public ulong OwnerEntityId;
+    public float Damage;
+    public float KnockbackX, KnockbackY, KnockbackZ;
+    public ushort StunTicks;
+}
+```
 
 ---
 
@@ -247,61 +416,48 @@ R:2.0           (radius)
 
 ---
 
-## 🚧 Current limitations (to extend)
+## 📊 Performance notes
 
-### 1. **Single shape: spheres only**
+- **SpellResolver.Tick()**: O(H × E) where H = active hitboxes, E = entities
+- **Typically**: H < 10, E < 50 → ~500 checks/tick = negligible
+- **Pure math**: no Godot physics queries (netcode-ready)
+- **Struct-based**: no GC allocations (except List resize)
 
-- No capsules (long swords)
-- No boxes (rectangular AoE)
-- No cones (flamethrower)
-- No rays (laser beam)
+---
 
-**Future solution**: add a `HitboxShape` enum in `Hitbox.cs`
+## ✅ Summary
 
-```csharp
-public enum HitboxShape { Sphere, Capsule, Box, Cone, Ray }
+| Aspect | Current state |
+|--------|-------------|
+| **Hitbox spawning** | ✅ Sim-authoritative via HitboxEvent.TriggerTick (ServerSimulation) |
+| **Detection** | ✅ Sphere-sphere / capsule pure math (netcode-ready) |
+| **Tick-based** | ✅ 60Hz, ushort ticks |
+| **One-hit** | ✅ HashSet anti double-hit |
+| **Projectiles** | ✅ Velocity support (VX, VY, VZ) |
+| **Knockback** | ✅ Direction calculated (fixed dist≈0 edge case) |
+| **Multi-shapes** | ✅ Spheres + Capsules (hitbox + hurtbox) |
+| **Data-driven hitbox** | ✅ HitboxEvent[] with TriggerTick, offset, radius, damage |
+| **Multi-hitboxes per attack** | ✅ Multiple HitboxEvents per stage |
+| **Combo chaining** | ✅ ChainWindowTicks on AttackStage, sim-managed |
+| **Interruptible flag** | ✅ HitboxEvent.Interruptible |
+| **Skeleton hurtboxes** | ✅ Bone-sampled per tick from animation |
+| **Debug visual** | ✅ F3 toggle, wireframe + labels |
 
-public struct Hitbox
-{
-    public HitboxShape Shape;
-    public float Param1, Param2, Param3;  // Capsule: radius, height, 0
-                                           // Box: width, height, depth
-                                           // Cone: angle, range, 0
-    // ...
-}
-```
+---
 
-### 2. **Hitbox spawn hardcoded**
+## 🔗 Key files to modify for extension
 
-- Position: `attackerPos + forward * 2f` (hardcoded 2m in front)
-- Radius: `2f` (hardcoded)
-- Duration: `5` ticks (hardcoded)
-
-**Move to `AttackStage`:**
-
-```csharp
-public struct AttackStage
-{
-    // Existing fields...
-    public float HitboxOffsetForward;  // 2f = 2m in front
-    public float HitboxOffsetUp;       // 1f = 1m above
-    public float HitboxRadius;         // 2f = sphere 2m
-    public ushort HitboxDurationTicks; // 5 = ~83ms
-}
-```
-
-### 3. **No multi-hitboxes per attack**
-
-- One attack = one hitbox
-- No support for: long sword (3 aligned hitboxes), shotgun (5 projectiles), etc.
-
-**Future solution**: `Hitbox[] Hitboxes` in `AttackStage`
+1. **`Shared/AttackData.cs`**: Add new fields to `HitboxEvent` or `AttackStage`
+2. **`Shared/Hitbox.cs`**: Add new hitbox shapes or parameters
+3. **`Shared/SpellResolver.cs`**: Add collision shapes (box, cone, ray)
+4. **`Shared/ServerSimulation.cs`**: Modify hitbox spawning logic or event processing
+5. **`Scripts/Debug/DebugHitboxDraw.cs`**: Visualize new shapes
 
 ---
 
 ## 📋 How to add a new attack
 
-### Step 1: Define the `AttackStage` (data-driven)
+### Step 1: Define `AbilityData` + `AttackStage` + `HitboxEvent`
 
 ```csharp
 // In CharacterDefinition.cs
@@ -313,180 +469,51 @@ new AbilityData
     {
         new AttackStage
         {
-            Damage = 50f,
-            KnockbackForce = 30f,
-            KnockbackUpward = 10f,
+            DurationTicks = 30,       // 0.5s animation lock
             LungeForce = 5f,          // Forward dash during attack
-            StunTicks = 60,           // 1s stun
-            SelfLockTicks = 80,       // 1.33s animation lock
-            StartupTicks = 20,        // 0.33s startup (telegraphing)
+            HitboxEvents = new[]
+            {
+                new HitboxEvent
+                {
+                    TriggerTick = 10,         // Spawn on frame 10 of 30
+                    DurationTicks = 5,        // Active for ~83ms
+                    Radius = 3f,              // Big slam radius
+                    OffX = 0f, OffY = 0.5f, OffZ = 0f,  // At feet
+                    Damage = 50f,
+                    KnockbackForce = 30f,
+                    KnockbackUpward = 10f,
+                    StunTicks = 60,           // 1s stun
+                    Interruptible = false,    // Cannot be cancelled
+                }
+            },
+            ChainWindowTicks = 0,     // No combo chain
         }
     }
 }
 ```
 
-### Step 2: Spawn the hitbox (currently hardcoded)
+### Step 2: The simulation handles the rest
 
-```csharp
-// In PlayerController.cs or CombatComponent.cs
-var stage = ability.Stages[_currentStage];
-var attackerPos = GlobalPosition;
-var forward = -Transform.Basis.Z.Normalized();
+`ServerSimulation.Tick()` automatically:
+1. Detects the attack input → enters `ActionState.Attacking`
+2. Counts `AttackElapsedTicks` each tick
+3. Spawns the hitbox via `SpellResolver.Spawn()` when `AttackElapsedTicks == TriggerTick`
+4. Resolves collisions in `SpellResolver.Tick()`
+5. Applies damage, knockback, and stun to the target
 
-var hb = new Hitbox
-{
-    X = attackerPos.X + forward.X * 2f,   // ⚠️ Hardcoded: 2m in front
-    Y = attackerPos.Y + 1f,               // ⚠️ Hardcoded: 1m in height
-    Z = attackerPos.Z + forward.Z * 2f,
-    Radius = 2f,                          // ⚠️ Hardcoded: radius 2m
-    DurationTicks = 5,                    // ⚠️ Hardcoded: 5 ticks
-    VX = 0, VY = 0, VZ = 0,              // Static melee (0 = no projectile)
-    Damage = stage.Damage,
-    KnockbackForce = stage.KnockbackForce,
-    KnockbackUpward = stage.KnockbackUpward,
-    StunTicks = stage.StunTicks,
-    OwnerId = _entityId,
-    Active = true,
-};
-SpellResolver.Spawn(hb);
-```
-
-### Step 3: Tick + resolve hits
-
-```csharp
-var entities = BuildEntityList();
-var results = SpellResolver.Tick(entities);
-
-foreach (var hit in results)
-{
-    // Apply damage, knockback, stun
-    _simulation.OnEntityHit?.Invoke(hit.TargetEntityId, hit.Damage, 
-                                    hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
-}
-```
+No client-side code needed for hitbox spawning.
 
 ---
 
-## 🎮 Debug controls
+## ®️ Legacy: Client-side hitbox spawning (non-LMB abilities only)
 
-- **F3**: Toggle hitbox/hurtbox visualization
-- **Tab**: Target NPC (shows target ring)
-- **LMB/RMB**: Spawn melee hitboxes
-- **Q/E/R/F**: Abilities
-
----
-
-## 🔧 Next steps to extend the system
-
-### Option A: Add params in `AttackStage` (data-driven)
+Some abilities (RMB aimed-charge, special effects via `AbilityRegistry`) still spawn hitboxes client-side via `CombatComponent.ResolveAbilityStages()`. This is a transitional pattern — all future abilities should use `HitboxEvent` for sim-authoritative spawning.
 
 ```csharp
-public struct AttackStage
-{
-    // Existing...
-    public float HitboxOffsetForward;
-    public float HitboxOffsetUp;
-    public float HitboxRadius;
-    public ushort HitboxDurationTicks;
-    public HitboxShape HitboxShape;  // Sphere, Capsule, Box, Cone
-}
+// PlayerController.ResolveAbilityStages() — for RMB/special abilities only
+// Sim handles LMB hitbox spawning (triggered by HitboxEvent.TriggerTick)
+// Client still handles other slots (RMB, Q, E, R, F) via AbilityRegistry effects
 ```
-
-**Advantages**: Simple, keep logic in code  
-**Disadvantages**: Not flexible for multi-hitboxes (long sword = 3 spheres)
-
-### Option B: Define `HitboxTemplate[]` per attack
-
-```csharp
-public struct HitboxTemplate
-{
-    public HitboxShape Shape;
-    public Vector3 OffsetLocal;   // Relative to attacker
-    public float Radius;
-    public ushort SpawnDelayTicks; // Delayed spawn (e.g., projectile after 10t)
-    public ushort DurationTicks;
-}
-
-public struct AttackStage
-{
-    // Existing...
-    public HitboxTemplate[] Hitboxes;  // Multi-hitbox support
-}
-```
-
-**Advantages**: Flexible (shotgun = 5 projectiles, sword = 3 spheres aligned)  
-**Disadvantages**: More complex to setup
-
-### Option C: Hitbox spawning via `SpecialEffectKeys` (ability code)
-
-```csharp
-// In CharacterDefinition.cs
-new AbilityData
-{
-    Name = "Fireball",
-    SpecialEffectKeys = new[] { "spawn_fireball_projectile" },
-    // ...
-}
-
-// In AbilityRegistry.cs
-_effects["spawn_fireball_projectile"] = (combat, _) =>
-{
-    var pos = combat.GetOwnerPosition();
-    var forward = combat.GetCameraForward();
-    var hb = new Hitbox
-    {
-        X = pos.X, Y = pos.Y + 1.5f, Z = pos.Z,
-        VX = forward.X * 30f,  // Projectile: 30 m/s
-        VY = forward.Y * 30f,
-        VZ = forward.Z * 30f,
-        Radius = 1f,
-        DurationTicks = 120,  // 2s lifetime
-        Damage = 40f,
-        // ...
-    };
-    SpellResolver.Spawn(hb);
-};
-```
-
-**Advantages**: Maximum flexibility (custom code per spell)  
-**Disadvantages**: Less data-driven, harder to debug
-
-**Recommendation**: Start with **Option A** (simple) for basic attacks, keep **Option C** for complex spells (projectiles, delayed AoE).
-
----
-
-## 📊 Performance notes
-
-- **SpellResolver.Tick()**: O(H × E) where H = active hitboxes, E = entities
-- **Typically**: H < 10, E < 50 → ~500 checks/tick = negligible
-- **Pure math**: no Godot physics queries (netcode-ready)
-- **Struct-based**: no GC allocations (except List resize)
-
----
-
-## 🔗 Key files to modify for extension
-
-1. **`Shared/Hitbox.cs`**: Add fields (Shape, Params)
-2. **`Shared/AttackData.cs`**: Add HitboxTemplate[] or offset/radius fields
-3. **`Shared/SpellResolver.cs`**: Add collision shapes (capsule, box, cone)
-4. **`Scripts/Combat/CombatComponent.cs`**: Spawn logic from AttackStage data
-5. **`Scripts/Debug/DebugHitboxDraw.cs`**: Visualize new shapes (capsules, boxes)
-
----
-
-## ✅ Summary
-
-| Aspect | Current state |
-|--------|-------------|
-| **Detection** | ✅ Sphere-sphere pure math (netcode-ready) |
-| **Tick-based** | ✅ 60Hz, ushort ticks |
-| **One-hit** | ✅ HashSet anti double-hit |
-| **Projectiles** | ✅ Velocity support (VX, VY, VZ) |
-| **Knockback** | ✅ Direction calculated (fixed: line 106 bug) |
-| **Debug visual** | ✅ F3 toggle, wireframe + labels |
-| **Multi-shapes** | ❌ Spheres only (capsules/boxes coming) |
-| **Data-driven hitbox spawn** | ❌ Hardcoded (offset/radius/duration) |
-| **Multi-hitboxes** | ❌ One attack = one hitbox |
 
 ---
 
