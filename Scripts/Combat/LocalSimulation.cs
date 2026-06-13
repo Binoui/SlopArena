@@ -67,29 +67,32 @@ public partial class LocalSimulation : Node
             foreach (var cap in state.CharDef.HurtboxCapsules)
             {
                 // Rotate capsule offsets by character facing yaw
-                float sx = state.PX + cap.Sx * cos - cap.Sz * sin;
+                float sx = state.PX + (cap.Sx * cos) - (cap.Sz * sin);
                 float sy = state.PY + cap.Sy;
-                float sz = state.PZ + cap.Sx * sin + cap.Sz * cos;
-                float ex = state.PX + cap.Ex * cos - cap.Ez * sin;
+                float sz = state.PZ + (cap.Sx * sin) + (cap.Sz * cos);
+                float ex = state.PX + (cap.Ex * cos) - (cap.Ez * sin);
                 float ey = state.PY + cap.Ey;
-                float ez = state.PZ + cap.Ex * sin + cap.Ez * cos;
+                float ez = state.PZ + (cap.Ex * sin) + (cap.Ez * cos);
 
                 bool isCapsule = (sx != ex || sy != ey || sz != ez);
                 entityList.Add(new SpellResolver.EntityData
                 {
                     Id = kvp.Key,
-                    PosX = sx, PosY = sy, PosZ = sz,
+                    PosX = sx,
+                    PosY = sy,
+                    PosZ = sz,
                     Radius = cap.Radius,
                     Shape = isCapsule ? HitboxShape.Capsule : HitboxShape.Sphere,
-                    EndX = ex, EndY = ey, EndZ = ez,
+                    EndX = ex,
+                    EndY = ey,
+                    EndZ = ez,
                     Active = true,
                 });
             }
         }
 
         // Resolve hitboxes
-        var results = SpellResolver.Tick(entityList);
-        foreach (var hit in results)
+        foreach (var hit in SpellResolver.Tick(entityList))
         {
             RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
             OnDealDamage?.Invoke(hit.OwnerEntityId, hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
@@ -136,12 +139,12 @@ public partial class LocalSimulation : Node
             float sin = Mathf.Sin(state.FacingYaw);
             foreach (var cap in state.CharDef.HurtboxCapsules)
             {
-                float sx = state.PX + cap.Sx * cos - cap.Sz * sin;
+                float sx = state.PX + (cap.Sx * cos) - (cap.Sz * sin);
                 float sy = state.PY + cap.Sy;
-                float sz = state.PZ + cap.Sx * sin + cap.Sz * cos;
-                float ex = state.PX + cap.Ex * cos - cap.Ez * sin;
+                float sz = state.PZ + (cap.Sx * sin) + (cap.Sz * cos);
+                float ex = state.PX + (cap.Ex * cos) - (cap.Ez * sin);
                 float ey = state.PY + cap.Ey;
-                float ez = state.PZ + cap.Ex * sin + cap.Ez * cos;
+                float ez = state.PZ + (cap.Ex * sin) + (cap.Ez * cos);
                 bool capsule = (sx != ex || sy != ey || sz != ez);
                 result.Add((sx, sy, sz, ex, ey, ez, cap.Radius, capsule));
             }

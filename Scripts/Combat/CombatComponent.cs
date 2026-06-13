@@ -523,10 +523,14 @@ public partial class CombatComponent : Node
         {
             entities.Add(new SpellResolver.EntityData
             {
-                PosX = sx, PosY = sy, PosZ = sz,
+                PosX = sx,
+                PosY = sy,
+                PosZ = sz,
                 Radius = radius,
                 Shape = isCap ? HitboxShape.Capsule : HitboxShape.Sphere,
-                EndX = ex, EndY = ey, EndZ = ez,
+                EndX = ex,
+                EndY = ey,
+                EndZ = ez,
                 Active = true
             });
         }

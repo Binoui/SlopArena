@@ -20,7 +20,9 @@ public partial class LocalServerBridge : Node
     /// <summary>Map entityId → CombatComponent for damage/status events.</summary>
     public Dictionary<ulong, CombatComponent> CombatComponents { get; set; } = new();
 
-    // ── EVENTS (for UI, auto-target, etc.) ──
+    /// <summary>
+    /// ── EVENTS (for UI, auto-target, etc.) ──
+    /// </summary>
     public Action<ulong, float, float, float, float>? OnEntityHit;
     public Action<ulong, ulong, float, float, float, float>? OnDealDamage;
     public Action<ulong, StatusType, float, ulong>? OnStatusApply;
@@ -120,12 +122,12 @@ public partial class LocalServerBridge : Node
             float sin = MathF.Sin(state.FacingYaw);
             foreach (var cap in def.HurtboxCapsules)
             {
-                float sx = state.PX + cap.Sx * cos - cap.Sz * sin;
+                float sx = state.PX + (cap.Sx * cos) - (cap.Sz * sin);
                 float sy = state.PY + cap.Sy;
-                float sz = state.PZ + cap.Sx * sin + cap.Sz * cos;
-                float ex = state.PX + cap.Ex * cos - cap.Ez * sin;
+                float sz = state.PZ + (cap.Sx * sin) + (cap.Sz * cos);
+                float ex = state.PX + (cap.Ex * cos) - (cap.Ez * sin);
                 float ey = state.PY + cap.Ey;
-                float ez = state.PZ + cap.Ex * sin + cap.Ez * cos;
+                float ez = state.PZ + (cap.Ex * sin) + (cap.Ez * cos);
                 bool isCap = (sx != ex || sy != ey || sz != ez);
                 result.Add((sx, sy, sz, ex, ey, ez, cap.Radius, isCap));
             }
@@ -133,7 +135,10 @@ public partial class LocalServerBridge : Node
         return result;
     }
 
-    // Expose defs for debug (internal accessor via reflection or public)
+    /// <summary>
+    /// Expose defs for debug (internal accessor via reflection or public)
+    /// </summary>
+    /// <returns></returns>
     private Dictionary<ulong, CharacterDefinition> GetDefs()
     {
         // We need to store defs ourselves since ServerSimulation keeps them private.
@@ -141,7 +146,9 @@ public partial class LocalServerBridge : Node
         return _defs;
     }
 
-    // Store defs locally for debug access
+    /// <summary>
+    /// Store defs locally for debug access
+    /// </summary>
     private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
     public void StoreDef(ulong id, CharacterDefinition def) => _defs[id] = def;
 }

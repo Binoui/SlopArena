@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace SlopArena.Shared
 {
@@ -14,9 +13,18 @@ namespace SlopArena.Shared
         public string Name;
         public int Parent;
         public int[] Children;
-        public float[] RestPos;     // 3 floats: tx, ty, tz
-        public float[] RestRot;     // 4 floats: qx, qy, qz, qw (glTF convention: xyz then w)
-        public float[] RestScale;   // 3 floats
+        /// <summary>
+        /// 3 floats: tx, ty, tz
+        /// </summary>
+        public float[] RestPos;
+        /// <summary>
+        /// 4 floats: qx, qy, qz, qw (glTF convention: xyz then w)
+        /// </summary>
+        public float[] RestRot;
+        /// <summary>
+        /// 3 floats
+        /// </summary>
+        public float[] RestScale;
         public bool IsSkinRoot;
     }
 
@@ -26,9 +34,15 @@ namespace SlopArena.Shared
     public struct AnimTrack
     {
         public int BoneIndex;
-        public string Path; // "translation", "rotation", "scale"
+        /// <summary>
+        /// &quot;translation&quot;, &quot;rotation&quot;, &quot;scale&quot;
+        /// </summary>
+        public string Path;
         public float[] Times;
-        public float[] Values; // VEC3 for translation/scale, VEC4 for rotation
+        /// <summary>
+        /// VEC3 for translation/scale, VEC4 for rotation
+        /// </summary>
+        public float[] Values;
     }
 
     /// <summary>
@@ -37,7 +51,10 @@ namespace SlopArena.Shared
     public struct AnimationData
     {
         public string Name;
-        public float Duration; // in seconds
+        /// <summary>
+        /// in seconds
+        /// </summary>
+        public float Duration;
         public AnimTrack[] Tracks;
     }
 
@@ -52,12 +69,26 @@ namespace SlopArena.Shared
         public AnimationData[] Animations { get; private set; }
         public int RootBone { get; private set; }
 
-        // Cached per-frame (set by SampleAnimation)
-        private float[][] _localPos;   // per bone: 3 floats
-        private float[][] _localRot;   // per bone: 4 floats (qx, qy, qz, qw)
-        private float[][] _localScale; // per bone: 3 floats
-        private float[][] _worldPos;   // per bone: 3 floats (computed)
-        private float[][] _worldRot;   // per bone: 4 floats (computed)
+        /// <summary>
+        /// Cached per-frame (set by SampleAnimation)
+        /// </summary>
+        private readonly float[][] _localPos;   // per bone: 3 floats
+        /// <summary>
+        /// per bone: 4 floats (qx, qy, qz, qw)
+        /// </summary>
+        private readonly float[][] _localRot;
+        /// <summary>
+        /// per bone: 3 floats
+        /// </summary>
+        private readonly float[][] _localScale;
+        /// <summary>
+        /// per bone: 3 floats (computed)
+        /// </summary>
+        private readonly float[][] _worldPos;
+        /// <summary>
+        /// per bone: 4 floats (computed)
+        /// </summary>
+        private readonly float[][] _worldRot;
 
         public ServerSkeleton(GlbNode[] nodes, AnimationData[] anims, int rootBone)
         {
@@ -128,7 +159,7 @@ namespace SlopArena.Shared
 
                 if (track.Path == "translation")
                 {
-                    int stride = 3;
+                    const int stride = 3;
                     int base0 = k * stride;
                     int base1 = nextK * stride;
                     _localPos[bi][0] = Lerp(track.Values[base0], track.Values[base1], frac);
@@ -137,13 +168,13 @@ namespace SlopArena.Shared
                 }
                 else if (track.Path == "rotation")
                 {
-                    int stride = 4;
+                    const int stride = 4;
                     int base0 = k * stride;
                     int base1 = nextK * stride;
                     // SLERP between quaternions
                     float qax = track.Values[base0], qay = track.Values[base0 + 1], qaz = track.Values[base0 + 2], qaw = track.Values[base0 + 3];
                     float qbx = track.Values[base1], qby = track.Values[base1 + 1], qbz = track.Values[base1 + 2], qbw = track.Values[base1 + 3];
-                    float dot = qax * qbx + qay * qby + qaz * qbz + qaw * qbw;
+                    float dot = (qax * qbx) + (qay * qby) + (qaz * qbz) + (qaw * qbw);
                     if (dot < 0) { qbx = -qbx; qby = -qby; qbz = -qbz; qbw = -qbw; dot = -dot; }
                     if (dot > 0.9999f) { /* near-linear */ }
                     float theta = MathF.Acos(Math.Clamp(dot, -1f, 1f));
@@ -152,10 +183,10 @@ namespace SlopArena.Shared
                     {
                         float wa = MathF.Sin((1 - frac) * theta) / sinTheta;
                         float wb = MathF.Sin(frac * theta) / sinTheta;
-                        _localRot[bi][0] = wa * qax + wb * qbx;
-                        _localRot[bi][1] = wa * qay + wb * qby;
-                        _localRot[bi][2] = wa * qaz + wb * qbz;
-                        _localRot[bi][3] = wa * qaw + wb * qbw;
+                        _localRot[bi][0] = (wa * qax) + (wb * qbx);
+                        _localRot[bi][1] = (wa * qay) + (wb * qby);
+                        _localRot[bi][2] = (wa * qaz) + (wb * qbz);
+                        _localRot[bi][3] = (wa * qaw) + (wb * qbw);
                     }
                     else
                     {
@@ -165,7 +196,7 @@ namespace SlopArena.Shared
                 }
                 else if (track.Path == "scale")
                 {
-                    int stride = 3;
+                    const int stride = 3;
                     int base0 = k * stride;
                     int base1 = nextK * stride;
                     _localScale[bi][0] = Lerp(track.Values[base0], track.Values[base1], frac);
@@ -213,10 +244,11 @@ namespace SlopArena.Shared
 
                 // Combine quaternions: q_world_child = q_world_parent * q_local_child
                 float lqw = _localRot[idx][3], lqx = _localRot[idx][0], lqy = _localRot[idx][1], lqz = _localRot[idx][2];
-                float w = pqw * lqw - pqx * lqx - pqy * lqy - pqz * lqz;
-                float x = pqw * lqx + pqx * lqw + pqy * lqz - pqz * lqy;
-                float y = pqw * lqy - pqx * lqz + pqy * lqw + pqz * lqx;
-                float z = pqw * lqz + pqx * lqy - pqy * lqx + pqz * lqw;
+                float w = (pqw * lqw) - (pqx * lqx) - (pqy * lqy) - (pqz * lqz);
+                float x = (pqw * lqx) + (pqx * lqw) + (pqy * lqz) - (pqz * lqy);
+                float y = (pqw * lqy) - (pqx * lqz) + (pqy * lqw) + (pqz * lqx);
+                float z = (pqw * lqz) + (pqx * lqy) - (pqy * lqx) + (pqz * lqw);
+
                 _worldRot[idx][0] = x; _worldRot[idx][1] = y;
                 _worldRot[idx][2] = z; _worldRot[idx][3] = w;
             }
@@ -261,21 +293,21 @@ namespace SlopArena.Shared
 
         // ── Helpers ──
 
-        private static float Lerp(float a, float b, float t) => a + (b - a) * t;
+        private static float Lerp(float a, float b, float t) => a + ((b - a) * t);
 
         private static void RotateVector3(ref float x, ref float y, ref float z,
             float qx, float qy, float qz, float qw)
         {
             // v' = 2*(qw*qv + q × qv) cross part + qv*(qw² - |q|²) scalar part
             float ux = qx, uy = qy, uz = qz;
-            float crossX = uy * z - uz * y;
-            float crossY = uz * x - ux * z;
-            float crossZ = ux * y - uy * x;
-            float dot = ux * x + uy * y + uz * z;
-            float s = qw * qw - (ux * ux + uy * uy + uz * uz);
-            x = 2f * (qw * crossX + dot * ux) + s * x;
-            y = 2f * (qw * crossY + dot * uy) + s * y;
-            z = 2f * (qw * crossZ + dot * uz) + s * z;
+            float crossX = (uy * z) - (uz * y);
+            float crossY = (uz * x) - (ux * z);
+            float crossZ = (ux * y) - (uy * x);
+            float dot = (ux * x) + (uy * y) + (uz * z);
+            float s = (qw * qw) - ((ux * ux) + (uy * uy) + (uz * uz));
+            x = (2f * ((qw * crossX) + (dot * ux))) + (s * x);
+            y = (2f * ((qw * crossY) + (dot * uy))) + (s * y);
+            z = (2f * ((qw * crossZ) + (dot * uz))) + (s * z);
         }
 
         // ── GLB PARSER ──
@@ -287,8 +319,8 @@ namespace SlopArena.Shared
             uint magic = BitConverter.ToUInt32(glbData, 0);
             if (magic != 0x46546C67) throw new Exception("Not a valid GLB file");
 
-            byte[]? binBuf = null;
-            JsonDocument? jsonDoc = null;
+            byte[] binBuf = null;
+            JsonDocument jsonDoc = null;
 
             while (pos < glbData.Length)
             {
@@ -296,7 +328,7 @@ namespace SlopArena.Shared
                 uint chunkType = BitConverter.ToUInt32(glbData, pos + 4);
                 if (chunkLen > 100_000_000)
                 {
-                    System.Console.WriteLine($"[Skeleton] Invalid chunkLen={chunkLen} at pos={pos}, fileLen={glbData.Length}");
+                    Console.WriteLine($"[Skeleton] Invalid chunkLen={chunkLen} at pos={pos}, fileLen={glbData.Length}");
                     break;
                 }
                 byte[] chunkData = new byte[chunkLen];
@@ -405,7 +437,7 @@ namespace SlopArena.Shared
                         float[] times = new float[inputCount];
                         if (binBuf != null)
                             for (int t = 0; t < inputCount; t++)
-                                times[t] = BitConverter.ToSingle(binBuf, inputByteOffset + t * 4);
+                                times[t] = BitConverter.ToSingle(binBuf, inputByteOffset + (t * 4));
 
                         // Read output (value) accessor
                         int outAccIdx = samp.GetProperty("output").GetInt32();
@@ -426,7 +458,7 @@ namespace SlopArena.Shared
                         if (binBuf != null)
                             for (int t = 0; t < outCount; t++)
                                 for (int c = 0; c < comps; c++)
-                                    values[t * comps + c] = BitConverter.ToSingle(binBuf, outByteOffset + t * realStride + c * 4);
+                                    values[(t * comps) + c] = BitConverter.ToSingle(binBuf, outByteOffset + (t * realStride) + (c * 4));
 
                         var key = (nodeIdx, path);
                         if (!trackMap.ContainsKey(key))
