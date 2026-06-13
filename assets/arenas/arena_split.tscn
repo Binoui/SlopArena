@@ -18,79 +18,79 @@ uv1_triplanar = true
 [node name="Arena" type="Node3D" unique_id=411501500]
 
 [node name="Lower_N" type="CSGBox3D" parent="." unique_id=562507988]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -2, 15)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -1, 15)
 use_collision = true
 size = Vector3(60, 2, 30)
 material = SubResource("mat_lower")
 
 [node name="Lower_S" type="CSGBox3D" parent="." unique_id=1912248413]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -2, 45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, -1, 45)
 use_collision = true
 size = Vector3(60, 2, 30)
 material = SubResource("mat_lower")
 
 [node name="Lower_W" type="CSGBox3D" parent="." unique_id=108600995]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, -2, 30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, -1, 30)
 use_collision = true
 size = Vector3(30, 2, 30)
 material = SubResource("mat_lower")
 
 [node name="Lower_E" type="CSGBox3D" parent="." unique_id=1936132782]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, -2, 30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, -1, 30)
 use_collision = true
 size = Vector3(30, 2, 30)
 material = SubResource("mat_lower")
 
 [node name="UpperCenter" type="CSGBox3D" parent="." unique_id=77338631]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 1, 30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 2, 30)
 use_collision = true
 size = Vector3(20, 2, 20)
 material = SubResource("mat_upper")
 
 [node name="Ramp_NW" type="CSGBox3D" parent="." unique_id=1324015762]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, -0.5, 22)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.5, 22)
 use_collision = true
 size = Vector3(4, 1, 4)
 material = SubResource("mat_upper")
 
 [node name="Ramp_NE" type="CSGBox3D" parent="." unique_id=1786611563]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, -0.5, 22)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 0.5, 22)
 use_collision = true
 size = Vector3(4, 1, 4)
 material = SubResource("mat_upper")
 
 [node name="Ramp_SW" type="CSGBox3D" parent="." unique_id=734675208]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, -0.5, 38)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.5, 38)
 use_collision = true
 size = Vector3(4, 1, 4)
 material = SubResource("mat_upper")
 
 [node name="Ramp_SE" type="CSGBox3D" parent="." unique_id=562031596]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, -0.5, 38)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 0.5, 38)
 use_collision = true
 size = Vector3(4, 1, 4)
 material = SubResource("mat_upper")
 
 [node name="Pillar_NW" type="CSGBox3D" parent="." unique_id=1585025044]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 6)
 use_collision = true
 size = Vector3(4, 6, 4)
 material = SubResource("mat_upper")
 
 [node name="Pillar_NE" type="CSGBox3D" parent="." unique_id=1121464126]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 1, 6)
 use_collision = true
 size = Vector3(4, 6, 4)
 material = SubResource("mat_upper")
 
 [node name="Pillar_SW" type="CSGBox3D" parent="." unique_id=159051765]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 54)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, 54)
 use_collision = true
 size = Vector3(4, 6, 4)
 material = SubResource("mat_upper")
 
 [node name="Pillar_SE" type="CSGBox3D" parent="." unique_id=525600580]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 54)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 1, 54)
 use_collision = true
 size = Vector3(4, 6, 4)
 material = SubResource("mat_upper")
