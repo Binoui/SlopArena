@@ -28,9 +28,11 @@ namespace SlopArena.Shared
         public byte AttackSlot;
         /// <summary>Combo stage index for animation selection.</summary>
         public byte ComboStage;
+        /// <summary>Facing yaw in radians, from server authority.</summary>
+        public float FacingYaw;
 
-        /// <summary>34 bytes (position + velocity + action state + grounded + state ticks + attack slot + combo)</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1;
+        /// <summary>38 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 4;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -49,6 +51,7 @@ namespace SlopArena.Shared
                 StateDurationFrames = s.StateTicks,
                 AttackSlot = s.AttackSlot,
                 ComboStage = s.ComboStage,
+                FacingYaw = s.FacingYaw,
             };
         }
 
@@ -64,6 +67,7 @@ namespace SlopArena.Shared
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
                 ComboStage = ComboStage,
+                FacingYaw = FacingYaw,
             };
         }
 
@@ -84,6 +88,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(30, 2), StateDurationFrames);
             buffer[32] = AttackSlot;
             buffer[33] = ComboStage;
+            BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(34, 4), FacingYaw);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -104,6 +109,7 @@ namespace SlopArena.Shared
             packet.StateDurationFrames = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(30, 2));
             packet.AttackSlot = buffer[32];
             packet.ComboStage = buffer[33];
+            packet.FacingYaw = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(34, 4));
             return packet;
         }
     }
