@@ -71,12 +71,12 @@ namespace SlopArena.Shared
             ArenaDefinition arena)
         {
             var stats = def.Movement;
-    
+
             // Apply combat aim yaw from input (degrees * 100 → radians)
             // FacingYaw (movement-facing) is handled by ProcessNormalMovement via Atan2
             float aimDeg = input.AimYaw * 0.01f;
             s.AimYaw = aimDeg * (MathF.PI / 180f);
-    
+
             // 1. Tick timers
             TickTimers(ref s);
 
@@ -142,7 +142,12 @@ namespace SlopArena.Shared
                 {
                     var ability = input.ActiveSlot switch
                     {
-                        1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                        1 => def.LMB,
+                        2 => def.RMB,
+                        3 => def.Q,
+                        4 => def.E,
+                        5 => def.R,
+                        6 => def.F,
                         _ => def.LMB,
                     };
                     if (s.ComboStage < ability.Stages.Length - 1)
@@ -157,8 +162,12 @@ namespace SlopArena.Shared
                 {
                     ushort cd = input.ActiveSlot switch
                     {
-                        1 => s.Cooldown0, 2 => s.Cooldown1, 3 => s.Cooldown2,
-                        4 => s.Cooldown3, 5 => s.Cooldown4, 6 => s.Cooldown5,
+                        1 => s.Cooldown0,
+                        2 => s.Cooldown1,
+                        3 => s.Cooldown2,
+                        4 => s.Cooldown3,
+                        5 => s.Cooldown4,
+                        6 => s.Cooldown5,
                         _ => 0,
                     };
                     if (cd == 0)
@@ -181,7 +190,7 @@ namespace SlopArena.Shared
             s.PY += s.VY * TickDt;
 
             // 7. Ground collision (flat floor)
-            float groundY = arena.FloorHeight + def.CapsuleHeight * 0.5f;
+            float groundY = arena.FloorHeight + (def.CapsuleHeight * 0.5f);
             if (s.PY <= groundY + 0.1f)
             {
                 s.IsGrounded = true;
@@ -299,7 +308,7 @@ namespace SlopArena.Shared
 
             // Ground check
             bool wasAirborne = !s.IsGrounded;
-            float groundY = arena.FloorHeight + def.CapsuleHeight * 0.5f;
+            float groundY = arena.FloorHeight + (def.CapsuleHeight * 0.5f);
             s.IsGrounded = s.PY <= groundY + 0.1f;
 
             if (s.IsGrounded)
@@ -485,7 +494,12 @@ namespace SlopArena.Shared
 
             var ability = s.AttackSlot switch
             {
-                1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                1 => def.LMB,
+                2 => def.RMB,
+                3 => def.Q,
+                4 => def.E,
+                5 => def.R,
+                6 => def.F,
                 _ => def.LMB,
             };
 
@@ -523,15 +537,24 @@ namespace SlopArena.Shared
         {
             var ability = slot switch
             {
-                1 => def.LMB, 2 => def.RMB, 3 => def.Q, 4 => def.E, 5 => def.R, 6 => def.F,
+                1 => def.LMB,
+                2 => def.RMB,
+                3 => def.Q,
+                4 => def.E,
+                5 => def.R,
+                6 => def.F,
                 _ => def.LMB,
             };
 
             // Cooldown check
             ushort cd = slot switch
             {
-                1 => s.Cooldown0, 2 => s.Cooldown1, 3 => s.Cooldown2,
-                4 => s.Cooldown3, 5 => s.Cooldown4, 6 => s.Cooldown5,
+                1 => s.Cooldown0,
+                2 => s.Cooldown1,
+                3 => s.Cooldown2,
+                4 => s.Cooldown3,
+                5 => s.Cooldown4,
+                6 => s.Cooldown5,
                 _ => 0,
             };
             if (cd > 0) return;
