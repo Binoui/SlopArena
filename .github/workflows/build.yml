@@ -21,7 +21,13 @@ jobs:
         run: dotnet restore
 
       - name: Format check
-        run: dotnet format SlopArena.sln --verify-no-changes --verbosity diagnostic
+        run: |
+          dotnet format SlopArena.sln
+          if ! git diff --exit-code; then
+            echo "❌ Formatting changes were made. Run 'dotnet format SlopArena.sln' locally and commit."
+            exit 1
+          fi
+          echo "✅ No formatting changes needed"
 
       - name: Build
         run: dotnet build --no-restore --verbosity minimal
