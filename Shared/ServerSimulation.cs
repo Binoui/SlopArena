@@ -53,6 +53,12 @@ namespace SlopArena.Shared
             if (baked != null && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
             {
                 int animIdx = baked.FindAnimIndex(targetAnim);
+                // Fallback to idle if animation not in baked data
+                if (animIdx < 0)
+                {
+                    targetAnim = "idle";
+                    animIdx = baked.FindAnimIndex(targetAnim);
+                }
                 if (animIdx >= 0)
                 {
                     // Clamp frame
@@ -162,6 +168,13 @@ namespace SlopArena.Shared
                         targetAnim = "idle";
 
                     int animIdx = baked.FindAnimIndex(targetAnim);
+                    // Fallback to idle if the animation isn't in the baked data
+                    // (air attacks, spells — not all GLB animations are baked)
+                    if (animIdx < 0)
+                    {
+                        targetAnim = "idle";
+                        animIdx = baked.FindAnimIndex(targetAnim);
+                    }
                     if (animIdx >= 0)
                     {
                         int fc = baked.Animations[animIdx].FrameCount;
