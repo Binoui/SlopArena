@@ -1258,7 +1258,7 @@ public partial class PlayerController : CharacterBody3D
     {
         // All abilities handled by sim now. Keep the warp logic for now.
         if (_combatComponent == null || !stage.UseTargetLock) return;
-        _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, null);
+        _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, null!);
     }
 
     /// <summary>
