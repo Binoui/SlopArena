@@ -112,7 +112,7 @@ _Process(delta):
   1. Receive server states (non-bloquant)
      → Net.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(32) = 44B
+     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(38) = 50B
 
   2. For player's server state:
      a. Find predicted state for same tick
@@ -172,7 +172,7 @@ Tick():
   6. Broadcast to all clients
      → For each client:
        → For each entity:
-         → Packet: entityId(8) + tick(4) + CharacterStatePacket(32) = 44B
+         → Packet: entityId(8) + tick(4) + CharacterStatePacket(38) = 50B
          → tick = client's own tick number (echoed back)
        → Client filters by entityId
 ```
@@ -214,7 +214,7 @@ Total: 22 bytes
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(32) = 44 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(38) = 50 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
@@ -231,19 +231,22 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(32) = 44
 Total: 44 bytes per entity
 ```
 
-**CharacterStatePacket layout (32 bytes):**
+**CharacterStatePacket layout (38 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0      | uint    | TickNumber          | Echoed client tick (for matching) |
-| 4      | float   | PositionX           |                                    |
-| 8      | float   | PositionY           |                                    |
-| 12     | float   | PositionZ           |                                    |
-| 16     | float   | VelocityX           |                                    |
-| 20     | float   | VelocityY           |                                    |
-| 24     | float   | VelocityZ           |                                    |
-| 28     | byte    | CurrentActionState  | ActionState enum                   |
-| 29     | byte    | IsGrounded          | Bool (0/1)                         |
-| 30     | ushort  | StateDurationFrames | Remaining ticks in current state   |
+| 4      | float   | PositionX           | World X                            |
+| 8      | float   | PositionY           | World Y                            |
+| 12     | float   | PositionZ           | World Z                            |
+| 16     | float   | VelocityX           | World velocity X                   |
+| 20     | float   | VelocityY           | World velocity Y                   |
+| 24     | float   | VelocityZ           | World velocity Z                   |
+| 28     | byte    | CurrentActionState  | Idle/Dashing/Attacking/Hitstun     |
+| 29     | byte    | IsGrounded          | 0 or 1                             |
+| 30-31  | ushort  | StateDurationFrames | Remaining ticks in current state  |
+| 32     | byte    | AttackSlot          | 0=none, 1-6=LMB/RMB/Q/E/R/F      |
+| 33     | byte    | ComboStage          | 0-3 combo chain stage             |
+| 34-37  | float   | FacingYaw           | Server-authoritative facing yaw   |
 
 **Le serveur envoie TOUS les états à chaque client.** Le client ignore ceux qui ne le concernent pas. Pas de overhead de routing.
 
@@ -286,7 +289,7 @@ Total: 44 bytes per entity
 | EntityId            | ulong   | 0 = unassigned                       |
 | ...                 |         |                                      |
 
-Only a subset is serialized in `CharacterStatePacket` (position, velocity, action state, grounded flag, state duration, tick number). The remaining fields are computed locally or will be added to later packet versions.
+Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, and facing yaw are serialized. The remaining fields (jumps, dodges, DI, knockback, etc.) are computed locally.
 
 ---
 

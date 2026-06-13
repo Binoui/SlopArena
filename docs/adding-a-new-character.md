@@ -328,9 +328,21 @@ HurtboxBoneDefs = new HurtboxBoneDef[]
 - Loads your character scene (Skeleton3D + AnimationPlayer)
 - For each animation, samples bone positions at 60fps
 - Transforms positions into Hips local space via `AffineInverse()`
-- Writes a compact binary file (≈170KB for 7 bones × 19 anims)
+- Writes a compact binary file (≈270KB for 11 bones × 19 anims)
 
-### 4d. Integration checklist
+### 4d. Integration & visual alignment
+
+After baking, the system auto-computes the visual model offset:
+
+```csharp
+AutoModelYOffset = true,       // compute from baked data
+HurtboxBoneScale = 0.01f,      // Mixamo cm→m conversion
+ModelSoleOffset = 0.47f,       // fine-tune so feet touch ground
+```
+
+The auto-offset scans all bones at idle frame 0, finds the lowest point (toe tip), and positions the model so it touches the capsule bottom. If the feet don't touch the ground, adjust `ModelSoleOffset`.
+
+### 4e. Integration checklist
 
 - [ ] `BakedDataPath` points to the generated .bin
 - [ ] `HurtboxBoneScale` matches your GLB's unit system
@@ -382,6 +394,7 @@ Update this switch when adding a new class.
 - [ ] `AnimationNames` — set in each AbilityData
 - [ ] Bake skeleton — run `BakeSkeletonTool` → check `.bin` in `data/`
 - [ ] `BakedDataPath` + `HurtboxBoneScale` set in `CharacterDefinition`
+- [ ] `ModelSoleOffset` adjusted so the model's feet touch the ground
 - [ ] `ClassSelectUI` — add to class switch if needed
 - [ ] Build & test — `dotnet build`, 0 errors
 
