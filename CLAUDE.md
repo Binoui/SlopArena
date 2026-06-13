@@ -107,7 +107,7 @@ The client CAN use Godot physics for rendering/prediction, but the server is the
 - All network packets use `System.Buffers.Binary.BinaryPrimitives` for explicit little-endian serialization
 - Packet size is a compile-time constant (`Size`)
 - No Godot types in packet structs — serialize as primitives (float, int, byte, ushort)
-- Client sends `ClientInputPacket` (14 bytes), server responds with `CharacterStatePacket` (31 bytes)
+- Client sends `ClientInputPacket` (14 bytes), server responds with `CharacterStatePacket` (38 bytes)
 
 ### 5f. Don't Mix Rendering with Logic
 
