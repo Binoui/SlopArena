@@ -79,7 +79,7 @@ namespace SlopArena.Shared
                     DisplayName = "The Pit",
                     ScenePath = "res://assets/arenas/arena_pit.tscn",
                     KillHeight = -15f,  // Deep blast zone (80x80 large stage)
-                    FloorHeight = -1f,
+                    FloorHeight = 0f,
                     MinX = 0f, MaxX = 80f,
                     MinZ = 0f, MaxZ = 80f,
                     SpawnPoints = new[]
@@ -118,18 +118,18 @@ namespace SlopArena.Shared
                     Name = "split",
                     DisplayName = "The Split",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
-                    KillHeight = -7f,   // Shallow blast zone (60x60 small competitive stage)
-                    FloorHeight = -1f,
+                    KillHeight = -6f,   // Shallow blast zone (60x60 small competitive stage)
+                    FloorHeight = 0f,
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]
                     {
-                        new SpawnPoint { X = 15f, Y = 0.5f, Z = 15f, Yaw = 0f },
-                        new SpawnPoint { X = 45f, Y = 0.5f, Z = 15f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 15f, Y = 0.5f, Z = 45f, Yaw = 0f },
-                        new SpawnPoint { X = 45f, Y = 0.5f, Z = 45f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 30f, Y = 2.5f, Z = 30f, Yaw = 0f },
-                        new SpawnPoint { X = 22f, Y = 0.5f, Z = 30f, Yaw = 0f },
+                        new SpawnPoint { X = 15f, Y = 1.5f, Z = 15f, Yaw = 0f },
+                        new SpawnPoint { X = 45f, Y = 1.5f, Z = 15f, Yaw = MathF.PI },
+                        new SpawnPoint { X = 15f, Y = 1.5f, Z = 45f, Yaw = 0f },
+                        new SpawnPoint { X = 45f, Y = 1.5f, Z = 45f, Yaw = MathF.PI },
+                        new SpawnPoint { X = 30f, Y = 3.5f, Z = 30f, Yaw = 0f },
+                        new SpawnPoint { X = 22f, Y = 1.5f, Z = 30f, Yaw = 0f },
                     }
                 },
             };

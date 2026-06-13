@@ -66,8 +66,14 @@ namespace SlopArena.Shared
         /// </summary>
         public float ModelYOffset;
         /// <summary>
+        /// Additional downward offset for the sole of the foot (below the lowest bone).
+        /// Bones are inside the mesh; this accounts for sole thickness.
+        /// Typical: 0.04-0.06m for humanoids, 0 for robots/mechs.
+        /// </summary>
+        public float ModelSoleOffset;
+        /// <summary>
         /// If true, ModelYOffset is computed from the baked skeleton data
-        /// (foot bone position at idle frame 0) instead of using the manual value.
+        /// (lowest bone position at idle frame 0) instead of using the manual value.
         /// </summary>
         public bool AutoModelYOffset;
 
@@ -183,6 +189,7 @@ namespace SlopArena.Shared
                 GlbPath = "res://assets/characters/manki/manki.glb",
                 BakedDataPath = "res://data/manki_skeleton.bin",
                 HurtboxBoneScale = 0.01f,
+                ModelSoleOffset = 0.47f,
                 AutoModelYOffset = true,
                 LMB = new AbilityData
                 {

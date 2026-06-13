@@ -1205,8 +1205,7 @@ public partial class PlayerController : CharacterBody3D
             if (found > 0 && lowestY < float.MaxValue)
             {
                 float footWorldY = lowestY * _charDef.HurtboxBoneScale;
-                float offset = -(footWorldY + _charDef.CapsuleHeight * 0.5f);
-                GD.Print($"[Model] Auto-offset: lowestBoneY={lowestY:F4} → {offset:F4}m ({found}/{_bakedData.BoneNames.Length} bones)");
+                float offset = -(footWorldY + _charDef.CapsuleHeight * 0.5f + _charDef.ModelSoleOffset);
                 return offset;
             }
             GD.Print("[Model] No 'idle' animation or bones in baked data, using fallback");
@@ -1268,7 +1267,7 @@ public partial class PlayerController : CharacterBody3D
         _bakedData.GetBonePosition("idle", 0, 6, out _, out float footY, out _);
         float footWorld = py + modelY + footY * _charDef.HurtboxBoneScale;
         GD.Print($"[Y] state.PY={py:F4} capsuleBottom={capsuleBottom:F4} floor={Simulation.FloorHeight} " +
-                 $"modelOff={modelY:F4} | " +
+                 $"modelOff={modelY:F4} sole={_charDef.ModelSoleOffset:F4} | " +
                  $"Hips_world={hipsWorld:F4} Foot_world={footWorld:F4} Toe_world={toeWorld:F4}");
     }
 
