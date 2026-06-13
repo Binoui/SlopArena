@@ -400,6 +400,12 @@ public partial class MatchManager : Node3D
 
             // Track animation frame (same loop/wrap logic as ServerSimulation)
             int animIdx = baked?.FindAnimIndex(targetAnim) ?? -1;
+            // Fallback to idle for unbaked anims
+            if (animIdx < 0 && baked != null)
+            {
+                targetAnim = "idle";
+                animIdx = baked.FindAnimIndex(targetAnim);
+            }
             int frame = _serverAnimFrames.GetValueOrDefault(id, 0);
             int prevIdx = _serverPrevAnimIdx.GetValueOrDefault(id, -1);
             if (prevIdx != animIdx)
