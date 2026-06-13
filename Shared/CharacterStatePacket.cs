@@ -24,8 +24,13 @@ namespace SlopArena.Shared
         /// <summary>IsGrounded flag from server.</summary>
         public bool IsGrounded;
 
-        /// <summary>32 bytes (position + velocity + action state + grounded + state ticks)</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2;
+        /// <summary>Attack slot (1-6) for animation selection on client/ghost.</summary>
+        public byte AttackSlot;
+        /// <summary>Combo stage index for animation selection.</summary>
+        public byte ComboStage;
+
+        /// <summary>34 bytes (position + velocity + action state + grounded + state ticks + attack slot + combo)</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -42,6 +47,8 @@ namespace SlopArena.Shared
                 CurrentActionState = (byte)s.State,
                 IsGrounded = s.IsGrounded,
                 StateDurationFrames = s.StateTicks,
+                AttackSlot = s.AttackSlot,
+                ComboStage = s.ComboStage,
             };
         }
 
@@ -55,6 +62,8 @@ namespace SlopArena.Shared
                 State = (ActionState)CurrentActionState,
                 IsGrounded = IsGrounded,
                 StateTicks = StateDurationFrames,
+                AttackSlot = AttackSlot,
+                ComboStage = ComboStage,
             };
         }
 
@@ -73,6 +82,8 @@ namespace SlopArena.Shared
             buffer[28] = CurrentActionState;
             buffer[29] = IsGrounded ? (byte)1 : (byte)0;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(30, 2), StateDurationFrames);
+            buffer[32] = AttackSlot;
+            buffer[33] = ComboStage;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -91,6 +102,8 @@ namespace SlopArena.Shared
             packet.CurrentActionState = buffer[28];
             packet.IsGrounded = buffer[29] != 0;
             packet.StateDurationFrames = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(30, 2));
+            packet.AttackSlot = buffer[32];
+            packet.ComboStage = buffer[33];
             return packet;
         }
     }
