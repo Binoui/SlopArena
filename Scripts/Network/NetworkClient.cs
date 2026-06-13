@@ -17,7 +17,7 @@ public partial class NetworkClient : Node
     private ulong _entityId;
     private bool _connected;
 
-    public bool IsConnected => _connected;
+    new public bool IsConnected => _connected;
 
     /// <summary>Last received server tick (for comparison).</summary>
     public uint LastServerTick { get; private set; }

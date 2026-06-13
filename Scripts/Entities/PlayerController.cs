@@ -56,8 +56,14 @@ public partial class PlayerController : CharacterBody3D
     private Node3D? _playerModel;
     private BoneHurtboxSetup? _boneHurtboxes;
     private bool _heavyHeld = false;
-    public byte _pendingSlotPress; // set by _UnhandledInput, consumed by BuildInputState
-    private byte _lastComboStage; // track animation changes during combo chain
+    /// <summary>
+    /// set by _UnhandledInput, consumed by BuildInputState
+    /// </summary>
+    public byte _pendingSlotPress;
+    /// <summary>
+    /// track animation changes during combo chain
+    /// </summary>
+    private byte _lastComboStage;
 
     /// <summary>
     /// Persistent damage % label above the character (Smash-style)
@@ -177,7 +183,7 @@ public partial class PlayerController : CharacterBody3D
         // Create combat component with target lock
         _combatComponent = new CombatComponent();
         _combatComponent.Name = "CombatComponent";
-        _combatComponent.Setup(this, simulation, entityId, spellVFX, _targetLock);
+        _combatComponent.Setup(this, simulation!, entityId, spellVFX, _targetLock);
         _combatComponent.OnTakeDamage += OnCombatTakeDamage;
         AddChild(_combatComponent);
     }
@@ -694,14 +700,14 @@ public partial class PlayerController : CharacterBody3D
 
         // Dash FSM transition
         if (_fsm != null && simState == ActionState.Dashing && !_fsm.IsInState("dash"))
+        {
+            var dashState = _fsm.GetState<DashState>("dash");
+            if (dashState != null)
             {
-                var dashState = _fsm.GetState<DashState>("dash");
-                if (dashState != null)
-                {
-                    dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
-                    _fsm.TransitionTo("dash");
-                }
+                dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
+                _fsm.TransitionTo("dash");
             }
+        }
 
         bool wasKnocked = _movementComponent.IsInKnockback();
         // Movement simulation handled by ServerSimulation (in MatchManager._PhysicsProcess)
@@ -932,116 +938,6 @@ public partial class PlayerController : CharacterBody3D
         }
     }
 
-    /// <summary>
-    /// Resolve attack stages against simulation entities via SpellResolver.
-    /// </summary>
-    private void ResolveAbilityStages(AttackStage[] stages, int slotIndex, bool airborne)
-    {
-        var sim = _combatComponent?.GetSimulation();
-        if (sim == null || _combatComponent == null) return;
-        ulong pid = _combatComponent.GetEntityId();
-
-        // LMB combo stage tracking via CharacterState (ground only; air uses stage 0)
-        int stageIndex;
-        byte newComboStage = _movementComponent.State.ComboStage;
-        if (slotIndex == 0 && !airborne)
-        {
-            if (_movementComponent.State.ComboStage == 0)
-                newComboStage = 1;
-            else if (_movementComponent.State.ComboStage < stages.Length)
-                newComboStage++;
-            else
-            {
-                ref var s = ref _movementComponent.State;
-                s.BufferedChain = 0; // combo maxed, clear queue
-                return;
-            }
-            stageIndex = newComboStage - 1;
-        }
-        else
-        {
-            stageIndex = 0;
-        }
-        // ── Stage resolution (hitbox spawning) ──
-        // Sim handles LMB hitbox spawning (triggered by HitboxEvent.TriggerTick)
-        // Client still handles other slots (RMB, Q, E, R, F) via AbilityRegistry effects
-
-        var stage = stages[stageIndex];
-        var hitEvent = stage.HitboxEvents != null && stage.HitboxEvents.Length > 0
-            ? stage.HitboxEvents[0] : default;
-
-        // Look up full ability data for aimed-charge / cone detection
-        var ability = _charDef.GetSlotAbility(slotIndex, airborne);
-        bool isConeAttack = ability.AimedCharge.HasValue;
-        // Use camera-relative input direction for lunge, fall back to character facing
-        Vector3 fwd = (-Transform.Basis.Z with { Y = 0 }).Normalized();
-        Vector3 lungeDir = _moveDirection.LengthSquared() > 0.001f ? _moveDirection : fwd;
-        Vector3 pos = GlobalPosition;
-
-        // Lunge in camera-relative input direction (not character facing)
-        if (stage.LungeForce > 0f)
-        {
-            float upBoost = Velocity.Y + 2f;
-            Velocity = new Vector3(lungeDir.X * stage.LungeForce, upBoost, lungeDir.Z * stage.LungeForce);
-        }
-
-        // Spawn melee hitbox in attack direction
-        Vector3 hitDir = GetAttackDirection(stage);
-        Vector3 handPos = pos + (Vector3.Up * 1.2f); // Hand height
-        Vector3 hitPos = pos + (hitDir * 2.0f) + (Vector3.Up * 1.0f);
-
-        Hitbox hb;
-        if (isConeAttack)
-        {
-            // Capsule (tube) hitbox for flamethrower-like abilities
-            float maxRange = ability.AimedCharge!.Value.ConeRange;
-            // Scale range by charge: 10m (uncharged) → 15m (full)
-            ushort ct = _movementComponent.State.ChargeTicks;
-            ushort maxCt = ability.AimedCharge!.Value.MaxChargeTicks;
-            float t = maxCt > 0 ? Math.Clamp((float)ct / maxCt, 0f, 1f) : 0f;
-            float coneRange = 10f + (t * (maxRange - 10f));
-            // TEMP: negate direction — GLB model faces +Z (Mixamo), not Godot -Z
-            Vector3 tipPos = handPos + (-hitDir * coneRange);
-            hb = new Hitbox
-            {
-                X = handPos.X, Y = handPos.Y, Z = handPos.Z,
-                EndX = tipPos.X, EndY = tipPos.Y, EndZ = tipPos.Z,
-                Shape = HitboxShape.Capsule,
-                Radius = 0.6f,  // Narrow tube
-                DurationTicks = 12,  // ~200ms burst
-                Damage = hitEvent.Damage,
-                KnockbackForce = hitEvent.KnockbackForce,
-                KnockbackUpward = hitEvent.KnockbackUpward,
-                StunTicks = hitEvent.StunTicks,
-                OwnerId = pid,
-            };
-        }
-        else
-        {
-            // Default sphere hitbox for melee attacks
-            hb = new Hitbox
-            {
-                X = hitPos.X, Y = hitPos.Y, Z = hitPos.Z,
-                Radius = 2.5f,
-                DurationTicks = 15,
-                Damage = hitEvent.Damage,
-                KnockbackForce = hitEvent.KnockbackForce,
-                KnockbackUpward = hitEvent.KnockbackUpward,
-                StunTicks = hitEvent.StunTicks,
-                OwnerId = pid,
-            };
-        }
-        SpellResolver.Spawn(hb);
-        if (isConeAttack)
-            GD.Print($"[HITBOX] Capsule R={hb.Radius:F1} RNG={ability.AimedCharge!.Value.ConeRange} DMG={hitEvent.Damage} KB={hitEvent.KnockbackForce}");
-        else
-            GD.Print($"[HITBOX] Sphere at ({hitPos.X:F1},{hitPos.Y:F1},{hitPos.Z:F1}) R={hb.Radius:F1} " +
-                     $"DMG={hitEvent.Damage} KB={hitEvent.KnockbackForce} Dir=({hitDir.X:F1},{hitDir.Z:F1})");
-
-        // Update CharacterState combo/animation ticks
-        _movementComponent.SetComboState(newComboStage, stage.ChainWindowTicks, stage.DurationTicks);
-    }
-
     // ==========================================
     // KNOCKBACK
     // ==========================================
@@ -1205,8 +1101,7 @@ public partial class PlayerController : CharacterBody3D
             if (found > 0 && lowestY < float.MaxValue)
             {
                 float footWorldY = lowestY * _charDef.HurtboxBoneScale;
-                float offset = -(footWorldY + _charDef.CapsuleHeight * 0.5f + _charDef.ModelSoleOffset);
-                return offset;
+                return -(footWorldY + (_charDef.CapsuleHeight * 0.5f) + _charDef.ModelSoleOffset);
             }
             GD.Print("[Model] No 'idle' animation or bones in baked data, using fallback");
         }
@@ -1256,16 +1151,16 @@ public partial class PlayerController : CharacterBody3D
     {
         if (_bakedData == null) return;
         float py = _movementComponent.State.PY;
-        float capsuleBottom = py - _charDef.CapsuleHeight * 0.5f;
+        float capsuleBottom = py - (_charDef.CapsuleHeight * 0.5f);
         float modelY = _playerModel?.Position.Y ?? 0f;
         // LeftToe_End world Y (index 10 in baked data)
         _bakedData.GetBonePosition("idle", 0, 10, out _, out float toeY, out _);
-        float toeWorld = py + modelY + toeY * _charDef.HurtboxBoneScale;
+        float toeWorld = py + modelY + (toeY * _charDef.HurtboxBoneScale);
         // Hips world Y (bone index 2, always 0 in baked)
         float hipsWorld = py + modelY;
         // LeftFoot hurtbox world Y (bone index 6)
         _bakedData.GetBonePosition("idle", 0, 6, out _, out float footY, out _);
-        float footWorld = py + modelY + footY * _charDef.HurtboxBoneScale;
+        float footWorld = py + modelY + (footY * _charDef.HurtboxBoneScale);
         GD.Print($"[Y] state.PY={py:F4} capsuleBottom={capsuleBottom:F4} floor={Simulation.FloorHeight} " +
                  $"modelOff={modelY:F4} sole={_charDef.ModelSoleOffset:F4} | " +
                  $"Hips_world={hipsWorld:F4} Foot_world={footWorld:F4} Toe_world={toeWorld:F4}");
@@ -1364,41 +1259,6 @@ public partial class PlayerController : CharacterBody3D
         // All abilities handled by sim now. Keep the warp logic for now.
         if (_combatComponent == null || !stage.UseTargetLock) return;
         _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, null);
-    }
-
-    /// <summary>
-    /// Get attack direction with priority:
-    /// 1. Cached warp direction (if we just warped)
-    /// 2. Active target lock (if target still locked)
-    /// 3. Input direction (if moving)
-    /// 4. Camera forward (fallback)
-    /// </summary>
-    private Vector3 GetAttackDirection(AttackStage stage)
-    {
-        // Priority 1: Cached warp direction
-        Vector3 warpDir = _combatComponent?.GetFinalWarpDirection() ?? Vector3.Zero;
-        if (stage.UseTargetLock && warpDir.LengthSquared() > 0.001f)
-        {
-            warpDir.Y = 0;
-            return warpDir.Normalized();
-        }
-
-        // Priority 2: Active target lock
-        if (stage.UseTargetLock && _targetLock?.CurrentTarget != null)
-        {
-            Vector3 dir = _targetLock.GetDirectionToTarget();
-            dir.Y = 0;
-            return dir.Normalized();
-        }
-
-        // Priority 3: Input direction
-        if (_moveDirection.LengthSquared() > 0.001f)
-        {
-            return _moveDirection;
-        }
-
-        // Priority 4: Player forward (character facing, not camera — camera looks at player)
-        return GetPlayerForward();
     }
 
     /// <summary>

@@ -35,19 +35,25 @@ public partial class MatchManager : Node3D
     private const int NpcCount = 5;
     private ArenaDefinition _arenaDef = ArenaRegistry.Get("split");
 
-    // ── Local prediction ──
+    /// <summary>
+    /// ── Local prediction ──
+    /// </summary>
     private ServerSimulation _localSim = null!;
     private CharacterDefinition _charDef;
     private ulong _playerEntityId = 1;
     private BakedAnimationData _playerBakedData = null!;
 
-    // ── Server ghost (confirmed state from server, drawn in green) ──
+    /// <summary>
+    /// ── Server ghost (confirmed state from server, drawn in green) ──
+    /// </summary>
     private readonly Dictionary<ulong, CharacterState> _serverConfirmedStates = new();
     private readonly Dictionary<ulong, int> _serverAnimFrames = new();
     private readonly Dictionary<ulong, int> _serverPrevAnimIdx = new();
     private uint _lastServerTick;
 
-    // ── Tick + rollback ──
+    /// <summary>
+    /// ── Tick + rollback ──
+    /// </summary>
     private const int RollbackFrames = 10;
     private uint _sendTick;
     private readonly InputState[] _inputBuffer = new InputState[RollbackFrames];
@@ -84,17 +90,19 @@ public partial class MatchManager : Node3D
             catch (Exception ex)
             {
                 GD.PrintErr($"[Match] Failed to load baked data: {ex.Message}");
-                GD.PrintErr($"[Match] Will use fallback capsules");
+                GD.PrintErr("[Match] Will use fallback capsules");
             }
         }
         else
         {
-            GD.Print($"[Match] No baked data path set, using fallback capsules");
+            GD.Print("[Match] No baked data path set, using fallback capsules");
         }
 
         var initialState = new CharacterState
         {
-            PX = spawn.X, PY = spawn.Y + 5f, PZ = spawn.Z,
+            PX = spawn.X,
+            PY = spawn.Y + 5f,
+            PZ = spawn.Z,
             FacingYaw = spawn.Yaw,
             JumpsLeft = _charDef.Movement.MaxJumps,
         };
@@ -105,7 +113,9 @@ public partial class MatchManager : Node3D
             var npcSpawn = _arenaDef.SpawnPoints[i];
             _localSim.RegisterEntity((ulong)(100 + i), _charDef, new CharacterState
             {
-                PX = npcSpawn.X, PY = npcSpawn.Y + 1f, PZ = npcSpawn.Z,
+                PX = npcSpawn.X,
+                PY = npcSpawn.Y + 1f,
+                PZ = npcSpawn.Z,
                 FacingYaw = npcSpawn.Yaw,
                 JumpsLeft = _charDef.Movement.MaxJumps,
             }, _playerBakedData);
@@ -180,7 +190,7 @@ public partial class MatchManager : Node3D
         // 3. Store predicted state
         var predicted = _localSim.GetState(_playerEntityId);
         _stateBuffer[_sendTick % RollbackFrames] = predicted;
-        
+
         // Debug: first batch of entity data
         if (_sendTick == 10)
         {
@@ -393,7 +403,7 @@ public partial class MatchManager : Node3D
                 targetAnim = "small_hit";
             else if (!state.IsGrounded)
                 targetAnim = state.VY > 0 ? "jump" : "fall";
-            else if (state.VX * state.VX + state.VZ * state.VZ > 1f)
+            else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f)
                 targetAnim = "run";
             else
                 targetAnim = "idle";

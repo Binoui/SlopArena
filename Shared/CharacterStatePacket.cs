@@ -60,8 +60,12 @@ namespace SlopArena.Shared
         {
             return new CharacterState
             {
-                PX = PositionX, PY = PositionY, PZ = PositionZ,
-                VX = VelocityX, VY = VelocityY, VZ = VelocityZ,
+                PX = PositionX,
+                PY = PositionY,
+                PZ = PositionZ,
+                VX = VelocityX,
+                VY = VelocityY,
+                VZ = VelocityZ,
                 State = (ActionState)CurrentActionState,
                 IsGrounded = IsGrounded,
                 StateTicks = StateDurationFrames,

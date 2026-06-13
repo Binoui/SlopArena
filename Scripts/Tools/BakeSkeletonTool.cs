@@ -1,5 +1,4 @@
 using Godot;
-using SlopArena.Shared;
 using System;
 using System.Collections.Generic;
 
@@ -14,7 +13,8 @@ namespace SlopArena.Tools
     {
         [Export] public string CharacterScenePath = "res://assets/characters/manki/manki.tscn";
         [Export] public string OutputPath = "res://data/manki_skeleton.bin";
-        [Export] public bool TriggerBake
+        [Export]
+        public bool TriggerBake
         {
             get => _triggerBake;
             set
@@ -28,7 +28,9 @@ namespace SlopArena.Tools
         }
         private bool _triggerBake;
 
-        // Actual bone names from Godot's Skeleton3D (underscore format)
+        /// <summary>
+        /// Actual bone names from Godot's Skeleton3D (underscore format)
+        /// </summary>
         private static readonly string[] BoneNames = new[]
         {
             "mixamorig_Head",
@@ -102,7 +104,7 @@ namespace SlopArena.Tools
                 for (int i = 0; i < skel.GetBoneCount(); i++)
                     allBones += (i > 0 ? ", " : "") + skel.GetBoneName(i);
                 GD.PrintErr($"BakeSkeleton: All bones: {allBones}");
-                GD.PrintErr($"BakeSkeleton: No bones matched");
+                GD.PrintErr("BakeSkeleton: No bones matched");
                 QuitGame();
                 return;
             }

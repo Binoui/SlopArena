@@ -1,6 +1,5 @@
 using Godot;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using SlopArena.Shared;
 
@@ -9,7 +8,7 @@ using SlopArena.Shared;
 /// </summary>
 public partial class Main : Node3D
 {
-    private Process? _serverProcess;
+    private Process _serverProcess;
     private MatchManager _matchManager = null!;
     private CanvasLayer _canvasLayer = null!;
     private ActionBarHUD _actionBarHUD = null!;
@@ -136,7 +135,7 @@ public partial class Main : Node3D
         };
 
         // Respawn timer in _Process
-        var respawnTimer = 0f;
+        const float respawnTimer = 0f;
         SetProcess(true);
         // Override _Process via a simple timer approach isn't great, use a handler
         _matchManager.Player.OnStateUpdated += (_, _, _, _, _) =>
@@ -224,7 +223,7 @@ public partial class Main : Node3D
         crosshair.Size = new Vector2(8f, 8f);
         crosshair.Color = new Color(1f, 1f, 1f, 0.6f);
         crosshair.MouseFilter = Control.MouseFilterEnum.Ignore;
-        crosshair.Position = GetViewport().GetVisibleRect().Size / 2 - new Vector2(4f, 4f);
+        crosshair.Position = (GetViewport().GetVisibleRect().Size / 2) - new Vector2(4f, 4f);
         _canvasLayer.AddChild(crosshair);
     }
 

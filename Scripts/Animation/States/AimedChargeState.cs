@@ -174,7 +174,7 @@ public sealed partial class AimedChargeState : State
         _attackFired = true;
 
         // Determine if fully charged
-        bool fullyCharged = _config.MaxChargeTicks > 0 && _chargeTicks >= _config.MaxChargeTicks;
+        _ = _config.MaxChargeTicks > 0 && _chargeTicks >= _config.MaxChargeTicks;
 
         // Signal the sim to start the attack via pending slot press
         // _slotIndex is 0-5, map to 1-6 for ActiveSlot

@@ -27,7 +27,7 @@ public partial class DebugHitboxDraw : MeshInstance3D
     }
 
     public void UpdateHitboxes(
-        List<SlopArena.Shared.Hitbox> hitboxes,
+        List<Hitbox> hitboxes,
         List<SpellResolver.EntityData> localEntities,
         List<SpellResolver.EntityData> serverEntities,
         Vector3 worldOffset)
@@ -46,7 +46,7 @@ public partial class DebugHitboxDraw : MeshInstance3D
                 float y = hb.Y - worldOffset.Y;
                 float z = hb.Z - worldOffset.Z;
 
-                if (hb.Shape == SlopArena.Shared.HitboxShape.Capsule)
+                if (hb.Shape == HitboxShape.Capsule)
                     DrawWireCapsule(_mesh, x, y, z, hb.EndX - worldOffset.X, hb.EndY - worldOffset.Y, hb.EndZ - worldOffset.Z, hb.Radius, 12);
                 else
                     DrawWireSphere(_mesh, x, y, z, hb.Radius, 12);
@@ -80,7 +80,7 @@ public partial class DebugHitboxDraw : MeshInstance3D
             float ly = e.PosY - worldOffset.Y;
             float lz = e.PosZ - worldOffset.Z;
 
-            if (e.Shape == SlopArena.Shared.HitboxShape.Capsule)
+            if (e.Shape == HitboxShape.Capsule)
             {
                 float lex = e.EndX - worldOffset.X;
                 float ley = e.EndY - worldOffset.Y;

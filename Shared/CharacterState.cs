@@ -55,7 +55,10 @@ namespace SlopArena.Shared
         public byte AttackSlot;
         /// <summary>Buffered input slot (general buffer during any lock). 0 = none.</summary>
         public byte BufferedSlot;
-        public byte ComboStage;          // 0 = none, 1-3 = stage
+        /// <summary>
+        /// 0 = none, 1-3 = stage
+        /// </summary>
+        public byte ComboStage;
         /// <summary>
         /// chain window remaining
         /// </summary>

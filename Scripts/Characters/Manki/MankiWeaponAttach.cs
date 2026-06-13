@@ -134,14 +134,12 @@ public partial class MankiWeaponAttach : Node
 
         if (_rightHandIdx >= 0 && _rightHandNode != null && visible)
         {
-            Vector3 pos = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandIdx).Origin;
-            _rightHandNode.GlobalPosition = pos;
+            _rightHandNode.GlobalPosition = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_rightHandIdx).Origin;
         }
 
         if (_leftHandIdx >= 0 && _leftHandNode != null && visible)
         {
-            Vector3 pos = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_leftHandIdx).Origin;
-            _leftHandNode.GlobalPosition = pos;
+            _leftHandNode.GlobalPosition = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_leftHandIdx).Origin;
         }
     }
 }
