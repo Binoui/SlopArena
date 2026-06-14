@@ -357,6 +357,7 @@ namespace SlopArena.Shared
 			foreach (var id in deadIds)
 			{
 				var def = _defs[id];
+				var oldState = _states[id];
 				_states[id] = new CharacterState
 				{
 					PX = _arena.SpawnPoints[0].X,
@@ -365,6 +366,7 @@ namespace SlopArena.Shared
 					FacingYaw = _arena.SpawnPoints[0].Yaw,
 					JumpsLeft = def.Movement.MaxJumps,
 					AirDodgesLeft = 1,
+					Deaths = (byte)(oldState.Deaths + 1),
 					DamagePercent = 0,
 				};
 			}
