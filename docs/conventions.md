@@ -144,10 +144,10 @@ All lower case. Underscores for spaces.
 | `attack_3` | Backflip kick | LMB stage 3 (launcher) |
 | `rmb_loop` | Charged punch start | RMB hold |
 | `attack_heavy_release` | Charged punch release | RMB release |
-| `spell_q` | Fire Lash (ground kick) | Q |
-| `spell_e` | Rising Flame (uppercut) | E |
-| `spell_r` | Ember Burst (explosion) | R |
-| `spell_f` | Inferno Dance (ult) | F |
+| `spell_q` | Round Bomb (projectile) | Q |
+| `spell_e` | Dynamite Jump (ground launch) | E |
+| `spell_r` | Dive Bomb (air slam) | R |
+| `spell_f` | Big Boom (ult) | F |
 
 Each character defines their own ability animation names in `CharacterDefinition.cs` under `AnimationNames`.
 
@@ -160,8 +160,8 @@ Each character defines their own ability animation names in `CharacterDefinition
 assets/
   characters/
     manki/
-      anim_monkey.glb           → master file (model + all anims embedded)
-      anim_monkey.glb.import    → Godot import config
+      manki.glb           → master file (model + all anims embedded)
+      manki.glb.import    → Godot import config
     weapons/
       sword_2handed_color.gltf
 ```
