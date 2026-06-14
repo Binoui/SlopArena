@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bake_arenas"]
+
+[node name="ArenaBaker" type="Node"]
+script = ExtResource("1_arena_baker")
+
+[ext_resource type="Script" path="res://Scripts/Tools/ArenaBaker.cs" id="1_arena_baker"]
