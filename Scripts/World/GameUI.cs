@@ -4,24 +4,35 @@ using System;
 
 /// <summary>
 /// Builds and wires all UI elements for the match.
-/// Extracted from Main.cs to keep the entry point clean.
+/// Works with both TrainingMatch and PvPMatch via callbacks.
 /// </summary>
 public class GameUI
 {
     private readonly CanvasLayer _canvas;
     private readonly Node3D _world;
-    private readonly TrainingMatch _match;
+    private readonly Node3D _matchNode;
+    private readonly PlayerController _player;
+    private readonly PlayerController[] _npcs;
+    private readonly Action<ulong> _setTarget;
+    private readonly Func<ulong> _getTarget;
+    private readonly Func<bool> _hasTarget;
 
     public ActionBarHUD? ActionBar { get; private set; }
     public UnitFrames? UnitFrames { get; private set; }
     public RespawnTimerUI? RespawnTimer { get; private set; }
     public EscapeMenuUI? EscapeMenu { get; private set; }
 
-    public GameUI(CanvasLayer canvas, Node3D world, TrainingMatch match)
+    public GameUI(CanvasLayer canvas, Node3D worldNode, PlayerController player, PlayerController[] npcs,
+        Action<ulong> setTarget, Func<ulong> getTarget, Func<bool> hasTarget)
     {
         _canvas = canvas;
-        _world = world;
-        _match = match;
+        _world = worldNode;
+        _matchNode = worldNode; // match is a child of world
+        _player = player;
+        _npcs = npcs;
+        _setTarget = setTarget;
+        _getTarget = getTarget;
+        _hasTarget = hasTarget;
     }
 
     public void Build(SpellVFXManager spellVFX)
@@ -42,10 +53,10 @@ public class GameUI
         label.HorizontalAlignment = HorizontalAlignment.Right;
         _canvas.AddChild(label);
 
-        _match.Player.OnStateUpdated += (px, pz, py, vx, vz) =>
+        _player.OnStateUpdated += (px, pz, py, vx, vz) =>
         {
             float speed = MathF.Sqrt((vx * vx) + (vz * vz));
-            label.Text = $"DMG: {_match.Player.GetDamagePercent()}%  SPD: {speed:F1}";
+            label.Text = $"DMG: {_player.GetDamagePercent()}%  SPD: {speed:F1}";
         };
     }
 
@@ -53,7 +64,7 @@ public class GameUI
     {
         UnitFrames = new UnitFrames { Name = "UnitFrames" };
         _canvas.AddChild(UnitFrames);
-        UnitFrames.Setup(_match.Player, _match.NPCs);
+        UnitFrames.Setup(_player, _npcs);
     }
 
     private void BuildRespawnTimer()
@@ -61,8 +72,8 @@ public class GameUI
         RespawnTimer = new RespawnTimerUI { Name = "RespawnTimerUI" };
         _canvas.AddChild(RespawnTimer);
 
-        _match.Player.OnStateUpdated += (_, _, _, _, _) =>
-            RespawnTimer?.UpdateTimer(_match.Player.GetRespawnTimeRemaining());
+        _player.OnStateUpdated += (_, _, _, _, _) =>
+            RespawnTimer?.UpdateTimer(_player.GetRespawnTimeRemaining());
     }
 
     private void BuildActionBar()
@@ -73,8 +84,8 @@ public class GameUI
         ActionBar = hudScene.Instantiate<ActionBarHUD>();
         ActionBar.Name = "ActionBarHUD";
         _canvas.AddChild(ActionBar);
-        ActionBar.Setup(_match.Player);
-        _match.Player.OnAbilityUsed += (slot) => ActionBar?.FlashSlot(slot);
+        ActionBar.Setup(_player);
+        _player.OnAbilityUsed += (slot) => ActionBar?.FlashSlot(slot);
     }
 
     private void BuildCamera()
@@ -84,9 +95,9 @@ public class GameUI
 
         var cameraMount = camScene.Instantiate<CameraMount>();
         cameraMount.Name = "CameraMount";
-        cameraMount.Target = _match.Player;
+        cameraMount.Target = _player;
         _world.AddChild(cameraMount);
-        _match.Player.SetCamera(cameraMount);
+        _player.SetCamera(cameraMount);
     }
 
     private void BuildEscapeMenu()
@@ -94,15 +105,15 @@ public class GameUI
         EscapeMenu = new EscapeMenuUI { Name = "EscapeMenuUI" };
         _canvas.AddChild(EscapeMenu);
         EscapeMenu.Build();
-        EscapeMenu.OnExitLobby += () => _match.GetTree()?.ChangeSceneToFile("res://main.tscn");
-        EscapeMenu.OnExitGame += () => _match.GetTree()?.Quit();
+        EscapeMenu.OnExitLobby += () => _matchNode.GetTree()?.ChangeSceneToFile("res://main.tscn");
+        EscapeMenu.OnExitGame += () => _matchNode.GetTree()?.Quit();
     }
 
     private void BuildTargeting()
     {
-        _match.Player.OnTargetNextPressed += () =>
+        _player.OnTargetNextPressed += () =>
         {
-            var viewport = _match.GetViewport();
+            var viewport = _matchNode.GetViewport();
             if (viewport == null) return;
             var camera = viewport.GetCamera3D();
             if (camera == null) return;
@@ -111,7 +122,7 @@ public class GameUI
             var dir = camera.ProjectRayNormal(center);
             var query = PhysicsRayQueryParameters3D.Create(from, from + (dir * 100f));
             query.CollisionMask = 2;
-            var result = _match.GetWorld3D().DirectSpaceState.IntersectRay(query);
+            var result = _matchNode.GetWorld3D().DirectSpaceState.IntersectRay(query);
             if (result.Count > 0 && result.ContainsKey("collider"))
             {
                 var collider = (Node)result["collider"];
@@ -121,8 +132,12 @@ public class GameUI
                     string name = collider.Name;
                     if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
                     {
-                        if (idx >= 0 && idx < _match.NPCs.Length && _match.NPCs[idx]?.IsNpcAlive() == true)
-                            _match.SetTarget((ulong)(100 + idx));
+                        if (idx >= 0 && idx < _npcs.Length && _npcs[idx]?.IsNpcAlive() == true)
+                            _setTarget((ulong)(100 + idx));
+                    }
+                    else if (name == "Opponent")
+                    {
+                        _setTarget(2);
                     }
                     break;
                 }
@@ -133,8 +148,8 @@ public class GameUI
     /// <summary>Handle escape key toggle.</summary>
     public void ToggleEscapeMenu()
     {
-        if (EscapeMenu == null || _match.Player == null) return;
-        EscapeMenu.Toggle(_match.Player);
-        _match.Player.IsEscapeMenuOpen = EscapeMenu.IsOpen();
+        if (EscapeMenu == null || _player == null) return;
+        EscapeMenu.Toggle(_player);
+        _player.IsEscapeMenuOpen = EscapeMenu.IsOpen();
     }
 }
