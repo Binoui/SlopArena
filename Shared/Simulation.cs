@@ -124,7 +124,7 @@ namespace SlopArena.Shared
                 // Dash
                 if (input.Dash && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0)
                 {
-                    StartDash(ref s, stats, input.MoveX, 0f);
+                    StartDash(ref s, stats, input.MoveX, input.MoveY);
                 }
 
                 // Attack via ActiveSlot (1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F)

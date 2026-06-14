@@ -33,7 +33,7 @@ public sealed partial class AimedChargeState : State
 
     public AimedChargeState()
     {
-        AnimationName = "rmb_loop"; // default, overridden by Configure
+        AnimationName = "spell_rmb_loop"; // default, overridden by Configure
         CanMove = false;
     }
 

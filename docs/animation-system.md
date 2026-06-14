@@ -11,7 +11,7 @@ Two independent layers that communicate via `Travel()`:
 ```
 AnimationTree (flat StateMachine root)    ← visual blends only
     17 states: Idle, Run, air (BlendSpace1D),
-    Land, melee, leg_sweep, backflip, spells...
+    Land, melee, spell_lmb_2, backflip, spells...
 
 Custom FSM (StateMachine.cs)               ← game logic + state transitions
     IdleState → RunState → AirState → LandingState → AttackState
@@ -137,8 +137,8 @@ AnimationNodeStateMachine (root)
 │                     │             Land ──at end──→ Idle
 │                     │
 │                     ├── melee ──0.15s──→ End (LMB stage 1)
-│                     │      └── code ChainTo() → leg_sweep → backflip
-│                     ├── attack_air_lmb, attack_air_rmb, lmb_loop
+│                     │      └── code ChainTo() → spell_lmb_2 → backflip
+│                     ├── attack_air_lmb, attack_air_rmb, attack_heavy_charge
 │                     └── spell_q, spell_e, spell_r, spell_f
 ```
 
