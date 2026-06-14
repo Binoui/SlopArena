@@ -1,0 +1,370 @@
+[gd_scene format=3 uid="uid://cf212b2iyxng7"]
+
+[ext_resource type="PackedScene" uid="uid://bcvclgju4hsu5" path="res://assets/characters/bunny/bunny.glb" id="1_400fg"]
+[ext_resource type="Script" uid="uid://cfeofiqt7wjb4" path="res://Scripts/Animation/StateMachine.cs" id="2_3sgcm"]
+[ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="3_yy137"]
+[ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="4_b5fl0"]
+[ext_resource type="Script" uid="uid://dyo0kq8c3kkno" path="res://Scripts/Animation/States/AirState.cs" id="5_f6xia"]
+[ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="6_oin5n"]
+[ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="7_jepol"]
+[ext_resource type="Script" uid="uid://1u3xeyilh8ck" path="res://Scripts/Animation/States/AimedChargeState.cs" id="8_v5j0v"]
+[ext_resource type="Script" uid="uid://wu75iehvao7o" path="res://Scripts/Animation/States/DashState.cs" id="9_poyq5"]
+[ext_resource type="Script" uid="uid://bn2tc7gwfuvan" path="res://Scripts/Animation/States/HitReactionState.cs" id="10_rl3hh"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
+animation = &"idle"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_idle"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_idle"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_idle")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_idle")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_land"]
+animation = &"jump"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.490000000000002
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_land"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_land"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_land")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_land")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_run"]
+animation = &"run"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 1
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_run"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_run"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_run")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_run")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
+animation = &"jump"
+
+[sub_resource type="AnimationNodeAnimation" id="anim_fall"]
+animation = &"fall"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="blend_air"]
+blend_point_0/node = SubResource("anim_jump")
+blend_point_0/pos = -1.0
+blend_point_1/node = SubResource("anim_fall")
+blend_point_1/pos = 1.0
+snap = 0.14
+blend_mode = 1
+
+[sub_resource type="AnimationNodeAnimation" id="anim_backflip"]
+animation = &"backflip"
+use_custom_timeline = true
+timeline_length = 1.795
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 1
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_backflip"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_backflip"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_backflip")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_backflip")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_dash"]
+animation = &"charged_punch"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = false
+start_offset = 0.0
+loop_mode = 1
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_dash"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_dash"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_dash")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_dash")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit_hard"]
+animation = &"kick_high_full"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_hit_hard"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_hit_hard"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_hit_hard")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_hit_hard")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit_medium"]
+animation = &"kick_medium"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_hit_medium"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_hit_medium"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_hit_medium")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_hit_medium")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_hit_small"]
+animation = &"fall"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_hit_small"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_hit_small"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_hit_small")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_hit_small")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_kick_high"]
+animation = &"kick_high"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_kick_high"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_kick_high"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_kick_high")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_kick_high")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_kick_high_full"]
+animation = &"kick_high_full"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_kick_high_full"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_kick_high_full"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_kick_high_full")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_kick_high_full")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_kick_low"]
+animation = &"kick_low"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_kick_low"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_kick_low"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_kick_low")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_kick_low")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_kick_medium"]
+animation = &"kick_medium"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_kick_medium"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_kick_medium"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_kick_medium")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_kick_medium")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_kick_wheel"]
+animation = &"kick_wheel"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_kick_wheel"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_kick_wheel"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_kick_wheel")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_kick_wheel")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_punch_down"]
+animation = &"punch_down"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_punch_down"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_punch_down"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_punch_down")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_punch_down")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_rmb_loop"]
+animation = &"charged_punch"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_rmb_loop"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_rmb_loop"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_rmb_loop")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_rmb_loop")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeAnimation" id="anim_throw"]
+animation = &"throw"
+
+[sub_resource type="AnimationNodeTimeScale" id="ts_throw"]
+
+[sub_resource type="AnimationNodeBlendTree" id="bt_throw"]
+nodes/output/position = Vector2(700, 100)
+nodes/TimeScale/node = SubResource("ts_throw")
+nodes/TimeScale/position = Vector2(400, 100)
+nodes/Animation/node = SubResource("anim_throw")
+nodes/Animation/position = Vector2(100, 100)
+node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_01"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_015"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_at_end"]
+reset = false
+
+[sub_resource type="AnimationNodeStateMachine" id="sm_bunny"]
+states/End/position = Vector2(1600, 250)
+states/Idle/node = SubResource("bt_idle")
+states/Idle/position = Vector2(200, 100)
+states/Land/node = SubResource("bt_land")
+states/Land/position = Vector2(400, 250)
+states/Run/node = SubResource("bt_run")
+states/Run/position = Vector2(400, 100)
+states/Start/position = Vector2(50, 175)
+states/air/node = SubResource("blend_air")
+states/air/position = Vector2(200, 250)
+states/backflip/node = SubResource("bt_backflip")
+states/backflip/position = Vector2(1200, 100)
+states/dash/node = SubResource("bt_dash")
+states/dash/position = Vector2(600, 400)
+states/hit_hard/node = SubResource("bt_hit_hard")
+states/hit_hard/position = Vector2(1000, 600)
+states/hit_medium/node = SubResource("bt_hit_medium")
+states/hit_medium/position = Vector2(800, 600)
+states/hit_small/node = SubResource("bt_hit_small")
+states/hit_small/position = Vector2(600, 600)
+states/kick_high/node = SubResource("bt_kick_high")
+states/kick_high/position = Vector2(1000, 100)
+states/kick_high_full/node = SubResource("bt_kick_high_full")
+states/kick_high_full/position = Vector2(1100, 100)
+states/kick_low/node = SubResource("bt_kick_low")
+states/kick_low/position = Vector2(800, 100)
+states/kick_medium/node = SubResource("bt_kick_medium")
+states/kick_medium/position = Vector2(900, 100)
+states/kick_wheel/node = SubResource("bt_kick_wheel")
+states/kick_wheel/position = Vector2(1200, 250)
+states/punch_down/node = SubResource("bt_punch_down")
+states/punch_down/position = Vector2(1000, 250)
+states/rmb_loop/node = SubResource("bt_rmb_loop")
+states/rmb_loop/position = Vector2(1000, 400)
+states/throw/node = SubResource("bt_throw")
+states/throw/position = Vector2(800, 400)
+transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "air", SubResource("xfade_01"), "Run", "air", SubResource("xfade_01"), "air", "Land", SubResource("xfade_015"), "Land", "Idle", SubResource("xfade_at_end"), "Idle", "dash", SubResource("xfade_01"), "Run", "dash", SubResource("xfade_01"), "air", "dash", SubResource("xfade_01"), "dash", "End", SubResource("xfade_015"), "Idle", "kick_low", SubResource("xfade_01"), "Run", "kick_low", SubResource("xfade_01"), "air", "kick_low", SubResource("xfade_01"), "kick_low", "End", SubResource("xfade_015"), "kick_medium", "End", SubResource("xfade_015"), "kick_high", "End", SubResource("xfade_015"), "kick_high_full", "End", SubResource("xfade_015"), "Idle", "kick_wheel", SubResource("xfade_01"), "Run", "kick_wheel", SubResource("xfade_01"), "air", "kick_wheel", SubResource("xfade_01"), "kick_wheel", "End", SubResource("xfade_015"), "Idle", "punch_down", SubResource("xfade_01"), "Run", "punch_down", SubResource("xfade_01"), "punch_down", "End", SubResource("xfade_015"), "Idle", "throw", SubResource("xfade_01"), "Run", "throw", SubResource("xfade_01"), "air", "throw", SubResource("xfade_01"), "throw", "End", SubResource("xfade_015"), "Idle", "backflip", SubResource("xfade_01"), "Run", "backflip", SubResource("xfade_01"), "air", "backflip", SubResource("xfade_01"), "backflip", "End", SubResource("xfade_015"), "Idle", "rmb_loop", SubResource("xfade_01"), "Run", "rmb_loop", SubResource("xfade_01"), "rmb_loop", "End", SubResource("xfade_015"), "hit_small", "End", SubResource("xfade_015"), "hit_medium", "End", SubResource("xfade_015"), "hit_hard", "End", SubResource("xfade_015"), "Land", "Run", SubResource("xfade_015"), "air", "End", SubResource("xfade_015")]
+
+[node name="Bunny" type="Node3D" unique_id=881826129]
+
+[node name="bunny" parent="." unique_id=845524197 instance=ExtResource("1_400fg")]
+
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=1215559337]
+root_node = NodePath("../bunny")
+tree_root = SubResource("sm_bunny")
+anim_player = NodePath("../bunny/AnimationPlayer")
+parameters/Idle/TimeScale/scale = 1.0
+parameters/Land/TimeScale/scale = 1.0
+parameters/Run/TimeScale/scale = 1.0
+parameters/air/blend_position = 0.0
+parameters/backflip/TimeScale/scale = 1.0
+parameters/dash/TimeScale/scale = 1.0
+parameters/hit_hard/TimeScale/scale = 1.0
+parameters/hit_medium/TimeScale/scale = 1.0
+parameters/hit_small/TimeScale/scale = 1.0
+parameters/kick_high/TimeScale/scale = 1.0
+parameters/kick_high_full/TimeScale/scale = 1.0
+parameters/kick_low/TimeScale/scale = 1.0
+parameters/kick_medium/TimeScale/scale = 1.0
+parameters/kick_wheel/TimeScale/scale = 1.0
+parameters/punch_down/TimeScale/scale = 1.0
+parameters/rmb_loop/TimeScale/scale = 1.0
+parameters/throw/TimeScale/scale = 1.0
+
+[node name="FSM" type="Node" parent="." unique_id=1870874765]
+script = ExtResource("2_3sgcm")
+
+[node name="idle" type="Node" parent="FSM" unique_id=954222308]
+script = ExtResource("3_yy137")
+
+[node name="run" type="Node" parent="FSM" unique_id=1089925046]
+script = ExtResource("4_b5fl0")
+
+[node name="air" type="Node" parent="FSM" unique_id=1423766126]
+script = ExtResource("5_f6xia")
+
+[node name="landing" type="Node" parent="FSM" unique_id=413031327]
+script = ExtResource("6_oin5n")
+
+[node name="attack" type="Node" parent="FSM" unique_id=1665636160]
+script = ExtResource("7_jepol")
+
+[node name="aimed_charge" type="Node" parent="FSM" unique_id=1176904107]
+script = ExtResource("8_v5j0v")
+
+[node name="dash" type="Node" parent="FSM" unique_id=991289536]
+script = ExtResource("9_poyq5")
+
+[node name="hit_reaction" type="Node" parent="FSM" unique_id=1911907198]
+script = ExtResource("10_rl3hh")
+
+[editable path="bunny"]

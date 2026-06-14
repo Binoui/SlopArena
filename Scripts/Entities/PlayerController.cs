@@ -255,9 +255,14 @@ public partial class PlayerController : CharacterBody3D
             animPlayer = _animationController.FindAnimationPlayer(_playerModel);
             if (animPlayer != null)
             {
-                // Fix RootNode to point to our PlayerModel (paths are relative to this)
+                // Fix RootNode: point to the GLB root (parent of armature), so track
+                // paths like "Armature/Skeleton3D:mixamorig_Hips" resolve correctly.
                 if (skeleton != null)
-                    animPlayer.RootNode = _playerModel.GetPath();
+                {
+                    Node? glbRoot = skeleton.GetParent()?.GetParent();
+                    if (glbRoot != null)
+                        animPlayer.RootNode = glbRoot.GetPath();
+                }
             }
             else
             {
@@ -265,7 +270,11 @@ public partial class PlayerController : CharacterBody3D
                 animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
                 _playerModel.AddChild(animPlayer);
                 if (skeleton != null)
-                    animPlayer.RootNode = _playerModel.GetPath();
+                {
+                    Node? glbRoot = skeleton.GetParent()?.GetParent();
+                    if (glbRoot != null)
+                        animPlayer.RootNode = glbRoot.GetPath();
+                }
 
                 // Create "default" library
                 var lib = new AnimationLibrary();
@@ -278,7 +287,12 @@ public partial class PlayerController : CharacterBody3D
             // Fallback: create our own AnimationPlayer
             animPlayer = new AnimationPlayer { Name = "AnimationPlayer" };
             (_playerModel ?? this).AddChild(animPlayer);
-            if (skeleton != null) animPlayer.RootNode = _playerModel?.GetPath();
+            if (skeleton != null)
+            {
+                Node? glbRoot = skeleton.GetParent()?.GetParent();
+                if (glbRoot != null)
+                    animPlayer.RootNode = glbRoot.GetPath();
+            }
             var lib = new AnimationLibrary();
             animPlayer.AddAnimationLibrary("default", lib);
         }
@@ -1050,7 +1064,12 @@ public partial class PlayerController : CharacterBody3D
         {
             case CharacterClass.Manki:
                 modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = Vector3.One;
+                scale = new Vector3(0.01f, 0.01f, 0.01f);
+                position = new Vector3(0, 0, 0);
+                break;
+            case CharacterClass.Bunny:
+                modelPath = "res://assets/characters/bunny/bunny.tscn";
+                scale = new Vector3(0.01f, 0.01f, 0.01f);
                 position = new Vector3(0, 0, 0);
                 break;
             default:
@@ -1161,7 +1180,7 @@ public partial class PlayerController : CharacterBody3D
         // LeftFoot hurtbox world Y (bone index 6)
         _bakedData.GetBonePosition("idle", 0, 6, out _, out float footY, out _);
         float footWorld = py + modelY + (footY * _charDef.HurtboxBoneScale);
-        GD.Print($"[Y] state.PY={py:F4} capsuleBottom={capsuleBottom:F4} floor={Simulation.FloorHeight} " +
+        GD.Print($"[Y] state.PY={py:F4} capsuleBottom={capsuleBottom:F4} floor={_arenaDef.FloorHeight} " +
                  $"modelOff={modelY:F4} sole={_charDef.ModelSoleOffset:F4} | " +
                  $"Hips_world={hipsWorld:F4} Foot_world={footWorld:F4} Toe_world={toeWorld:F4}");
     }

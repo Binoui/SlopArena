@@ -11,7 +11,7 @@ public partial class AnimationController : Node
     private AnimationPlayer? _animPlayer;
     private Skeleton3D? _skeleton;
     private AnimationTree? _animTree;
-    private static bool _tracksFixed = false;
+    private bool _tracksFixed = false;
 
     public void Setup(AnimationPlayer animPlayer, Skeleton3D? skeleton)
     {
