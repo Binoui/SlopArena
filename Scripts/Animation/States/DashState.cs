@@ -27,7 +27,6 @@ public sealed partial class DashState : State
     public override void Enter()
     {
         base.Enter(); // plays dash anim
-        Movement.StartDash(_dirX, _dirZ);
         Player.SetModelEmission(new Color(0.3f, 0.9f, 1.0f)); // Cyan
     }
 

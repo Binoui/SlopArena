@@ -209,7 +209,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 43, Radius = 0.7f, OffX = 0, OffY = 1.0f, OffZ = 2.0f, Damage = 10f, KnockbackForce = 16f, KnockbackUpward = 4f, StunTicks = 18, Interruptible = true } },
                                 AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     },
-                    AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
+                    AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
                 },
 
                 AirLMB = new AbilityData
@@ -222,7 +222,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 4, DurationTicks = 12, Radius = 0.6f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, KnockbackForce = 8f, KnockbackUpward = 8f, StunTicks = 14, Interruptible = true } },
                                 AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     },
-                    AnimationNames = new[] { "attack_air_lmb" },
+                    AnimationNames = new[] { "spell_lmb_air" },
                 },
 
                 // RMB — charged cone flamethrower
@@ -243,12 +243,12 @@ namespace SlopArena.Shared
                                 AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
                     ChargeHoldTicks = 45,
-                    AnimationNames = new[] { "rmb_loop" },
+                    AnimationNames = new[] { "spell_rmb_loop" },
                     SpecialEffectKeys = new[] { "MankiAerosolFlame" },
                     AimedCharge = new AimedChargeData
                     {
-                        ChargeAnimName = "rmb_loop",
-                        AttackAnimName = "rmb_attack",
+                        ChargeAnimName = "spell_rmb_loop",
+                        AttackAnimName = "spell_rmb_attack",
                         ConeAngle = 60f,
                         ConeRange = 15f,
                         MaxChargeTicks = 45,
@@ -265,7 +265,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.7f, OffX = 0, OffY = 1.0f, OffZ = 1.8f, Damage = 8f, KnockbackForce = 12f, KnockbackUpward = -8f, StunTicks = 16, Interruptible = true } },
                                 AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     },
-                    AnimationNames = new[] { "attack_air_rmb" },
+                    AnimationNames = new[] { "spell_rmb_air" },
                 },
 
                 Q = new AbilityData
@@ -320,6 +320,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 41, Radius = 1.2f, OffX = 0, OffY = 0.5f, OffZ = 1.5f, Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, StunTicks = 20, Interruptible = true } },
                                 AttackRange = 6f, WarpRange = 15f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     },
+                    AnimationNames = new[] { "spell_f" },
                     SpecialEffectKeys = new[] { "MankiBigBoom" },
                 },
             };
@@ -398,7 +399,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 40, Radius = 0.6f, OffX = 0, OffY = 0.9f, OffZ = 1.5f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 10f, StunTicks = 14, Interruptible = true } },
                                 AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     },
-                    AnimationNames = new[] { "kick_low", "kick_medium", "kick_high" },
+                    AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
                 },
 
                 AirLMB = new AbilityData
@@ -411,7 +412,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 4, DurationTicks = 12, Radius = 0.55f, OffX = 0, OffY = 0.9f, OffZ = 1.3f, Damage = 5f, KnockbackForce = 6f, KnockbackUpward = 8f, StunTicks = 12, Interruptible = true } },
                                 AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     },
-                    AnimationNames = new[] { "kick_high" },
+                    AnimationNames = new[] { "spell_lmb_air" },
                 },
 
                 RMB = new AbilityData
@@ -424,7 +425,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 24, Radius = 1.8f, OffX = 0, OffY = 0.2f, OffZ = 0f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 4f, StunTicks = 12, Interruptible = true } },
                                 AttackRange = 3f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
-                    AnimationNames = new[] { "punch_down" },
+                    AnimationNames = new[] { "spell_lmb_1" },
                     SpecialEffectKeys = new[] { "BunnyCarrotSlam" },
                 },
 
@@ -438,7 +439,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.6f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 7f, KnockbackForce = 10f, KnockbackUpward = -8f, StunTicks = 14, Interruptible = true } },
                                 AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     },
-                    AnimationNames = new[] { "kick_wheel" },
+                    AnimationNames = new[] { "spell_rmb_air" },
                 },
 
                 Q = new AbilityData
@@ -451,7 +452,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 6, Interruptible = true } },
                                 AttackRange = 4f, WarpRange = 8f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                     },
-                    AnimationNames = new[] { "throw" },
+                    AnimationNames = new[] { "spell_q" },
                     SpecialEffectKeys = new[] { "BunnyWhirlingCarrot" },
                 },
 
@@ -465,7 +466,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 28, Radius = 0.6f, OffX = 0, OffY = 0.8f, OffZ = -1.0f, Damage = 4f, KnockbackForce = 8f, KnockbackUpward = 2f, StunTicks = 8, Interruptible = true } },
                                 AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
-                    AnimationNames = new[] { "backflip" },
+                    AnimationNames = new[] { "spell_e" },
                     SpecialEffectKeys = new[] { "BunnyFlipKick" },
                 },
 
@@ -479,7 +480,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 28, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 2.0f, Damage = 12f, KnockbackForce = 20f, KnockbackUpward = 6f, StunTicks = 18, Interruptible = true } },
                                 AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                     },
-                    AnimationNames = new[] { "kick_high_full" },
+                    AnimationNames = new[] { "spell_r" },
                     SpecialEffectKeys = new[] { "BunnyDragonKick" },
                 },
 
@@ -496,7 +497,7 @@ namespace SlopArena.Shared
                                 HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 3.5f, OffX = 0, OffY = 0.5f, OffZ = 0f, Damage = 4f, KnockbackForce = 4f, KnockbackUpward = 2f, StunTicks = 4, Interruptible = false } },
                                 AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     },
-                    AnimationNames = new[] { "kick_high_full" },
+                    AnimationNames = new[] { "spell_f" },
                     SpecialEffectKeys = new[] { "BunnyJadeHare" },
                 },
             };
