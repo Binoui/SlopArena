@@ -9,7 +9,8 @@ using SlopArena.Shared;
 public partial class Main : Node3D
 {
     private Process _serverProcess;
-    private TrainingMatch _matchManager = null!;
+    private TrainingMatch? _matchManager;
+    private PvPMatch? _pvpMatch;
     private CanvasLayer _canvasLayer = null!;
     private GameUI _gameUI = null!;
     private DebugHitboxDraw _debugDraw = null!;
@@ -28,9 +29,9 @@ public partial class Main : Node3D
         // Class select
         var classSelect = new ClassSelectUI();
         _canvasLayer.AddChild(classSelect);
-        var tcs = new System.Threading.Tasks.TaskCompletionSource<CharacterClass>();
-        classSelect.OnClassConfirmed += (cls) => tcs.TrySetResult(cls);
-        var selectedClass = await tcs.Task;
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<(CharacterClass cls, string? ip)>();
+        classSelect.OnClassConfirmed += (cls, ip) => tcs.TrySetResult((cls, ip));
+        var (selectedClass, serverIp) = await tcs.Task;
 
         // Crosshair
         CreateCrosshair();
@@ -46,22 +47,41 @@ public partial class Main : Node3D
         // Server (editor only)
         StartLocalServer(selectedClass);
 
-        // Match
-        _matchManager = new TrainingMatch { Name = "MatchManager" };
-        AddChild(_matchManager);
-        _matchManager.Start(selectedClass, _spellVFX);
-
-        // UI
-        _gameUI = new GameUI(_canvasLayer, this, _matchManager);
-        _gameUI.Build(_spellVFX);
+        // Match — training or PvP based on IP
+        if (serverIp != null)
+        {
+            var pvp = new PvPMatch { Name = "MatchManager" };
+            _pvpMatch = pvp;
+            AddChild(pvp);
+            pvp.Start(selectedClass, _spellVFX, serverIp);
+            _gameUI = new GameUI(_canvasLayer, this, pvp.Player, Array.Empty<PlayerController>(),
+                id => pvp.SetTarget(id), () => pvp.GetTarget(), () => pvp.HasTarget());
+            _gameUI.Build(_spellVFX);
+        }
+        else
+        {
+            _matchManager = new TrainingMatch { Name = "MatchManager" };
+            AddChild(_matchManager);
+            _matchManager.Start(selectedClass, _spellVFX);
+            _gameUI = new GameUI(_canvasLayer, this, _matchManager.Player, _matchManager.NPCs,
+                id => _matchManager.SetTarget(id), () => _matchManager.GetTarget(), () => _matchManager.HasTarget());
+            _gameUI.Build(_spellVFX);
+        }
     }
 
     public override void _Process(double delta)
     {
-        if (_debugDraw != null && _debugHitboxVisible && _matchManager != null)
+        if (_debugDraw == null || !_debugHitboxVisible) return;
+
+        if (_matchManager != null)
         {
             var (hitboxes, entities) = _matchManager.GetDebugData();
             _debugDraw.UpdateHitboxes(hitboxes, entities, entities, Vector3.Zero);
+        }
+        else if (_pvpMatch != null)
+        {
+            var (hitboxes, local, server) = _pvpMatch.GetDebugData();
+            _debugDraw.UpdateHitboxes(hitboxes, local, server, Vector3.Zero);
         }
     }
 
@@ -78,16 +98,22 @@ public partial class Main : Node3D
             {
                 _debugHitboxVisible = !_debugHitboxVisible;
                 if (_debugDraw != null) _debugDraw.Visible = _debugHitboxVisible;
-                if (_matchManager?.Player != null) _matchManager.Player.DebugEmissionEnabled = _debugHitboxVisible;
-                foreach (var npc in _matchManager?.NPCs ?? Array.Empty<PlayerController>())
-                    if (npc != null) npc.DebugEmissionEnabled = _debugHitboxVisible;
+                var player = _matchManager?.Player ?? _pvpMatch?.Player;
+                if (player != null) player.DebugEmissionEnabled = _debugHitboxVisible;
+                if (_matchManager?.NPCs != null)
+                    foreach (var npc in _matchManager.NPCs)
+                        if (npc != null) npc.DebugEmissionEnabled = _debugHitboxVisible;
+                if (_pvpMatch?.Opponent != null)
+                    _pvpMatch.Opponent.DebugEmissionEnabled = _debugHitboxVisible;
                 GD.Print($"Debug Hitboxes: {(_debugHitboxVisible ? "ON" : "OFF")}");
             }
             else if (key.Keycode == Key.F4 || key.PhysicalKeycode == Key.F4)
             {
                 _matchManager?.Player?.DebugYPositions();
-                foreach (var npc in _matchManager?.NPCs ?? Array.Empty<PlayerController>())
-                    npc?.DebugYPositions();
+                _pvpMatch?.Player?.DebugYPositions();
+                if (_matchManager?.NPCs != null)
+                    foreach (var npc in _matchManager.NPCs) npc?.DebugYPositions();
+                _pvpMatch?.Opponent?.DebugYPositions();
             }
         }
     }
