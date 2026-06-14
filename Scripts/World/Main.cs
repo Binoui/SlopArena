@@ -9,7 +9,7 @@ using SlopArena.Shared;
 public partial class Main : Node3D
 {
     private Process _serverProcess;
-    private MatchManager _matchManager = null!;
+    private TrainingMatch _matchManager = null!;
     private CanvasLayer _canvasLayer = null!;
     private ActionBarHUD _actionBarHUD = null!;
     private UnitFrames _unitFrames = null!;
@@ -50,9 +50,9 @@ public partial class Main : Node3D
         StartLocalServer(selectedClass);
 
         // Match manager (spawns everything, runs game loop)
-        _matchManager = new MatchManager { Name = "MatchManager" };
+        _matchManager = new TrainingMatch { Name = "MatchManager" };
         AddChild(_matchManager);
-        _matchManager.StartMatch(selectedClass, _spellVFX);
+        _matchManager.Start(selectedClass, _spellVFX);
 
         // HUD label (top-right info)
         var label = new Label { Name = "Label", Size = new Vector2(600f, 200f) };
@@ -151,8 +151,8 @@ public partial class Main : Node3D
         // (hitboxes are on the server process, not the client)
         if (_debugDraw != null && _debugHitboxVisible && _matchManager != null)
         {
-            var (hitboxes, localEntities, serverEntities) = _matchManager.GetDebugData();
-            _debugDraw.UpdateHitboxes(hitboxes, localEntities, serverEntities, Vector3.Zero);
+            var (hitboxes, entities) = _matchManager.GetDebugData();
+            _debugDraw.UpdateHitboxes(hitboxes, entities, entities, Vector3.Zero);
         }
     }
 
