@@ -7,10 +7,11 @@ using System;
 /// Pre-match class selection screen.
 /// Player picks a class before the match starts. Choice is locked once match begins.
 /// Shows class name, description, and stats for each available character.
+/// Optional IP field: blank = training mode, filled = PvP connect.
 /// </summary>
 public partial class ClassSelectUI : Control
 {
-    public event Action<CharacterClass>? OnClassConfirmed;
+    public event Action<CharacterClass, string?>? OnClassConfirmed;
 
     private CharacterClass _selectedClass = CharacterClass.Manki;
     private bool _confirmed = false;
@@ -24,6 +25,7 @@ public partial class ClassSelectUI : Control
     private VBoxContainer? _classButtons;
     private Button? _readyBtn;
     private Label? _statsLabel;
+    private LineEdit? _ipField;
 
     public override void _Ready()
     {
@@ -79,6 +81,22 @@ public partial class ClassSelectUI : Control
         _statsLabel.AddThemeFontSizeOverride("font_size", 16);
         _statsLabel.Modulate = new Color(0.6f, 0.6f, 0.6f);
         AddChild(_statsLabel);
+
+        // IP field (PvP mode — blank = training)
+        var ipLabel = new Label();
+        ipLabel.Text = "Server IP (blank = training mode)";
+        ipLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        ipLabel.Position = new Vector2((viewportSize.X / 2f) - 300f, 680f);
+        ipLabel.Size = new Vector2(600f, 30f);
+        ipLabel.AddThemeFontSizeOverride("font_size", 14);
+        ipLabel.Modulate = new Color(0.6f, 0.6f, 0.6f);
+        AddChild(ipLabel);
+
+        _ipField = new LineEdit();
+        _ipField.PlaceholderText = "127.0.0.1";
+        _ipField.Position = new Vector2((viewportSize.X / 2f) - 150f, 710f);
+        _ipField.CustomMinimumSize = new Vector2(300f, 35f);
+        AddChild(_ipField);
 
         // Ready button
         _readyBtn = new Button();
@@ -137,11 +155,13 @@ public partial class ClassSelectUI : Control
         _readyBtn.Modulate = new Color(0.3f, 0.3f, 0.3f);
         _readyBtn.Disabled = true;
 
-        // Brief delay then fire event
+        string? ip = _ipField?.Text?.Trim();
+        if (string.IsNullOrEmpty(ip)) ip = null;
+
         var timer = GetTree().CreateTimer(0.3f);
         timer.Timeout += () =>
         {
-            OnClassConfirmed?.Invoke(_selectedClass);
+            OnClassConfirmed?.Invoke(_selectedClass, ip);
             QueueFree();
         };
     }
