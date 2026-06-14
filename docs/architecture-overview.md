@@ -1,7 +1,7 @@
 # Architecture Overview — Codebase Map
 
 > **For agents and new contributors.** Read this first — it tells you where everything lives.
-> For netcode theory, see `docs/netcode-architecture.md`. For art/naming, see `docs/conventions.md`.
+> For netcode theory, see `docs/systems/netcode-architecture.md`. For art/naming, see `docs/contributing/conventions.md`.
 
 ---
 
@@ -136,7 +136,7 @@ SlopArena/
 → `CharacterDefinition.cs` — add `SpecialEffectKeys` to the ability
 
 ### Add a new character
-→ Full guide: `docs/adding-a-new-character.md`
+→ Full guide: `docs/characters/adding-a-new-character.md`
 → Quick version: add `CharacterClass` enum value → write `BuildXxx()` → register in `BuildRegistry()`
 
 ---
@@ -172,9 +172,9 @@ dotnet run --project Server/SlopArena.Server.csproj
 
 | Doc | Covers |
 |-----|--------|
-| `docs/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
-| `docs/conventions.md` | Art direction, animation naming, bone naming |
-| `docs/adding-a-new-character.md` | Full pipeline for new characters |
-| `docs/animation-system.md` | FSM lifecycle, AnimationTree structure |
-| `docs/combat-systems.md` | Universal combat mechanics |
+| `docs/systems/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
+| `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
+| `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
+| `docs/systems/animation-system.md` | FSM lifecycle, AnimationTree structure |
+| `docs/systems/combat-systems.md` | Universal combat mechanics |
 | `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no Godot physics) |
