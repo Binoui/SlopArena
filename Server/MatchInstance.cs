@@ -266,12 +266,12 @@ namespace SlopArena.Server
             if (_udpServer == null) return;
 
             // Player 1 state packet
-            var p1Packet = StateToPacket(_p1State);
+            var p1Packet = CharacterStatePacket.FromState(_p1State, _serverTick);
             Span<byte> p1Buffer = stackalloc byte[CharacterStatePacket.Size];
             p1Packet.Serialize(p1Buffer);
 
             // Player 2 state packet
-            var p2Packet = StateToPacket(_p2State);
+            var p2Packet = CharacterStatePacket.FromState(_p2State, _serverTick);
             Span<byte> p2Buffer = stackalloc byte[CharacterStatePacket.Size];
             p2Packet.Serialize(p2Buffer);
 
@@ -290,20 +290,5 @@ namespace SlopArena.Server
             }
         }
 
-        private static CharacterStatePacket StateToPacket(CharacterState state)
-        {
-            return new CharacterStatePacket
-            {
-                TickNumber = 0, // Will be set by caller if needed
-                PositionX = state.PX,
-                PositionY = state.PZ, // PZ → world Y (up)
-                PositionZ = state.PY, // PY → world Z (forward)
-                VelocityX = state.VX,
-                VelocityY = state.VZ,
-                VelocityZ = state.VY,
-                CurrentActionState = (byte)state.State,
-                StateDurationFrames = state.StateTicks
-            };
-        }
     }
 }

@@ -368,7 +368,7 @@ public partial class MatchManager : Node3D
 	/// <summary>Get debug hitbox/hurtbox data from the local simulation.</summary>
 	public (List<Hitbox> hitboxes, List<SpellResolver.EntityData> localEntities, List<SpellResolver.EntityData> serverEntities) GetDebugData()
 	{
-		var hitboxes = SpellResolver.GetActiveHitboxes();
+		var hitboxes = _localSim.Resolver.GetActiveHitboxes();
 		var localEntities = _localSim?.GetLastEntityData() ?? new();
 		var serverEntities = BuildServerGhostEntities();
 		return (hitboxes, localEntities, serverEntities);
