@@ -25,6 +25,7 @@ using SlopArena.Shared;
 public partial class MatchManager : Node3D
 {
 	public PlayerController Player { get; private set; } = null!;
+	public PlayerController Opponent { get; private set; } = null!;
 	public PlayerController[] NPCs { get; private set; } = new PlayerController[5];
 	public NetworkClient Net { get; private set; } = null!;
 
@@ -33,6 +34,7 @@ public partial class MatchManager : Node3D
 
 	private SpellVFXManager? _spellVFX;
 	private const int NpcCount = 5;
+	private const ulong OpponentEntityId = 2;
 	private ArenaDefinition _arenaDef = ArenaRegistry.Get("split");
 
 	/// <summary>
@@ -121,6 +123,19 @@ public partial class MatchManager : Node3D
 			}, _playerBakedData);
 		}
 
+		// PvP opponent (entity 2 — opposite spawn from player)
+		var oppSpawn = _arenaDef.SpawnPoints.Length > 1
+			? _arenaDef.SpawnPoints[1]
+			: new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = MathF.PI };
+		_localSim.RegisterEntity(OpponentEntityId, _charDef, new CharacterState
+		{
+			PX = oppSpawn.X,
+			PY = oppSpawn.Y + 1f,
+			PZ = oppSpawn.Z,
+			FacingYaw = oppSpawn.Yaw,
+			JumpsLeft = _charDef.Movement.MaxJumps,
+		}, _playerBakedData);
+
 		// Network client
 		Net = new NetworkClient { Name = "NetworkClient" };
 		AddChild(Net);
@@ -150,6 +165,15 @@ public partial class MatchManager : Node3D
 		AddChild(Player);
 		Player.Position = spawn.ToGodot() + new Vector3(5f, 15f, 0f);
 		Player.SetupCombat(null!, _arenaDef, _playerEntityId, _spellVFX);
+
+		// Spawn opponent (PvP — entity 2, no local input)
+		Opponent = new PlayerController { Name = "Opponent" };
+		Opponent.SetClass(playerClass); // TODO: get from server match info
+		Opponent.SetNPC(true);          // no local input, server-authoritative
+		Opponent.AddToGroup("enemies");
+		AddChild(Opponent);
+		Opponent.Position = oppSpawn.ToGodot() + new Vector3(0f, 1f, 0f);
+		Opponent.SetupCombat(null!, _arenaDef, OpponentEntityId, null);
 
 		// Heightmap
 		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -216,6 +240,10 @@ public partial class MatchManager : Node3D
 			var npcState = _localSim.GetState(eid);
 			NPCs[i].ApplyServerState(npcState);
 		}
+
+		// Opponent: apply predicted state from local sim
+		var oppState = _localSim.GetState(OpponentEntityId);
+		Opponent.ApplyServerState(oppState);
 	}
 
 	// ── RENDER: reconcile with server ──
@@ -262,6 +290,7 @@ public partial class MatchManager : Node3D
 					var npcStates = new CharacterState[NpcCount];
 					for (int i = 0; i < NpcCount; i++)
 						npcStates[i] = _localSim.GetState((ulong)(100 + i));
+					var oldOppState = _localSim.GetState(OpponentEntityId);
 
 					// Reset local sim to the server's confirmed state
 					var safeState = serverState;
@@ -276,6 +305,11 @@ public partial class MatchManager : Node3D
 							? s : npcStates[i];
 						_localSim.RegisterEntity(npcId, _charDef, npcState, _playerBakedData);
 					}
+
+					// Re-register opponent
+					var oppRollbackState = _serverConfirmedStates.TryGetValue(OpponentEntityId, out var os)
+						? os : oldOppState;
+					_localSim.RegisterEntity(OpponentEntityId, _charDef, oppRollbackState, _playerBakedData);
 
 					// Re-simulate from serverTick+1 to currentTick
 					uint currentTick = _sendTick;
@@ -301,11 +335,21 @@ public partial class MatchManager : Node3D
 				NPCs[i].ApplyServerState(npcServer.state);
 		}
 
+		// Opponent: apply server state directly (authority)
+		if (serverStates.TryGetValue(OpponentEntityId, out var oppServer))
+			Opponent.ApplyServerState(oppServer.state);
+
 		// Target ring follow
 		if (_targetRing != null && _targetRing.Visible)
 		{
 			ulong tid = GetTarget();
-			if (tid >= 100 && tid < 100 + NpcCount)
+			if (tid == OpponentEntityId && Opponent != null)
+			{
+				Vector3 pos = Opponent.GlobalPosition;
+				pos.Y = 0.1f;
+				_targetRing.Position = pos;
+			}
+			else if (tid >= 100 && tid < 100 + NpcCount)
 			{
 				int idx = (int)(tid - 100);
 				if (idx >= 0 && idx < NpcCount && NPCs[idx] != null)
@@ -328,20 +372,23 @@ public partial class MatchManager : Node3D
 	public void SetTarget(ulong entityId)
 	{
 		_targetId = entityId;
-		bool valid = entityId >= 100 && entityId < 100 + NpcCount;
+		bool valid = entityId == OpponentEntityId || (entityId >= 100 && entityId < 100 + NpcCount);
 		if (_targetRing != null)
 		{
 			if (valid)
 			{
-				int idx = (int)(entityId - 100);
-				if (idx >= 0 && idx < NpcCount && NPCs[idx] != null)
+				Vector3 pos;
+				if (entityId == OpponentEntityId && Opponent != null)
+					pos = Opponent.GlobalPosition;
+				else
 				{
-					Vector3 pos = NPCs[idx]!.GlobalPosition;
-					pos.Y = 0.1f;
-					_targetRing.Position = pos;
-					_targetRing.Visible = true;
+					int idx = (int)(entityId - 100);
+					pos = idx >= 0 && idx < NpcCount && NPCs[idx] != null
+						? NPCs[idx]!.GlobalPosition : Vector3.Zero;
 				}
-				else _targetRing.Visible = false;
+				pos.Y = 0.1f;
+				_targetRing.Position = pos;
+				_targetRing.Visible = true;
 			}
 			else _targetRing.Visible = false;
 		}
