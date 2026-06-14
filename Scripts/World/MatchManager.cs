@@ -33,7 +33,7 @@ public partial class MatchManager : Node3D
 	public event Action<ulong>? OnTargetChanged;
 
 	private SpellVFXManager? _spellVFX;
-	private const int NpcCount = 5;
+	private const int NpcCount = 1;
 	private const ulong OpponentEntityId = 2;
 	private ArenaDefinition _arenaDef = ArenaRegistry.Get("split");
 
