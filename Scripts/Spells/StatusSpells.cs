@@ -94,7 +94,8 @@ public static class StatusSpells
         impact.MaterialOverride = mat;
 
         AddToScene(combat, impact);
-        impact.GlobalPosition = position;
+        if (combat.GetOwner() is Node3D owner && owner.IsInsideTree())
+            impact.GlobalPosition = position;
 
         // Fade out and remove
         var timer = combat.GetTree().CreateTimer(0.3f);
@@ -173,7 +174,7 @@ public static class StatusSpells
             var current = tree.CurrentScene;
             if (current == null) { node.QueueFree(); return; }
             if (!current.IsInsideTree()) { node.QueueFree(); return; }
-            current.AddChild(node);
+            //current.AddChild(node);
         }
         else
         {

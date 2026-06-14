@@ -333,7 +333,7 @@ new AbilityData
         },
         // Stages 2-3: Similar with adjusted values
     },
-    AnimationNames = new[] { "melee", "leg_sweep", "backflip" },
+    AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
 }
 ```
 

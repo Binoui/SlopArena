@@ -87,16 +87,6 @@ func _init():
         test_hips.origin.x, test_hips.origin.y, test_hips.origin.z
     ])
 
-    anim_player.play("backflip")
-    anim_player.seek(0.5, true)
-    await process_frame
-    test_head = skel.get_bone_global_pose(bone_indices[0])
-    test_hips = skel.get_bone_global_pose(skel.find_bone("mixamorig_Hips"))
-    print("Test backflip frame 0.5s: Head=(%.4f, %.4f, %.4f) Hips=(%.4f, %.4f, %.4f)" % [
-        test_head.origin.x, test_head.origin.y, test_head.origin.z,
-        test_hips.origin.x, test_hips.origin.y, test_hips.origin.z
-    ])
-
     # Open file
     var f := FileAccess.open(OUTPUT_PATH, FileAccess.WRITE)
     if f == null:

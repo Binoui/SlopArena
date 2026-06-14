@@ -718,7 +718,11 @@ public partial class PlayerController : CharacterBody3D
             var dashState = _fsm.GetState<DashState>("dash");
             if (dashState != null)
             {
-                dashState.SetDirection(_moveDirection.X, _moveDirection.Z);
+                // Use the direction the simulation already computed (handles FacingYaw fallback)
+                float dashDirX = _movementComponent.State.DashDirX;
+                float dashDirZ = _movementComponent.State.DashDirZ;
+                GD.Print($"[Dash] facingYaw={_movementComponent.State.FacingYaw:F3} moveDir=({_moveDirection.X:F2},{_moveDirection.Z:F2}) dashDir=({dashDirX:F2},{dashDirZ:F2})");
+                dashState.SetDirection(dashDirX, dashDirZ);
                 _fsm.TransitionTo("dash");
             }
         }
@@ -1064,7 +1068,7 @@ public partial class PlayerController : CharacterBody3D
         {
             case CharacterClass.Manki:
                 modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = new Vector3(0.01f, 0.01f, 0.01f);
+                scale = Vector3.One;
                 position = new Vector3(0, 0, 0);
                 break;
             case CharacterClass.Bunny:

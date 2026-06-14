@@ -59,7 +59,7 @@ Ability LMB:
     HitboxEvents: [{ TriggerTick: 6, DurationTicks: 3, Radius: 0.5, Damage: 4, ... }]
     LungeForce: 0
     
-  Stages[1] (leg_sweep):
+  Stages[1] (spell_lmb_2):
     DurationTicks: 38
     HitboxEvents: [{ TriggerTick: 8, DurationTicks: 3, Radius: 0.6, Damage: 5, ... }]
     LungeForce: 0
