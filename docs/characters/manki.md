@@ -64,7 +64,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 
 ## Files
 
-- `assets/characters/manki/anim_monkey.glb` — model + all animations embedded
+- `assets/characters/manki/manki.glb` — model + all animations embedded
 - `Scripts/Characters/Manki/MankiAbilities.cs` — special effects
 - `Shared/CharacterDefinition.cs` — enum + registry entry
 

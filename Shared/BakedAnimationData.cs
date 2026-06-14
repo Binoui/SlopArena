@@ -11,18 +11,18 @@ namespace SlopArena.Shared
     /// </summary>
     public class BakedAnimationData
     {
-        public string[] BoneNames;
-        public BakedAnim[] Animations;
+        public string[] BoneNames = null!;
+        public BakedAnim[] Animations = null!;
 
         /// <summary>
         /// One baked animation.
         /// </summary>
         public class BakedAnim
         {
-            public string Name;
+            public string Name = null!;
             public int FrameCount;
             /// <summary>positions[frame][boneIndex * 3 + 0/1/2] = x/y/z</summary>
-            public float[][] Frames; // [frameCount][boneCount * 3]
+            public float[][] Frames = null!; // [frameCount][boneCount * 3]
         }
 
         /// <summary>

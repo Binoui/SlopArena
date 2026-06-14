@@ -217,10 +217,10 @@ Only one character is active in the codebase. Design others from scratch followi
 | AirLMB | Rising uppercut (1-2 hits) | Physical | Launch follow-up, dash-cancelable |
 | RMB | Charged heavy punch | Physical | ~15 dmg charged, ~10 uncharged |
 | AirRMB | Downward fire slam | Physical | Spike, 1 hit per flight |
-| Q | Fire Lash (ground kick) | Ability | CC / engage, medium range |
-| E | Rising Flame (uppercut) | Ability | Recovery / launcher, vertical mobility |
-| R | Ember Burst (explosion) | Ability | Zone / burst, area denial |
-| F | Inferno Dance (ult) | Ability | Big finisher, telegraphed wind-up |
+| Q | Round Bomb (projectile) | Ability | Zone / poke, medium range |
+| E | Dynamite Jump (launch) | Ability | Mobility / engage, vertical |
+| R | Dive Bomb (air slam) | Ability | Air-to-ground, area damage |
+| F | Big Boom (ult) | Ability | Big finisher, telegraphed wind-up |
 | Passive | — | — | (None yet) |
 
 **Gameplan**: rush down → land a CC → air combo → finisher on landing. High mobility, low range. Must commit to engage.

@@ -58,4 +58,4 @@ bake-arenas:
 	@ls -1 data/arenas/*.arena 2>/dev/null | wc -l | xargs -I{} echo "  {} .arena files in data/arenas/"
 
 report:
-	@./scripts/quality-report.sh
+	@./ci/quality-report.sh

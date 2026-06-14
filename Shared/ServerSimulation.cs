@@ -28,7 +28,7 @@ namespace SlopArena.Shared
 
 		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
-		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData baked = null)
+		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
 		{
 			_defs[id] = def;
 			_states[id] = initialState;
