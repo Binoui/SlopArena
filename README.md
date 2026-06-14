@@ -133,15 +133,14 @@ Full guide: [`docs/adding-a-new-character.md`](docs/adding-a-new-character.md)
 
 ## Documentation
 
-| Doc | What it covers |
-|-----|---------------|
-| [`docs/characters/manki.md`](docs/characters/manki.md) | Manki kit, concept, design notes |
-| [`docs/animation-system.md`](docs/animation-system.md) | FSM lifecycle, AnimationTree structure |
-| [`docs/combat-systems.md`](docs/combat-systems.md) | Universal combat mechanics |
-| [`docs/character-kit-design-principles.md`](docs/character-kit-design-principles.md) | Design rules for abilities |
-| [`docs/conventions.md`](docs/conventions.md) | Art direction, animation naming, bone naming |
-| [`docs/adding-a-new-character.md`](docs/adding-a-new-character.md) | Full pipeline guide |
-| [`docs/research/dko-mechanics.md`](docs/research/dko-mechanics.md) | DKO systems reference |
+> Full index: [`docs/README.md`](docs/README.md)
+
+| Section | Key docs |
+|---------|----------|
+| **Orientation** | [`docs/architecture-overview.md`](docs/architecture-overview.md), [`docs/testing.md`](docs/testing.md) |
+| **Systems** | [`docs/systems/combat-systems.md`](docs/systems/combat-systems.md), [`docs/systems/animation-system.md`](docs/systems/animation-system.md), [`docs/systems/netcode-architecture.md`](docs/systems/netcode-architecture.md) |
+| **Characters** | [`docs/characters/manki.md`](docs/characters/manki.md), [`docs/characters/bunny.md`](docs/characters/bunny.md), [`docs/characters/adding-a-new-character.md`](docs/characters/adding-a-new-character.md) |
+| **Contributing** | [`docs/contributing/conventions.md`](docs/contributing/conventions.md), [`docs/contributing/quality.md`](docs/contributing/quality.md) |
 
 ---
 
