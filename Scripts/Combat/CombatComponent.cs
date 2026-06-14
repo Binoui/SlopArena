@@ -30,6 +30,7 @@ public partial class CombatComponent : Node
     private SpellVFXManager? _spellVFX;
     private TargetLockSystem? _targetLock;
     private AttackWarping? _warpSystem;
+    private StatusComponent _statusComp = null!;
 
     // ==========================================
     // EVENTS
@@ -47,27 +48,12 @@ public partial class CombatComponent : Node
     /// </summary>
     public event Action<ulong, float, float, float, float>? OnDealDamage;
 
-    /// <summary>
-    /// Fired when a status is applied (for visual feedback).
-    /// Parameters: statusType, duration, sourceEntityId
-    /// </summary>
-    public event Action<StatusType, float, ulong>? OnStatusApplied;
-
-    /// <summary>
-    /// Fired when a status is consumed (removed for bonus effect).
-    /// </summary>
-    public event Action<StatusType>? OnStatusConsumed;
-
-    /// <summary>
-    /// Fired when a status expires naturally.
-    /// </summary>
-    public event Action<StatusType>? OnStatusExpired;
+    // Status events delegated to StatusComponent — use GetStatusComponent().OnStatusApplied etc.
 
     // ==========================================
-    // STATUS EFFECTS
+    // STATUS EFFECTS (delegated to StatusComponent)
     // ==========================================
 
-    private Dictionary<StatusType, float> _statuses = new Dictionary<StatusType, float>();
     private readonly SpellResolver _spellResolver = new();
 
     /// <summary>
@@ -76,18 +62,39 @@ public partial class CombatComponent : Node
     /// </summary>
     private List<ulong> _lastHitTargets = new List<ulong>();
 
+    public StatusComponent GetStatusComponent() => _statusComp;
+
+    public void ApplyStatus(StatusType type, float duration, ulong sourceEntityId = 0)
+        => _statusComp.ApplyStatus(type, duration, sourceEntityId);
+
+    public bool HasStatus(StatusType type) => _statusComp.HasStatus(type);
+    public float GetStatusDuration(StatusType type) => _statusComp.GetStatusDuration(type);
+    public bool ConsumeStatus(StatusType type) => _statusComp.ConsumeStatus(type);
+    public void RemoveStatus(StatusType type) => _statusComp.RemoveStatus(type);
+
+    public Dictionary<StatusType, float> GetAllStatuses() => _statusComp.GetAllStatuses();
+
+    public List<ulong> GetTargetsFromLastHit() => _lastHitTargets;
+
+    public bool HasStatusOnTarget(ulong targetEntityId, StatusType type)
+        => _statusComp.HasStatusOnTarget(targetEntityId, type);
+
+    public void ApplyStatusToLastHit(StatusType type, float duration)
+    {
+        foreach (ulong targetId in _lastHitTargets)
+            _statusComp.ApplyStatusToEntity(targetId, type, duration);
+    }
+
+    public void ApplyStatusToEntity(ulong targetEntityId, StatusType type, float duration)
+        => _statusComp.ApplyStatusToEntity(targetEntityId, type, duration);
+
+    public bool ConsumeStatusOnTarget(ulong targetEntityId, StatusType type)
+        => _statusComp.ConsumeStatusOnTarget(targetEntityId, type);
+
     // ==========================================
     // SETUP
     // ==========================================
 
-    /// <summary>
-    /// Initialize the combat component.
-    /// </summary>
-    /// <param name="owner">The owning Node3D (player, dummy, etc.)</param>
-    /// <param name="simulation">Reference to the local simulation</param>
-    /// <param name="entityId">Unique entity ID in the simulation</param>
-    /// <param name="spellVFX">Optional reference to spell VFX manager</param>
-    /// <param name="targetLock">Optional target lock system for Range-based attacks</param>
     public void Setup(Node3D owner, LocalServerBridge simulation, ulong entityId, SpellVFXManager? spellVFX = null, TargetLockSystem? targetLock = null)
     {
         _owner = owner;
@@ -95,8 +102,10 @@ public partial class CombatComponent : Node
         _entityId = entityId;
         _spellVFX = spellVFX;
         _targetLock = targetLock;
+        _statusComp = new StatusComponent { Name = "StatusComponent" };
+        AddChild(_statusComp);
+        _statusComp.Setup(simulation, entityId);
 
-        // Create warp system if target lock available
         if (targetLock != null)
         {
             _warpSystem = new AttackWarping();
@@ -105,14 +114,7 @@ public partial class CombatComponent : Node
         }
     }
 
-    /// <summary>
-    /// Get the spell VFX manager (for abilities).
-    /// </summary>
     public SpellVFXManager? GetSpellVFX() => _spellVFX;
-
-    /// <summary>
-    /// Get the entity ID in the simulation.
-    /// </summary>
     public ulong GetEntityId() => _entityId;
 
     // ==========================================
@@ -186,129 +188,6 @@ public partial class CombatComponent : Node
     }
 
     // ==========================================
-    // STATUS EFFECTS
-    // ==========================================
-
-    /// <summary>
-    /// Apply a status effect to this entity for a duration.
-    /// If status already exists, refreshes to max duration.
-    /// </summary>
-    public void ApplyStatus(StatusType type, float duration, ulong sourceEntityId = 0)
-    {
-        if (duration <= 0f) return;
-
-        _statuses[type] = duration;
-        OnStatusApplied?.Invoke(type, duration, sourceEntityId);
-    }
-
-    /// <summary>
-    /// Check if this entity currently has a status active.
-    /// </summary>
-    public bool HasStatus(StatusType type)
-    {
-        return _statuses.ContainsKey(type) && _statuses[type] > 0f;
-    }
-
-    /// <summary>
-    /// Get remaining duration of a status (0 if not active).
-    /// </summary>
-    public float GetStatusDuration(StatusType type)
-    {
-        if (_statuses.TryGetValue(type, out float duration))
-            return duration;
-        return 0f;
-    }
-
-    /// <summary>
-    /// Consume (remove) a status and return true if it was active.
-    /// Used for one-shot bonus effects.
-    /// </summary>
-    public bool ConsumeStatus(StatusType type)
-    {
-        if (HasStatus(type))
-        {
-            _statuses.Remove(type);
-            OnStatusConsumed?.Invoke(type);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Remove a status without consuming it.
-    /// </summary>
-    public void RemoveStatus(StatusType type)
-    {
-        if (_statuses.Remove(type))
-        {
-            OnStatusExpired?.Invoke(type);
-        }
-    }
-
-    /// <summary>
-    /// Get all active statuses and their remaining durations.
-    /// </summary>
-    public Dictionary<StatusType, float> GetAllStatuses()
-    {
-        var active = new Dictionary<StatusType, float>();
-        foreach (var kvp in _statuses)
-        {
-            if (kvp.Value > 0f)
-                active[kvp.Key] = kvp.Value;
-        }
-        return active;
-    }
-
-    /// <summary>
-    /// Apply a status to all entities hit in the most recent CheckMeleeCone/CheckCircleHit call.
-    /// This is used by spell effects after dealing damage.
-    /// </summary>
-    public List<ulong> GetTargetsFromLastHit() => _lastHitTargets;
-
-    public bool HasStatusOnTarget(ulong targetEntityId, StatusType type)
-    {
-        if (_simulation != null && _simulation.CombatComponents.TryGetValue(targetEntityId, out var targetCombat))
-            return targetCombat.HasStatus(type);
-        return false;
-    }
-
-    public void ApplyStatusToLastHit(StatusType type, float duration)
-    {
-        foreach (ulong targetId in _lastHitTargets)
-        {
-            // We need to find the target's CombatComponent to apply the status
-            // The target's CombatComponent is found via the entity system
-            ApplyStatusToEntity(targetId, type, duration);
-        }
-    }
-
-    /// <summary>
-    /// Apply a status to a specific entity by ID.
-    /// Looks up the entity's CombatComponent via the simulation's entity-owner mapping.
-    /// </summary>
-    public void ApplyStatusToEntity(ulong targetEntityId, StatusType type, float duration)
-    {
-        if (_simulation == null) return;
-
-        // Route via simulation's status apply event
-        _simulation.OnStatusApply?.Invoke(targetEntityId, type, duration, _entityId);
-    }
-
-    /// <summary>
-    /// Check if the entity this is attached to has a specific status
-    /// and can consume it. Used by spells on the caster (self-buffs, etc.)
-    /// </summary>
-    public bool ConsumeStatusOnTarget(ulong targetEntityId, StatusType type)
-    {
-        if (_simulation == null) return false;
-
-        // Route consumption request via simulation
-        if (_simulation.OnStatusConsume != null)
-            return _simulation.OnStatusConsume(targetEntityId, type);
-        return false;
-    }
-
-    // ==========================================
     // DAMAGE / KNOCKBACK
     // ==========================================
 
@@ -330,24 +209,7 @@ public partial class CombatComponent : Node
     /// </summary>
     public void TakeDamage(float damage, float kbX, float kbY, float kbZ)
     {
-        float finalDamage = damage;
-
-        // Check Vulnerable → +30% damage
-        if (ConsumeStatus(StatusType.Vulnerable))
-        {
-            finalDamage *= 1.3f;
-        }
-
-        // Check Bouclier → absorbs damage
-        if (HasStatus(StatusType.Shielded))
-        {
-            float shieldAbsorb = damage * 0.5f; // 50% damage reduction while shielded
-            finalDamage -= shieldAbsorb;
-            if (finalDamage < 0f) finalDamage = 0f;
-
-            // Bouclier expires after absorbing
-            RemoveStatus(StatusType.Shielded);
-        }
+        float finalDamage = _statusComp.ModifyIncomingDamage(damage);
 
         // Apply damage to movement component
         if (_owner is PlayerController player)
@@ -358,34 +220,7 @@ public partial class CombatComponent : Node
     }
 
     // ==========================================
-    // STATUS TICK (called from _Process)
-    // ==========================================
-
-    public override void _Process(double delta)
-    {
-        float dt = (float)delta;
-
-        // Tick down status durations
-        var expired = new List<StatusType>();
-        foreach (var kvp in _statuses)
-        {
-            float newTime = kvp.Value - dt;
-            if (newTime <= 0f)
-            {
-                expired.Add(kvp.Key);
-            }
-            else
-            {
-                _statuses[kvp.Key] = newTime;
-            }
-        }
-
-        foreach (var type in expired)
-        {
-            _statuses.Remove(type);
-            OnStatusExpired?.Invoke(type);
-        }
-    }
+    // Status tick handled by StatusComponent._Process
 
     // ==========================================
     // ACCESSORS (used by spell effects)
