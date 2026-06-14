@@ -143,6 +143,25 @@ namespace SlopArena.Shared
         /// ═══════════════════════════════════════
         /// </summary>
         /// <returns></returns>
+        /// <summary>
+        /// ═══════════════════════════════════════
+        /// MANKI — Pyromaniac Monkey Bomber
+        /// ═══════════════════════════════════════
+        ///
+        /// Data format notes for agents tuning values:
+        ///   - All durations are ushort TICKS (1 tick = 1/60s ≈ 16.6ms)
+        ///     60 ticks = 1 second, 180 ticks = 3 seconds, 600 ticks = 10 seconds
+        ///   - All positions/distances are METERS (Godot world units = meters)
+        ///   - HurtboxBoneScale: Mixamo GLB uses cm, so 0.01 = convert cm→m
+        ///   - Hitbox Offsets: (OffX, OffY, OffZ) from character center, rotated by facing yaw
+        ///     Positive OffZ = in front, OffY = up from feet
+        ///   - Capsule shape: OffX/OffY/OffZ = start, EndOffX/Y/Z = capsule end (relative to Off)
+        ///   - Damage: flat value, KnockbackForce: horizontal push, KnockbackUpward: vertical launch
+        ///   - StunTicks: how long the victim is in hitstun (can't act)
+        ///   - Interruptible: if true, attacker's hitbox cancels if they get hit during it
+        ///   - ChainWindowTicks: input buffer window after stage ends (0 = final stage)
+        ///   - TriggerTick: when during the animation the hitbox spawns (must be < DurationTicks)
+        /// </summary>
         private static CharacterDefinition BuildManki()
         {
             return new CharacterDefinition
@@ -186,6 +205,9 @@ namespace SlopArena.Shared
 
                 // ── Bone-attached hurtboxes (ServerSkeleton-based) ──
                 // Follows same pattern as BoneHurtboxSetup.DefaultHumanoid()
+                // Each bone gets one sphere. Bone names match Mixamo rig ("mixamorig:Head").
+                // Radius in meters. Larger = easier to hit. Typical ranges:
+                //   Head: 0.20-0.35, Torso: 0.25-0.40, Hands: 0.10-0.18, Feet: 0.14-0.22
                 HurtboxBoneDefs = new HurtboxBoneDef[]
                 {
                     new("mixamorig:Head", 0, 0, 0, 0.25f),
