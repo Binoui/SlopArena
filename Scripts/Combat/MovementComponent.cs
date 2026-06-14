@@ -100,19 +100,18 @@ public class MovementComponent
 
         // Godot collision/rendering step.
         _body.MoveAndSlide();
-        bool godotGrounded = _body.IsOnFloor();
 
-        // Sync grounded state from Godot (authoritative floor detection)
+        // Sync grounded state from Godot
         s = ref State;
-        s.IsGrounded = godotGrounded;
+        s.IsGrounded = _body.IsOnFloor();
 
         // Floor safety
-        if (_body.GlobalPosition.Y < Simulation.FloorHeight - 1f && State.IsGrounded)
+        if (_body.GlobalPosition.Y < _arenaDef.FloorHeight - 1f && State.IsGrounded)
         {
-            _body.GlobalPosition = new Vector3(_body.GlobalPosition.X, Simulation.FloorHeight + 0.5f, _body.GlobalPosition.Z);
+            _body.GlobalPosition = new Vector3(_body.GlobalPosition.X, _arenaDef.FloorHeight + 0.5f, _body.GlobalPosition.Z);
             _body.Velocity = new Vector3(_body.Velocity.X, 0f, _body.Velocity.Z);
             s = ref State;
-            s.PY = Simulation.FloorHeight + 0.5f;
+            s.PY = _arenaDef.FloorHeight + 0.5f;
             s.VY = 0f;
         }
     }

@@ -1069,7 +1069,7 @@ public partial class PlayerController : CharacterBody3D
                 break;
             case CharacterClass.Bunny:
                 modelPath = "res://assets/characters/bunny/bunny.tscn";
-                scale = new Vector3(0.01f, 0.01f, 0.01f);
+                scale = new Vector3(0.017f, 0.017f, 0.017f);
                 position = new Vector3(0, 0, 0);
                 break;
             default:
@@ -1088,9 +1088,13 @@ public partial class PlayerController : CharacterBody3D
         var pm = GD.Load<PackedScene>(modelPath)?.Instantiate<Node3D>();
         if (pm == null) { CreateFallbackMesh(); return null; }
 
+        GD.Print($"[Model] Loading {_playerClass}: path={modelPath} scale={scale} capsule=({_charDef.CapsuleRadius},{_charDef.CapsuleHeight})");
+
         pm.Name = "PlayerModel";
         pm.Scale = scale;
-        pm.Position = new Vector3(position.X, ComputeModelYOffset(), position.Z);
+        float modelYOffset = ComputeModelYOffset();
+        pm.Position = new Vector3(position.X, modelYOffset, position.Z);
+        GD.Print($"[Model] Y offset={modelYOffset:F4} (auto={_charDef.AutoModelYOffset}, sole={_charDef.ModelSoleOffset})");
         AddChild(pm);
 
         return pm;
@@ -1108,22 +1112,26 @@ public partial class PlayerController : CharacterBody3D
         {
             // Scan ALL bones at idle frame 0, find the lowest Y (closest to ground)
             float lowestY = float.MaxValue;
+            string lowestBone = "";
             int found = 0;
             for (int bi = 0; bi < _bakedData.BoneNames.Length; bi++)
             {
                 if (_bakedData.GetBonePosition("idle", 0, bi, out _, out float by, out _))
                 {
-                    if (by < lowestY) lowestY = by;
+                    if (by < lowestY) { lowestY = by; lowestBone = _bakedData.BoneNames[bi]; }
                     found++;
                 }
             }
             if (found > 0 && lowestY < float.MaxValue)
             {
                 float footWorldY = lowestY * _charDef.HurtboxBoneScale;
-                return -(footWorldY + (_charDef.CapsuleHeight * 0.5f) + _charDef.ModelSoleOffset);
+                float result = -(footWorldY + (_charDef.CapsuleHeight * 0.5f) + _charDef.ModelSoleOffset);
+                GD.Print($"[ModelY] Auto: lowest={lowestY:F4} (bone={lowestBone}) scale={_charDef.HurtboxBoneScale} footY={footWorldY:F4} capsuleHalf={_charDef.CapsuleHeight*0.5f} sole={_charDef.ModelSoleOffset} => offset={result:F4}");
+                return result;
             }
-            GD.Print("[Model] No 'idle' animation or bones in baked data, using fallback");
+            GD.Print("[ModelY] No 'idle' animation or bones in baked data, using fallback");
         }
+        GD.Print($"[ModelY] Fallback: ModelYOffset={_charDef.ModelYOffset}");
         return _charDef.ModelYOffset;
     }
 

@@ -54,9 +54,15 @@ namespace SlopArena.Shared
         private const ushort TurnaroundLagTicks = 6;
 
         /// <summary>
-        /// Floor height (flat arena ground at Y=0)
+        /// Tolerance for snapping to platform surfaces (units).
+        /// Characters must be within this window above the surface to snap.
         /// </summary>
-        public const float FloorHeight = 0f;
+        private const float PlatformSnapTolerance = 0.5f;
+        /// <summary>
+        /// How far above the surface the character can be and still land.
+        /// Must be small enough that a jump (VY ≈ 10) immediately breaks it in 1-2 frames.
+        /// </summary>
+        private const float PlatformLandTolerance = 0.02f;
 
         // ── MAIN ENTRY POINT ──
 
@@ -114,12 +120,7 @@ namespace SlopArena.Shared
             // 5. Input-driven actions (only when not locked by animation)
             if (s.AnimLockTicks == 0)
             {
-                // Jump
-                if (input.Jump && s.IsGrounded)
-                {
-                    ApplyJump(ref s, stats.JumpForce);
-                }
-
+                // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
                 if (input.Dash && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0)
                 {
@@ -189,9 +190,11 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 7. Ground collision (flat floor)
-            float groundY = arena.FloorHeight + (def.CapsuleHeight * 0.5f);
-            if (s.PY <= groundY + 0.1f)
+            // 7. Ground collision (platform-aware)
+            float capsuleHalf = def.CapsuleHeight * 0.5f;
+            float bestSurfaceY = GetGroundSurfaceY(s.PX, s.PZ, s.PY, capsuleHalf, arena);
+            float groundY = bestSurfaceY + capsuleHalf;
+            if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
             {
                 s.IsGrounded = true;
                 s.PY = groundY;
@@ -306,10 +309,12 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // Ground check
+            // Ground check (platform-aware)
             bool wasAirborne = !s.IsGrounded;
-            float groundY = arena.FloorHeight + (def.CapsuleHeight * 0.5f);
-            s.IsGrounded = s.PY <= groundY + 0.1f;
+            float capsuleHalfKb = def.CapsuleHeight * 0.5f;
+            float bestSurfaceY = GetGroundSurfaceY(s.PX, s.PZ, s.PY, capsuleHalfKb, arena);
+            float groundY = bestSurfaceY + capsuleHalfKb;
+            s.IsGrounded = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
 
             if (s.IsGrounded)
             {
@@ -771,6 +776,36 @@ namespace SlopArena.Shared
         }
 
         // ── MATH HELPERS ──
+
+        /// <summary>Find the highest walkable surface Y at the character's XZ position.
+        /// Checks arena platforms first (highest wins), falls back to FloorHeight.</summary>
+        private static float GetGroundSurfaceY(float px, float pz, float py, float capsuleHalf, ArenaDefinition arena)
+        {
+            float bestSurfaceY = arena.FloorHeight;
+            if (arena.Platforms == null || arena.Platforms.Length == 0)
+                return bestSurfaceY;
+
+            foreach (var plat in arena.Platforms)
+            {
+                // Check XZ bounds: is the character within this platform's rectangle?
+                if (MathF.Abs(px - plat.CenterX) > plat.HalfSizeX) continue;
+                if (MathF.Abs(pz - plat.CenterZ) > plat.HalfSizeZ) continue;
+
+                // The capsule center Y when standing on this platform
+                float standCenterY = plat.SurfaceY + capsuleHalf;
+
+                // Only snap if the character's center is at or slightly below
+                // the standing height, but not way above it (prevents upward snap).
+                if (py <= standCenterY + PlatformLandTolerance &&
+                    py >= standCenterY - PlatformSnapTolerance)
+                {
+                    if (plat.SurfaceY > bestSurfaceY)
+                        bestSurfaceY = plat.SurfaceY;
+                }
+            }
+
+            return bestSurfaceY;
+        }
 
         private static float MoveToward(float from, float to, float delta)
         {
