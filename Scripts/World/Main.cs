@@ -46,8 +46,8 @@ public partial class Main : Node3D
         _spellVFX = new SpellVFXManager { Name = "SpellVFX" };
         AddChild(_spellVFX);
 
-        // Start the local server process
-        StartLocalServer();
+        // Start the local server process with the selected character class
+        StartLocalServer(selectedClass);
 
         // Match manager (spawns everything, runs game loop)
         _matchManager = new MatchManager { Name = "MatchManager" };
@@ -227,7 +227,7 @@ public partial class Main : Node3D
         _canvasLayer.AddChild(crosshair);
     }
 
-    private void StartLocalServer()
+    private void StartLocalServer(CharacterClass playerClass)
     {
         var projectDir = ProjectSettings.GlobalizePath("res://");
         var serverDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(projectDir, "ServerApp"));
@@ -239,14 +239,14 @@ public partial class Main : Node3D
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "dotnet",
-                    Arguments = $"\"{dllPath}\"",
+                    Arguments = $"\"{dllPath}\" \"{playerClass}\"",
                     WorkingDirectory = serverDir,
                     CreateNoWindow = true,
                     UseShellExecute = false,
                 }
             };
             _serverProcess.Start();
-            GD.Print("[Main] Local server started");
+            GD.Print($"[Main] Local server started (class={playerClass})");
         }
         else
         {

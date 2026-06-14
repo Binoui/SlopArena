@@ -10,7 +10,7 @@ namespace ServerApp;
 
 class Program
 {
-    static void Main()
+    static void Main(string[] args)
     {
         int port = 9876;
         var udp = new UdpClient(port);
@@ -18,7 +18,13 @@ class Program
 
         var arena = ArenaRegistry.Get("split");
         var sim = new ServerSimulation(arena);
-        var charDef = CharacterRegistry.Get(CharacterClass.Manki);
+
+        // Determine character class from command-line arg (default: Manki)
+        var playerClass = CharacterClass.Manki;
+        if (args.Length > 0 && Enum.TryParse<CharacterClass>(args[0], true, out var parsed))
+            playerClass = parsed;
+        var charDef = CharacterRegistry.Get(playerClass);
+        Console.WriteLine($"[Server] Character class: {playerClass}");
 
         // Load baked skeleton data
         BakedAnimationData? bakedData = null;

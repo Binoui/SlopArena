@@ -57,6 +57,7 @@ public partial class ClassSelectUI : Control
         AddChild(_classButtons);
 
         AddClassButton(CharacterClass.Manki, "Manki");// only Manki for now
+        AddClassButton(CharacterClass.Bunny, "Bunny");
 
         // Selected class description
         _description = new Label();
@@ -121,7 +122,7 @@ public partial class ClassSelectUI : Control
         {
             if (child is Button btn)
             {
-                btn.Modulate = btn.Text == "Manki"
+                btn.Modulate = btn.Text == _selectedClass.ToString()
                     ? new Color(0.3f, 0.9f, 0.3f)
                     : new Color(1f, 1f, 1f);
             }
@@ -148,12 +149,14 @@ public partial class ClassSelectUI : Control
     private static string GetClassDescription(CharacterClass cls) => cls switch
     {
         CharacterClass.Manki => "A pyromaniac monkey who rushes down with melee combos and bombards with explosives. Lobs round bombs, rocket jumps with dynamite, and dive bombs from above for a massive Big Boom finale.",
+        CharacterClass.Bunny => "A white rabbit kung-fu assassin who kicks first and asks questions later. Punishes with the Whirling Carrot mark into Dragon's Kick, then flips away before you can react.",
         _ => ""
     };
 
     private static string GetClassStats(CharacterClass cls) => cls switch
     {
         CharacterClass.Manki => "HP: Medium  |  Speed: Fast  |  Range: Melee + Projectile  |  Difficulty: Medium",
+        CharacterClass.Bunny => "HP: Low  |  Speed: Very Fast  |  Range: Melee  |  Difficulty: Hard",
         _ => ""
     };
 }
