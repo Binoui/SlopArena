@@ -16,10 +16,17 @@ public static class AbilityRegistry
         {
 			// Manki — Mad Bomber Monkey
 			{ "MankiAerosolFlame", MankiAbilities.AerosolFlame },
-            { "MankiRoundBomb", MankiAbilities.RoundBomb },
-            { "MankiDynamiteJump", MankiAbilities.DynamiteJump },
-            { "MankiDiveBomb", MankiAbilities.DiveBomb },
-            { "MankiBigBoom", MankiAbilities.BigBoom },
+			{ "MankiRoundBomb", MankiAbilities.RoundBomb },
+			{ "MankiDynamiteJump", MankiAbilities.DynamiteJump },
+			{ "MankiDiveBomb", MankiAbilities.DiveBomb },
+			{ "MankiBigBoom", MankiAbilities.BigBoom },
+
+			// Bunny — Kung-Fu Rabbit
+			{ "BunnyCarrotSlam", BunnyAbilities.CarrotSlam },
+			{ "BunnyWhirlingCarrot", BunnyAbilities.WhirlingCarrot },
+			{ "BunnyFlipKick", BunnyAbilities.FlipKick },
+			{ "BunnyDragonKick", BunnyAbilities.DragonKick },
+			{ "BunnyJadeHare", BunnyAbilities.JadeHare },
         };
 
     /// <summary>
