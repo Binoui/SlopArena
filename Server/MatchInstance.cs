@@ -7,10 +7,14 @@ namespace SlopArena.Server
 {
     /// <summary>
     /// One match instance — 2 players, 60Hz UDP simulation on a dedicated port.
-    /// Runs on its own thread.
+    /// Runs on its own thread. Uses ServerSimulation for full hit detection,
+    /// hurtbox tracking, and void death.
     /// </summary>
     public class MatchInstance
     {
+        private const ulong P1EntityId = 1;
+        private const ulong P2EntityId = 2;
+
         private readonly int _port;
         private readonly string _matchId;
         private readonly string _arenaName;
@@ -20,17 +24,13 @@ namespace SlopArena.Server
         private IPEndPoint? _player2EndPoint;
         private bool _running = true;
 
-        // Per-player state
-        private CharacterState _p1State;
-        private CharacterState _p2State;
-        private CharacterDefinition _p1Def;
-        private CharacterDefinition _p2Def;
         private ArenaDefinition _arena;
-        private uint _serverTick;
+        private ServerSimulation _sim = null!;
 
         // Input buffering (per player, keyed by tick)
         private readonly List<ClientInputPacket> _p1Queue = new();
         private readonly List<ClientInputPacket> _p2Queue = new();
+        private uint _serverTick;
 
         private Thread? _thread;
         private readonly Action<int> _onMatchEnd;
@@ -62,11 +62,17 @@ namespace SlopArena.Server
             Console.WriteLine($"[Match:{_matchId}] Starting on port {_port}");
 
             _arena = ArenaRegistry.Get(_arenaName);
-            _p1Def = CharacterRegistry.Get(CharacterClass.Manki);
-            _p2Def = CharacterRegistry.Get(CharacterClass.Manki);
+            var p1Def = CharacterRegistry.Get(CharacterClass.Manki);
+            var p2Def = CharacterRegistry.Get(CharacterClass.Manki);
 
-            InitializePlayerState(ref _p1State, _p1Def, 0);
-            InitializePlayerState(ref _p2State, _p2Def, 1);
+            // Load baked skeleton data
+            var p1Baked = LoadBakedData(p1Def);
+            var p2Baked = LoadBakedData(p2Def);
+
+            // Create simulation and register both entities
+            _sim = new ServerSimulation(_arena);
+            _sim.RegisterEntity(P1EntityId, p1Def, CreateInitialState(p1Def, 0), p1Baked);
+            _sim.RegisterEntity(P2EntityId, p2Def, CreateInitialState(p2Def, 1), p2Baked);
 
             try
             {
@@ -113,14 +119,32 @@ namespace SlopArena.Server
             _onMatchEnd(_port);
         }
 
-        private static void InitializePlayerState(ref CharacterState state, CharacterDefinition def, int spawnIndex)
+        private static BakedAnimationData? LoadBakedData(CharacterDefinition def)
         {
-            var arena = ArenaRegistry.Get("pit");
-            var spawn = arena.SpawnPoints.Length > spawnIndex
-                ? arena.SpawnPoints[spawnIndex]
+            if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
+
+            try
+            {
+                string sysPath = def.BakedDataPath.Replace("res://", "");
+                var binData = System.IO.File.ReadAllBytes(sysPath);
+                var baked = BakedAnimationData.LoadFromBin(binData);
+                Console.WriteLine($"[Server] Loaded baked data: {sysPath} ({binData.Length} bytes, {baked.Animations.Length} anims)");
+                return baked;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Server] Failed to load baked data: {ex.Message} — using fallback capsules");
+                return null;
+            }
+        }
+
+        private CharacterState CreateInitialState(CharacterDefinition def, int spawnIndex)
+        {
+            var spawn = _arena.SpawnPoints.Length > spawnIndex
+                ? _arena.SpawnPoints[spawnIndex]
                 : new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = 0f };
 
-            state = new CharacterState
+            return new CharacterState
             {
                 PX = spawn.X,
                 PY = spawn.Y,
@@ -210,23 +234,59 @@ namespace SlopArena.Server
             var p1Input = FlushQueue(_p1Queue, out _);
             var p2Input = FlushQueue(_p2Queue, out _);
 
+            var inputs = new Dictionary<ulong, InputState>();
+
             if (p1Input.HasValue)
             {
                 _serverTick = Math.Max(_serverTick, p1Input.Value.TickNumber);
-                var input = PacketToInputState(p1Input.Value);
-                Simulation.SimulateTick(ref _p1State, _p1Def, input, _arena);
+                inputs[P1EntityId] = PacketToInputState(p1Input.Value);
             }
 
             if (p2Input.HasValue)
             {
                 _serverTick = Math.Max(_serverTick, p2Input.Value.TickNumber);
-                var input = PacketToInputState(p2Input.Value);
-                Simulation.SimulateTick(ref _p2State, _p2Def, input, _arena);
+                inputs[P2EntityId] = PacketToInputState(p2Input.Value);
             }
 
-            // Send state to both players
-            if (p1Input.HasValue || p2Input.HasValue)
+            // Run authoritative simulation (movement + hit detection + hurtboxes + void death)
+            if (inputs.Count > 0)
+            {
+                _sim.Tick(inputs);
                 SendState();
+            }
+        }
+
+        private void SendState()
+        {
+            if (_udpServer == null) return;
+
+            var p1Packet = CharacterStatePacket.FromState(_sim.GetState(P1EntityId), _serverTick);
+            var p2Packet = CharacterStatePacket.FromState(_sim.GetState(P2EntityId), _serverTick);
+
+            Span<byte> p1Buffer = stackalloc byte[CharacterStatePacket.Size];
+            p1Packet.Serialize(p1Buffer);
+
+            Span<byte> p2Buffer = stackalloc byte[CharacterStatePacket.Size];
+            p2Packet.Serialize(p2Buffer);
+
+            try
+            {
+                // Send both states to both players (T1.6)
+                if (_player1EndPoint != null)
+                {
+                    _udpServer.Send(p1Buffer.ToArray(), CharacterStatePacket.Size, _player1EndPoint);
+                    _udpServer.Send(p2Buffer.ToArray(), CharacterStatePacket.Size, _player1EndPoint);
+                }
+                if (_player2EndPoint != null)
+                {
+                    _udpServer.Send(p1Buffer.ToArray(), CharacterStatePacket.Size, _player2EndPoint);
+                    _udpServer.Send(p2Buffer.ToArray(), CharacterStatePacket.Size, _player2EndPoint);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Match:{_matchId}] Send error: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -260,35 +320,5 @@ namespace SlopArena.Server
                 MoveY = ((packet.MovementFlags & 0x01) != 0 ? 1f : 0f) - ((packet.MovementFlags & 0x04) != 0 ? 1f : 0f),
             };
         }
-
-        private void SendState()
-        {
-            if (_udpServer == null) return;
-
-            // Player 1 state packet
-            var p1Packet = CharacterStatePacket.FromState(_p1State, _serverTick);
-            Span<byte> p1Buffer = stackalloc byte[CharacterStatePacket.Size];
-            p1Packet.Serialize(p1Buffer);
-
-            // Player 2 state packet
-            var p2Packet = CharacterStatePacket.FromState(_p2State, _serverTick);
-            Span<byte> p2Buffer = stackalloc byte[CharacterStatePacket.Size];
-            p2Packet.Serialize(p2Buffer);
-
-            // Send P1 state to P1, P2 state to P2
-            // TODO: In full implementation, send both states to both players (for hit detection prediction)
-            try
-            {
-                if (_player1EndPoint != null)
-                    _udpServer.Send(p1Buffer.ToArray(), CharacterStatePacket.Size, _player1EndPoint);
-                if (_player2EndPoint != null)
-                    _udpServer.Send(p2Buffer.ToArray(), CharacterStatePacket.Size, _player2EndPoint);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Match:{_matchId}] Send error: {ex.Message}");
-            }
-        }
-
     }
 }
