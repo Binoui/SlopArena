@@ -23,7 +23,6 @@ public partial class UnitFrames : Control
     // ==========================================
 
     private PlayerController? _player;
-    private DummyManager? _dummyMgr;
 
     // ==========================================
     // TARGET STATE
