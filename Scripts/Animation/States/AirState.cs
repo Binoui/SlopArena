@@ -2,62 +2,65 @@
 using Godot;
 
 /// <summary>
-/// Air state — drives the BlendSpace1D parameter for jump↔fall blend.
-/// While rising: full jump animation.
-/// After apex: blends toward fall with a slow timer (2s to reach full fall).
+/// Air state — drives the BlendSpace1D parameter for jump/fall blend.
 /// </summary>
 public sealed partial class AirState : State
 {
-    /// <summary>
-    /// |VY| at which fall blend = 100%
-    /// </summary>
-    private const float FallBlendSpeed = 20f;
+	private const float FallBlendSpeed = 20f;
+	/// <summary>Consecutive grounded frames needed to transition out of air.</summary>
+	private const int GroundedThreshold = 3;
+	private int _groundedCount;
 
-    public AirState()
-    {
-        AnimationName = "air";
-    }
+	public AirState()
+	{
+		AnimationName = "air";
+	}
 
-    public override void Enter()
-    {
-        Player.SetModelEmission(new Color(0.5f, 0.8f, 1.0f)); // Light blue
-        base.Enter();
-        StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
-    }
+	public override void Enter()
+	{
+		_groundedCount = 0;
+		Player.SetModelEmission(new Color(0.5f, 0.8f, 1.0f));
+		base.Enter();
+		StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
+	}
 
-    public override void OnProcess(float delta)
-    {
-        float vy = Player.Velocity.Y;
+	public override void OnProcess(float delta)
+	{
+		float vy = Player.Velocity.Y;
 
-        // Detect any jump (first from ground, or double jump mid-air)
-        if (InputCtrl.JumpJustPressed)
-        {
-            StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
-            return; // skip blend calc this frame, next frame will blend from -1
-        }
+		// Jump input
+		if (InputCtrl.JumpJustPressed)
+		{
+			StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
+			return;
+		}
 
-        if (vy > 0f)
-        {
-            // Still rising — keep full jump animation
-            StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
-        }
-        else
-        {
-            // Apex+falling — blend toward fall with a quadratic curve
-            //   t = |VY| / FallBlendSpeed  (clamped to 1)
-            //   blend = lerp(-1, +1, t²)
-            //
-            // Normal jump landing (VY≈-10): t=0.5, t²=0.25 → 25% fall
-            // Short hop (VY≈-5):          t=0.25, t²=0.06 → 6% fall
-            // Platform drop (VY≈-20):     t=1.0, t²=1.0  → 100% fall
-            float t = Mathf.Clamp(Mathf.Abs(vy) / FallBlendSpeed, 0f, 1f);
-            StateMachine.SetAnimParameter("parameters/air/blend_position", Mathf.Lerp(-1f, 1f, t * t));
-        }
+		// Rising
+		if (vy > 0f)
+		{
+			StateMachine.SetAnimParameter("parameters/air/blend_position", -1f);
+		}
+		else
+		{
+			float t = Mathf.Clamp(Mathf.Abs(vy) / FallBlendSpeed, 0f, 1f);
+			StateMachine.SetAnimParameter("parameters/air/blend_position", Mathf.Lerp(-1f, 1f, t * t));
+		}
 
-        // Transition to Landing when grounded
-        if (Movement.IsGrounded && vy <= 0f)
-        {
-            StateMachine.TransitionTo("landing");
-        }
-    }
+		// Ground detection with threshold to prevent flicker
+		if (Movement.IsGrounded)
+		{
+			_groundedCount++;
+			if (_groundedCount >= GroundedThreshold)
+			{
+				Vector3 vel = Player.Velocity;
+				bool moving = (vel.X * vel.X + vel.Z * vel.Z) > 1f;
+				GD.Print($"[Air] Land tick={Engine.GetPhysicsFrames()} count={_groundedCount} -> {(moving ? "run" : "landing")}");
+				StateMachine.TransitionTo(moving ? "run" : "landing");
+			}
+		}
+		else
+		{
+			_groundedCount = 0;
+		}
+	}
 }
