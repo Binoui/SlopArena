@@ -2,7 +2,7 @@
 using Godot;
 
 /// <summary>
-/// Landing state — brief recovery after hitting the ground (~10 frames / 0.167s).
+/// Landing state — brief recovery after hitting the ground (~10 ticks / 0.167s).
 /// Cancelable into jump or dash on input. Attacks are handled by _UnhandledInput
 /// before _Process, so they cancel naturally.
 /// Auto-transitions to Idle or Run when timer expires.
@@ -15,16 +15,16 @@ public sealed partial class LandingState : State
     }
 
     /// <summary>
-    /// ~10 frames at 60fps
+    /// ~10 ticks at 60fps (0.167s)
     /// </summary>
     [Export]
-    private float _landingDuration = 0.167f;
+    private ushort _landingTicks = 10;
 
-    private float _timer;
+    private ushort _ticksRemaining;
 
     public override void Enter()
     {
-        _timer = _landingDuration;
+        _ticksRemaining = _landingTicks;
         Movement.ResetJumps();
         Player.SetModelEmission(new Color(0.9f, 0.9f, 0.2f)); // Yellow
         base.Enter();
@@ -32,8 +32,6 @@ public sealed partial class LandingState : State
 
     public override void OnProcess(float delta)
     {
-        _timer -= delta;
-
         // Cancel landing on jump or dash
         if (InputCtrl.JumpJustPressed)
         {
@@ -45,9 +43,11 @@ public sealed partial class LandingState : State
             StateMachine.TransitionTo("idle");
             return;
         }
+    }
 
-        // Auto-transition when landing animation finishes
-        if (_timer <= 0f)
+    public override void OnPhysicsProcess(float delta)
+    {
+        if (--_ticksRemaining == 0)
         {
             if (Player.MoveDirection.LengthSquared() > 0.001f)
                 StateMachine.TransitionTo("run");
