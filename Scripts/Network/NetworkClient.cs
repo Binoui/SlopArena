@@ -13,7 +13,7 @@ using SlopArena.Shared;
 public partial class NetworkClient : Node
 {
     private UdpClient? _udp;
-    private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876);
+    private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876); // default, overridden in Connect()
     private ulong _entityId;
     private bool _connected;
 
@@ -22,15 +22,16 @@ public partial class NetworkClient : Node
     /// <summary>Last received server tick (for comparison).</summary>
     public uint LastServerTick { get; private set; }
 
-    public void Connect(ulong entityId)
+    public void Connect(ulong entityId, string ip = "127.0.0.1", int port = 9876)
     {
         _entityId = entityId;
+        _serverEp = new IPEndPoint(IPAddress.Parse(ip), port);
         try
         {
             _udp = new UdpClient();
             _udp.Connect(_serverEp);
             _connected = true;
-            GD.Print($"[NetworkClient] Connected as entity {entityId}");
+            GD.Print($"[NetworkClient] Connected as entity {entityId} to {ip}:{port}");
         }
         catch (Exception ex)
         {
