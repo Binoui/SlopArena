@@ -51,7 +51,7 @@ public partial class PlayerController : CharacterBody3D
     private CameraMount? _camera;
     private CombatComponent? _combatComponent;
     private TargetLockSystem? _targetLock;
-    private MeshInstance3D? _firstMesh;
+    private PlayerModel? _playerModelHelper;
     private Vector3 _moveDirection = Vector3.Zero;
     private Node3D? _playerModel;
     private BoneHurtboxSetup? _boneHurtboxes;
@@ -235,7 +235,8 @@ public partial class PlayerController : CharacterBody3D
         AddChild(_animationController);
 
         // Model + AnimationPlayer
-        _playerModel = LoadPlayerModel();
+        _playerModelHelper = new PlayerModel(this, _charDef, _playerClass, _bakedData, _isNPC);
+        _playerModel = _playerModelHelper.Load();
         AnimationPlayer? animPlayer = null;
         Skeleton3D? skeleton = null;
 
@@ -1050,109 +1051,6 @@ public partial class PlayerController : CharacterBody3D
     // ==========================================
     // MODEL LOADING
     // ==========================================
-
-    private void CreateFallbackMesh()
-    {
-        var cm = new CapsuleMesh { Radius = 1.5f, Height = 3f };
-        cm.SurfaceSetMaterial(0, new StandardMaterial3D { AlbedoColor = new Color(0f, 0.75f, 1f), EmissionEnabled = true, Emission = new Color(0f, 0.5f, 0.8f), EmissionEnergyMultiplier = 2f });
-        AddChild(new MeshInstance3D { Mesh = cm });
-    }
-
-    private Node3D? LoadPlayerModel()
-    {
-        string modelPath;
-        Vector3 scale;
-        Vector3 position;
-
-        switch (_playerClass)
-        {
-            case CharacterClass.Manki:
-                modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = Vector3.One;
-                position = new Vector3(0, 0, 0);
-                break;
-            case CharacterClass.Bunny:
-                modelPath = "res://assets/characters/bunny/bunny.tscn";
-                scale = new Vector3(0.017f, 0.017f, 0.017f);
-                position = new Vector3(0, 0, 0);
-                break;
-            default:
-                modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = Vector3.One;
-                position = new Vector3(0, 0, 0);
-                break;
-        }
-
-        if (!ResourceLoader.Exists(modelPath))
-        {
-            CreateFallbackMesh();
-            return null;
-        }
-
-        var pm = GD.Load<PackedScene>(modelPath)?.Instantiate<Node3D>();
-        if (pm == null) { CreateFallbackMesh(); return null; }
-
-        GD.Print($"[Model] Loading {_playerClass}: path={modelPath} scale={scale} capsule=({_charDef.CapsuleRadius},{_charDef.CapsuleHeight})");
-
-        pm.Name = "PlayerModel";
-        pm.Scale = scale;
-        float modelYOffset = ComputeModelYOffset();
-        pm.Position = new Vector3(position.X, modelYOffset, position.Z);
-        GD.Print($"[Model] Y offset={modelYOffset:F4} (auto={_charDef.AutoModelYOffset}, sole={_charDef.ModelSoleOffset})");
-        AddChild(pm);
-
-        return pm;
-    }
-
-    /// <summary>
-    /// Compute the Y offset that aligns the visual model's feet with the capsule bottom.
-    /// Uses the baked skeleton data (foot position relative to Hips at idle frame 0).
-    /// Falls back to CharacterDefinition.ModelYOffset if auto-compute fails.
-    /// </summary>
-    private float ComputeModelYOffset()
-    {
-        // Try auto-compute from baked data
-        if (_charDef.AutoModelYOffset && _bakedData != null)
-        {
-            // Scan ALL bones at idle frame 0, find the lowest Y (closest to ground)
-            float lowestY = float.MaxValue;
-            string lowestBone = "";
-            int found = 0;
-            for (int bi = 0; bi < _bakedData.BoneNames.Length; bi++)
-            {
-                if (_bakedData.GetBonePosition("idle", 0, bi, out _, out float by, out _))
-                {
-                    if (by < lowestY) { lowestY = by; lowestBone = _bakedData.BoneNames[bi]; }
-                    found++;
-                }
-            }
-            if (found > 0 && lowestY < float.MaxValue)
-            {
-                float footWorldY = lowestY * _charDef.HurtboxBoneScale;
-                float result = -(footWorldY + (_charDef.CapsuleHeight * 0.5f) + _charDef.ModelSoleOffset);
-                GD.Print($"[ModelY] Auto: lowest={lowestY:F4} (bone={lowestBone}) scale={_charDef.HurtboxBoneScale} footY={footWorldY:F4} capsuleHalf={_charDef.CapsuleHeight*0.5f} sole={_charDef.ModelSoleOffset} => offset={result:F4}");
-                return result;
-            }
-            GD.Print("[ModelY] No 'idle' animation or bones in baked data, using fallback");
-        }
-        GD.Print($"[ModelY] Fallback: ModelYOffset={_charDef.ModelYOffset}");
-        return _charDef.ModelYOffset;
-    }
-
-    private void ApplySkinRecursive(Node node, Texture2D? tex)
-    {
-        if (node is MeshInstance3D mi)
-        {
-            var mat = new StandardMaterial3D();
-            mat.VertexColorUseAsAlbedo = false;
-            mat.TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear;
-            if (tex != null) { mat.AlbedoTexture = tex; }
-            else mat.AlbedoColor = new Color(0.7f, 0.7f, 0.7f);
-            mi.MaterialOverride = mat;
-            if (_isNPC && _firstMesh == null) { _firstMesh = mi; mat.EmissionEnabled = true; mat.Emission = new Color(0.8f, 0f, 0f); _npcOriginalEmission = mat.EmissionEnergyMultiplier; }
-        }
-        foreach (var c in node.GetChildren()) ApplySkinRecursive(c, tex);
-    }
 
     // ==========================================
     // AI INPUT INJECTION (for NPCs)
