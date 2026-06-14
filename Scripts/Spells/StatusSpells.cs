@@ -174,7 +174,7 @@ public static class StatusSpells
             var current = tree.CurrentScene;
             if (current == null) { node.QueueFree(); return; }
             if (!current.IsInsideTree()) { node.QueueFree(); return; }
-            //current.AddChild(node);
+            current.AddChild(node);
         }
         else
         {
