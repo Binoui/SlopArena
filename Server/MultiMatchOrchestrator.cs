@@ -113,6 +113,8 @@ namespace SlopArena.Server
         public int MaxConcurrentMatches { get; set; } = 15;
         public string MasterServerUrl { get; set; } = "http://localhost:5000";
         public bool IsOfficial { get; set; } = false;
+        /// <summary>Directory containing .arena files. Relative to the server working directory.</summary>
+        public string ArenaDataDir { get; set; } = "data/arenas";
         public CustomRules? CustomRules { get; set; }
 
         public static ServerConfig Load(string path)
