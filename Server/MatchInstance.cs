@@ -32,6 +32,11 @@ namespace SlopArena.Server
         private readonly List<ClientInputPacket> _p2Queue = new();
         private uint _serverTick;
 
+        // Connection timeout
+        private DateTime _lastP1Packet = DateTime.UtcNow;
+        private DateTime _lastP2Packet = DateTime.UtcNow;
+        private const double TimeoutSeconds = 5.0;
+
         private Thread? _thread;
         private readonly Action<int> _onMatchEnd;
 
@@ -98,7 +103,21 @@ namespace SlopArena.Server
                 {
                     ReceiveInputs();
                     if (_player1EndPoint != null && _player2EndPoint != null)
+                    {
+                        // Check for disconnected players
+                        var now = DateTime.UtcNow;
+                        bool p1Timeout = (now - _lastP1Packet).TotalSeconds > TimeoutSeconds;
+                        bool p2Timeout = (now - _lastP2Packet).TotalSeconds > TimeoutSeconds;
+
+                        if (p1Timeout || p2Timeout)
+                        {
+                            Console.WriteLine($"[Match:{_matchId}] Player {(p1Timeout ? "1" : "2")} timed out — stopping match.");
+                            _running = false;
+                            continue;
+                        }
+
                         Tick();
+                    }
                     nextTickTime += tickDurationMs;
 
                     if (currentTime > nextTickTime + tickDurationMs * 10)
@@ -190,15 +209,21 @@ namespace SlopArena.Server
                             if (_player1EndPoint == null)
                             {
                                 _player1EndPoint = remoteEP;
+                                _lastP1Packet = DateTime.UtcNow;
                                 Console.WriteLine($"[Match:{_matchId}] Player 1 connected: {remoteEP}");
                             }
                             else if (_player2EndPoint == null)
                             {
                                 _player2EndPoint = remoteEP;
+                                _lastP2Packet = DateTime.UtcNow;
                                 Console.WriteLine($"[Match:{_matchId}] Player 2 connected: {remoteEP} — match starting!");
                             }
                             continue;
                         }
+
+                        // Update last packet time for timeout detection
+                        if (isP1) _lastP1Packet = DateTime.UtcNow;
+                        if (isP2) _lastP2Packet = DateTime.UtcNow;
 
                         if (packet.TickNumber <= _serverTick) continue;
 
