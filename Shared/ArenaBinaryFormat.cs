@@ -80,7 +80,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), platCount); pos += 4;
             for (int i = 0; i < platCount; i++)
             {
-                var p = arena.Platforms[i];
+                var p = arena.Platforms![i];
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), p.CenterX); pos += 4;
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), p.CenterZ); pos += 4;
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), p.HalfSizeX); pos += 4;
@@ -99,7 +99,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), spawnCount32); pos += 4;
             for (int i = 0; i < spawnCount32; i++)
             {
-                var s = arena.SpawnPoints[i];
+                var s = arena.SpawnPoints![i];
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), s.X); pos += 4;
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), s.Y); pos += 4;
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(pos), s.Z); pos += 4;
@@ -128,15 +128,15 @@ namespace SlopArena.Shared
             var arena = new ArenaDefinition();
 
             // Name
-            arena.Name = ReadString(data, ref pos);
+            arena.Name = ReadString(data, ref pos)!;
             if (arena.Name == null) return null;
 
             // DisplayName
-            arena.DisplayName = ReadString(data, ref pos);
+            arena.DisplayName = ReadString(data, ref pos)!;
             if (arena.DisplayName == null) return null;
 
             // ScenePath
-            arena.ScenePath = ReadString(data, ref pos);
+            arena.ScenePath = ReadString(data, ref pos)!;
             if (arena.ScenePath == null) return null;
 
             // KillHeight

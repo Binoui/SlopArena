@@ -29,7 +29,15 @@ namespace SlopArena.Shared
 
     public struct CharacterDefinition
     {
-        public CharacterDefinition() { HurtboxBoneScale = 1.0f; }
+        public CharacterDefinition()
+        {
+            HurtboxBoneScale = 1.0f;
+            DisplayName = null!;
+            HurtboxCapsules = null!;
+            HurtboxBoneDefs = null!;
+            GlbPath = null!;
+            BakedDataPath = null!;
+        }
 
         public CharacterClass Class;
         public string DisplayName;

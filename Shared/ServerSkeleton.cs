@@ -9,22 +9,31 @@ namespace SlopArena.Shared
     /// </summary>
     public struct GlbNode
     {
+        public GlbNode()
+        {
+            Name = null!;
+            Children = null!;
+            RestPos = null!;
+            RestRot = null!;
+            RestScale = null!;
+        }
+
         public int Index;
-        public string Name;
+        public string Name = null!;
         public int Parent;
-        public int[] Children;
+        public int[] Children = null!;
         /// <summary>
         /// 3 floats: tx, ty, tz
         /// </summary>
-        public float[] RestPos;
+        public float[] RestPos = null!;
         /// <summary>
         /// 4 floats: qx, qy, qz, qw (glTF convention: xyz then w)
         /// </summary>
-        public float[] RestRot;
+        public float[] RestRot = null!;
         /// <summary>
         /// 3 floats
         /// </summary>
-        public float[] RestScale;
+        public float[] RestScale = null!;
         public bool IsSkinRoot;
     }
 
@@ -33,16 +42,23 @@ namespace SlopArena.Shared
     /// </summary>
     public struct AnimTrack
     {
+        public AnimTrack()
+        {
+            Path = null!;
+            Times = null!;
+            Values = null!;
+        }
+
         public int BoneIndex;
         /// <summary>
         /// &quot;translation&quot;, &quot;rotation&quot;, &quot;scale&quot;
         /// </summary>
-        public string Path;
-        public float[] Times;
+        public string Path = null!;
+        public float[] Times = null!;
         /// <summary>
         /// VEC3 for translation/scale, VEC4 for rotation
         /// </summary>
-        public float[] Values;
+        public float[] Values = null!;
     }
 
     /// <summary>
@@ -50,12 +66,18 @@ namespace SlopArena.Shared
     /// </summary>
     public struct AnimationData
     {
-        public string Name;
+        public AnimationData()
+        {
+            Name = null!;
+            Tracks = null!;
+        }
+
+        public string Name = null!;
         /// <summary>
         /// in seconds
         /// </summary>
         public float Duration;
-        public AnimTrack[] Tracks;
+        public AnimTrack[] Tracks = null!;
     }
 
     /// <summary>
@@ -103,9 +125,9 @@ namespace SlopArena.Shared
             _worldRot = new float[n][];
             for (int i = 0; i < n; i++)
             {
-                _localPos[i] = (float[])nodes[i].RestPos?.Clone() ?? new float[] { 0, 0, 0 };
-                _localRot[i] = (float[])nodes[i].RestRot?.Clone() ?? new float[] { 0, 0, 0, 1 };
-                _localScale[i] = (float[])nodes[i].RestScale?.Clone() ?? new float[] { 1, 1, 1 };
+                _localPos[i] = (float[])(nodes[i].RestPos?.Clone() ?? new float[] { 0, 0, 0 })!;
+                _localRot[i] = (float[])(nodes[i].RestRot?.Clone() ?? new float[] { 0, 0, 0, 1 })!;
+                _localScale[i] = (float[])(nodes[i].RestScale?.Clone() ?? new float[] { 1, 1, 1 })!;
                 _worldPos[i] = new float[3];
                 _worldRot[i] = new float[4];
             }
@@ -319,8 +341,8 @@ namespace SlopArena.Shared
             uint magic = BitConverter.ToUInt32(glbData, 0);
             if (magic != 0x46546C67) throw new Exception("Not a valid GLB file");
 
-            byte[] binBuf = null;
-            JsonDocument jsonDoc = null;
+            byte[]? binBuf = null;
+            JsonDocument? jsonDoc = null;
 
             while (pos < glbData.Length)
             {

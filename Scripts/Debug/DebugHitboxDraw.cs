@@ -92,7 +92,7 @@ public partial class DebugHitboxDraw : MeshInstance3D
                 DrawWireSphere(_mesh, lx, ly, lz, e.Radius, 12);
             }
 
-            UpdateLabel(labelIndex++, new Vector3(lx, ly + e.Radius + 0.3f, lz), $"{prefix}\nR:{e.Radius:F1}\n{e.Id}", color);
+            //UpdateLabel(labelIndex++, new Vector3(lx, ly + e.Radius + 0.3f, lz), $"{prefix}\nR:{e.Radius:F1}\n{e.Id}", color);
         }
         _mesh.SurfaceEnd();
     }
