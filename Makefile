@@ -1,15 +1,16 @@
-.PHONY: help build clean check format lint test report
+.PHONY: help build clean check format lint test report bake-arenas
 
 help:
 	@echo "SlopArena Development Commands"
 	@echo "=============================="
-	@echo "  make build     - Build the project"
-	@echo "  make check     - Run all quality checks"
-	@echo "  make report    - Show code quality report"
-	@echo "  make format    - Auto-format code"
-	@echo "  make lint      - Run code analysis"
-	@echo "  make clean     - Clean build artifacts"
-	@echo "  make test      - Run tests (when implemented)"
+	@echo "  make build        - Build the project"
+	@echo "  make check        - Run all quality checks"
+	@echo "  make report       - Show code quality report"
+	@echo "  make format       - Auto-format code"
+	@echo "  make lint         - Run code analysis"
+	@echo "  make clean        - Clean build artifacts"
+	@echo "  make test         - Run tests (when implemented)"
+	@echo "  make bake-arenas  - Bake arena .tscn files to .arena binary"
 
 build:
 	@echo "🔨 Building SlopArena..."
@@ -49,6 +50,12 @@ lint:
 test:
 	@echo "🧪 Running tests..."
 	@echo "  (No tests implemented yet)"
+
+bake-arenas:
+	@echo "🏟️  Baking arenas from hardcoded data..."
+	@dotnet run --project tools/BakeArenas.csproj -- "data/arenas"
+	@echo "  Also available: run tools/bake_arenas.tscn in Godot to bake from .tscn scenes"
+	@ls -1 data/arenas/*.arena 2>/dev/null | wc -l | xargs -I{} echo "  {} .arena files in data/arenas/"
 
 report:
 	@./scripts/quality-report.sh

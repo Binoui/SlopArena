@@ -1,3 +1,5 @@
+using SlopArena.Shared;
+
 namespace SlopArena.Server
 {
     static class Program
@@ -14,7 +16,11 @@ namespace SlopArena.Server
             Console.WriteLine($"Port range: {config.Port}-{config.Port + config.MaxConcurrentMatches - 1}");
             Console.WriteLine($"Max concurrent matches: {config.MaxConcurrentMatches}");
             Console.WriteLine($"Master server: {config.MasterServerUrl}");
+            Console.WriteLine($"Arena data: {config.ArenaDataDir}");
             Console.WriteLine();
+
+            // Load arena definitions from .arena files (fallback to hardcoded)
+            ArenaRegistry.LoadFromDirectory(config.ArenaDataDir);
 
             var orchestrator = new MultiMatchOrchestrator(config);
             var registration = new GameServerRegistration(config, orchestrator);
