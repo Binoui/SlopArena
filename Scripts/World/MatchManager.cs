@@ -384,7 +384,7 @@ public partial class MatchManager : Node3D
 		{
 			ulong id = kvp.Key;
 			var state = kvp.Value;
-			var def = CharacterRegistry.Get(CharacterClass.Manki); // TODO: per-character
+			var def = CharacterRegistry.Get(_charDef.Class); // per-character
 			var baked = _playerBakedData; // TODO: per-character
 
 			// Determine animation (same logic as ServerSimulation)
