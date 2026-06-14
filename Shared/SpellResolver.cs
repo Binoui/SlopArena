@@ -8,9 +8,9 @@ namespace SlopArena.Shared
     /// Spawn hitboxes via Spawn(), then call Tick() each server tick.
     /// Handles: movement (projectiles), sphere-sphere collision, aging, knockback.
     /// </summary>
-    public static class SpellResolver
+    public class SpellResolver
     {
-        private static readonly List<Hitbox> _hitboxes = new();
+        private readonly List<Hitbox> _hitboxes = new();
 
         /// <summary>
         /// Result of a single hitbox-entity collision.
@@ -49,7 +49,7 @@ namespace SlopArena.Shared
         /// <summary>
         /// Spawn a new hitbox. Call this from ability code.
         /// </summary>
-        public static void Spawn(Hitbox hb)
+        public void Spawn(Hitbox hb)
         {
             hb.Active = true;
             hb.AgeTicks = 0;
@@ -59,12 +59,12 @@ namespace SlopArena.Shared
         /// <summary>
         /// Clear all hitboxes (e.g., on match reset).
         /// </summary>
-        public static void Clear() => _hitboxes.Clear();
+        public void Clear() => _hitboxes.Clear();
 
         /// <summary>
         /// Get a snapshot of all active hitboxes (for debug visualization).
         /// </summary>
-        public static List<Hitbox> GetActiveHitboxes()
+        public List<Hitbox> GetActiveHitboxes()
         {
             var snapshot = new List<Hitbox>(_hitboxes.Count);
             foreach (var hb in _hitboxes)
@@ -79,7 +79,7 @@ namespace SlopArena.Shared
         /// Returns all hits this tick (one per entity, first hitbox to connect wins).
         /// Already-hit entities in this tick are skipped (no double-hit).
         /// </summary>
-        public static List<HitResult> Tick(List<EntityData> entities)
+        public List<HitResult> Tick(List<EntityData> entities)
         {
             var results = new List<HitResult>();
             var hitThisTick = new HashSet<ulong>();

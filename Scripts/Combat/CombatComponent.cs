@@ -68,6 +68,7 @@ public partial class CombatComponent : Node
     // ==========================================
 
     private Dictionary<StatusType, float> _statuses = new Dictionary<StatusType, float>();
+    private readonly SpellResolver _spellResolver = new();
 
     /// <summary>
     /// Tracks which entities were hit in the most recent hit check,
@@ -138,9 +139,9 @@ public partial class CombatComponent : Node
             KnockbackUpward = knockbackUpward,
             OwnerId = _entityId,
         };
-        SpellResolver.Spawn(hb);
-        GD.Print($"[HITBOX] MeleeCone at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
-        foreach (var hit in SpellResolver.Tick(entities))
+        _spellResolver.Spawn(hb);
+
+        foreach (var hit in _spellResolver.Tick(entities))
         {
             _lastHitTargets.Add(hit.TargetEntityId);
             _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
@@ -172,9 +173,9 @@ public partial class CombatComponent : Node
             KnockbackUpward = knockbackUpward,
             OwnerId = _entityId,
         };
-        SpellResolver.Spawn(hb);
-        GD.Print($"[HITBOX] CircleAoE at ({hb.X:F1},{hb.Y:F1},{hb.Z:F1}) R={hb.Radius:F1} DMG={damage} KB={knockbackForce}");
-        foreach (var hit in SpellResolver.Tick(entities))
+        _spellResolver.Spawn(hb);
+
+        foreach (var hit in _spellResolver.Tick(entities))
         {
             _lastHitTargets.Add(hit.TargetEntityId);
             _simulation.RouteHit(hit.TargetEntityId, hit.Damage, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);

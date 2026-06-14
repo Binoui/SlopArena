@@ -25,6 +25,7 @@ namespace SlopArena.Shared
 		/// cached for debug
 		/// </summary>
 		private List<SpellResolver.EntityData> _lastEntityList = new();
+		private readonly SpellResolver _spellResolver = new();
 
 		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
@@ -50,6 +51,8 @@ namespace SlopArena.Shared
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
 		/// <summary>Entity data from last Tick (for debug visualization).</summary>
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
+		/// <summary>Spell resolver instance (for debug visualization).</summary>
+		public SpellResolver Resolver => _spellResolver;
 
 		/// <summary>
 		/// Build hurtbox entity list from a single CharacterState + definition.
@@ -307,7 +310,7 @@ namespace SlopArena.Shared
 									float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
 									float hey = hy + evt.EndOffY;
 									float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
-									SpellResolver.Spawn(new Hitbox
+									_spellResolver.Spawn(new Hitbox
 									{
 										X = hx,
 										Y = hy,
@@ -333,7 +336,7 @@ namespace SlopArena.Shared
 
 			// ── Step 3: Resolve hitboxes ──
 			_lastEntityList = entityList;
-			foreach (var hit in SpellResolver.Tick(entityList))
+			foreach (var hit in _spellResolver.Tick(entityList))
 			{
 				if (_states.TryGetValue(hit.TargetEntityId, out var targetState))
 				{
