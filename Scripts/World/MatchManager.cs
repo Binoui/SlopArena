@@ -54,7 +54,7 @@ public partial class MatchManager : Node3D
 	/// <summary>
 	/// ── Tick + rollback ──
 	/// </summary>
-	private const int RollbackFrames = 10;
+	private const int RollbackFrames = 30;
 	private uint _sendTick;
 	private readonly InputState[] _inputBuffer = new InputState[RollbackFrames];
 	private readonly CharacterState[] _stateBuffer = new CharacterState[RollbackFrames];
@@ -247,18 +247,35 @@ public partial class MatchManager : Node3D
 				int idx = (int)(serverTick % RollbackFrames);
 				var predicted = _stateBuffer[idx];
 
-				// Compare server vs predicted — use generous threshold on localhost
+				// Compare server vs predicted — 3D distance check
 				// Server is 1-2 frames behind, small differences are expected
+				float dx = predicted.PX - serverState.PX;
 				float dy = predicted.PY - serverState.PY;
-				if (MathF.Abs(dy) > 0.5f)
+				float dz = predicted.PZ - serverState.PZ;
+				float distSq = dx * dx + dy * dy + dz * dz;
+				if (distSq > 0.25f) // 0.5m threshold
 				{
 					// ── ROLLBACK ──
-					GD.Print($"[Rollback] Tick {serverTick}: dy={dy:F3}m, resimulating...");
+					GD.Print($"[Rollback] Tick {serverTick}: d=({dx:F2},{dy:F2},{dz:F2}) dist={MathF.Sqrt(distSq):F3}m, resimulating...");
+
+					// Snapshot NPC states from the current sim before replacing it
+					var npcStates = new CharacterState[NpcCount];
+					for (int i = 0; i < NpcCount; i++)
+						npcStates[i] = _localSim.GetState((ulong)(100 + i));
 
 					// Reset local sim to the server's confirmed state
 					var safeState = serverState;
 					_localSim = new ServerSimulation(_arenaDef);
 					_localSim.RegisterEntity(_playerEntityId, _charDef, safeState, _playerBakedData);
+
+					// Re-register NPCs with their last known state (prefer server-confirmed)
+					for (int i = 0; i < NpcCount; i++)
+					{
+						ulong npcId = (ulong)(100 + i);
+						var npcState = _serverConfirmedStates.TryGetValue(npcId, out var s)
+							? s : npcStates[i];
+						_localSim.RegisterEntity(npcId, _charDef, npcState, _playerBakedData);
+					}
 
 					// Re-simulate from serverTick+1 to currentTick
 					uint currentTick = _sendTick;
