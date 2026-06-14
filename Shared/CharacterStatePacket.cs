@@ -31,8 +31,11 @@ namespace SlopArena.Shared
         /// <summary>Facing yaw in radians, from server authority.</summary>
         public float FacingYaw;
 
-        /// <summary>38 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 4;
+        /// <summary>Match lifecycle state from server.</summary>
+        public MatchState MatchState;
+
+        /// <summary>39 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 4 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -93,6 +96,7 @@ namespace SlopArena.Shared
             buffer[32] = AttackSlot;
             buffer[33] = ComboStage;
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(34, 4), FacingYaw);
+            buffer[38] = (byte)MatchState;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -114,6 +118,7 @@ namespace SlopArena.Shared
             packet.AttackSlot = buffer[32];
             packet.ComboStage = buffer[33];
             packet.FacingYaw = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(34, 4));
+            packet.MatchState = (MatchState)buffer[38];
             return packet;
         }
     }

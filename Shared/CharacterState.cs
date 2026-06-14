@@ -31,6 +31,7 @@ namespace SlopArena.Shared
         public byte AirDodgesLeft;
         public bool IsGrounded;
         public bool WasAirborneDuringKnockback;
+        public byte Deaths;              // match death counter, server authority
 
         /// <summary>
         /// ── Dash ──
