@@ -15,18 +15,47 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: chickensoft-games/setup-godot@v2
+        name: Setup Godot (4.6 .NET)
+        with:
+          version: 4.6.3
+          use-dotnet: true
+          include-templates: true
+
+      - name: Build C# assemblies
+        run: dotnet build --configuration Release
+
       - name: Generate next version tag
         id: tag
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "latest=$LATEST_TAG"
-          # Strip 'v' prefix, split, bump patch
           IFS='.' read -r -a PARTS <<< "${LATEST_TAG#v}"
           MAJOR=${PARTS[0]:-0}
           MINOR=${PARTS[1]:-0}
           PATCH=${PARTS[2]:-0}
           NEW_TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
           echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Export Linux
+        run: |
+          mkdir -p dist/linux
+          godot --headless --export-release "Linux" dist/linux/SlopArena.x86_64
+
+      - name: Export Windows
+        run: |
+          mkdir -p dist/windows
+          godot --headless --export-release "Windows" dist/windows/SlopArena.exe
+
+      - name: Package artifacts
+        run: |
+          cd dist
+          zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-linux.zip" linux/
+          zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip" windows/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -35,3 +64,6 @@ jobs:
           name: ${{ steps.tag.outputs.new_tag }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          files: |
+            SlopArena-${{ steps.tag.outputs.new_tag }}-linux.zip
+            SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip
