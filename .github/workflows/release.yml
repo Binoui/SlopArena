@@ -50,10 +50,6 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p dist/windows
-          echo "=== Export templates ==="
-          ls -la /home/runner/.local/share/godot/export_templates/4.6.3.stable.mono/
-          echo "=== Presets from file ==="
-          godot --headless --export-list 2>&1 || true
           # Generate fresh export_presets.cfg with only the Windows preset
           printf '%s\n' \
             '[preset.0]' \
@@ -77,11 +73,9 @@ jobs:
             'texture_format/etc2_astc=false' \
             'dotnet/include_script_source=true' \
             > export_presets.cfg
-          echo "=== New export_presets.cfg ==="
-          cat export_presets.cfg
-          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe &> /tmp/godot_win_export.log || true
-          echo "=== Godot output ==="
-          cat /tmp/godot_win_export.log
+          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          echo "=== Windows dist contents ==="
+          ls -la dist/windows/
 
       - name: Package artifacts
         run: |
