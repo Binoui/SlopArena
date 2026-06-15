@@ -75,7 +75,12 @@ jobs:
             'texture_format/etc2_astc=false' \
             'dotnet/include_script_source=true' \
             > export_presets.cfg
-          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          echo "=== Generated CFG ==="
+          cat export_presets.cfg
+          echo "=== Godot preset scan ==="
+          godot --headless --quit -- editor_settings/export_presets 2>&1 || true
+          echo "=== Trying export-debug instead ==="
+          godot --headless --export-debug "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
           echo "=== Windows dist contents ==="
           ls -la dist/windows/
 
