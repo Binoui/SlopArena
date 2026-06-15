@@ -1,0 +1,285 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "hermes-agent",
+  "elements": [
+    {
+      "type": "rectangle",
+      "id": "bg1",
+      "x": 20, "y": 20, "width": 240, "height": 240,
+      "backgroundColor": "#a5d8ff", "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "boundElements": [{ "id": "t_main", "type": "text" }]
+    },
+    {
+      "type": "text",
+      "id": "t_main",
+      "x": 40, "y": 30, "width": 200, "height": 25,
+      "text": "MAIN MENU",
+      "fontSize": 20, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg1", "originalText": "MAIN MENU", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_main2",
+      "x": 45, "y": 100, "width": 190, "height": 25,
+      "text": "Training Mode",
+      "fontSize": 18, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg1", "originalText": "Training Mode", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_main3",
+      "x": 45, "y": 140, "width": 190, "height": 25,
+      "text": "Join Server",
+      "fontSize": 18, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg1", "originalText": "Join Server", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_main4",
+      "x": 45, "y": 180, "width": 190, "height": 25,
+      "text": "Host Server",
+      "fontSize": 18, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg1", "originalText": "Host Server", "autoResize": true
+    },
+
+    {
+      "type": "rectangle",
+      "id": "bg_train",
+      "x": 340, "y": 20, "width": 240, "height": 140,
+      "backgroundColor": "#b2f2bb", "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "boundElements": [{ "id": "t_train", "type": "text" }]
+    },
+    {
+      "type": "text",
+      "id": "t_train",
+      "x": 360, "y": 30, "width": 200, "height": 25,
+      "text": "TRAINING MODE",
+      "fontSize": 20, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_train", "originalText": "TRAINING MODE", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_train2",
+      "x": 365, "y": 70, "width": 190, "height": 20,
+      "text": "Char Select",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_train", "originalText": "Char Select", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_train3",
+      "x": 365, "y": 100, "width": 190, "height": 20,
+      "text": "Map Select",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_train", "originalText": "Map Select", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_train4",
+      "x": 365, "y": 130, "width": 190, "height": 20,
+      "text": "Start Match",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_train", "originalText": "Start Match", "autoResize": true
+    },
+
+    {
+      "type": "arrow",
+      "id": "a_train",
+      "x": 260, "y": 100, "width": 80, "height": 0,
+      "points": [[0,0],[80,0]], "endArrowhead": "arrow",
+      "startBinding": { "elementId": "bg1", "fixedPoint": [1, 0.43] },
+      "endBinding": { "elementId": "bg_train", "fixedPoint": [0, 0.5] }
+    },
+
+    {
+      "type": "rectangle",
+      "id": "bg_join",
+      "x": 340, "y": 190, "width": 240, "height": 180,
+      "backgroundColor": "#ffd8a8", "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "boundElements": [{ "id": "t_join", "type": "text" }]
+    },
+    {
+      "type": "text",
+      "id": "t_join",
+      "x": 360, "y": 200, "width": 200, "height": 25,
+      "text": "JOIN SERVER",
+      "fontSize": 20, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_join", "originalText": "JOIN SERVER", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_join2",
+      "x": 365, "y": 240, "width": 190, "height": 20,
+      "text": "IP Field",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_join", "originalText": "IP Field", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_join3",
+      "x": 365, "y": 270, "width": 190, "height": 20,
+      "text": "Char Select",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_join", "originalText": "Char Select", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_join4",
+      "x": 365, "y": 300, "width": 190, "height": 20,
+      "text": "Map Select",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_join", "originalText": "Map Select", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_join5",
+      "x": 365, "y": 330, "width": 190, "height": 20,
+      "text": "Start",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_join", "originalText": "Start", "autoResize": true
+    },
+
+    {
+      "type": "arrow",
+      "id": "a_join",
+      "x": 260, "y": 200, "width": 80, "height": 0,
+      "points": [[0,0],[80,0]], "endArrowhead": "arrow",
+      "startBinding": { "elementId": "bg1", "fixedPoint": [1, 0.85] },
+      "endBinding": { "elementId": "bg_join", "fixedPoint": [0, 0.1] }
+    },
+
+    {
+      "type": "rectangle",
+      "id": "bg_host",
+      "x": 340, "y": 400, "width": 240, "height": 200,
+      "backgroundColor": "#d0bfff", "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "boundElements": [{ "id": "t_host", "type": "text" }]
+    },
+    {
+      "type": "text",
+      "id": "t_host",
+      "x": 360, "y": 410, "width": 200, "height": 25,
+      "text": "HOST SERVER",
+      "fontSize": 20, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "HOST SERVER", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_host2",
+      "x": 365, "y": 450, "width": 190, "height": 20,
+      "text": "Lobby (IP/port)",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "Lobby (IP/port)", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_host3",
+      "x": 365, "y": 480, "width": 190, "height": 20,
+      "text": "Players: 1/2",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "Players: 1/2", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_host4",
+      "x": 365, "y": 510, "width": 190, "height": 20,
+      "text": "Start button",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "Start button", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_host5",
+      "x": 365, "y": 540, "width": 190, "height": 20,
+      "text": "Char Select (synced)",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "Char Select (synced)", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "t_host6",
+      "x": 365, "y": 570, "width": 190, "height": 20,
+      "text": "Map Select",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "textAlign": "center", "verticalAlign": "middle",
+      "containerId": "bg_host", "originalText": "Map Select", "autoResize": true
+    },
+
+    {
+      "type": "arrow",
+      "id": "a_host",
+      "x": 260, "y": 220, "width": 80, "height": 220,
+      "points": [[0,0],[80,0],[80,220],[0,220]],
+      "endArrowhead": "arrow",
+      "startBinding": { "elementId": "bg1", "fixedPoint": [1, 0.95] },
+      "endBinding": { "elementId": "bg_host", "fixedPoint": [0, 0.85] }
+    },
+
+    {
+      "type": "text",
+      "id": "legend_title",
+      "x": 50, "y": 340, "width": 200, "height": 25,
+      "text": "LEGEND",
+      "fontSize": 20, "fontFamily": 1, "strokeColor": "#1e1e1e",
+      "originalText": "LEGEND", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "legend1",
+      "x": 50, "y": 370, "width": 200, "height": 20,
+      "text": "Blue = Menu screens",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#a5d8ff",
+      "originalText": "Blue = Menu screens", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "legend2",
+      "x": 50, "y": 400, "width": 200, "height": 20,
+      "text": "Green = Training flow",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#b2f2bb",
+      "originalText": "Green = Training flow", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "legend3",
+      "x": 50, "y": 430, "width": 200, "height": 20,
+      "text": "Orange = Join flow",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#ffd8a8",
+      "originalText": "Orange = Join flow", "autoResize": true
+    },
+    {
+      "type": "text",
+      "id": "legend4",
+      "x": 50, "y": 460, "width": 200, "height": 20,
+      "text": "Purple = Host flow",
+      "fontSize": 16, "fontFamily": 1, "strokeColor": "#d0bfff",
+      "originalText": "Purple = Host flow", "autoResize": true
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff"
+  }
+}
