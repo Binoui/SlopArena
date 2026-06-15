@@ -79,7 +79,7 @@ jobs:
             '[preset.0]' \
             'name="Windows Desktop"' \
             'platform="Windows"' \
-            'runnable=false' \
+            'runnable=true' \
             'dedicated_server=false' \
             'custom_features=""' \
             'export_filter="all_resources"' \
@@ -87,15 +87,7 @@ jobs:
             'exclude_filter=""' \
             'export_path=""' \
             'encryption_include_filters=""' \
-            'encryption_exclude_filters=""' \
-            '[preset.0.options]' \
-            'custom_template/debug=""' \
-            'custom_template/release=""' \
-            'binary_format/embed_pck=true' \
-            'binary_format/architecture="x86_64"' \
-            'texture_format/s3tc_bptc=true' \
-            'texture_format/etc2_astc=false' \
-            'dotnet/include_script_source=true'
+            'encryption_exclude_filters=""'
           echo "=== CFG ==="
           cat export_presets.cfg
           godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
