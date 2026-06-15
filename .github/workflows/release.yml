@@ -90,7 +90,7 @@ jobs:
             'encryption_exclude_filters=""'
           echo "=== CFG ==="
           cat export_presets.cfg
-          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          godot --headless --export "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
           echo "=== dist contents ==="
           ls -la dist/windows/
       - name: Upload Windows artifact
