@@ -46,16 +46,13 @@ jobs:
           mkdir -p dist/linux
           godot --headless --export-release "Linux/X11" dist/linux/SlopArena.x86_64
 
-      - name: Export Windows
+      - name: Export Windows (experimental)
         continue-on-error: true
         run: |
           mkdir -p dist/windows
-          # Clear Godot cache so it re-reads config
-          rm -rf .godot/
-          # Generate fresh export_presets.cfg with only the Windows preset
           printf '%s\n' > export_presets.cfg \
             '[preset.0]' \
-            'name="Windows Desktop"' \
+            'name="Windows"' \
             'platform="Windows"' \
             'runnable=false' \
             'dedicated_server=false' \
@@ -74,17 +71,13 @@ jobs:
             'texture_format/s3tc_bptc=true' \
             'texture_format/etc2_astc=false' \
             'dotnet/include_script_source=true'
-          echo "=== CFG ==="
-          cat export_presets.cfg
-          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
-          echo "=== dist ==="
-          ls -la dist/windows/
+          godot --headless --export-release "Windows" dist/windows/SlopArena.exe 2>&1 || true
 
       - name: Package artifacts
         run: |
           cd dist
           [ -d linux ] && zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-linux.zip" linux/
-          [ -d windows ] && zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip" windows/
+          [ -s windows/SlopArena.exe ] && zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip" windows/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -96,4 +89,3 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             SlopArena-${{ steps.tag.outputs.new_tag }}-linux.zip
-            SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip
