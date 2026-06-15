@@ -75,22 +75,22 @@ jobs:
         run: |
           mkdir -p dist/windows
           # Generate Windows-only export preset (committed file only has Linux)
-          printf '%s\n' > export_presets.cfg \
-            '[preset.0]' \
-            'name="Windows Desktop"' \
-            'platform="Windows"' \
-            'runnable=true' \
-            'dedicated_server=false' \
-            'custom_features=""' \
-            'export_filter="all_resources"' \
-            'include_filter=""' \
-            'exclude_filter=""' \
-            'export_path=""' \
-            'encryption_include_filters=""' \
-            'encryption_exclude_filters=""'
+          rm -f export_presets.cfg
+          echo '[preset.0]' > export_presets.cfg
+          echo 'name="Windows Desktop"' >> export_presets.cfg
+          echo 'platform="Windows"' >> export_presets.cfg
+          echo 'runnable=true' >> export_presets.cfg
+          echo 'dedicated_server=false' >> export_presets.cfg
+          echo 'custom_features=""' >> export_presets.cfg
+          echo 'export_filter="all_resources"' >> export_presets.cfg
+          echo 'include_filter=""' >> export_presets.cfg
+          echo 'exclude_filter=""' >> export_presets.cfg
+          echo 'export_path=""' >> export_presets.cfg
+          echo 'encryption_include_filters=""' >> export_presets.cfg
+          echo 'encryption_exclude_filters=""' >> export_presets.cfg
           echo "=== CFG ==="
           cat export_presets.cfg
-          godot --headless --export "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
           echo "=== dist contents ==="
           ls -la dist/windows/
       - name: Upload Windows artifact
