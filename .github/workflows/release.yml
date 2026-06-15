@@ -92,6 +92,9 @@ jobs:
           echo 'custom_template/debug=""' >> export_presets.cfg
           echo 'custom_template/release=""' >> export_presets.cfg
           echo 'binary_format/embed_pck=true' >> export_presets.cfg
+          echo 'binary_format/architecture="x86_64"' >> export_presets.cfg
+          echo 'texture_format/s3tc_bptc=true' >> export_presets.cfg
+          echo 'texture_format/etc2_astc=false' >> export_presets.cfg
           echo 'dotnet/include_script_source=true' >> export_presets.cfg
           echo "=== CFG ==="
           cat export_presets.cfg
