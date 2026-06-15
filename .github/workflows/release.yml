@@ -50,6 +50,8 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p dist/windows
+          # Clear Godot cache so it re-reads config
+          rm -rf .godot/
           # Generate fresh export_presets.cfg with only the Windows preset
           printf '%s\n' \
             '[preset.0]' \
