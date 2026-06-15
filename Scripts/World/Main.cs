@@ -1,21 +1,39 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using SlopArena.Shared;
 
 /// <summary>
-/// Entry point: class select → start match → delegate UI to GameUI.
+/// Entry point: screen navigation controller for SlopArena menus.
+/// Manages screen stack and transitions through game flow:
+///   MainMenu → (Training | Join | Host) → CharacterSelect → MapSelect → Match
 /// </summary>
 public partial class Main : Node3D
 {
     private Process _serverProcess;
-    private TrainingMatch? _matchManager;
-    private PvPMatch? _pvpMatch;
-    private CanvasLayer _canvasLayer = null!;
-    private GameUI _gameUI = null!;
-    private DebugHitboxDraw _debugDraw = null!;
-    private SpellVFXManager _spellVFX = null!;
+    private PvPMatch _pvpMatch;
+    private TrainingMatch _matchManager;
+    private CanvasLayer _canvasLayer;
+    private GameUI _gameUI;
+    private DebugHitboxDraw _debugDraw;
+    private SpellVFXManager _spellVFX;
     private bool _debugHitboxVisible = true;
+
+    // Screen navigation
+    private readonly Stack<Control> _screenStack = new();
+
+    // Cached packed scenes
+    private PackedScene _mainMenuScene = null!;
+    private PackedScene _joinServerScene = null!;
+    private PackedScene _hostLobbyScene = null!;
+    private PackedScene _charSelectScene = null!;
+    private PackedScene _mapSelectScene = null!;
+
+    // Flow state
+    private string _flowMode; // "training", "join", "host"
+    private string _serverIp;
+    private CharacterClass _selectedClass;
 
     public override async void _Ready()
     {
@@ -23,18 +41,15 @@ public partial class Main : Node3D
         SetupInputActions();
         DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
 
+        // Preload screen scenes
+        _mainMenuScene = GD.Load<PackedScene>("res://Scripts/UI/main_menu.tscn");
+        _joinServerScene = GD.Load<PackedScene>("res://Scripts/UI/join_server.tscn");
+        _hostLobbyScene = GD.Load<PackedScene>("res://Scripts/UI/host_lobby.tscn");
+        _charSelectScene = GD.Load<PackedScene>("res://Scripts/UI/character_select.tscn");
+        _mapSelectScene = GD.Load<PackedScene>("res://Scripts/UI/map_select.tscn");
+
         _canvasLayer = new CanvasLayer { Name = "CanvasLayer" };
         AddChild(_canvasLayer);
-
-        // Class select
-        var classSelect = new ClassSelectUI();
-        _canvasLayer.AddChild(classSelect);
-        var tcs = new System.Threading.Tasks.TaskCompletionSource<(CharacterClass cls, string? ip)>();
-        classSelect.OnClassConfirmed += (cls, ip) => tcs.TrySetResult((cls, ip));
-        var (selectedClass, serverIp) = await tcs.Task;
-
-        // Crosshair
-        CreateCrosshair();
 
         // Debug draw
         _debugDraw = new DebugHitboxDraw { Name = "DebugHitboxDraw" };
@@ -44,30 +59,152 @@ public partial class Main : Node3D
         _spellVFX = new SpellVFXManager { Name = "SpellVFX" };
         AddChild(_spellVFX);
 
-        // Server (editor only)
-        StartLocalServer(selectedClass);
+        // Show main menu
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        ShowMainMenu();
+    }
 
-        // Match — training or PvP based on IP
-        if (serverIp != null)
+    // ═══ SCREEN NAVIGATION ═══
+
+    private void PushScreen(Control screen)
+    {
+        _screenStack.Push(screen);
+        _canvasLayer.AddChild(screen);
+    }
+
+    private void PopScreen()
+    {
+        if (_screenStack.Count > 0)
         {
-            var pvp = new PvPMatch { Name = "MatchManager" };
-            _pvpMatch = pvp;
-            AddChild(pvp);
-            pvp.Start(selectedClass, _spellVFX, serverIp);
-            _gameUI = new GameUI(_canvasLayer, this, pvp.Player, Array.Empty<PlayerController>(),
-                id => pvp.SetTarget(id), () => pvp.GetTarget(), () => pvp.HasTarget());
-            _gameUI.Build(_spellVFX);
+            var screen = _screenStack.Pop();
+            screen.QueueFree();
         }
-        else
+    }
+
+    private void ClearScreens()
+    {
+        while (_screenStack.Count > 0)
+            PopScreen();
+    }
+
+    private void TransitionTo(Control screen)
+    {
+        ClearScreens();
+        PushScreen(screen);
+    }
+
+    // ═══ SCREEN CONSTRUCTORS ═══
+
+    private void ShowMainMenu()
+    {
+        var menu = _mainMenuScene.Instantiate<MainMenuUI>();
+        menu.OnTrainingMode += () =>
+        {
+            _flowMode = "training";
+            ShowCharacterSelect();
+        };
+        menu.OnJoinServer += () => ShowJoinServer();
+        menu.OnHostServer += () =>
+        {
+            _flowMode = "host";
+            StartLocalServer(null);
+            ShowHostLobby();
+        };
+        menu.OnQuit += () => GetTree().Quit();
+        TransitionTo(menu);
+    }
+
+    private void ShowJoinServer()
+    {
+        var join = _joinServerScene.Instantiate<JoinServerUI>();
+        join.OnConnect += (ip) =>
+        {
+            _flowMode = "join";
+            _serverIp = ip;
+            ShowCharacterSelect();
+        };
+        join.OnBack += () => ShowMainMenu();
+        PushScreen(join);
+    }
+
+    private void ShowHostLobby()
+    {
+        var lobby = _hostLobbyScene.Instantiate<HostLobbyUI>();
+        lobby.OnStartGame += () => ShowCharacterSelect();
+        lobby.OnBack += () =>
+        {
+            _serverProcess?.Kill();
+            _serverProcess = null;
+            ShowMainMenu();
+        };
+        PushScreen(lobby);
+    }
+
+    private void ShowCharacterSelect()
+    {
+        var charSelect = _charSelectScene.Instantiate<CharacterSelectUI>();
+        charSelect.OnCharacterConfirmed += (cls) =>
+        {
+            _selectedClass = cls;
+            ShowMapSelect();
+        };
+        charSelect.OnBack += () =>
+        {
+            if (_flowMode == "training")
+                ShowMainMenu();
+            else if (_flowMode == "join")
+                ShowJoinServer();
+            else if (_flowMode == "host")
+            {
+                // Go back to host lobby (pop char select, show lobby underneath)
+                PopScreen();
+            }
+        };
+        PushScreen(charSelect);
+    }
+
+    private void ShowMapSelect()
+    {
+        var mapSelect = _mapSelectScene.Instantiate<MapSelectUI>();
+        mapSelect.OnMapConfirmed += (arenaName) => StartMatch(arenaName);
+        mapSelect.OnBack += () => PopScreen();
+        PushScreen(mapSelect);
+    }
+
+    // ═══ MATCH START ═══
+
+    private void StartMatch(string arenaName)
+    {
+        ClearScreens();
+
+        // Crosshair
+        CreateCrosshair();
+
+        if (_flowMode == "training")
         {
             _matchManager = new TrainingMatch { Name = "MatchManager" };
             AddChild(_matchManager);
-            _matchManager.Start(selectedClass, _spellVFX);
+            _matchManager.Start(_selectedClass, _spellVFX);
             _gameUI = new GameUI(_canvasLayer, this, _matchManager.Player, _matchManager.NPCs,
                 id => _matchManager.SetTarget(id), () => _matchManager.GetTarget(), () => _matchManager.HasTarget());
             _gameUI.Build(_spellVFX);
         }
+        else if (_flowMode == "join" || _flowMode == "host")
+        {
+            string ip = _flowMode == "join" ? _serverIp : "127.0.0.1";
+            int port = 9876;
+
+            var pvp = new PvPMatch { Name = "MatchManager" };
+            _pvpMatch = pvp;
+            AddChild(pvp);
+            pvp.Start(_selectedClass, _spellVFX, ip, port);
+            _gameUI = new GameUI(_canvasLayer, this, pvp.Player, Array.Empty<PlayerController>(),
+                id => pvp.SetTarget(id), () => pvp.GetTarget(), () => pvp.HasTarget());
+            _gameUI.Build(_spellVFX);
+        }
     }
+
+    // ═══ INPUT HANDLING ═══
 
     public override void _Process(double delta)
     {
@@ -118,6 +255,8 @@ public partial class Main : Node3D
         }
     }
 
+    // ═══ SETUP ═══
+
     private void SetupInputActions()
     {
         void Add(string n, InputEvent k) { if (!InputMap.HasAction(n)) InputMap.AddAction(n); InputMap.ActionAddEvent(n, k); }
@@ -147,7 +286,7 @@ public partial class Main : Node3D
             cross.Position = DisplayServer.WindowGetSize() / 2 - (cross.Size / 2);
     }
 
-    private void StartLocalServer(CharacterClass playerClass)
+    private void StartLocalServer(CharacterClass? playerClass)
     {
         if (!OS.HasFeature("editor")) return;
 
@@ -161,14 +300,14 @@ public partial class Main : Node3D
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "dotnet",
-                    Arguments = $"\"{dllPath}\" \"{playerClass}\"",
+                    Arguments = $"\"{dllPath}\" \"{playerClass ?? CharacterClass.Manki}\"",
                     WorkingDirectory = serverDir,
                     CreateNoWindow = true,
                     UseShellExecute = false,
                 }
             };
             _serverProcess.Start();
-            GD.Print($"[Main] Local server started (class={playerClass})");
+            GD.Print($"[Main] Local server started (class={playerClass ?? CharacterClass.Manki})");
         }
         else
         {

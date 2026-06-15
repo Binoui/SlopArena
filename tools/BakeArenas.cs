@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using SlopArena.Shared;
 
 namespace SlopArena.Tools;
@@ -17,12 +19,12 @@ static class BakeArenas
         // If running via dotnet run --project tools/BakeArenas.csproj from project root,
         // the working directory is the project root. So "data/arenas" is correct.
         string outputDir = Path.GetFullPath(baseDir);
-        System.IO.Directory.CreateDirectory(outputDir);
+        Directory.CreateDirectory(outputDir);
 
         int count = 0;
         foreach (var arena in ArenaRegistry.All)
         {
-            string path = System.IO.Path.Combine(outputDir, arena.Name + ".arena");
+            string path = Path.Combine(outputDir, arena.Name + ".arena");
             ArenaBinaryFormat.SaveToFile(path, arena);
             Console.WriteLine($"Baked: {arena.Name} -> {path}");
             Console.WriteLine($"  Platforms: {arena.Platforms?.Length ?? 0}  Spawns: {arena.SpawnPoints?.Length ?? 0}");
