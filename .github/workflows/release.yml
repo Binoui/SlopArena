@@ -77,7 +77,9 @@ jobs:
         run: |
           cd dist
           [ -d linux ] && zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-linux.zip" linux/
-          [ -s windows/SlopArena.exe ] && zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip" windows/
+          if [ -s windows/SlopArena.exe ]; then
+            zip -r "../SlopArena-${{ steps.tag.outputs.new_tag }}-windows.zip" windows/
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
