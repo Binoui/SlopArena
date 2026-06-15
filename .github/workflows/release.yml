@@ -53,7 +53,7 @@ jobs:
           # Clear Godot cache so it re-reads config
           rm -rf .godot/
           # Generate fresh export_presets.cfg with only the Windows preset
-          printf '%s\n' \
+          printf '%s\n' > export_presets.cfg \
             '[preset.0]' \
             'name="Windows Desktop"' \
             'platform="Windows"' \
@@ -73,15 +73,11 @@ jobs:
             'binary_format/architecture="x86_64"' \
             'texture_format/s3tc_bptc=true' \
             'texture_format/etc2_astc=false' \
-            'dotnet/include_script_source=true' \
-            > export_presets.cfg
-          echo "=== Generated CFG ==="
+            'dotnet/include_script_source=true'
+          echo "=== CFG ==="
           cat export_presets.cfg
-          echo "=== Godot preset scan ==="
-          godot --headless --quit -- editor_settings/export_presets 2>&1 || true
-          echo "=== Trying export-debug instead ==="
-          godot --headless --export-debug "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
-          echo "=== Windows dist contents ==="
+          godot --headless --export-release "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          echo "=== dist ==="
           ls -la dist/windows/
 
       - name: Package artifacts
