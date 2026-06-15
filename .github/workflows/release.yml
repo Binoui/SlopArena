@@ -85,12 +85,12 @@ jobs:
           echo 'export_filter="all_resources"' >> export_presets.cfg
           echo 'include_filter=""' >> export_presets.cfg
           echo 'exclude_filter=""' >> export_presets.cfg
-          echo 'export_path=""' >> export_presets.cfg
+          echo 'export_path="dist/windows/SlopArena.exe"' >> export_presets.cfg
           echo 'encryption_include_filters=""' >> export_presets.cfg
           echo 'encryption_exclude_filters=""' >> export_presets.cfg
           echo "=== CFG ==="
           cat export_presets.cfg
-          godot --headless --export-debug "Windows Desktop" dist/windows/SlopArena.exe 2>&1 || true
+          godot --headless --export-release "Windows Desktop" 2>&1 || true
           echo "=== dist contents ==="
           ls -la dist/windows/
       - name: Upload Windows artifact
