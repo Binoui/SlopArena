@@ -40,13 +40,16 @@ public partial class TrainingMatch : Node3D
         }, _playerBakedData);
 
         // NPC
+        var npcClass = CharacterClass.Manki; // matches SpawnNPCs() for i=0 (NpcCount=1)
+        var npcDef = CharacterRegistry.Get(npcClass);
+        var npcBaked = LoadBakedData(npcDef);
         var npcSpawn = _arenaDef.SpawnPoints[0];
-        _localSim.RegisterEntity(100, _charDef, new CharacterState
+        _localSim.RegisterEntity(100, npcDef, new CharacterState
         {
             PX = npcSpawn.X, PY = npcSpawn.Y + 1f, PZ = npcSpawn.Z,
             FacingYaw = npcSpawn.Yaw,
-            JumpsLeft = _charDef.Movement.MaxJumps,
-        }, _playerBakedData);
+            JumpsLeft = npcDef.Movement.MaxJumps,
+        }, npcBaked);
 
         // Arena visual
         var arenaNode = new ArenaManager { Name = "ArenaManager" };
@@ -83,9 +86,12 @@ public partial class TrainingMatch : Node3D
     {
         for (int i = 0; i < NpcCount; i++)
         {
+            var npcClass = i % 2 == 0 ? CharacterClass.Manki : CharacterClass.Bunny;
             var npc = new PlayerController { Name = $"NPC_{i}" };
-            npc.SetClass(i % 2 == 0 ? CharacterClass.Manki : CharacterClass.Bunny);
+            npc.SetClass(npcClass);
             npc.SetNPC(true);
+            var npcBaked = LoadBakedData(CharacterRegistry.Get(npcClass));
+            npc.SetBakedData(npcBaked);
             npc.AddToGroup("enemies");
             AddChild(npc);
             npc.Position = _arenaDef.SpawnPoints[i].ToGodot() + new Vector3(0f, 1f, 0f);

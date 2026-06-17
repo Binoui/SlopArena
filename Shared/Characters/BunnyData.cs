@@ -13,9 +13,9 @@ public static partial class CharacterRegistry
         {
             Class = CharacterClass.Bunny,
             DisplayName = "Bunny",
-            CapsuleRadius = 0.5f,
+            CapsuleRadius = 0.6f,
             CapsuleHeight = 1.5f,
-            HurtboxRadius = 0.9f,
+            HurtboxRadius = 1f,
             Movement = new MovementStats
             {
                 WalkSpeed = 10f,
@@ -32,7 +32,6 @@ public static partial class CharacterRegistry
                 MaxJumps = 2,
             },
 
-            // Fallback capsules (manual) until baked skeleton is generated
             HurtboxCapsules = new HurtboxCapsule[]
             {
                 new(0f, 0.2f, 0f, 0f, 0.9f, 0f, 0.3f),
@@ -45,18 +44,19 @@ public static partial class CharacterRegistry
 
             HurtboxBoneDefs = new HurtboxBoneDef[]
             {
-                new("mixamorig:Head", 0, 0, 0, 0.35f),
-                new("mixamorig:Spine2", 0, 0, 0, 0.40f),
-                new("mixamorig:Hips", 0, 0, 0, 0.40f),
-                new("mixamorig:RightHand", 0, 0, 0, 0.18f),
-                new("mixamorig:LeftHand", 0, 0, 0, 0.18f),
-                new("mixamorig:RightFoot", 0, 0, 0, 0.22f),
-                new("mixamorig:LeftFoot", 0, 0, 0, 0.22f),
+                new("mixamorig:Head", 0, 0, 0, 0.25f),
+                new("mixamorig:Spine2", 0, 0, 0, 0.3f),
+                new("mixamorig:Hips", 0, 0, 0, 0.3f),
+                new("mixamorig:RightHand", 0, 0, 0, 0.14f),
+                new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
+                new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
+                new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
-            GlbPath = "res://assets/characters/bunny/bunny.tscn",
+            GlbPath = "res://assets/characters/bunny/bunny.glb",
             BakedDataPath = "res://data/bunny_skeleton.bin",
-            HurtboxBoneScale = 0.017f,
-            ModelSoleOffset = 0.60f,
+            VisualScale = 0.022f,
+            HurtboxBoneScale = 0.022f,
+            ModelSoleOffset = 1.1f,
             AutoModelYOffset = true,
 
             // ═══ ABILITIES ═══

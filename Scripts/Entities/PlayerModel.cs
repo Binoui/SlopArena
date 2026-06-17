@@ -34,21 +34,17 @@ public class PlayerModel
     public Node3D? Load()
     {
         string modelPath;
-        Vector3 scale;
 
         switch (_playerClass)
         {
             case CharacterClass.Manki:
                 modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = Vector3.One;
                 break;
             case CharacterClass.Bunny:
                 modelPath = "res://assets/characters/bunny/bunny.tscn";
-                scale = new Vector3(0.017f, 0.017f, 0.017f);
                 break;
             default:
                 modelPath = "res://assets/characters/manki/manki.tscn";
-                scale = Vector3.One;
                 break;
         }
 
@@ -65,11 +61,11 @@ public class PlayerModel
             return null;
         }
 
-        GD.Print($"[Model] Loading {_playerClass}: path={modelPath} scale={scale} " +
+        GD.Print($"[Model] Loading {_playerClass}: path={modelPath} scale={_charDef.VisualScale} " +
                  $"capsule=({_charDef.CapsuleRadius},{_charDef.CapsuleHeight})");
 
         pm.Name = "PlayerModel";
-        pm.Scale = scale;
+        pm.Scale = Vector3.One * _charDef.VisualScale;
         float modelYOffset = ComputeModelYOffset();
         pm.Position = new Vector3(0, modelYOffset, 0);
         GD.Print($"[Model] Y offset={modelYOffset:F4} " +
@@ -124,7 +120,8 @@ public class PlayerModel
 
             for (int bi = 0; bi < _bakedData.BoneNames.Length; bi++)
             {
-                if (_bakedData.GetBonePosition("idle", 0, bi, out _, out float by, out _))
+                string refAnim = _bakedData.FindAnimIndex("tpose") >= 0 ? "tpose" : "idle";
+                if (_bakedData.GetBonePosition(refAnim, 0, bi, out _, out float by, out _))
                 {
                     if (by < lowestY) { lowestY = by; lowestBone = _bakedData.BoneNames[bi]; }
                     found++;

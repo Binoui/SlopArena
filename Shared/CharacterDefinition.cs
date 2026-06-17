@@ -85,6 +85,14 @@ namespace SlopArena.Shared
         /// (lowest bone position at idle frame 0) instead of using the manual value.
         /// </summary>
         public bool AutoModelYOffset;
+        /// <summary>
+        /// Scale factor from GLB skeleton units to world meters.
+        /// Applied to both the visual model node and the baked bone positions
+        /// so hurtboxes and visuals stay aligned.
+        /// Manki: 1.0 (Mixamo cm→m handled by GLB import).
+        /// Bunny: ~0.022 (Tripo/Hunyuan export in raw units).
+        /// </summary>
+        public float VisualScale;
 
         public AbilityData LMB;
         public AbilityData RMB;
