@@ -89,6 +89,7 @@ public partial class PvPMatch : Node3D
         Opponent = new PlayerController { Name = "Opponent" };
         Opponent.SetClass(playerClass);
         Opponent.SetNPC(true);
+        Opponent.SetBakedData(_playerBakedData);
         Opponent.AddToGroup("enemies");
         AddChild(Opponent);
         Opponent.Position = oppSpawn.ToGodot() + new Vector3(0f, 1f, 0f);

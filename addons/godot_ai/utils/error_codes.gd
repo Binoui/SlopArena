@@ -1,0 +1,84 @@
+@tool
+class_name McpErrorCodes
+extends RefCounted
+
+## Error code constants shared across handlers. Mirrors protocol/errors.py.
+##
+## This `class_name` shipped in v2.3.2 and earlier and must stay reachable
+## through self-update. v2.4.1 dropped it and triggered a "Could not resolve
+## script" cascade for every user upgrading from any earlier version; v2.4.2
+## restored it as a hot-fix. The cascade fires because Godot keeps stale
+## registry entries during the disable -> extract -> enable window when a
+## previously-registered class_name disappears, and that failure mode is
+## independent of the runner's install ordering. See CLAUDE.md's
+## never-delete-published-class_name policy for the shape-aware shim path
+## that retirement (if ever needed) must follow.
+##
+## All consumers use the preload-alias pattern
+## (`const ErrorCodes := preload(...)`) introduced in #412. The alias is
+## stylistic; both `McpErrorCodes.X` and `ErrorCodes.X` resolve through the
+## same Script object cache, so the alias is not a parse-safety boundary
+## under the single-phase runner.
+
+const INVALID_PARAMS := "INVALID_PARAMS"
+const EDITED_SCENE_MISMATCH := "EDITED_SCENE_MISMATCH"
+const EDITOR_NOT_READY := "EDITOR_NOT_READY"
+const UNKNOWN_COMMAND := "UNKNOWN_COMMAND"
+const INTERNAL_ERROR := "INTERNAL_ERROR"
+const DEFERRED_TIMEOUT := "DEFERRED_TIMEOUT"
+# game_eval failure codes (#490) — keep in sync with protocol/errors.py
+const EVAL_COMPILE_ERROR := "EVAL_COMPILE_ERROR"
+const EVAL_RUNTIME_ERROR := "EVAL_RUNTIME_ERROR"
+## #518: the play session is up (EditorInterface.is_playing_scene() is true, so
+## editor_handler's EDITOR_NOT_READY "game is not running" gate already passed)
+## but the game-side _mcp_game_helper autoload never registered its debugger
+## capture within EVAL_READY_WAIT_SEC. Carved out of INTERNAL_ERROR so this
+## boot-window / missing-autoload race stops masquerading as the opaque "eval
+## hung" 10s timeout in telemetry — the same split #490 made for compile/runtime
+## errors. NOT a hang: it fires fast (~3s) and is caller-actionable (let the game
+## finish booting and retry, or check the autoload is enabled).
+const EVAL_GAME_NOT_READY := "EVAL_GAME_NOT_READY"
+## audit-v2 #21 (issue #365): finer-grained codes carved out of the 471
+## INVALID_PARAMS sites so agents can distinguish recoverable input
+## errors from structural ones. INVALID_PARAMS stays for genuinely
+## catch-all input errors that don't fit any of the buckets below.
+##
+## - NODE_NOT_FOUND: scene-tree/autoload node lookup failed (path didn't
+##   resolve to a Node).
+## - RESOURCE_NOT_FOUND: a `res://` path lookup failed (file/.tres/
+##   .gdshader/.tscn etc. doesn't exist or couldn't load). Distinct from
+##   NODE_NOT_FOUND because the recovery path differs — agents need to
+##   know whether to fix a node path vs. create/import a resource.
+## - PROPERTY_NOT_ON_CLASS: property/signal/method/uniform/slot lookup
+##   failed on a known instance (path resolved, but the requested
+##   member doesn't exist on that class).
+## - VALUE_OUT_OF_RANGE: numeric/index bound violation OR enum value
+##   not in the allowed set.
+## - WRONG_TYPE: input was a value (or a loaded resource) of the wrong
+##   type — the param was provided, but `typeof` or `is X` failed.
+## - MISSING_REQUIRED_PARAM: required input field was absent or empty.
+const NODE_NOT_FOUND := "NODE_NOT_FOUND"
+const RESOURCE_NOT_FOUND := "RESOURCE_NOT_FOUND"
+const PROPERTY_NOT_ON_CLASS := "PROPERTY_NOT_ON_CLASS"
+const VALUE_OUT_OF_RANGE := "VALUE_OUT_OF_RANGE"
+const WRONG_TYPE := "WRONG_TYPE"
+const MISSING_REQUIRED_PARAM := "MISSING_REQUIRED_PARAM"
+
+
+## Build a standard error response dictionary.
+static func make(code: String, message: String) -> Dictionary:
+	return {"status": "error", "error": {"code": code, "message": message}}
+
+
+## Return a NEW error dict with the original code and a prefixed message.
+## Prefer this over mutating `err["error"]["message"]` in place — callers
+## that want to add context ("Property '%s': …") shouldn't need to know
+## the internal shape of the dict returned by `make`. Empty `prefix`
+## returns `err` unchanged so callers don't need their own guard.
+static func prefix_message(err: Dictionary, prefix: String) -> Dictionary:
+	if prefix.is_empty():
+		return err
+	var inner: Dictionary = err.get("error", {})
+	var code: String = inner.get("code", INTERNAL_ERROR)
+	var message: String = inner.get("message", "")
+	return make(code, "%s: %s" % [prefix, message])

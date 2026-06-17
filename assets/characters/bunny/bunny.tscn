@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cf212b2iyxng7"]
 
-[ext_resource type="PackedScene" uid="uid://bcvclgju4hsu5" path="res://assets/characters/bunny/bunny.glb" id="1_400fg"]
+[ext_resource type="PackedScene" uid="uid://cchyitrg36lxk" path="res://assets/characters/bunny/bunny.glb" id="1_400fg"]
 [ext_resource type="Script" uid="uid://cfeofiqt7wjb4" path="res://Scripts/Animation/StateMachine.cs" id="2_3sgcm"]
 [ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="3_yy137"]
 [ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="4_b5fl0"]
@@ -46,7 +46,7 @@ node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 animation = &"run"
 use_custom_timeline = true
 timeline_length = 1.0
-stretch_time_scale = true
+stretch_time_scale = false
 start_offset = 0.0
 loop_mode = 1
 
@@ -315,7 +315,7 @@ states/spell_rmb_attack/position = Vector2(1000, 250)
 states/spell_rmb_loop/node = SubResource("bt_rmb_loop")
 states/spell_rmb_loop/position = Vector2(1000, 400)
 transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "air", SubResource("xfade_01"), "Run", "air", SubResource("xfade_01"), "air", "Land", SubResource("xfade_015"), "Land", "Idle", SubResource("xfade_at_end"), "Idle", "dash", SubResource("xfade_01"), "Run", "dash", SubResource("xfade_01"), "air", "dash", SubResource("xfade_01"), "dash", "End", SubResource("xfade_015"), "Idle", "spell_lmb_1", SubResource("xfade_01"), "Run", "spell_lmb_1", SubResource("xfade_01"), "air", "spell_lmb_1", SubResource("xfade_01"), "spell_lmb_1", "End", SubResource("xfade_015"), "spell_lmb_2", "End", SubResource("xfade_015"), "spell_lmb_3", "End", SubResource("xfade_015"), "spell_r", "End", SubResource("xfade_015"), "Idle", "spell_air_rmb", SubResource("xfade_01"), "Run", "spell_air_rmb", SubResource("xfade_01"), "air", "spell_air_rmb", SubResource("xfade_01"), "spell_air_rmb", "End", SubResource("xfade_015"), "Idle", "spell_rmb_attack", SubResource("xfade_01"), "Run", "spell_rmb_attack", SubResource("xfade_01"), "spell_rmb_attack", "End", SubResource("xfade_015"), "Idle", "spell_q", SubResource("xfade_01"), "Run", "spell_q", SubResource("xfade_01"), "air", "spell_q", SubResource("xfade_01"), "spell_q", "End", SubResource("xfade_015"), "Idle", "spell_e", SubResource("xfade_01"), "Run", "spell_e", SubResource("xfade_01"), "air", "spell_e", SubResource("xfade_01"), "spell_e", "End", SubResource("xfade_015"), "Idle", "spell_f", SubResource("xfade_01"), "Run", "spell_f", SubResource("xfade_01"), "spell_f", "End", SubResource("xfade_015"), "Idle", "spell_rmb_loop", SubResource("xfade_01"), "Run", "spell_rmb_loop", SubResource("xfade_01"), "spell_rmb_loop", "End", SubResource("xfade_015"), "hit_small", "End", SubResource("xfade_015"), "hit_medium", "End", SubResource("xfade_015"), "hit_hard", "End", SubResource("xfade_015"), "Land", "Run", SubResource("xfade_015"), "air", "End", SubResource("xfade_015")]
-graph_offset = Vector2(440, 78)
+graph_offset = Vector2(69, 50)
 
 [node name="Bunny" type="Node3D" unique_id=881826129]
 

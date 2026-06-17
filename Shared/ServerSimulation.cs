@@ -92,7 +92,7 @@ namespace SlopArena.Shared
 
 						bx *= scale; by *= scale; bz *= scale;
 						float wx = px + ((bx * cos) + (bz * sin));
-						float wy = py + by;
+						float wy = py - def.CapsuleHeight * 0.5f + by;
 						float wz = pz + ((-bx * sin) + (bz * cos));
 
 						list.Add(new SpellResolver.EntityData
@@ -202,7 +202,7 @@ namespace SlopArena.Shared
 					{
 						int fc = baked.Animations[animIdx].FrameCount;
 
-						// Track frame (1 tick = 1 frame at 60fps)
+						// Track tick (1 tick = 1 frame at 60fps)
 						int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
 						int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
 						if (prevAnim != animIdx)
@@ -211,10 +211,28 @@ namespace SlopArena.Shared
 							_prevAnimIndex[id] = animIdx;
 						}
 
-						// Advance frame, wrapping for looping animations
+						// Advance tick counter, wrapping for looping animations
 						int nextFrame = frame + 1;
 						if (nextFrame >= fc) nextFrame = 0;
 						_animFrames[id] = nextFrame;
+
+						// Map tick → baked frame using DurationTicks so server
+						// hurtbox positions match the client's TimeScale playback.
+						// For attack animations: bakedFrame = tick * fc / DurationTicks
+						// For looping animations (idle/run/etc): use raw frame (= TimeScale 1.0)
+						int bakedFrame = frame;
+						if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+						{
+							bool airborne = !state.IsGrounded;
+							var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+							int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+							if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+							{
+								int durationTicks = ability.Stages[stageIdx].DurationTicks;
+								if (durationTicks > 0)
+									bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+							}
+						}
 
 						float px = state.PX, py = state.PY, pz = state.PZ;
 						float yaw = state.FacingYaw;
@@ -223,16 +241,19 @@ namespace SlopArena.Shared
 						for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
 						{
 							var hbd = def.HurtboxBoneDefs[bi];
-							if (!baked.GetBonePosition(targetAnim, frame, bi, out float bx, out float by, out float bz))
+							if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz))
 								continue;
 
 							// Apply bone scale (Mixamo cm → m = 0.01, native m = 1.0)
 							float scale = def.HurtboxBoneScale;
 							bx *= scale; by *= scale; bz *= scale;
 
+							// Apply sole offset so hurtbox matches visual model position
+							float soleY = -def.ModelSoleOffset;
+
 							// Bone → world: rotate by yaw, then add character position
 							float wx = px + ((bx * cos) + (bz * sin));
-							float wy = py + by;
+							float wy = py + by + soleY;
 							float wz = pz + ((-bx * sin) + (bz * cos));
 							wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
 

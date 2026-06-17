@@ -87,7 +87,7 @@ public static class UITheme
 
 		var font = GetFont();
 		if (font != null) btn.AddThemeFontOverride("font", font);
-		btn.AddThemeColorOverride("font_color", tint ?? White);
+		btn.AddThemeColorOverride("font_color", White);
 		btn.AddThemeColorOverride("font_hover_color", OrangeBright);
 		btn.AddThemeColorOverride("font_disabled_color", new Color(0.3f, 0.3f, 0.4f, 1f));
 		btn.AddThemeFontSizeOverride("font_size", fontSize);

@@ -320,6 +320,9 @@ public partial class PlayerController : CharacterBody3D
             _fsm?.TransitionTo("idle");
         }).CallDeferred();
 
+        // Apply animation TimeScales: duration = bakedFrames / DurationTicks
+        ApplyAnimationTimeScales();
+
         // Bone-attached hurtboxes (Smash-style — multiple spheres on skeleton bones)
         if (skeleton != null)
         {
@@ -327,6 +330,21 @@ public partial class PlayerController : CharacterBody3D
             AddChild(_boneHurtboxes);
             _boneHurtboxes.Build(skeleton, BoneHurtboxSetup.DefaultHumanoid());
         }
+
+        // Debug: print model position vs hurtbox positions (deferred: need scene tree settled)
+        Callable.From(() =>
+        {
+            if (_playerModel != null)
+                GD.Print($"[Debug] {Name}: body Y={GlobalPosition.Y:F4} " +
+                         $"model GlobalY={_playerModel.GlobalPosition.Y:F4} model LocalY={_playerModel.Position.Y:F4}");
+            if (_boneHurtboxes != null)
+            {
+                var caps = _boneHurtboxes.GetWorldCapsules();
+                for (int ci = 0; ci < caps.Count; ci++)
+                    GD.Print($"[Debug] {Name}: capsule[{ci}] start=({caps[ci].start.X:F2},{caps[ci].start.Y:F2},{caps[ci].start.Z:F2}) " +
+                             $"end=({caps[ci].end.X:F2},{caps[ci].end.Y:F2},{caps[ci].end.Z:F2})");
+            }
+        }).CallDeferred();
 
         // Visual feedback on damage (hit flash + hit reaction)
         // Subscribed in SetupCombat via OnCombatTakeDamage
@@ -1196,4 +1214,77 @@ public partial class PlayerController : CharacterBody3D
     /// ==========================================
     /// </summary>
     private Vector2 _storedMousePos = Vector2.Zero;
+
+    // ==========================================
+    // ANIMATION TIME SCALE
+    // ==========================================
+
+    /// <summary>
+    /// Compute and apply TimeScale for each ability animation so the visual
+    /// duration matches DurationTicks from CharacterDefinition.
+    /// Formula: TimeScale = bakedFrameCount / DurationTicks
+    /// Looping animations (idle/run/jump/fall) stay at 1.0.
+    /// </summary>
+    private void ApplyAnimationTimeScales()
+    {
+        if (_bakedData == null || _playerModel == null) return;
+        var animTree = _playerModel.GetNodeOrNull<AnimationTree>("AnimationTree");
+        if (animTree == null) return;
+
+        void SetTimeScale(string animName, ushort durationTicks)
+        {
+            if (durationTicks == 0) return;
+            int frameCount = 0;
+            for (int a = 0; a < _bakedData.Animations.Length; a++)
+            {
+                if (_bakedData.Animations[a].Name == animName)
+                {
+                    frameCount = _bakedData.Animations[a].FrameCount;
+                    break;
+                }
+            }
+            if (frameCount <= 0) return;
+
+            float timeScale = frameCount / (float)durationTicks;
+            string paramPath = $"parameters/{animName}/TimeScale/scale";
+            // Only set if the AnimationTree has this parameter
+            try { animTree.Set(paramPath, timeScale); }
+            catch { return; } // parameter doesn't exist — skip
+            GD.Print($"[TimeScale] {animName}: {frameCount}f / {durationTicks}t = {timeScale:F3}x");
+        }
+
+        // Collect all (animationName, DurationTicks) pairs from all abilities
+        var animToTicks = new System.Collections.Generic.List<(string name, ushort ticks)>();
+
+        void CollectStages(AbilityData ability)
+        {
+            for (int s = 0; s < ability.Stages.Length; s++)
+            {
+                string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
+                if (!string.IsNullOrEmpty(an))
+                    animToTicks.Add((an, ability.Stages[s].DurationTicks));
+            }
+            if (ability.ChargedStages != null)
+            {
+                for (int s = 0; s < ability.ChargedStages.Length; s++)
+                {
+                    string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
+                    if (!string.IsNullOrEmpty(an))
+                        animToTicks.Add((an, ability.ChargedStages[s].DurationTicks));
+                }
+            }
+        }
+
+        CollectStages(_charDef.LMB);
+        CollectStages(_charDef.RMB);
+        CollectStages(_charDef.AirLMB);
+        CollectStages(_charDef.AirRMB);
+        CollectStages(_charDef.Q);
+        CollectStages(_charDef.E);
+        CollectStages(_charDef.R);
+        CollectStages(_charDef.F);
+
+        foreach (var (name, ticks) in animToTicks)
+            SetTimeScale(name, ticks);
+    }
 }

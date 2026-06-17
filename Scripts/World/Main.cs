@@ -124,7 +124,7 @@ public partial class Main : Node3D
             ShowCharacterSelect();
         };
         join.OnBack += () => ShowMainMenu();
-        PushScreen(join);
+        TransitionTo(join);
     }
 
     private void ShowHostLobby()
@@ -137,7 +137,7 @@ public partial class Main : Node3D
             _serverProcess = null;
             ShowMainMenu();
         };
-        PushScreen(lobby);
+        TransitionTo(lobby);
     }
 
     private void ShowCharacterSelect()
@@ -155,20 +155,17 @@ public partial class Main : Node3D
             else if (_flowMode == "join")
                 ShowJoinServer();
             else if (_flowMode == "host")
-            {
-                // Go back to host lobby (pop char select, show lobby underneath)
-                PopScreen();
-            }
+                ShowHostLobby();
         };
-        PushScreen(charSelect);
+        TransitionTo(charSelect);
     }
 
     private void ShowMapSelect()
     {
         var mapSelect = _mapSelectScene.Instantiate<MapSelectUI>();
         mapSelect.OnMapConfirmed += (arenaName) => StartMatch(arenaName);
-        mapSelect.OnBack += () => PopScreen();
-        PushScreen(mapSelect);
+        mapSelect.OnBack += () => ShowCharacterSelect();
+        TransitionTo(mapSelect);
     }
 
     // ═══ MATCH START ═══

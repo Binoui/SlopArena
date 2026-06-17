@@ -1,8 +1,10 @@
 @tool
 extends SceneTree
 
-## Headless bake: loads manki.glb directly, bakes bone positions per frame.
-## Run: godot --headless --script tools/headless_bake.gd --path .
+## Headless bake: loads a character GLB and bakes bone positions per frame.
+## Usage: godot --headless --script tools/headless_bake.gd --path . -- <char1> [char2 ...]
+##   e.g. godot --headless --script tools/headless_bake.gd --path . -- manki bunny
+##   Each character must have assets/characters/<name>/<name>.glb
 
 const BONE_NAMES := [
     "mixamorig_Head",
@@ -19,21 +21,41 @@ const BONE_NAMES := [
 ]
 
 const FPS := 60.0
-const OUTPUT_PATH := "res://data/manki_skeleton.bin"
-const GLB_PATH := "res://assets/characters/manki/manki.glb"
 
 func _init():
+    # Parse character names from command line
+    var user_args := OS.get_cmdline_user_args()
+    var chars: Array[String] = []
+    for a in user_args:
+        var trimmed := a.strip_edges()
+        if trimmed.length() > 0:
+            chars.append(trimmed)
+
+    if chars.is_empty():
+        chars = ["manki", "bunny"]
+
+    for char_name in chars:
+        var result := await bake_character(char_name)
+        if result != OK:
+            printerr("FAILED: ", char_name)
+            quit(1)
+
+    quit(0)
+
+
+func bake_character(char_name: String) -> int:
+    var glb_path := "res://assets/characters/%s/%s.glb" % [char_name, char_name]
+    var output_path := "res://data/%s_skeleton.bin" % [char_name]
+
+    print("\n=== %s: Loading GLB..." % char_name)
     # Need a frame to initialize skeleton transforms
     await process_frame
 
-    print("Headless BakeSkeleton v3: Loading GLB...")
-
     # Load GLB directly
-    var glb := load(GLB_PATH) as PackedScene
+    var glb := load(glb_path) as PackedScene
     if glb == null:
-        printerr("Cannot load: ", GLB_PATH)
-        quit(1)
-        return
+        printerr("Cannot load: ", glb_path)
+        return ERR_FILE_CANT_OPEN
 
     var instance := glb.instantiate() as Node3D
     root.add_child(instance)
@@ -47,15 +69,12 @@ func _init():
 
     if skel == null:
         printerr("No Skeleton3D found")
-        quit(1)
-        return
+        return ERR_UNCONFIGURED
     if anim_player == null:
         printerr("No AnimationPlayer found")
-        quit(1)
-        return
+        return ERR_UNCONFIGURED
 
-    print("Found Skeleton3D (%d bones) + AnimationPlayer" % skel.get_bone_count())
-    print("Bones: ", skel.get_bone_count())
+    print("  Found Skeleton3D (%d bones) + AnimationPlayer" % skel.get_bone_count())
 
     # Build bone index map
     var bone_indices: Array[int] = []
@@ -64,35 +83,21 @@ func _init():
         if idx >= 0:
             bone_indices.append(idx)
         else:
-            printerr("Bone not found: ", name)
+            printerr("  Bone not found: ", name)
 
     if bone_indices.size() == 0:
-        printerr("No bones matched")
-        quit(1)
-        return
+        printerr("  No bones matched")
+        return ERR_UNCONFIGURED
 
     var bone_count := bone_indices.size()
     var anim_list := anim_player.get_animation_list()
-    print("%d bones, %d animations" % [bone_count, anim_list.size()])
-
-    # Quick test: sample frame 0 of "idle" to see if bone positions change with animation
-    anim_player.stop()
-    anim_player.play("idle")
-    anim_player.seek(0.0, true)
-    await process_frame
-    var test_head := skel.get_bone_global_pose(bone_indices[0])
-    var test_hips := skel.get_bone_global_pose(skel.find_bone("mixamorig_Hips"))
-    print("Test idle frame 0: Head=(%.4f, %.4f, %.4f) Hips=(%.4f, %.4f, %.4f)" % [
-        test_head.origin.x, test_head.origin.y, test_head.origin.z,
-        test_hips.origin.x, test_hips.origin.y, test_hips.origin.z
-    ])
+    print("  %d bones, %d animations" % [bone_count, anim_list.size()])
 
     # Open file
-    var f := FileAccess.open(OUTPUT_PATH, FileAccess.WRITE)
+    var f := FileAccess.open(output_path, FileAccess.WRITE)
     if f == null:
-        printerr("Cannot open output: ", OUTPUT_PATH)
-        quit(1)
-        return
+        printerr("  Cannot open output: ", output_path)
+        return ERR_FILE_CANT_WRITE
 
     # Header
     f.store_32(0x4C454B53)  # "SKEL"
@@ -109,13 +114,38 @@ func _init():
 
     var hips_idx := skel.find_bone("mixamorig_Hips")
 
+    # Step 1: sample the rest pose Hips transform (stopped player).
+    # This gives armature-local space: X=right, Y=up, Z=depth — what the server expects.
+    anim_player.stop()
+    await process_frame
+    var rest_hips_inv := Transform3D.IDENTITY
+    if hips_idx >= 0:
+        rest_hips_inv = skel.get_bone_global_pose(hips_idx).affine_inverse()
+
+    # Step 2: compute the Y normalization offset from idle frame 0.
+    # We measure the lowest bone in armature-local space at idle frame 0
+    # so the lowest contact point = 0 in baked space for every character.
+    # This must be idle (not rest pose) because some characters stand differently
+    # in their idle pose than in their rest pose (e.g. digitigrade animals).
+    anim_player.play("idle")
+    anim_player.seek(0.0, true)
+    await process_frame
+    var ground_offset_y := INF
+    var ground_bone := ""
+    for bi in bone_indices:
+        var local_y := (rest_hips_inv * skel.get_bone_global_pose(bi).origin).y
+        if local_y < ground_offset_y:
+            ground_offset_y = local_y
+            ground_bone = skel.get_bone_name(bi)
+    print("  Ground ref: local_y=%.4f  bone=%s" % [ground_offset_y, ground_bone])
+
     # Each animation
     for anim_name in anim_list:
         var anim: Animation = anim_player.get_animation(anim_name)
         var duration := anim.length
         var frame_count := ceili(duration * FPS) + 1
 
-        print("  Anim '%s'" % anim_name)
+        print("  '%s' -> %d frames" % [anim_name, frame_count])
 
         var name_bytes := anim_name.to_utf8_buffer()
         f.store_32(name_bytes.size())
@@ -132,28 +162,20 @@ func _init():
             # Wait a frame to ensure skeleton updates
             await process_frame
 
-            # Transform bones into Hips' local coordinate system using AffineInverse.
-            # This gives correct positions in character-local space:
-            #   X = local right, Y = local up, Z = local forward
-            # so the runtime rotation formula (FacingYaw) works correctly.
-            var hips_inv := Transform3D.IDENTITY
-            if hips_idx >= 0:
-                hips_inv = skel.get_bone_global_pose(hips_idx).affine_inverse()
-
             for bone_idx in bone_indices:
-                var pose := skel.get_bone_global_pose(bone_idx)
-                var local_pos := hips_inv * pose.origin
+                var bone_world := skel.get_bone_global_pose(bone_idx).origin
+                var local_pos := rest_hips_inv * bone_world
                 f.store_float(local_pos.x)
-                f.store_float(local_pos.y)
+                f.store_float(local_pos.y - ground_offset_y)
                 f.store_float(local_pos.z)
 
     f.close()
-    print("Done! Written to ", OUTPUT_PATH)
-    quit(0)
+    print("  ✓ Written to ", output_path)
+    instance.queue_free()
+    return OK
 
 
 func find_child_of_type(node, type_name: String) -> Node:
-    """Recursively find a child node of the given type."""
     if node.get_class() == type_name:
         return node
     for child in node.get_children():

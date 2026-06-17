@@ -46,7 +46,7 @@ node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 animation = &"run"
 use_custom_timeline = true
 timeline_length = 1.0
-stretch_time_scale = true
+stretch_time_scale = false
 start_offset = 0.0
 loop_mode = 1
 
@@ -210,11 +210,6 @@ node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 
 [sub_resource type="AnimationNodeAnimation" id="anim_melee"]
 animation = &"spell_lmb_1"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
 
 [sub_resource type="AnimationNodeTimeScale" id="ts_melee"]
 
@@ -228,11 +223,6 @@ node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 
 [sub_resource type="AnimationNodeAnimation" id="anim_leg_sweep"]
 animation = &"spell_lmb_2"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
 
 [sub_resource type="AnimationNodeTimeScale" id="ts_leg_sweep"]
 
@@ -246,11 +236,6 @@ node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
 
 [sub_resource type="AnimationNodeAnimation" id="anim_backflip"]
 animation = &"spell_lmb_3"
-use_custom_timeline = true
-timeline_length = 1.795
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
 
 [sub_resource type="AnimationNodeTimeScale" id="ts_backflip"]
 
@@ -366,7 +351,7 @@ states/spell_rmb_attack/position = Vector2(1400, 250)
 states/spell_rmb_loop/node = SubResource("bt_attack_heavy_charge")
 states/spell_rmb_loop/position = Vector2(1000, 250)
 transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "air", SubResource("xfade_01"), "Run", "air", SubResource("xfade_01"), "air", "Land", SubResource("xfade_015"), "Land", "Idle", SubResource("xfade_at_end"), "Idle", "dash", SubResource("xfade_01"), "Run", "dash", SubResource("xfade_01"), "air", "dash", SubResource("xfade_01"), "dash", "End", SubResource("xfade_015"), "Idle", "spell_lmb_1", SubResource("xfade_01"), "Run", "spell_lmb_1", SubResource("xfade_01"), "air", "spell_lmb_1", SubResource("xfade_01"), "spell_lmb_1", "End", SubResource("xfade_015"), "spell_lmb_2", "End", SubResource("xfade_015"), "spell_lmb_3", "End", SubResource("xfade_015"), "Idle", "spell_air_lmb", SubResource("xfade_01"), "Run", "spell_air_lmb", SubResource("xfade_01"), "air", "spell_air_lmb", SubResource("xfade_01"), "spell_air_lmb", "End", SubResource("xfade_015"), "Idle", "spell_rmb_loop", SubResource("xfade_01"), "Run", "spell_rmb_loop", SubResource("xfade_01"), "spell_rmb_loop", "End", SubResource("xfade_015"), "spell_rmb_loop", "spell_rmb_attack", SubResource("xfade_01"), "spell_rmb_attack", "End", SubResource("xfade_015"), "air", "spell_air_rmb", SubResource("xfade_01"), "spell_air_rmb", "End", SubResource("xfade_015"), "Idle", "spell_q", SubResource("xfade_01"), "Run", "spell_q", SubResource("xfade_01"), "air", "spell_q", SubResource("xfade_01"), "spell_q", "End", SubResource("xfade_015"), "Idle", "spell_e", SubResource("xfade_01"), "Run", "spell_e", SubResource("xfade_01"), "air", "spell_e", SubResource("xfade_01"), "spell_e", "End", SubResource("xfade_015"), "Idle", "spell_r", SubResource("xfade_01"), "Run", "spell_r", SubResource("xfade_01"), "air", "spell_r", SubResource("xfade_01"), "spell_r", "End", SubResource("xfade_015"), "Idle", "spell_f", SubResource("xfade_01"), "Run", "spell_f", SubResource("xfade_01"), "air", "spell_f", SubResource("xfade_01"), "spell_f", "End", SubResource("xfade_015"), "air", "End", SubResource("xfade_015"), "hit_small", "End", SubResource("xfade_015"), "hit_medium", "End", SubResource("xfade_015"), "hit_hard", "End", SubResource("xfade_015"), "Land", "Run", SubResource("AnimationNodeStateMachineTransition_j33en")]
-graph_offset = Vector2(603, 163)
+graph_offset = Vector2(92, 46)
 
 [node name="Manki" type="Node3D" unique_id=1599709154]
 
@@ -422,5 +407,8 @@ script = ExtResource("11_dash")
 script = ExtResource("12_hitrx")
 
 [node name="manki" parent="." unique_id=1416905880 instance=ExtResource("7_j33en")]
+
+[node name="Armature" parent="manki" index="0" unique_id=719223378]
+transform = Transform3D(0.01, 0, 0, 0, -3.5762788e-09, -0.01, 0, 0.01, -3.5762788e-09, 0, 0, 0)
 
 [editable path="manki"]

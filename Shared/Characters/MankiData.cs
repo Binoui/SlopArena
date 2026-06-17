@@ -46,26 +46,6 @@ public static partial class CharacterRegistry
                 MaxJumps = 2,
             },
 
-            HurtboxCapsules = new HurtboxCapsule[]
-            {
-                // Torso: hips → upper chest
-                new(0f, 0.2f, 0f, 0f, 1.0f, 0f, 0.35f),
-                // Head: sphere at neck level
-                new(0f, 1.4f, 0f, 0f, 1.4f, 0f, 0.25f),
-                // Right arm: shoulder → hand
-                new(0.35f, 0.9f, 0f, 0.7f, 0.7f, 0.2f, 0.14f),
-                // Left arm: shoulder → hand
-                new(-0.35f, 0.9f, 0f, -0.7f, 0.7f, 0.2f, 0.14f),
-                // Right leg: hip → foot
-                new(0.15f, 0f, 0f, 0.15f, -0.9f, 0f, 0.18f),
-                // Left leg: hip → foot
-                new(-0.15f, 0f, 0f, -0.15f, -0.9f, 0f, 0.18f),
-            },
-
-            // ── Bone-attached hurtboxes (ServerSkeleton-based) ──
-            // Each bone gets one sphere. Bone names match Mixamo rig ("mixamorig:Head").
-            // Radius in meters. Larger = easier to hit. Typical ranges:
-            //   Head: 0.20-0.35, Torso: 0.25-0.40, Hands: 0.10-0.18, Feet: 0.14-0.22
             HurtboxBoneDefs = new HurtboxBoneDef[]
             {
                 new("mixamorig:Head", 0, 0, 0, 0.25f),
@@ -78,8 +58,9 @@ public static partial class CharacterRegistry
             },
             GlbPath = "res://assets/characters/manki/manki.glb",
             BakedDataPath = "res://data/manki_skeleton.bin",
+            VisualScale = 1.0f,
             HurtboxBoneScale = 0.01f,
-            ModelSoleOffset = 0.10f,
+            ModelSoleOffset = 0.0f,
             AutoModelYOffset = true,
 
             // ═══ ABILITIES ═══
