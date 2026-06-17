@@ -248,12 +248,10 @@ namespace SlopArena.Shared
 							float scale = def.HurtboxBoneScale;
 							bx *= scale; by *= scale; bz *= scale;
 
-							// Apply sole offset so hurtbox matches visual model position
-							float soleY = -def.ModelSoleOffset;
-
 							// Bone → world: rotate by yaw, then add character position
+							// py is capsule center; baked Y=0 at ground, so subtract capsuleHalf
 							float wx = px + ((bx * cos) + (bz * sin));
-							float wy = py + by + soleY;
+							float wy = py - def.CapsuleHeight * 0.5f + by;
 							float wz = pz + ((-bx * sin) + (bz * cos));
 							wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
 

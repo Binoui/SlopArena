@@ -56,7 +56,7 @@ public static partial class CharacterRegistry
             BakedDataPath = "res://data/bunny_skeleton.bin",
             VisualScale = 0.022f,
             HurtboxBoneScale = 0.022f,
-            ModelSoleOffset = 0.0f,
+            ModelSoleOffset = 1.1f,
             AutoModelYOffset = true,
 
             // ═══ ABILITIES ═══
