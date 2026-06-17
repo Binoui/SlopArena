@@ -330,22 +330,6 @@ public partial class PlayerController : CharacterBody3D
             AddChild(_boneHurtboxes);
             _boneHurtboxes.Build(skeleton, BoneHurtboxSetup.DefaultHumanoid());
         }
-
-        // Debug: print model position vs hurtbox positions (deferred: need scene tree settled)
-        Callable.From(() =>
-        {
-            if (_playerModel != null)
-                GD.Print($"[Debug] {Name}: body Y={GlobalPosition.Y:F4} " +
-                         $"model GlobalY={_playerModel.GlobalPosition.Y:F4} model LocalY={_playerModel.Position.Y:F4}");
-            if (_boneHurtboxes != null)
-            {
-                var caps = _boneHurtboxes.GetWorldCapsules();
-                for (int ci = 0; ci < caps.Count; ci++)
-                    GD.Print($"[Debug] {Name}: capsule[{ci}] start=({caps[ci].start.X:F2},{caps[ci].start.Y:F2},{caps[ci].start.Z:F2}) " +
-                             $"end=({caps[ci].end.X:F2},{caps[ci].end.Y:F2},{caps[ci].end.Z:F2})");
-            }
-        }).CallDeferred();
-
         // Visual feedback on damage (hit flash + hit reaction)
         // Subscribed in SetupCombat via OnCombatTakeDamage
 
