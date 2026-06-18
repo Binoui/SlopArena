@@ -163,18 +163,6 @@ public class MovementComponent
     }
 
     /// <summary>
-    /// Set combo stage and attack lock ticks (called by PlayerController after ExecuteSlot).
-    /// Note: uses ref to modify the struct in-place (CharacterState is a value type).
-    /// </summary>
-    public void SetComboState(byte comboStage, ushort chainWindowTicks, ushort selfLockTicks)
-    {
-        ref var s = ref State;
-        s.ComboStage = comboStage;
-        s.ComboTimerTicks = chainWindowTicks;
-        s.AnimLockTicks = selfLockTicks;
-    }
-
-    /// <summary>
     /// Check if the entity is currently in knockback.
     /// </summary>
     public bool IsInKnockback()

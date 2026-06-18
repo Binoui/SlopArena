@@ -43,7 +43,6 @@ public class GameUI
         BuildActionBar();
         BuildCamera();
         BuildEscapeMenu();
-        BuildTargeting();
     }
 
     private void BuildHUD()
@@ -107,42 +106,6 @@ public class GameUI
         EscapeMenu.Build();
         EscapeMenu.OnExitLobby += () => _matchNode.GetTree()?.ChangeSceneToFile("res://main.tscn");
         EscapeMenu.OnExitGame += () => _matchNode.GetTree()?.Quit();
-    }
-
-    private void BuildTargeting()
-    {
-        _player.OnTargetNextPressed += () =>
-        {
-            var viewport = _matchNode.GetViewport();
-            if (viewport == null) return;
-            var camera = viewport.GetCamera3D();
-            if (camera == null) return;
-            var center = viewport.GetVisibleRect().Size / 2;
-            var from = camera.ProjectRayOrigin(center);
-            var dir = camera.ProjectRayNormal(center);
-            var query = PhysicsRayQueryParameters3D.Create(from, from + (dir * 100f));
-            query.CollisionMask = 2;
-            var result = _matchNode.GetWorld3D().DirectSpaceState.IntersectRay(query);
-            if (result.Count > 0 && result.ContainsKey("collider"))
-            {
-                var collider = (Node)result["collider"];
-                while (collider != null)
-                {
-                    if (collider is not CharacterBody3D) { collider = collider.GetParent(); continue; }
-                    string name = collider.Name;
-                    if (name.StartsWith("NPC_") && int.TryParse(name.AsSpan("NPC_".Length), out int idx))
-                    {
-                        if (idx >= 0 && idx < _npcs.Length && _npcs[idx]?.IsNpcAlive() == true)
-                            _setTarget((ulong)(100 + idx));
-                    }
-                    else if (name == "Opponent")
-                    {
-                        _setTarget(2);
-                    }
-                    break;
-                }
-            }
-        };
     }
 
     /// <summary>Handle escape key toggle.</summary>

@@ -103,7 +103,7 @@ public partial class ActionBarHUD : Control
 		if (_classNameLabel != null)
 			_classNameLabel.Text = def.DisplayName.ToUpper();
 
-		AbilityData[] abilities = { def.LMB, def.RMB, def.Q, def.E, def.R, def.F };
+		AbilitySpec[] abilities = { def.LMB, def.RMB, def.Q, def.E, def.R, def.F };
 
 		for (int i = 0; i < 6; i++)
 		{
@@ -149,7 +149,7 @@ public partial class ActionBarHUD : Control
 		if (_player == null) return;
 
 		var def = _player.GetCharacterDef();
-		AbilityData[] abilities = { def.LMB, def.RMB, def.Q, def.E, def.R, def.F };
+		AbilitySpec[] abilities = { def.LMB, def.RMB, def.Q, def.E, def.R, def.F };
 		int[] slotIds = { 0, 1, 2, 3, 4, 5 };
 
 		for (int i = 0; i < 6; i++)

@@ -55,7 +55,6 @@ public partial class PlayerController : CharacterBody3D
     private Vector3 _moveDirection = Vector3.Zero;
     private Node3D? _playerModel;
     private BoneHurtboxSetup? _boneHurtboxes;
-    private bool _heavyHeld = false;
     /// <summary>
     /// set by _UnhandledInput, consumed by BuildInputState
     /// </summary>
@@ -64,6 +63,11 @@ public partial class PlayerController : CharacterBody3D
     /// track animation changes during combo chain
     /// </summary>
     private byte _lastComboStage;
+
+    // ── Ability system ──
+    private Ability? _activeAbility;
+    private float? _abilityAimYaw;
+    private ushort? _abilityAimDistance;
 
     /// <summary>
     /// Persistent damage % label above the character (Smash-style)
@@ -130,8 +134,6 @@ public partial class PlayerController : CharacterBody3D
     // ==========================================
 
     public event Action<float, float, float, float, float>? OnStateUpdated;
-    public event Action? OnTargetNextPressed;
-    public event Action<ulong>? OnLeftClickEntity;
     /// <summary>
     /// slotIndex, for HUD flash
     /// </summary>
@@ -161,6 +163,10 @@ public partial class PlayerController : CharacterBody3D
     public byte GetComboStage() => _movementComponent.State.ComboStage;
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
     public Vector3 MoveDirection => _moveDirection;
+    /// <summary>Camera yaw in radians (0 = looks along -Z). For abilities that need initial aim.</summary>
+    public float GetCameraYaw() => _camera != null ? _camera.GetCameraYaw() : GlobalRotation.Y;
+    /// <summary>Get the FSM state machine for animation/movement control.</summary>
+    public StateMachine? GetFSM() => _fsm;
 
     public void SetupCombat(LocalServerBridge? simulation, ArenaDefinition arenaDef, ulong entityId, SpellVFXManager? spellVFX = null)
     {
@@ -505,6 +511,13 @@ public partial class PlayerController : CharacterBody3D
         if (!_isPlayerControlled) return;
         if (IsEscapeMenuOpen) { if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible; return; }
 
+        // Forward input to active ability first (mouse motion during aiming, etc.)
+        if (_activeAbility != null)
+        {
+            _activeAbility.OnInput(@event);
+            if (_activeAbility != null) return; // ability might self-deactivate
+        }
+
         if (@event is InputEventMouseButton mb)
         {
             if (mb.Pressed)
@@ -516,55 +529,31 @@ public partial class PlayerController : CharacterBody3D
 
             if (mb.ButtonIndex == MouseButton.Left && mb.Pressed && _combatComponent != null)
             {
-                // Let the sim handle LMB via ActiveSlot in next BuildInputState
-                _pendingSlotPress = 1;
+                bool airborne = !_movementComponent.IsGrounded;
+                ActivateAbility(AbilityFactory.Create(0, airborne, _charDef));
                 GetViewport().SetInputAsHandled(); return;
             }
 
-            if (mb.ButtonIndex == MouseButton.Right && _combatComponent != null)
+            if (mb.ButtonIndex == MouseButton.Right && mb.Pressed && _combatComponent != null)
             {
-                if (mb.Pressed)
-                {
-                    if (_movementComponent.IsGrounded)
-                    {
-                        var ability = _charDef.GetSlotAbility(1, false);
-                        if (ability.AimedCharge.HasValue && _fsm != null)
-                        {
-                            // Start AimedCharge FSM state (visual indicator)
-                            float aimYaw = GlobalRotation.Y;
-                            var chargeState = _fsm.GetState<AimedChargeState>("aimed_charge");
-                            if (chargeState != null)
-                            {
-                                chargeState.Configure(ability.AimedCharge.Value, 1, false, aimYaw);
-                                _fsm.TransitionTo("aimed_charge");
-                                GetViewport().SetInputAsHandled(); return;
-                            }
-                        }
-                    }
-                    // Direct attack (air RMB or no AimedCharge)
-                    _pendingSlotPress = 2;
-                    GetViewport().SetInputAsHandled(); return;
-                }
-                else
-                {
-                    // Release — if in AimedCharge, fire
-                    if (_fsm != null && _fsm.IsInState("aimed_charge"))
-                    {
-                        _pendingSlotPress = 2;
-                    }
-                    GetViewport().SetInputAsHandled(); return;
-                }
+                bool airborne = !_movementComponent.IsGrounded;
+                ActivateAbility(AbilityFactory.Create(1, airborne, _charDef));
+                GetViewport().SetInputAsHandled(); return;
             }
         }
 
         if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured
-            && (_fsm == null || !_fsm.IsInState("aimed_charge")))
+            && _activeAbility == null)
             _camera?.RotateCamera(mm.Relative);
 
-        if (Input.IsActionJustPressed("ability_q")) _pendingSlotPress = 3;
-        if (Input.IsActionJustPressed("ability_e")) _pendingSlotPress = 4;
-        if (Input.IsActionJustPressed("ability_r")) _pendingSlotPress = 5;
-        if (Input.IsActionJustPressed("ability_f")) _pendingSlotPress = 6;
+        if (Input.IsActionJustPressed("ability_q"))
+        {
+            ActivateAbility(AbilityFactory.Create(2, false, _charDef));
+            GetViewport().SetInputAsHandled(); return;
+        }
+        if (Input.IsActionJustPressed("ability_e")) ActivateAbility(AbilityFactory.Create(3, false, _charDef));
+        if (Input.IsActionJustPressed("ability_r")) ActivateAbility(AbilityFactory.Create(4, false, _charDef));
+        if (Input.IsActionJustPressed("ability_f")) ActivateAbility(AbilityFactory.Create(5, false, _charDef));
         if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
@@ -572,38 +561,33 @@ public partial class PlayerController : CharacterBody3D
     // PROCESS (timers, NPC)
     // ==========================================
 
-    private float _trinketCooldownTimer = 0f;
-    [Export] public float TrinketCooldown = 120f;
-    [Export] public float TrinketPushSpeed = 18.0f;
-    private float _heavyHoldTimer = 0f;
-
     public override void _Process(double delta)
     {
         float dt = (float)delta;
         _inputCtrl.Poll();
         UpdateDebugLabel();
         UpdateDamageLabel();
-        if (_trinketCooldownTimer > 0f) _trinketCooldownTimer -= dt;
 
-        // Legacy hold timer for RMB charge (only if not using AimedCharge system)
-        if ((_fsm == null || !_fsm.IsInState("aimed_charge")) &&
-            Input.IsMouseButtonPressed(MouseButton.Right) && _combatComponent != null)
+        // ── Active ability tick ──
+        if (_activeAbility != null)
         {
-            _heavyHoldTimer += dt;
-            if (_heavyHoldTimer > 0.3f && !_heavyHeld)
+            var result = _activeAbility.Tick(this, dt);
+            if (result != null)
             {
-                _heavyHeld = true;
-                _pendingSlotPress = 2;
-            }
-        }
-        else
-        {
-            _heavyHoldTimer = 0f;
-        }
+                // Store aim data for BuildInputState
+                _abilityAimYaw = result.Value.AimYaw;
+                _abilityAimDistance = result.Value.AimDistance;
 
-        // Consume buffered LMB chain when lock expires (queue-based, like souls-like FSM)
-        // LMB buffering is handled by the sim now — no client-side execution needed
-        // The old code consumed via ExecuteSlot(0) which is now removed
+                if (result.Value.ActiveSlot.HasValue)
+                {
+                    // Ability fired — set the slot and deactivate
+                    _pendingSlotPress = result.Value.ActiveSlot.Value;
+                    OnAbilityUsed?.Invoke(result.Value.ActiveSlot.Value - 1);
+                    DeactivateAbility();
+                }
+            }
+            // null result means ability is still active (charging, aiming, etc.)
+        }
 
         // Respawn timer (both player and NPCs)
         if (_respawnTimer > 0f)
@@ -668,10 +652,7 @@ public partial class PlayerController : CharacterBody3D
                 simComboStage != _lastComboStage && simComboStage > 0)
             {
                 var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
-                string animName = ability.AnimationNames != null && ability.AnimationNames.Length > 0
-                    ? ability.AnimationNames[simComboStage % ability.AnimationNames.Length] : "melee";
-                if (ability.AimedCharge.HasValue)
-                    animName = ability.AimedCharge.Value.AttackAnimName;
+                string animName = ability.GetAnimationName(simComboStage);
                 var attackState = _fsm.GetAttackState();
                 if (attackState != null)
                 {
@@ -683,31 +664,13 @@ public partial class PlayerController : CharacterBody3D
             if (simState == ActionState.Attacking && !_fsm.IsInState("attack"))
             {
                 // Sim started an attack — play the FSM animation
-                byte comboStage = simComboStage;
                 var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
-                string animName = "melee";
-                if (ability.AnimationNames != null && ability.AnimationNames.Length > 0)
-                {
-                    animName = ability.AnimationNames[comboStage % ability.AnimationNames.Length];
-                    if (ability.AimedCharge.HasValue)
-                        animName = ability.AimedCharge.Value.AttackAnimName;
-                }
+                string animName = ability.GetAnimationName(simComboStage);
                 var attackState = _fsm.GetAttackState();
                 if (attackState != null)
                 {
                     attackState.NextAnimName = animName;
                     _fsm.TransitionTo("attack");
-                }
-
-                // Trigger special effects for this ability slot (projectiles, etc.)
-                if (slot > 0)
-                {
-                    var spellAbility = _charDef.GetSlotAbility(slot - 1, !_movementComponent.IsGrounded);
-                    if (spellAbility.SpecialEffectKeys != null)
-                    {
-                        foreach (var key in spellAbility.SpecialEffectKeys)
-                            AbilityRegistry.Execute(key, _combatComponent!);
-                    }
                 }
             }
 
@@ -767,8 +730,11 @@ public partial class PlayerController : CharacterBody3D
             input.Right = moveX > 0.3f;
             input.Jump = _inputCtrl.JumpJustPressed;
             input.Dash = _inputCtrl.DashJustPressed;
-            input.Attack = _inputCtrl.IsAttackPressed();
             input.Crouch = false; // NPCs don't crouch for now
+
+            // NPC abilities use the same ActiveSlot pipeline as player
+            input.ActiveSlot = _pendingSlotPress;
+            _pendingSlotPress = 0;
 
             // Set move direction for animations
             _moveDirection = new Vector3(moveX, 0f, moveY).Normalized();
@@ -833,16 +799,30 @@ public partial class PlayerController : CharacterBody3D
         input.Dash = Input.IsActionJustPressed("dash");
         input.Crouch = Input.IsActionPressed("crouch");
         // ActiveSlot replaces the old Attack flag — sim handles everything
-        input.Attack = false;
         // Consume pending slot press (sim handles buffering via InputBufferWindow)
         input.ActiveSlot = _pendingSlotPress;
         _pendingSlotPress = 0;
+        input.IsAiming = _activeAbility != null;
         // Send facing yaw (degrees * 100, clamp to short range)
         float deg = Mathf.RadToDeg(GlobalRotation.Y);
         input.FacingYaw = (short)Math.Clamp(deg * 100f, -32768, 32767);
-        // Send aim yaw from camera (combat facing)
+        // Send aim yaw from camera (combat facing), overridden by active ability
         float aimDeg = _camera != null ? Mathf.RadToDeg(_camera.GetCameraYaw()) : deg;
         input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768, 32767);
+        input.AimDistance = 0;
+
+        // Active ability overrides aim data
+        if (_abilityAimYaw.HasValue)
+        {
+            float throwDeg = Mathf.RadToDeg(_abilityAimYaw.Value);
+            input.AimYaw = (short)Math.Clamp(throwDeg * 100f, -32768, 32767);
+        }
+        if (_abilityAimDistance.HasValue)
+            input.AimDistance = _abilityAimDistance.Value;
+
+        // Clear consumed aim data (was set by Tick, consumed here in BuildInputState)
+        _abilityAimYaw = null;
+        _abilityAimDistance = null;
 
         // Zero movement if FSM state disallows it (e.g., aimed charge, attack)
         if (_fsm != null && !_fsm.CanMove())
@@ -856,107 +836,6 @@ public partial class PlayerController : CharacterBody3D
         }
 
         return input;
-    }
-
-    // ==========================================
-    // COMBAT: unified ability execution
-    // ==========================================
-
-    /// <summary>
-    /// Execute any ability slot (0-5) uniformly.
-    /// </summary>
-    public void ExecuteSlot(int slotIndex, bool charged, bool airborne)
-    {
-        if (_combatComponent == null) return;
-        if (_movementComponent.IsInKnockback()) return;
-        if (_movementComponent.State.AnimLockTicks > 0) return; // sim handles buffering
-
-        // Slot 0 (LMB) chains into next combo stage.
-        // Other slots are blocked during an active attack.
-        if (slotIndex != 0 && _fsm != null && _fsm.IsInState("attack")) return;
-
-        var ability = _charDef.GetSlotAbility(slotIndex, airborne);
-
-        // Cooldown check
-        ushort slotCd = slotIndex switch
-        {
-            0 => _movementComponent.State.Cooldown0,
-            1 => _movementComponent.State.Cooldown1,
-            2 => _movementComponent.State.Cooldown2,
-            3 => _movementComponent.State.Cooldown3,
-            4 => _movementComponent.State.Cooldown4,
-            5 => _movementComponent.State.Cooldown5,
-            _ => 0
-        };
-        if (slotCd > 0) return;
-        OnAbilityUsed?.Invoke(slotIndex);
-        var stages = charged && ability.ChargedStages != null ? ability.ChargedStages : ability.Stages;
-
-        // Play attack animation via AnimationTree StateMachine
-        int animStage = (stages != null && stages.Length > 0)
-            ? Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1)
-            : 0;
-        string? animName = ability.AnimationNames != null && animStage < ability.AnimationNames.Length
-            ? ability.AnimationNames[animStage]
-            : null;
-        // If this ability uses AimedCharge, use the attack anim (not the charge loop)
-        if (animName != null && ability.AimedCharge.HasValue)
-            animName = ability.AimedCharge.Value.AttackAnimName;
-        if (animName != null && _fsm != null)
-        {
-            var attackState = _fsm.GetAttackState();
-            if (attackState != null)
-            {
-                if (_fsm.IsInState("attack"))
-                {
-                    // Combo chain
-                    if (stages != null && stages.Length > 0)
-                    {
-                        int stageIdx = Math.Clamp(_movementComponent.State.ComboStage, 0, stages.Length - 1);
-                        ExecuteAttackStage(stages[stageIdx], stages, slotIndex, charged, airborne, isComboChain: true, startup: 0);
-                    }
-                    attackState.ChainTo(animName);
-                }
-                else
-                {
-                    // First attack
-                    ushort startup = (stages != null && stages.Length > 0 && stages[animStage].HitboxEvents?.Length > 0) ? stages[animStage].HitboxEvents[0].TriggerTick : (ushort)0;
-                    if (stages != null && stages.Length > 0)
-                    {
-                        ExecuteAttackStage(stages[animStage], stages, slotIndex, charged, airborne, isComboChain: false, startup);
-                    }
-                    attackState.NextAnimName = animName;
-                    _fsm.TransitionTo("attack");
-                }
-            }
-        }
-
-        // ── Step 2: Special effects ──
-        // Only fire immediately if no startup delay (otherwise fired after delay in _PhysicsProcess)
-        if (ability.SpecialEffectKeys != null)
-        {
-            ushort startup = (stages != null && stages.Length > 0 && stages[0].HitboxEvents?.Length > 0) ? stages[0].HitboxEvents[0].TriggerTick : (ushort)0;
-            if (startup == 0)
-            {
-                foreach (var key in ability.SpecialEffectKeys)
-                    AbilityRegistry.Execute(key, _combatComponent);
-            }
-        }
-
-        // ── Step 3: Set cooldown ──
-        if (ability.CooldownTicks > 0)
-        {
-            ref var s = ref _movementComponent.State;
-            switch (slotIndex)
-            {
-                case 0: s.Cooldown0 = ability.CooldownTicks; break;
-                case 1: s.Cooldown1 = ability.CooldownTicks; break;
-                case 2: s.Cooldown2 = ability.CooldownTicks; break;
-                case 3: s.Cooldown3 = ability.CooldownTicks; break;
-                case 4: s.Cooldown4 = ability.CooldownTicks; break;
-                case 5: s.Cooldown5 = ability.CooldownTicks; break;
-            }
-        }
     }
 
     // ==========================================
@@ -975,6 +854,31 @@ public partial class PlayerController : CharacterBody3D
             return _boneHurtboxes.GetWorldCapsules();
         // Fallback: single sphere (degenerate capsule)
         return new List<(Vector3, Vector3, float)> { (GlobalPosition, GlobalPosition, _charDef.HurtboxRadius) };
+    }
+
+    // ==========================================
+    // ABILITY SYSTEM
+    // ==========================================
+
+    /// <summary>
+    /// Activate an ability. Deactivates any currently active ability first.
+    /// </summary>
+    private void ActivateAbility(Ability ability)
+    {
+        _activeAbility?.OnDeactivate(this);
+        _activeAbility = ability;
+        _abilityAimYaw = null;
+        _abilityAimDistance = null;
+        ability.OnActivate(this);
+    }
+
+    /// <summary>
+    /// Deactivate the currently active ability (if any).
+    /// </summary>
+    private void DeactivateAbility()
+    {
+        _activeAbility?.OnDeactivate(this);
+        _activeAbility = null;
     }
 
     // ==========================================
@@ -1111,13 +1015,14 @@ public partial class PlayerController : CharacterBody3D
     }
 
     /// <summary>
-    /// Trigger an ability by slot index (for NPCs).
-    /// 0 = LMB, 1-5 = Q/E/R/F/etc.
+    /// Trigger an ability by slot index (for NPCs / BotController).
+    /// Sets _pendingSlotPress so the sim picks it up on the next tick,
+    /// same as player abilities.
     /// </summary>
     public void UseAbility(int slot)
     {
-        if (!_isNPC) return; // Only NPCs can have direct ability calls
-        ExecuteSlot(slot, charged: false, airborne: !_movementComponent.IsGrounded);
+        if (!_isNPC) return;
+        _pendingSlotPress = (byte)(slot + 1); // slot is 0-based, ActiveSlot is 1-based
     }
 
     // ==========================================
@@ -1182,17 +1087,6 @@ public partial class PlayerController : CharacterBody3D
     // ==========================================
 
     /// <summary>
-    /// Execute an attack stage with optional warp and startup delay.
-    /// (Legacy — all abilities now go through _pendingSlotPress → sim)
-    /// </summary>
-    private void ExecuteAttackStage(AttackStage stage, AttackStage[] stages, int slotIndex, bool charged, bool airborne, bool isComboChain, ushort startup)
-    {
-        // All abilities handled by sim now. Keep the warp logic for now.
-        if (_combatComponent == null || !stage.UseTargetLock) return;
-        _combatComponent.ExecuteAttackWithWarp(stage, _charDef.Movement.SprintSpeed, null!);
-    }
-
-    /// <summary>
     /// ==========================================
     /// CLICK TARGETING STATE
     /// ==========================================
@@ -1240,7 +1134,7 @@ public partial class PlayerController : CharacterBody3D
         // Collect all (animationName, DurationTicks) pairs from all abilities
         var animToTicks = new System.Collections.Generic.List<(string name, ushort ticks)>();
 
-        void CollectStages(AbilityData ability)
+        void CollectStages(AbilitySpec ability)
         {
             for (int s = 0; s < ability.Stages.Length; s++)
             {

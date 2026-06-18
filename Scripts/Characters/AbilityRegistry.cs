@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Registry of all class ability special effects. Maps a string key to the actual method.
-/// Each key is referenced by CharacterDefinition's AbilityData.SpecialEffectKeys.
+/// Each key is referenced by CharacterDefinition's AbilitySpec.SpecialEffectKeys.
 ///
 /// Adding a new character:
 ///   1. Create Scripts/Characters/{Name}/{Name}Abilities.cs
@@ -31,7 +31,7 @@ public static class AbilityRegistry
 
     /// <summary>
     /// Execute a special effect by key name.
-    /// Called from PlayerController.ExecuteSlot after stage resolution.
+    /// Called from Ability.TriggerEffects() when an ability fires.
     /// Returns false if the key was not found.
     /// </summary>
     public static bool Execute(string key, CombatComponent combat)
