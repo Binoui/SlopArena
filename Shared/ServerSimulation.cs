@@ -226,37 +226,10 @@ namespace SlopArena.Shared
 				{
 					if (state.AttackElapsedTicks != evt.TriggerTick) continue;
 
-					if (ability is RoundBombSpec roundBomb)
+					// Let the AbilitySpec decide: true = handled, false = use default melee
+					if (!ability.SpawnHitbox(evt, state, def, _spellResolver, id))
 					{
-						// ── Targeted projectile (velocity from aim) ──
-						var pc = roundBomb.ProjectileConfig;
-						float D = Math.Clamp(state.AimTargetDistance, 0.5f, pc.MaxRange);
-						float launchRad = pc.LaunchAngleDeg * (MathF.PI / 180f);
-						float g = pc.Gravity;
-						float dY = -def.CapsuleHeight * 0.5f - pc.LaunchOffsetY;
-
-						CombatMath.ComputeProjectileLaunch(D, launchRad, g, dY,
-							out float _, out float hSpeed, out float vSpeed);
-
-						float aimCos = MathF.Cos(state.AimYaw);
-						float aimSin = MathF.Sin(state.AimYaw);
-						float cosθ = MathF.Cos(launchRad);
-
-						_spellResolver.Spawn(new Hitbox
-						{
-							X = state.PX, Y = state.PY + pc.LaunchOffsetY, Z = state.PZ,
-							VX = hSpeed * aimSin, VY = vSpeed, VZ = hSpeed * aimCos,
-							Radius = pc.HitboxRadius, Shape = HitboxShape.Sphere,
-							EndX = state.PX, EndY = state.PY, EndZ = state.PZ,
-							Damage = pc.Damage, KnockbackForce = pc.KnockbackForce,
-							KnockbackUpward = pc.KnockbackUpward, StunTicks = pc.StunTicks,
-							DurationTicks = pc.MaxFlightTicks, OwnerId = id, Gravity = g,
-							Explosion = pc.Explosion,
-						});
-					}
-					else
-					{
-						// ── Melee/static hitbox ──
+						// ── Default melee/static hitbox ──
 						float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
 						float hy = state.PY + evt.OffY;
 						float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
@@ -305,6 +278,7 @@ namespace SlopArena.Shared
 					StunTicks = explosion.StunTicks,
 					DurationTicks = explosion.DurationTicks,
 					OwnerId = ownerId,
+					CanHitOwner = explosion.CanHitOwner,
 				});
 			}
 

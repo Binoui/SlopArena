@@ -17,7 +17,7 @@ public static class AbilityRegistry
 			// Manki — Mad Bomber Monkey
 			{ "MankiAerosolFlame", MankiAbilities.AerosolFlame },
 			{ "MankiRoundBomb", MankiAbilities.RoundBomb },
-			{ "MankiDynamiteJump", MankiAbilities.DynamiteJump },
+			{ "MankiPlaceMine", MankiAbilities.PlaceMine },
 			{ "MankiDiveBomb", MankiAbilities.DiveBomb },
 			{ "MankiBigBoom", MankiAbilities.BigBoom },
 
