@@ -84,21 +84,6 @@ public sealed class InputController
     }
 
     /// <summary>
-    /// Check if attack button is pressed this frame.
-    /// </summary>
-    public bool IsAttackPressed()
-    {
-        if (_aiControlled)
-        {
-            return _aiInput.Attack;
-        }
-        else
-        {
-            return Input.IsActionPressed("attack");
-        }
-    }
-
-    /// <summary>
     /// Check if AI mode is active.
     /// </summary>
     public bool IsAIControlled() => _aiControlled;

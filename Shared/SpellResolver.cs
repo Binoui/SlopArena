@@ -13,6 +13,12 @@ namespace SlopArena.Shared
         private readonly List<Hitbox> _hitboxes = new();
 
         /// <summary>
+        /// Projectile deactivation events this tick (for explosion spawning).
+        /// Position is the last known position before deactivation.
+        /// </summary>
+        private readonly List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId)> _pendingExplosions = new();
+
+        /// <summary>
         /// Result of a single hitbox-entity collision.
         /// </summary>
         public struct HitResult
@@ -62,6 +68,37 @@ namespace SlopArena.Shared
         public void Clear() => _hitboxes.Clear();
 
         /// <summary>
+        /// Drain and return all pending explosion events from this tick.
+        /// Call after Tick() to spawn explosion hitboxes at the returned positions.
+        /// </summary>
+        public List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId)> DrainPendingExplosions()
+        {
+            var result = new List<(float, float, float, ProjectileExplosion, ulong)>(_pendingExplosions);
+            _pendingExplosions.Clear();
+            return result;
+        }
+
+        /// <summary>
+        /// Check remaining active projectiles for ground collision.
+        /// Any projectile with an explosion config that is below the floor Y
+        /// gets an explosion spawned at the floor and is deactivated.
+        /// </summary>
+        public void CheckGroundCollision(float floorY)
+        {
+            for (int i = _hitboxes.Count - 1; i >= 0; i--)
+            {
+                var hb = _hitboxes[i];
+                if (!hb.Active || !hb.Explosion.HasValue || hb.Gravity <= 0f) continue;
+                if (hb.Y + (hb.Radius * 0.5f) >= floorY) continue;
+
+                // Below ground: queue explosion, deactivate
+                var exp = hb.Explosion.Value;
+                _pendingExplosions.Add((hb.X, floorY, hb.Z, exp, hb.OwnerId));
+                _hitboxes.RemoveAt(i);
+            }
+        }
+
+        /// <summary>
         /// Get a snapshot of all active hitboxes (for debug visualization).
         /// </summary>
         public List<Hitbox> GetActiveHitboxes()
@@ -89,10 +126,17 @@ namespace SlopArena.Shared
                 var hb = _hitboxes[i];
                 if (!hb.Active) { _hitboxes.RemoveAt(i); continue; }
 
+                // Save position before movement (for explosion spawning)
+                float prevX = hb.X, prevY = hb.Y, prevZ = hb.Z;
+
                 // Move projectile
                 hb.X += hb.VX * Simulation.TickDt;
                 hb.Y += hb.VY * Simulation.TickDt;
                 hb.Z += hb.VZ * Simulation.TickDt;
+
+                // Apply gravity to projectile (if set)
+                if (hb.Gravity > 0f)
+                    hb.VY -= hb.Gravity * Simulation.TickDt;
 
                 // Check collision against each entity
                 foreach (var entity in entities)
@@ -149,6 +193,9 @@ namespace SlopArena.Shared
                 hb.AgeTicks++;
                 if (hb.AgeTicks >= hb.DurationTicks || !hb.Active)
                 {
+                    // Queue explosion if this projectile has one (use pre-move position)
+                    if (hb.Explosion.HasValue && hb.Gravity > 0f)
+                        _pendingExplosions.Add((prevX, prevY, prevZ, hb.Explosion.Value, hb.OwnerId));
                     _hitboxes.RemoveAt(i);
                 }
                 else
