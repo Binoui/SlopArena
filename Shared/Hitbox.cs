@@ -54,5 +54,8 @@ namespace SlopArena.Shared
         /// Used by projectiles to create an AoE burst on impact.
         /// </summary>
         public ProjectileExplosion? Explosion;
+
+        /// <summary>If true, this hitbox can hit the entity that spawned it.</summary>
+        public bool CanHitOwner;
     }
 }

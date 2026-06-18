@@ -50,12 +50,14 @@ public static partial class MankiAbilities
         // ── Gather the same params the server uses ──
         float aimYaw = 0f, targetDist = 8f, launchAngleDeg = 20f, gravity = 30f, launchOffsetY = 1.2f;
         float capsuleHalf = 0.65f;
+        float hitboxRadius = 0.6f, explosionRadius = 2.5f;
+        float maxRange = 12f;
 
         if (combat.GetOwnerNode() is PlayerController player)
         {
             ref var state = ref player.GetState();
             aimYaw = state.AimYaw;
-            targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, 12f);
+            targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, maxRange);
 
             var def = player.GetCharacterDef();
             capsuleHalf = def.CapsuleHeight * 0.5f;
@@ -64,10 +66,15 @@ public static partial class MankiAbilities
 			if (def.Q is RoundBombSpec bombSpec)
 			{
 				var pc = bombSpec.ProjectileConfig;
+                maxRange = pc.MaxRange;
 				launchAngleDeg = pc.LaunchAngleDeg;
 				gravity = pc.Gravity;
 				launchOffsetY = pc.LaunchOffsetY;
+                hitboxRadius = pc.HitboxRadius;
+                if (pc.Explosion.HasValue)
+                    explosionRadius = pc.Explosion.Value.Radius;
 			}
+            targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, maxRange);
 		}
 
 		// Compute velocity — SAME as ServerSimulation.cs lines 233-248
@@ -84,9 +91,9 @@ public static partial class MankiAbilities
 
 		Vector3 launchPos = combat.GetOwnerPosition() + (Vector3.Up * launchOffsetY);
 
-		// ── Spawn the visual mesh ──
-		var proj = new MeshInstance3D();
-		var sphere = new SphereMesh { Radius = 0.3f, Height = 0.6f, RadialSegments = 12, Rings = 8 };
+        // ── Spawn the visual mesh ──
+        var proj = new MeshInstance3D();
+        var sphere = new SphereMesh { Radius = hitboxRadius, Height = hitboxRadius * 2f, RadialSegments = 12, Rings = 8 };
 		var mat = new StandardMaterial3D
 		{
 			AlbedoColor = new Color(1f, 0.7f, 0f),
@@ -106,22 +113,88 @@ public static partial class MankiAbilities
 			gravity, 0.05f,
 			() =>
 			{
-				if (GodotObject.IsInstanceValid(proj))
-				{
-					StatusSpells.CreateImpactVisual(combat, proj.GlobalPosition, 2f, new Color(1f, 0.7f, 0f));
-					StatusSpells.CreateCircleVisual(combat, proj.GlobalPosition, 2.5f, new Color(1f, 0.5f, 0f, 0.3f), 0.3f);
+							if (GodotObject.IsInstanceValid(proj))
+							{
+								StatusSpells.CreateImpactVisual(combat, proj.GlobalPosition, explosionRadius, new Color(1f, 0.7f, 0f));
+								StatusSpells.CreateCircleVisual(combat, proj.GlobalPosition, explosionRadius, new Color(1f, 0.5f, 0f, 0.3f), 0.3f);
 					proj.QueueFree();
 				}
 			});
 		tree.CurrentScene?.AddChild(flyer);
 	}
 
-	public static void DynamiteJump(CombatComponent combat)
+	/// <summary>
+	/// E — Dynamite Mine: place or detonate a mine on the ground.
+	/// The first press places a mine (visual sphere at ground level).
+	/// A second press or 3s timer detonates it with explosion VFX.
+	/// Server handles the actual hitbox/damage via ExplosiveMineSpec.
+	/// </summary>
+	public static void PlaceMine(CombatComponent combat)
 	{
-		Vector3 pos = combat.GetOwnerPosition();
-		StatusSpells.CreateImpactVisual(combat, pos + (Vector3.Down * 0.5f), 2.5f, new Color(1f, 0.6f, 0f));
-		StatusSpells.CreateCircleVisual(combat, pos, 3f, new Color(1f, 0.4f, 0f, 0.25f), 0.3f);
+	    SceneTree? tree = combat.GetTree();
+	    if (tree == null) return;
+
+	    // Read mine data from character definition
+	    float mineRadius = 0.3f;
+	    float explosionRadius = 2.5f;
+	    float autoDetonateSec = 3f;
+	    if (combat.GetOwnerNode() is PlayerController player)
+	    {
+	        var def = player.GetCharacterDef();
+	        if (def.E is ExplosiveMineSpec mineSpec)
+	        {
+	            mineRadius = mineSpec.MineRadius;
+	            explosionRadius = mineSpec.ExplosionConfig.Radius;
+	            autoDetonateSec = mineSpec.MineDurationTicks / 60f;
+	        }
+	    }
+
+	    Vector3 pos = combat.GetOwnerPosition();
+	    ulong ownerId = combat.GetOwnerNode()?.GetInstanceId() ?? 0;
+
+	    // Check if this owner already has a mine mesh
+	    if (_mineMeshes.TryGetValue(ownerId, out var existing) && GodotObject.IsInstanceValid(existing))
+	    {
+	        // Detonate: remove mine, show explosion
+	        existing.QueueFree();
+	        _mineMeshes.Remove(ownerId);
+	        StatusSpells.CreateImpactVisual(combat, existing.GlobalPosition, explosionRadius * 0.8f, new Color(1f, 0.6f, 0f));
+	        StatusSpells.CreateCircleVisual(combat, existing.GlobalPosition, explosionRadius, new Color(1f, 0.4f, 0f, 0.25f), 0.3f);
+	    }
+	    else
+	    {
+	        // Place: spawn mine mesh at feet using the data-driven radius
+	        pos.Y = 0.05f;
+	        var mine = new MeshInstance3D();
+	        var sphere = new SphereMesh { Radius = mineRadius, Height = mineRadius * 2f, RadialSegments = 12, Rings = 8 };
+	        var mat = new StandardMaterial3D
+	        {
+	            AlbedoColor = new Color(0.8f, 0.2f, 0.1f),
+	            EmissionEnabled = true,
+	            Emission = new Color(1f, 0.3f, 0f),
+	            EmissionEnergyMultiplier = 3f,
+	        };
+	        mine.Mesh = sphere;
+	        mine.MaterialOverride = mat;
+	        tree.CurrentScene?.AddChild(mine);
+	        mine.GlobalPosition = pos;
+	        _mineMeshes[ownerId] = mine;
+
+	        // Auto-remove after data-defined duration
+	        tree.CreateTimer(autoDetonateSec).Timeout += () =>
+	        {
+	            if (_mineMeshes.TryGetValue(ownerId, out var m) && m == mine && GodotObject.IsInstanceValid(mine))
+	            {
+	                StatusSpells.CreateImpactVisual(combat, mine.GlobalPosition, explosionRadius * 0.8f, new Color(1f, 0.6f, 0f));
+	                StatusSpells.CreateCircleVisual(combat, mine.GlobalPosition, explosionRadius, new Color(1f, 0.4f, 0f, 0.25f), 0.3f);
+	                mine.QueueFree();
+	                _mineMeshes.Remove(ownerId);
+	            }
+	        };
+	    }
 	}
+
+	private static readonly System.Collections.Generic.Dictionary<ulong, MeshInstance3D> _mineMeshes = new();
 
 	public static void DiveBomb(CombatComponent combat)
 	{

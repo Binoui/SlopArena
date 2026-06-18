@@ -174,18 +174,30 @@ public static partial class CharacterRegistry
                 },
             },
 
-            E = new AbilitySpec
+            E = new ExplosiveMineSpec
             {
-                Name = "Dynamite Jump",
-                CooldownTicks = 180,
+                Name = "Dynamite Mine",
+                CooldownTicks = 30,
+                MineRadius = 0.3f,
+                MineDurationTicks = 180,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 47, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 25, Radius = 0.6f, OffX = 0, OffY = 0f, OffZ = 0f, Damage = 5f, KnockbackForce = 4f, KnockbackUpward = 4f, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                    new() { DurationTicks = 20, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 1, Radius = 0.1f } },
+                            AttackRange = 0, WarpRange = 0, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_e" },
-                SpecialEffectKeys = new[] { "MankiDynamiteJump" },
+                SpecialEffectKeys = new[] { "MankiPlaceMine" },
+                ExplosionConfig = new ProjectileExplosion
+                {
+                    Radius = 2.5f,
+                    Damage = 5f,
+                    KnockbackForce = 5f,
+                    KnockbackUpward = 20f,
+                    StunTicks = 20,
+                    DurationTicks = 8,
+                    CanHitOwner = true,
+                },
             },
 
             R = new AbilitySpec

@@ -208,8 +208,8 @@ public partial class PlayerController : CharacterBody3D
         if (hitState != null)
         {
             hitState.HitAnimName = hitAnim;
-            ref var s = ref _movementComponent.State;
-            s.AnimLockTicks = 30;
+            // Match server's hitstun duration so animation lock equals actual hitstun
+            _movementComponent.State.AnimLockTicks = _movementComponent.State.HitstunTicks;
         }
         _fsm?.TransitionTo("hit_reaction");
     }
@@ -529,6 +529,7 @@ public partial class PlayerController : CharacterBody3D
 
             if (mb.ButtonIndex == MouseButton.Left && mb.Pressed && _combatComponent != null)
             {
+                if (GetSlotCooldown(0) > 0) return;
                 bool airborne = !_movementComponent.IsGrounded;
                 ActivateAbility(AbilityFactory.Create(0, airborne, _charDef));
                 GetViewport().SetInputAsHandled(); return;
@@ -536,6 +537,7 @@ public partial class PlayerController : CharacterBody3D
 
             if (mb.ButtonIndex == MouseButton.Right && mb.Pressed && _combatComponent != null)
             {
+                if (GetSlotCooldown(1) > 0) return;
                 bool airborne = !_movementComponent.IsGrounded;
                 ActivateAbility(AbilityFactory.Create(1, airborne, _charDef));
                 GetViewport().SetInputAsHandled(); return;
@@ -548,12 +550,25 @@ public partial class PlayerController : CharacterBody3D
 
         if (Input.IsActionJustPressed("ability_q"))
         {
+            if (GetSlotCooldown(2) > 0) return;
             ActivateAbility(AbilityFactory.Create(2, false, _charDef));
             GetViewport().SetInputAsHandled(); return;
         }
-        if (Input.IsActionJustPressed("ability_e")) ActivateAbility(AbilityFactory.Create(3, false, _charDef));
-        if (Input.IsActionJustPressed("ability_r")) ActivateAbility(AbilityFactory.Create(4, false, _charDef));
-        if (Input.IsActionJustPressed("ability_f")) ActivateAbility(AbilityFactory.Create(5, false, _charDef));
+        if (Input.IsActionJustPressed("ability_e"))
+        {
+            if (GetSlotCooldown(3) > 0) return;
+            ActivateAbility(AbilityFactory.Create(3, false, _charDef));
+        }
+        if (Input.IsActionJustPressed("ability_r"))
+        {
+            if (GetSlotCooldown(4) > 0) return;
+            ActivateAbility(AbilityFactory.Create(4, false, _charDef));
+        }
+        if (Input.IsActionJustPressed("ability_f"))
+        {
+            if (GetSlotCooldown(5) > 0) return;
+            ActivateAbility(AbilityFactory.Create(5, false, _charDef));
+        }
         if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
@@ -676,6 +691,13 @@ public partial class PlayerController : CharacterBody3D
 
             // Track combo stage for animation chaining
             _lastComboStage = _movementComponent.State.ComboStage;
+        }
+
+        // Hitstun FSM transition (fallback if OnCombatTakeDamage event didn't fire)
+        if (_fsm != null && simState == ActionState.Hitstun && !_fsm.IsInState("hit_reaction"))
+        {
+            _movementComponent.State.AnimLockTicks = _movementComponent.State.HitstunTicks;
+            _fsm.TransitionTo("hit_reaction");
         }
 
         // Dash FSM transition
