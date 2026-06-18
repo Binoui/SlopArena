@@ -124,5 +124,36 @@ namespace SlopArena.Shared
             float dz = z2 - z1;
             return MathF.Sqrt((dx * dx) + (dz * dz));
         }
+
+        /// <summary>
+        /// Compute projectile launch speed and horizontal/vertical components
+        /// for a targeted throw landing at a different height than launch.
+        ///
+        /// Formula: v² = g·D² / (2·cos²(θ)·(D·tan(θ) - dY))
+        /// where D = horizontal distance, dY = targetY - launchY (negative = lower),
+        /// θ = launch angle, g = gravity.
+        ///
+        /// Used by both client (arc visual) and server (hitbox velocity).
+        /// </summary>
+        /// <param name="targetDistance">Horizontal distance in meters (D).</param>
+        /// <param name="launchAngleRad">Launch angle above horizontal in radians.</param>
+        /// <param name="gravity">Gravity in m/s².</param>
+        /// <param name="heightOffset">Vertical displacement: targetY - launchY (negative when throwing downward).</param>
+        /// <param name="speed">Launch speed magnitude.</param>
+        /// <param name="hSpeed">Horizontal speed component.</param>
+        /// <param name="vSpeed">Vertical speed component (upward positive).</param>
+        public static void ComputeProjectileLaunch(
+            float targetDistance, float launchAngleRad, float gravity, float heightOffset,
+            out float speed, out float hSpeed, out float vSpeed)
+        {
+            float tanθ = MathF.Tan(launchAngleRad);
+            float cosθ = MathF.Cos(launchAngleRad);
+            float denom = 2f * cosθ * cosθ * (targetDistance * tanθ - heightOffset);
+            speed = denom > 0.001f
+                ? MathF.Sqrt(gravity * targetDistance * targetDistance / denom)
+                : MathF.Sqrt(targetDistance * gravity);
+            hSpeed = speed * cosθ;
+            vSpeed = speed * MathF.Sin(launchAngleRad);
+        }
     }
 }

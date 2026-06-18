@@ -60,55 +60,52 @@ namespace SlopArena.Shared
     }
 
     /// <summary>
-    /// Full definition of one ability slot (0-5).
-    /// Stages.Length = 1 for single hit, N for combo chains.
-    /// SpecialEffectKeys reference methods in AbilityRegistry for
-    /// effects that stages can't express (hitbox spawning, teleport, etc.).
-    /// AnimationNames per stage: "attack_2h_slice", "spell_cast", etc.
+    /// Config for a targeted projectile ability (hold-to-aim, release-to-throw).
+    /// The projectile trajectory is a parabolic arc computed from the client's
+    /// aim direction + distance.
     /// </summary>
-    public struct AbilityData
+    public struct ProjectileConfig
     {
-        public string Name;
+        /// <summary>Launch angle above horizontal in degrees (e.g., 30 = 30° arc).</summary>
+        public float LaunchAngleDeg;
+        /// <summary>Gravity applied to the projectile per tick (m/s²). Use sim gravity (35) for consistency.</summary>
+        public float Gravity;
+        /// <summary>Max targeting range in meters (e.g., 20).</summary>
+        public float MaxRange;
+        /// <summary>Hitbox radius for the projectile sphere.</summary>
+        public float HitboxRadius;
+        /// <summary>Launch height offset from character feet (e.g., 1.2 = hand height).</summary>
+        public float LaunchOffsetY;
+        /// <summary>Damage on direct hit.</summary>
+        public float Damage;
+        /// <summary>Horizontal knockback force.</summary>
+        public float KnockbackForce;
+        /// <summary>Vertical knockback (upward).</summary>
+        public float KnockbackUpward;
+        /// <summary>Stun ticks on hit.</summary>
+        public ushort StunTicks;
+        /// <summary>Max lifetime of the projectile in ticks (600 = 10 seconds, more than enough).</summary>
+        public ushort MaxFlightTicks;
         /// <summary>
-        /// 0 = no cooldown
+        /// Optional explosion on impact (entity hit or ground). If set, a spherical AoE
+        /// hitbox spawns at the projectile's last position when it deactivates.
         /// </summary>
-        public ushort CooldownTicks;
-        public AttackStage[] Stages;
-
-        /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
-        public AttackStage[] ChargedStages;
-        /// <summary>Ticks to hold before charged version fires.</summary>
-        public ushort ChargeHoldTicks;
-
-        /// <summary>Special effects (hitbox spawning, teleport, buff, delayed AoE). Keys in AbilityRegistry.</summary>
-        public string[] SpecialEffectKeys;
-
-        /// <summary>Animation name for each stage.
-        /// Each character defines their own animation keys.
-        /// Example: LMB = ["attack_2h_slice", "attack_2h_chop", "attack_2h_spin"]
-        /// </summary>
-        public string[] AnimationNames;
-
-        /// <summary>Optional aimed-charge config (e.g., RMB cone flamethrower).</summary>
-        public AimedChargeData? AimedCharge;
+        public ProjectileExplosion? Explosion;
     }
 
     /// <summary>
-    /// Config for an aimed charge ability.
-    /// Player enters a charge state with a ground-projected AoE indicator,
-    /// then releases to fire the attack.
+    /// Explosion spawned when a projectile hits an entity or the ground.
+    /// Larger radius, separate damage/knockback from the direct projectile hit.
     /// </summary>
-    public struct AimedChargeData
+    public struct ProjectileExplosion
     {
-        /// <summary>Animation to loop during charge.</summary>
-        public string ChargeAnimName;
-        /// <summary>Animation to play on release.</summary>
-        public string AttackAnimName;
-        /// <summary>Cone angle in degrees (e.g., 60 = 60° cone).</summary>
-        public float ConeAngle;
-        /// <summary>Cone length/range in world units.</summary>
-        public float ConeRange;
-        /// <summary>Max charge ticks for power scaling (0 = no scaling).</summary>
-        public ushort MaxChargeTicks;
+        public float Radius;
+        public float Damage;
+        public float KnockbackForce;
+        public float KnockbackUpward;
+        public ushort StunTicks;
+        /// <summary>Lifetime of the explosion hitbox in ticks.</summary>
+        public ushort DurationTicks;
     }
 }
+

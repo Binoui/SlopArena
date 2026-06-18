@@ -82,6 +82,9 @@ namespace SlopArena.Shared
             // FacingYaw (movement-facing) is handled by ProcessNormalMovement via Atan2
             float aimDeg = input.AimYaw * 0.01f;
             s.AimYaw = aimDeg * (MathF.PI / 180f);
+            // Store aim target distance (cm → m) for projectile abilities
+            s.AimTargetDistance = input.AimDistance * 0.01f;
+            s.IsAiming = input.IsAiming;
 
             // 1. Tick timers
             TickTimers(ref s);
@@ -136,41 +139,20 @@ namespace SlopArena.Shared
             // Buffer input if locked within window
             if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0) && s.BufferedSlot == 0)
             {
-                // Combo chain: same slot during attack → always buffer
-                // Don't buffer the click that STARTED the attack (elapsed==0)
-                if (s.State == ActionState.Attacking && input.ActiveSlot == s.AttackSlot &&
-                    s.AttackElapsedTicks > 0)
+                // Combo chain buffer: same slot during active attack
+                if (s.State == ActionState.Attacking && input.ActiveSlot == s.AttackSlot)
                 {
-                    var ability = input.ActiveSlot switch
-                    {
-                        1 => def.LMB,
-                        2 => def.RMB,
-                        3 => def.Q,
-                        4 => def.E,
-                        5 => def.R,
-                        6 => def.F,
-                        _ => def.LMB,
-                    };
-                    if (s.ComboStage < ability.Stages.Length - 1)
-                    {
-                        // Can't GD.Print here (shared lib), but buffer IS set
+                    bool airborne = !s.IsGrounded;
+                    var ability = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
+                    ushort cd = AbilityExecutor.GetCooldown(s, input.ActiveSlot);
+                    if (AbilityExecutor.CanBufferCombo(s, ability, cd))
                         s.BufferedSlot = input.ActiveSlot;
-                    }
                 }
                 // General buffer: within window of unlock
                 else if ((s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
                          (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
                 {
-                    ushort cd = input.ActiveSlot switch
-                    {
-                        1 => s.Cooldown0,
-                        2 => s.Cooldown1,
-                        3 => s.Cooldown2,
-                        4 => s.Cooldown3,
-                        5 => s.Cooldown4,
-                        6 => s.Cooldown5,
-                        _ => 0,
-                    };
+                    ushort cd = AbilityExecutor.GetCooldown(s, input.ActiveSlot);
                     if (cd == 0)
                         s.BufferedSlot = input.ActiveSlot;
                 }
@@ -497,94 +479,18 @@ namespace SlopArena.Shared
             if (s.AnimLockTicks > 0)
                 return;
 
-            var ability = s.AttackSlot switch
-            {
-                1 => def.LMB,
-                2 => def.RMB,
-                3 => def.Q,
-                4 => def.E,
-                5 => def.R,
-                6 => def.F,
-                _ => def.LMB,
-            };
-
-            // 1. Buffered chain (click during lock, set by buffer section)
-            if (s.BufferedSlot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
-            {
-                s.BufferedSlot = 0;
-                s.ComboStage++;
-                var nextStage = ability.Stages[s.ComboStage];
-                s.AnimLockTicks = nextStage.DurationTicks;
-                s.AttackElapsedTicks = 0;
-                return;
-            }
-
-            // 2. Immediate chain (click on same frame lock expired)
-            if (input.ActiveSlot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
-            {
-                input.ActiveSlot = 0; // consumed, prevent re-buffer below
-                s.ComboStage++;
-                var nextStage = ability.Stages[s.ComboStage];
-                s.AnimLockTicks = nextStage.DurationTicks;
-                s.AttackElapsedTicks = 0;
-                return;
-            }
-
-            // 3. No chaining → back to idle, keep BufferedSlot for consumption step 4.5
-            s.State = ActionState.Idle;
-            s.ComboStage = 0;
-            s.AttackSlot = 0;
-            s.AttackElapsedTicks = 0;
+            bool airborne = !s.IsGrounded;
+            var ability = def.GetSlotAbility(s.AttackSlot - 1, airborne);
+            AbilityExecutor.ProcessActive(ref s, ability, ref input);
         }
 
         /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.</summary>
         private static void StartAttackFromSlot(ref CharacterState s, CharacterDefinition def, byte slot)
         {
-            var ability = slot switch
-            {
-                1 => def.LMB,
-                2 => def.RMB,
-                3 => def.Q,
-                4 => def.E,
-                5 => def.R,
-                6 => def.F,
-                _ => def.LMB,
-            };
-
-            // Cooldown check
-            ushort cd = slot switch
-            {
-                1 => s.Cooldown0,
-                2 => s.Cooldown1,
-                3 => s.Cooldown2,
-                4 => s.Cooldown3,
-                5 => s.Cooldown4,
-                6 => s.Cooldown5,
-                _ => 0,
-            };
-            if (cd > 0) return;
-
-            // Combo chain: same slot, next stage exists
-            if (slot == s.AttackSlot && s.ComboStage < ability.Stages.Length - 1)
-            {
-                s.ComboStage++;
-                var stage = ability.Stages[s.ComboStage];
-                s.State = ActionState.Attacking;
-                s.AnimLockTicks = stage.DurationTicks;
-                s.AttackElapsedTicks = 0;
-                return;
-            }
-
-            // Fresh attack
-            if (ability.Stages.Length > 0)
-            {
-                var stage = ability.Stages[0];
-                s.State = ActionState.Attacking;
-                s.AnimLockTicks = stage.DurationTicks;
-                s.ComboStage = 0;
-                s.AttackElapsedTicks = 0;
-                s.AttackSlot = slot;
-            }
+            bool airborne = !s.IsGrounded;
+            var ability = def.GetSlotAbility(slot - 1, airborne);
+            ushort cd = AbilityExecutor.GetCooldown(s, slot);
+            AbilityExecutor.TryStart(ref s, ability, slot, cd);
         }
 
         /// <summary>
@@ -728,12 +634,11 @@ namespace SlopArena.Shared
                 // - During attack animation (AnimLockTicks > 0): no gravity, maintain position
                 // - During dash: no gravity, maintains horizontal momentum
                 // - After float ends: gravity resumes naturally from current VY (starts slow)
-                if (s.AnimLockTicks > 0 || s.State == ActionState.Dashing || s.State == ActionState.Attacking)
+                if (s.AnimLockTicks > 0 || s.State == ActionState.Dashing || s.State == ActionState.Attacking || s.IsAiming)
                 {
-                    // Gentle downward drift during float (not full gravity)
-                    // Attack float: almost zero movement
+                    float floatG = stats.AirFloatGravity > 0 ? stats.AirFloatGravity : 6f;
                     if (s.VY > -3f)
-                        s.VY -= 6f * TickDt; // ~6 m/s² drift (vs full gravity 35-42)
+                        s.VY -= floatG * TickDt;
                 }
                 else
                 {

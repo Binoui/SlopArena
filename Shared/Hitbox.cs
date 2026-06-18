@@ -43,5 +43,16 @@ namespace SlopArena.Shared
         public ulong OwnerId;
 
         public bool Active;
+
+        /// <summary>
+        /// Gravity applied each tick (m/s²). 0 = no gravity (default for melee hitboxes).
+        /// </summary>
+        public float Gravity;
+
+        /// <summary>
+        /// Optional explosion spawned when this hitbox deactivates (hits entity or expires).
+        /// Used by projectiles to create an AoE burst on impact.
+        /// </summary>
+        public ProjectileExplosion? Explosion;
     }
 }

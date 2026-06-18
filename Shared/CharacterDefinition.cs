@@ -19,6 +19,8 @@ namespace SlopArena.Shared
         public float AirAcceleration;
         public float JumpForce;
         public float Gravity;
+        /// <summary>Reduced gravity while attacking/aiming in the air (m/s²). Default 6f.</summary>
+        public float AirFloatGravity;
         public ushort DashDurationTicks;
         public ushort DashCooldownTicks;
         public float GroundFriction;
@@ -94,16 +96,16 @@ namespace SlopArena.Shared
         /// </summary>
         public float VisualScale;
 
-        public AbilityData LMB;
-        public AbilityData RMB;
-        public AbilityData AirLMB;
-        public AbilityData AirRMB;
-        public AbilityData Q;
-        public AbilityData E;
-        public AbilityData R;
-        public AbilityData F;
+        public AbilitySpec LMB;
+        public AbilitySpec RMB;
+        public AbilitySpec AirLMB;
+        public AbilitySpec AirRMB;
+        public AbilitySpec Q;
+        public AbilitySpec E;
+        public AbilitySpec R;
+        public AbilitySpec F;
 
-        public readonly AbilityData GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
+        public readonly AbilitySpec GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
             (0, true) => AirLMB,
             (1, true) => AirRMB,

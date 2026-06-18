@@ -9,21 +9,9 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, CharacterState> _states = new();
 		private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
 		private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
-		/// <summary>
-		/// current frame per entity
-		/// </summary>
 		private readonly Dictionary<ulong, int> _animFrames = new();
-		/// <summary>
-		/// for edge detection
-		/// </summary>
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
-		/// <summary>
-		/// for edge detection
-		/// </summary>
 		private readonly Dictionary<ulong, bool> _prevAttack = new();
-		/// <summary>
-		/// cached for debug
-		/// </summary>
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		private readonly SpellResolver _spellResolver = new();
 
@@ -49,71 +37,45 @@ namespace SlopArena.Shared
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
-		/// <summary>Entity data from last Tick (for debug visualization).</summary>
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
-		/// <summary>Spell resolver instance (for debug visualization).</summary>
 		public SpellResolver Resolver => _spellResolver;
 
-		/// <summary>
-		/// Build hurtbox entity list from a single CharacterState + definition.
-		/// Static — usable from client code to reconstruct the server's entity view.
-		/// </summary>
 		public static List<SpellResolver.EntityData> BuildEntitiesFromState(
 			CharacterState state, CharacterDefinition def, BakedAnimationData baked,
 			string targetAnim, int animFrame)
 		{
 			var list = new List<SpellResolver.EntityData>();
-
 			if (baked != null && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
 			{
 				int animIdx = baked.FindAnimIndex(targetAnim);
-				// Fallback to idle if animation not in baked data
-				if (animIdx < 0)
-				{
-					targetAnim = "idle";
-					animIdx = baked.FindAnimIndex(targetAnim);
-				}
+				if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
 				if (animIdx >= 0)
 				{
-					// Clamp frame
 					int fc = baked.Animations[animIdx].FrameCount;
 					if (animFrame >= fc) animFrame = fc - 1;
-
 					float px = state.PX, py = state.PY, pz = state.PZ;
 					float yaw = state.FacingYaw;
 					float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
 					float scale = def.HurtboxBoneScale;
-
 					for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
 					{
 						var hbd = def.HurtboxBoneDefs[bi];
-						if (!baked.GetBonePosition(targetAnim, animFrame, bi, out float bx, out float by, out float bz))
-							continue;
-
+						if (!baked.GetBonePosition(targetAnim, animFrame, bi, out float bx, out float by, out float bz)) continue;
 						bx *= scale; by *= scale; bz *= scale;
 						float wx = px + ((bx * cos) + (bz * sin));
 						float wy = py - def.CapsuleHeight * 0.5f + by;
 						float wz = pz + ((-bx * sin) + (bz * cos));
-
 						list.Add(new SpellResolver.EntityData
 						{
-							Id = 0,
-							PosX = wx,
-							PosY = wy,
-							PosZ = wz,
-							Radius = hbd.Radius,
-							Shape = HitboxShape.Sphere,
-							EndX = wx,
-							EndY = wy,
-							EndZ = wz,
-							Active = true,
+							Id = 0, PosX = wx, PosY = wy, PosZ = wz,
+							Radius = hbd.Radius, Shape = HitboxShape.Sphere,
+							EndX = wx, EndY = wy, EndZ = wz, Active = true,
 						});
 					}
 				}
 			}
 			else
 			{
-				// Fallback: fixed capsules
 				float cos = MathF.Cos(state.FacingYaw);
 				float sin = MathF.Sin(state.FacingYaw);
 				foreach (var cap in def.HurtboxCapsules)
@@ -126,19 +88,12 @@ namespace SlopArena.Shared
 					float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
 					list.Add(new SpellResolver.EntityData
 					{
-						PosX = sx,
-						PosY = sy,
-						PosZ = sz,
-						Radius = cap.Radius,
+						PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
 						Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
-						EndX = ex,
-						EndY = ey,
-						EndZ = ez,
-						Active = true,
+						EndX = ex, EndY = ey, EndZ = ez, Active = true,
 					});
 				}
 			}
-
 			return list;
 		}
 
@@ -155,7 +110,7 @@ namespace SlopArena.Shared
 				_states[id] = state;
 			}
 
-			// ── Step 2: Build entity list ──
+			// ── Step 2: Build entity list for hit detection ──
 			var entityList = new List<SpellResolver.EntityData>();
 			foreach (var kvp in _states)
 			{
@@ -163,63 +118,34 @@ namespace SlopArena.Shared
 				var state = kvp.Value;
 				var def = _defs[id];
 
-				// Use baked skeleton data for precise bone positions
 				if (_bakedData.TryGetValue(id, out var baked) && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
 				{
-					// Determine animation from action state
 					string targetAnim;
-					if (state.State == ActionState.Dashing)
-						targetAnim = "dash";
+					if (state.State == ActionState.Dashing) targetAnim = "dash";
 					else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
 					{
-						// Look up animation from the actual ability (respects airborne)
 						bool airborne = !state.IsGrounded;
 						var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
 						int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-						if (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length)
-							targetAnim = ability.AnimationNames[stageIdx];
-						else
-							targetAnim = "melee";
+						targetAnim = (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length) ? ability.AnimationNames[stageIdx] : "melee";
 					}
-					else if (state.State == ActionState.Hitstun)
-						targetAnim = "small_hit";
-					else if (!state.IsGrounded)
-						targetAnim = state.VY > 0 ? "jump" : "fall";
-					else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f)
-						targetAnim = "run";
-					else
-						targetAnim = "idle";
+					else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
+					else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
+					else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
+					else targetAnim = "idle";
 
 					int animIdx = baked.FindAnimIndex(targetAnim);
-					// Fallback to idle if the animation isn't in the baked data
-					// (air attacks, spells — not all GLB animations are baked)
-					if (animIdx < 0)
-					{
-						targetAnim = "idle";
-						animIdx = baked.FindAnimIndex(targetAnim);
-					}
+					if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
 					if (animIdx >= 0)
 					{
 						int fc = baked.Animations[animIdx].FrameCount;
-
-						// Track tick (1 tick = 1 frame at 60fps)
 						int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
 						int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
-						if (prevAnim != animIdx)
-						{
-							frame = 0;
-							_prevAnimIndex[id] = animIdx;
-						}
-
-						// Advance tick counter, wrapping for looping animations
+						if (prevAnim != animIdx) { frame = 0; _prevAnimIndex[id] = animIdx; }
 						int nextFrame = frame + 1;
 						if (nextFrame >= fc) nextFrame = 0;
 						_animFrames[id] = nextFrame;
 
-						// Map tick → baked frame using DurationTicks so server
-						// hurtbox positions match the client's TimeScale playback.
-						// For attack animations: bakedFrame = tick * fc / DurationTicks
-						// For looping animations (idle/run/etc): use raw frame (= TimeScale 1.0)
 						int bakedFrame = frame;
 						if (state.State == ActionState.Attacking && state.AttackSlot > 0)
 						{
@@ -229,8 +155,7 @@ namespace SlopArena.Shared
 							if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
 							{
 								int durationTicks = ability.Stages[stageIdx].DurationTicks;
-								if (durationTicks > 0)
-									bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+								if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
 							}
 						}
 
@@ -241,39 +166,24 @@ namespace SlopArena.Shared
 						for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
 						{
 							var hbd = def.HurtboxBoneDefs[bi];
-							if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz))
-								continue;
-
-							// Apply bone scale (Mixamo cm → m = 0.01, native m = 1.0)
+							if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz)) continue;
 							float scale = def.HurtboxBoneScale;
 							bx *= scale; by *= scale; bz *= scale;
-
-							// Bone → world: rotate by yaw, then add character position
-							// py is capsule center; baked Y=0 at ground, so subtract capsuleHalf
 							float wx = px + ((bx * cos) + (bz * sin));
 							float wy = py - def.CapsuleHeight * 0.5f + by;
 							float wz = pz + ((-bx * sin) + (bz * cos));
 							wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
-
 							entityList.Add(new SpellResolver.EntityData
 							{
-								Id = id,
-								PosX = wx,
-								PosY = wy,
-								PosZ = wz,
-								Radius = hbd.Radius,
-								Shape = HitboxShape.Sphere,
-								EndX = wx,
-								EndY = wy,
-								EndZ = wz,
-								Active = true,
+								Id = id, PosX = wx, PosY = wy, PosZ = wz,
+								Radius = hbd.Radius, Shape = HitboxShape.Sphere,
+								EndX = wx, EndY = wy, EndZ = wz, Active = true,
 							});
 						}
 					}
 				}
 				else
 				{
-					// Fallback: fixed capsules
 					float cos = MathF.Cos(state.FacingYaw);
 					float sin = MathF.Sin(state.FacingYaw);
 					foreach (var cap in def.HurtboxCapsules)
@@ -286,69 +196,80 @@ namespace SlopArena.Shared
 						float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
 						entityList.Add(new SpellResolver.EntityData
 						{
-							Id = id,
-							PosX = sx,
-							PosY = sy,
-							PosZ = sz,
-							Radius = cap.Radius,
+							Id = id, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
 							Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
-							EndX = ex,
-							EndY = ey,
-							EndZ = ez,
-							Active = true,
+							EndX = ex, EndY = ey, EndZ = ez, Active = true,
 						});
 					}
 				}
 			}
 
-			// ── Spawn hitbox events for all attacking entities ──
+			// ── Spawn hitbox events for attacking entities ──
 			foreach (var kvp in _states)
 			{
 				ulong id = kvp.Key;
 				var state = kvp.Value;
 				var def = _defs[id];
-				if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+				if (state.State != ActionState.Attacking || state.AttackSlot == 0) continue;
+
+				bool airborne = !state.IsGrounded;
+				var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+				int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+				if (stageIdx < 0 || stageIdx >= ability.Stages.Length) continue;
+
+				var stage = ability.Stages[stageIdx];
+				if (stage.HitboxEvents == null) continue;
+
+				float cos = MathF.Cos(state.FacingYaw);
+				float sin = MathF.Sin(state.FacingYaw);
+				foreach (var evt in stage.HitboxEvents)
 				{
-					bool airborne = !state.IsGrounded;
-					var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-					int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-					if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+					if (state.AttackElapsedTicks != evt.TriggerTick) continue;
+
+					if (ability is RoundBombSpec roundBomb)
 					{
-						var stage = ability.Stages[stageIdx];
-						if (stage.HitboxEvents != null)
+						// ── Targeted projectile (velocity from aim) ──
+						var pc = roundBomb.ProjectileConfig;
+						float D = Math.Clamp(state.AimTargetDistance, 0.5f, pc.MaxRange);
+						float launchRad = pc.LaunchAngleDeg * (MathF.PI / 180f);
+						float g = pc.Gravity;
+						float dY = -def.CapsuleHeight * 0.5f - pc.LaunchOffsetY;
+
+						CombatMath.ComputeProjectileLaunch(D, launchRad, g, dY,
+							out float _, out float hSpeed, out float vSpeed);
+
+						float aimCos = MathF.Cos(state.AimYaw);
+						float aimSin = MathF.Sin(state.AimYaw);
+						float cosθ = MathF.Cos(launchRad);
+
+						_spellResolver.Spawn(new Hitbox
 						{
-							float cos = MathF.Cos(state.FacingYaw);
-							float sin = MathF.Sin(state.FacingYaw);
-							foreach (var evt in stage.HitboxEvents)
-							{
-								if (state.AttackElapsedTicks == evt.TriggerTick)
-								{
-									float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
-									float hy = state.PY + evt.OffY;
-									float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
-									float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
-									float hey = hy + evt.EndOffY;
-									float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
-									_spellResolver.Spawn(new Hitbox
-									{
-										X = hx,
-										Y = hy,
-										Z = hz,
-										Radius = evt.Radius,
-										Shape = evt.Shape,
-										EndX = hex,
-										EndY = hey,
-										EndZ = hez,
-										Damage = evt.Damage,
-										KnockbackForce = evt.KnockbackForce,
-										KnockbackUpward = evt.KnockbackUpward,
-										StunTicks = evt.StunTicks,
-										DurationTicks = evt.DurationTicks,
-										OwnerId = id,
-									});
-								}
-							}
-						}
+							X = state.PX, Y = state.PY + pc.LaunchOffsetY, Z = state.PZ,
+							VX = hSpeed * aimSin, VY = vSpeed, VZ = hSpeed * aimCos,
+							Radius = pc.HitboxRadius, Shape = HitboxShape.Sphere,
+							EndX = state.PX, EndY = state.PY, EndZ = state.PZ,
+							Damage = pc.Damage, KnockbackForce = pc.KnockbackForce,
+							KnockbackUpward = pc.KnockbackUpward, StunTicks = pc.StunTicks,
+							DurationTicks = pc.MaxFlightTicks, OwnerId = id, Gravity = g,
+							Explosion = pc.Explosion,
+						});
+					}
+					else
+					{
+						// ── Melee/static hitbox ──
+						float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
+						float hy = state.PY + evt.OffY;
+						float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
+						float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
+						float hey = hy + evt.EndOffY;
+						float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
+						_spellResolver.Spawn(new Hitbox
+						{
+							X = hx, Y = hy, Z = hz, Radius = evt.Radius, Shape = evt.Shape,
+							EndX = hex, EndY = hey, EndZ = hez, Damage = evt.Damage,
+							KnockbackForce = evt.KnockbackForce, KnockbackUpward = evt.KnockbackUpward,
+							StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
+						});
 					}
 				}
 			}
@@ -357,36 +278,50 @@ namespace SlopArena.Shared
 			_lastEntityList = entityList;
 			foreach (var hit in _spellResolver.Tick(entityList))
 			{
-				if (_states.TryGetValue(hit.TargetEntityId, out var targetState))
+				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
+				float finalDamage = hit.Damage;
+				targetState.DamagePercent += (ushort)finalDamage;
+				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
+				Simulation.ApplyKnockback(ref targetState, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
+				targetState.HitstunTicks = hit.StunTicks;
+				_states[hit.TargetEntityId] = targetState;
+			}
+
+			// ── Step 3b: Projectile explosions (entity hit + ground impact) ──
+			// Ground collision for remaining active projectiles
+			_spellResolver.CheckGroundCollision(_arena.FloorHeight);
+
+			// Spawn explosion hitboxes for all deactivated projectiles this tick
+			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
+			{
+				_spellResolver.Spawn(new Hitbox
 				{
-					float finalDamage = hit.Damage;
-					targetState.DamagePercent += (ushort)finalDamage;
-					if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
-					Simulation.ApplyKnockback(ref targetState, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
-					targetState.HitstunTicks = hit.StunTicks;
-					_states[hit.TargetEntityId] = targetState;
-				}
+					X = ex, Y = ey, Z = ez,
+					Radius = explosion.Radius, Shape = HitboxShape.Sphere,
+					EndX = ex, EndY = ey, EndZ = ez,
+					Damage = explosion.Damage,
+					KnockbackForce = explosion.KnockbackForce,
+					KnockbackUpward = explosion.KnockbackUpward,
+					StunTicks = explosion.StunTicks,
+					DurationTicks = explosion.DurationTicks,
+					OwnerId = ownerId,
+				});
 			}
 
 			// ── Step 4: Void death check ──
 			var deadIds = new List<ulong>();
 			foreach (var kvp in _states)
-				if (kvp.Value.PY < _arena.KillHeight)
-					deadIds.Add(kvp.Key);
+				if (kvp.Value.PY < _arena.KillHeight) deadIds.Add(kvp.Key);
 			foreach (var id in deadIds)
 			{
-				var def = _defs[id];
+				var d = _defs[id];
 				var oldState = _states[id];
 				_states[id] = new CharacterState
 				{
-					PX = _arena.SpawnPoints[0].X,
-					PY = _arena.SpawnPoints[0].Y,
-					PZ = _arena.SpawnPoints[0].Z,
+					PX = _arena.SpawnPoints[0].X, PY = _arena.SpawnPoints[0].Y, PZ = _arena.SpawnPoints[0].Z,
 					FacingYaw = _arena.SpawnPoints[0].Yaw,
-					JumpsLeft = def.Movement.MaxJumps,
-					AirDodgesLeft = 1,
-					Deaths = (byte)(oldState.Deaths + 1),
-					DamagePercent = 0,
+					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
+					Deaths = (byte)(oldState.Deaths + 1), DamagePercent = 0,
 				};
 			}
 		}

@@ -105,6 +105,10 @@ namespace SlopArena.Shared
         public float FacingYaw;          // radians, +Z = 0
         /// <summary>Combat aim yaw in radians — sent by client, used for hitboxes/hurtboxes.</summary>
         public float AimYaw;
+        /// <summary>Target distance for projectile aim (meters). Set from InputState.AimDistance each tick.</summary>
+        public float AimTargetDistance;
+        /// <summary>True while player is holding an aim-to-fire ability (RMB charge, Q throw).</summary>
+        public bool IsAiming;
 
         /// <summary>
         /// ── Sprint / Dash-dance ──

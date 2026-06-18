@@ -7,7 +7,7 @@ using Godot;
 /// that lasts for a specified duration.
 ///
 /// These are the ONLY remaining part of the old wizard arena StatusSpells.
-/// All spell effect methods were removed — abilities now use AbilityData + AttackStage
+/// All spell effect methods were removed — abilities now use AbilitySpec + AttackStage
 /// from CharacterDefinition for gameplay, and ClassAbilities for special effects.
 /// </summary>
 public static class StatusSpells

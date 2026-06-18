@@ -24,6 +24,7 @@ public static partial class CharacterRegistry
                 AirAcceleration = 16f,
                 JumpForce = 14f,
                 Gravity = 34f,
+                AirFloatGravity = 6f,
                 DashDurationTicks = 8,
                 DashCooldownTicks = 48,
                 GroundFriction = 16f,
@@ -61,7 +62,7 @@ public static partial class CharacterRegistry
 
             // ═══ ABILITIES ═══
 
-            LMB = new AbilityData
+            LMB = new AbilitySpec
             {
                 Name = "Rabbit Combo",
                 CooldownTicks = 0,
@@ -80,7 +81,7 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
             },
 
-            AirLMB = new AbilityData
+            AirLMB = new AbilitySpec
             {
                 Name = "Rising Bun",
                 CooldownTicks = 0,
@@ -93,7 +94,7 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_lmb_air" },
             },
 
-            RMB = new AbilityData
+            RMB = new AbilitySpec
             {
                 Name = "Carrot Slam",
                 CooldownTicks = 45,
@@ -107,7 +108,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "BunnyCarrotSlam" },
             },
 
-            AirRMB = new AbilityData
+            AirRMB = new AbilitySpec
             {
                 Name = "Helicopter",
                 CooldownTicks = 0,
@@ -120,13 +121,13 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_air" },
             },
 
-            Q = new AbilityData
+            Q = new AbilitySpec
             {
                 Name = "Whirling Carrot",
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 30, ChainWindowTicks = 0,
+                    new() { DurationTicks = 60, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, KnockbackForce = 3f, KnockbackUpward = 2f, StunTicks = 6, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 8f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                 },
@@ -134,7 +135,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "BunnyWhirlingCarrot" },
             },
 
-            E = new AbilityData
+            E = new AbilitySpec
             {
                 Name = "Flip Kick",
                 CooldownTicks = 75,
@@ -148,7 +149,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "BunnyFlipKick" },
             },
 
-            R = new AbilityData
+            R = new AbilitySpec
             {
                 Name = "Dragon's Kick",
                 CooldownTicks = 120,
@@ -162,7 +163,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "BunnyDragonKick" },
             },
 
-            F = new AbilityData
+            F = new AbilitySpec
             {
                 Name = "Jade Hare",
                 CooldownTicks = 450,
