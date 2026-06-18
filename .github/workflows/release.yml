@@ -1,26 +1,85 @@
-name: Create Release
+name: Export & Release
 
 on:
   push:
     branches: [release]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  export-windows:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Generate next version tag
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Export Windows
+        id: export
+        uses: firebelley/godot-export@v6
+        with:
+          godot_version: 4.6.3
+          godot_dotnet: true
+          platform: windows
+          preset_name: Windows Desktop
+          project_path: "."
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlopArena-windows
+          path: |
+            build/windows/
+          if-no-files-found: error
+
+  export-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Export Linux
+        id: export
+        uses: firebelley/godot-export@v6
+        with:
+          godot_version: 4.6.3
+          godot_dotnet: true
+          platform: linux
+          preset_name: Linux
+          project_path: "."
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlopArena-linux
+          path: |
+            build/linux/
+          if-no-files-found: error
+
+  release:
+    needs: [export-windows, export-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Generate tag
         id: tag
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "latest=$LATEST_TAG"
-          # Strip 'v' prefix, split, bump patch
           IFS='.' read -r -a PARTS <<< "${LATEST_TAG#v}"
           MAJOR=${PARTS[0]:-0}
           MINOR=${PARTS[1]:-0}
@@ -28,10 +87,17 @@ jobs:
           NEW_TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
           echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Package releases
+        run: |
+          mkdir -p release
+          zip -r release/SlopArena-windows.zip SlopArena-windows/ -x "*.pdb"
+          tar -czf release/SlopArena-linux.tar.gz SlopArena-linux/ --exclude="*.pdb"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.new_tag }}
           name: ${{ steps.tag.outputs.new_tag }}
           target_commitish: ${{ github.sha }}
+          files: release/*
           generate_release_notes: true

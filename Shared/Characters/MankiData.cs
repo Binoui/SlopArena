@@ -38,6 +38,7 @@ public static partial class CharacterRegistry
                 AirAcceleration = 14f,
                 JumpForce = 10f,
                 Gravity = 35f,
+                AirFloatGravity = 6f,
                 DashDurationTicks = 8,
                 DashCooldownTicks = 56,
                 GroundFriction = 14f,
@@ -65,7 +66,7 @@ public static partial class CharacterRegistry
 
             // ═══ ABILITIES ═══
 
-            LMB = new AbilityData
+            LMB = new AbilitySpec
             {
                 Name = "Monkey Combo",
                 CooldownTicks = 0,
@@ -84,7 +85,7 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
             },
 
-            AirLMB = new AbilityData
+            AirLMB = new AbilitySpec
             {
                 Name = "Air Punch",
                 CooldownTicks = 0,
@@ -98,7 +99,7 @@ public static partial class CharacterRegistry
             },
 
             // RMB — charged cone flamethrower
-            RMB = new AbilityData
+            RMB = new AerosolFlameSpec
             {
                 Name = "Aerosol + Lighter",
                 CooldownTicks = 30,
@@ -115,19 +116,15 @@ public static partial class CharacterRegistry
                             AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargeHoldTicks = 45,
-                AnimationNames = new[] { "spell_rmb_loop" },
+                AnimationNames = new[] { "spell_rmb_attack" },
                 SpecialEffectKeys = new[] { "MankiAerosolFlame" },
-                AimedCharge = new AimedChargeData
-                {
-                    ChargeAnimName = "spell_rmb_loop",
-                    AttackAnimName = "spell_rmb_attack",
-                    ConeAngle = 60f,
-                    ConeRange = 15f,
-                    MaxChargeTicks = 45,
-                },
+                ChargeAnimName = "spell_rmb_loop",
+                ConeAngle = 60f,
+                ConeRange = 15f,
+                MaxChargeTicks = 45,
             },
 
-            AirRMB = new AbilityData
+            AirRMB = new AbilitySpec
             {
                 Name = "Drop Kick",
                 CooldownTicks = 0,
@@ -140,21 +137,44 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_air" },
             },
 
-            Q = new AbilityData
+            Q = new RoundBombSpec
             {
                 Name = "Round Bomb",
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 30, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 14, Radius = 0.6f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                    new() { DurationTicks = 60, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 0.6f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, StunTicks = 14, Interruptible = false } },
+                            AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_q" },
                 SpecialEffectKeys = new[] { "MankiRoundBomb" },
+                LoopAnimName = "spell_q_loop",
+                ProjectileConfig = new ProjectileConfig
+                {
+                    LaunchAngleDeg = 30f,
+                    Gravity = 30f,
+                    MaxRange = 12f,
+                    HitboxRadius = 0.6f,
+                    LaunchOffsetY = 1.2f,
+                    Damage = 8f,
+                    KnockbackForce = 10f,
+                    KnockbackUpward = 6f,
+                    StunTicks = 14,
+                    MaxFlightTicks = 90,
+                    Explosion = new ProjectileExplosion
+                    {
+                        Radius = 2.5f,
+                        Damage = 6f,
+                        KnockbackForce = 6f,
+                        KnockbackUpward = 4f,
+                        StunTicks = 10,
+                        DurationTicks = 8,
+                    },
+                },
             },
 
-            E = new AbilityData
+            E = new AbilitySpec
             {
                 Name = "Dynamite Jump",
                 CooldownTicks = 180,
@@ -168,7 +188,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "MankiDynamiteJump" },
             },
 
-            R = new AbilityData
+            R = new AbilitySpec
             {
                 Name = "Dive Bomb",
                 CooldownTicks = 240,
@@ -182,7 +202,7 @@ public static partial class CharacterRegistry
                 SpecialEffectKeys = new[] { "MankiDiveBomb" },
             },
 
-            F = new AbilityData
+            F = new AbilitySpec
             {
                 Name = "Big Boom",
                 CooldownTicks = 600,

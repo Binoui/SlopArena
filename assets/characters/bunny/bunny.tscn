@@ -7,9 +7,9 @@
 [ext_resource type="Script" uid="uid://dyo0kq8c3kkno" path="res://Scripts/Animation/States/AirState.cs" id="5_f6xia"]
 [ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="6_oin5n"]
 [ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="7_jepol"]
-[ext_resource type="Script" uid="uid://1u3xeyilh8ck" path="res://Scripts/Animation/States/AimedChargeState.cs" id="8_v5j0v"]
 [ext_resource type="Script" uid="uid://wu75iehvao7o" path="res://Scripts/Animation/States/DashState.cs" id="9_poyq5"]
 [ext_resource type="Script" uid="uid://bn2tc7gwfuvan" path="res://Scripts/Animation/States/HitReactionState.cs" id="10_rl3hh"]
+[ext_resource type="Script" path="res://Scripts/Animation/States/AimedChargeState.cs" id="8_v5j0v"]
 
 [sub_resource type="AnimationNodeAnimation" id="anim_idle"]
 animation = &"idle"
