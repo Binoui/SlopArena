@@ -63,6 +63,27 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
+        /// Remove an active hitbox owned by ownerId that matches the predicate,
+        /// queue its explosion (if any), and return true. Useful for manual
+        /// detonation of deployable abilities (mines, traps, etc.).
+        /// </summary>
+        public bool RemoveHitbox(ulong ownerId, Func<Hitbox, bool> predicate)
+        {
+            for (int i = _hitboxes.Count - 1; i >= 0; i--)
+            {
+                var hb = _hitboxes[i];
+                if (!hb.Active || hb.OwnerId != ownerId) continue;
+                if (!predicate(hb)) continue;
+
+                if (hb.Explosion.HasValue)
+                    _pendingExplosions.Add((hb.X, hb.Y, hb.Z, hb.Explosion.Value, hb.OwnerId));
+                _hitboxes.RemoveAt(i);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Clear all hitboxes (e.g., on match reset).
         /// </summary>
         public void Clear() => _hitboxes.Clear();
@@ -141,7 +162,8 @@ namespace SlopArena.Shared
                 // Check collision against each entity
                 foreach (var entity in entities)
                 {
-                    if (!entity.Active || entity.Id == hb.OwnerId) continue;
+                    if (!entity.Active) continue;
+                    if (!hb.CanHitOwner && entity.Id == hb.OwnerId) continue;
                     if (hitThisTick.Contains(entity.Id)) continue;
 
                     bool hit = false;
@@ -193,8 +215,8 @@ namespace SlopArena.Shared
                 hb.AgeTicks++;
                 if (hb.AgeTicks >= hb.DurationTicks || !hb.Active)
                 {
-                    // Queue explosion if this projectile has one (use pre-move position)
-                    if (hb.Explosion.HasValue && hb.Gravity > 0f)
+                    // Queue explosion if this has one (use pre-move position)
+                    if (hb.Explosion.HasValue)
                         _pendingExplosions.Add((prevX, prevY, prevZ, hb.Explosion.Value, hb.OwnerId));
                     _hitboxes.RemoveAt(i);
                 }

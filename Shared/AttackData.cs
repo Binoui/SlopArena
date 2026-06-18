@@ -104,8 +104,9 @@ namespace SlopArena.Shared
         public float KnockbackForce;
         public float KnockbackUpward;
         public ushort StunTicks;
-        /// <summary>Lifetime of the explosion hitbox in ticks.</summary>
         public ushort DurationTicks;
+        /// <summary>If true, this explosion can hit its spawner (mine jump, etc.).</summary>
+        public bool CanHitOwner;
     }
 }
 
