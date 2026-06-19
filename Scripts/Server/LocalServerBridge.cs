@@ -93,6 +93,7 @@ public partial class LocalServerBridge : Node
         body.Velocity = new Vector3(state.VX, state.VY, state.VZ);
 
         // Facing
+        GD.Print($"[ServerBridge] FacingYaw={state.FacingYaw:F3} VX={state.VX:F2} VZ={state.VZ:F2}");
         body.GlobalRotation = new Vector3(0f, state.FacingYaw, 0f);
     }
 

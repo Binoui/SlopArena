@@ -31,6 +31,7 @@ public static partial class CharacterRegistry
                 AirFriction = 0.5f,
                 MaxFallSpeed = 48f,
                 MaxJumps = 2,
+                JumpDurationTicks = 28,
             },
 
             HurtboxCapsules = new HurtboxCapsule[]
@@ -59,6 +60,11 @@ public static partial class CharacterRegistry
             HurtboxBoneScale = 0.022f,
             ModelSoleOffset = 1.1f,
             AutoModelYOffset = true,
+
+            // Bunny GLB uses "hit_small"/"hit_medium"/"hit_hard" (not Mixamo defaults)
+            HitSmallAnim = "hit_small",
+            HitMediumAnim = "hit_medium",
+            HitHardAnim = "hit_hard",
 
             // ═══ ABILITIES ═══
 
