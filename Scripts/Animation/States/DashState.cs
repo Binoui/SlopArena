@@ -50,7 +50,7 @@ public sealed partial class DashState : State
         }
         else
         {
-            StateMachine.TransitionTo("air");
+            StateMachine.TransitionTo("fall");
         }
     }
 }

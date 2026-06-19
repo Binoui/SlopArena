@@ -54,6 +54,6 @@ public sealed partial class HitReactionState : State
         if (Movement.IsGrounded)
             StateMachine.TransitionTo("idle");
         else
-            StateMachine.TransitionTo("air");
+            StateMachine.TransitionTo("fall");
     }
 }

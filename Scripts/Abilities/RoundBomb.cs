@@ -33,7 +33,7 @@ public class RoundBomb : Ability
         _fired = false;
 
         // Self-setup: camera yaw + π offset (camera looks -Z, server AimYaw=0 means +Z)
-        _aimYaw = player.GetCameraYaw() + Mathf.Pi;
+        _aimYaw = player.GetCameraYaw();
         _targetDistance = Spec.ProjectileConfig.MaxRange;
         _sceneRoot = player.GetParent();
 
@@ -128,8 +128,11 @@ public class RoundBomb : Ability
 
         Vector3 targetPos = player.GlobalPosition;
         targetPos.X += aimSin * _targetDistance;
-        targetPos.Z += aimCos * _targetDistance;
+        targetPos.Z -= aimCos * _targetDistance;
         targetPos.Y = _groundY;
+
+        GD.Print($"[Q] _aimYaw={_aimYaw:F3} camYaw={player.GetCameraYaw():F3} sin={aimSin:F3} cos={aimCos:F3}");
+        GD.Print($"[Q] target=({targetPos.X:F2},{targetPos.Z:F2}) player=({player.GlobalPosition.X:F2},{player.GlobalPosition.Z:F2})");
 
         _circle.SetPosition(targetPos);
 

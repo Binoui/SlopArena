@@ -11,7 +11,7 @@ public sealed partial class LandingState : State
 {
     public LandingState()
     {
-        AnimationName = "Land";
+        AnimationName = ""; // No animation — crossfade in FSM handles the transition
     }
 
     /// <summary>
@@ -32,12 +32,7 @@ public sealed partial class LandingState : State
 
     public override void OnProcess(float delta)
     {
-        // Cancel landing on jump or dash
-        if (InputCtrl.JumpJustPressed)
-        {
-            StateMachine.TransitionTo("air");
-            return;
-        }
+        // Cancel landing on dash (jump is handled centrally in PlayerController)
         if (InputCtrl.DashJustPressed)
         {
             StateMachine.TransitionTo("idle");

@@ -228,6 +228,14 @@ public partial class Main : Node3D
                 _gameUI?.ToggleEscapeMenu();
                 GetViewport().SetInputAsHandled();
             }
+            else if (key.Keycode == Key.F1 || key.PhysicalKeycode == Key.F1)
+            {
+                Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
+                    ? Input.MouseModeEnum.Visible
+                    : Input.MouseModeEnum.Captured;
+                GetViewport().SetInputAsHandled();
+                GD.Print($"[Main] Mouse mode: {Input.MouseMode}");
+            }
             else if (key.Keycode == Key.F3 || key.PhysicalKeycode == Key.F3)
             {
                 _debugHitboxVisible = !_debugHitboxVisible;
@@ -276,11 +284,22 @@ public partial class Main : Node3D
 
     private void CreateCrosshair()
     {
-        var cross = new ColorRect { Name = "Crosshair", Size = new Vector2(4f, 4f), Color = new Color(1f, 1f, 1f, 0.7f) };
-        cross.Position = DisplayServer.WindowGetSize() / 2 - (cross.Size / 2);
+        var cross = new ColorRect { Name = "Crosshair", Size = new Vector2(20f, 2f), Color = new Color(1f, 1f, 1f, 0.7f) };
+        var viewportSize = GetViewport().GetVisibleRect().Size;
+        cross.Position = viewportSize / 2 - (cross.Size / 2);
+        GD.Print($"[Crosshair] viewport=({viewportSize.X},{viewportSize.Y}) crossPos={cross.Position}");
         _canvasLayer.AddChild(cross);
+
+        var crossV = new ColorRect { Name = "CrosshairV", Size = new Vector2(2f, 20f), Color = new Color(1f, 1f, 1f, 0.7f) };
+        crossV.Position = viewportSize / 2 - (crossV.Size / 2);
+        _canvasLayer.AddChild(crossV);
+
         GetTree().Root.SizeChanged += () =>
-            cross.Position = DisplayServer.WindowGetSize() / 2 - (cross.Size / 2);
+        {
+            var vs = GetViewport().GetVisibleRect().Size;
+            cross.Position = vs / 2 - (cross.Size / 2);
+            crossV.Position = vs / 2 - (crossV.Size / 2);
+        };
     }
 
     private void StartLocalServer(CharacterClass? playerClass)

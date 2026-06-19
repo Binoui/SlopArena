@@ -3,6 +3,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using SlopArena.Shared;
+using SlopArena;
 
 /// <summary>
 /// Thin orchestrator: delegates movement to MovementComponent and animation to AnimationController.
@@ -31,6 +32,7 @@ public partial class PlayerController : CharacterBody3D
     }
 
     public new CharacterClass GetClass() => _playerClass;
+    public CharacterDefinition CharDef => _charDef;
 
     // ==========================================
     // HURTBOX / %
@@ -306,12 +308,16 @@ public partial class PlayerController : CharacterBody3D
 
         _animationController.Setup(animPlayer, skeleton);
 
-        // Find AnimationTree (created in manki.tscn by the user)
+        // Find AnimationTree (created in .tscn by user), build StateMachine from data
         if (_playerModel != null)
         {
             var animTree = _playerModel.GetNodeOrNull<AnimationTree>("AnimationTree");
             if (animTree != null)
+            {
+                if (animPlayer != null)
+                    animTree.TreeRoot = AnimationTreeBuilder.Build(animPlayer, _charDef);
                 _animationController.SetupAnimationTree(animTree);
+            }
 
             // Find FSM in the model scene (manki.tscn)
             _fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM");
@@ -325,6 +331,9 @@ public partial class PlayerController : CharacterBody3D
             _fsm?.Initialize(this, _movementComponent, _inputCtrl);
             _fsm?.TransitionTo("idle");
         }).CallDeferred();
+
+        // Register programmatically-added states (not in .tscn)
+        _fsm?.AddState(new JumpState());
 
         // Apply animation TimeScales: duration = bakedFrames / DurationTicks
         ApplyAnimationTimeScales();
@@ -379,9 +388,7 @@ public partial class PlayerController : CharacterBody3D
         if (_debugLabel == null) return;
 
         string fsmState = _fsm?.CurrentStateName ?? "?";
-        var animTree = _playerModel?.GetNodeOrNull<AnimationTree>("AnimationTree");
-        float airBlend = animTree?.Get("parameters/air/blend_position").AsSingle() ?? 0f;
-        _debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  air: {airBlend:F2}  floor: {IsOnFloor()}";
+        _debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
     }
 
     // ── DAMAGE % LABEL (Smash-style, above everyone) ──
@@ -502,52 +509,60 @@ public partial class PlayerController : CharacterBody3D
         SettingsUI.LoadBindings();
     }
 
-    // ==========================================
-    // UNHANDLED INPUT
-    // ==========================================
+    // ════════════════════════════════════════
+    // INPUT (everything in _Input — embedded editor eats events in _UnhandledInput)
+    // ════════════════════════════════════════
 
-    public override void _UnhandledInput(InputEvent @event)
+    public override void _Input(InputEvent @event)
     {
         if (!_isPlayerControlled) return;
-        if (IsEscapeMenuOpen) { if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible; return; }
 
-        // Forward input to active ability first (mouse motion during aiming, etc.)
-        if (_activeAbility != null)
+        // If escape menu is open, skip all game input
+        if (IsEscapeMenuOpen)
+            return;
+
+        // Camera orbit
+        if (@event is InputEventMouseMotion mm && _camera != null && _activeAbility == null)
+            _camera.RotateCamera(mm.Relative);
+
+        // Click to capture mouse
+        if (@event is InputEventMouseButton cb && cb.Pressed && Input.MouseMode != Input.MouseModeEnum.Captured)
+            Input.MouseMode = Input.MouseModeEnum.Captured;
+
+        // Mouse wheel zoom
+        if (@event is InputEventMouseButton mb && mb.Pressed)
         {
-            _activeAbility.OnInput(@event);
-            if (_activeAbility != null) return; // ability might self-deactivate
+            if (mb.ButtonIndex == MouseButton.WheelUp) { _camera?.ZoomCamera(-1f); return; }
+            if (mb.ButtonIndex == MouseButton.WheelDown) { _camera?.ZoomCamera(1f); return; }
         }
 
-        if (@event is InputEventMouseButton mb)
+        // Attack clicks
+        if (@event is InputEventMouseButton ib && ib.Pressed && _combatComponent != null)
         {
-            if (mb.Pressed)
-            {
-                if (mb.ButtonIndex == MouseButton.WheelUp) { _camera?.ZoomCamera(-1f); return; }
-                if (mb.ButtonIndex == MouseButton.WheelDown) { _camera?.ZoomCamera(1f); return; }
-                if (Input.MouseMode != Input.MouseModeEnum.Captured) Input.MouseMode = Input.MouseModeEnum.Captured;
-            }
-
-            if (mb.ButtonIndex == MouseButton.Left && mb.Pressed && _combatComponent != null)
+            if (ib.ButtonIndex == MouseButton.Left)
             {
                 if (GetSlotCooldown(0) > 0) return;
                 bool airborne = !_movementComponent.IsGrounded;
                 ActivateAbility(AbilityFactory.Create(0, airborne, _charDef));
-                GetViewport().SetInputAsHandled(); return;
+                GetViewport().SetInputAsHandled();
             }
-
-            if (mb.ButtonIndex == MouseButton.Right && mb.Pressed && _combatComponent != null)
+            else if (ib.ButtonIndex == MouseButton.Right)
             {
                 if (GetSlotCooldown(1) > 0) return;
                 bool airborne = !_movementComponent.IsGrounded;
                 ActivateAbility(AbilityFactory.Create(1, airborne, _charDef));
-                GetViewport().SetInputAsHandled(); return;
+                GetViewport().SetInputAsHandled();
             }
         }
 
-        if (@event is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured
-            && _activeAbility == null)
-            _camera?.RotateCamera(mm.Relative);
+        // Forward input to active ability (mouse motion during aiming, etc.)
+        if (_activeAbility != null)
+        {
+            _activeAbility.OnInput(@event);
+            if (_activeAbility != null) return;
+        }
 
+        // Ability keys (Q, E, R, F)
         if (Input.IsActionJustPressed("ability_q"))
         {
             if (GetSlotCooldown(2) > 0) return;
@@ -569,8 +584,9 @@ public partial class PlayerController : CharacterBody3D
             if (GetSlotCooldown(5) > 0) return;
             ActivateAbility(AbilityFactory.Create(5, false, _charDef));
         }
-        if (Input.IsActionJustPressed("ui_cancel")) Input.MouseMode = Input.MouseModeEnum.Visible;
     }
+
+    // Remove _UnhandledInput entirely — everything is in _Input now
 
     // ==========================================
     // PROCESS (timers, NPC)
@@ -582,6 +598,15 @@ public partial class PlayerController : CharacterBody3D
         _inputCtrl.Poll();
         UpdateDebugLabel();
         UpdateDamageLabel();
+
+        // ── Centralized jump input ──
+        // All jump transitions (ground jump, double jump after hitstun)
+        // are handled here rather than in individual states.
+        string currentState = _fsm?.CurrentStateName ?? "";
+        if (_inputCtrl.JumpJustPressed && currentState is "idle" or "run" or "landing" or "fall")
+        {
+            _fsm?.TransitionTo("jump");
+        }
 
         // ── Active ability tick ──
         if (_activeAbility != null)
@@ -831,6 +856,8 @@ public partial class PlayerController : CharacterBody3D
         // Send aim yaw from camera (combat facing), overridden by active ability
         float aimDeg = _camera != null ? Mathf.RadToDeg(_camera.GetCameraYaw()) : deg;
         input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768, 32767);
+        if (input.ActiveSlot > 0 || input.Jump || input.Dash)
+            GD.Print($"[Input] FacingYaw={input.FacingYaw}deg AimYaw={input.AimYaw}deg bodyYaw={deg:F2} camYaw={aimDeg:F2}");
         input.AimDistance = 0;
 
         // Active ability overrides aim data

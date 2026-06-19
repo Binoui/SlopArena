@@ -27,6 +27,8 @@ namespace SlopArena.Shared
         public float AirFriction;
         public float MaxFallSpeed;
         public byte MaxJumps;
+        /// <summary>Duration of the rising phase of a jump in ticks (1 tick = 1/60s).</summary>
+        public ushort JumpDurationTicks;
     }
 
     public struct CharacterDefinition
@@ -95,6 +97,29 @@ namespace SlopArena.Shared
         /// Bunny: ~0.022 (Tripo/Hunyuan export in raw units).
         /// </summary>
         public float VisualScale;
+
+        // ── Animation catalog (defaults match Mixamo naming) ──
+
+        /// <summary>Idle animation clip name. Default: "idle"</summary>
+        public string IdleAnim = "idle";
+        /// <summary>Run animation clip name. Default: "run"</summary>
+        public string RunAnim = "run";
+        /// <summary>Dash animation clip name. Default: "dash"</summary>
+        public string DashAnim = "dash";
+        /// <summary>Jump animation clip (BlendSpace1D position -1). Default: "jump"</summary>
+        public string JumpAnim = "jump";
+        /// <summary>Fall animation clip (BlendSpace1D position +1). Default: "fall"</summary>
+        public string FallAnim = "fall";
+        /// <summary>Small hit reaction clip. Default: "small_hit"</summary>
+        public string HitSmallAnim = "small_hit";
+        /// <summary>Medium hit reaction clip. Default: "medium_hit"</summary>
+        public string HitMediumAnim = "medium_hit";
+        /// <summary>Hard hit reaction clip. Default: "hard_hit"</summary>
+        public string HitHardAnim = "hard_hit";
+        /// <summary>Landing uses JumpAnim clip with this start offset (seconds). Default: 0.49f</summary>
+        public float LandStartOffset = 0.49f;
+        /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>
+        public AnimationClipConfig[]? ClipOverrides;
 
         public AbilitySpec LMB;
         public AbilitySpec RMB;

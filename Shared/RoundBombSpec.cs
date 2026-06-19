@@ -29,7 +29,7 @@ namespace SlopArena.Shared
             resolver.Spawn(new Hitbox
             {
                 X = state.PX, Y = state.PY + pc.LaunchOffsetY, Z = state.PZ,
-                VX = hSpeed * aimSin, VY = vSpeed, VZ = hSpeed * aimCos,
+                VX = hSpeed * aimSin, VY = vSpeed, VZ = -hSpeed * aimCos,
                 Radius = pc.HitboxRadius, Shape = HitboxShape.Sphere,
                 EndX = state.PX, EndY = state.PY, EndZ = state.PZ,
                 Damage = pc.Damage, KnockbackForce = pc.KnockbackForce,

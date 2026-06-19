@@ -109,7 +109,7 @@ public static partial class MankiAbilities
 		// ── Fly on the same parabolic arc ──
 		var flyer = new ParabolicProjectile(
 			proj, launchPos,
-			hSpeed * aimSin, vSpeed, hSpeed * aimCos,
+			hSpeed * aimSin, vSpeed, -hSpeed * aimCos,
 			gravity, 0.05f,
 			() =>
 			{
