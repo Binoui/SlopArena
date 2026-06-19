@@ -22,17 +22,10 @@ public sealed partial class IdleState : State
 
 	public override void OnProcess(float delta)
 	{
-		// Jump — transition immediately when action is pressed
-		if (InputCtrl.JumpJustPressed)
-		{
-			StateMachine.TransitionTo("air");
-			return;
-		}
-
-		// Walked off edge — go to air (blend handles jump→fall naturally)
+		// Walked off edge — go to fall (no jump animation for gravity)
 		if (!Movement.IsGrounded && Player.Velocity.Y < 0f)
 		{
-			StateMachine.TransitionTo("air");
+			StateMachine.TransitionTo("fall");
 			return;
 		}
 

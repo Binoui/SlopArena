@@ -4,318 +4,12 @@
 [ext_resource type="Script" uid="uid://cfeofiqt7wjb4" path="res://Scripts/Animation/StateMachine.cs" id="2_3sgcm"]
 [ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="3_yy137"]
 [ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="4_b5fl0"]
-[ext_resource type="Script" uid="uid://dyo0kq8c3kkno" path="res://Scripts/Animation/States/AirState.cs" id="5_f6xia"]
 [ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="6_oin5n"]
 [ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="7_jepol"]
+[ext_resource type="Script" uid="uid://d040towwir4ia" path="res://Scripts/Animation/States/AimedChargeState.cs" id="8_v5j0v"]
 [ext_resource type="Script" uid="uid://wu75iehvao7o" path="res://Scripts/Animation/States/DashState.cs" id="9_poyq5"]
 [ext_resource type="Script" uid="uid://bn2tc7gwfuvan" path="res://Scripts/Animation/States/HitReactionState.cs" id="10_rl3hh"]
-[ext_resource type="Script" path="res://Scripts/Animation/States/AimedChargeState.cs" id="8_v5j0v"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_idle"]
-animation = &"idle"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_idle"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_idle"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_idle")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_idle")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_land"]
-animation = &"jump"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.490000000000002
-loop_mode = 0
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_land"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_land"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_land")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_land")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_run"]
-animation = &"run"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_run"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_run"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_run")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_run")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_jump"]
-animation = &"jump"
-
-[sub_resource type="AnimationNodeAnimation" id="anim_fall"]
-animation = &"fall"
-
-[sub_resource type="AnimationNodeBlendSpace1D" id="blend_air"]
-blend_point_0/node = SubResource("anim_jump")
-blend_point_0/pos = -1.0
-blend_point_1/node = SubResource("anim_fall")
-blend_point_1/pos = 1.0
-snap = 0.14
-blend_mode = 1
-
-[sub_resource type="AnimationNodeAnimation" id="anim_dash"]
-animation = &"spell_lmb_1"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = false
-start_offset = 0.0
-loop_mode = 1
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_dash"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_dash"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_dash")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_dash")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_hit_hard"]
-animation = &"spell_r"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_hit_hard"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_hit_hard"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_hit_hard")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_hit_hard")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_hit_medium"]
-animation = &"spell_lmb_2"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_hit_medium"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_hit_medium"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_hit_medium")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_hit_medium")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_hit_small"]
-animation = &"fall"
-use_custom_timeline = true
-timeline_length = 1.0
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 0
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_hit_small"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_hit_small"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_hit_small")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_hit_small")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_kick_wheel"]
-animation = &"spell_air_rmb"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_kick_wheel"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_kick_wheel"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_kick_wheel")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_kick_wheel")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_backflip"]
-animation = &"spell_e"
-use_custom_timeline = true
-timeline_length = 1.795
-stretch_time_scale = true
-start_offset = 0.0
-loop_mode = 1
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_backflip"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_backflip"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_backflip")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_backflip")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_kick_high_full"]
-animation = &"spell_f"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_kick_high_full"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_kick_high_full"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_kick_high_full")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_kick_high_full")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_kick_low"]
-animation = &"spell_lmb_1"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_kick_low"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_kick_low"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_kick_low")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_kick_low")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_kick_medium"]
-animation = &"spell_lmb_2"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_kick_medium"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_kick_medium"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_kick_medium")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_kick_medium")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_kick_high"]
-animation = &"spell_lmb_3"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_kick_high"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_kick_high"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_kick_high")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_kick_high")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_throw"]
-animation = &"spell_q"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_throw"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_throw"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_throw")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_throw")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_punch_down"]
-animation = &"spell_lmb_1"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_punch_down"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_punch_down"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_punch_down")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_punch_down")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeAnimation" id="anim_rmb_loop"]
-animation = &"spell_lmb_1"
-
-[sub_resource type="AnimationNodeTimeScale" id="ts_rmb_loop"]
-
-[sub_resource type="AnimationNodeBlendTree" id="bt_rmb_loop"]
-nodes/output/position = Vector2(700, 100)
-nodes/TimeScale/node = SubResource("ts_rmb_loop")
-nodes/TimeScale/position = Vector2(400, 100)
-nodes/Animation/node = SubResource("anim_rmb_loop")
-nodes/Animation/position = Vector2(100, 100)
-node_connections = [&"output", 0, &"TimeScale", &"TimeScale", 0, &"Animation"]
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_01"]
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_015"]
-
-[sub_resource type="AnimationNodeStateMachineTransition" id="xfade_at_end"]
-reset = false
-
-[sub_resource type="AnimationNodeStateMachine" id="sm_bunny"]
-states/End/position = Vector2(1600, 250)
-states/Idle/node = SubResource("bt_idle")
-states/Idle/position = Vector2(200, 100)
-states/Land/node = SubResource("bt_land")
-states/Land/position = Vector2(400, 250)
-states/Run/node = SubResource("bt_run")
-states/Run/position = Vector2(400, 100)
-states/Start/position = Vector2(50, 175)
-states/air/node = SubResource("blend_air")
-states/air/position = Vector2(200, 250)
-states/dash/node = SubResource("bt_dash")
-states/dash/position = Vector2(600, 400)
-states/hit_hard/node = SubResource("bt_hit_hard")
-states/hit_hard/position = Vector2(1000, 600)
-states/hit_medium/node = SubResource("bt_hit_medium")
-states/hit_medium/position = Vector2(800, 600)
-states/hit_small/node = SubResource("bt_hit_small")
-states/hit_small/position = Vector2(600, 600)
-states/spell_air_rmb/node = SubResource("bt_kick_wheel")
-states/spell_air_rmb/position = Vector2(1200, 218)
-states/spell_e/node = SubResource("bt_backflip")
-states/spell_e/position = Vector2(1200, 100)
-states/spell_f/node = SubResource("bt_kick_high_full")
-states/spell_f/position = Vector2(1300, 100)
-states/spell_lmb_1/node = SubResource("bt_kick_low")
-states/spell_lmb_1/position = Vector2(800, 100)
-states/spell_lmb_2/node = SubResource("bt_kick_medium")
-states/spell_lmb_2/position = Vector2(900, 100)
-states/spell_lmb_3/node = SubResource("bt_kick_high")
-states/spell_lmb_3/position = Vector2(1000, 100)
-states/spell_q/node = SubResource("bt_throw")
-states/spell_q/position = Vector2(800, 400)
-states/spell_r/node = SubResource("bt_kick_high_full")
-states/spell_r/position = Vector2(1100, 100)
-states/spell_rmb_attack/node = SubResource("bt_punch_down")
-states/spell_rmb_attack/position = Vector2(1000, 250)
-states/spell_rmb_loop/node = SubResource("bt_rmb_loop")
-states/spell_rmb_loop/position = Vector2(1000, 400)
-transitions = ["Start", "Idle", SubResource("xfade_01"), "Idle", "Run", SubResource("xfade_015"), "Run", "Idle", SubResource("xfade_015"), "Idle", "air", SubResource("xfade_01"), "Run", "air", SubResource("xfade_01"), "air", "Land", SubResource("xfade_015"), "Land", "Idle", SubResource("xfade_at_end"), "Idle", "dash", SubResource("xfade_01"), "Run", "dash", SubResource("xfade_01"), "air", "dash", SubResource("xfade_01"), "dash", "End", SubResource("xfade_015"), "Idle", "spell_lmb_1", SubResource("xfade_01"), "Run", "spell_lmb_1", SubResource("xfade_01"), "air", "spell_lmb_1", SubResource("xfade_01"), "spell_lmb_1", "End", SubResource("xfade_015"), "spell_lmb_2", "End", SubResource("xfade_015"), "spell_lmb_3", "End", SubResource("xfade_015"), "spell_r", "End", SubResource("xfade_015"), "Idle", "spell_air_rmb", SubResource("xfade_01"), "Run", "spell_air_rmb", SubResource("xfade_01"), "air", "spell_air_rmb", SubResource("xfade_01"), "spell_air_rmb", "End", SubResource("xfade_015"), "Idle", "spell_rmb_attack", SubResource("xfade_01"), "Run", "spell_rmb_attack", SubResource("xfade_01"), "spell_rmb_attack", "End", SubResource("xfade_015"), "Idle", "spell_q", SubResource("xfade_01"), "Run", "spell_q", SubResource("xfade_01"), "air", "spell_q", SubResource("xfade_01"), "spell_q", "End", SubResource("xfade_015"), "Idle", "spell_e", SubResource("xfade_01"), "Run", "spell_e", SubResource("xfade_01"), "air", "spell_e", SubResource("xfade_01"), "spell_e", "End", SubResource("xfade_015"), "Idle", "spell_f", SubResource("xfade_01"), "Run", "spell_f", SubResource("xfade_01"), "spell_f", "End", SubResource("xfade_015"), "Idle", "spell_rmb_loop", SubResource("xfade_01"), "Run", "spell_rmb_loop", SubResource("xfade_01"), "spell_rmb_loop", "End", SubResource("xfade_015"), "hit_small", "End", SubResource("xfade_015"), "hit_medium", "End", SubResource("xfade_015"), "hit_hard", "End", SubResource("xfade_015"), "Land", "Run", SubResource("xfade_015"), "air", "End", SubResource("xfade_015")]
-graph_offset = Vector2(69, 50)
+[ext_resource type="Script" uid="uid://drks1rbds7g4t" path="res://Scripts/Animation/States/FallState.cs" id="11_3sgcm"]
 
 [node name="Bunny" type="Node3D" unique_id=881826129]
 
@@ -323,26 +17,7 @@ graph_offset = Vector2(69, 50)
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1215559337]
 root_node = NodePath("../bunny")
-tree_root = SubResource("sm_bunny")
 anim_player = NodePath("../bunny/AnimationPlayer")
-parameters/Idle/TimeScale/scale = 1.0
-parameters/Land/TimeScale/scale = 1.0
-parameters/Run/TimeScale/scale = 1.0
-parameters/air/blend_position = 0.0
-parameters/dash/TimeScale/scale = 1.0
-parameters/hit_hard/TimeScale/scale = 1.0
-parameters/hit_medium/TimeScale/scale = 1.0
-parameters/hit_small/TimeScale/scale = 1.0
-parameters/spell_air_rmb/TimeScale/scale = 1.0
-parameters/spell_e/TimeScale/scale = 1.0
-parameters/spell_f/TimeScale/scale = 1.0
-parameters/spell_lmb_1/TimeScale/scale = 1.0
-parameters/spell_lmb_2/TimeScale/scale = 1.0
-parameters/spell_lmb_3/TimeScale/scale = 1.0
-parameters/spell_q/TimeScale/scale = 1.0
-parameters/spell_r/TimeScale/scale = 1.0
-parameters/spell_rmb_attack/TimeScale/scale = 1.0
-parameters/spell_rmb_loop/TimeScale/scale = 1.0
 
 [node name="FSM" type="Node" parent="." unique_id=1870874765]
 script = ExtResource("2_3sgcm")
@@ -354,7 +29,7 @@ script = ExtResource("3_yy137")
 script = ExtResource("4_b5fl0")
 
 [node name="air" type="Node" parent="FSM" unique_id=1423766126]
-script = ExtResource("5_f6xia")
+script = ExtResource("11_3sgcm")
 
 [node name="landing" type="Node" parent="FSM" unique_id=413031327]
 script = ExtResource("6_oin5n")
@@ -370,5 +45,8 @@ script = ExtResource("9_poyq5")
 
 [node name="hit_reaction" type="Node" parent="FSM" unique_id=1911907198]
 script = ExtResource("10_rl3hh")
+
+[node name="fall" type="Node" parent="FSM" unique_id=1044312963]
+script = ExtResource("11_3sgcm")
 
 [editable path="bunny"]

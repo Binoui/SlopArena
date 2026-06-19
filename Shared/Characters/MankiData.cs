@@ -45,6 +45,7 @@ public static partial class CharacterRegistry
                 AirFriction = 0.4f,
                 MaxFallSpeed = 45f,
                 MaxJumps = 2,
+                JumpDurationTicks = 24,
             },
 
             HurtboxBoneDefs = new HurtboxBoneDef[]
@@ -63,6 +64,14 @@ public static partial class CharacterRegistry
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = true,
+
+            // Default animation names match Mixamo: idle, run, dash, jump, fall, small_hit, medium_hit, hard_hit
+            // Only ClipOverrides needed for custom timelines
+            ClipOverrides = new AnimationClipConfig[]
+            {
+                new() { Name = "spell_q_loop", LoopMode = ClipLoopMode.PingPong, TimelineLength = 3.0f },
+                new() { Name = "spell_q", StartOffset = 0.5f, TimelineLength = 2.0f },
+            },
 
             // ═══ ABILITIES ═══
 
