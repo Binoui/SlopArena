@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SlopArena.Shared
 {
     /// <summary>
@@ -10,6 +12,8 @@ namespace SlopArena.Shared
     public class AbilitySpec
     {
         public string Name = "";
+        /// <summary>Unique numeric ID for factory dispatch (0 = GenericMelee fallback).</summary>
+        public byte AbilityTypeId;
         /// <summary>0 = no cooldown</summary>
         public ushort CooldownTicks;
         public AttackStage[] Stages = [];
@@ -20,6 +24,8 @@ namespace SlopArena.Shared
         public string[]? SpecialEffectKeys;
         /// <summary>Animation name per combo stage.</summary>
         public string[]? AnimationNames;
+        /// <summary>Named float parameters for server-side abilities (e.g., "backflip_damage").</summary>
+        public Dictionary<string, float> Params = new();
 
         /// <summary>
         /// Get the animation name for a given combo stage.

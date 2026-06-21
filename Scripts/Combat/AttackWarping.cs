@@ -22,7 +22,7 @@ public partial class AttackWarping : Node
     /// <summary>
     /// Safety timeout
     /// </summary>
-    private float _maxWarpDuration = 0.5f;
+    private float _maxWarpDuration = 1.0f;
     private Action? _onWarpComplete;
 
     /// <summary>
@@ -98,19 +98,7 @@ public partial class AttackWarping : Node
             _warpDirection = _targetLock.GetDirectionToTarget();
         }
 
-        // Move toward target
-        if (_owner is CharacterBody3D body)
-        {
-            // Use MoveAndSlide for collision-aware warping
-            body.Velocity = _warpDirection * _warpSpeed;
-            body.MoveAndSlide();
-        }
-        else
-        {
-            // Direct position update (no collision)
-            _owner.GlobalPosition += _warpDirection * moveDistance;
-        }
-
+        // Movement is handled by WarpState — only track distance + timing here
         _warpDistanceRemaining -= moveDistance;
 
         // Check completion
@@ -130,10 +118,7 @@ public partial class AttackWarping : Node
     private void EndWarp()
     {
         _isWarping = false;
-        _finalWarpDirection = _warpDirection;  // Cache final direction for hitbox spawning
-
-        if (_owner is CharacterBody3D body)
-            body.Velocity = Vector3.Zero;
+        _finalWarpDirection = _warpDirection;
 
         GD.Print("[Warp] Warp complete, executing attack");
         _onWarpComplete?.Invoke();

@@ -76,6 +76,9 @@ public static class AnimationTreeBuilder
             dashAnim.LoopMode = Animation.LoopModeEnum.Linear;
         }
         sm.AddNode("dash", dash, new Vector2(600, 400));
+
+        // Warp node (no animation — WarpState C# state Travels to "Run" directly)
+        sm.AddNode("warp", new AnimationNodeAnimation(), new Vector2(600, 300));
     }
 
     private static void AddJumpState(
@@ -124,7 +127,7 @@ public static class AnimationTreeBuilder
                 animNode.UseCustomTimeline = true;
                 animNode.TimelineLength = 2.0f;
                 animNode.StretchTimeScale = false;
-                animNode.LoopMode = Animation.LoopModeEnum.None;
+                animNode.LoopMode = Animation.LoopModeEnum.Linear;
             }
             sm.AddNode(stateName, node, pos);
         }
@@ -191,8 +194,13 @@ public static class AnimationTreeBuilder
         AnimationNodeStateMachine sm, CharacterDefinition charDef)
     {
         var xfade = new AnimationNodeStateMachineTransition();
-        var xfadeRestart = new AnimationNodeStateMachineTransition { Reset = true };
         var xfadeSlowFall = new AnimationNodeStateMachineTransition { XfadeTime = 0.15f, Reset = true };
+
+        // Warp → attacks (warp reuses Run anim, crossfade handles the blend)
+        sm.AddTransition("Idle", "warp", xfade);
+        sm.AddTransition("Run", "warp", xfade);
+        foreach (var animName in _allAttackAnimNames)
+            sm.AddTransition("warp", animName, xfade);
 
         // Core movement
         sm.AddTransition("Idle", "Run", xfade);
@@ -201,9 +209,9 @@ public static class AnimationTreeBuilder
         // Jump
         sm.AddTransition("Idle", "jump", xfade);
         sm.AddTransition("Run", "jump", xfade);
-        sm.AddTransition("jump", "jump", xfadeRestart);
         sm.AddTransition("jump", "Run", xfade);
         sm.AddTransition("jump", "Idle", xfade);
+        sm.AddTransition("jump", "dash", xfade);
 
         // Fall (from jump end: slow crossfade, from off-edge/hitstun: fast)
         sm.AddTransition("jump", "fall", xfadeSlowFall);

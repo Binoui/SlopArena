@@ -35,8 +35,10 @@ namespace SlopArena.Shared
         public ushort DurationTicks;
         /// <summary>Hitbox events triggered during this stage.</summary>
         public HitboxEvent[] HitboxEvents;
-        /// <summary>Forward burst during attack.</summary>
+        /// <summary>Forward burst at attack start (applied once).</summary>
         public float LungeForce;
+        /// <summary>Per-tick velocity during this stage (world space). Set VY for jump arcs.</summary>
+        public float MoveX, MoveY, MoveZ;
         /// <summary>
         /// 0 = final stage / no chain. Non-zero = frames to buffer next input.
         /// </summary>

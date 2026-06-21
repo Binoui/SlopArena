@@ -158,9 +158,32 @@ public partial class PlayerController : CharacterBody3D
     }
     public byte GetComboStage() => _movementComponent.State.ComboStage;
     public ushort GetComboTimerTicks() => _movementComponent.State.ComboTimerTicks;
+
+    /// <summary>
+    /// Get the attack animation name for the current state.
+    /// For server-side abilities (AbilityTypeId > 0), uses AnimIndex from the packet.
+    /// For data-driven abilities, falls back to ComboStage-based lookup.
+    /// </summary>
+    private string GetAttackAnimName(byte slot, byte comboStage)
+    {
+        bool airborne = !_movementComponent.IsGrounded;
+        int slotIdx = slot > 0 ? slot - 1 : 0;
+        var ability = _charDef.GetSlotAbility(slotIdx, airborne);
+
+        if (ability.AbilityTypeId > 0 && ability.AnimationNames != null && ability.AnimationNames.Length > 0)
+        {
+            byte animIdx = _movementComponent.State.AnimIndex;
+            if (animIdx < ability.AnimationNames.Length)
+                return ability.AnimationNames[animIdx];
+        }
+
+        return ability.GetAnimationName(comboStage);
+    }
     public Vector3 MoveDirection => _moveDirection;
     /// <summary>Camera yaw in radians (0 = looks along -Z). For abilities that need initial aim.</summary>
     public float GetCameraYaw() => _camera != null ? _camera.GetCameraYaw() : GlobalRotation.Y;
+    public TargetLockSystem? GetTargetLock() => _targetLock;
+    public ref CharacterState GetMovementState() => ref _movementComponent.State;
     /// <summary>Get the FSM state machine for animation/movement control.</summary>
     public StateMachine? GetFSM() => _fsm;
 
@@ -331,6 +354,7 @@ public partial class PlayerController : CharacterBody3D
 
         // Register programmatically-added states (not in .tscn)
         _fsm?.AddState(new JumpState());
+        _fsm?.AddState(new WarpState());
 
         // Bone-attached hurtboxes (Smash-style — multiple spheres on skeleton bones)
         if (skeleton != null)
@@ -410,18 +434,34 @@ public partial class PlayerController : CharacterBody3D
         // Attack clicks
         if (@event is InputEventMouseButton ib && ib.Pressed && _combatComponent != null)
         {
-            if (ib.ButtonIndex == MouseButton.Left)
+            if (ib.ButtonIndex == MouseButton.Left || ib.ButtonIndex == MouseButton.Right)
             {
-                if (GetSlotCooldown(0) > 0) return;
+                int slot = ib.ButtonIndex == MouseButton.Left ? 0 : 1;
+                if (GetSlotCooldown(slot) > 0) return;
                 bool airborne = !_movementComponent.IsGrounded;
-                ActivateAbility(AbilityFactory.Create(0, airborne, _charDef));
-                GetViewport().SetInputAsHandled();
-            }
-            else if (ib.ButtonIndex == MouseButton.Right)
-            {
-                if (GetSlotCooldown(1) > 0) return;
-                bool airborne = !_movementComponent.IsGrounded;
-                ActivateAbility(AbilityFactory.Create(1, airborne, _charDef));
+
+                // Check for warp-to-target
+                var spec = _charDef.GetSlotAbility(slot, airborne);
+                bool isWarping = spec != null && spec.Stages is { Length: > 0 } && spec.Stages[0].WarpRange > 0f
+                    && _targetLock?.CurrentTarget != null;
+
+                if (isWarping)
+                {
+                    _fsm?.TransitionTo("warp");
+                    float dist = _targetLock!.GetDistanceToTarget();
+                    Vector3 dir = _targetLock.GetDirectionToTarget();
+                    ref var s = ref _movementComponent.State;
+                    s.WarpTargetX = GlobalPosition.X + dir.X * dist;
+                    s.WarpTargetZ = GlobalPosition.Z + dir.Z * dist;
+                    s.WarpSpeed = _charDef.Movement.SprintSpeed;
+                    s.WarpAttackRange = spec.Stages[0].AttackRange;
+                    // Tell sim to activate this slot — it will enter Warping due to warp data
+                    _pendingSlotPress = (byte)(slot + 1);
+                }
+                else
+                {
+                    ActivateAbility(AbilityFactory.Create(slot, airborne, _charDef));
+                }
                 GetViewport().SetInputAsHandled();
             }
         }
@@ -563,7 +603,7 @@ public partial class PlayerController : CharacterBody3D
                 simComboStage != _lastComboStage && simComboStage > 0)
             {
                 var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
-                string animName = ability.GetAnimationName(simComboStage);
+                string animName = GetAttackAnimName(slot, simComboStage);
                 var attackState = _fsm.GetAttackState();
                 if (attackState != null)
                 {
@@ -575,8 +615,7 @@ public partial class PlayerController : CharacterBody3D
             if (simState == ActionState.Attacking && !_fsm.IsInState("attack"))
             {
                 // Sim started an attack — play the FSM animation
-                var ability = _charDef.GetSlotAbility(slot > 0 ? slot - 1 : 0, !_movementComponent.IsGrounded);
-                string animName = ability.GetAnimationName(simComboStage);
+                string animName = GetAttackAnimName(slot, simComboStage);
                 var attackState = _fsm.GetAttackState();
                 if (attackState != null)
                 {

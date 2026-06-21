@@ -60,6 +60,10 @@ namespace SlopArena.Shared
         /// 0 = none, 1-3 = stage
         /// </summary>
         public byte ComboStage;
+        /// <summary>Animation index (into spec's AnimationNames[]) set by server ability. Synced to client.</summary>
+        public byte AnimIndex;
+        /// <summary>True when a server-side ability class is active (skip old data-driven attack processing).</summary>
+        public bool IsServerAbility;
         /// <summary>
         /// chain window remaining
         /// </summary>
@@ -109,6 +113,14 @@ namespace SlopArena.Shared
         public float AimTargetDistance;
         /// <summary>True while player is holding an aim-to-fire ability (RMB charge, Q throw).</summary>
         public bool IsAiming;
+
+        /// <summary>
+        /// ── Warp (auto-dash toward target before attacking) ──
+        /// </summary>
+        public float WarpTargetX;
+        public float WarpTargetZ;
+        public float WarpSpeed;
+        public float WarpAttackRange;  // stop warping when this close
 
         /// <summary>
         /// ── Sprint / Dash-dance ──

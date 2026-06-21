@@ -4,11 +4,20 @@ using System.Collections.Generic;
 namespace SlopArena.Shared
 {
     /// <summary>
+    /// Interface for abilities to register hitboxes without knowing about
+    /// hit detection internals.
+    /// </summary>
+    public interface ISpellResolver
+    {
+        void Spawn(Hitbox hb);
+    }
+
+    /// <summary>
     /// Pure C# hitbox management — no Godot dependency.
     /// Spawn hitboxes via Spawn(), then call Tick() each server tick.
     /// Handles: movement (projectiles), sphere-sphere collision, aging, knockback.
     /// </summary>
-    public class SpellResolver
+    public class SpellResolver : ISpellResolver
     {
         private readonly List<Hitbox> _hitboxes = new();
 
