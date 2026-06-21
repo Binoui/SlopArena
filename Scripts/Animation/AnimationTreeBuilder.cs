@@ -82,6 +82,13 @@ public static class AnimationTreeBuilder
         AnimationNodeStateMachine sm, AnimationPlayer animPlayer, CharacterDefinition charDef)
     {
         var jump = CreateWrappedState(animPlayer, charDef.JumpAnim, charDef);
+        if (jump.GetNode("Animation") is AnimationNodeAnimation jumpAnim)
+        {
+            jumpAnim.UseCustomTimeline = true;
+            jumpAnim.TimelineLength = 3.0f;
+            jumpAnim.StretchTimeScale = false;
+            jumpAnim.LoopMode = Animation.LoopModeEnum.Linear;
+        }
         sm.AddNode("jump", jump, new Vector2(200, 175));
     }
 
@@ -90,7 +97,12 @@ public static class AnimationTreeBuilder
     {
         var fall = CreateWrappedState(animPlayer, charDef.FallAnim, charDef);
         if (fall.GetNode("Animation") is AnimationNodeAnimation fallAnim)
+        {
+            fallAnim.TimelineLength = 20f;
+            fallAnim.UseCustomTimeline = true;
+            fallAnim.StretchTimeScale = false;
             fallAnim.LoopMode = Animation.LoopModeEnum.Linear;
+        }
         sm.AddNode("fall", fall, new Vector2(200, 250));
     }
 
@@ -179,7 +191,8 @@ public static class AnimationTreeBuilder
         AnimationNodeStateMachine sm, CharacterDefinition charDef)
     {
         var xfade = new AnimationNodeStateMachineTransition();
-
+        var xfadeRestart = new AnimationNodeStateMachineTransition { Reset = true };
+        var xfadeSlowFall = new AnimationNodeStateMachineTransition { XfadeTime = 0.15f, Reset = true };
 
         // Core movement
         sm.AddTransition("Idle", "Run", xfade);
@@ -188,9 +201,11 @@ public static class AnimationTreeBuilder
         // Jump
         sm.AddTransition("Idle", "jump", xfade);
         sm.AddTransition("Run", "jump", xfade);
+        sm.AddTransition("jump", "jump", xfadeRestart);
+        sm.AddTransition("jump", "Run", xfade);
+        sm.AddTransition("jump", "Idle", xfade);
 
         // Fall (from jump end: slow crossfade, from off-edge/hitstun: fast)
-        var xfadeSlowFall = new AnimationNodeStateMachineTransition { XfadeTime = 0.15f };
         sm.AddTransition("jump", "fall", xfadeSlowFall);
         sm.AddTransition("Idle", "fall", xfade);   // walked off edge — fast
         sm.AddTransition("Run", "fall", xfade);    // ran off edge — fast

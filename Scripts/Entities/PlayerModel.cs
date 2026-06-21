@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using System.Collections.Generic;
 using SlopArena.Shared;
 
 /// <summary>
@@ -156,5 +157,73 @@ public class PlayerModel
             EmissionEnergyMultiplier = 2f
         });
         _owner.AddChild(new MeshInstance3D { Mesh = cm });
+    }
+
+    /// <summary>
+    /// Compute and apply TimeScale for each ability animation so the visual
+    /// duration matches DurationTicks from CharacterDefinition.
+    /// Formula: TimeScale = bakedFrameCount / DurationTicks
+    /// Looping animations (idle/run/jump/fall) stay at 1.0.
+    /// </summary>
+    public void ApplyAnimationTimeScales(AnimationTree animTree, CharacterDefinition charDef)
+    {
+        if (_bakedData == null) return;
+        if (animTree == null) return;
+
+        void SetTimeScale(string animName, ushort durationTicks)
+        {
+            if (durationTicks == 0) return;
+            int frameCount = 0;
+            for (int a = 0; a < _bakedData.Animations.Length; a++)
+            {
+                if (_bakedData.Animations[a].Name == animName)
+                {
+                    frameCount = _bakedData.Animations[a].FrameCount;
+                    break;
+                }
+            }
+            if (frameCount <= 0) return;
+
+            float timeScale = frameCount / (float)durationTicks;
+            string paramPath = $"parameters/{animName}/TimeScale/scale";
+            // Only set if the AnimationTree has this parameter
+            try { animTree.Set(paramPath, timeScale); }
+            catch { return; } // parameter doesn't exist — skip
+            GD.Print($"[TimeScale] {animName}: {frameCount}f / {durationTicks}t = {timeScale:F3}x");
+        }
+
+        // Collect all (animationName, DurationTicks) pairs from all abilities
+        var animToTicks = new System.Collections.Generic.List<(string name, ushort ticks)>();
+
+        void CollectStages(AbilitySpec ability)
+        {
+            for (int s = 0; s < ability.Stages.Length; s++)
+            {
+                string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
+                if (!string.IsNullOrEmpty(an))
+                    animToTicks.Add((an, ability.Stages[s].DurationTicks));
+            }
+            if (ability.ChargedStages != null)
+            {
+                for (int s = 0; s < ability.ChargedStages.Length; s++)
+                {
+                    string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
+                    if (!string.IsNullOrEmpty(an))
+                        animToTicks.Add((an, ability.ChargedStages[s].DurationTicks));
+                }
+            }
+        }
+
+        CollectStages(charDef.LMB);
+        CollectStages(charDef.RMB);
+        CollectStages(charDef.AirLMB);
+        CollectStages(charDef.AirRMB);
+        CollectStages(charDef.Q);
+        CollectStages(charDef.E);
+        CollectStages(charDef.R);
+        CollectStages(charDef.F);
+
+        foreach (var (name, ticks) in animToTicks)
+            SetTimeScale(name, ticks);
     }
 }
