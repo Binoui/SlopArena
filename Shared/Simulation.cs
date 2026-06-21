@@ -179,8 +179,8 @@ namespace SlopArena.Shared
             if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
             {
                 s.IsGrounded = true;
-                s.PY = groundY;
                 s.VY = 0f;
+                // Don't snap PY to groundY — let MoveAndSlide handle floor contact smoothly
             }
             else
             {
@@ -300,8 +300,8 @@ namespace SlopArena.Shared
 
             if (s.IsGrounded)
             {
-                s.PY = groundY;
                 s.VY = 0f;
+                // Don't snap PY to groundY — let MoveAndSlide handle floor contact
             }
 
             if (wasAirborne && s.IsGrounded)
