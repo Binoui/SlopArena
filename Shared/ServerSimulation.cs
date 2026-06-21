@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using SlopArena.Shared.Abilities;
+using static SlopArena.Shared.AbilityExecutor;
 
 namespace SlopArena.Shared
 {
@@ -14,6 +16,9 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, bool> _prevAttack = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		private readonly SpellResolver _spellResolver = new();
+
+		// ── Ability pool ──
+		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
 
 		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
@@ -33,12 +38,117 @@ namespace SlopArena.Shared
 			_bakedData.Remove(id);
 			_animFrames.Remove(id);
 			_prevAnimIndex.Remove(id);
+			_prevAttack.Remove(id);
+			_activeAbilities.Remove(id);
 		}
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
+		public void SetState(ulong id, CharacterState state) => _states[id] = state;
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
 		public SpellResolver Resolver => _spellResolver;
+
+		// ── Ability pool management ──
+
+		/// <summary>
+		/// Activate a server ability for an entity.
+		/// Calls OnStart and registers the ability for per-tick updates.
+		/// </summary>
+		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def)
+		{
+			if (!_states.TryGetValue(entityId, out var state)) return;
+			ability.Resolver = _spellResolver;
+			ability.Slot = slot;
+			ability.OnStart(ref state, def);
+			state.AnimIndex = ability.AnimIndex;
+			state.IsServerAbility = true;
+			_states[entityId] = state;
+			_activeAbilities[entityId] = ability;
+		}
+
+		/// <summary>
+		/// Deactivate the current ability for an entity.
+		/// If not interrupted, calls OnEnd and applies cooldown.
+		/// On interruption (hitstun, death), OnEnd is skipped — the instance is just dropped.
+		/// </summary>
+		public void DeactivateAbility(ulong entityId, bool interrupted)
+		{
+			if (!_activeAbilities.TryGetValue(entityId, out var ability)) return;
+
+			if (!interrupted && _states.TryGetValue(entityId, out var state))
+			{
+				ability.OnEnd(ref state);
+
+				// Apply cooldown for the slot (ability.Slot is 0-based, SetCooldown expects 1-based)
+				if (ability.Slot < 6)
+					SetCooldown(ref state, (byte)(ability.Slot + 1), ability.Cooldown);
+
+				state.IsServerAbility = false;
+				_states[entityId] = state;
+			}
+			else if (_states.TryGetValue(entityId, out var interruptedState))
+			{
+				interruptedState.IsServerAbility = false;
+				_states[entityId] = interruptedState;
+			}
+
+			_activeAbilities.Remove(entityId);
+		}
+
+		/// <summary>
+		/// Get the active ability for an entity, or null if none.
+		/// </summary>
+		public ServerAbility? GetActiveAbility(ulong entityId)
+		{
+			return _activeAbilities.TryGetValue(entityId, out var a) ? a : null;
+		}
+
+		/// <summary>
+		/// Tick all active abilities. Called after simulation each frame.
+		/// Abilities that set AttackSlot=0 (via EndAbility) are auto-deactivated.
+		/// </summary>
+		public void TickAbilities(Dictionary<ulong, InputState> inputs)
+		{
+			// Collect entities whose ability ended this tick (can't modify dict during iteration)
+			var ended = new List<ulong>();
+
+			foreach (var kvp in _activeAbilities)
+			{
+				ulong id = kvp.Key;
+				var ability = kvp.Value;
+				if (!_states.TryGetValue(id, out var state)) continue;
+				if (!_defs.TryGetValue(id, out var def)) continue;
+				var input = inputs.TryGetValue(id, out var i) ? i : default;
+
+				ability.Tick(ref state, ref input, def);
+				state.AnimIndex = ability.AnimIndex;
+
+				// Check if ability ended itself (EndAbility set AttackSlot=0)
+				if (state.AttackSlot == 0)
+				{
+					ended.Add(id);
+				}
+				else
+				{
+					_states[id] = state;
+				}
+			}
+
+			// Deactivate ended abilities (cooldown still needs applying)
+			foreach (var id in ended)
+			{
+				if (_activeAbilities.TryGetValue(id, out var ability)
+				    && _states.TryGetValue(id, out var state))
+				{
+					// OnEnd already called by EndAbility, skip the duplicate
+					// Apply cooldown
+					if (ability.Slot < 6)
+						SetCooldown(ref state, (byte)(ability.Slot + 1), ability.Cooldown);
+					_states[id] = state;
+				}
+				_activeAbilities.Remove(id);
+			}
+		}
 
 		public static List<SpellResolver.EntityData> BuildEntitiesFromState(
 			CharacterState state, CharacterDefinition def, BakedAnimationData baked,
@@ -99,6 +209,30 @@ namespace SlopArena.Shared
 
 		public void Tick(Dictionary<ulong, InputState> inputs)
 		{
+			// ── Pre-sim: Activate server abilities from inputs ──
+			foreach (var kvp in _states)
+			{
+				ulong id = kvp.Key;
+				var state = kvp.Value;
+				var input = inputs.TryGetValue(id, out var i) ? i : default;
+				if (input.ActiveSlot == 0) continue;
+				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
+
+				var def = _defs[id];
+				bool airborne = !state.IsGrounded;
+				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
+				if (spec.AbilityTypeId == 0) continue; // data-driven, handled by SimulateTick
+
+				// Server-side ability: activate via pool
+				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(spec.AbilityTypeId);
+				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
+				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
+				// Consume input so SimulateTick doesn't also try to start an attack
+				var consumedInput = input;
+				consumedInput.ActiveSlot = 0;
+				inputs[id] = consumedInput;
+			}
+
 			// ── Step 1: Simulate each entity ──
 			foreach (var kvp in _states)
 			{
@@ -109,6 +243,9 @@ namespace SlopArena.Shared
 				Simulation.SimulateTick(ref state, def, input, _arena);
 				_states[id] = state;
 			}
+
+			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
+			TickAbilities(inputs);
 
 			// ── Step 2: Build entity list for hit detection ──
 			var entityList = new List<SpellResolver.EntityData>();

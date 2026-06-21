@@ -28,14 +28,16 @@ namespace SlopArena.Shared
         public byte AttackSlot;
         /// <summary>Combo stage index for animation selection.</summary>
         public byte ComboStage;
+        /// <summary>Animation index into the ability's AnimationNames[] (set by server ability class).</summary>
+        public byte AnimIndex;
         /// <summary>Facing yaw in radians, from server authority.</summary>
         public float FacingYaw;
 
         /// <summary>Match lifecycle state from server.</summary>
         public MatchState MatchState;
 
-        /// <summary>39 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 4 + 1;
+        /// <summary>40 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -54,6 +56,7 @@ namespace SlopArena.Shared
                 StateDurationFrames = s.StateTicks,
                 AttackSlot = s.AttackSlot,
                 ComboStage = s.ComboStage,
+                AnimIndex = s.AnimIndex,
                 FacingYaw = s.FacingYaw,
             };
         }
@@ -74,6 +77,7 @@ namespace SlopArena.Shared
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
                 ComboStage = ComboStage,
+                AnimIndex = AnimIndex,
                 FacingYaw = FacingYaw,
             };
         }
@@ -97,6 +101,7 @@ namespace SlopArena.Shared
             buffer[33] = ComboStage;
             BinaryPrimitives.WriteSingleLittleEndian(buffer.Slice(34, 4), FacingYaw);
             buffer[38] = (byte)MatchState;
+            buffer[39] = AnimIndex;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -119,6 +124,7 @@ namespace SlopArena.Shared
             packet.ComboStage = buffer[33];
             packet.FacingYaw = BinaryPrimitives.ReadSingleLittleEndian(buffer.Slice(34, 4));
             packet.MatchState = (MatchState)buffer[38];
+            packet.AnimIndex = buffer[39];
             return packet;
         }
     }

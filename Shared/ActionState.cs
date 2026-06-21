@@ -7,6 +7,7 @@ namespace SlopArena.Shared
         Hitstun = 2,
         Sliding = 3,
         Attacking = 4,
-        AirDodging = 5
+        AirDodging = 5,
+        Warping = 6
     }
 }

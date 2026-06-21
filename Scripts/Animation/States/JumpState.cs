@@ -22,6 +22,8 @@ public sealed partial class JumpState : State
     {
         _ticksRemaining = Player.CharDef.Movement.JumpDurationTicks;
         _groundedCount = 0;
+        // Reset jump animation on re-entry (double jump) — Godot 4.6 doesn't allow self-transitions
+        StateMachine.SetAnimParameter("parameters/jump/Animation/start_offset", 0f);
         base.Enter();
         Player.SetModelEmission(new Color(0.5f, 0.8f, 1.0f)); // Light blue
     }

@@ -42,7 +42,7 @@ namespace SlopArena.Shared
         /// <summary>
         /// full duration invincible
         /// </summary>
-        private const ushort DashInvincibilityTicks = 30;
+        private const ushort DashInvincibilityTicks = 15;
 
         /// <summary>
         /// 0.2s
@@ -110,6 +110,8 @@ namespace SlopArena.Shared
                 ProcessAirDodge();
             else if (s.State == ActionState.Attacking)
                 ProcessAttack(ref s, def, ref input);
+            else if (s.State == ActionState.Warping)
+                ProcessWarp(ref s, def);
 
             // 4.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
@@ -158,8 +160,8 @@ namespace SlopArena.Shared
                 }
             }
 
-            // 6. ProcessNormalMovement (always applicable)
-            if (s.State == ActionState.Idle || s.State == ActionState.Attacking)
+            // 6. ProcessNormalMovement (only for idle — attacks handle velocity via LungeForce)
+            if (s.State == ActionState.Idle)
             {
                 ProcessNormalMovement(ref s, stats, input);
             }
@@ -230,36 +232,30 @@ namespace SlopArena.Shared
         // ── HITSTUN + DI (Directional Influence) ──
 
         /// <summary>
-        /// Process hitstun state: freeze victim for a few frames, then apply knockback with DI.
-        /// DI (Directional Influence) = held input direction at END of hitstun modifies knockback.
+        /// Process hitstun state: apply knockback immediately (no freeze before flight).
+        /// HitstunTicks controls how long the victim can't act (animation lock).
+        /// DI input is stored during hitstun and applied when it expires.
         /// </summary>
         private static void ProcessHitstun(ref CharacterState s, InputState input)
         {
-            // Victim is frozen in place during hitstun
-            s.VX = 0f;
-            s.VZ = 0f;
-            // Keep vertical velocity (gravity still applies if airborne)
+            // Apply knockback immediately — don't freeze the victim
+            s.VX = s.KVX;
+            s.VY = s.KVY;
+            s.VZ = s.KVZ;
 
-            // Store current input (will use the LAST frame's input for DI)
-            // Player has the full hitstun window to react and hold a direction
+            // Store current input for DI (applied when hitstun expires)
             s.DIX = input.MoveX;
             s.DIY = input.MoveY;
 
-            // When hitstun ends, apply knockback modified by held direction
+            // When hitstun ends, apply DI influence to remaining knockback
             if (s.HitstunTicks == 0)
             {
-                // Apply DI influence to knockback direction
-                // DI modifies trajectory based on held direction at end of hitstun
-                const float DIStrength = 3.5f; // Strong influence
+                const float DIStrength = 3.5f;
                 s.KVX += s.DIX * DIStrength;
-                s.KVZ += s.DIY * DIStrength; // MoveY maps to Z in world space
-
-                // Reset DI
+                s.KVZ += s.DIY * DIStrength;
                 s.DIX = 0f;
                 s.DIY = 0f;
-
-                // Exit hitstun, enter knockback state
-                s.State = ActionState.Idle; // Will transition to knockback via HasKnockback check
+                s.State = ActionState.Idle;
             }
         }
 
@@ -476,6 +472,9 @@ namespace SlopArena.Shared
 
         private static void ProcessAttack(ref CharacterState s, CharacterDefinition def, ref InputState input)
         {
+            // Server-side abilities handle their own tick via ServerSimulation.TickAbilities
+            if (s.IsServerAbility) return;
+
             if (s.AnimLockTicks > 0)
                 return;
 
@@ -484,13 +483,65 @@ namespace SlopArena.Shared
             AbilityExecutor.ProcessActive(ref s, ability, ref input);
         }
 
-        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.</summary>
+        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.
+        /// Checks for warp-to-target when the ability has WarpRange > 0.</summary>
         private static void StartAttackFromSlot(ref CharacterState s, CharacterDefinition def, byte slot)
         {
             bool airborne = !s.IsGrounded;
             var ability = def.GetSlotAbility(slot - 1, airborne);
+
+            // Check for warp-to-target
+            if (ability != null && ability.Stages is { Length: > 0 }
+                && ability.Stages[0].WarpRange > 0f && s.WarpSpeed > 0f)
+            {
+                float dx = s.WarpTargetX - s.PX;
+                float dz = s.WarpTargetZ - s.PZ;
+                float distSq = dx * dx + dz * dz;
+                float attackRangeSq = s.WarpAttackRange * s.WarpAttackRange;
+                float warpRangeSq = ability.Stages[0].WarpRange * ability.Stages[0].WarpRange;
+
+                if (distSq <= warpRangeSq && distSq > attackRangeSq)
+                {
+                    s.AttackSlot = slot;
+                    s.State = ActionState.Warping;
+                    return;
+                }
+            }
+
             ushort cd = AbilityExecutor.GetCooldown(s, slot);
             AbilityExecutor.TryStart(ref s, ability, slot, cd);
+        }
+
+        /// <summary>
+        /// Process warping state: move toward warp target each tick, transition to attack on arrival.
+        /// </summary>
+        private static void ProcessWarp(ref CharacterState s, CharacterDefinition def)
+        {
+            float dx = s.WarpTargetX - s.PX;
+            float dz = s.WarpTargetZ - s.PZ;
+            float distSq = dx * dx + dz * dz;
+            float attackRangeSq = s.WarpAttackRange * s.WarpAttackRange;
+
+            // Close enough → start the attack
+            if (distSq <= attackRangeSq)
+            {
+                s.WarpSpeed = 0f; // clear warp
+                bool airborne = !s.IsGrounded;
+                var ability = def.GetSlotAbility(s.AttackSlot - 1, airborne);
+                ushort cd = AbilityExecutor.GetCooldown(s, s.AttackSlot);
+                AbilityExecutor.TryStart(ref s, ability, s.AttackSlot, cd);
+                return;
+            }
+
+            // Move toward target
+            float dist = MathF.Sqrt(distSq);
+            float step = s.WarpSpeed * TickDt;
+            float ratio = Math.Min(step / dist, 1f);
+            s.PX += dx * ratio;
+            s.PZ += dz * ratio;
+
+            // Face toward target
+            s.FacingYaw = MathF.Atan2(dx, dz);
         }
 
         /// <summary>

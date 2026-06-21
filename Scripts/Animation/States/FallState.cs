@@ -9,18 +9,23 @@ using Godot;
 /// </summary>
 public sealed partial class FallState : State
 {
-    /// <summary>Consecutive grounded frames needed to transition out of fall.</summary>
     private const int GroundedThreshold = 3;
     private int _groundedCount;
 
+    /// <summary>Start offset for the jump animation when entering from an air-dash (seconds).</summary>
+    private const float JumpStartOffset = 0.25f;
+
     public FallState()
     {
-        AnimationName = ""; // No animation — keep showing whatever was last playing
+        AnimationName = "jump";
     }
 
     public override void Enter()
     {
         _groundedCount = 0;
+        // When entering from air-dash, start the jump clip at an offset so the pose
+        // matches a falling pose rather than restarting from the jump-squat.
+        StateMachine.SetAnimParameter("parameters/jump/Animation/start_offset", JumpStartOffset);
         base.Enter();
         Player.SetModelEmission(new Color(0.5f, 0.8f, 1.0f));
     }

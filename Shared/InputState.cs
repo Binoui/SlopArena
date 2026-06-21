@@ -24,6 +24,11 @@ namespace SlopArena.Shared
         /// <summary>Aim distance in cm (ushort, 0-6500, i.e. 0-65m). Set by client during targeted-aiming state.</summary>
         public ushort AimDistance;
 
+        /// <summary>Warp target position (local-only, not networked).</summary>
+        public float WarpTargetX, WarpTargetZ;
+        public float WarpSpeed;
+        public float WarpAttackRange;
+
         /// <summary>14 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 distance)</summary>
         public const int Size = 8 + 1 + 1 + 2 + 2 + 2;
 

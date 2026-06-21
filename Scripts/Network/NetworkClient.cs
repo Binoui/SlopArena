@@ -54,7 +54,7 @@ public partial class NetworkClient : Node
     }
 
     /// <summary>
-    /// Receive packet format: entityId(8) + tick(4) + CharacterStatePacket(32) = 44 bytes each.
+    /// Receive packet format: entityId(8) + tick(4) + CharacterStatePacket(40) = 52 bytes each.
     /// Returns dict: entityId → (tick, state)
     /// </summary>
     public Dictionary<ulong, (uint tick, CharacterState state)> ReceiveStates()
