@@ -104,6 +104,16 @@ public partial class TrainingMatch : Node3D
         if (Player == null || _localSim == null) return;
 
         var input = Player.GetCurrentInput();
+
+        // Sync warp target from MovementComponent to local sim (client knows target position)
+        var playerState = Player.GetMovementState();
+        var simState = _localSim.GetState(1);
+        simState.WarpTargetX = playerState.WarpTargetX;
+        simState.WarpTargetZ = playerState.WarpTargetZ;
+        simState.WarpSpeed = playerState.WarpSpeed;
+        simState.WarpAttackRange = playerState.WarpAttackRange;
+        _localSim.SetState(1, simState);
+
         _localSim.Tick(new Dictionary<ulong, InputState> { { 1, input } });
 
         // Apply predicted states

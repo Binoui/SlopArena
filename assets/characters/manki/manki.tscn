@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://dbodxtgswwvfu" path="res://Scripts/Animation/States/IdleState.cs" id="4_t77cg"]
 [ext_resource type="Script" uid="uid://cxqqa40mttfb5" path="res://Scripts/Animation/States/RunState.cs" id="5_xfoba"]
 [ext_resource type="PackedScene" uid="uid://bw8k3y0r2vk" path="res://assets/characters/manki/manki.glb" id="7_j33en"]
-[ext_resource type="Script" uid="uid://doewcrpb1e88l" path="res://Scripts/Animation/States/LandingState.cs" id="8_8obs1"]
 [ext_resource type="Script" uid="uid://4cew66y7vjdy" path="res://Scripts/Animation/States/AttackState.cs" id="9_t77cg"]
 [ext_resource type="Script" uid="uid://d040towwir4ia" path="res://Scripts/Animation/States/AimedChargeState.cs" id="10_charge"]
 [ext_resource type="Script" uid="uid://drks1rbds7g4t" path="res://Scripts/Animation/States/FallState.cs" id="10_gs8io"]
@@ -28,9 +27,6 @@ script = ExtResource("5_xfoba")
 
 [node name="air" type="Node" parent="FSM" unique_id=1630159486]
 script = ExtResource("10_gs8io")
-
-[node name="landing" type="Node" parent="FSM" unique_id=415177410]
-script = ExtResource("8_8obs1")
 
 [node name="attack" type="Node" parent="FSM" unique_id=881088101]
 script = ExtResource("9_t77cg")

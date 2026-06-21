@@ -51,9 +51,6 @@ public sealed partial class HitReactionState : State
         if (Movement.State.AnimLockTicks > 0)
             return;
 
-        if (Movement.IsGrounded)
-            StateMachine.TransitionTo("idle");
-        else
-            StateMachine.TransitionTo("fall");
+        StateMachine.TransitionTo("fall");
     }
 }

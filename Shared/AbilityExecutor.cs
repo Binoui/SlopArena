@@ -39,6 +39,14 @@ namespace SlopArena.Shared
                 s.AttackElapsedTicks = 0;
                 s.AttackSlot = slot;
                 s.ComboTimerTicks = stage.ChainWindowTicks;
+
+                // Lunge: forward burst during the attack (DKO-style)
+                if (stage.LungeForce > 0f)
+                {
+                    s.VX = MathF.Sin(s.FacingYaw) * stage.LungeForce;
+                    s.VZ = MathF.Cos(s.FacingYaw) * stage.LungeForce;
+                }
+
                 return true;
             }
 
@@ -52,6 +60,18 @@ namespace SlopArena.Shared
         /// </summary>
         public static bool ProcessActive(ref CharacterState s, AbilitySpec ability, ref InputState input)
         {
+            // Apply per-stage movement velocity (backflip, jump arcs, etc.)
+            if (s.ComboStage < ability.Stages.Length)
+            {
+                var currentStage = ability.Stages[s.ComboStage];
+                if (currentStage.MoveX != 0f || currentStage.MoveY != 0f || currentStage.MoveZ != 0f)
+                {
+                    s.VX = currentStage.MoveX;
+                    s.VY = currentStage.MoveY;
+                    s.VZ = currentStage.MoveZ;
+                }
+            }
+
             if (s.AnimLockTicks > 0) return true; // still locked, nothing to do
 
             // 1. Buffered chain (click buffered during lock, set by CanBuffer check in Simulation)
