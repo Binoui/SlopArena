@@ -72,18 +72,12 @@ public partial class PlayerController : CharacterBody3D
     private ushort? _abilityAimDistance;
 
     /// <summary>
-    /// Persistent damage % label above the character (Smash-style)
-    /// </summary>
-    private Label3D? _damagePercentLabel;
-
-    /// <summary>
-    /// Ground arrow indicator
-    /// </summary>
-    private MeshInstance3D? _groundArrow;
-    /// <summary>
     /// camera-relative (X=camRight, Y=camForward)
     /// </summary>
     private Vector2 _snappedInputDirection = Vector2.Zero;
+
+    private GroundArrowIndicator? _groundArrowIndicator;
+    private DebugOverlay? _debugOverlay;
 
     // ==========================================
     // RESPAWN STATE (Player + NPC)
@@ -323,6 +317,9 @@ public partial class PlayerController : CharacterBody3D
             _fsm = _playerModel.GetNodeOrNull<StateMachine>("FSM");
             if (_fsm == null)
                 GD.PrintErr($"{_playerClass}: No FSM node found — add StateMachine named 'FSM' to model scene");
+
+            // Apply animation TimeScales: duration = bakedFrames / DurationTicks
+            _playerModelHelper?.ApplyAnimationTimeScales(animTree, _charDef);
         }
 
         // Initialize StateMachine deferred (needs AnimationTree to settle in tree)
@@ -335,9 +332,6 @@ public partial class PlayerController : CharacterBody3D
         // Register programmatically-added states (not in .tscn)
         _fsm?.AddState(new JumpState());
 
-        // Apply animation TimeScales: duration = bakedFrames / DurationTicks
-        ApplyAnimationTimeScales();
-
         // Bone-attached hurtboxes (Smash-style — multiple spheres on skeleton bones)
         if (skeleton != null)
         {
@@ -349,141 +343,18 @@ public partial class PlayerController : CharacterBody3D
         // Subscribed in SetupCombat via OnCombatTakeDamage
 
         // Ground arrow indicator
-        _groundArrow = CreateGroundArrow();
-        AddChild(_groundArrow);
+        _groundArrowIndicator = new GroundArrowIndicator { Name = "GroundArrow" };
+        AddChild(_groundArrowIndicator);
 
         if (_isPlayerControlled)
         {
             Input.MouseMode = Input.MouseModeEnum.Captured;
         }
-        SetupDebugLabel();
-        SetupDamageLabel();
-    }
-
-    // ── DEBUG ──
-
-    private Label? _debugLabel;
-
-    private void SetupDebugLabel()
-    {
-        // Only show debug for the real player (Name set before _Ready)
-        if (Name != "Player") return;
-
-        _debugLabel = new Label();
-        _debugLabel.Name = "DebugLabel";
-        _debugLabel.Position = new Vector2(10, 10);
-        _debugLabel.HorizontalAlignment = HorizontalAlignment.Left;
-        _debugLabel.AddThemeColorOverride("font_color", new Color(0, 1, 0));
-        _debugLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.8f));
-        _debugLabel.AddThemeConstantOverride("shadow_offset_x", 1);
-        _debugLabel.AddThemeConstantOverride("shadow_offset_y", 1);
-
-        var canvas = new CanvasLayer();
-        canvas.AddChild(_debugLabel);
-        AddChild(canvas);
-    }
-
-    private void UpdateDebugLabel()
-    {
-        if (_debugLabel == null) return;
-
-        string fsmState = _fsm?.CurrentStateName ?? "?";
-        _debugLabel.Text = $"fsm: {fsmState}  Y: {Velocity.Y:F1}  floor: {IsOnFloor()}";
-    }
-
-    // ── DAMAGE % LABEL (Smash-style, above everyone) ──
-
-    private void SetupDamageLabel()
-    {
-        _damagePercentLabel = new Label3D();
-        _damagePercentLabel.Name = "DamagePercentLabel";
-        _damagePercentLabel.PixelSize = 0.012f;
-        _damagePercentLabel.Billboard = BaseMaterial3D.BillboardModeEnum.Enabled;
-        _damagePercentLabel.OutlineSize = 4;
-        _damagePercentLabel.OutlineModulate = new Color(0f, 0f, 0f, 0.9f);
-        _damagePercentLabel.Modulate = Colors.White;
-        _damagePercentLabel.Position = new Vector3(0f, 5f, 0f);
-        _damagePercentLabel.Text = "0%";
-        AddChild(_damagePercentLabel);
-    }
-
-    private void UpdateDamageLabel()
-    {
-        if (_damagePercentLabel == null) return;
-        ushort pct = _movementComponent.DamagePercent;
-        _damagePercentLabel.Text = $"{pct}%";
-        float t = Mathf.Clamp(pct / 150f, 0f, 1f);
-        _damagePercentLabel.Modulate = new Color(1f, 1f - (t * 0.7f), 0.2f - (t * 0.1f));
+        _debugOverlay = new DebugOverlay(this, Name == "Player");
+        AddChild(_debugOverlay);
     }
 
     // ==========================================
-    // GROUND ARROW (indicates input direction)
-    // ==========================================
-
-    private MeshInstance3D CreateGroundArrow()
-    {
-        var arrow = new MeshInstance3D();
-        arrow.Name = "GroundArrow";
-
-        // Build a chevron/triangle pointing in +Z (forward)
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-
-        // Arrow shape: triangle pointing forward (Z+)
-        const float size = 0.8f;
-
-        // Tip
-        st.AddVertex(new Vector3(0f, 0f, size));
-        // Left
-        st.AddVertex(new Vector3(-size * 0.5f, 0f, 0f));
-        // Right
-        st.AddVertex(new Vector3(size * 0.5f, 0f, 0f));
-
-        st.GenerateNormals();
-        arrow.Mesh = st.Commit();
-
-        // Semi-transparent white material
-        arrow.MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(1f, 1f, 1f, 0.6f),
-            EmissionEnabled = true,
-            Emission = new Color(0.8f, 0.8f, 1f),
-            EmissionEnergyMultiplier = 1.5f,
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelDither,
-            DistanceFadeMaxDistance = 50f,
-        };
-
-        arrow.Visible = false;
-        return arrow;
-    }
-
-    private void UpdateGroundArrow(bool hasInput)
-    {
-        if (_groundArrow == null) return;
-
-        if (!hasInput || _isNPC)
-        {
-            _groundArrow.Visible = false;
-            return;
-        }
-
-        _groundArrow.Visible = true;
-
-        // Position at character's feet on the ground
-        Vector3 pos = GlobalPosition;
-        pos.Y = 0.05f;
-        _groundArrow.Position = pos;
-
-        // Rotate to face the input direction (camera-relative snapped direction)
-        if (_snappedInputDirection.LengthSquared() > 0.001f)
-        {
-            float angle = MathF.Atan2(_snappedInputDirection.X, _snappedInputDirection.Y);
-            _groundArrow.Rotation = new Vector3(0f, angle, 0f);
-        }
-    }
-
     // ==========================================
     // INPUT MAP SETUP
     // ==========================================
@@ -596,14 +467,14 @@ public partial class PlayerController : CharacterBody3D
     {
         float dt = (float)delta;
         _inputCtrl.Poll();
-        UpdateDebugLabel();
-        UpdateDamageLabel();
+        _debugOverlay?.UpdateDebug(_fsm?.CurrentStateName ?? "?", Velocity.Y, IsOnFloor());
+        _debugOverlay?.UpdateDamage(_movementComponent.DamagePercent);
 
         // ── Centralized jump input ──
         // All jump transitions (ground jump, double jump after hitstun)
         // are handled here rather than in individual states.
         string currentState = _fsm?.CurrentStateName ?? "";
-        if (_inputCtrl.JumpJustPressed && currentState is "idle" or "run" or "landing" or "fall")
+        if (_inputCtrl.JumpJustPressed && currentState is "idle" or "run" or "fall")
         {
             _fsm?.TransitionTo("jump");
         }
@@ -749,7 +620,7 @@ public partial class PlayerController : CharacterBody3D
             _movementComponent.DoTechRoll();
 
         // Update ground arrow
-        UpdateGroundArrow(_snappedInputDirection.LengthSquared() > 0.001f);
+        _groundArrowIndicator?.Update(GlobalPosition, _snappedInputDirection);
 
         // Animation handled by FSM states (idle/run/jump/fall/landing)
         // FSM runs in _Process — no manual Travel calls needed here
@@ -763,128 +634,26 @@ public partial class PlayerController : CharacterBody3D
 
     private InputState BuildInputState()
     {
-        var input = new InputState();
+        var result = _inputCtrl.BuildInputState(
+            camera: _camera,
+            bodyYaw: GlobalRotation.Y,
+            isNPC: _isNPC,
+            isAiming: _activeAbility != null,
+            pendingSlotPress: _pendingSlotPress,
+            abilityAimYaw: _abilityAimYaw,
+            abilityAimDistance: _abilityAimDistance,
+            fsm: _fsm
+        );
 
-        // If NPC with AI-injected input, use that directly
-        if (_isNPC && _inputCtrl.IsAIControlled())
-        {
-            var (moveX, moveY) = _inputCtrl.GetMovement();
-            input.MoveX = moveX;
-            input.MoveY = moveY;
-            input.Up = moveY < -0.3f;
-            input.Down = moveY > 0.3f;
-            input.Left = moveX < -0.3f;
-            input.Right = moveX > 0.3f;
-            input.Jump = _inputCtrl.JumpJustPressed;
-            input.Dash = _inputCtrl.DashJustPressed;
-            input.Crouch = false; // NPCs don't crouch for now
+        _moveDirection = result.moveDirection;
+        _snappedInputDirection = result.snappedInputDirection;
 
-            // NPC abilities use the same ActiveSlot pipeline as player
-            input.ActiveSlot = _pendingSlotPress;
-            _pendingSlotPress = 0;
-
-            // Set move direction for animations
-            _moveDirection = new Vector3(moveX, 0f, moveY).Normalized();
-            _snappedInputDirection = new Vector2(moveX, moveY);
-
-            return input;
-        }
-
-        // Human player: read from Godot Input
-        // Get camera-relative forward/right (default to world if no camera)
-        Vector3 camForward = Vector3.Forward;
-        Vector3 camRight = Vector3.Right;
-        if (_camera != null)
-        {
-            // Z = direction où la caméra regarde = -Basis.Z = vers le centre de l'écran
-            camForward = _camera.GetForwardDirection();
-            camRight = _camera.GetRightDirection();
-        }
-
-        // Build raw camera-relative direction
-        Vector3 rawDir = Vector3.Zero;
-        if (Input.IsActionPressed("move_forward")) rawDir += camForward;
-        if (Input.IsActionPressed("move_back")) rawDir -= camForward;
-        if (Input.IsActionPressed("move_left")) rawDir -= camRight;
-        if (Input.IsActionPressed("move_right")) rawDir += camRight;
-
-        // 8-direction snap
-        _moveDirection = Vector3.Zero;
-        _snappedInputDirection = Vector2.Zero;
-
-        if (rawDir.LengthSquared() > 0.001f)
-        {
-            // Get angle in camera-relative space (camRight=X, camForward=Z)
-            // Convert to camera-relative 2D coordinates
-            float rawForward = rawDir.Dot(camForward);
-            float rawRight = rawDir.Dot(camRight);
-
-            // Snap to 8 directions: compute angle and round to nearest 45°
-            float angle = MathF.Atan2(rawRight, rawForward);
-            const float snapStep = MathF.PI / 4f; // 45°
-            float snappedAngle = MathF.Round(angle / snapStep) * snapStep;
-
-            // Convert snapped angle back to camera-relative direction
-            float fwd = MathF.Cos(snappedAngle);
-            float rgt = MathF.Sin(snappedAngle);
-
-            // Store in snapped direction (for ground arrow)
-            _snappedInputDirection = new Vector2(rgt, fwd);
-
-            // Convert from camera-relative to world space
-            _moveDirection = (camForward * fwd) + (camRight * rgt);
-            _moveDirection = _moveDirection.Normalized();
-        }
-
-        input.MoveX = _moveDirection.X;
-        input.MoveY = _moveDirection.Z;
-        input.Up = _moveDirection.Z < -0.3f;      // forward in world +Z
-        input.Down = _moveDirection.Z > 0.3f;     // backward
-        input.Left = _moveDirection.X < -0.3f;    // left
-        input.Right = _moveDirection.X > 0.3f;    // right
-        input.Jump = Input.IsActionJustPressed("jump");
-        input.Dash = Input.IsActionJustPressed("dash");
-        input.Crouch = Input.IsActionPressed("crouch");
-        // ActiveSlot replaces the old Attack flag — sim handles everything
-        // Consume pending slot press (sim handles buffering via InputBufferWindow)
-        input.ActiveSlot = _pendingSlotPress;
+        // Clear consumed frame state owned by PlayerController
         _pendingSlotPress = 0;
-        input.IsAiming = _activeAbility != null;
-        // Send facing yaw (degrees * 100, clamp to short range)
-        float deg = Mathf.RadToDeg(GlobalRotation.Y);
-        input.FacingYaw = (short)Math.Clamp(deg * 100f, -32768, 32767);
-        // Send aim yaw from camera (combat facing), overridden by active ability
-        float aimDeg = _camera != null ? Mathf.RadToDeg(_camera.GetCameraYaw()) : deg;
-        input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768, 32767);
-        if (input.ActiveSlot > 0 || input.Jump || input.Dash)
-            GD.Print($"[Input] FacingYaw={input.FacingYaw}deg AimYaw={input.AimYaw}deg bodyYaw={deg:F2} camYaw={aimDeg:F2}");
-        input.AimDistance = 0;
-
-        // Active ability overrides aim data
-        if (_abilityAimYaw.HasValue)
-        {
-            float throwDeg = Mathf.RadToDeg(_abilityAimYaw.Value);
-            input.AimYaw = (short)Math.Clamp(throwDeg * 100f, -32768, 32767);
-        }
-        if (_abilityAimDistance.HasValue)
-            input.AimDistance = _abilityAimDistance.Value;
-
-        // Clear consumed aim data (was set by Tick, consumed here in BuildInputState)
         _abilityAimYaw = null;
         _abilityAimDistance = null;
 
-        // Zero movement if FSM state disallows it (e.g., aimed charge, attack)
-        if (_fsm != null && !_fsm.CanMove())
-        {
-            input.MoveX = 0f;
-            input.MoveY = 0f;
-            input.Jump = false;
-            input.Dash = false;
-            _moveDirection = Vector3.Zero;
-            _snappedInputDirection = Vector2.Zero;
-        }
-
-        return input;
+        return result.input;
     }
 
     // ==========================================
@@ -1141,77 +910,4 @@ public partial class PlayerController : CharacterBody3D
     /// ==========================================
     /// </summary>
     private Vector2 _storedMousePos = Vector2.Zero;
-
-    // ==========================================
-    // ANIMATION TIME SCALE
-    // ==========================================
-
-    /// <summary>
-    /// Compute and apply TimeScale for each ability animation so the visual
-    /// duration matches DurationTicks from CharacterDefinition.
-    /// Formula: TimeScale = bakedFrameCount / DurationTicks
-    /// Looping animations (idle/run/jump/fall) stay at 1.0.
-    /// </summary>
-    private void ApplyAnimationTimeScales()
-    {
-        if (_bakedData == null || _playerModel == null) return;
-        var animTree = _playerModel.GetNodeOrNull<AnimationTree>("AnimationTree");
-        if (animTree == null) return;
-
-        void SetTimeScale(string animName, ushort durationTicks)
-        {
-            if (durationTicks == 0) return;
-            int frameCount = 0;
-            for (int a = 0; a < _bakedData.Animations.Length; a++)
-            {
-                if (_bakedData.Animations[a].Name == animName)
-                {
-                    frameCount = _bakedData.Animations[a].FrameCount;
-                    break;
-                }
-            }
-            if (frameCount <= 0) return;
-
-            float timeScale = frameCount / (float)durationTicks;
-            string paramPath = $"parameters/{animName}/TimeScale/scale";
-            // Only set if the AnimationTree has this parameter
-            try { animTree.Set(paramPath, timeScale); }
-            catch { return; } // parameter doesn't exist — skip
-            GD.Print($"[TimeScale] {animName}: {frameCount}f / {durationTicks}t = {timeScale:F3}x");
-        }
-
-        // Collect all (animationName, DurationTicks) pairs from all abilities
-        var animToTicks = new System.Collections.Generic.List<(string name, ushort ticks)>();
-
-        void CollectStages(AbilitySpec ability)
-        {
-            for (int s = 0; s < ability.Stages.Length; s++)
-            {
-                string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
-                if (!string.IsNullOrEmpty(an))
-                    animToTicks.Add((an, ability.Stages[s].DurationTicks));
-            }
-            if (ability.ChargedStages != null)
-            {
-                for (int s = 0; s < ability.ChargedStages.Length; s++)
-                {
-                    string an = s < ability.AnimationNames.Length ? ability.AnimationNames[s] : "";
-                    if (!string.IsNullOrEmpty(an))
-                        animToTicks.Add((an, ability.ChargedStages[s].DurationTicks));
-                }
-            }
-        }
-
-        CollectStages(_charDef.LMB);
-        CollectStages(_charDef.RMB);
-        CollectStages(_charDef.AirLMB);
-        CollectStages(_charDef.AirRMB);
-        CollectStages(_charDef.Q);
-        CollectStages(_charDef.E);
-        CollectStages(_charDef.R);
-        CollectStages(_charDef.F);
-
-        foreach (var (name, ticks) in animToTicks)
-            SetTimeScale(name, ticks);
-    }
 }

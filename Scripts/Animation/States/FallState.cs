@@ -3,8 +3,9 @@ using Godot;
 
 /// <summary>
 /// Fall state — default airborne state when not jumping.
-/// Uses the dedicated "fall" AnimationTree node.
+/// No dedicated animation — keeps showing whatever was last playing (jump, run, idle).
 /// Transitions to JumpState on double-jump, to run/idle on ground contact.
+/// Avoids the jarring fall-pose flash when landing quickly after a jump.
 /// </summary>
 public sealed partial class FallState : State
 {
@@ -14,7 +15,7 @@ public sealed partial class FallState : State
 
     public FallState()
     {
-        AnimationName = "fall";
+        AnimationName = ""; // No animation — keep showing whatever was last playing
     }
 
     public override void Enter()
@@ -40,7 +41,8 @@ public sealed partial class FallState : State
             {
                 Vector3 vel = Player.Velocity;
                 bool moving = (vel.X * vel.X + vel.Z * vel.Z) > 1f;
-                StateMachine.TransitionTo(moving ? "run" : "landing");
+                Movement.ResetJumps();
+                StateMachine.TransitionTo(moving ? "run" : "idle");
             }
         }
         else
