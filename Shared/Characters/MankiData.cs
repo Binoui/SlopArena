@@ -80,7 +80,6 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Monkey Combo",
-                AbilityTypeId = 1,
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -117,7 +116,6 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Aerosol + Lighter",
-                AbilityTypeId = 3,
                 CooldownTicks = 30,
                 Stages = new AttackStage[]
                 {
@@ -176,7 +174,6 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Round Bomb",
-                AbilityTypeId = 2,
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {

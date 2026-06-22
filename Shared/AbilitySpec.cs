@@ -12,7 +12,10 @@ namespace SlopArena.Shared
     public class AbilitySpec
     {
         public string Name = "";
-        /// <summary>Unique numeric ID for factory dispatch (0 = GenericMelee fallback).</summary>
+        /// <summary>
+        /// DEPRECATED: No longer used since slot-based mapping.
+        /// Factory now maps by (CharacterClass, slot) instead of global typeId.
+        /// </summary>
         public byte AbilityTypeId;
         /// <summary>0 = no cooldown</summary>
         public ushort CooldownTicks;

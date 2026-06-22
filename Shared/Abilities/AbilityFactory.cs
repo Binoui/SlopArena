@@ -3,42 +3,45 @@ using System;
 namespace SlopArena.Shared.Abilities;
 
 /// <summary>
-/// Factory for instantiating and initializing server-side abilities.
-/// Uses character class + ability slot to namespace ability IDs.
+/// Factory for instantiating server-side abilities.
+/// Maps (CharacterClass, slot) to concrete ServerAbility implementations.
+/// Slot: 0=LMB, 1=RMB, 2=Q, 3=E, 4=R, 5=F
 /// </summary>
 public static class AbilityFactory
 {
     /// <summary>
-    /// Create a server ability instance by character class and ability type ID.
-    /// Type ID is character-specific (each character has its own ID namespace).
+    /// Create a server ability instance by character class and slot.
+    /// Returns null if the slot has no ServerAbility (data-driven fallback).
     /// </summary>
-    public static ServerAbility CreateServer(CharacterClass characterClass, byte typeId)
+    public static ServerAbility? CreateServer(CharacterClass characterClass, byte slot, bool airborne)
     {
         return characterClass switch
         {
-            CharacterClass.Manki => CreateMankiAbility(typeId),
-            CharacterClass.Bunny => CreateBunnyAbility(typeId),
-            _ => throw new ArgumentException($"Unknown character class: {characterClass}"),
+            CharacterClass.Manki => CreateMankiAbility(slot, airborne),
+            CharacterClass.Bunny => CreateBunnyAbility(slot, airborne),
+            _ => null,
         };
     }
 
-    private static ServerAbility CreateMankiAbility(byte typeId) => typeId switch
+    private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        1 => new MankiLmbCombo(),
-        2 => new MankiRoundBomb(),
-        3 => new MankiAerosolFlame(),
-        _ => throw new ArgumentException($"Unknown Manki ability typeId: {typeId}"),
+        (0, false) => new MankiLmbCombo(),     // LMB
+        (1, false) => new MankiAerosolFlame(), // RMB
+        (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
+        // (3, _) => new MankiE(),             // E - TODO
+        // (4, _) => new MankiR(),             // R - TODO
+        // (5, _) => new MankiF(),             // F - TODO
+        _ => null, // No ServerAbility = data-driven fallback
     };
 
-    private static ServerAbility CreateBunnyAbility(byte typeId) => typeId switch
+    private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
         // TODO: Implement Bunny abilities
-        _ => throw new NotImplementedException($"Bunny ability {typeId} not implemented yet"),
+        _ => null,
     };
 
     /// <summary>
     /// Initialize an ability's metadata from its spec definition.
-    /// Slot is passed separately (0-based: 0 = LMB, 1 = RMB, etc.).
     /// </summary>
     public static void InitFromSpec(ServerAbility ability, AbilitySpec spec, byte slot)
     {

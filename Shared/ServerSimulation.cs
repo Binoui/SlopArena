@@ -256,16 +256,12 @@ namespace SlopArena.Shared
 				ushort cooldown = GetCooldown(state, input.ActiveSlot);
 				if (cooldown > 0) continue;
 
-				if (spec.AbilityTypeId == 0)
-				{
-					Console.WriteLine($"[ServerSimulation] ERROR: Ability slot {input.ActiveSlot} has AbilityTypeId=0 (no ServerAbility assigned)");
-					continue;
-				}
-
-				// Server-side ability: activate via pool
+				// Server-side ability: try to create via slot mapping
 				if (_activeAbilities.ContainsKey(id)) continue;
 
-				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, spec.AbilityTypeId);
+				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
+				if (ability == null) continue; // No ServerAbility for this slot, skip (data-driven fallback)
+
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 				// Consume input so SimulateTick doesn't also try to start an attack

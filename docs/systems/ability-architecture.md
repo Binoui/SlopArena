@@ -16,7 +16,7 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 │  CharacterDefinition (MankiData.cs)                  │
 │  ┌────────────────────────────────────────────────┐ │
 │  │ LMB = new AbilitySpec {                        │ │
-│  │   AbilityTypeId = 1,  // → MankiLmbCombo       │ │
+│  │   Name = "Monkey Combo",                       │ │
 │  │   Params = {                                   │ │
 │  │     ["lunge_duration"] = 10f,                  │ │
 │  │   },                                           │ │
@@ -26,11 +26,11 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
-│  AbilityFactory.CreateServer(typeId)                 │
+│  AbilityFactory.CreateServer(characterClass, slot)   │
 │  ┌────────────────────────────────────────────────┐ │
-│  │ 1 => new MankiLmbCombo()                       │ │
-│  │ 2 => new MankiRoundBomb()                      │ │
-│  │ 3 => new MankiAerosolFlame()                   │ │
+│  │ Manki + slot 0 => new MankiLmbCombo()          │ │
+│  │ Manki + slot 2 => new MankiRoundBomb()         │ │
+│  │ Manki + slot 1 => new MankiAerosolFlame()      │ │
 │  └────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
                     ▼
@@ -117,24 +117,44 @@ public sealed class NewAbility : ServerAbility
 2. **Register in AbilityFactory:**
 ```csharp
 // Add to the appropriate character's private method (e.g., CreateMankiAbility)
-4 => new NewAbility(),
+private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
+{
+    (0, false) => new MankiLmbCombo(),
+    (1, false) => new MankiAerosolFlame(),
+    (2, _) => new MankiRoundBomb(),
+    (3, _) => new NewAbility(),  // New slot mapping
+    _ => null,
+};
 ```
 
-### Character-Namespaced IDs
+### Slot-Based Mapping
 
-Each character has its own ability ID namespace (1-255 per character). This allows multiple characters to use ID 1 for their LMB without conflicts.
+Each ability is mapped by (CharacterClass, slot, airborne) tuple:
+- Slot 0 = LMB
+- Slot 1 = RMB
+- Slot 2 = Q
+- Slot 3 = E
+- Slot 4 = R
+- Slot 5 = F
+
+The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air punch when airborne).
 
 **Example:**
-- Manki LMB = `CharacterClass.Manki, typeId=1`
-- Bunny LMB = `CharacterClass.Bunny, typeId=1`
-
-No collision because they're in different character namespaces.
+```csharp
+private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
+{
+    (0, false) => new MankiLmbCombo(),     // Ground LMB
+    (0, true) => new MankiAirPunch(),      // Air LMB
+    (1, false) => new MankiAerosolFlame(), // Ground RMB
+    _ => null, // Data-driven fallback for slots without ServerAbility
+};
+```
 
 3. **Add to CharacterDefinition:**
 ```csharp
-LMB = new AbilitySpec
+E = new AbilitySpec
 {
-    AbilityTypeId = 4,
+    Name = "New Ability",
     Params = new() { ["duration"] = 30f },
     // ... rest of data
 }
