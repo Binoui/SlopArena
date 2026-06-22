@@ -10,6 +10,12 @@
 ```
 SlopArena/
 ├── Shared/              ← Pure C# library. NO Godot deps. The game's brain.
+│   ├── Abilities/           ← ServerAbility implementations (pure C#, no Godot)
+│   │   ├── ServerAbility.cs     ← Base class: OnStart/Tick/OnEnd lifecycle
+│   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
+│   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
+│   │   ├── MankiRoundBomb.cs    ← Manki Q: parabolic projectile
+│   │   └── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
 │   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs     ← Hitbox spawn/Tick: sphere-capsule collision math
 │   ├── CharacterState.cs    ← Per-tick entity state (pos, vel, cooldowns, deaths)
@@ -117,13 +123,19 @@ SlopArena/
 ## Changing Gameplay Data
 
 ### Tune a character's stats
-→ `Shared/CharacterDefinition.cs` → `BuildManki()` or `BuildBunny()`
+→ `Shared/Characters/MankiData.cs` or `BunnyData.cs`
 - `Movement` struct: speed, jump, gravity, dash
 - `HurtboxBoneDefs[]`: bone-attached hurtbox spheres
-- `LMB/RMB/Q/E/R/F` abilities: `AbilityData` with `AttackStage[]`
+- `LMB/RMB/Q/E/R/F` abilities: `AbilitySpec` with `AbilityTypeId` and `Params`
+
+### Tune a specific ability's behavior
+→ `Shared/Characters/MankiData.cs` → the ability's `Params` dictionary
+- Tunable parameters like `lunge_duration`, `explosion_damage`, `charge_threshold`
+- No code recompilation needed for balance changes
+- Logic lives in `Shared/Abilities/<CharacterName><AbilityName>.cs`
 
 ### Tune a specific ability's hitbox
-→ `Shared/CharacterDefinition.cs` → the ability's `Stages[].HitboxEvents[]`
+→ `Shared/Characters/MankiData.cs` → the ability's `Stages[].HitboxEvents[]`
 - `TriggerTick`: when during the animation the hitbox spawns
 - `DurationTicks`: how long it lives
 - `Radius`: hitbox size (sphere) or capsule radius
@@ -173,6 +185,7 @@ dotnet run --project Server/SlopArena.Server.csproj
 | Doc | Covers |
 |-----|--------|
 | `docs/systems/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
+| `docs/systems/ability-architecture.md` | ServerAbility pattern, lifecycle, creating new abilities |
 | `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
 | `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
 | `docs/systems/animation-system.md` | FSM lifecycle, AnimationTree structure |
