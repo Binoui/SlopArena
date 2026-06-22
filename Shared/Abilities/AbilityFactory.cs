@@ -1,3 +1,5 @@
+using System;
+
 namespace SlopArena.Shared.Abilities;
 
 /// <summary>

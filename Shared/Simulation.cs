@@ -103,17 +103,30 @@ namespace SlopArena.Shared
                 return;
             }
 
-            // 4. State machine
-            if (s.State == ActionState.Dashing)
-                ProcessDash(ref s, stats);
-            else if (s.State == ActionState.AirDodging)
-                ProcessAirDodge();
-            else if (s.State == ActionState.Attacking)
-                ProcessAttack(ref s, def, ref input);
-            else if (s.State == ActionState.Warping)
-                ProcessWarp(ref s, def);
+            // 4. Warp processing: velocity override during any state
+            if (s.WarpSpeed > 0f)
+            {
+                bool warpComplete = ProcessWarp(ref s, def, arena);
+                if (warpComplete)
+                {
+                    // Warp arrival: ability activation is handled by ServerAbility.OnStart
+                    // Just clear warp state here
+                    s.State = ActionState.Idle;
+                }
+            }
+            // Only process state machine if not warping
+            else
+            {
+                // 5. State machine
+                if (s.State == ActionState.Dashing)
+                    ProcessDash(ref s, stats);
+                else if (s.State == ActionState.AirDodging)
+                    ProcessAirDodge();
+                else if (s.State == ActionState.Attacking)
+                    ProcessAttack(ref s, def, ref input);
+            }
 
-            // 4.5 Consume buffered input (any lock just expired)
+            // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)
             {
@@ -122,7 +135,7 @@ namespace SlopArena.Shared
                 StartAttackFromSlot(ref s, def, slot);
             }
 
-            // 5. Input-driven actions (only when not locked by animation)
+            // 6. Input-driven actions (only when not locked by animation)
             if (s.AnimLockTicks == 0)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
@@ -160,21 +173,21 @@ namespace SlopArena.Shared
                 }
             }
 
-            // 6. ProcessNormalMovement (only for idle — attacks handle velocity via LungeForce)
+            // 7. ProcessNormalMovement (only for idle — attacks handle velocity via LungeForce)
             if (s.State == ActionState.Idle)
             {
                 ProcessNormalMovement(ref s, stats, input);
             }
 
-            // 5. Gravity
+            // 8. Gravity
             ApplyGravity(ref s, stats);
 
-            // 6. Position update (Euler integration)
+            // 9. Position update (Euler integration)
             s.PX += s.VX * TickDt;
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 7. Ground collision (platform-aware)
+            // 10. Ground collision (platform-aware)
             float capsuleHalf = def.CapsuleHeight * 0.5f;
             float bestSurfaceY = GetGroundSurfaceY(s.PX, s.PZ, s.PY, capsuleHalf, arena);
             float groundY = bestSurfaceY + capsuleHalf;
@@ -189,7 +202,7 @@ namespace SlopArena.Shared
                 s.IsGrounded = false;
             }
 
-            // 8. Landing cleanup
+            // 11. Landing cleanup
             if (s.State == ActionState.AirDodging && s.IsGrounded)
             {
                 s.State = ActionState.Idle;
@@ -483,65 +496,47 @@ namespace SlopArena.Shared
             AbilityExecutor.ProcessActive(ref s, ability, ref input);
         }
 
-        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.
-        /// Checks for warp-to-target when the ability has WarpRange > 0.</summary>
+        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.</summary>
         private static void StartAttackFromSlot(ref CharacterState s, CharacterDefinition def, byte slot)
         {
             bool airborne = !s.IsGrounded;
             var ability = def.GetSlotAbility(slot - 1, airborne);
-
-            // Check for warp-to-target
-            if (ability != null && ability.Stages is { Length: > 0 }
-                && ability.Stages[0].WarpRange > 0f && s.WarpSpeed > 0f)
-            {
-                float dx = s.WarpTargetX - s.PX;
-                float dz = s.WarpTargetZ - s.PZ;
-                float distSq = dx * dx + dz * dz;
-                float attackRangeSq = s.WarpAttackRange * s.WarpAttackRange;
-                float warpRangeSq = ability.Stages[0].WarpRange * ability.Stages[0].WarpRange;
-
-                if (distSq <= warpRangeSq && distSq > attackRangeSq)
-                {
-                    s.AttackSlot = slot;
-                    s.State = ActionState.Warping;
-                    return;
-                }
-            }
 
             ushort cd = AbilityExecutor.GetCooldown(s, slot);
             AbilityExecutor.TryStart(ref s, ability, slot, cd);
         }
 
         /// <summary>
-        /// Process warping state: move toward warp target each tick, transition to attack on arrival.
+        /// Process warping state: sets velocity toward warp target each tick.
+        /// Position update and collision are handled by main SimulateTick loop.
+        /// Returns true if warp completed (arrived at target), false if still warping.
         /// </summary>
-        private static void ProcessWarp(ref CharacterState s, CharacterDefinition def)
+        private static bool ProcessWarp(ref CharacterState s, CharacterDefinition def, ArenaDefinition arena)
         {
             float dx = s.WarpTargetX - s.PX;
             float dz = s.WarpTargetZ - s.PZ;
             float distSq = dx * dx + dz * dz;
             float attackRangeSq = s.WarpAttackRange * s.WarpAttackRange;
 
-            // Close enough → start the attack
+            // Close enough → warp complete
             if (distSq <= attackRangeSq)
             {
-                s.WarpSpeed = 0f; // clear warp
-                bool airborne = !s.IsGrounded;
-                var ability = def.GetSlotAbility(s.AttackSlot - 1, airborne);
-                ushort cd = AbilityExecutor.GetCooldown(s, s.AttackSlot);
-                AbilityExecutor.TryStart(ref s, ability, s.AttackSlot, cd);
-                return;
+                s.WarpSpeed = 0f;
+                s.VX = 0f;
+                s.VZ = 0f;
+                return true;
             }
 
-            // Move toward target
+            // Set velocity toward target
             float dist = MathF.Sqrt(distSq);
-            float step = s.WarpSpeed * TickDt;
-            float ratio = Math.Min(step / dist, 1f);
-            s.PX += dx * ratio;
-            s.PZ += dz * ratio;
-
-            // Face toward target
+            s.VX = (dx / dist) * s.WarpSpeed;
+            s.VZ = (dz / dist) * s.WarpSpeed;
             s.FacingYaw = MathF.Atan2(dx, dz);
+
+            // Position update and collision handled by main SimulateTick loop (steps 5-7)
+            // Gravity is applied by ApplyGravity() (step 5)
+
+            return false; // still warping
         }
 
         /// <summary>
