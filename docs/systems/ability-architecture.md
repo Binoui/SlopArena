@@ -116,8 +116,19 @@ public sealed class NewAbility : ServerAbility
 
 2. **Register in AbilityFactory:**
 ```csharp
+// Add to the appropriate character's private method (e.g., CreateMankiAbility)
 4 => new NewAbility(),
 ```
+
+### Character-Namespaced IDs
+
+Each character has its own ability ID namespace (1-255 per character). This allows multiple characters to use ID 1 for their LMB without conflicts.
+
+**Example:**
+- Manki LMB = `CharacterClass.Manki, typeId=1`
+- Bunny LMB = `CharacterClass.Bunny, typeId=1`
+
+No collision because they're in different character namespaces.
 
 3. **Add to CharacterDefinition:**
 ```csharp

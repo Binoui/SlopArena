@@ -265,7 +265,7 @@ namespace SlopArena.Shared
 				// Server-side ability: activate via pool
 				if (_activeAbilities.ContainsKey(id)) continue;
 
-				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(spec.AbilityTypeId);
+				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, spec.AbilityTypeId);
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 				// Consume input so SimulateTick doesn't also try to start an attack

@@ -4,24 +4,37 @@ namespace SlopArena.Shared.Abilities;
 
 /// <summary>
 /// Factory for instantiating and initializing server-side abilities.
-/// Maps AbilityTypeId to concrete ServerAbility subclasses.
+/// Uses character class + ability slot to namespace ability IDs.
 /// </summary>
 public static class AbilityFactory
 {
     /// <summary>
-    /// Create a server ability instance by type ID.
-    /// 1 = MankiLmbCombo, 2 = MankiRoundBomb, 3 = MankiAerosolFlame.
+    /// Create a server ability instance by character class and ability type ID.
+    /// Type ID is character-specific (each character has its own ID namespace).
     /// </summary>
-    public static ServerAbility CreateServer(byte typeId)
+    public static ServerAbility CreateServer(CharacterClass characterClass, byte typeId)
     {
-        return typeId switch
+        return characterClass switch
         {
-            1 => new MankiLmbCombo(),
-            2 => new MankiRoundBomb(),
-            3 => new MankiAerosolFlame(),
-            _ => throw new ArgumentException($"Unknown AbilityTypeId: {typeId}"),
+            CharacterClass.Manki => CreateMankiAbility(typeId),
+            CharacterClass.Bunny => CreateBunnyAbility(typeId),
+            _ => throw new ArgumentException($"Unknown character class: {characterClass}"),
         };
     }
+
+    private static ServerAbility CreateMankiAbility(byte typeId) => typeId switch
+    {
+        1 => new MankiLmbCombo(),
+        2 => new MankiRoundBomb(),
+        3 => new MankiAerosolFlame(),
+        _ => throw new ArgumentException($"Unknown Manki ability typeId: {typeId}"),
+    };
+
+    private static ServerAbility CreateBunnyAbility(byte typeId) => typeId switch
+    {
+        // TODO: Implement Bunny abilities
+        _ => throw new NotImplementedException($"Bunny ability {typeId} not implemented yet"),
+    };
 
     /// <summary>
     /// Initialize an ability's metadata from its spec definition.
