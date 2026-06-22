@@ -122,8 +122,7 @@ namespace SlopArena.Shared
                     ProcessDash(ref s, stats);
                 else if (s.State == ActionState.AirDodging)
                     ProcessAirDodge();
-                else if (s.State == ActionState.Attacking)
-                    ProcessAttack(ref s, def, ref input);
+                // Attacking state is now purely handled by ServerSimulation.TickAbilities
             }
 
             // 5.5 Consume buffered input (any lock just expired)
@@ -132,7 +131,10 @@ namespace SlopArena.Shared
             {
                 byte slot = s.BufferedSlot;
                 s.BufferedSlot = 0;
-                StartAttackFromSlot(ref s, def, slot);
+                // Ability activation handled by ServerSimulation.Tick pre-sim phase
+                // Client prediction: mark state as Attacking to prevent movement
+                s.State = ActionState.Attacking;
+                s.AttackSlot = slot;
             }
 
             // 6. Input-driven actions (only when not locked by animation)
@@ -148,28 +150,23 @@ namespace SlopArena.Shared
                 // Attack via ActiveSlot (1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F)
                 if (input.ActiveSlot > 0 && s.State == ActionState.Idle)
                 {
-                    StartAttackFromSlot(ref s, def, input.ActiveSlot);
+                    // Ability activation handled by ServerSimulation.Tick pre-sim phase
+                    // Client prediction: mark state as Attacking to prevent movement
+                    s.State = ActionState.Attacking;
+                    s.AttackSlot = input.ActiveSlot;
                 }
             }
             // Buffer input if locked within window
+            // NOTE: Combo buffering is now handled by ServerAbility.Tick lifecycle
+            // Only general input buffering (unlock window) is kept for client prediction
             if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0) && s.BufferedSlot == 0)
             {
-                // Combo chain buffer: same slot during active attack
-                if (s.State == ActionState.Attacking && input.ActiveSlot == s.AttackSlot)
-                {
-                    bool airborne = !s.IsGrounded;
-                    var ability = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
-                    ushort cd = AbilityExecutor.GetCooldown(s, input.ActiveSlot);
-                    if (AbilityExecutor.CanBufferCombo(s, ability, cd))
-                        s.BufferedSlot = input.ActiveSlot;
-                }
                 // General buffer: within window of unlock
-                else if ((s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
-                         (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
+                if ((s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
+                    (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
                 {
-                    ushort cd = AbilityExecutor.GetCooldown(s, input.ActiveSlot);
-                    if (cd == 0)
-                        s.BufferedSlot = input.ActiveSlot;
+                    // No cooldown check here — ServerSimulation handles ability activation validation
+                    s.BufferedSlot = input.ActiveSlot;
                 }
             }
 
@@ -482,29 +479,9 @@ namespace SlopArena.Shared
         }
 
         // ── ATTACK PROCESSING ──
+        // Removed: ProcessAttack() — all ability execution now handled by ServerAbility lifecycle
 
-        private static void ProcessAttack(ref CharacterState s, CharacterDefinition def, ref InputState input)
-        {
-            // Server-side abilities handle their own tick via ServerSimulation.TickAbilities
-            if (s.IsServerAbility) return;
-
-            if (s.AnimLockTicks > 0)
-                return;
-
-            bool airborne = !s.IsGrounded;
-            var ability = def.GetSlotAbility(s.AttackSlot - 1, airborne);
-            AbilityExecutor.ProcessActive(ref s, ability, ref input);
-        }
-
-        /// <summary>Start an attack from a given slot (1-6). Handles combo chain if same slot.</summary>
-        private static void StartAttackFromSlot(ref CharacterState s, CharacterDefinition def, byte slot)
-        {
-            bool airborne = !s.IsGrounded;
-            var ability = def.GetSlotAbility(slot - 1, airborne);
-
-            ushort cd = AbilityExecutor.GetCooldown(s, slot);
-            AbilityExecutor.TryStart(ref s, ability, slot, cd);
-        }
+        // Removed: StartAttackFromSlot() — ability activation is now handled by ServerSimulation pre-sim phase
 
         /// <summary>
         /// Process warping state: sets velocity toward warp target each tick.
