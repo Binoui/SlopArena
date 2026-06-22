@@ -4,15 +4,13 @@ using SlopArena.Shared;
 
 /// <summary>
 /// Q — Round Bomb: hold to aim, release to throw a projectile along a parabolic arc.
-/// Plays LoopAnimName while aiming, then AnimationNames[0] on throw.
-/// Wraps a RoundBombSpec from the character definition.
+/// Plays "spell_q_loop" while aiming, then AnimationNames[0] on throw.
+/// Reads params from AbilitySpec.Params.
 /// </summary>
 public class RoundBomb : Ability
 {
     public override string Name => "Round Bomb";
     public override byte SlotNumber { get; set; } = 3;
-
-    private RoundBombSpec Spec => (RoundBombSpec)Data;
 
     // Draw helpers
     private readonly GroundCircle _circle = new();
@@ -34,7 +32,8 @@ public class RoundBomb : Ability
 
         // Self-setup: camera yaw + π offset (camera looks -Z, server AimYaw=0 means +Z)
         _aimYaw = player.GetCameraYaw();
-        _targetDistance = Spec.ProjectileConfig.MaxRange;
+        float maxRange = Data?.Params?.TryGetValue("max_range", out float mr) == true ? mr : 12f;
+        _targetDistance = maxRange;
         _sceneRoot = player.GetParent();
 
         // Transition FSM to aimed_charge for aiming loop animation
@@ -44,7 +43,7 @@ public class RoundBomb : Ability
             var chargeState = fsm.GetState<AimedChargeState>("aimed_charge");
             if (chargeState != null)
             {
-                chargeState.Configure(Spec.LoopAnimName);
+                chargeState.Configure("spell_q_loop");
                 fsm.TransitionTo("aimed_charge");
             }
         }
@@ -114,10 +113,10 @@ public class RoundBomb : Ability
         if (@event is InputEventMouseMotion mm)
         {
             _aimYaw -= mm.Relative.X * MouseSensitivity;
-            var pc = Spec.ProjectileConfig;
+            float maxRange = Data?.Params?.TryGetValue("max_range", out float mr) == true ? mr : 12f;
             _targetDistance = Mathf.Clamp(
                 _targetDistance - mm.Relative.Y * DistanceSensitivity,
-                1f, pc.MaxRange);
+                1f, maxRange);
         }
     }
 
@@ -137,7 +136,8 @@ public class RoundBomb : Ability
         _circle.SetPosition(targetPos);
 
         Vector3 launchPos = player.GlobalPosition + (Vector3.Up * 1.2f);
-        var pc = Spec.ProjectileConfig;
-        _arc.Draw(_sceneRoot ?? player, launchPos, targetPos, pc.LaunchAngleDeg, pc.Gravity);
+        float launchAngle = Data?.Params?.TryGetValue("launch_angle", out float la) == true ? la : 30f;
+        float gravity = Data?.Params?.TryGetValue("gravity", out float g) == true ? g : 30f;
+        _arc.Draw(_sceneRoot ?? player, launchPos, targetPos, launchAngle, gravity);
     }
 }
