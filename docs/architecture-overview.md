@@ -33,7 +33,7 @@ SlopArena/
 │
 ├── Scripts/              ← Godot C# client code. Has Godot. imports.
 │   ├── Animation/           ← Custom FSM (State.cs, StateMachine.cs, States/)
-│   ├── Combat/              ← MovementComponent, CombatComponent, AttackWarping
+│   ├── Combat/              ← MovementComponent, CombatComponent
 │   ├── Entities/            ← PlayerController (1301 lines, the big one)
 │   ├── World/               ← Main.cs (entry), MatchManager (match orchestration)
 │   ├── InputController.cs   ← Centralized input polling
