@@ -10,15 +10,14 @@ public static class AbilityFactory
 {
     /// <summary>
     /// Create a server ability instance by type ID.
-    /// 0 = GenericMelee (fallback), 1 = MeleeCombo, 2 = BackflipRoll.
+    /// 1 = MankiLmbCombo.
     /// </summary>
     public static ServerAbility CreateServer(byte typeId)
     {
         return typeId switch
         {
-            1 => new MeleeCombo(),
-            2 => new BackflipRoll(),
-            _ => new GenericMelee(),
+            1 => new MankiLmbCombo(),
+            _ => throw new ArgumentException($"Unknown AbilityTypeId: {typeId}"),
         };
     }
 

@@ -78,6 +78,7 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Monkey Combo",
+                AbilityTypeId = 1,
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -92,6 +93,10 @@ public static partial class CharacterRegistry
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
+                Params = new()
+                {
+                    ["lunge_duration"] = 10f,
+                },
             },
 
             AirLMB = new AbilitySpec
