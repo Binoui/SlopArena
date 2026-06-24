@@ -167,22 +167,30 @@ public static class AnimationTreeBuilder
     {
         _chargeLoopAnimNames.Clear();
 
-        // RMB charge loop (AerosolFlameSpec)
-        if (charDef.RMB is AerosolFlameSpec flame && !string.IsNullOrEmpty(flame.ChargeAnimName))
+        // RMB charge loop (Manki Aerosol Flame)
+        if (charDef.RMB != null && charDef.RMB.AbilityTypeId == 3)
         {
-            _chargeLoopAnimNames.Add(flame.ChargeAnimName);
-            var node = CreateWrappedState(animPlayer, flame.ChargeAnimName, charDef);
-            if (node.GetNode("Animation") is AnimationNodeAnimation animNode)
-                animNode.LoopMode = Animation.LoopModeEnum.Linear;
-            sm.AddNode(flame.ChargeAnimName, node, new Vector2(1000, 250));
+            string chargeAnim = "spell_rmb_charge";
+            if (!string.IsNullOrEmpty(chargeAnim))
+            {
+                _chargeLoopAnimNames.Add(chargeAnim);
+                var node = CreateWrappedState(animPlayer, chargeAnim, charDef);
+                if (node.GetNode("Animation") is AnimationNodeAnimation animNode)
+                    animNode.LoopMode = Animation.LoopModeEnum.Linear;
+                sm.AddNode(chargeAnim, node, new Vector2(1000, 250));
+            }
         }
 
-        // Q charge loop (RoundBombSpec)
-        if (charDef.Q is RoundBombSpec bomb && !string.IsNullOrEmpty(bomb.LoopAnimName))
+        // Q charge loop (Manki Round Bomb)
+        if (charDef.Q != null && charDef.Q.AbilityTypeId == 2)
         {
-            _chargeLoopAnimNames.Add(bomb.LoopAnimName);
-            var node = CreateWrappedState(animPlayer, bomb.LoopAnimName, charDef);
-            sm.AddNode(bomb.LoopAnimName, node, new Vector2(792, 413));
+            string loopAnim = "spell_q_loop";
+            if (!string.IsNullOrEmpty(loopAnim))
+            {
+                _chargeLoopAnimNames.Add(loopAnim);
+                var node = CreateWrappedState(animPlayer, loopAnim, charDef);
+                sm.AddNode(loopAnim, node, new Vector2(792, 413));
+            }
         }
     }
 
@@ -251,22 +259,28 @@ public static class AnimationTreeBuilder
             sm.AddTransition(loopName, "End", xfade);
         }
 
-        // RMB: charge loop → attack
-        if (charDef.RMB is AerosolFlameSpec flame &&
-            !string.IsNullOrEmpty(flame.ChargeAnimName) &&
-            flame.AnimationNames is { Length: > 0 } &&
-            !string.IsNullOrEmpty(flame.AnimationNames[0]))
+        // RMB: charge loop → attack (Manki Aerosol Flame)
+        if (charDef.RMB != null && charDef.RMB.AbilityTypeId == 3)
         {
-            sm.AddTransition(flame.ChargeAnimName, flame.AnimationNames[0], xfade);
+            string chargeAnim = "spell_rmb_charge";
+            if (!string.IsNullOrEmpty(chargeAnim) &&
+                charDef.RMB.AnimationNames is { Length: > 0 } &&
+                !string.IsNullOrEmpty(charDef.RMB.AnimationNames[0]))
+            {
+                sm.AddTransition(chargeAnim, charDef.RMB.AnimationNames[0], xfade);
+            }
         }
 
-        // Q: charge loop → attack (Manki)
-        if (charDef.Q is RoundBombSpec bomb &&
-            !string.IsNullOrEmpty(bomb.LoopAnimName) &&
-            bomb.AnimationNames is { Length: > 0 } &&
-            !string.IsNullOrEmpty(bomb.AnimationNames[0]))
+        // Q: charge loop → attack (Manki Round Bomb)
+        if (charDef.Q != null && charDef.Q.AbilityTypeId == 2)
         {
-            sm.AddTransition(bomb.LoopAnimName, bomb.AnimationNames[0], xfade);
+            string loopAnim = "spell_q_loop";
+            if (!string.IsNullOrEmpty(loopAnim) &&
+                charDef.Q.AnimationNames is { Length: > 0 } &&
+                !string.IsNullOrEmpty(charDef.Q.AnimationNames[0]))
+            {
+                sm.AddTransition(loopAnim, charDef.Q.AnimationNames[0], xfade);
+            }
         }
     }
 

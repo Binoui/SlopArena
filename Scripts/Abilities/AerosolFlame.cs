@@ -5,14 +5,12 @@ using SlopArena.Shared;
 /// <summary>
 /// RMB — Aerosol + Lighter: hold to charge, release to fire cone flamethrower.
 /// Shows a ground-projected cone indicator while held.
-/// Wraps an AerosolFlameSpec from the character definition.
+/// Reads params from AbilitySpec.Params.
 /// </summary>
 public class AerosolFlame : Ability
 {
     public override string Name => "Aerosol + Lighter";
     public override byte SlotNumber { get; set; } = 2;
-
-    private AerosolFlameSpec Spec => (AerosolFlameSpec)Data;
 
     private readonly GroundCone _cone = new();
     private float _aimYaw;
@@ -33,7 +31,7 @@ public class AerosolFlame : Ability
             var chargeState = fsm.GetState<AimedChargeState>("aimed_charge");
             if (chargeState != null)
             {
-                chargeState.Configure(Spec.ChargeAnimName);
+                chargeState.Configure("spell_rmb_charge");
                 fsm.TransitionTo("aimed_charge");
             }
         }
@@ -54,7 +52,9 @@ public class AerosolFlame : Ability
         if (hit.Count > 0 && hit.ContainsKey("position"))
             _groundY = ((Vector3)hit["position"]).Y;
 
-        _cone.Show(player, Spec.ConeAngle, Spec.ConeRange, _groundY);
+        float coneAngle = 60f; // default cone angle
+        float coneRange = 5f;  // default cone range
+        _cone.Show(player, coneAngle, coneRange, _groundY);
         player.SetModelEmission(new Color(1.0f, 0.5f, 0.1f));
     }
 
@@ -63,8 +63,9 @@ public class AerosolFlame : Ability
         if (_fired) return null;
 
         _chargeTicks++;
-        if (Spec.MaxChargeTicks > 0 && _chargeTicks > Spec.MaxChargeTicks)
-            _chargeTicks = Spec.MaxChargeTicks;
+        int maxCharge = (int)(Data?.Params?.TryGetValue("charge_threshold", out float mc) == true ? mc : 45f);
+        if (maxCharge > 0 && _chargeTicks > maxCharge)
+            _chargeTicks = maxCharge;
 
         // Sync charge progress to sim
         ref var state = ref player.GetState();

@@ -76,7 +76,7 @@ private static CharacterDefinition BuildYourClass()
         // ═══════ ABILITIES ═══════
         // Each slot: LMB, AirLMB, RMB, AirRMB, Q, E, R, F
 
-        LMB = new AbilityData
+        LMB = new AbilitySpec
         {
             Name = "My Combo",
             CooldownTicks = 0,         // 0 = no cooldown (basic attacks)
@@ -110,7 +110,7 @@ private static CharacterDefinition BuildYourClass()
         },
 
         // Air LMB — separate ability, used when airborne
-        AirLMB = new AbilityData
+        AirLMB = new AbilitySpec
         {
             Name = "Rising Slash",
             CooldownTicks = 0,
@@ -121,7 +121,7 @@ private static CharacterDefinition BuildYourClass()
         },
 
         // Air RMB — downward spike
-        AirRMB = new AbilityData
+        AirRMB = new AbilitySpec
         {
             Name = "Aerial Slam",
             CooldownTicks = 0,
@@ -131,10 +131,10 @@ private static CharacterDefinition BuildYourClass()
             }
         },
 
-        Q = new AbilityData { ... },
-        E = new AbilityData { ... },
-        R = new AbilityData { ... },
-        F = new AbilityData { ... },   // Ultimate
+        Q = new AbilitySpec { ... },
+        E = new AbilitySpec { ... },
+        R = new AbilitySpec { ... },
+        F = new AbilitySpec { ... },   // Ultimate
     };
 }
 ```
@@ -157,61 +157,107 @@ private static CharacterDefinition BuildYourClass()
 
 ---
 
-## 2. Code — Special Effects
+## 2. Code — ServerAbility Implementation
 
-If an ability needs logic beyond what AttackStage can express (e.g., teleport, delayed AoE, status application), create a special effect file.
+If an ability needs per-tick logic beyond hitbox spawning (e.g., movement, projectiles, charging), create a ServerAbility subclass.
 
-### 2a. Create the abilities file
+### 2a. Create the ServerAbility file
 
-```
-Scripts/Characters/{YourClass}/{YourClass}Abilities.cs
-```
+Create `Shared/Abilities/{CharacterName}{AbilityName}.cs`:
 
 ```csharp
-#nullable enable
-using Godot;
+using System;
 
-public static class YourClassAbilities
+namespace SlopArena.Shared.Abilities
 {
-    public static void EffectName(CombatComponent combat)
+    /// <summary>
+    /// Description of what this ability does.
+    /// </summary>
+    public sealed class YourClassAbilityName : ServerAbility
     {
-        Vector3 pos = combat.GetOwnerPosition();
-        Vector3 forward = combat.GetCameraForward();
-
-        // Visual feedback
-        StatusSpells.CreateCircleVisual(combat, pos, 5f, new Color(1f, 0.5f, 0f, 0.3f), 1f);
-        StatusSpells.CreateImpactVisual(combat, pos, 3f, new Color(1f, 0.8f, 0f));
-
-        // Hit detection
-        var hits = combat.CheckMeleeCone(pos, forward, 3f, 45f, 8f, 15f, 5f);
-
-        // Status effects
-        combat.ApplyStatus(StatusType.Slowed, 3f, combat.GetEntityId());
-        combat.ApplyStatusToLastHit(StatusType.Burn, 4f);
+        private ushort _chargeTicks;
+        
+        public override void OnStart(ref CharacterState s, CharacterDefinition def)
+        {
+            s.State = ActionState.Attacking;
+            s.AnimLockTicks = (ushort)GetParam(def, "duration", 30f);
+            s.AnimIndex = 0; // map to animation in CharacterDefinition
+        }
+        
+        public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+        {
+            // Per-tick logic here
+            if (s.AttackElapsedTicks >= s.AnimLockTicks)
+                EndAbility(ref s);
+        }
+        
+        public override void OnEnd(ref CharacterState s)
+        {
+            // Cleanup if needed (optional)
+        }
     }
 }
 ```
 
-Available CombatComponent API:
+### 2b. Register in AbilityFactory
 
-| Method | Purpose |
-|--------|---------|
-| `GetOwnerPosition()` | Get 3D position of the character |
-| `GetCameraForward()` | Get camera-relative forward direction |
-| `CheckMeleeCone(pos, dir, range, angle, dmg, kb, kbUp)` | Cone hit check → returns hit entity IDs |
-| `CheckCircleHit(pos, radius, dmg, kb, kbUp)` | Circle AoE hit check |
-| `ApplyStatus(type, duration, sourceId)` | Apply status to self |
-| `ApplyStatusToLastHit(type, duration)` | Apply status to most recent hit targets |
-
-### 2b. Register in AbilityRegistry
-
-In `Scripts/Characters/AbilityRegistry.cs`:
+In `Shared/Abilities/AbilityFactory.cs`:
 
 ```csharp
-{ "YourClassEffectName", YourClassAbilities.EffectName },
+public static ServerAbility CreateServer(byte typeId)
+{
+    return typeId switch
+    {
+        1 => new MankiLmbCombo(),
+        2 => new MankiRoundBomb(),
+        3 => new MankiAerosolFlame(),
+        4 => new YourClassAbilityName(),  // ← Add your ability
+        _ => throw new ArgumentException($"Unknown AbilityTypeId: {typeId}"),
+    };
+}
 ```
 
-The key string must match `SpecialEffectKeys` in your `CharacterDefinition`.
+### 2c. Add to CharacterDefinition
+
+In `Shared/Characters/YourClassData.cs`:
+
+```csharp
+LMB = new AbilitySpec
+{
+    Name = "Ability Name",
+    AbilityTypeId = 4,  // matches AbilityFactory
+    CooldownTicks = 0,
+    Params = new() 
+    { 
+        ["duration"] = 30f,
+        // ... other tunable params
+    },
+    Stages = new AttackStage[]
+    {
+        new() 
+        { 
+            DurationTicks = 30,
+            HitboxEvents = new HitboxEvent[]
+            {
+                new HitboxEvent 
+                { 
+                    TriggerTick = 10, 
+                    DurationTicks = 5, 
+                    Radius = 1f, 
+                    Damage = 8f,
+                    // ... other hitbox properties
+                }
+            }
+        }
+    },
+    AnimationNames = new[] { "animation_name" },
+}
+```
+
+**For simple abilities without per-tick logic:**
+If your ability is just hitbox spawning at fixed timings (no movement, no conditionals), you can use `AbilityTypeId = 0` and the old data-driven pattern still works. However, ServerAbility is recommended for all new abilities as it's more flexible.
+
+See `docs/systems/ability-architecture.md` for complete ServerAbility pattern documentation.
 
 ---
 
@@ -262,7 +308,7 @@ Place FBX files in: `assets/characters/{YourClass}/`
 
 ### 3c. Animation naming convention
 
-In `AbilityData.AnimationNames`, use the FBX animation name (without `.fbx`):
+In `AbilitySpec.AnimationNames`, use the FBX animation name (without `.fbx`):
 
 ```csharp
 AnimationNames = new[] { "sword_slash", "sword_spin", "sword_uppercut" }
@@ -277,7 +323,7 @@ With GLB, Godot's `AnimationPlayer` reads animation tracks by bone **path** (e.g
 
 **Key points:**
 - Animations are **embedded in the GLB file** — no separate FBX files
-- `AnimationNames` in `AbilityData` must match the animation names inside the GLB
+- `AnimationNames` in `AbilitySpec` must match the animation names inside the GLB
 - The `AnimationTree` root StateMachine state names must match `AnimationNames`
 - Godot handles bone remapping between different skeletons automatically via `AnimationMixer` if needed
 
@@ -391,7 +437,7 @@ Update this switch when adding a new class.
 - [ ] `AbilityRegistry` — keys registered
 - [ ] GLB file — in `assets/characters/{Name}/`
 - [ ] Animations — all 8 slots + locomotion (idle/run/jump/fall)
-- [ ] `AnimationNames` — set in each AbilityData
+- [ ] `AnimationNames` — set in each AbilitySpec
 - [ ] Bake skeleton — run `BakeSkeletonTool` → check `.bin` in `data/`
 - [ ] `BakedDataPath` + `HurtboxBoneScale` set in `CharacterDefinition`
 - [ ] `ModelSoleOffset` adjusted so the model's feet touch the ground

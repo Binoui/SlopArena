@@ -324,6 +324,9 @@ public enum StatusFlags : byte
 **Verify:** Status effects persist across client restarts (server-authoritative). Hacked client can't grant itself shield.
 
 ### T3.3: Add AttackWarping server reconciliation
+
+> **✅ RESOLVED (2026-06-22):** This task was completed in the ServerAbility refactor. `AttackWarping.cs` was deleted and warp movement is now server-authoritative via `Simulation.ProcessWarp()`. See `docs/superpowers/plans/2026-06-22-server-ability-refactor.md` for implementation details.
+
 **Root cause:** `AttackWarping.cs` moves player via `body.MoveAndSlide()` with no server awareness. Rubberbanding on state sync.
 
 **File:** `Scripts/Combat/AttackWarping.cs`

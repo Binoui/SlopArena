@@ -48,7 +48,7 @@ public static partial class MankiAbilities
         if (tree == null) return;
 
         // ── Gather the same params the server uses ──
-        float aimYaw = 0f, targetDist = 8f, launchAngleDeg = 20f, gravity = 30f, launchOffsetY = 1.2f;
+        float aimYaw = 0f, targetDist = 8f, launchAngleDeg = 30f, gravity = 30f, launchOffsetY = 1.2f;
         float capsuleHalf = 0.65f;
         float hitboxRadius = 0.6f, explosionRadius = 2.5f;
         float maxRange = 12f;
@@ -57,24 +57,21 @@ public static partial class MankiAbilities
         {
             ref var state = ref player.GetState();
             aimYaw = state.AimYaw;
-            targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, maxRange);
 
             var def = player.GetCharacterDef();
             capsuleHalf = def.CapsuleHeight * 0.5f;
 
-			// Read ProjectileConfig from the character definition's RoundBombSpec
-			if (def.Q is RoundBombSpec bombSpec)
+			// Read params from AbilitySpec.Params (same source as server)
+			if (def.Q?.Params != null)
 			{
-				var pc = bombSpec.ProjectileConfig;
-                maxRange = pc.MaxRange;
-				launchAngleDeg = pc.LaunchAngleDeg;
-				gravity = pc.Gravity;
-				launchOffsetY = pc.LaunchOffsetY;
-                hitboxRadius = pc.HitboxRadius;
-                if (pc.Explosion.HasValue)
-                    explosionRadius = pc.Explosion.Value.Radius;
+				if (def.Q.Params.TryGetValue("max_range", out float mr)) maxRange = mr;
+				if (def.Q.Params.TryGetValue("launch_angle", out float la)) launchAngleDeg = la;
+				if (def.Q.Params.TryGetValue("gravity", out float gv)) gravity = gv;
+				if (def.Q.Params.TryGetValue("launch_offset_y", out float lo)) launchOffsetY = lo;
+				if (def.Q.Params.TryGetValue("hitbox_radius", out float hr)) hitboxRadius = hr;
+				if (def.Q.Params.TryGetValue("explosion_radius", out float er)) explosionRadius = er;
 			}
-            targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, maxRange);
+			targetDist = Mathf.Clamp(state.AimTargetDistance, 0.5f, maxRange);
 		}
 
 		// Compute velocity — SAME as ServerSimulation.cs lines 233-248

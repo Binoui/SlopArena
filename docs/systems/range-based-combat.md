@@ -14,11 +14,12 @@ This system implements three core Range-Based mechanics:
 ```
 Scripts/Combat/
 ├── TargetLockSystem.cs      — Soft lock (auto-track nearest enemy)
-├── AttackWarping.cs          — Auto-dash toward target
 ├── CombatComponent.cs        — Range checks + warp execution
 └── Hurtbox.cs
 
 Shared/
+├── Simulation.cs             — ProcessWarp() for server-authoritative warping
+├── Abilities/                — ServerAbility implementations control warp movement
 └── AttackData.cs             — Attack definitions with Range-Based ranges
 ```
 
@@ -65,9 +66,9 @@ Vector3 dir = _targetLock.GetDirectionToTarget();
 
 ## ⚡ Attack Warping
 
-**File**: `Scripts/Combat/AttackWarping.cs`
+**File**: `Shared/Simulation.cs` (ProcessWarp function)
 
-Auto-dash toward target when in warp range but outside attack range.
+Server-authoritative auto-dash toward target when in warp range but outside attack range.
 
 ### Behavior
 ```
@@ -76,7 +77,8 @@ Player presses attack button:
 │  └─> Execute attack immediately
 │
 ├─ AttackRange < distance ≤ WarpRange (4-12m)
-│  ├─> Dash toward target at warp speed
+│  ├─> ServerAbility sets IsWarping = true + WarpTarget
+│  ├─> Simulation.ProcessWarp() interpolates position per tick
 │  ├─> Stop at AttackRange distance
 │  └─> Execute attack
 │
@@ -85,21 +87,22 @@ Player presses attack button:
 ```
 
 ### Features
-- **Dynamic tracking**: Updates warp direction mid-dash (tracks moving targets)
-- **Collision-aware**: Uses `CharacterBody3D.MoveAndSlide()` for physics
-- **Safety timeout**: 0.5s max warp duration (prevents infinite dash)
-- **Cancellable**: Can be interrupted by hitstun
+- **Server-authoritative**: Warp movement runs in `Simulation.SimulateTick()`
+- **Tick-based interpolation**: `WarpSpeed` controls interpolation factor per tick
+- **Prediction-friendly**: Client simulates same warp logic for smooth rendering
+- **Cancellable**: Cleared on hitstun or death
 
-### Usage
+### Usage (in ServerAbility)
 ```csharp
-// Start warp (called automatically by CombatComponent)
-_warpSystem.StartWarp(attackRange: 4f, warpSpeed: 25f, onComplete: () =>
+public override void OnStart(ref CharacterState s, CharacterDefinition def)
 {
-    ExecuteAttack();
-});
-
-// Cancel warp (e.g., got hit during warp)
-_warpSystem.CancelWarp();
+    // Set warp destination
+    s.WarpTargetX = targetPosX;
+    s.WarpTargetY = targetPosY;
+    s.WarpTargetZ = targetPosZ;
+    s.WarpSpeed = 0.3f;  // 30% of remaining distance per tick
+    s.IsWarping = true;
+}
 ```
 
 ---
@@ -405,13 +408,13 @@ Warp system prints debug messages:
 ## ✅ Implementation Checklist
 
 - [x] TargetLockSystem.cs (soft lock)
-- [x] AttackWarping.cs (auto-dash)
+- [x] Server-side warp (Simulation.ProcessWarp)
 - [x] AttackData.cs (Range-Based range fields)
 - [x] CombatComponent.cs (range check + warp integration)
 - [x] PlayerController.cs (target lock setup)
 - [x] DummyManager.cs (add NPCs to "enemies" group)
 - [x] CharacterDefinition.cs (add ranges to Manki attacks)
-- [ ] Wire up attack input to call `ExecuteAttackWithWarp()` (current: direct spawn)
+- [x] ServerAbility implementations (warp via IsWarping flag)
 - [ ] Add rotation toward target during attack (TrackingStrength)
 - [ ] Add warp VFX (dash trail)
 - [ ] Add target reticle HUD element
