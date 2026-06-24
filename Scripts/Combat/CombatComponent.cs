@@ -29,7 +29,6 @@ public partial class CombatComponent : Node
     private ulong _entityId = 1;
     private SpellVFXManager? _spellVFX;
     private TargetLockSystem? _targetLock;
-    private AttackWarping? _warpSystem;
     private StatusComponent _statusComp = null!;
 
     // ==========================================
@@ -106,12 +105,6 @@ public partial class CombatComponent : Node
         AddChild(_statusComp);
         _statusComp.Setup(simulation, entityId);
 
-        if (targetLock != null)
-        {
-            _warpSystem = new AttackWarping();
-            _warpSystem.Setup(owner, targetLock);
-            AddChild(_warpSystem);
-        }
     }
 
     public SpellVFXManager? GetSpellVFX() => _spellVFX;
@@ -275,76 +268,6 @@ public partial class CombatComponent : Node
         return _owner?.GlobalPosition ?? Vector3.Zero;
     }
 
-    // ==========================================
-    // DKO-STYLE ATTACK EXECUTION
-    // ==========================================
-
-    /// <summary>
-    /// Execute attack with Range-based range checking + warping.
-    /// Checks target distance and initiates warp if in warp range.
-    /// Callback fires after warp completes (or immediately if no warp needed).
-    /// </summary>
-    public void ExecuteAttackWithWarp(AttackStage stage, float warpSpeed, Action onAttackStart)
-    {
-        // No target lock system → execute immediately
-        if (!stage.UseTargetLock || _targetLock == null || _warpSystem == null)
-        {
-            onAttackStart?.Invoke();
-            return;
-        }
-
-        // No valid target → execute immediately
-        if (_targetLock.CurrentTarget == null)
-        {
-            onAttackStart?.Invoke();
-            return;
-        }
-
-        float distToTarget = _targetLock.GetDistanceToTarget();
-
-        // Check ranges
-        if (distToTarget <= stage.AttackRange)
-        {
-            // In attack range → execute immediately
-            onAttackStart?.Invoke();
-        }
-        else if (distToTarget <= stage.WarpRange)
-        {
-            // In warp range → dash toward target first
-            GD.Print($"[Warp] Target {distToTarget:F1}m away, warping to {stage.AttackRange:F1}m");
-            _warpSystem.StartWarp(stage.AttackRange, warpSpeed, () => onAttackStart?.Invoke());
-        }
-        else
-        {
-            // Out of range → attack in place (will likely miss)
-            onAttackStart?.Invoke();
-        }
-    }
-
-    /// <summary>
-    /// Cancel active warp (e.g., player got hit during warp startup).
-    /// </summary>
-    public void CancelAttackWarp()
-    {
-        _warpSystem?.CancelWarp();
-    }
-
-    /// <summary>
-    /// Check if currently warping toward target.
-    /// </summary>
-    public bool IsWarping()
-    {
-        return _warpSystem?.IsWarping ?? false;
-    }
-
-    /// <summary>
-    /// Get the final warp direction (for hitbox spawning after warp completes).
-    /// Returns Vector3.Zero if no warp system or no warp occurred.
-    /// </summary>
-    public Vector3 GetFinalWarpDirection()
-    {
-        return _warpSystem?.GetFinalWarpDirection() ?? Vector3.Zero;
-    }
 
     // ==========================================
     // HELPERS

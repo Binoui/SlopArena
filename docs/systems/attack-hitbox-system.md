@@ -70,73 +70,75 @@ Ability LMB:
     LungeForce: 0
 ```
 
-## 3. Flow in the Simulation
+## 3. ServerAbility Lifecycle
 
-### Initialization
+### Activation (ServerSimulation.cs pre-sim phase)
 
-When the player presses LMB (input.Attack = true):
+When player presses an ability slot:
+1. Check cooldown (GetCooldown)
+2. Check AnimLockTicks/HitstunTicks
+3. Check if ability already active
+4. Instantiate ServerAbility via AbilityFactory
+5. Call ability.OnStart(ref state, def)
+6. Register in _activeAbilities dictionary
 
+### Tick Loop (ServerSimulation.TickAbilities)
+
+Each active ability's Tick() is called:
+```csharp
+ability.Tick(ref state, ref input, def)
 ```
-SimulateTick:
-  1. InputState.Attack ∧ State == Idle → Stage = Stages[0]
-  2. State = Attacking
-  3. s.AnimLockTicks = Stage.DurationTicks
-### Buffer Input
+
+ServerAbility can:
+- Set velocity (SetVelocityInFacing, SetVelocity)
+- Spawn hitboxes (SpawnHitbox helper)
+- Read params (GetParam)
+- Advance combo stages (track _stage, _stageTicks)
+- End naturally (EndAbility)
+
+### Completion or Interruption
+
+**Natural end (EndAbility called):**
+- OnEnd() is called
+- Cooldown applied
+- State set to Idle
+
+**Interruption (hitstun, death):**
+- OnEnd() is NOT called
+- Ability dropped from _activeAbilities
+- Velocity preserved (momentum-granting abilities work correctly)
+
+### Example: MankiLmbCombo
 
 ```csharp
-// Buffer section (end of SimulateTick):
-if input.ActiveSlot > 0 && AnimLockTicks > 0 && BufferedSlot == 0:
-  // Combo chain: same slot → always buffer (after first frame)
-  if State == Attacking && ActiveSlot == AttackSlot && AttackElapsedTicks > 0:
-    BufferedSlot = ActiveSlot
+public override void OnStart(ref CharacterState s, CharacterDefinition def)
+{
+    _stage = 0;
+    s.State = ActionState.Attacking;
+    s.AnimLockTicks = GetCurrentStage(def).DurationTicks;
+    SetVelocityInFacing(ref s, stage.LungeForce);
+}
 
-  // General buffer: within InputBufferWindow (6 frames) of unlock
-  else if AnimLockTicks <= InputBufferWindow || HitstunTicks <= InputBufferWindow:
-    if cooldown == 0:
-      BufferedSlot = ActiveSlot
+public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+{
+    // Apply lunge for first 10 ticks
+    if (_stageTicks <= _lungeDuration && stage.LungeForce > 0f)
+        SetVelocityInFacing(ref s, stage.LungeForce);
+    
+    // Spawn hitboxes at trigger tick
+    foreach (var evt in stage.HitboxEvents)
+        if (evt.TriggerTick == _stageTicks)
+            SpawnHitbox(ref s, evt);
+    
+    // Chain to next stage if input buffered
+    if (input.ActiveSlot == (Slot + 1) && _stageTicks >= stage.ChainWindowTicks)
+        AdvanceStage();
+    
+    // End when duration expires
+    if (_stageTicks >= stage.DurationTicks)
+        EndAbility(ref s);
+}
 ```
-
-### Tick During Attack
-
-```csharp
-ProcessAttack (when AnimLockTicks reaches 0):
-  // 1. Buffered chain (click during previous frames)
-  if BufferedSlot == AttackSlot && ComboStage < Stages.Length - 1:
-    -> Advance to next stage
-    AnimLockTicks = nextStage.DurationTicks
-  
-  // 2. Immediate chain (click on this same frame)
-  else if ActiveSlot == AttackSlot && ComboStage < Stages.Length - 1:
-    ActiveSlot = 0  // consumed, prevent re-buffer
-    -> Advance to next stage
-  
-  // 3. No combo -> idle
-  else:
-    State = Idle, clear AttackSlot/ComboStage
-```
-
-### Cancel on Hitstun
-
-```csharp
-When State == Hitstun:
-  Clear BufferedSlot (cancels interruptible hitbox events)
-```
-
-### Combo Chaining Mechanism
-
-The combo uses a **buffer-slot** system, not a timing window:
-
-1. During an attack, if the player clicks the **same slot** (`ActiveSlot == AttackSlot`), the sim sets `BufferedSlot = ActiveSlot`
-2. The click that **started** the current attack is not buffered (`AttackElapsedTicks > 0` guard)
-3. When the current stage ends (`AnimLockTicks == 0`), `ProcessAttack` checks:
-   - `BufferedSlot` first (click arrived during earlier frames)
-   - `ActiveSlot` second (click arrived on the same frame)
-4. If either matches the current `AttackSlot` and a next stage exists, **advance**:
-   - `ComboStage++`, set `AnimLockTicks = nextStage.DurationTicks`
-5. The client detects the `ComboStage` change and calls `ChainTo(nextAnimName)` to play the next animation without leaving the FSM "attack" state
-6. If no buffer and no input, **idle**: `State = Idle`, `AttackSlot = 0`
-
-The general input buffer (`InputBufferWindow = 6`) catches any slot input within the last 6 frames of any lock state (attack, hitstun). This is separate from the combo buffer which catches same-slot inputs during the entire attack.
 
 ## 4. Advantages
 
@@ -144,5 +146,13 @@ The general input buffer (`InputBufferWindow = 6`) catches any slot input within
 - **No desync** — the client only renders
 - **Natural cancel** — hitstun → clear queue
 - **Flexible** — N hitboxes per attack, variable positions, arbitrary timings
-- **Combo** — buffer-slot system works for any multi-stage ability (not just LMB)
+- **Combo** — ServerAbility subclasses can track stages and chain logic
 - **Works for all abilities** — projectile, burst, multi-hit, everything
+
+---
+
+## Related Docs
+
+- `ability-architecture.md` — Full ServerAbility pattern guide
+- `netcode-architecture.md` — Server-authoritative model
+- `combat-systems.md` — Universal combat mechanics

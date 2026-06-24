@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using SlopArena.Shared.Abilities;
-using static SlopArena.Shared.AbilityExecutor;
 
 namespace SlopArena.Shared
 {
@@ -101,6 +100,36 @@ namespace SlopArena.Shared
 		public ServerAbility? GetActiveAbility(ulong entityId)
 		{
 			return _activeAbilities.TryGetValue(entityId, out var a) ? a : null;
+		}
+
+		/// <summary>
+		/// Get cooldown ticks for a slot (1-6).
+		/// </summary>
+		public static ushort GetCooldown(CharacterState s, byte slot) => slot switch
+		{
+			1 => s.Cooldown0,
+			2 => s.Cooldown1,
+			3 => s.Cooldown2,
+			4 => s.Cooldown3,
+			5 => s.Cooldown4,
+			6 => s.Cooldown5,
+			_ => 0,
+		};
+
+		/// <summary>
+		/// Set cooldown ticks for a slot (1-6).
+		/// </summary>
+		public static void SetCooldown(ref CharacterState s, byte slot, ushort ticks)
+		{
+			switch (slot)
+			{
+				case 1: s.Cooldown0 = ticks; break;
+				case 2: s.Cooldown1 = ticks; break;
+				case 3: s.Cooldown2 = ticks; break;
+				case 4: s.Cooldown3 = ticks; break;
+				case 5: s.Cooldown4 = ticks; break;
+				case 6: s.Cooldown5 = ticks; break;
+			}
 		}
 
 		/// <summary>
@@ -216,15 +245,23 @@ namespace SlopArena.Shared
 				var state = kvp.Value;
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
 				if (input.ActiveSlot == 0) continue;
+				if (state.AnimLockTicks > 0 || state.HitstunTicks > 0) continue;
 				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
 
 				var def = _defs[id];
 				bool airborne = !state.IsGrounded;
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
-				if (spec.AbilityTypeId == 0) continue; // data-driven, handled by SimulateTick
 
-				// Server-side ability: activate via pool
-				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(spec.AbilityTypeId);
+				// Check cooldown BEFORE activating
+				ushort cooldown = GetCooldown(state, input.ActiveSlot);
+				if (cooldown > 0) continue;
+
+				// Server-side ability: try to create via slot mapping
+				if (_activeAbilities.ContainsKey(id)) continue;
+
+				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
+				if (ability == null) continue; // No ServerAbility for this slot, skip (data-driven fallback)
+
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 				// Consume input so SimulateTick doesn't also try to start an attack
