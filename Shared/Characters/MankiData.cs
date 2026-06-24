@@ -1,3 +1,5 @@
+using System;
+
 namespace SlopArena.Shared;
 
 /// <summary>
@@ -92,6 +94,10 @@ public static partial class CharacterRegistry
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
+                Params = new()
+                {
+                    ["lunge_duration"] = 10f,
+                },
             },
 
             AirLMB = new AbilitySpec
@@ -107,30 +113,49 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_lmb_air" },
             },
 
-            // RMB — charged cone flamethrower
-            RMB = new AerosolFlameSpec
+            RMB = new AbilitySpec
             {
                 Name = "Aerosol + Lighter",
                 CooldownTicks = 30,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 58, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 38, Shape = HitboxShape.Capsule, Radius = 0.8f, OffX = 0, OffY = 1.0f, OffZ = 2.0f, EndOffZ = 3.0f, Damage = 8f, KnockbackForce = 14f, KnockbackUpward = 4f, StunTicks = 24, Interruptible = true } },
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 6f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargedStages = new AttackStage[]
                 {
                     new() { DurationTicks = 50, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 30, Shape = HitboxShape.Capsule, Radius = 1.0f, OffX = 0, OffY = 1.0f, OffZ = 2.5f, EndOffZ = 4.0f, Damage = 14f, KnockbackForce = 24f, KnockbackUpward = 8f, StunTicks = 20, Interruptible = true } },
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargeHoldTicks = 45,
-                AnimationNames = new[] { "spell_rmb_attack" },
+                AnimationNames = new[] { "spell_rmb_attack", "spell_rmb_charged" },
                 SpecialEffectKeys = new[] { "MankiAerosolFlame" },
-                ChargeAnimName = "spell_rmb_loop",
-                ConeAngle = 60f,
-                ConeRange = 15f,
-                MaxChargeTicks = 45,
+                Params = new()
+                {
+                    ["charge_threshold"] = 45f,
+                    ["normal_duration"] = 58f,
+                    ["normal_trigger_tick"] = 8f,
+                    ["normal_off_z"] = 2.0f,
+                    ["normal_end_off_z"] = 3.0f,
+                    ["normal_radius"] = 0.8f,
+                    ["normal_hitbox_duration"] = 38f,
+                    ["normal_damage"] = 8f,
+                    ["normal_knockback"] = 14f,
+                    ["normal_knockback_up"] = 4f,
+                    ["normal_stun"] = 24f,
+                    ["charged_duration"] = 50f,
+                    ["charged_trigger_tick"] = 10f,
+                    ["charged_off_z"] = 2.5f,
+                    ["charged_end_off_z"] = 4.0f,
+                    ["charged_radius"] = 1.0f,
+                    ["charged_hitbox_duration"] = 30f,
+                    ["charged_damage"] = 14f,
+                    ["charged_knockback"] = 24f,
+                    ["charged_knockback_up"] = 8f,
+                    ["charged_stun"] = 20f,
+                },
             },
 
             AirRMB = new AbilitySpec
@@ -146,40 +171,38 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_air" },
             },
 
-            Q = new RoundBombSpec
+            Q = new AbilitySpec
             {
                 Name = "Round Bomb",
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 0.6f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 6f, StunTicks = 14, Interruptible = false } },
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_q" },
                 SpecialEffectKeys = new[] { "MankiRoundBomb" },
-                LoopAnimName = "spell_q_loop",
-                ProjectileConfig = new ProjectileConfig
+                Params = new()
                 {
-                    LaunchAngleDeg = 30f,
-                    Gravity = 30f,
-                    MaxRange = 12f,
-                    HitboxRadius = 0.6f,
-                    LaunchOffsetY = 1.2f,
-                    Damage = 8f,
-                    KnockbackForce = 10f,
-                    KnockbackUpward = 6f,
-                    StunTicks = 14,
-                    MaxFlightTicks = 90,
-                    Explosion = new ProjectileExplosion
-                    {
-                        Radius = 2.5f,
-                        Damage = 6f,
-                        KnockbackForce = 6f,
-                        KnockbackUpward = 4f,
-                        StunTicks = 10,
-                        DurationTicks = 8,
-                    },
+                    ["throw_duration"] = 60f,
+                    ["throw_trigger_tick"] = 10f,
+                    ["launch_angle"] = 30f,
+                    ["gravity"] = 30f,
+                    ["max_range"] = 12f,
+                    ["hitbox_radius"] = 0.6f,
+                    ["launch_offset_y"] = 1.2f,
+                    ["damage"] = 8f,
+                    ["knockback_force"] = 10f,
+                    ["knockback_upward"] = 6f,
+                    ["stun_ticks"] = 14f,
+                    ["max_flight_ticks"] = 90f,
+                    ["explosion_radius"] = 2.5f,
+                    ["explosion_damage"] = 6f,
+                    ["explosion_knockback_force"] = 6f,
+                    ["explosion_knockback_upward"] = 4f,
+                    ["explosion_stun_ticks"] = 10f,
+                    ["explosion_duration_ticks"] = 8f,
                 },
             },
 
