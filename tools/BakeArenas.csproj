@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Shared\SlopArena.Shared.csproj" />
+    <ProjectReference Include="..\src\Shared\SlopArena.Shared.csproj" />
   </ItemGroup>
 </Project>

@@ -19,7 +19,7 @@ build:
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@dotnet clean --nologo
-	@rm -rf bin/ obj/ Shared/bin/ Shared/obj/ Server/bin/ Server/obj/
+	@rm -rf bin/ obj/ src/Shared/bin/ src/Shared/obj/ src/Server/bin/ src/Server/obj/
 
 check: lint
 	@echo "✅ All checks passed!"
