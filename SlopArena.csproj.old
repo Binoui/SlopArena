@@ -1,0 +1,30 @@
+<Project Sdk="Godot.NET.Sdk/4.6.3">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <NoWarn>CA1031</NoWarn> <!-- Game code catches general exceptions for robustness -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exclude Shared/obj and Shared/bin from compilation to prevent duplicate assembly attributes -->
+    <Compile Remove="Shared/obj/**/*.cs" />
+    <Compile Remove="Shared/bin/**/*.cs" />
+    <Compile Remove="Server/**/*.cs" />
+    <Compile Remove="MasterServer/**/*.cs" />
+    <Compile Remove="ServerApp/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.CodeFixes" Version="4.15.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
