@@ -95,3 +95,24 @@ TargetMetadata.dat
 *.so.debug
 *.sym
 *.pth
+
+# ==========================================
+# Unity (client/)
+# ==========================================
+client/Unity/[Ll]ibrary/
+client/Unity/[Tt]emp/
+client/Unity/[Oo]bj/
+client/Unity/[Bb]uild/
+client/Unity/[Bb]uilds/
+client/Unity/[Ll]ogs/
+client/Unity/[Uu]serSettings/
+client/Unity/[Mm]emoryCapturer/
+client/Unity/.vs/
+client/Unity/*.csproj
+client/Unity/*.uid
+client/Unity/*.meta
+client/Unity/*.sln
+client/Unity/*.user
+client/Unity/Assets/Shared/*.pdb
+client/Unity/Assets/Shared/*.deps.json
+client/Unity/Assets/Shared/*.runtimeconfig.json

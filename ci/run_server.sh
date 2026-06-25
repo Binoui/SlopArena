@@ -10,4 +10,4 @@ then
 fi
 
 echo "Building and starting SlopArena Authoritative Server..."
-dotnet run --project Server/SlopArena.Server.csproj
+dotnet run --project src/Server/SlopArena.Server.csproj

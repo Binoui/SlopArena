@@ -37,7 +37,7 @@ jobs:
           echo "🔍 Running quality checks..."
 
           # Check for Godot types in Shared/
-          if grep -r "using Godot" Shared/*.cs 2>/dev/null; then
+          if grep -r "using Godot" src/Shared/*.cs 2>/dev/null; then
             echo "❌ ERROR: Godot types found in Shared/"
             exit 1
           fi

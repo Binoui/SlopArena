@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>IDE0005</NoWarn>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>SlopArena.Shared</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Binoui</Authors>
+    <Description>Shared gameplay library for SlopArena — pure C#, no Godot dependency</Description>
+    <RepositoryUrl>https://github.com/Binoui/SlopArena</RepositoryUrl>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Memory" Version="4.6.0" />
+  </ItemGroup>
+  <Target Name="CopyToUnityClient" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)/../../client/Unity/Assets/Shared/')">
+    <ItemGroup>
+      <_SlopArenaFiles Include="$(OutDir)SlopArena.Shared.dll" />
+      <_SlopArenaFiles Include="$(OutDir)SlopArena.Shared.pdb" />
+      <_SlopArenaDeps Include="$(OutDir)System.*.dll" />
+      <_SlopArenaDeps Include="$(OutDir)Microsoft.*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SlopArenaFiles);@(_SlopArenaDeps)" DestinationFolder="$(MSBuildProjectDirectory)/../../client/Unity/Assets/Shared/" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
