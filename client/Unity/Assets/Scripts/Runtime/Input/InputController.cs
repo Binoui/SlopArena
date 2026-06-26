@@ -31,6 +31,10 @@ namespace SlopArena.Client.Input
         // ── Slot press (set by Poll, consumed via ConsumePendingSlotPress) ──
         private byte _pendingSlotPress;
 
+        // ── Previous-frame held state (for manual edge detection) ──
+        private bool _previousSpaceHeld;
+        private bool _previousShiftHeld;
+
         // ════════════════════════════════════════════════════════════════
         //  AI control
         // ════════════════════════════════════════════════════════════════
@@ -77,11 +81,16 @@ namespace SlopArena.Client.Input
                 return;
             }
 
-            // Human-driven: read InputSystem
             var kb = Keyboard.current;
             var mouse = Mouse.current;
 
-            JumpJustPressed = kb.spaceKey.wasPressedThisFrame;
+            bool spaceHeld = kb.spaceKey.isPressed;
+            JumpJustPressed = spaceHeld && !_previousSpaceHeld;
+            _previousSpaceHeld = spaceHeld;
+
+            bool shiftHeld = kb.shiftKey.isPressed;
+            DashJustPressed = shiftHeld && !_previousShiftHeld;
+            _previousShiftHeld = shiftHeld;
             if (JumpJustPressed)
                 Debug.Log($"[Input] JumpJustPressed = true");
 
