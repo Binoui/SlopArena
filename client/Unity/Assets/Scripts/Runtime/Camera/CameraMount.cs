@@ -1,28 +1,20 @@
 using UnityEngine;
 using Unity.Cinemachine;
-using UnityEngine.InputSystem;
 
 namespace SlopArena.Client.Camera
 {
     [RequireComponent(typeof(CinemachineCamera))]
+    [RequireComponent(typeof(CinemachineOrbitalFollow))]
     public class CameraMount : MonoBehaviour
     {
-        [Header("Orbit")]
-        [SerializeField] private float _yawSpeed = 180f;
-        [SerializeField] private float _pitchSpeed = 120f;
-
-        [Header("Zoom")]
-        [SerializeField] private float _zoomSpeed = 8f;
 
         private CinemachineCamera _cmCam;
         private CinemachineOrbitalFollow _orbital;
-        private CinemachinePanTilt _panTilt;
 
         private void Awake()
         {
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
-            _panTilt = GetComponent<CinemachinePanTilt>();
         }
 
         private void Start()
@@ -30,37 +22,31 @@ namespace SlopArena.Client.Camera
             Cursor.lockState = CursorLockMode.Locked;
         }
 
-        private void Update()
-        {
-            var mouse = Mouse.current;
-            if (mouse != null)
-            {
-                Vector2 delta = mouse.delta.ReadValue();
-                float mx = delta.x * _yawSpeed * Time.deltaTime;
-                float my = delta.y * _pitchSpeed * Time.deltaTime;
-                if (_panTilt != null)
-                {
-                    _panTilt.PanAxis.Value += mx;
-                    _panTilt.TiltAxis.Value -= my;
-                    _panTilt.TiltAxis.Value = Mathf.Clamp(_panTilt.TiltAxis.Value, -80f, 80f);
-                }
-            }
-
-            float scroll = mouse != null ? mouse.scroll.ReadValue().y : 0f;
-            if (Mathf.Abs(scroll) > 0.01f && _orbital != null)
-                _orbital.RadialAxis.Value = Mathf.Clamp(
-                    _orbital.RadialAxis.Value - scroll * _zoomSpeed, 3f, 20f);
-        }
 
         public void SetTarget(Transform target)
         {
-            _cmCam.Follow = target;
-            _cmCam.LookAt = target;
+            _cmCam.Target = new CameraTarget
+            {
+                TrackingTarget = target,
+                LookAtTarget = target
+            };
         }
+
+        /// <summary>
+        /// Snap orbit to face the target from behind at a comfortable angle.
+        /// Call after SetTarget to avoid the camera starting at a random orientation.
+        /// </summary>
+        public void ResetView(Transform target)
+        {
+            if (_orbital == null) return;
+            _orbital.HorizontalAxis.Value = target.eulerAngles.y;
+            _orbital.VerticalAxis.Value = 17.5f;
+        }
+
 
         public float GetCameraYawDeg()
         {
-            return _panTilt != null ? _panTilt.PanAxis.Value : 0f;
+            return _orbital != null ? _orbital.HorizontalAxis.Value : 0f;
         }
 
         public float GetCameraYawRad()

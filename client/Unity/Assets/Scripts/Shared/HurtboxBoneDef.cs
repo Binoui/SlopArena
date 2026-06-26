@@ -1,0 +1,1 @@
+../../../../../src/Shared/HurtboxBoneDef.cs

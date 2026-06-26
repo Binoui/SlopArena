@@ -31,20 +31,12 @@ namespace SlopArena.Shared
         public ushort JumpDurationTicks;
     }
 
-    public struct CharacterDefinition
+    public class CharacterDefinition
     {
-        public CharacterDefinition()
-        {
-            HurtboxBoneScale = 1.0f;
-            DisplayName = null!;
-            HurtboxCapsules = null!;
-            HurtboxBoneDefs = null!;
-            GlbPath = null!;
-            BakedDataPath = null!;
-        }
+        
 
         public CharacterClass Class;
-        public string DisplayName;
+        public string DisplayName = "";
         public MovementStats Movement;
 
         public float CapsuleRadius;
@@ -54,22 +46,22 @@ namespace SlopArena.Shared
         /// <summary>
         /// World-space offset from character position (legacy, used when no skeleton)
         /// </summary>
-        public HurtboxCapsule[] HurtboxCapsules;
+        public HurtboxCapsule[]? HurtboxCapsules;
 
         /// <summary>
         /// Bone-attached hurtboxes (ServerSkeleton-based). Replaces HurtboxCapsules when loaded.
         /// Each entry defines a sphere at a bone position with an offset.
         /// </summary>
-        public HurtboxBoneDef[] HurtboxBoneDefs;
+        public HurtboxBoneDef[]? HurtboxBoneDefs;
         /// <summary>Path to the GLB file containing the skeleton model.</summary>
-        public string GlbPath;
+        public string GlbPath = "";
         /// <summary>Path to the baked skeleton .bin file (pre-computed bone positions per frame).</summary>
-        public string BakedDataPath;
+        public string BakedDataPath = "";
         /// <summary>
         /// Scale factor for baked bone positions. Mixamo GLBs are in cm (0.01),
         /// Blender/Maya exports with meters are 1.0. Default: 1.0
         /// </summary>
-        public float HurtboxBoneScale;
+        public float HurtboxBoneScale = 1.0f;
         /// <summary>
         /// Y offset for the visual model relative to capsule center.
         /// Aligns the model's feet with the capsule bottom.
@@ -96,7 +88,7 @@ namespace SlopArena.Shared
         /// Manki: 1.0 (Mixamo cm→m handled by GLB import).
         /// Bunny: ~0.022 (Tripo/Hunyuan export in raw units).
         /// </summary>
-        public float VisualScale;
+        public float VisualScale = 1.0f;
 
         // ── Animation catalog (defaults match Mixamo naming) ──
 
@@ -121,16 +113,17 @@ namespace SlopArena.Shared
         /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>
         public AnimationClipConfig[]? ClipOverrides;
 
-        public AbilitySpec LMB;
-        public AbilitySpec RMB;
-        public AbilitySpec AirLMB;
-        public AbilitySpec AirRMB;
-        public AbilitySpec Q;
-        public AbilitySpec E;
-        public AbilitySpec R;
-        public AbilitySpec F;
+        public AbilitySpec? LMB;
+        public AbilitySpec? RMB;
+        public AbilitySpec? AirLMB;
+        public AbilitySpec? AirRMB;
+        public AbilitySpec? Q;
+        public AbilitySpec? E;
+        public AbilitySpec? R;
+        public AbilitySpec? F;
+        // No constructor needed — class fields auto-default
 
-        public readonly AbilitySpec GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
+        public AbilitySpec GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
             (0, true) => AirLMB,
             (1, true) => AirRMB,

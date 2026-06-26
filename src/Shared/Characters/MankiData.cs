@@ -65,7 +65,8 @@ public static partial class CharacterRegistry
             VisualScale = 1.0f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
-            AutoModelYOffset = true,
+            AutoModelYOffset = false,
+            ModelYOffset = -0.52f,
 
             // Default animation names match Mixamo: idle, run, dash, jump, fall, small_hit, medium_hit, hard_hit
             // Only ClipOverrides needed for custom timelines

@@ -10,22 +10,29 @@ namespace SlopArena.Shared
     ///
     /// Format:
     ///   Magic:  "AREN" (0x4E455241)
-    ///   Version: uint32 (currently 1)
+    ///   Version: uint32 (1, 2, or 3)
     ///   Name:        uint32 len + UTF8 bytes
     ///   DisplayName: uint32 len + UTF8 bytes
     ///   ScenePath:   uint32 len + UTF8 bytes
     ///   KillHeight:  float32
-    ///   FloorHeight: float32
-    ///   PlatformCount: uint32
-    ///     For each: CenterX, CenterZ, HalfSizeX, HalfSizeZ, SurfaceY (5 × float32)
     ///   MinX, MaxX, MinZ, MaxZ: 4 × float32
     ///   SpawnCount: uint32
     ///     For each: X, Y, Z, Yaw (4 × float32)
+    ///   [Version 3+]: Heightmap: Width(int), Height(int), CellSize(float),
+    ///     OriginX(float), OriginZ(float), DataLength(int), then Data[] floats
+    ///   [Version 2+]: TriangleCount: uint32
+    ///     For each: AX, AY, AZ, BX, BY, BZ, CX, CY, CZ (9 × float32)
+    /// <summary>
+    /// Version history:
+    ///   1 = Initial format: platforms, spawns, bounds. No triangle collision.
+    ///   2 = Added CollisionTriangle[] after spawn data.
+    ///   3 = Removed FloorHeight + PlatformDef[]; added Heightmap after spawn data.
     /// </summary>
+
     public static class ArenaBinaryFormat
     {
         private const uint Magic = 0x4E455241; // "AREN"
-        private const uint Version = 1;
+        private const uint Version = 3;
 
         /// <summary>
         /// Serialize an ArenaDefinition to a byte array.
@@ -39,12 +46,11 @@ namespace SlopArena.Shared
             size += 4 + Encoding.UTF8.GetByteCount(arena.ScenePath ?? "");
 
             size += 4; // KillHeight (float)
-            size += 4; // FloorHeight (float)
 
-            // Platforms
-            int platCount = arena.Platforms?.Length ?? 0;
-            size += 4; // count
-            size += platCount * 5 * 4; // 5 floats each
+            // Heightmap (v3+)
+            int hmDataLen = arena.Heightmap.Data?.Length ?? 0;
+            size += 6 * 4; // Width, Height, CellSize, OriginX, OriginZ, DataLength
+            size += hmDataLen * 4; // Data[] floats
 
             // Bounds
             size += 4 * 4; // MinX, MaxX, MinZ, MaxZ
@@ -53,6 +59,11 @@ namespace SlopArena.Shared
             int spawnCount = arena.SpawnPoints?.Length ?? 0;
             size += 4; // count
             size += spawnCount * 4 * 4; // 4 floats each
+
+            // Collision triangles (v2)
+            int triCount = arena.CollisionTriangles?.Length ?? 0;
+            size += 4; // count
+            size += triCount * 9 * 4; // 9 floats per triangle
 
             var buffer = new byte[size];
             int pos = 0;
@@ -73,21 +84,6 @@ namespace SlopArena.Shared
             // KillHeight
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillHeight)); pos += 4;
 
-            // FloorHeight
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.FloorHeight)); pos += 4;
-
-            // Platforms
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), platCount); pos += 4;
-            for (int i = 0; i < platCount; i++)
-            {
-                var p = arena.Platforms![i];
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(p.CenterX)); pos += 4;
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(p.CenterZ)); pos += 4;
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(p.HalfSizeX)); pos += 4;
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(p.HalfSizeZ)); pos += 4;
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(p.SurfaceY)); pos += 4;
-            }
-
             // Bounds
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.MinX)); pos += 4;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.MaxX)); pos += 4;
@@ -106,13 +102,40 @@ namespace SlopArena.Shared
                 BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(s.Yaw)); pos += 4;
             }
 
+            // Heightmap (v3+)
+            ArenaHeightmap hm = arena.Heightmap;
+            int dataLen = hm.Data?.Length ?? 0;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), hm.Width); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), hm.Height); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(hm.CellSize)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(hm.OriginX)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(hm.OriginZ)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), dataLen); pos += 4;
+            for (int i = 0; i < dataLen; i++)
+            {
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(hm.Data![i])); pos += 4;
+            }
+
+            // Collision triangles (v2)
+            int triCount32 = arena.CollisionTriangles?.Length ?? 0;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), triCount32); pos += 4;
+            for (int i = 0; i < triCount32; i++)
+            {
+                var t = arena.CollisionTriangles![i];
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.AX)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.AY)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.AZ)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.BX)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.BY)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.BZ)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.CX)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.CY)); pos += 4;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(t.CZ)); pos += 4;
+            }
+
             return buffer;
         }
 
-        /// <summary>
-        /// Deserialize an ArenaDefinition from a byte array.
-        /// Returns null if the data is invalid or version mismatch.
-        /// </summary>
         public static ArenaDefinition? Deserialize(byte[] data)
         {
             int pos = 0;
@@ -123,7 +146,7 @@ namespace SlopArena.Shared
             if (magic != Magic) return null;
 
             uint version = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos)); pos += 4;
-            if (version != Version) return null;
+            if (version < 1 || version > Version) return null;
 
             var arena = new ArenaDefinition();
 
@@ -143,24 +166,6 @@ namespace SlopArena.Shared
             if (pos + 4 > data.Length) return null;
             arena.KillHeight = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
 
-            // FloorHeight
-            if (pos + 4 > data.Length) return null;
-            arena.FloorHeight = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-
-            // Platforms
-            if (pos + 4 > data.Length) return null;
-            int platCount = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos)); pos += 4;
-            arena.Platforms = new PlatformDef[platCount];
-            for (int i = 0; i < platCount; i++)
-            {
-                if (pos + 20 > data.Length) return null;
-                float cx = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-                float cz = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-                float hx = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-                float hz = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-                float sy = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
-                arena.Platforms[i] = new PlatformDef { CenterX = cx, CenterZ = cz, HalfSizeX = hx, HalfSizeZ = hz, SurfaceY = sy };
-            }
 
             // Bounds
             if (pos + 16 > data.Length) return null;
@@ -181,6 +186,55 @@ namespace SlopArena.Shared
                 float sz = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
                 float syaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
                 arena.SpawnPoints[i] = new SpawnPoint { X = sx, Y = sy, Z = sz, Yaw = syaw };
+            }
+
+            // Heightmap (v3+)
+            if (version >= 3)
+            {
+                if (pos + 24 > data.Length) return null;
+                int hmWidth = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos)); pos += 4;
+                int hmHeight = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos)); pos += 4;
+                float hmCellSize = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                float hmOriginX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                float hmOriginZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                int hmDataLen = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos)); pos += 4;
+                if (pos + hmDataLen * 4 > data.Length) return null;
+                var hmData = new float[hmDataLen];
+                for (int i = 0; i < hmDataLen; i++)
+                {
+                    hmData[i] = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                }
+                arena.Heightmap = new ArenaHeightmap { Width = hmWidth, Height = hmHeight, CellSize = hmCellSize, OriginX = hmOriginX, OriginZ = hmOriginZ, Data = hmData };
+            }
+            else
+            {
+                arena.Heightmap = default;
+            }
+
+            // Collision triangles (v2+)
+            if (version >= 2)
+            {
+                if (pos + 4 > data.Length) return null;
+                int triCount = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos)); pos += 4;
+                arena.CollisionTriangles = new CollisionTriangle[triCount];
+                for (int i = 0; i < triCount; i++)
+                {
+                    if (pos + 36 > data.Length) return null;
+                    float ax = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float ay = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float az = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float bx = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float by = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float bz = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float cx = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float cy = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    float cz = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                    arena.CollisionTriangles[i] = new CollisionTriangle { AX = ax, AY = ay, AZ = az, BX = bx, BY = by, BZ = bz, CX = cx, CY = cy, CZ = cz };
+                }
+            }
+            else
+            {
+                arena.CollisionTriangles = null;
             }
 
             return arena;

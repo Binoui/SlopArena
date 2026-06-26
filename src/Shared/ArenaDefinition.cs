@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace SlopArena.Shared
 {
@@ -13,18 +14,102 @@ namespace SlopArena.Shared
     }
 
     /// <summary>
-    /// A rectangular walkable surface in the arena.
-    /// Defined by the top face of a CSGBox3D in the scene.
-    /// SurfaceY is the walkable Y (top of the box).
-    /// CenterX/CenterZ + HalfSizeX/HalfSizeZ define the XZ rectangle.
+    /// Precomputed 2D heightfield for fast ground-surface lookup.
+    /// Built from collision triangles at bake time.
+    /// Each cell stores the highest surface Y at that XZ position.
+    /// Bilinear interpolation between 4 neighboring cells on Sample().
     /// </summary>
     [Serializable]
-    public struct PlatformDef
+    public struct ArenaHeightmap
     {
-        public float CenterX, CenterZ;
-        public float HalfSizeX, HalfSizeZ;
-        /// <summary>Y of the walkable top surface</summary>
-        public float SurfaceY;
+        /// <summary>Number of cells along the X axis (columns).</summary>
+        public int Width;
+        /// <summary>Number of cells along the Z axis (rows).</summary>
+        public int Height;
+        /// <summary>World-space size of each cell in meters.</summary>
+        public float CellSize;
+        /// <summary>World-space X of the grid origin (min corner).</summary>
+        public float OriginX;
+        /// <summary>World-space Z of the grid origin (min corner).</summary>
+        public float OriginZ;
+        /// <summary>Height values, row-major: index = z * Width + x. float.MinValue = no surface.</summary>
+        public float[] Data;
+
+        /// <summary>
+        /// Sample the ground surface Y at a world XZ position.
+        /// Uses bilinear interpolation between the 4 nearest cells.
+        /// Returns float.MinValue if outside the grid or no surface data.
+        /// </summary>
+        public readonly float Sample(float px, float pz)
+        {
+            if (Data == null || Width == 0 || Height == 0) return float.MinValue;
+
+            float fx = (px - OriginX) / CellSize;
+            float fz = (pz - OriginZ) / CellSize;
+
+            int x0 = (int)MathF.Floor(fx);
+            int z0 = (int)MathF.Floor(fz);
+            int x1 = x0 + 1;
+            int z1 = z0 + 1;
+
+            if (x0 < 0 || x1 >= Width || z0 < 0 || z1 >= Height) return float.MinValue;
+
+            float tx = fx - x0;
+            float tz = fz - z0;
+
+            float y00 = Data[z0 * Width + x0];
+            float y10 = Data[z0 * Width + x1];
+            float y01 = Data[z1 * Width + x0];
+            float y11 = Data[z1 * Width + x1];
+
+            // Treat MinValue cells as holes — skip in interpolation
+            float top = float.MinValue, bot = float.MinValue;
+            if (y00 > float.MinValue && y10 > float.MinValue) top = y00 + (y10 - y00) * tx;
+            else if (y00 > float.MinValue) top = y00;
+            else if (y10 > float.MinValue) top = y10;
+
+            if (y01 > float.MinValue && y11 > float.MinValue) bot = y01 + (y11 - y01) * tx;
+            else if (y01 > float.MinValue) bot = y01;
+            else if (y11 > float.MinValue) bot = y11;
+
+            if (top > float.MinValue && bot > float.MinValue) return top + (bot - top) * tz;
+            if (top > float.MinValue) return top;
+            if (bot > float.MinValue) return bot;
+            return float.MinValue;
+        }
+    }
+
+    /// <summary>
+    /// A single collision triangle in world space.
+    /// Three vertices forming a solid surface the server checks for character collision.
+    /// All coordinates are in meters. Normal is computed at runtime.
+    /// </summary>
+    [Serializable]
+    public struct CollisionTriangle
+    {
+        public float AX, AY, AZ;   // vertex A
+        public float BX, BY, BZ;   // vertex B
+        public float CX, CY, CZ;   // vertex C
+    }
+
+    /// <summary>
+    /// Spatial grid for broad-phase collision queries.
+    /// Pre-computed from CollisionTriangles at arena load time.
+    /// Cells are uniform cubes over the arena bounding box.
+    /// </summary>
+    [Serializable]
+    public struct CollisionGrid
+    {
+        /// <summary>Size of each cell in world units.</summary>
+        public float CellSize;
+        /// <summary>Number of cells along each axis.</summary>
+        public int CellsX, CellsY, CellsZ;
+        /// <summary>Origin of the grid (min corner of the covered volume).</summary>
+        public float OriginX, OriginY, OriginZ;
+        /// <summary>Prefix-sum into CellTriangles: cell i covers indices CellStarts[i]..CellStarts[i+1]-1.</summary>
+        public int[] CellStarts;
+        /// <summary>Triangle indices belonging to each cell.</summary>
+        public int[] CellTriangles;
     }
 
     /// <summary>
@@ -58,15 +143,11 @@ namespace SlopArena.Shared
         /// </summary>
         public float KillHeight;
         /// <summary>
-        /// Y coordinate of the main floor surface (for ground collision)
+        /// Precomputed heightmap for fast ground-surface lookup.
+        /// Replaces PlatformDef[] + FloorHeight. Built from collision triangles at bake time.
+        /// Null for hardcoded arenas that haven't been baked yet.
         /// </summary>
-        public float FloorHeight;
-        /// <summary>
-        /// Walkable platforms (raised surfaces, ramps, galleries).
-        /// Each platform is a rectangular surface at a specific Y.
-        /// The server checks these for ground collision.
-        /// </summary>
-        public PlatformDef[] Platforms;
+        public ArenaHeightmap Heightmap;
         /// <summary>
         /// arena bounds X (used for camera/mechanics)
         /// </summary>
@@ -76,6 +157,155 @@ namespace SlopArena.Shared
         /// </summary>
         public float MinZ, MaxZ;
         public SpawnPoint[] SpawnPoints;
+        /// <summary>
+        /// Collision triangle mesh for server-side stage collision.
+        /// Characters collide with these triangles during movement and knockback.
+        /// Baked from Unity scene colliders, loaded by server for client-side prediction + server authority.
+        /// </summary>
+        public CollisionTriangle[] CollisionTriangles;
+        /// <summary>
+        /// Pre-computed spatial grid for broad-phase collision queries.
+        /// Built from CollisionTriangles when the arena is loaded.
+        /// Null until BuildSpatialGrid() is called (happens in ArenaRegistry on arena load).
+        /// </summary>
+        public CollisionGrid SpatialGrid;
+    }
+
+    /// <summary>
+    /// Utility methods for ArenaDefinition.
+    /// </summary>
+    public static class ArenaCollision
+    {
+        /// <summary>
+        /// Build a spatial grid from the arena's collision triangles.
+        /// Grid cells are cubes of the given size. Each triangle is assigned to every cell
+        /// its bounding box overlaps. The result is stored in arena.SpatialGrid.
+        /// If CollisionTriangles is null or empty, SpatialGrid is left as default.
+        /// </summary>
+        public static CollisionGrid BuildSpatialGrid(in ArenaDefinition arena, float cellSize = 4f)
+        {
+            if (arena.CollisionTriangles == null || arena.CollisionTriangles.Length == 0)
+                return default;
+
+            var tris = arena.CollisionTriangles;
+
+            // Compute grid dimensions from arena bounds + triangle extent
+            float minY = float.MaxValue, maxY = float.MinValue;
+            float minX = arena.MinX, maxX = arena.MaxX;
+            float minZ = arena.MinZ, maxZ = arena.MaxZ;
+            for (int i = 0; i < tris.Length; i++)
+            {
+                var t = tris[i];
+                float tMinY = t.AY; if (t.BY < tMinY) tMinY = t.BY; if (t.CY < tMinY) tMinY = t.CY;
+                float tMaxY = t.AY; if (t.BY > tMaxY) tMaxY = t.BY; if (t.CY > tMaxY) tMaxY = t.CY;
+                if (tMinY < minY) minY = tMinY;
+                if (tMaxY > maxY) maxY = tMaxY;
+            }
+
+            // Ensure min height spans the full expected play area
+            if (minY > arena.KillHeight) minY = arena.KillHeight;
+            float surfaceMaxY = arena.Heightmap.Data != null && arena.Heightmap.Data.Length > 0
+                ? arena.Heightmap.Data.Max()
+                : arena.KillHeight + 20f;
+            if (maxY < surfaceMaxY + 20f) maxY = surfaceMaxY + 20f;
+
+            int cellsX = Math.Max(1, (int)MathF.Ceiling((maxX - minX) / cellSize));
+            int cellsY = Math.Max(1, (int)MathF.Ceiling((maxY - minY) / cellSize));
+            int cellsZ = Math.Max(1, (int)MathF.Ceiling((maxZ - minZ) / cellSize));
+            int totalCells = cellsX * cellsY * cellsZ;
+
+            // Count triangles per cell (first pass) and assign (second pass)
+            var counts = new int[totalCells];
+
+            for (int ti = 0; ti < tris.Length; ti++)
+            {
+                var t = tris[ti];
+                float tMinX = t.AX; if (t.BX < tMinX) tMinX = t.BX; if (t.CX < tMinX) tMinX = t.CX;
+                float tMaxX = t.AX; if (t.BX > tMaxX) tMaxX = t.BX; if (t.CX > tMaxX) tMaxX = t.CX;
+                float tMinY = t.AY; if (t.BY < tMinY) tMinY = t.BY; if (t.CY < tMinY) tMinY = t.CY;
+                float tMaxY = t.AY; if (t.BY > tMaxY) tMaxY = t.BY; if (t.CY > tMaxY) tMaxY = t.CY;
+                float tMinZ = t.AZ; if (t.BZ < tMinZ) tMinZ = t.BZ; if (t.CZ < tMinZ) tMinZ = t.CZ;
+                float tMaxZ = t.AZ; if (t.BZ > tMaxZ) tMaxZ = t.BZ; if (t.CZ > tMaxZ) tMaxZ = t.CZ;
+
+                int ixMin = (int)((tMinX - minX) / cellSize);
+                int ixMax = (int)((tMaxX - minX) / cellSize);
+                int iyMin = (int)((tMinY - minY) / cellSize);
+                int iyMax = (int)((tMaxY - minY) / cellSize);
+                int izMin = (int)((tMinZ - minZ) / cellSize);
+                int izMax = (int)((tMaxZ - minZ) / cellSize);
+                ClampRange(ref ixMin, ref ixMax, 0, cellsX - 1);
+                ClampRange(ref iyMin, ref iyMax, 0, cellsY - 1);
+                ClampRange(ref izMin, ref izMax, 0, cellsZ - 1);
+
+                for (int iz = izMin; iz <= izMax; iz++)
+                    for (int iy = iyMin; iy <= iyMax; iy++)
+                        for (int ix = ixMin; ix <= ixMax; ix++)
+                            counts[iz * cellsX * cellsY + iy * cellsX + ix]++;
+            }
+
+            // Build prefix sum
+            var starts = new int[totalCells + 1];
+            for (int i = 0; i < totalCells; i++)
+                starts[i + 1] = starts[i] + counts[i];
+
+            var triIndices = new int[starts[totalCells]];
+            var nextSlot = new int[totalCells];
+            Array.Copy(starts, 0, nextSlot, 0, totalCells);
+            // nextSlot[i] now tracks the current write position for cell i
+            // (starts[i] is the start, nextSlot[i] advanced during assignment)
+
+            for (int ti = 0; ti < tris.Length; ti++)
+            {
+                var t = tris[ti];
+                float tMinX = t.AX; if (t.BX < tMinX) tMinX = t.BX; if (t.CX < tMinX) tMinX = t.CX;
+                float tMaxX = t.AX; if (t.BX > tMaxX) tMaxX = t.BX; if (t.CX > tMaxX) tMaxX = t.CX;
+                float tMinY = t.AY; if (t.BY < tMinY) tMinY = t.BY; if (t.CY < tMinY) tMinY = t.CY;
+                float tMaxY = t.AY; if (t.BY > tMaxY) tMaxY = t.BY; if (t.CY > tMaxY) tMaxY = t.CY;
+                float tMinZ = t.AZ; if (t.BZ < tMinZ) tMinZ = t.BZ; if (t.CZ < tMinZ) tMinZ = t.CZ;
+                float tMaxZ = t.AZ; if (t.BZ > tMaxZ) tMaxZ = t.BZ; if (t.CZ > tMaxZ) tMaxZ = t.CZ;
+
+                int ixMin = (int)((tMinX - minX) / cellSize);
+                int ixMax = (int)((tMaxX - minX) / cellSize);
+                int iyMin = (int)((tMinY - minY) / cellSize);
+                int iyMax = (int)((tMaxY - minY) / cellSize);
+                int izMin = (int)((tMinZ - minZ) / cellSize);
+                int izMax = (int)((tMaxZ - minZ) / cellSize);
+                ClampRange(ref ixMin, ref ixMax, 0, cellsX - 1);
+                ClampRange(ref iyMin, ref iyMax, 0, cellsY - 1);
+                ClampRange(ref izMin, ref izMax, 0, cellsZ - 1);
+
+                for (int iz = izMin; iz <= izMax; iz++)
+                    for (int iy = iyMin; iy <= iyMax; iy++)
+                        for (int ix = ixMin; ix <= ixMax; ix++)
+                        {
+                            int cell = iz * cellsX * cellsY + iy * cellsX + ix;
+                            triIndices[nextSlot[cell]++] = ti;
+                        }
+            }
+
+            Console.WriteLine($"[ArenaCollision] Built spatial grid for '{arena.Name}': " +
+                $"{tris.Length} triangles, {totalCells} cells ({cellsX}×{cellsY}×{cellsZ}), " +
+                $"avg {starts[totalCells] / (float)totalCells:F1} tri/cell");
+
+            return new CollisionGrid
+            {
+                CellSize = cellSize,
+                CellsX = cellsX,
+                CellsY = cellsY,
+                CellsZ = cellsZ,
+                OriginX = minX,
+                OriginY = minY,
+                OriginZ = minZ,
+                CellStarts = starts,
+                CellTriangles = triIndices,
+            };
+        }
+
+        private static void ClampRange(ref int lo, ref int hi, int min, int max)
+        {
+            if (lo < min) lo = min;
+            if (hi > max) hi = max;
+        }
     }
 
     public static class ArenaRegistry
@@ -122,8 +352,10 @@ namespace SlopArena.Shared
                     var arena = ArenaBinaryFormat.LoadFromFile(file);
                     if (arena.HasValue)
                     {
-                        loaded.Add(arena.Value);
-                        Console.WriteLine($"[ArenaRegistry] Loaded: {arena.Value.Name} ({file})");
+                        var a = arena.Value;
+                        a.SpatialGrid = ArenaCollision.BuildSpatialGrid(in a);
+                        loaded.Add(a);
+                        Console.WriteLine($"[ArenaRegistry] Loaded: {a.Name} ({file})");
                     }
                     else
                     {
@@ -159,7 +391,12 @@ namespace SlopArena.Shared
         private static void EnsureInitialized()
         {
             if (_initialized) return;
-            _hardcoded = BuildAll();
+            var arenas = BuildAll();
+            for (int i = 0; i < arenas.Length; i++)
+            {
+                arenas[i].SpatialGrid = ArenaCollision.BuildSpatialGrid(in arenas[i]);
+            }
+            _hardcoded = arenas;
             _initialized = true;
         }
 
@@ -176,10 +413,6 @@ namespace SlopArena.Shared
                     DisplayName = "The Pit",
                     ScenePath = "res://assets/arenas/arena_pit.tscn",
                     KillHeight = -15f,  // Deep blast zone (80x80 large stage)
-                    FloorHeight = 0f,
-                    Platforms = new[] {
-                        new PlatformDef { CenterX = 40f, CenterZ = 40f, HalfSizeX = 40f, HalfSizeZ = 40f, SurfaceY = 0f },
-                    },
                     MinX = 0f, MaxX = 80f,
                     MinZ = 0f, MaxZ = 80f,
                     SpawnPoints = new[]
@@ -201,14 +434,6 @@ namespace SlopArena.Shared
                     DisplayName = "Crossroads",
                     ScenePath = "res://assets/arenas/arena_cross.tscn",
                     KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
-                    FloorHeight = 0f,
-                    Platforms = new[] {
-                        new PlatformDef { CenterX = 30f, CenterZ = 30f, HalfSizeX = 10f, HalfSizeZ = 10f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 30f, CenterZ = 12f, HalfSizeX = 8f, HalfSizeZ = 6f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 30f, CenterZ = 48f, HalfSizeX = 8f, HalfSizeZ = 6f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 12f, CenterZ = 30f, HalfSizeX = 6f, HalfSizeZ = 8f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 48f, CenterZ = 30f, HalfSizeX = 6f, HalfSizeZ = 8f, SurfaceY = 0f },
-                    },
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]
@@ -230,21 +455,6 @@ namespace SlopArena.Shared
                     DisplayName = "The Split",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
                     KillHeight = -6f,   // Shallow blast zone (60x60 small competitive stage)
-                    FloorHeight = 0f,
-                    Platforms = new[] {
-                        // Lower quadrants (surface Y=0, CSG pos Y=-1 size 2)
-                        new PlatformDef { CenterX = 30f, CenterZ = 15f, HalfSizeX = 30f, HalfSizeZ = 15f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 30f, CenterZ = 45f, HalfSizeX = 30f, HalfSizeZ = 15f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 15f, CenterZ = 30f, HalfSizeX = 15f, HalfSizeZ = 15f, SurfaceY = 0f },
-                        new PlatformDef { CenterX = 45f, CenterZ = 30f, HalfSizeX = 15f, HalfSizeZ = 15f, SurfaceY = 0f },
-                        // Upper center platform (surface Y=3, CSG pos Y=2 size 2)
-                        new PlatformDef { CenterX = 30f, CenterZ = 30f, HalfSizeX = 10f, HalfSizeZ = 10f, SurfaceY = 3f },
-                        // Ramps (surface Y=1, CSG pos Y=0.5 size 1)
-                        new PlatformDef { CenterX = 22f, CenterZ = 22f, HalfSizeX = 2f, HalfSizeZ = 2f, SurfaceY = 1f },
-                        new PlatformDef { CenterX = 38f, CenterZ = 22f, HalfSizeX = 2f, HalfSizeZ = 2f, SurfaceY = 1f },
-                        new PlatformDef { CenterX = 22f, CenterZ = 38f, HalfSizeX = 2f, HalfSizeZ = 2f, SurfaceY = 1f },
-                        new PlatformDef { CenterX = 38f, CenterZ = 38f, HalfSizeX = 2f, HalfSizeZ = 2f, SurfaceY = 1f },
-                    },
                     MinX = 0f, MaxX = 60f,
                     MinZ = 0f, MaxZ = 60f,
                     SpawnPoints = new[]
@@ -263,8 +473,6 @@ namespace SlopArena.Shared
                     Name = "training",
                     DisplayName = "Training Room",
                     KillHeight = -15f,
-                    FloorHeight = 0f,
-                    Platforms = null,
                     MinX = -25f, MaxX = 25f,
                     MinZ = -25f, MaxZ = 25f,
                     SpawnPoints = new[]
@@ -281,30 +489,6 @@ namespace SlopArena.Shared
                     DisplayName = "Sanctum",
                     ScenePath = "res://assets/arenas/arena_sanctum.tscn",
                     KillHeight = -20f,
-                    FloorHeight = 0f,
-                    Platforms = new[] {
-                        // Main floor (CSG pos Y=-5 size 10 → surface Y=0)
-                        new PlatformDef { CenterX = 100f, CenterZ = 100f, HalfSizeX = 100f, HalfSizeZ = 100f, SurfaceY = 0f },
-                        // Central raised platform (CSG pos Y=2.5 size 5 → surface Y=5)
-                        new PlatformDef { CenterX = 100f, CenterZ = 100f, HalfSizeX = 20f, HalfSizeZ = 20f, SurfaceY = 5f },
-                        // Side galleries (CSG pos Y=7.5 size 1 → surface Y=8)
-                        new PlatformDef { CenterX = 16f, CenterZ = 100f, HalfSizeX = 6f, HalfSizeZ = 50f, SurfaceY = 8f },
-                        new PlatformDef { CenterX = 184f, CenterZ = 100f, HalfSizeX = 6f, HalfSizeZ = 50f, SurfaceY = 8f },
-                        // Center piece (CSG pos Y=5.5 size 1 → surface Y=6)
-                        new PlatformDef { CenterX = 100f, CenterZ = 100f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 6f },
-                        // Stair landings — left side
-                        new PlatformDef { CenterX = 12f, CenterZ = 26f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 4f },
-                        new PlatformDef { CenterX = 20f, CenterZ = 26f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 8f },
-                        // Stair landings — right side
-                        new PlatformDef { CenterX = 188f, CenterZ = 26f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 8f },
-                        new PlatformDef { CenterX = 180f, CenterZ = 26f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 4f },
-                        // Stair landings — left side south
-                        new PlatformDef { CenterX = 12f, CenterZ = 174f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 4f },
-                        new PlatformDef { CenterX = 20f, CenterZ = 174f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 8f },
-                        // Stair landings — right side south
-                        new PlatformDef { CenterX = 188f, CenterZ = 174f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 8f },
-                        new PlatformDef { CenterX = 180f, CenterZ = 174f, HalfSizeX = 4f, HalfSizeZ = 4f, SurfaceY = 4f },
-                    },
                     MinX = 0f, MaxX = 200f,
                     MinZ = 0f, MaxZ = 200f,
                     SpawnPoints = new[]

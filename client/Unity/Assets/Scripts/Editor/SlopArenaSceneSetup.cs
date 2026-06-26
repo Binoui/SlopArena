@@ -41,11 +41,6 @@ namespace SlopArena.Client.Editor
             var camMountGO = new GameObject("CameraMount");
             var cmCam = camMountGO.AddComponent<CinemachineCamera>();
             var orbital = camMountGO.AddComponent<CinemachineOrbitalFollow>();
-            orbital.VerticalAxis.Range = new Vector2(0.5f, 6f);
-            orbital.VerticalAxis.Value = 2f;
-            orbital.HorizontalAxis.Range = new Vector2(3f, 15f);
-            orbital.HorizontalAxis.Value = 8f;
-            var panTilt = camMountGO.AddComponent<CinemachinePanTilt>();
             var camMount = camMountGO.AddComponent<CameraMount>();
             var camGO = new GameObject("Main Camera", typeof(UnityEngine.Camera), typeof(AudioListener));
             camGO.tag = "MainCamera";
@@ -54,39 +49,59 @@ namespace SlopArena.Client.Editor
             camGO.transform.localRotation = Quaternion.identity;
             camGO.AddComponent<CinemachineBrain>();
 
-            // ── 4. Player ──
-            var playerGO = new GameObject("Player");
+            // ── 4. Player (from prefab) ──
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab");
+            GameObject playerGO;
+            PlayerRenderer playerRenderer;
+            InputController inputCtrl;
+            if (playerPrefab != null)
+            {
+                playerGO = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
+                playerGO.name = "Player";
+                playerRenderer = playerGO.GetComponent<PlayerRenderer>();
+                inputCtrl = playerGO.GetComponent<InputController>();
+            }
+            else
+            {
+                playerGO = new GameObject("Player");
+                playerRenderer = playerGO.AddComponent<PlayerRenderer>();
+                inputCtrl = playerGO.AddComponent<InputController>();
+            }
             playerGO.transform.position = new Vector3(0, 5, 5);
-            var playerAnimator = playerGO.AddComponent<Animator>();
-            var playerRenderer = playerGO.AddComponent<PlayerRenderer>();
-            playerRenderer.EntityName = "Player";
-            playerRenderer.EntityId = 1;
-            var playerSo = new SerializedObject(playerRenderer);
-            playerSo.FindProperty("_animator").objectReferenceValue = playerAnimator;
-            playerSo.ApplyModifiedProperties();
-            playerGO.AddComponent<InputController>();
             camMount.SetTarget(playerGO.transform);
 
-            // ── 5. Training Dummy ──
-            var dummyGO = new GameObject("TrainingDummy");
+            // ── 5. Training Dummy (from prefab) ──
+            var dummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Dummy.prefab");
+            GameObject dummyGO;
+            PlayerRenderer dummyRenderer;
+            if (dummyPrefab != null)
+            {
+                dummyGO = (GameObject)PrefabUtility.InstantiatePrefab(dummyPrefab);
+                dummyGO.name = "TrainingDummy";
+                dummyRenderer = dummyGO.GetComponent<PlayerRenderer>();
+            }
+            else
+            {
+                dummyGO = new GameObject("TrainingDummy");
+                dummyRenderer = dummyGO.AddComponent<PlayerRenderer>();
+            }
             dummyGO.transform.position = new Vector3(0, 5, -5);
             dummyGO.transform.rotation = Quaternion.Euler(0, 180, 0);
-            var dummyAnimator = dummyGO.AddComponent<Animator>();
-            var dummyRenderer = dummyGO.AddComponent<PlayerRenderer>();
-            dummyRenderer.EntityName = "TrainingDummy";
-            dummyRenderer.EntityId = 2;
-            var dummySo = new SerializedObject(dummyRenderer);
-            dummySo.FindProperty("_animator").objectReferenceValue = dummyAnimator;
-            dummySo.ApplyModifiedProperties();
 
-            // ── 6. GameManager ──
+
+            // ── 6. TrainingMatch ──
+            var matchGO = new GameObject("TrainingMatch");
+            var match = matchGO.AddComponent<TrainingMatch>();
+            var matchSo = new SerializedObject(match);
+            matchSo.FindProperty("_playerRenderer").objectReferenceValue = playerRenderer;
+            matchSo.FindProperty("_npcRenderer").objectReferenceValue = dummyRenderer;
+            matchSo.FindProperty("_inputController").objectReferenceValue = inputCtrl;
+            matchSo.FindProperty("_cameraMount").objectReferenceValue = camMount;
+            matchSo.ApplyModifiedProperties();
+
+            // ── 7. GameManager (singleton) ──
             var gmGO = new GameObject("GameManager");
-            var gm = gmGO.AddComponent<GameManager>();
-            var gmSo = new SerializedObject(gm);
-            gmSo.FindProperty("_offlineMode").boolValue = true;
-            gmSo.FindProperty("_playerRenderer").objectReferenceValue = playerRenderer;
-            gmSo.FindProperty("_opponentRenderer").objectReferenceValue = dummyRenderer;
-            gmSo.ApplyModifiedProperties();
+            gmGO.AddComponent<GameManager>();
 
             // ── Save ──
             string path = "Assets/Scenes/Arena_Offline.unity";
