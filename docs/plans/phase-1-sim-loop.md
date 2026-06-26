@@ -184,3 +184,39 @@ Task 1.3 depends on 1.1.
 Task 1.4 depends on 1.3 (deletes code TrainingMatch replaces).
 
 **Recommended:** single subagent does all four sequentially — they're tightly coupled.
+
+---
+
+## Current Status (2026-06-27)
+
+**Completed:**
+- ✅ Phase 1 core implemented and functional
+- Manki moves with WASD (camera-relative 8-direction)
+- Jump with JumpSquat state (6 ticks grounded prep)
+- Double jump works
+- Mouse orbits camera (InputAxisController)
+- HardLookAt aim component keeps camera facing player
+- Frame-by-frame animation driving (sim controls animation frame, not triggers)
+- Jump/dash input uses manual edge detection (not `wasPressedThisFrame`)
+- NPC spawns and stands idle
+- Bake skeleton tool ported to Unity editor
+- Hurtbox debug visualization via Gizmos
+
+**In flight / known issues:**
+- Jump input detection: `isPressed` edge tracking works, but jump may still fail if
+  `JumpsLeft` resets 1 tick after landing (step 5.75 runs before ProcessGroundMovement).
+  Impact: first grounded tick rejects jump if both jumps were used. Imperceptible (~16ms)
+  unless compounded with other issues.
+- Jump animation timing: frame-by-frame driving is in, but baked data frame counts
+  are fallback 30 frames when baked data is unavailable.
+- Arena ground collision: heightmap sampling works but terrain bake may need refresh.
+
+**Server refactor needed:**
+`Simulation.cs` is growing complex — the tick method is ~260 lines with cross-cutting
+state (JumpSquat expiry, jump detection, ground collision, gravity, position update)
+interleaved with state machine logic. Future additions (berserk mode, debuffs, item state,
+online sync) will compound this. Suggested direction:
+- Extract jump/jumpsquat into dedicated static methods (like `ProcessDash`, `ProcessKnockback`)
+- Move ground collision into a method (called from both normal sim and knockback paths)
+- Consider a tick-phase pipeline (array of `ISimPhase`) if state interactions grow beyond
+  the current linear flow
