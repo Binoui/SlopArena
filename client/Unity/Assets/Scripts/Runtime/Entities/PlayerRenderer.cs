@@ -123,11 +123,11 @@ namespace SlopArena.Client.Entities
             _animator.SetFloat("Speed", hSpeed);
             _animator.SetBool("IsMoving", hSpeed > _runSpeedThreshold);
 
-            if (!isGrounded && _wasGrounded)
-            {
+            // Jump trigger: fire during JumpSquat while IsGrounded is still true
+            // This ensures animator sees Jump=true + IsGrounded=true → Movement→Jump fires, not Movement→Fall
+            // Falling off edges naturally uses the Movement→Fall transition (no Jump trigger set)
+            if (state.State == ActionState.JumpSquat)
                 _animator.SetTrigger("Jump");
-                Debug.Log($"[Anim] {_entityName}({_entityId}) → Jump trigger (was grounded, now airborne)");
-            }
 
             _wasGrounded = isGrounded;
 
