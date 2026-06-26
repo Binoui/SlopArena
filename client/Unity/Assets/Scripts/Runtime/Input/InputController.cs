@@ -82,7 +82,8 @@ namespace SlopArena.Client.Input
             var mouse = Mouse.current;
 
             JumpJustPressed = kb.spaceKey.wasPressedThisFrame;
-            DashJustPressed = kb.shiftKey.wasPressedThisFrame;
+            if (JumpJustPressed)
+                Debug.Log($"[Input] JumpJustPressed = true");
 
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
@@ -228,6 +229,8 @@ namespace SlopArena.Client.Input
             input.Right = moveDirection.x > 0.3f;
             input.Jump = JumpJustPressed;
             input.Dash = DashJustPressed;
+            if (input.Jump)
+                Debug.Log($"[Input] Jump in InputState=true (AI={isNPC})");
             input.Crouch = kb != null && kb.ctrlKey.isPressed;
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = isAiming;

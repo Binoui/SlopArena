@@ -179,6 +179,14 @@ namespace SlopArena.Shared
                 }
             }
 
+            else if (input.Jump)
+            {
+                string reason = s.HitstunTicks > 0 ? "hitstun" :
+                    s.State == ActionState.JumpSquat ? "already_squatting" :
+                    s.JumpsLeft <= 0 ? "no_jumps" : "unknown";
+                OnDebugLog?.Invoke($"[JumpBlocked] input.Jump=true but blocked by {reason}");
+            }
+
             // 6. Input-driven actions (only when not locked by animation or in jump squat)
             if (s.AnimLockTicks == 0 && s.State != ActionState.JumpSquat)
             {
