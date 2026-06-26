@@ -148,6 +148,8 @@ namespace SlopArena.Client.Entities
                         _animator.SetTrigger("AirDodge"); break;
                     case ActionState.Sliding:
                         _animator.SetTrigger("Slide"); break;
+                    case ActionState.JumpSquat:
+                        _animator.SetTrigger("Idle"); break;
                     case ActionState.Idle:
                         _animator.SetTrigger("Idle"); break;
                 }
