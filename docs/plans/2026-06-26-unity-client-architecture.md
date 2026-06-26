@@ -86,32 +86,24 @@ Update (variable rate):
 
 ---
 
-## Phase 1 — Foundation: Match Loop + Local Sim
+## Phase 1 — Foundation: Match Loop + Local Sim ✅ (2026-06-27)
 
-**Deliverable:** Manki moves + jumps + faces camera direction in a clean sim loop, no server process. Dummy NPC stands still (no input → idle anim). No network, no VFX, no UI.
+**Status: COMPLETE** — tested in Editor, Manki moves/jumps/camera works.
 
-**Godot reference:**
-
-| Unity file | Reads from Godot |
+| Deliverable | Status |
 |---|---|
-| `LocalSimulationBridge.cs` | `Scripts/Server/LocalServerBridge.cs` — same pattern, strip Godot types |
-| `TrainingMatch.cs` | `Scripts/World/TrainingMatch.cs:102-123` — the _PhysicsProcess tick loop |
-| `MatchBase.cs` | New — abstract base for TrainingMatch + PvPMatch |
+| Manki moves with WASD (camera-relative 8-dir) | ✅ |
+| Jump with JumpSquat (6t squat → VY applied) | ✅ |
+| Double jump | ✅ |
+| Camera orbits with mouse (Cinemachine + HardLookAt) | ✅ |
+| Dummy NPC spawns and stands idle | ✅ |
+| No terminal/server process needed | ✅ |
+| Frame-by-frame animation driving | ✅ |
+| Manual edge detection for jump/dash input | ✅ |
 
-**Files to create:**
-- `Runtime/Simulation/LocalSimulationBridge.cs`
-- `Runtime/World/MatchBase.cs`
-- `Runtime/World/TrainingMatch.cs`
-
-**Files to modify:**
-- `GameManager.cs` — strip the `dotnet run` launch, `NetworkClient`, raw polling, `KillProcessOnPort`. Keep only scene orchestration skeleton for later PvP flow.
-- `InputController.cs` — wire to `TrainingMatch` (currently unused, GameManager duplicates raw polling)
-
-**Godot files deleted after this phase:**
-- `Scripts/Server/LocalServerBridge.cs`
-- `Scripts/World/TrainingMatch.cs`
-
-**Test:** Open `Arena_Offline` scene → Manki runs around with WASD, jumps with space, camera orbits with mouse. Dummy idle-animates at spawn position. No terminal with `dotnet run` needed.
+**Notes for next phase:** `Simulation.SimulateTick` needs refactoring — the linear
+method is ~260 lines with cross-cutting concerns (jump, ground collision, gravity)
+difficult to maintain. Consider extracting into smaller phase-methods before Phase 2.
 
 ---
 
