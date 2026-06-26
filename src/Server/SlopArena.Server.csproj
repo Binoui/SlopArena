@@ -4,11 +4,16 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>CA1031</NoWarn> <!-- Server catches general exceptions intentionally (network robustness) -->
+    <NoWarn>CA1031</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\SlopArena.Shared.csproj" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jitter2" Version="2.*" />
   </ItemGroup>
 
   <ItemGroup>

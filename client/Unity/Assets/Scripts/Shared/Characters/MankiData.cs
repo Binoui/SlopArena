@@ -1,0 +1,1 @@
+../../../../../../src/Shared/Characters/MankiData.cs

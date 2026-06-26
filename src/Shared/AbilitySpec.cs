@@ -19,7 +19,7 @@ namespace SlopArena.Shared
         public byte AbilityTypeId;
         /// <summary>0 = no cooldown</summary>
         public ushort CooldownTicks;
-        public AttackStage[] Stages = [];
+        public AttackStage[] Stages;
         /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
         public AttackStage[]? ChargedStages;
         public ushort ChargeHoldTicks;

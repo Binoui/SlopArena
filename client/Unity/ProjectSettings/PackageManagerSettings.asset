@@ -30,11 +30,23 @@ MonoBehaviour:
     m_Compliance:
       m_Status: 0
       m_Violations: []
-  m_UserSelectedRegistryName: 
+  - m_Id: scoped:project:package.openupm.com
+    m_Name: package.openupm.com
+    m_Url: https://package.openupm.com
+    m_Scopes:
+    - com.ivanmurzak
+    - extensions.unity
+    m_IsDefault: 0
+    m_Capabilities: 0
+    m_ConfigSource: 4
+    m_Compliance:
+      m_Status: 0
+      m_Violations: []
+  m_UserSelectedRegistryName: package.openupm.com
   m_UserAddingNewScopedRegistry: 0
   m_RegistryInfoDraft:
     m_Modified: 0
     m_ErrorMessage: 
-    m_UserModificationsInstanceId: -924
-    m_OriginalInstanceId: -926
+    m_UserModificationsInstanceId: -864
+    m_OriginalInstanceId: -866
   m_LoadAssets: 0

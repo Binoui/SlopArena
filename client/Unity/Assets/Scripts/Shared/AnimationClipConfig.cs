@@ -1,0 +1,1 @@
+../../../../../src/Shared/AnimationClipConfig.cs
