@@ -59,6 +59,8 @@ namespace SlopArena.Client.World
             _playerRenderer.CapsuleRadius = charDef.CapsuleRadius;
             _playerRenderer.CapsuleHeight = charDef.CapsuleHeight;
             _playerRenderer.HurtboxBoneDefs = charDef.HurtboxBoneDefs;
+            _playerRenderer.SetBakedData(baked);
+            _playerRenderer.SetCharacterDefinition(charDef);
             if (_npcRenderer != null)
             {
                 _npcRenderer.CapsuleRadius = charDef.CapsuleRadius;

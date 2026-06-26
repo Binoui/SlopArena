@@ -44,6 +44,14 @@ namespace SlopArena.Client.Entities
         /// Y offset to align the visual model's feet with the collision capsule bottom.
         /// Set from CharacterDefinition.ModelYOffset (≈ -0.52 for Manki).
         /// </summary>
+
+        /// <summary>
+        /// Character definition for ability animation lookups.
+        /// Set from TrainingMatch at spawn.
+        /// </summary>
+        private CharacterDefinition? _charDef;
+
+        public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
         public float ModelYOffset
         {
             get => _modelYOffset;
@@ -79,6 +87,18 @@ namespace SlopArena.Client.Entities
         private CharacterState _lastState;
         private bool _wasGrounded = true;
 
+        // ── Frame-by-frame animation control ──
+
+        private BakedAnimationData? _bakedData;
+        private int _animFrame;           // current frame index within the active clip
+        private string _lastAnimClip = ""; // clip name from last tick (to detect transitions)
+
+        /// <summary>
+        /// Set baked skeleton data for frame-accurate animation.
+        /// Must be called before first ApplyServerState.
+        /// </summary>
+        public void SetBakedData(BakedAnimationData? data) => _bakedData = data;
+
         // ── Lifecycle ──
 
         private void Awake()
@@ -106,6 +126,30 @@ namespace SlopArena.Client.Entities
 
         // ── Animation State Machine ──
 
+        /// <summary>
+        /// Resolve the target animation clip name from current character state.
+        /// Mirrors the logic in ServerSimulation.Tick entity-list building.
+        /// </summary>
+        private string ResolveAnimClip(CharacterState state)
+        {
+            if (state.State == ActionState.Dashing) return "Dash";
+            if (state.State == ActionState.Hitstun) return "Hitstun";
+            if (state.State == ActionState.Attacking && state.AttackSlot > 0 && _charDef != null)
+            {
+                bool airborne = !state.IsGrounded;
+                var spec = _charDef.GetSlotAbility(state.AttackSlot - 1, airborne);
+                int stageIdx = Mathf.Min(state.ComboStage, (byte)(spec.Stages.Length - 1));
+                if (stageIdx >= 0 && stageIdx < spec.AnimationNames.Length)
+                    return spec.AnimationNames[stageIdx];
+                return "Melee";
+            }
+            if (state.State == ActionState.JumpSquat) return "Jump";
+            if (!state.IsGrounded) return state.VY > 0f ? "Jump" : "Fall";
+            float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
+            if (hSpeed > _runSpeedThreshold) return "Movement";
+            return "Movement";
+        }
+
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animator == null || _animator.runtimeAnimatorController == null)
@@ -123,37 +167,47 @@ namespace SlopArena.Client.Entities
             _animator.SetFloat("Speed", hSpeed);
             _animator.SetBool("IsMoving", hSpeed > _runSpeedThreshold);
 
-            // Jump trigger: fire during JumpSquat while IsGrounded is still true
-            // This ensures animator sees Jump=true + IsGrounded=true → Movement→Jump fires, not Movement→Fall
-            // Falling off edges naturally uses the Movement→Fall transition (no Jump trigger set)
-            if (state.State == ActionState.JumpSquat)
-                _animator.SetTrigger("Jump");
+            // Resolve target animation clip
+            string targetClip = ResolveAnimClip(state);
 
-            _wasGrounded = isGrounded;
-
-            if (_lastState.State != state.State)
+            // Frame-accurate driving for discrete animation states
+            // Movement (idle/run blend tree) uses Play to enter the state, then Speed float drives the blend
+            if (targetClip == "Movement")
             {
-                Debug.Log($"[Anim] {_entityName}({_entityId}) ActionState changed: {_lastState.State} → {state.State}");
-                switch (state.State)
+                if (_lastAnimClip != targetClip)
                 {
-                    case ActionState.Attacking:
-                        _animator.SetTrigger("Attack");
-                        _animator.SetInteger("ComboStage", state.ComboStage);
-                        break;
-                    case ActionState.Dashing:
-                        _animator.SetTrigger("Dash"); break;
-                    case ActionState.Hitstun:
-                        _animator.SetTrigger("Hitstun"); break;
-                    case ActionState.AirDodging:
-                        _animator.SetTrigger("AirDodge"); break;
-                    case ActionState.Sliding:
-                        _animator.SetTrigger("Slide"); break;
-                    case ActionState.JumpSquat:
-                        _animator.SetTrigger("Idle"); break;
-                    case ActionState.Idle:
-                        _animator.SetTrigger("Idle"); break;
+                    _animator.Play("Movement", 0, 0f);
+                    _lastAnimClip = targetClip;
                 }
             }
+            else
+            {
+                // Frame-by-frame: compute normalized time from elapsed frames
+                if (_lastAnimClip != targetClip)
+                {
+                    // Clip transition: reset frame counter
+                    _animFrame = 0;
+                    _lastAnimClip = targetClip;
+                }
+                else
+                {
+                    _animFrame++;
+                }
+
+                int totalFrames = 30; // fallback if baked data unavailable
+                if (_bakedData != null)
+                {
+                    int idx = _bakedData.FindAnimIndex(targetClip);
+                    if (idx >= 0)
+                        totalFrames = _bakedData.Animations[idx].FrameCount;
+                }
+
+                float normalizedTime = totalFrames > 0 ? (_animFrame % totalFrames) / (float)totalFrames : 0f;
+                _animator.Play(targetClip, 0, normalizedTime);
+                _animator.Update(0f); // immediately apply
+            }
+
+            _wasGrounded = isGrounded;
         }
 
         /// <summary>
