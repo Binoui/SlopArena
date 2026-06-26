@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SlopArena.Shared.Abilities;
 
 namespace SlopArena.Shared
@@ -440,7 +441,10 @@ namespace SlopArena.Shared
 
 			// ── Step 3b: Projectile explosions (entity hit + ground impact) ──
 			// Ground collision for remaining active projectiles
-			_spellResolver.CheckGroundCollision(_arena.FloorHeight);
+            float floorY = _arena.Heightmap.Data != null && _arena.Heightmap.Data.Length > 0
+                ? _arena.Heightmap.Data.Min()
+                : 0f;
+            _spellResolver.CheckGroundCollision(floorY);
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())

@@ -115,4 +115,15 @@ client/Unity/*.sln
 client/Unity/*.user
 client/Unity/Assets/Shared/*.pdb
 client/Unity/Assets/Shared/*.deps.json
+client/Unity/Assets/Shared/*.meta
 client/Unity/Assets/Shared/*.runtimeconfig.json
+
+# Root Unity artifacts (orphaned)
+/Library/
+/Logs/
+/UserSettings/
+/Temp/
+
+# Asset store bundles (symlinked from /mnt/storage)
+client/Unity/Assets/LowPolyFantasyArena
+client/Unity/Assets/LowPolyMegaBundle

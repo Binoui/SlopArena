@@ -22,6 +22,9 @@ namespace SlopArena.Shared
     {
         /// <summary>Input buffer window in ticks. Inputs within this many frames of unlock are buffered.</summary>
         public const ushort InputBufferWindow = 6;
+        private static int _logCounter;
+        /// <summary>Hook for debug logging. Set by the client to receive sim trace messages.</summary>
+        public static System.Action<string>? OnDebugLog;
         public const float TickDt = 1f / 60f;
 
         /// <summary>
@@ -184,15 +187,25 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // 10. Ground collision (platform-aware)
+            // 10. Ground collision via heightmap
             float capsuleHalf = def.CapsuleHeight * 0.5f;
-            float bestSurfaceY = GetGroundSurfaceY(s.PX, s.PZ, s.PY, capsuleHalf, arena);
-            float groundY = bestSurfaceY + capsuleHalf;
-            if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
+            float surfaceY = arena.Heightmap.Data != null
+                ? arena.Heightmap.Sample(s.PX, s.PZ)
+                : arena.KillHeight + 1f;
+            float groundY = float.NaN;
+            if (surfaceY > float.MinValue)
             {
-                s.IsGrounded = true;
-                s.VY = 0f;
-                // Don't snap PY to groundY — let MoveAndSlide handle floor contact smoothly
+                groundY = surfaceY + capsuleHalf;
+                if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
+                {
+                    s.IsGrounded = true;
+                    s.VY = 0f;
+                    s.PY = groundY;
+                }
+                else
+                {
+                    s.IsGrounded = false;
+                }
             }
             else
             {
@@ -204,6 +217,11 @@ namespace SlopArena.Shared
             {
                 s.State = ActionState.Idle;
             }
+
+            // DEBUG: log ground collision data (every 60 ticks = ~1/sec per entity)
+            if (_logCounter++ % 60 == 0)
+                OnDebugLog?.Invoke(
+                    $"[SimGround] sY={surfaceY:F3} cH={capsuleHalf:F3} gY={groundY:F3} PY={s.PY:F3} gnd={s.IsGrounded} st={s.State}");
         }
 
         // ── TIMERS ──
@@ -297,17 +315,26 @@ namespace SlopArena.Shared
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
-            // Ground check (platform-aware)
+            // Ground check via heightmap
             bool wasAirborne = !s.IsGrounded;
             float capsuleHalfKb = def.CapsuleHeight * 0.5f;
-            float bestSurfaceY = GetGroundSurfaceY(s.PX, s.PZ, s.PY, capsuleHalfKb, arena);
-            float groundY = bestSurfaceY + capsuleHalfKb;
-            s.IsGrounded = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
+            float kbSurfaceY = arena.Heightmap.Data != null
+                ? arena.Heightmap.Sample(s.PX, s.PZ)
+                : float.MinValue;
+            if (kbSurfaceY > float.MinValue)
+            {
+                float groundY = kbSurfaceY + capsuleHalfKb;
+                s.IsGrounded = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
+            }
+            else
+            {
+                s.IsGrounded = false;
+            }
 
             if (s.IsGrounded)
             {
                 s.VY = 0f;
-                // Don't snap PY to groundY — let MoveAndSlide handle floor contact
+                s.PY = kbSurfaceY + capsuleHalfKb;
             }
 
             if (wasAirborne && s.IsGrounded)
@@ -705,34 +732,62 @@ namespace SlopArena.Shared
 
         // ── MATH HELPERS ──
 
-        /// <summary>Find the highest walkable surface Y at the character's XZ position.
-        /// Checks arena platforms first (highest wins), falls back to FloorHeight.</summary>
-        private static float GetGroundSurfaceY(float px, float pz, float py, float capsuleHalf, ArenaDefinition arena)
+        // (removed GetGroundSurfaceY — replaced by ArenaHeightmap.Sample)
+
+        /// <summary>
+        /// Get candidate triangle indices near a sphere at (px, py, pz).
+        /// Uses the arena's spatial grid for broadphase culling.
+        /// </summary>
+        public static int GetCandidateTriangles(
+            float px, float py, float pz, float radius,
+            in ArenaDefinition arena,
+            int[] outIndices)
         {
-            float bestSurfaceY = arena.FloorHeight;
-            if (arena.Platforms == null || arena.Platforms.Length == 0)
-                return bestSurfaceY;
+            var grid = arena.SpatialGrid;
+            if (grid.CellStarts == null || grid.CellStarts.Length == 0)
+                return 0;
 
-            foreach (var plat in arena.Platforms)
+            int ixMin = (int)((px - radius - grid.OriginX) / grid.CellSize);
+            int ixMax = (int)((px + radius - grid.OriginX) / grid.CellSize);
+            int iyMin = (int)((py - radius - grid.OriginY) / grid.CellSize);
+            int iyMax = (int)((py + radius - grid.OriginY) / grid.CellSize);
+            int izMin = (int)((pz - radius - grid.OriginZ) / grid.CellSize);
+            int izMax = (int)((pz + radius - grid.OriginZ) / grid.CellSize);
+
+            if (ixMin < 0) ixMin = 0;
+            if (ixMax >= grid.CellsX) ixMax = grid.CellsX - 1;
+            if (iyMin < 0) iyMin = 0;
+            if (iyMax >= grid.CellsY) iyMax = grid.CellsY - 1;
+            if (izMin < 0) izMin = 0;
+            if (izMax >= grid.CellsZ) izMax = grid.CellsZ - 1;
+
+            if (ixMin > ixMax || iyMin > iyMax || izMin > izMax)
+                return 0;
+
+            int count = 0;
+            for (int iz = izMin; iz <= izMax; iz++)
             {
-                // Check XZ bounds: is the character within this platform's rectangle?
-                if (MathF.Abs(px - plat.CenterX) > plat.HalfSizeX) continue;
-                if (MathF.Abs(pz - plat.CenterZ) > plat.HalfSizeZ) continue;
-
-                // The capsule center Y when standing on this platform
-                float standCenterY = plat.SurfaceY + capsuleHalf;
-
-                // Only snap if the character's center is at or slightly below
-                // the standing height, but not way above it (prevents upward snap).
-                if (py <= standCenterY + PlatformLandTolerance &&
-                    py >= standCenterY - PlatformSnapTolerance)
+                for (int iy = iyMin; iy <= iyMax; iy++)
                 {
-                    if (plat.SurfaceY > bestSurfaceY)
-                        bestSurfaceY = plat.SurfaceY;
+                    for (int ix = ixMin; ix <= ixMax; ix++)
+                    {
+                        int cell = iz * grid.CellsX * grid.CellsY + iy * grid.CellsX + ix;
+                        int start = grid.CellStarts[cell];
+                        int end = grid.CellStarts[cell + 1];
+                        for (int i = start; i < end; i++)
+                        {
+                            int ti = grid.CellTriangles[i];
+                            bool dup = false;
+                            for (int j = 0; j < count; j++)
+                                if (outIndices[j] == ti) { dup = true; break; }
+                            if (!dup)
+                                outIndices[count++] = ti;
+                        }
+                    }
                 }
             }
 
-            return bestSurfaceY;
+            return count;
         }
 
         private static float MoveToward(float from, float to, float delta)

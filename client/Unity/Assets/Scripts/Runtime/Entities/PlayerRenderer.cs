@@ -21,6 +21,42 @@ namespace SlopArena.Client.Entities
         [Header("Thresholds")]
         [SerializeField] private float _runSpeedThreshold = 0.1f;
 
+        [Header("Debug Visualization")]
+        [SerializeField] private float _capsuleRadius = 0.6f;
+        [SerializeField] private float _capsuleHeight = 1.3f;
+
+        public float CapsuleRadius
+        {
+            get => _capsuleRadius;
+            set => _capsuleRadius = value;
+        }
+        public float CapsuleHeight
+        {
+            get => _capsuleHeight;
+            set => _capsuleHeight = value;
+        }
+        private HurtboxBoneDef[] _hurtboxBoneDefs = System.Array.Empty<HurtboxBoneDef>();
+
+        [Header("Visual Offset")]
+        [SerializeField] private float _modelYOffset;
+
+        /// <summary>
+        /// Y offset to align the visual model's feet with the collision capsule bottom.
+        /// Set from CharacterDefinition.ModelYOffset (≈ -0.52 for Manki).
+        /// </summary>
+        public float ModelYOffset
+        {
+            get => _modelYOffset;
+            set => _modelYOffset = value;
+        }
+
+        /// <summary>Hurtbox bone definitions for debug visualization.</summary>
+        public HurtboxBoneDef[] HurtboxBoneDefs
+        {
+            get => _hurtboxBoneDefs;
+            set => _hurtboxBoneDefs = value;
+        }
+
         /// <summary>Entity display name (settable in Inspector).</summary>
         public string EntityName
         {
@@ -60,8 +96,7 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void ApplyServerState(CharacterState state)
         {
-            // ── Transform ──
-            transform.position = new Vector3(state.PX, state.PY, state.PZ);
+            transform.position = new Vector3(state.PX, state.PY + _modelYOffset, state.PZ);
             transform.rotation = Quaternion.Euler(0f, state.FacingYaw * Mathf.Rad2Deg, 0f);
 
             UpdateAnimationState(state);
@@ -78,6 +113,9 @@ namespace SlopArena.Client.Entities
 
             bool isGrounded = state.IsGrounded;
 
+            // DEBUG: trace state and ground detection
+            Debug.Log($"[Anim] {_entityName}({_entityId}) Y={state.PY:F3} VY={state.VY:F3} grounded={isGrounded} state={state.State} warp={state.WarpSpeed:F2}");
+
             _animator.SetBool("IsGrounded", isGrounded);
             _animator.SetBool("IsWarping", state.WarpSpeed > 0f);
 
@@ -86,12 +124,16 @@ namespace SlopArena.Client.Entities
             _animator.SetBool("IsMoving", hSpeed > _runSpeedThreshold);
 
             if (!isGrounded && _wasGrounded)
+            {
                 _animator.SetTrigger("Jump");
+                Debug.Log($"[Anim] {_entityName}({_entityId}) → Jump trigger (was grounded, now airborne)");
+            }
 
             _wasGrounded = isGrounded;
 
             if (_lastState.State != state.State)
             {
+                Debug.Log($"[Anim] {_entityName}({_entityId}) ActionState changed: {_lastState.State} → {state.State}");
                 switch (state.State)
                 {
                     case ActionState.Attacking:
@@ -126,10 +168,46 @@ namespace SlopArena.Client.Entities
 
         private void OnDrawGizmosSelected()
         {
-            // Draw entity name above the renderer
+            // ── Entity name label ──
             Gizmos.color = Color.white;
             Vector3 labelPos = transform.position + Vector3.up * 2.5f;
             UnityEditor.Handles.Label(labelPos, _entityName);
+
+            // ── Collision capsule ──
+            Gizmos.color = new Color(0f, 1f, 0f, 0.6f);
+            Vector3 capCenter = transform.position;
+            float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
+            Vector3 top = capCenter + Vector3.up * halfH;
+            Vector3 bot = capCenter - Vector3.up * halfH;
+
+            UnityEditor.Handles.DrawWireDisc(top, Vector3.up, _capsuleRadius);
+            UnityEditor.Handles.DrawWireDisc(bot, Vector3.up, _capsuleRadius);
+            UnityEditor.Handles.DrawLine(top + Vector3.right * _capsuleRadius, bot + Vector3.right * _capsuleRadius);
+            UnityEditor.Handles.DrawLine(top - Vector3.right * _capsuleRadius, bot - Vector3.right * _capsuleRadius);
+            UnityEditor.Handles.DrawLine(top + Vector3.forward * _capsuleRadius, bot + Vector3.forward * _capsuleRadius);
+            UnityEditor.Handles.DrawLine(top - Vector3.forward * _capsuleRadius, bot - Vector3.forward * _capsuleRadius);
+
+            // ── Hurtbox spheres at bone positions ──
+            if (_hurtboxBoneDefs != null)
+            {
+                Gizmos.color = new Color(1f, 0.3f, 0.3f, 0.5f);
+                foreach (var def in _hurtboxBoneDefs)
+                {
+                    Transform bone = FindBone(def.BoneName);
+                    if (bone != null)
+                    {
+                        Vector3 localOffset = transform.InverseTransformDirection(new Vector3(def.OffX, def.OffY, def.OffZ));
+                        Gizmos.DrawWireSphere(bone.position + localOffset, def.Radius);
+                    }
+                }
+            }
+        }
+
+        private Transform FindBone(string name)
+        {
+            foreach (Transform child in transform.GetComponentsInChildren<Transform>(true))
+                if (child.name == name) return child;
+            return null;
         }
     }
 }

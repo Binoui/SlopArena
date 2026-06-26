@@ -6,12 +6,24 @@
     "com.unity.inputsystem": "1.19.0",
     "com.unity.render-pipelines.universal": "17.0.4",
     "com.unity.toolchain.linux-x86_64": "2.0.11",
+    "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.animation": "1.0.0",
     "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.particlesystem": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.uielements": "1.0.0"
-  }
+    "com.unity.modules.uielements": "1.0.0",
+    "com.ivanmurzak.unity.mcp": "0.82.2"
+  },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.ivanmurzak",
+        "extensions.unity"
+      ]
+    }
+  ]
 }
