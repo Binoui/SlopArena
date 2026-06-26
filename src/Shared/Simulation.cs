@@ -87,6 +87,21 @@ namespace SlopArena.Shared
             s.AimYaw = aimDeg * (MathF.PI / 180f);
             // Store aim target distance (cm → m) for projectile abilities
             s.AimTargetDistance = input.AimDistance * 0.01f;
+
+            // 2.5 JumpSquat: tick down, apply jump force on expiry
+            if (s.State == ActionState.JumpSquat)
+            {
+                s.StateTicks--;
+                if (s.StateTicks == 0)
+                {
+                    s.VY = stats.JumpForce;
+                    s.IsGrounded = false;
+                    s.State = ActionState.Idle;
+                }
+                // During squat: no horizontal movement, stay grounded
+                s.VX = 0f;
+                s.VZ = 0f;
+            }
             s.IsAiming = input.IsAiming;
 
             // 1. Tick timers
@@ -140,8 +155,32 @@ namespace SlopArena.Shared
                 s.AttackSlot = slot;
             }
 
-            // 6. Input-driven actions (only when not locked by animation)
-            if (s.AnimLockTicks == 0)
+            // 5.75 Jump detection (unconditional except hitstun / already squatting)
+            if (input.Jump && s.JumpsLeft > 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat)
+            {
+                if (s.IsGrounded)
+                {
+                    // Ground jump → enter JumpSquat
+                    s.State = ActionState.JumpSquat;
+                    s.StateTicks = stats.JumpSquatTicks;
+                    s.JumpsLeft--;
+                    s.VX = 0f;
+                    s.VZ = 0f;
+                    // VY stays 0 — applied when squat expires
+                }
+                else
+                {
+                    // Double jump
+                    s.VY = stats.JumpForce;
+                    (float dirX, float dirZ) = GetInputDirection(input);
+                    s.VX = dirX * stats.WalkSpeed;
+                    s.VZ = dirZ * stats.WalkSpeed;
+                    s.JumpsLeft--;
+                }
+            }
+
+            // 6. Input-driven actions (only when not locked by animation or in jump squat)
+            if (s.AnimLockTicks == 0 && s.State != ActionState.JumpSquat)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
@@ -162,10 +201,11 @@ namespace SlopArena.Shared
             // Buffer input if locked within window
             // NOTE: Combo buffering is now handled by ServerAbility.Tick lifecycle
             // Only general input buffering (unlock window) is kept for client prediction
-            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0) && s.BufferedSlot == 0)
+            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
             {
                 // General buffer: within window of unlock
-                if ((s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
+                if (s.State == ActionState.JumpSquat ||
+                    (s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
                     (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
                 {
                     // No cooldown check here — ServerSimulation handles ability activation validation
@@ -238,8 +278,8 @@ namespace SlopArena.Shared
             // Turnaround ticks
             if (s.TurnaroundTicks > 0) s.TurnaroundTicks--;
 
-            // State ticks
-            if (s.StateTicks > 0)
+            // State ticks (generic expiry — JumpSquat is handled specially below)
+            if (s.StateTicks > 0 && s.State != ActionState.JumpSquat)
             {
                 s.StateTicks--;
                 if (s.StateTicks == 0 && s.State != ActionState.Idle)
@@ -461,14 +501,6 @@ namespace SlopArena.Shared
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
             }
 
-            // Jump — applied by simulation (IsGrounded tracks properly)
-            if (input.Jump && s.JumpsLeft > 0)
-            {
-                s.VY = stats.JumpForce;
-                s.JumpsLeft--;
-                s.IsGrounded = false;
-            }
-
             UpdateFacing(ref s);
         }
 
@@ -492,15 +524,6 @@ namespace SlopArena.Shared
 
             // Dash initiation is handled by PlayerController outside of Simulation
             // (works both ground and air, has cooldown, grants invincibility)
-
-            // Double jump: press space in air to use remaining jump
-            if (input.Jump && s.JumpsLeft > 0)
-            {
-                s.VY = stats.JumpForce;
-                s.VX = dirX * stats.WalkSpeed;
-                s.VZ = dirZ * stats.WalkSpeed;
-                s.JumpsLeft--;
-            }
 
             UpdateFacing(ref s);
         }

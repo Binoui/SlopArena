@@ -27,8 +27,8 @@ namespace SlopArena.Shared
         public float AirFriction;
         public float MaxFallSpeed;
         public byte MaxJumps;
-        /// <summary>Duration of the rising phase of a jump in ticks (1 tick = 1/60s).</summary>
-        public ushort JumpDurationTicks;
+        /// <summary>Jump squat duration in ticks (1 tick = 1/60s). Character locks during this window before airborne.</summary>
+        public ushort JumpSquatTicks;
     }
 
     public class CharacterDefinition
