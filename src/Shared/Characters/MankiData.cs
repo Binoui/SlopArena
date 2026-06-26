@@ -47,7 +47,7 @@ public static partial class CharacterRegistry
                 AirFriction = 0.4f,
                 MaxFallSpeed = 45f,
                 MaxJumps = 2,
-                JumpDurationTicks = 60,
+                JumpSquatTicks = 6,
             },
 
             HurtboxBoneDefs = new HurtboxBoneDef[]
