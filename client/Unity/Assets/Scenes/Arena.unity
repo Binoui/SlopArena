@@ -245,9 +245,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50436160c9c41690bb703115acb00101, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _offlineMode: 0
-  _playerRenderer: {fileID: 0}
-  _opponentRenderer: {fileID: 0}
 --- !u!4 &288678126
 Transform:
   m_ObjectHideFlags: 0
@@ -274,6 +271,7 @@ GameObject:
   - component: {fileID: 525662903}
   - component: {fileID: 525662902}
   - component: {fileID: 525662904}
+  - component: {fileID: 525662905}
   m_Layer: 0
   m_Name: CameraMount
   m_TagString: Untagged
@@ -293,9 +291,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 920e321ce107d8c0fa05b1abf0346b9e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _yawSpeed: 180
-  _pitchSpeed: 120
-  _zoomSpeed: 8
 --- !u!4 &525662903
 Transform:
   m_ObjectHideFlags: 0
@@ -355,6 +350,69 @@ MonoBehaviour:
       BarrelClipping: 0.25
       Anamorphism: 0
   BlendHint: 0
+--- !u!114 &525662905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 525662901}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b5d7c088409d9a40b7b09aa707777f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  TargetOffset: {x: 0, y: 0, z: 0}
+  TrackerSettings:
+    BindingMode: 4
+    PositionDamping: {x: 1, y: 1, z: 1}
+    AngularDampingMode: 0
+    RotationDamping: {x: 1, y: 1, z: 1}
+    QuaternionDamping: 1
+  OrbitStyle: 0
+  Radius: 10
+  Orbits:
+    Top:
+      Radius: 2
+      Height: 5
+    Center:
+      Radius: 4
+      Height: 2.25
+    Bottom:
+      Radius: 2.5
+      Height: 0.1
+    SplineCurvature: 0.5
+  RecenteringTarget: 2
+  HorizontalAxis:
+    Value: 0
+    Center: 0
+    Range: {x: -180, y: 180}
+    Wrap: 1
+    Recentering:
+      Enabled: 0
+      Wait: 1
+      Time: 2
+    Restrictions: 0
+  VerticalAxis:
+    Value: 17.5
+    Center: 17.5
+    Range: {x: -10, y: 45}
+    Wrap: 0
+    Recentering:
+      Enabled: 0
+      Wait: 1
+      Time: 2
+    Restrictions: 0
+  RadialAxis:
+    Value: 1
+    Center: 1
+    Range: {x: 1, y: 1}
+    Wrap: 0
+    Recentering:
+      Enabled: 0
+      Wait: 1
+      Time: 2
+    Restrictions: 0
 --- !u!1 &534291962
 GameObject:
   m_ObjectHideFlags: 0
@@ -769,6 +827,9 @@ MonoBehaviour:
   _entityId: 1
   _animator: {fileID: 1512223013}
   _runSpeedThreshold: 0.1
+  _capsuleRadius: 0.6
+  _capsuleHeight: 1.3
+  _modelYOffset: 0
 --- !u!95 &1512223013
 Animator:
   serializedVersion: 7
@@ -840,6 +901,9 @@ MonoBehaviour:
   _entityId: 2
   _animator: {fileID: 1554294299}
   _runSpeedThreshold: 0.1
+  _capsuleRadius: 0.6
+  _capsuleHeight: 1.3
+  _modelYOffset: 0
 --- !u!95 &1554294299
 Animator:
   serializedVersion: 7

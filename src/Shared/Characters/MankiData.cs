@@ -62,6 +62,7 @@ public static partial class CharacterRegistry
             },
             GlbPath = "res://assets/characters/manki/manki.glb",
             BakedDataPath = "res://data/manki_skeleton.bin",
+            ModelResourcePath = "Characters/Manki",
             VisualScale = 1.0f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
