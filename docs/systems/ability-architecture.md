@@ -187,6 +187,13 @@ E = new AbilitySpec
 - Ability dropped from `_activeAbilities`
 - Velocity preserved (important for momentum-granting abilities)
 
+**Critical implementation detail:** `ActivateAbility` in `ServerSimulation.cs` sets
+`state.AttackSlot = (byte)(slot + 1)` after calling `OnStart`. Individual abilities
+`should NOT set AttackSlot in OnStart` — rely on ActivateAbility. (Bug: MankiLmbCombo
+and MankiAerosolFlame originally didn't set it, causing TickAbilities to immediately
+deactivate them via the `AttackSlot == 0` check. Fixed in `ActivateAbility`.)
+
+
 ## Best Practices
 
 1. **Keep logic in Tick(), data in Params**
@@ -213,6 +220,25 @@ public override void OnStart(ref CharacterState s, CharacterDefinition def)
 ```
 
 The sim will interpolate position each tick until `IsWarping` is cleared or warp completes.
+
+## Test Coverage
+
+All abilities have matching xUnit tests in `tests/Shared.Tests/`:
+
+| Test file | What it covers |
+|---|---|
+| `AbilityLifecycleTests.cs` | Activation, AttackSlot wiring, data-driven expiry |
+| `PhysicsTests.cs` | State transitions during attacks, hitstun knockback |
+| `CombatIntegrationTests.cs` | Two-entity stability during attacks |
+| `SpellResolverTests.cs` | Hitbox collision, CanHitOwner, explosions |
+| `ServerSimulationTests.cs` | Ability lifetime, self-hit prevention |
+| `CombatMathTests.cs` | Knockback formulas, DI, projectile math |
+
+**Run after every ability change:**
+```bash
+dotnet test tests/Shared.Tests/ --nologo
+```
+Build + test completes in <3s. See `docs/testing.md` for details.
 
 ## Related Docs
 
