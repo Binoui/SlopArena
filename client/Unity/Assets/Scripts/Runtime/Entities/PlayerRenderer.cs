@@ -158,7 +158,7 @@ namespace SlopArena.Client.Entities
             bool isGrounded = state.IsGrounded;
 
             // DEBUG: trace state and ground detection
-            Debug.Log($"[Anim] {_entityName}({_entityId}) Y={state.PY:F3} VY={state.VY:F3} grounded={isGrounded} state={state.State} warp={state.WarpSpeed:F2}");
+            //Debug.Log($"[Anim] {_entityName}({_entityId}) Y={state.PY:F3} VY={state.VY:F3} grounded={isGrounded} state={state.State} warp={state.WarpSpeed:F2}");
 
             _animator.SetBool("IsGrounded", isGrounded);
             _animator.SetBool("IsWarping", state.WarpSpeed > 0f);
@@ -222,7 +222,7 @@ namespace SlopArena.Client.Entities
 
         // ── Gizmos ──
 
-        private void OnDrawGizmosSelected()
+        private void OnDrawGizmos()
         {
             // ── Entity name label ──
             Gizmos.color = Color.white;

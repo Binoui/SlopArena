@@ -23,6 +23,8 @@ namespace SlopArena.Client.World
 
         private uint _tick;
         private ServerSimulation _localSim = null!;
+        private ArenaDefinition _arenaDef;
+        private byte _lastNpcDeaths;
         private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
 
@@ -45,6 +47,7 @@ namespace SlopArena.Client.World
 
             // Wire sim debug logging to Unity console
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
+            _arenaDef = arena;
             _localSim = new ServerSimulation(arena);
 
             var charDef = CharacterRegistry.Get(CharacterClass.Manki);
@@ -66,6 +69,8 @@ namespace SlopArena.Client.World
                 _npcRenderer.CapsuleRadius = charDef.CapsuleRadius;
                 _npcRenderer.CapsuleHeight = charDef.CapsuleHeight;
                 _npcRenderer.HurtboxBoneDefs = charDef.HurtboxBoneDefs;
+                _npcRenderer.SetBakedData(baked);
+                _npcRenderer.SetCharacterDefinition(charDef);
             }
 
             // Player spawn
@@ -91,6 +96,17 @@ namespace SlopArena.Client.World
             if (_npcRenderer != null)
                 _npcRenderer.transform.position = new Vector3(nSpawn.X, nSpawn.Y, nSpawn.Z);
 
+            // Override NPC position to 3m in front of player for hit testing
+            float facingDirX = Mathf.Cos(pSpawn.Yaw);
+            float facingDirZ = Mathf.Sin(pSpawn.Yaw);
+            var npcOverride = _localSim.GetState(NpcEntityId);
+            npcOverride.PX = pSpawn.X + facingDirX * 3f;
+            npcOverride.PZ = pSpawn.Z + facingDirZ * 3f;
+            _localSim.SetState(NpcEntityId, npcOverride);
+            if (_npcRenderer != null)
+                _npcRenderer.transform.position = new Vector3(npcOverride.PX, npcOverride.PY, npcOverride.PZ);
+            _lastNpcDeaths = _localSim.GetState(NpcEntityId).Deaths;
+
             // Camera
             if (_cameraMount != null)
             {
@@ -101,13 +117,20 @@ namespace SlopArena.Client.World
             Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
         }
 
+        private void Update()
+        {
+            _inputController.Poll();
+        }
+
         protected override void OnMatchFixedUpdate()
         {
             if (_localSim == null || _playerRenderer == null) return;
 
             // Input
-            _inputController.Poll();
+            // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
+            if (slot > 0)
+                Debug.Log($"[Input] slot={slot} animLock={_localSim.GetState(PlayerEntityId).AnimLockTicks} tick={_tick}");
             var (input, _, _) = _inputController.BuildInputState(
                 _cameraMount,
                 _playerRenderer.transform.eulerAngles.y,
@@ -131,10 +154,36 @@ namespace SlopArena.Client.World
                 Debug.Log($"[Training] tick={_tick} pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) vy={ps.VY:F2} grounded={ps.IsGrounded}");
             }
 
+#if UNITY_EDITOR
+            var hitState = _localSim.GetState(NpcEntityId);
+            if (hitState.HitstunTicks > 0)
+                Debug.Log($"[Combat] NPC hit! damage={hitState.DamagePercent:F1} hitstun={hitState.HitstunTicks}");
+#endif
+
             // Apply states
             _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
+
+            // Void-kill respawn: detect via Deaths counter (server CheckVoidDeaths runs inside Tick)
+            if (_npcRenderer != null)
+            {
+                var nState = _localSim.GetState(NpcEntityId);
+                if (nState.Deaths > _lastNpcDeaths)
+                {
+                    _lastNpcDeaths = nState.Deaths;
+                    _localSim.SetState(NpcEntityId, new CharacterState
+                    {
+                        PX = _localSim.GetState(PlayerEntityId).PX + 4f,
+                        PY = _arenaDef.SpawnPoints[0].Y + 2f,
+                        PZ = _localSim.GetState(PlayerEntityId).PZ,
+                        JumpsLeft = 2,
+                        AirDodgesLeft = 1,
+                        IsGrounded = true,
+                    });
+                    _npcRenderer.ResetAnimationState();
+                }
+            }
         }
     }
 }

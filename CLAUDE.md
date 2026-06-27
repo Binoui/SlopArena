@@ -62,6 +62,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Netcode-Ready Code Rules
 
+**Always run xUnit tests after any `src/Shared/` change:**
+```bash
+dotnet test tests/Shared.Tests/ --nologo
+```
+63+ tests cover physics (jump/dash/land), ability lifecycles, combat integration,
+and edge cases — all pure C#, no Godot needed. Build + test completes in <3s.
+
 SlopArena uses a server-authoritative 60Hz UDP model with client-side prediction + reconciliation.
 Every line of gameplay code must be written to work deterministically on both client and server.
 

@@ -61,6 +61,9 @@ SlopArena/
 ├── assets/               ← 3D models (.glb), textures, UI
 ├── data/                 ← Baked binary data (.arena, _skeleton.bin)
 └── docs/                 ← All documentation
+│
+├── tests/               ← xUnit simulation tests (.NET 8, pure C#)
+│   └── Shared.Tests/        ← ServerSimulation, SpellResolver, CombatMath, abilities
 ```
 
 ---
@@ -169,6 +172,12 @@ SlopArena/
 # Build all projects (Shared + Godot client + Server)
 dotnet build --nologo
 
+# Run ALL simulation unit tests (63+ tests: physics, abilities, combat, edges)
+dotnet test tests/Shared.Tests/ --nologo
+
+# Run a specific test category
+dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests|AbilityLifecycle"
+
 # Run linter
 make lint
 
@@ -177,6 +186,10 @@ make lint
 # Run headless server (separate terminal)
 dotnet run --project Server/SlopArena.Server.csproj
 ```
+
+> The simulation tests are the **first thing to run** after any `src/Shared/` change.
+> They validate state transitions, ability lifecycles, and hit detection without
+> needing Godot or a server. Build & test together takes <3 seconds.
 
 ---
 

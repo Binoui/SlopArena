@@ -77,8 +77,9 @@ namespace SlopArena.Shared.Abilities
                 });
             }
 
-            // End ability when animation lock expires
-            if (s.AttackElapsedTicks >= s.AnimLockTicks)
+            // End ability when duration expires
+            ushort duration = (ushort)GetParam(def, "throw_duration", 60f);
+            if (s.AttackElapsedTicks >= duration)
                 EndAbility(ref s);
         }
     }

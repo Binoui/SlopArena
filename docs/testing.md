@@ -1,3 +1,70 @@
+# Simulation Unit Tests
+
+> **The fastest feedback loop.** All simulation logic in `src/Shared/` is pure C# —
+> testable via xUnit without Godot, a server, or any runtime. Build + test takes <3s.
+>
+> **Run this first after every `src/Shared/` change.**
+
+## Running
+
+```bash
+# From repo root — build + test in one step
+dotnet test tests/Shared.Tests/ --nologo
+
+# Run a specific test category
+dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests"
+dotnet test tests/Shared.Tests/ --nologo --filter "AbilityLifecycle"
+dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
+
+# Run all tests: 63+ across 5 test suites (existing: ServerSimulation, SpellResolver,
+# CombatMath; new: PhysicsTests, AbilityLifecycle, CombatIntegration, EdgeCase)
+```
+
+## Test Suites
+
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `ServerSimulationTests.cs` | 9 | Entity registration, void death, Q lifecycle, self-hit |
+| `SpellResolverTests.cs` | 12 | Sphere/capsule collision, explosion, gravity, CanHitOwner |
+| `CombatMathTests.cs` | 21 | Knockback formulas, angle math, DI calculations |
+| `PhysicsTests.cs` | 12 | Jump chain, dash, landing, walk/sprint/friction, hitstun, data-driven attack expiry |
+| `AbilityLifecycleTests.cs` | 5 | ServerAbility activation, data-driven duration, basic lifecycle |
+| `CombatIntegrationTests.cs` | 2 | Two-entity tick stability |
+| `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
+
+> Abilities aren't fully implemented — ServerAbility tests verify basic activation
+> (state transitions, AttackSlot wiring). Data-driven attacks (no ServerAbility)
+> work fully through `SimulateTick`'s built-in expiry.
+
+## Writing New Tests
+
+**Use `TestHelpers`** (in `tests/Shared.Tests/TestHelpers.cs`) to avoid boilerplate:
+
+```csharp
+var arena = TestHelpers.TestArena();           // 200x200 flat heightmap
+var sim = TestHelpers.MakeSim(arena);          // fresh ServerSimulation
+var state = TestHelpers.PlayerState();          // entity 1, idle, grounded
+state.PY = TestHelpers.MankiGroundPY;          // snap to ground (capsule half)
+TestHelpers.RegisterPlayer(sim, Def, state);   // shorthand for sim.RegisterEntity(1, def, state)
+var t0 = TestHelpers.TickN(sim, Input(activeSlot: 1), 1); // 1 tick with input, rest default
+var after = TestHelpers.TickDefault(sim, 5);   // 5 ticks of default input
+TestHelpers.AssertNear(9f, after.PZ, 1.0f);   // tolerance-based float equality
+```
+
+**Pattern for ability tests:**
+```csharp
+// Press slot → check state → tick duration → check Idle
+TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1);
+Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+for (int i = 0; i < 60; i++) TestHelpers.TickDefault(sim, 1);
+Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+```
+
+**Always assert exact state, not side effects.** Test behavioral invariants:
+wrong state = caught on the assertion; wrong side effect = silent regression.
+
+---
+
 # Testing & Verification
 
 > How to verify that your changes work — for agents and contributors.

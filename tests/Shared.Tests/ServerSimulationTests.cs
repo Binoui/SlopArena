@@ -183,4 +183,71 @@ public class ServerSimulationTests
         // With no HurtboxCapsules or BakedAnimationData, list may be empty
         // But the assignment should not throw
     }
+
+    // ── Q ability self-hit ──
+
+    [Fact]
+    public void Tick_MankiQ_EntityIdSetOnRegister()
+    {
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena);
+        var def = CharacterRegistry.Get(CharacterClass.Manki);
+        var state = MakeIdleState(1);
+        sim.RegisterEntity(1, def, state);
+
+        Assert.Equal((ulong)1, sim.GetState(1).EntityId);
+    }
+
+    [Fact]
+    public void Tick_MankiQ_DoesNotHitOwner()
+    {
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena);
+        var def = CharacterRegistry.Get(CharacterClass.Manki);
+
+        var pState = MakeIdleState(1);
+        sim.RegisterEntity(1, def, pState);
+
+        var nState = MakeIdleState(100);
+        nState.PX = 3f;
+        sim.RegisterEntity(100, def, nState);
+
+        for (int i = 0; i < 20; i++)
+        {
+            var input = new Dictionary<ulong, InputState>
+            {
+                { 1, i == 0 ? new InputState { ActiveSlot = 3 } : default },
+                { 100, default },
+            };
+            sim.Tick(input);
+        }
+
+        var playerAfter = sim.GetState(1);
+        Assert.Equal(0u, playerAfter.DamagePercent);
+    }
+
+    [Fact]
+    public void Tick_MankiQ_StaysAttackingForDuration()
+    {
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena);
+        var def = CharacterRegistry.Get(CharacterClass.Manki);
+        var state = MakeIdleState(1);
+        sim.RegisterEntity(1, def, state);
+
+        // Tick 0: press Q
+        sim.Tick(new Dictionary<ulong, InputState>
+            { { 1, new InputState { ActiveSlot = 3 } } });
+        var t0 = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, t0.State);
+
+        for (int i = 1; i < 60; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
+            var s = sim.GetState(1);
+            bool shouldBeAttacking = i < 59;
+            Assert.True((s.State == ActionState.Attacking) == shouldBeAttacking,
+                $"tick {i}: expected {(shouldBeAttacking ? "Attacking" : "Idle")} but got {s.State}");
+        }
+    }
 }
