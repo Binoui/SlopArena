@@ -15,6 +15,7 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		private readonly SpellResolver _spellResolver = new();
+		private readonly Dictionary<ulong, (float x, float y, float z)> _respawnPositions = new();
 
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
@@ -31,6 +32,11 @@ namespace SlopArena.Shared
 			_prevAnimIndex[id] = -1;
 		}
 
+		public void SetRespawnPosition(ulong entityId, float x, float y, float z)
+		{
+			_respawnPositions[entityId] = (x, y, z);
+		}
+
 		public void RemoveEntity(ulong id)
 		{
 			_states.Remove(id);
@@ -39,6 +45,7 @@ namespace SlopArena.Shared
 			_animFrames.Remove(id);
 			_prevAnimIndex.Remove(id);
 			_activeAbilities.Remove(id);
+			_respawnPositions.Remove(id);
 		}
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
@@ -464,9 +471,11 @@ namespace SlopArena.Shared
 			{
 				var d = _defs[id];
 				var oldState = _states[id];
+				var (rpx, rpy, rpz) = _respawnPositions.TryGetValue(id, out var rp) ? rp :
+					(_arena.SpawnPoints[0].X, _arena.SpawnPoints[0].Y, _arena.SpawnPoints[0].Z);
 				_states[id] = new CharacterState
 				{
-					PX = _arena.SpawnPoints[0].X, PY = _arena.SpawnPoints[0].Y, PZ = _arena.SpawnPoints[0].Z,
+					PX = rpx, PY = rpy, PZ = rpz,
 					FacingYaw = _arena.SpawnPoints[0].Yaw,
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
 					Deaths = (byte)(oldState.Deaths + 1), DamagePercent = 0,

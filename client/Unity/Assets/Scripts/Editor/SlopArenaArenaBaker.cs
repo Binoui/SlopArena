@@ -127,6 +127,27 @@ public class SlopArenaArenaBaker : EditorWindow
                 }
             }
         }
+        // Include Terrain bounds in auto-bounds calculation
+        if (_autoBounds)
+        {
+            var terrainsForBounds = _arenaRoot.GetComponentsInChildren<Terrain>(true);
+            foreach (var terrain in terrainsForBounds)
+            {
+                var tData = terrain.terrainData;
+                if (tData == null) continue;
+                Transform tTrans = terrain.transform;
+                float w = tData.size.x;
+                float d = tData.size.z;
+                float tMinX = tTrans.position.x;
+                float tMaxX = tMinX + w;
+                float tMinZ = tTrans.position.z;
+                float tMaxZ = tMinZ + d;
+                if (tMinX < autoMinX) autoMinX = tMinX;
+                if (tMaxX > autoMaxX) autoMaxX = tMaxX;
+                if (tMinZ < autoMinZ) autoMinZ = tMinZ;
+                if (tMaxZ > autoMaxZ) autoMaxZ = tMaxZ;
+            }
+        }
 
             // Also sample Terrain components for collision data
             var terrains = _arenaRoot.GetComponentsInChildren<Terrain>(true);

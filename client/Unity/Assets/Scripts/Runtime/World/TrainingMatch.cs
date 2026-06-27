@@ -21,10 +21,16 @@ namespace SlopArena.Client.World
         [Header("Arena")]
         [SerializeField] private string _arenaName = "training";
 
+        [Header("Characters")]
+        [SerializeField] private CharacterClass _playerClass = CharacterClass.Manki;
+        [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
+
+        [Header("Debug")]
+        [SerializeField] private bool _showHitboxes;
+
         private uint _tick;
         private ServerSimulation _localSim = null!;
         private ArenaDefinition _arenaDef;
-        private byte _lastNpcDeaths;
         private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
 
@@ -50,62 +56,60 @@ namespace SlopArena.Client.World
             _arenaDef = arena;
             _localSim = new ServerSimulation(arena);
 
-            var charDef = CharacterRegistry.Get(CharacterClass.Manki);
-            var baked = LoadBakedData(charDef);
+            var playerDef = CharacterRegistry.Get(_playerClass);
+            var playerBaked = LoadBakedData(playerDef);
+            var npcDef = CharacterRegistry.Get(_npcClass);
+            var npcBaked = LoadBakedData(npcDef);
 
             // Apply model Y offset for visual alignment with capsule
-            _playerRenderer.ModelYOffset = charDef.ModelYOffset;
+            _playerRenderer.ModelYOffset = playerDef.ModelYOffset;
             if (_npcRenderer != null)
-                _npcRenderer.ModelYOffset = charDef.ModelYOffset;
+                _npcRenderer.ModelYOffset = npcDef.ModelYOffset;
 
             // Wire capsule size + hurtbox data for debug visualization
-            _playerRenderer.CapsuleRadius = charDef.CapsuleRadius;
-            _playerRenderer.CapsuleHeight = charDef.CapsuleHeight;
-            _playerRenderer.HurtboxBoneDefs = charDef.HurtboxBoneDefs;
-            _playerRenderer.SetBakedData(baked);
-            _playerRenderer.SetCharacterDefinition(charDef);
+            _playerRenderer.CapsuleRadius = playerDef.CapsuleRadius;
+            _playerRenderer.CapsuleHeight = playerDef.CapsuleHeight;
+            _playerRenderer.HurtboxBoneDefs = playerDef.HurtboxBoneDefs;
+            _playerRenderer.SetBakedData(playerBaked);
+            _playerRenderer.SetCharacterDefinition(playerDef);
+            _playerRenderer.LoadModel(playerDef);
             if (_npcRenderer != null)
             {
-                _npcRenderer.CapsuleRadius = charDef.CapsuleRadius;
-                _npcRenderer.CapsuleHeight = charDef.CapsuleHeight;
-                _npcRenderer.HurtboxBoneDefs = charDef.HurtboxBoneDefs;
-                _npcRenderer.SetBakedData(baked);
-                _npcRenderer.SetCharacterDefinition(charDef);
+                _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
+                _npcRenderer.CapsuleHeight = npcDef.CapsuleHeight;
+                _npcRenderer.HurtboxBoneDefs = npcDef.HurtboxBoneDefs;
+                _npcRenderer.SetBakedData(npcBaked);
+                _npcRenderer.SetCharacterDefinition(npcDef);
+                _npcRenderer.LoadModel(npcDef);
             }
 
             // Player spawn
             var pSpawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : new SpawnPoint();
-            _localSim.RegisterEntity(PlayerEntityId, charDef, new CharacterState
+            _localSim.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
             {
                 PX = pSpawn.X, PY = pSpawn.Y, PZ = pSpawn.Z,
                 FacingYaw = pSpawn.Yaw,
-                JumpsLeft = charDef.Movement.MaxJumps,
-            }, baked);
+                JumpsLeft = playerDef.Movement.MaxJumps,
+            }, playerBaked);
 
-            // NPC spawn
+            // NPC spawn — 3m in front of player for hit testing
             var nSpawn = arena.SpawnPoints.Length > 1 ? arena.SpawnPoints[1] : new SpawnPoint();
-            _localSim.RegisterEntity(NpcEntityId, charDef, new CharacterState
+            float npcX = pSpawn.X + Mathf.Cos(pSpawn.Yaw) * 3f;
+            float npcZ = pSpawn.Z + Mathf.Sin(pSpawn.Yaw) * 3f;
+            _localSim.RegisterEntity(NpcEntityId, npcDef, new CharacterState
             {
-                PX = nSpawn.X, PY = nSpawn.Y, PZ = nSpawn.Z,
+                PX = npcX, PY = nSpawn.Y, PZ = npcZ,
                 FacingYaw = nSpawn.Yaw + Mathf.PI,
-                JumpsLeft = charDef.Movement.MaxJumps,
-            }, baked);
+                JumpsLeft = npcDef.Movement.MaxJumps,
+            }, npcBaked);
 
             // Position renderers
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
             if (_npcRenderer != null)
-                _npcRenderer.transform.position = new Vector3(nSpawn.X, nSpawn.Y, nSpawn.Z);
+                _npcRenderer.transform.position = new Vector3(npcX, nSpawn.Y, npcZ);
 
-            // Override NPC position to 3m in front of player for hit testing
-            float facingDirX = Mathf.Cos(pSpawn.Yaw);
-            float facingDirZ = Mathf.Sin(pSpawn.Yaw);
-            var npcOverride = _localSim.GetState(NpcEntityId);
-            npcOverride.PX = pSpawn.X + facingDirX * 3f;
-            npcOverride.PZ = pSpawn.Z + facingDirZ * 3f;
-            _localSim.SetState(NpcEntityId, npcOverride);
-            if (_npcRenderer != null)
-                _npcRenderer.transform.position = new Vector3(npcOverride.PX, npcOverride.PY, npcOverride.PZ);
-            _lastNpcDeaths = _localSim.GetState(NpcEntityId).Deaths;
+            // Set NPC respawn position to same relative location
+            _localSim.SetRespawnPosition(NpcEntityId, npcX, pSpawn.Y + 2f, npcZ);
 
             // Camera
             if (_cameraMount != null)
@@ -120,6 +124,8 @@ namespace SlopArena.Client.World
         private void Update()
         {
             _inputController.Poll();
+            if (_showHitboxes && _localSim != null)
+                DrawHitboxDebug();
         }
 
         protected override void OnMatchFixedUpdate()
@@ -164,26 +170,87 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
+        }
 
-            // Void-kill respawn: detect via Deaths counter (server CheckVoidDeaths runs inside Tick)
-            if (_npcRenderer != null)
+        private void OnDrawGizmos()
+        {
+            if (_localSim == null) return;
+            DrawHitboxGizmos();
+        }
+
+        private void DrawHitboxGizmos()
+        {
+            var hitboxes = _localSim.Resolver.GetActiveHitboxes();
+            Gizmos.color = new Color(1f, 0.3f, 0f, 0.6f);
+            foreach (var hb in hitboxes)
             {
-                var nState = _localSim.GetState(NpcEntityId);
-                if (nState.Deaths > _lastNpcDeaths)
+                var center = new Vector3(hb.X, hb.Y, hb.Z);
+                if (hb.Shape == HitboxShape.Sphere || (hb.X == hb.EndX && hb.Y == hb.EndY && hb.Z == hb.EndZ))
                 {
-                    _lastNpcDeaths = nState.Deaths;
-                    _localSim.SetState(NpcEntityId, new CharacterState
+                    Gizmos.DrawWireSphere(center, hb.Radius);
+                }
+                else
+                {
+                    var end = new Vector3(hb.EndX, hb.EndY, hb.EndZ);
+                    Gizmos.DrawWireSphere(center, hb.Radius);
+                    Gizmos.DrawWireSphere(end, hb.Radius);
+                    Gizmos.DrawLine(center, end);
+                }
+            }
+        }
+
+        private void DrawHitboxDebug()
+        {
+            var hitboxes = _localSim.Resolver.GetActiveHitboxes();
+            Color color = new Color(1f, 0.3f, 0f, 0.6f);
+            foreach (var hb in hitboxes)
+            {
+                var center = new Vector3(hb.X, hb.Y, hb.Z);
+                if (hb.Shape == HitboxShape.Sphere || (hb.X == hb.EndX && hb.Y == hb.EndY && hb.Z == hb.EndZ))
+                {
+                    DebugDrawWireSphere(center, hb.Radius, color);
+                }
+                else
+                {
+                    var end = new Vector3(hb.EndX, hb.EndY, hb.EndZ);
+                    DebugDrawWireSphere(center, hb.Radius, color);
+                    DebugDrawWireSphere(end, hb.Radius, color);
+                    Debug.DrawLine(center, end, color);
+                }
+            }
+        }
+
+        private static void DebugDrawWireSphere(Vector3 center, float radius, Color color)
+        {
+            const int segments = 16;
+            for (int ring = 0; ring < 3; ring++)
+            {
+                Vector3 prev = default;
+                for (int i = 0; i <= segments; i++)
+                {
+                    float angle = i * (Mathf.PI * 2f / segments);
+                    Vector3 p = center;
+                    if (ring == 0)
                     {
-                        PX = _localSim.GetState(PlayerEntityId).PX + 4f,
-                        PY = _arenaDef.SpawnPoints[0].Y + 2f,
-                        PZ = _localSim.GetState(PlayerEntityId).PZ,
-                        JumpsLeft = 2,
-                        AirDodgesLeft = 1,
-                        IsGrounded = true,
-                    });
-                    _npcRenderer.ResetAnimationState();
+                        p.x += Mathf.Cos(angle) * radius;
+                        p.y += Mathf.Sin(angle) * radius;
+                    }
+                    else if (ring == 1)
+                    {
+                        p.x += Mathf.Cos(angle) * radius;
+                        p.z += Mathf.Sin(angle) * radius;
+                    }
+                    else
+                    {
+                        p.y += Mathf.Cos(angle) * radius;
+                        p.z += Mathf.Sin(angle) * radius;
+                    }
+                    if (i > 0)
+                        Debug.DrawLine(prev, p, color);
+                    prev = p;
                 }
             }
         }
     }
 }
+
