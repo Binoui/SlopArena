@@ -13,7 +13,6 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
 		private readonly Dictionary<ulong, int> _animFrames = new();
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
-		private readonly Dictionary<ulong, bool> _prevAttack = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		private readonly SpellResolver _spellResolver = new();
 
@@ -38,7 +37,6 @@ namespace SlopArena.Shared
 			_bakedData.Remove(id);
 			_animFrames.Remove(id);
 			_prevAnimIndex.Remove(id);
-			_prevAttack.Remove(id);
 			_activeAbilities.Remove(id);
 		}
 
@@ -66,34 +64,6 @@ namespace SlopArena.Shared
 			_activeAbilities[entityId] = ability;
 		}
 
-		/// <summary>
-		/// Deactivate the current ability for an entity.
-		/// If not interrupted, calls OnEnd and applies cooldown.
-		/// On interruption (hitstun, death), OnEnd is skipped — the instance is just dropped.
-		/// </summary>
-		public void DeactivateAbility(ulong entityId, bool interrupted)
-		{
-			if (!_activeAbilities.TryGetValue(entityId, out var ability)) return;
-
-			if (!interrupted && _states.TryGetValue(entityId, out var state))
-			{
-				ability.OnEnd(ref state);
-
-				// Apply cooldown for the slot (ability.Slot is 0-based, SetCooldown expects 1-based)
-				if (ability.Slot < 6)
-					SetCooldown(ref state, (byte)(ability.Slot + 1), ability.Cooldown);
-
-				state.IsServerAbility = false;
-				_states[entityId] = state;
-			}
-			else if (_states.TryGetValue(entityId, out var interruptedState))
-			{
-				interruptedState.IsServerAbility = false;
-				_states[entityId] = interruptedState;
-			}
-
-			_activeAbilities.Remove(entityId);
-		}
 
 		/// <summary>
 		/// Get the active ability for an entity, or null if none.
@@ -106,7 +76,7 @@ namespace SlopArena.Shared
 		/// <summary>
 		/// Get cooldown ticks for a slot (1-6).
 		/// </summary>
-		public static ushort GetCooldown(CharacterState s, byte slot) => slot switch
+		private static ushort GetCooldown(CharacterState s, byte slot) => slot switch
 		{
 			1 => s.Cooldown0,
 			2 => s.Cooldown1,
@@ -120,7 +90,7 @@ namespace SlopArena.Shared
 		/// <summary>
 		/// Set cooldown ticks for a slot (1-6).
 		/// </summary>
-		public static void SetCooldown(ref CharacterState s, byte slot, ushort ticks)
+		private static void SetCooldown(ref CharacterState s, byte slot, ushort ticks)
 		{
 			switch (slot)
 			{
@@ -237,7 +207,7 @@ namespace SlopArena.Shared
 			return list;
 		}
 
-		public void Tick(Dictionary<ulong, InputState> inputs)
+		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
 			// Snapshot keys to avoid collection-modified during ActivateAbility writes
@@ -272,7 +242,10 @@ namespace SlopArena.Shared
 				consumedInput.ActiveSlot = 0;
 				inputs[id] = consumedInput;
 			}
+		}
 
+		private void SimulateMovement(Dictionary<ulong, InputState> inputs)
+		{
 			// ── Step 1: Simulate each entity ──
 			// Snapshot keys to avoid collection-modified when writing _states[id] = state
 			ulong[] simIds = new ulong[_states.Count];
@@ -288,7 +261,10 @@ namespace SlopArena.Shared
 
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
 			TickAbilities(inputs);
+		}
 
+		private List<SpellResolver.EntityData> BuildHurtboxList()
+		{
 			// ── Step 2: Build entity list for hit detection ──
 			var entityList = new List<SpellResolver.EntityData>();
 			foreach (var kvp in _states)
@@ -361,28 +337,33 @@ namespace SlopArena.Shared
 						}
 					}
 				}
-					else if (def.HurtboxCapsules != null)
+				else if (def.HurtboxCapsules != null)
+				{
+					float cos = MathF.Cos(state.FacingYaw);
+					float sin = MathF.Sin(state.FacingYaw);
+					foreach (var cap in def.HurtboxCapsules)
 					{
-						float cos = MathF.Cos(state.FacingYaw);
-						float sin = MathF.Sin(state.FacingYaw);
-						foreach (var cap in def.HurtboxCapsules)
+						float sx = state.PX + (cap.Sx * cos) + (cap.Sz * sin);
+						float sy = state.PY + cap.Sy;
+						float sz = state.PZ + ((-cap.Sx * sin) + (cap.Sz * cos));
+						float ex = state.PX + (cap.Ex * cos) + (cap.Ez * sin);
+						float ey = state.PY + cap.Ey;
+						float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
+						entityList.Add(new SpellResolver.EntityData
 						{
-							float sx = state.PX + (cap.Sx * cos) + (cap.Sz * sin);
-							float sy = state.PY + cap.Sy;
-							float sz = state.PZ + ((-cap.Sx * sin) + (cap.Sz * cos));
-							float ex = state.PX + (cap.Ex * cos) + (cap.Ez * sin);
-							float ey = state.PY + cap.Ey;
-							float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
-							entityList.Add(new SpellResolver.EntityData
-							{
-								Id = id, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
-								Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
-								EndX = ex, EndY = ey, EndZ = ez, Active = true,
-							});
-						}
+							Id = id, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
+							Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
+							EndX = ex, EndY = ey, EndZ = ez, Active = true,
+						});
 					}
+				}
 			}
+			_lastEntityList = entityList;
+			return entityList;
+		}
 
+		private void SpawnHitboxEvents()
+		{
 			// ── Spawn hitbox events for attacking entities ──
 			foreach (var kvp in _states)
 			{
@@ -393,8 +374,8 @@ namespace SlopArena.Shared
 
 				bool airborne = !state.IsGrounded;
 				var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+				if (ability == null) continue;
 				int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-				if (stageIdx < 0 || stageIdx >= ability.Stages.Length) continue;
 
 				var stage = ability.Stages[stageIdx];
 				if (stage.HitboxEvents == null) continue;
@@ -425,9 +406,11 @@ namespace SlopArena.Shared
 					}
 				}
 			}
+		}
 
+		private void ResolveHits(List<SpellResolver.EntityData> entityList)
+		{
 			// ── Step 3: Resolve hitboxes ──
-			_lastEntityList = entityList;
 			foreach (var hit in _spellResolver.Tick(entityList))
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
@@ -438,13 +421,16 @@ namespace SlopArena.Shared
 				targetState.HitstunTicks = hit.StunTicks;
 				_states[hit.TargetEntityId] = targetState;
 			}
+		}
 
+		private void ProcessProjectileExplosions()
+		{
 			// ── Step 3b: Projectile explosions (entity hit + ground impact) ──
 			// Ground collision for remaining active projectiles
-            float floorY = _arena.Heightmap.Data != null && _arena.Heightmap.Data.Length > 0
-                ? _arena.Heightmap.Data.Min()
-                : 0f;
-            _spellResolver.CheckGroundCollision(floorY);
+			float floorY = _arena.Heightmap.Data != null && _arena.Heightmap.Data.Length > 0
+				? _arena.Heightmap.Data.Min()
+				: 0f;
+			_spellResolver.CheckGroundCollision(floorY);
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
@@ -463,7 +449,10 @@ namespace SlopArena.Shared
 					CanHitOwner = explosion.CanHitOwner,
 				});
 			}
+		}
 
+		private void CheckVoidDeaths()
+		{
 			// ── Step 4: Void death check ──
 			var deadIds = new List<ulong>();
 			foreach (var kvp in _states)
@@ -480,6 +469,22 @@ namespace SlopArena.Shared
 					Deaths = (byte)(oldState.Deaths + 1), DamagePercent = 0,
 				};
 			}
+		}
+
+		public void Tick(Dictionary<ulong, InputState> inputs)
+		{
+			PreTickAbilities(inputs);
+
+			SimulateMovement(inputs);
+
+			var entityList = BuildHurtboxList();
+			SpawnHitboxEvents();
+
+			ResolveHits(entityList);
+
+			ProcessProjectileExplosions();
+
+			CheckVoidDeaths();
 		}
 	}
 }
