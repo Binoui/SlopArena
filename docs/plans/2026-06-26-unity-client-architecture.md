@@ -88,7 +88,8 @@ Update (variable rate):
 
 ## Phase 1 — Foundation: Match Loop + Local Sim ✅ (2026-06-27)
 
-**Status: COMPLETE** — tested in Editor, Manki moves/jumps/camera works.
+**Status: COMPLETE** — tested in Editor, Manki moves/jumps/camera works. 63 xUnit tests
+validate the simulation ground truth.
 
 | Deliverable | Status |
 |---|---|
@@ -99,11 +100,16 @@ Update (variable rate):
 | Dummy NPC spawns and stands idle | ✅ |
 | No terminal/server process needed | ✅ |
 | Frame-by-frame animation driving | ✅ |
-| Manual edge detection for jump/dash input | ✅ |
+| 63 xUnit tests (physics, abilities, combat, edge cases) | ✅ |
+| `_pendingJump` sticky input flag (replaces volatile edge detector) | ✅ |
+| `ActivateAbility` AttackSlot bugfix | ✅ |
+| Input buffering: FSM gate preserves pending jump through locked states | ✅ |
 
-**Notes for next phase:** `Simulation.SimulateTick` needs refactoring — the linear
-method is ~260 lines with cross-cutting concerns (jump, ground collision, gravity)
-difficult to maintain. Consider extracting into smaller phase-methods before Phase 2.
+**Notes for next phase:** 21 new tests validate physics (jump/dash/land/hitstun),
+ability lifecycles (LMB/RMB/Q/E activation + data-driven expiry), and multi-entity
+stability. ServerAbility classes (MankiLmbCombo, MankiAerosolFlame) are partially
+implemented — tests document basic activation. `Simulation.SimulateTick` ~260 lines
+may need refactoring before adding more combat logic.
 
 ---
 
@@ -132,6 +138,14 @@ difficult to maintain. Consider extracting into smaller phase-methods before Pha
 
 **Test:** Press LMB near dummy → dummy plays hit reaction + slides backward. Dummy returns to idle after hitstun expires.
 
+
+**Prerequisite:** All 63 xUnit tests pass before Phase 2 work begins. The tests validate
+that hit detection (SpellResolver), damage/knockback (CombatMath), and state transitions
+(PhysicsTests) are correct — without needing Unity visuals.
+>
+**Test-driven approach:** Write a test for the new combat behavior (e.g., "LMB hitbox
+spawns at tick 6, NPC takes damage") before wiring the Unity renderer. Makes the
+simulation truth debuggable in <3s without opening the editor.
 ---
 
 ## Phase 3 — Dummy AI: Standing Reset + Basic Movement
