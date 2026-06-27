@@ -189,6 +189,18 @@ docs/
   conventions.md    → this file
 ```
 
+## 5b. Third-Party Assets
+
+**Purchased asset packs are never committed directly.** The flow:
+
+1. Asset source files go on `/mnt/storage` and are **symlinked** into the Unity project
+2. Symlinked paths are in `.gitignore` — the repo doesn't contain the data
+3. Auto-generated prefabs from import (`.prefab` + `.meta`) are also `.gitignore`d
+4. Only project-customized assets (edited materials, configured prefabs) are committed
+
+If you clone fresh, you need access to `/mnt/storage` or re-import from the original
+`.unitypackage`. This keeps the repo under 50MB while the full project with assets is ~5GB.
+
 ---
 
 ## 6. Character Kit Design Rules

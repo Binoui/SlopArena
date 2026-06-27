@@ -124,6 +124,11 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 /UserSettings/
 /Temp/
 
-# Asset store bundles (symlinked from /mnt/storage)
 client/Unity/Assets/LowPolyFantasyArena
 client/Unity/Assets/LowPolyMegaBundle
+
+# Auto-generated prefabs from symlinked asset packs (regenerate on clone)
+client/Unity/Assets/Prefabs/Arena_*.prefab
+client/Unity/Assets/Prefabs/Arena_*.prefab.meta
+client/Unity/Assets/Prefabs/Bridge_*.prefab
+client/Unity/Assets/Prefabs/Bridge_*.prefab.meta
