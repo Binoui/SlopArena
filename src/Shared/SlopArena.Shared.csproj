@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <BaseOutputPath>$(MSBuildProjectDirectory)/../../artifacts/Shared/bin/</BaseOutputPath>
@@ -14,9 +14,5 @@
     <Description>Shared data types for SlopArena — pure C#, no dependencies</Description>
     <RepositoryUrl>https://github.com/Binoui/SlopArena</RepositoryUrl>
   </PropertyGroup>
-  <!-- System.Memory for BinaryPrimitives / Span<T> -->
-  <ItemGroup>
-    <PackageReference Include="System.Memory" Version="4.6.0" />
-  </ItemGroup>
 
 </Project>
