@@ -29,6 +29,7 @@ namespace SlopArena.Client.Input
         private InputState _aiInput;
 
         // ── Slot press (set by Poll, consumed via ConsumePendingSlotPress) ──
+        private bool _pendingJump;
         private byte _pendingSlotPress;
 
         // ── Previous-frame held state (for manual edge detection) ──
@@ -76,23 +77,14 @@ namespace SlopArena.Client.Input
             if (_aiControlled)
             {
                 // AI-driven: use injected input
-                JumpJustPressed = _aiInput.Jump;
+                _pendingJump = _aiInput.Jump;
                 DashJustPressed = _aiInput.Dash;
                 return;
             }
 
             var kb = Keyboard.current;
             var mouse = Mouse.current;
-
-            bool spaceHeld = kb.spaceKey.isPressed;
-            JumpJustPressed = spaceHeld && !_previousSpaceHeld;
-            _previousSpaceHeld = spaceHeld;
-
-            bool shiftHeld = kb.shiftKey.isPressed;
-            DashJustPressed = shiftHeld && !_previousShiftHeld;
-            _previousShiftHeld = shiftHeld;
-            if (JumpJustPressed)
-                Debug.Log($"[Input] JumpJustPressed = true");
+            _pendingJump = kb.spaceKey.isPressed;
 
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
@@ -116,7 +108,10 @@ namespace SlopArena.Client.Input
         public byte ConsumePendingSlotPress()
         {
             byte slot = _pendingSlotPress;
-            _pendingSlotPress = 0;
+            if (slot > 0) {
+                Debug.Log($"[Input] ConsumePendingSlotPress: {slot}");
+                _pendingSlotPress = 0;
+            }
             return slot;
         }
 
@@ -180,10 +175,13 @@ namespace SlopArena.Client.Input
                 input.Down = move.y < -0.3f;
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
-                input.Jump = JumpJustPressed;
-                input.Dash = DashJustPressed;
                 input.Crouch = false;
                 input.ActiveSlot = pendingSlotPress;
+                if (_pendingJump)
+                {
+                    input.Jump = true;
+                    _pendingJump = false;
+                }
 
                 Vector3 moveDir = new Vector3(move.x, 0f, move.y).normalized;
                 Vector2 snappedDir = new Vector2(move.x, move.y);
@@ -236,10 +234,7 @@ namespace SlopArena.Client.Input
             input.Down = moveDirection.z < -0.3f;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
-            input.Jump = JumpJustPressed;
             input.Dash = DashJustPressed;
-            if (input.Jump)
-                Debug.Log($"[Input] Jump in InputState=true (AI={isNPC})");
             input.Crouch = kb != null && kb.ctrlKey.isPressed;
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = isAiming;
@@ -261,7 +256,6 @@ namespace SlopArena.Client.Input
             }
             if (abilityAimDistance.HasValue)
                 input.AimDistance = abilityAimDistance.Value;
-
             // FSM movement gate: zero out input if state disallows movement
             if (canMove != null && !canMove())
             {
@@ -271,6 +265,16 @@ namespace SlopArena.Client.Input
                 input.Dash = false;
                 moveDirection = Vector3.zero;
                 snappedInputDirection = Vector2.zero;
+            }
+            else
+            {
+                // Gate allows movement — consume pending jump
+                if (_pendingJump)
+                {
+                    input.Jump = true;
+                    _pendingJump = false;
+                    Debug.Log("[Input] _pendingJump consumed -> input.Jump=true");
+                }
             }
 
             return (input, moveDirection, snappedInputDirection);

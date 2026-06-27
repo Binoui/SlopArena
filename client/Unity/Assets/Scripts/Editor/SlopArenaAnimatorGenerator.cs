@@ -3,6 +3,7 @@ using UnityEditor.Animations;
 using UnityEngine;
 using SlopArena.Client.Animation;
 using System.Linq;
+using SlopArena.Shared;
 using System.IO;
 
 namespace SlopArena.Client.Editor
@@ -103,6 +104,53 @@ namespace SlopArena.Client.Editor
             var airDodgeState = State(sm, "AirDodge", new Vector3(250, 550, 0), null);
             var slideState = State(sm, "Slide", new Vector3(400, 550, 0), null);
 
+            // ── Ability animation states ──
+            // Load CharacterDefinition to get ability animation names and ClipOverrides
+            var charDef = CharacterRegistry.Get(CharacterClass.Manki);
+            if (charDef != null)
+            {
+                var seen = new System.Collections.Generic.HashSet<string>();
+                int abilityPosX = 700;
+                int abilityPosY = 100;
+                const int stepY = 50;
+
+                // ClipOverrides: create states for any override name (maps clips like "small_hit" → "Hitstun")
+                if (charDef.ClipOverrides != null)
+                {
+                    foreach (var ov in charDef.ClipOverrides)
+                    {
+                        string stateName = ov.Name;
+                        if (string.IsNullOrEmpty(stateName) || !seen.Add(stateName))
+                            continue;
+                        // Find matching clip from config fields by name
+                        AnimationClip? clip = FindClipByName(config, ov.Name);
+                        var st = State(sm, stateName, new Vector3(abilityPosX, abilityPosY, 0), clip);
+                        AnyTrigger(sm, st, "Attack");
+                        AutoExit(st, moveState);
+                        abilityPosY += stepY;
+                    }
+                }
+
+                // Collect unique animation names from all ability slots (6 slots × 2 airborne states)
+                for (int slot = 0; slot < 6; slot++)
+                {
+                    foreach (bool airborne in new[] { false, true })
+                    {
+                        var spec = charDef.GetSlotAbility(slot, airborne);
+                        if (spec?.AnimationNames == null) continue;
+                        foreach (var animName in spec.AnimationNames)
+                        {
+                            if (string.IsNullOrEmpty(animName) || !seen.Add(animName))
+                                continue;
+                            var st = State(sm, animName, new Vector3(abilityPosX, abilityPosY, 0), null);
+                            AnyTrigger(sm, st, "Attack");
+                            AutoExit(st, moveState);
+                            abilityPosY += stepY;
+                        }
+                    }
+                }
+            }
+
             sm.defaultState = moveState;
 
             // Any State → interrupt triggers
@@ -169,6 +217,40 @@ namespace SlopArena.Client.Editor
             t.duration = 0f;
         }
 
+        private static AnimationClip? FindClipByName(CharacterAnimationConfig config, string name)
+        {
+            string lower = name.ToLowerInvariant();
+            return lower switch
+            {
+                "idle" => config.Idle,
+                "run" => config.Run,
+                "jump" => config.Jump,
+                "fall" => config.Fall,
+                "land" => config.Land,
+                "attack_1" => config.Attack1,
+                "attack_2" => config.Attack2,
+                "attack_3" => config.Attack3,
+                "dash" => config.Dash,
+                "hit_small" => config.HitSmall,
+                "hit_large" => config.HitLarge,
+                "death" => config.Death,
+                "spell_q" => config.SpellQ,
+                "spell_e" => config.SpellE,
+                "spell_r" => config.SpellR,
+                "spell_f" => config.SpellF,
+                // GLB baked clip naming
+                "spell_lmb_1" => config.Attack1,
+                "spell_lmb_2" => config.Attack2,
+                "spell_lmb_3" => config.Attack3,
+                "spell_lmb_air" => config.Attack3,
+                "hit_light" => config.HitSmall,
+                "hit_medium" => config.HitLarge,
+                "dash_loop" => config.Dash,
+                "spell_q_loop" => config.SpellQ,
+                _ => null,
+            };
+        }
+
         private static void Trans(AnimatorState from, AnimatorState to, string param,
             AnimatorConditionMode mode, float duration, float exitTime = -1f)
         {
@@ -200,6 +282,7 @@ namespace SlopArena.Client.Editor
                 case "jump": config.Jump = clip; break;
                 case "fall": config.Fall = clip; break;
                 case "land": config.Land = clip; break;
+                // Mixamo naming (FBX file naming)
                 case "attack_1": config.Attack1 = clip; break;
                 case "attack_2": config.Attack2 = clip; break;
                 case "attack_3": config.Attack3 = clip; break;
@@ -211,6 +294,16 @@ namespace SlopArena.Client.Editor
                 case "spell_e": config.SpellE = clip; break;
                 case "spell_r": config.SpellR = clip; break;
                 case "spell_f": config.SpellF = clip; break;
+                // GLB baked clip naming
+                case "spell_lmb_1": config.Attack1 = clip; break;
+                case "spell_lmb_2": config.Attack2 = clip; break;
+                case "spell_lmb_3": config.Attack3 = clip; break;
+                case "spell_lmb_air": config.Attack3 = clip; break;
+                case "hit_light": config.HitSmall = clip; break;
+                case "hit_medium": config.HitLarge = clip; break;
+                case "hit_hard": break; // unused
+                case "dash_loop": config.Dash = clip; break;
+                case "spell_q_loop": config.SpellQ = clip; break;
             }
         }
 

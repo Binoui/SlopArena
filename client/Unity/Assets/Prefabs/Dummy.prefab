@@ -167,8 +167,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e87e200ca77218f2ca7a7cd9684d2290, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _entityName: Player
-  _entityId: 1
+  _entityName: NPC
+  _entityId: 100
   _animator: {fileID: 4686855583517649730}
   _runSpeedThreshold: 0.1
 --- !u!114 &5401717673974441158
@@ -1006,7 +1006,7 @@ Animator:
   m_GameObject: {fileID: 8831973375768598239}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: d1bfbe2f5d03dfb5ea3cf213a598b3ea, type: 3}
-  m_Controller: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: f5122a16961e481eda103dd15e2e06c9, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
   m_ApplyRootMotion: 1
