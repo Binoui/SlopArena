@@ -143,6 +143,32 @@ namespace SlopArena.Shared
                 // Attacking state is now purely handled by ServerSimulation.TickAbilities
             }
 
+            // Ground friction during attacking (abilities handle velocity via LungeForce)
+            if (s.State == ActionState.Attacking && s.IsGrounded)
+            {
+                float friction = stats.GroundFriction * TickDt;
+                s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
+                s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
+            }
+
+            // Data-driven attack expiry (no ServerAbility — auto-end when stage duration elapses)
+            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && !s.IsServerAbility)
+            {
+                var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
+                if (spec != null)
+                {
+                    int stageIdx = Math.Min(s.ComboStage, (byte)(spec.Stages.Length - 1));
+                    var stage = spec.Stages[stageIdx];
+                    if (s.AttackElapsedTicks >= stage.DurationTicks)
+                    {
+                        s.State = ActionState.Idle;
+                        s.AttackSlot = 0;
+                        s.ComboStage = 0;
+                        s.AttackElapsedTicks = 0;
+                    }
+                }
+            }
+
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)

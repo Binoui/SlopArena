@@ -24,6 +24,7 @@ namespace SlopArena.Shared
 		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
 		{
 			_defs[id] = def;
+			initialState.EntityId = id;
 			_states[id] = initialState;
 			if (baked != null) _bakedData[id] = baked;
 			_animFrames[id] = 0;
@@ -60,6 +61,7 @@ namespace SlopArena.Shared
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
 			state.IsServerAbility = true;
+			state.AttackSlot = (byte)(slot + 1);
 			_states[entityId] = state;
 			_activeAbilities[entityId] = ability;
 		}
@@ -127,6 +129,7 @@ namespace SlopArena.Shared
 				if (state.AttackSlot == 0)
 				{
 					ended.Add(id);
+					_states[id] = state; // Persist EndAbility changes (State=Idle, AttackSlot=0)
 				}
 				else
 				{

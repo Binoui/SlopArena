@@ -12,6 +12,14 @@ make format   # Auto-format code
 make clean    # Clean build artifacts
 ```
 
+```bash
+make test     # Run all simulation unit tests (63+ tests, <3s)
+```
+
+> `dotnet test tests/Shared.Tests/ --nologo` is the **first check** after any
+> `src/Shared/` change. It validates state transitions, ability lifecycles, and
+> hit detection without needing Godot or a server.
+
 ## Automated Checks
 
 ### 1. Pre-Commit Hook (Local)
