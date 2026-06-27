@@ -57,6 +57,8 @@ namespace SlopArena.Shared
         public string GlbPath = "";
         /// <summary>Path to the baked skeleton .bin file (pre-computed bone positions per frame).</summary>
         public string BakedDataPath = "";
+        /// <summary>Unity Resources path for the model prefab. E.g. "Characters/Manki"</summary>
+        public string ModelResourcePath = "";
         /// <summary>
         /// Scale factor for baked bone positions. Mixamo GLBs are in cm (0.01),
         /// Blender/Maya exports with meters are 1.0. Default: 1.0

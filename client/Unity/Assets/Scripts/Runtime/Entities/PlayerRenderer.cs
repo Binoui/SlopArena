@@ -8,7 +8,6 @@ namespace SlopArena.Client.Entities
     /// Applies server-authoritative position, rotation, and drives
     /// animation state on an Animator. Works for both player and NPC entities.
     /// </summary>
-    [RequireComponent(typeof(Animator))]
     public class PlayerRenderer : MonoBehaviour
     {
         [Header("Entity")]
@@ -58,6 +57,45 @@ namespace SlopArena.Client.Entities
             set => _modelYOffset = value;
         }
 
+        /// <summary>
+        /// Load the 3D model for this character from Resources.
+        /// Destroys any existing model child and instantiates the new one.
+        /// Must be called before ApplyServerState.
+        /// </summary>
+        public void LoadModel(CharacterDefinition def)
+        {
+            if (string.IsNullOrEmpty(def.ModelResourcePath)) return;
+
+            // Destroy existing model children
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                var child = transform.GetChild(i).gameObject;
+                if (Application.isPlaying)
+                    Destroy(child);
+                else
+                    DestroyImmediate(child);
+            }
+
+            var prefab = Resources.Load<GameObject>(def.ModelResourcePath);
+            if (prefab == null)
+            {
+                Debug.LogError($"[PlayerRenderer] Model not found at Resources/{def.ModelResourcePath}");
+                return;
+            }
+
+            var instance = Instantiate(prefab, transform);
+            instance.name = def.Class.ToString();
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+
+            if (def.VisualScale != 1f)
+                instance.transform.localScale = Vector3.one * def.VisualScale;
+
+            _animator = instance.GetComponent<Animator>();
+            if (_animator == null)
+                Debug.LogError($"[PlayerRenderer] Instantiated model has no Animator component");
+        }
+
         /// <summary>Hurtbox bone definitions for debug visualization.</summary>
         public HurtboxBoneDef[] HurtboxBoneDefs
         {
@@ -92,6 +130,7 @@ namespace SlopArena.Client.Entities
         private BakedAnimationData? _bakedData;
         private int _animFrame;           // current frame index within the active clip
         private string _lastAnimClip = ""; // clip name from last tick (to detect transitions)
+        private ushort _startLockTicks;
 
         /// <summary>
         /// Set baked skeleton data for frame-accurate animation.
@@ -182,29 +221,40 @@ namespace SlopArena.Client.Entities
             }
             else
             {
-                // Frame-by-frame: compute normalized time from elapsed frames
+                // Tick-driven and baked-frame fallback for discrete animation states
                 if (_lastAnimClip != targetClip)
                 {
-                    // Clip transition: reset frame counter
                     _animFrame = 0;
                     _lastAnimClip = targetClip;
+                    _startLockTicks = state.AnimLockTicks;
+                }
+
+                // Compute normalized time:
+                // - If AnimLockTicks is set (attack, hitstun, dash): use lock ratio for tick-exact timing
+                // - Otherwise: fall back to baked frame count
+                float normalizedTime;
+                if (_startLockTicks > 0)
+                {
+                    // _startLockTicks captured the initial value; state.AnimLockTicks counts down.
+                    // First frame: (start - (start-1)) / start ≈ 0.  Last frame: (start - 0) / start = 1.
+                    float elapsed = _startLockTicks - state.AnimLockTicks;
+                    normalizedTime = Mathf.Clamp01(elapsed / _startLockTicks);
                 }
                 else
                 {
                     _animFrame++;
+                    int totalFrames = 30;
+                    if (_bakedData != null)
+                    {
+                        int idx = _bakedData.FindAnimIndex(targetClip);
+                        if (idx >= 0)
+                            totalFrames = _bakedData.Animations[idx].FrameCount;
+                    }
+                    normalizedTime = totalFrames > 0 ? (_animFrame % totalFrames) / (float)totalFrames : 0f;
                 }
 
-                int totalFrames = 30; // fallback if baked data unavailable
-                if (_bakedData != null)
-                {
-                    int idx = _bakedData.FindAnimIndex(targetClip);
-                    if (idx >= 0)
-                        totalFrames = _bakedData.Animations[idx].FrameCount;
-                }
-
-                float normalizedTime = totalFrames > 0 ? (_animFrame % totalFrames) / (float)totalFrames : 0f;
                 _animator.Play(targetClip, 0, normalizedTime);
-                _animator.Update(0f); // immediately apply
+                _animator.Update(0f);
             }
 
             _wasGrounded = isGrounded;
@@ -217,6 +267,9 @@ namespace SlopArena.Client.Entities
         {
             _animator.Rebind();
             _wasGrounded = true;
+            _animFrame = 0;
+            _lastAnimClip = "";
+            _startLockTicks = 0;
             _lastState = default;
         }
 
