@@ -56,10 +56,12 @@ public static partial class CharacterRegistry
             },
             GlbPath = "res://assets/characters/bunny/bunny.glb",
             BakedDataPath = "res://data/bunny_skeleton.bin",
-            VisualScale = 0.022f,
-            HurtboxBoneScale = 0.022f,
-            ModelSoleOffset = 1.1f,
-            AutoModelYOffset = true,
+            VisualScale = 1.0f,
+            HurtboxBoneScale = 0.01f,
+            ModelSoleOffset = 0.0f,
+            AutoModelYOffset = false,
+            ModelYOffset = 0f,
+            ModelResourcePath = "Characters/Bunny",
 
             // Bunny GLB uses "hit_small"/"hit_medium"/"hit_hard" (not Mixamo defaults)
             HitSmallAnim = "hit_small",
@@ -97,7 +99,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 4, DurationTicks = 12, Radius = 0.55f, OffX = 0, OffY = 0.9f, OffZ = 1.3f, Damage = 5f, KnockbackForce = 6f, KnockbackUpward = 8f, StunTicks = 12, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_lmb_air" },
+                AnimationNames = new[] { "spell_lmb_3" },
             },
 
             RMB = new AbilitySpec
@@ -110,7 +112,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 24, Radius = 1.8f, OffX = 0, OffY = 0.2f, OffZ = 0f, Damage = 8f, KnockbackForce = 10f, KnockbackUpward = 4f, StunTicks = 12, Interruptible = true } },
                             AttackRange = 3f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_lmb_1" },
+                AnimationNames = new[] { "spell_rmb" },
                 SpecialEffectKeys = new[] { "BunnyCarrotSlam" },
             },
 
@@ -124,7 +126,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.6f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 7f, KnockbackForce = 10f, KnockbackUpward = -8f, StunTicks = 14, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_rmb_air" },
+                AnimationNames = new[] { "spell_air_rmb" },
             },
 
             Q = new AbilitySpec
@@ -165,7 +167,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 28, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 2.0f, Damage = 12f, KnockbackForce = 20f, KnockbackUpward = 6f, StunTicks = 18, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                 },
-                AnimationNames = new[] { "spell_r" },
+                AnimationNames = new[] { "spell_f" },
                 SpecialEffectKeys = new[] { "BunnyDragonKick" },
             },
 

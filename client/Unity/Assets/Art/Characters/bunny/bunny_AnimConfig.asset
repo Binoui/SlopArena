@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 06b0ddd57a57a2001a3df31c73956e2c, type: 3}
-  m_Name: manki_AnimConfig
+  m_Name: bunny_AnimConfig
   m_EditorClassIdentifier: 
   Idle: {fileID: -203655887218126122, guid: 2c109346b142fe65fab06d2f7af22c40, type: 3}
   Run: {fileID: -203655887218126122, guid: 7e637bc200fade57b9c8e3d9f2019685, type: 3}

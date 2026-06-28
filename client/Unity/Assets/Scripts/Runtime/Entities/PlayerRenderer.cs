@@ -154,7 +154,19 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void ApplyServerState(CharacterState state)
         {
-            transform.position = new Vector3(state.PX, state.PY + _modelYOffset, state.PZ);
+            Vector3 targetPos = new Vector3(state.PX, state.PY + _modelYOffset, state.PZ);
+
+            if (state.HitstunTicks > 0)
+            {
+                // Smooth knockback: lerp toward server position
+                transform.position = Vector3.Lerp(transform.position, targetPos, 0.6f);
+            }
+            else
+            {
+                // Normal movement: snap directly (60Hz is fast enough)
+                transform.position = targetPos;
+            }
+
             transform.rotation = Quaternion.Euler(0f, state.FacingYaw * Mathf.Rad2Deg, 0f);
 
             UpdateAnimationState(state);

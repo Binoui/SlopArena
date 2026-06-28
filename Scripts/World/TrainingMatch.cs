@@ -43,7 +43,7 @@ public partial class TrainingMatch : Node3D
         var npcClass = CharacterClass.Manki; // matches SpawnNPCs() for i=0 (NpcCount=1)
         var npcDef = CharacterRegistry.Get(npcClass);
         var npcBaked = LoadBakedData(npcDef);
-        var npcSpawn = _arenaDef.SpawnPoints[0];
+        var npcSpawn = _arenaDef.SpawnPoints[1];
         _localSim.RegisterEntity(100, npcDef, new CharacterState
         {
             PX = npcSpawn.X, PY = npcSpawn.Y + 1f, PZ = npcSpawn.Z,
