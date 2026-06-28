@@ -38,15 +38,15 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | **Air RMB** | Medium kick | Simple air kick | Medium knockback |
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
 | **E** | Dynamite Jump | Throw dynamite → explosion → self-propulsion | Rocket jump, vertical mobility + knockback on detonation (defensive + combo setup) |
-| **R** | Dive Bomb | Put on hard hat, jetpack up → target zone → dive head-first → AoE explosion | Air-to-ground slam, big damage, risky recovery. Opponent can dash-invuln through it |
-| **F** | Overclock | Mad scientist inject — eyes glow red, crackling energy | Self-buff 8s: all attacks (LMB, RMB, Q bombs) gain enhanced explosive effects — bigger AoE or bonus damage ticks |
+| **R** | Dive Bomb | Put on hard hat, jetpack up → aim downward → plunge into target zone → AoE explosion | Rise up, aim downward, then plunge into target zone. Risky recovery if baited; opponent can dash-invuln through it |
+| **F** | Overclock | Mad scientist inject — eyes glow red, crackling energy | Self-buff 8s: all attacks deal +3 bonus damage and +0.5m larger hitboxes (LMB, RMB, Q bombs) |
 
 ## Design Notes
 
 - **RMB**: inspired by improvised flamethrower — aerosol + lighter. During charge, Manki frantically shakes the bomb. On release, cone-shaped flame jet.
 - **E**: rocket jump. On ground = plant dynamite, propelled upward. In air = drop dynamite below, propelled upward. Explosion has knockback — serves as defensive peel (detonate to break enemy engage) and combo setup. Hitbox needs to be bigger than visual-only.
-- **R**: Dive Bomb. Manki stops air momentum, pulls out a yellow hard hat, dives head-first toward the ground. AoE explosion on impact. High damage but telegraphed — opponent can dodge with dash invincibility. Risky recovery option.
-- **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks gain bonus explosive effects — LMB hits have small explosions, RMB flame cone is bigger, Q bombs explode with larger radius or bonus damage. No single big hit, makes his whole kit scarier.
+- **R**: Dive Bomb. Manki rises upward, stalls to aim at a ground target, then plunges head-first. AoE explosion on impact at the target zone. High damage but telegraphed — opponent can dodge with dash invincibility. Risky recovery option if baited.
+- **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks deal +3 bonus damage and have +0.5m larger hitboxes. No single big hit, makes his whole kit scarier.
 
 ## Animation Names (to create)
 

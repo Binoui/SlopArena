@@ -73,19 +73,37 @@ namespace SlopArena.Shared.Abilities
             float wey = wy + evt.EndOffY;
             float wez = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
 
+            float damage = evt.Damage;
+            float radius = evt.Radius;
+            ApplyBuffBonuses(ref s, ref damage, ref radius);
+
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
-                Radius = evt.Radius,
+                Radius = radius,
                 Shape = evt.Shape,
                 EndX = wex, EndY = wey, EndZ = wez,
-                Damage = evt.Damage,
+                Damage = damage,
                 KnockbackForce = evt.KnockbackForce,
                 KnockbackUpward = evt.KnockbackUpward,
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,
             });
+        }
+
+        /// <summary>
+        /// Apply active buff bonuses to damage and radius.
+        /// Call before SpawnHitbox or Resolver.Spawn in any ability.
+        /// Overclock adds +3 damage and +0.5 radius.
+        /// </summary>
+        protected void ApplyBuffBonuses(ref CharacterState s, ref float damage, ref float radius)
+        {
+            if ((s.BuffActiveFlags & (byte)BuffType.Overclock) != 0)
+            {
+                damage += 3f;
+                radius += 0.5f;
+            }
         }
 
         /// <summary>Set character velocity (world space).</summary>

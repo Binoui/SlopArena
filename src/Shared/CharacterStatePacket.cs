@@ -35,9 +35,10 @@ namespace SlopArena.Shared
 
         /// <summary>Match lifecycle state from server.</summary>
         public MatchState MatchState;
-
-        /// <summary>40 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1;
+        /// <summary>Buff timer remaining (0 = no active buff). Set by Overclock etc.</summary>
+        public ushort BuffRemainingTicks;
+        /// <summary>42 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -54,10 +55,7 @@ namespace SlopArena.Shared
                 CurrentActionState = (byte)s.State,
                 IsGrounded = s.IsGrounded,
                 StateDurationFrames = s.StateTicks,
-                AttackSlot = s.AttackSlot,
-                ComboStage = s.ComboStage,
-                AnimIndex = s.AnimIndex,
-                FacingYaw = s.FacingYaw,
+                BuffRemainingTicks = s.BuffRemainingTicks,
             };
         }
 
@@ -76,9 +74,7 @@ namespace SlopArena.Shared
                 IsGrounded = IsGrounded,
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
-                ComboStage = ComboStage,
-                AnimIndex = AnimIndex,
-                FacingYaw = FacingYaw,
+                BuffRemainingTicks = BuffRemainingTicks,
             };
         }
 
@@ -101,7 +97,7 @@ namespace SlopArena.Shared
             buffer[33] = ComboStage;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(34, 4), BitConverter.SingleToInt32Bits(FacingYaw));
             buffer[38] = (byte)MatchState;
-            buffer[39] = AnimIndex;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -124,7 +120,7 @@ namespace SlopArena.Shared
             packet.ComboStage = buffer[33];
             packet.FacingYaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(34, 4)));
             packet.MatchState = (MatchState)buffer[38];
-            packet.AnimIndex = buffer[39];
+            packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
             return packet;
         }
     }

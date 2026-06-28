@@ -146,5 +146,10 @@ namespace SlopArena.Shared
         /// ── Per-slot cooldowns (0-5) ──
         /// </summary>
         public ushort Cooldown0, Cooldown1, Cooldown2, Cooldown3, Cooldown4, Cooldown5;
+        /// <summary>
+        /// ── Buff / Self-enhancement ──
+        /// </summary>
+        public ushort BuffRemainingTicks;  // 0 = no active buff
+        public byte BuffActiveFlags;        // bitfield, see BuffType enum
     }
 }
