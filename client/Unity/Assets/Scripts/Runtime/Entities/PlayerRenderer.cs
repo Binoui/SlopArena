@@ -49,6 +49,7 @@ namespace SlopArena.Client.Entities
         /// Set from TrainingMatch at spawn.
         /// </summary>
         private CharacterDefinition? _charDef;
+        private GameObject _modelInstance;
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
         public float ModelYOffset
@@ -85,11 +86,11 @@ namespace SlopArena.Client.Entities
 
             var instance = Instantiate(prefab, transform);
             instance.name = def.Class.ToString();
+            _modelInstance = instance;
             instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.identity;
 
-            if (def.VisualScale != 1f)
-                instance.transform.localScale = Vector3.one * def.VisualScale;
+            instance.transform.localScale = Vector3.one * def.VisualScale;
 
             _animator = instance.GetComponent<Animator>();
             if (_animator == null)
@@ -126,6 +127,8 @@ namespace SlopArena.Client.Entities
         private ActionState _lastAnimState;
         private byte _lastAttackSlot;
         private byte _lastComboStage;
+        private int _deathFlashTicks;
+        private const int DeathFlashDuration = 6;
         private bool _wasGrounded = true;
         // ── Frame-by-frame animation control ──
 
@@ -168,6 +171,26 @@ namespace SlopArena.Client.Entities
             }
 
             transform.rotation = Quaternion.Euler(0f, state.FacingYaw * Mathf.Rad2Deg, 0f);
+            // Death flash blink
+            if (_deathFlashTicks > 0)
+            {
+                _deathFlashTicks--;
+                if (_modelInstance != null)
+                {
+                    var mr = _modelInstance.GetComponentInChildren<SkinnedMeshRenderer>();
+                    if (mr != null)
+                        mr.enabled = (_deathFlashTicks % 2 == 0);
+                }
+            }
+            else
+            {
+                if (_modelInstance != null)
+                {
+                    var mr = _modelInstance.GetComponentInChildren<SkinnedMeshRenderer>();
+                    if (mr != null && !mr.enabled)
+                        mr.enabled = true;
+                }
+            }
 
             UpdateAnimationState(state);
 
@@ -254,6 +277,16 @@ namespace SlopArena.Client.Entities
             _lastAnimState = default;
             _lastAttackSlot = 0;
             _lastComboStage = 0;
+        }
+
+        /// <summary>
+        /// Called when the entity dies (void death detected via Deaths counter change).
+        /// Triggers a brief visual flash + animation reset.
+        /// </summary>
+        public void OnDeath()
+        {
+            _deathFlashTicks = DeathFlashDuration;
+            ResetAnimationState();
         }
 
         // ── Gizmos ──

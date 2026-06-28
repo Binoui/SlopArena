@@ -481,6 +481,7 @@ namespace SlopArena.Shared
 				{
 					PX = rpx, PY = rpy, PZ = rpz,
 					FacingYaw = _arena.SpawnPoints[0].Yaw,
+                    EntityId = id,
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
 					Deaths = (byte)(oldState.Deaths + 1), DamagePercent = 0,
 				};

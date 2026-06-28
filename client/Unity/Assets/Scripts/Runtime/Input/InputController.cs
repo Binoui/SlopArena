@@ -84,7 +84,7 @@ namespace SlopArena.Client.Input
 
             var kb = Keyboard.current;
             var mouse = Mouse.current;
-            _pendingJump = kb.spaceKey.isPressed;
+            if (kb.spaceKey.wasPressedThisFrame) _pendingJump = true;
 
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
