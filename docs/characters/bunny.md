@@ -18,10 +18,10 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 **Agile melee assassin / kick-focused brawler** — rushdown with mobility tools.
 - LMB = 3-hit kick combo (low → medium → high)
 - RMB = carrot slam (ground AoE)
-- Q = carrot boomerang (poke + mark setup for R)
+- Q = carrot boomerang (poke + mark setup for R, mark lasts ~5s)
 - E = backflip kick (disengage / mobility)
 - R = dragon kick (powerful finisher, boosted if target marked by Q)
-- F = Jade Hare (ult — sustained AoE kick zone)
+- F = Tempest of the Hare (ult — spin in place, cyclone pulls enemies toward center, final launcher kick)
 
 ## Kit
 
@@ -33,8 +33,8 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 | **Air RMB** | Helicopter | `spell_air_rmb` | Spinning wheel kick in air | Air combo extender, downward spike knockback |
 | **Q** | Whirling Carrot | `spell_q` | Throw spinning carrot like a boomerang | Projectile poke, marks target for R |
 | **E** | Flip Kick | `spell_e` | Backflip with extended kick | Backward mobility / disengage |
-| **R** | Dragon's Kick | `spell_f` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark |
-| **F** | Jade Hare (ult) | `spell_f` | Sustained circular kick | Large AoE zone, multi-hit damage over time (shares R's clip) |
+| **R** | Dragon's Kick | `spell_f` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
+| **F** | Tempest of the Hare (ult) | `spell_f` | Rapid spin in place, cyclone visual | Kicks pull nearby enemies toward center over 1.5s, then a final launcher kick. Bunny cannot move during it. Big damage + knockback if enemy is caught |
 
 ## Stats
 
@@ -107,7 +107,9 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 
 - [ ] Custom hit reaction animation FBX files (currently uses shared Manki `hit_light`/`hit_medium`)
 - [ ] Dash animation FBX (currently placeholder 1-frame clip)
-- [ ] Q boomerang mark consumed by R not yet implemented (status effect system)
 - [ ] F ult movement lock + cancel not wired
+- [ ] F ult (Tempest of the Hare) needs its own animation clip — currently shares R's `spell_f`
+- [ ] Carrot boomerang Q mark consumed by R not yet implemented (status effect system)
 - [ ] Some Mixamo attack animations could be replaced with custom ones
 - [ ] Carrot weapon model not attached as separate bone child
+- [ ] Future: consider separating this kit from rabbit model — kit leans generic martial artist, rabbit theme could go to a different character
