@@ -56,7 +56,7 @@ public static partial class CharacterRegistry
             },
             GlbPath = "res://assets/characters/bunny/bunny.glb",
             BakedDataPath = "res://data/bunny_skeleton.bin",
-            VisualScale = 1.0f,
+            VisualScale = 1.5f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,

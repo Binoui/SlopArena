@@ -60,7 +60,6 @@ public static partial class CharacterRegistry
                 new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
-            GlbPath = "res://assets/characters/manki/manki.glb",
             BakedDataPath = "res://data/manki_skeleton.bin",
             ModelResourcePath = "Characters/Manki",
             VisualScale = 1.0f,
