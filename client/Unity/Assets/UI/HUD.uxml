@@ -1,0 +1,35 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:Style src="HUD.uss" />
+    <ui:VisualElement style="flex-grow: 1; justify-content: flex-end; padding-bottom: 40px;">
+        <!-- Damage % -->
+        <ui:Label name="damage-percent" text="0%" class="damage-percent" />
+
+        <!-- Slot row -->
+        <ui:VisualElement name="slot-row" class="slot-row">
+            <ui:VisualElement name="slot-0" class="slot-icon">
+                <ui:VisualElement name="slot-0-cooldown" class="slot-cooldown" />
+                <ui:Label text="LMB" class="slot-key-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-1" class="slot-icon">
+                <ui:VisualElement name="slot-1-cooldown" class="slot-cooldown" />
+                <ui:Label text="RMB" class="slot-key-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-2" class="slot-icon">
+                <ui:VisualElement name="slot-2-cooldown" class="slot-cooldown" />
+                <ui:Label text="Q" class="slot-key-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-3" class="slot-icon">
+                <ui:VisualElement name="slot-3-cooldown" class="slot-cooldown" />
+                <ui:Label text="E" class="slot-key-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-4" class="slot-icon">
+                <ui:VisualElement name="slot-4-cooldown" class="slot-cooldown" />
+                <ui:Label text="R" class="slot-key-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-5" class="slot-icon">
+                <ui:VisualElement name="slot-5-cooldown" class="slot-cooldown" />
+                <ui:Label text="F" class="slot-key-label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -14,6 +14,7 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, int> _animFrames = new();
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
+		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
 		private readonly SpellResolver _spellResolver = new();
 		private readonly Dictionary<ulong, (float x, float y, float z)> _respawnPositions = new();
 
@@ -421,7 +422,10 @@ namespace SlopArena.Shared
 		private void ResolveHits(List<SpellResolver.EntityData> entityList)
 		{
 			// ── Step 3: Resolve hitboxes ──
-			foreach (var hit in _spellResolver.Tick(entityList))
+			var hits = _spellResolver.Tick(entityList);
+			LastTickHits.Clear();
+			LastTickHits.AddRange(hits);
+			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
 				float finalDamage = hit.Damage;

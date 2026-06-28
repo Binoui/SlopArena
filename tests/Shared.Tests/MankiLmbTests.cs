@@ -322,6 +322,44 @@ public class MankiLmbTests
         Assert.Equal((byte)1, afterChain.AttackSlot);
     }
 
+
+    [Fact]
+    public void ComboStage_AdvancesThroughFullChain()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPy;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Stage 1 starts: ComboStage = 0
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+        var s1 = sim.GetState(1);
+        Assert.Equal(0, s1.ComboStage);
+
+        // Chain to stage 2: ComboStage = 1
+        int stage1ChainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
+        for (int i = 1; i < stage1ChainTick; i++)
+            sim.Tick(new() { { 1, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+        var s2 = sim.GetState(1);
+        Assert.Equal(1, s2.ComboStage);
+
+        // Chain to stage 3: ComboStage = 2
+        int stage2ChainTick = Stage2.DurationTicks - Stage2.ChainWindowTicks;
+        for (int i = 0; i < stage2ChainTick - 1; i++)
+            sim.Tick(new() { { 1, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+        var s3 = sim.GetState(1);
+        Assert.Equal(2, s3.ComboStage);
+
+        // Stage 3 finishes naturally: ComboStage resets to 0
+        for (int i = 0; i < Stage3.DurationTicks + 10; i++)
+            sim.Tick(new() { { 1, default } });
+        var done = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, done.State);
+        Assert.Equal(0, done.ComboStage);
+
+    }
     // ── Helpers ──
 
     /// <summary>
