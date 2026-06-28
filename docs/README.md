@@ -17,7 +17,7 @@
 
 | Doc | Covers |
 |-----|--------|
-| [`systems/animation-system.md`](systems/animation-system.md) | FSM lifecycle, AnimationTree structure |
+| [`systems/animation-system.md`](systems/animation-system.md) | Unity Animator state machine, trigger-driven transitions |
 | [`systems/combat-systems.md`](systems/combat-systems.md) | Universal combat mechanics |
 | [`systems/hitbox-system.md`](systems/hitbox-system.md) | Hitbox/hurtbox architecture |
 | [`systems/attack-hitbox-system.md`](systems/attack-hitbox-system.md) | Attack hitbox data pipeline |

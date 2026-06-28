@@ -40,39 +40,47 @@ No more than 5 colors per character total (skin included).
 ## 2. Pipeline
 
 ```
-3daistudio        → concept art + rough model
+3daistudio        → concept art + rough model (FBX with Mixamo rig)
   ↓
 Blender           → cleanup, rigging, bone naming
   ↓
-Blender         → animation (one file per motion)
+Mixamo            → download per-animation FBX files
   ↓
-Blender (NLA)     → compose all animations into one master .glb
-  ↓
-Godot             → import + wire up
+Unity             → import FBX, rename clips, generate Animator, create prefab
 ```
 
-### 3daistudio
+### Model export
 
 - Generate in **T-pose** for clean auto-rigging
 - **No floating parts** — they cause rigging issues
-- **No weapons / props on the model** — attach via BoneAttachment in Godot
-- **No fire / particle effects on geometry** — all VFX are Godot particles
-- Export format: **GLB** (not FBX)
+- **No weapons / props on the model** — attach via bone child in Unity
+- **No fire / particle effects on geometry** — all VFX are Unity particle systems
+- Export format: **FBX** with Mixamo rig (not GLB)
 - Rig: **Mixamo standard** (23 bones, mixamorig: naming)
 - Poly count: ~4000 tris
+
+### Animations
+
+- Download each motion as a separate FBX from Mixamo
+- All FBX files share the same Mixamo skeleton
+- Place in `Assets/Art/Characters/<name>/Animations/`
+- Imported clips must be renamed from `mixamo.com` to the FBX filename
+- The `SlopArenaAnimatorGenerator` scans the folder and assigns clips automatically
 
 ### Mixamo + Blender (rigging)
 
 - Rename bones to match `mixamorig:` convention once, never change after
 - No finger bones, no twist bones
-- Export with **animations embedded** in the .glb when complete
-- Textures: JPEG embedded in .glb (option 1)
+- Export as **FBX** (not GLB) — Unity imports FBX natively
+- Textures: separate material assign in Unity (not embedded)
 
 ### Blender (Animations)
 
-- Import FBX/GLB with the Mixamo rig
+- Import FBX with the Mixamo rig
 - Block out key poses → let Cascadeor calculate physics
-- Export each animation as a separate .glb
+- Export each animation as a separate FBX file
+- Name exports to match convention: `spell_lmb_1`, `spell_lmb_2`, `spell_q`, etc.
+- All FBX files share the same skeleton
 - Later stage: compose into one master file per character
 
 ---

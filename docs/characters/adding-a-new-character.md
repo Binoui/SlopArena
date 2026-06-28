@@ -260,141 +260,75 @@ See `docs/systems/ability-architecture.md` for complete ServerAbility pattern do
 
 ---
 
-## 3. Model & Animations — GLB Pipeline
+## 3. Model & Animations — FBX Pipeline (Unity)
 
 ### 3a. Character mesh
 
-Any humanoid 3D model works — Mixamo handles rigging for most FBX files.
-Sources for CC0/royalty-free models:
+Place the static mesh FBX at `client/Unity/Assets/Art/Characters/<name>/<name>.fbx`.
+Set `importAnimation: OFF` in the FBX import settings — the mesh file contains
+no animations.
 
-| Source | Licence | Notes |
-|--------|---------|-------|
-| Your own Blender model | Any | Best control over look |
-| [Quaternius](https://quaternius.com) | CC0 | Consistent low-poly style |
-| [Sketchfab](https://sketchfab.com) (CC0 filter) | Varies | Check per-model licence |
-| [OpenGameArt](https://opengameart.org) | Varies | Filter by CC0 |
-| Kenney | CC0 | Blocky style, works fine |
+### 3b. Animation FBX files
 
-**Process:**
-1. Upload your FBX to [Mixamo](https://www.mixamo.com)
-2. Auto-rig with the Mixamo skeleton
-3. Download as **GLB** with skin + animations
-4. The skeleton mapping is handled automatically by `AnimationController`
+Each ability/locomotion slot gets a **separate FBX file** with one animation clip.
+Mixamo is the easiest source (free, auto-rigged), but any FBX animation with a
+compatible Mixamo skeleton works.
 
-### 3b. Animation files
+Place all animation FBX files in `Assets/Art/Characters/<name>/Animations/`.
 
-For each ability slot, provide an animation. Mixamo is the easiest source (free, auto-rigged),
-but any FBX animation with a compatible skeleton works.
+| Slot | FBX file | Expected clip name |
+|------|----------|-------------------|
+| Idle | `Idle.fbx` | Idle |
+| Run | `run.fbx` | run |
+| Jump | `jump.fbx` | jump |
+| Fall | `fall.fbx` | fall |
+| LMB stage 1 | `spell_lmb_1.fbx` | spell_lmb_1 |
+| LMB stage 2 | `spell_lmb_2.fbx` | spell_lmb_2 |
+| LMB stage 3 | `spell_lmb_3.fbx` | spell_lmb_3 |
+| RMB | `spell_rmb.fbx` | spell_rmb |
+| Air RMB | `spell_air_rmb.fbx` | spell_air_rmb |
+| Q | `spell_q.fbx` | spell_q |
+| E | `spell_e.fbx` | spell_e |
+| F (Ultimate) | `spell_f.fbx` | spell_f |
 
-**Required animations per character:**
+### 3c. Clip renaming (Mixamo workaround)
 
-| Slot | Type | Description |
-|------|------|-------------|
-| LMB stage 1 | Attack | First swing of basic combo |
-| LMB stage 2 | Attack | Second swing |
-| LMB stage 3 | Attack | Combo finisher (launcher) |
-| Air LMB | Air attack | Upward swing (juggling) |
-| RMB | Heavy attack | Big single hit |
-| Air RMB | Air attack | Downward spike |
-| Q / E / R | Special | Cast / strike / block |
-| F (Ult) | Ultimate | Big impactful move |
-| Idle | Locomotion | Standing breathing |
-| Run | Locomotion | Forward movement |
-| Jump / Fall | Locomotion | Air state
-
-All animations use the **same Mixamo skeleton** (`mixamorig:Hips`, etc.).
-Place FBX files in: `assets/characters/{YourClass}/`
-
-### 3c. Animation naming convention
-
-In `AbilitySpec.AnimationNames`, use the FBX animation name (without `.fbx`):
+Mixamo FBX animations all have the internal clip name `mixamo.com`.
+After importing, rename clips via Unity script:
 
 ```csharp
-AnimationNames = new[] { "sword_slash", "sword_spin", "sword_uppercut" }
+var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+var clips = new ModelImporterClipAnimation[1];
+clips[0] = new ModelImporterClipAnimation();
+clips[0].name = Path.GetFileNameWithoutExtension(path);
+clips[0].takeName = "mixamo.com";
+clips[0].firstFrame = 0;
+clips[0].lastFrame = importer.defaultClipAnimations[0].lastFrame;
+importer.clipAnimations = clips;
+importer.SaveAndReimport();
 ```
 
-The `AnimationController` loads animations by name from the character's animation library.
-If `AnimationNames` is null/empty, it falls back to generic names (`attack_{slot}_{stage}`).
+### 3d. Animation naming in code
 
-### 3d. GLB animation binding
-
-With GLB, Godot's `AnimationPlayer` reads animation tracks by bone **path** (e.g., `mixamorig:Hips:rotation_quaternion`). The skeleton layout is baked into the GLB — no manual remapping needed.
-
-**Key points:**
-- Animations are **embedded in the GLB file** — no separate FBX files
-- `AnimationNames` in `AbilitySpec` must match the animation names inside the GLB
-- The `AnimationTree` root StateMachine state names must match `AnimationNames`
-- Godot handles bone remapping between different skeletons automatically via `AnimationMixer` if needed
-
----
-
-## 4. Bake — Skeleton .bin Generation
-
-After importing your character's GLB and setting up animations, generate the pre-baked bone position file for runtime hurtbox positioning.
-
-### 4a. Add BakedDataPath to CharacterDefinition
+In `AbilitySpec.AnimationNames`, use the FBX clip name (the renamed clip,
+not the original `mixamo.com`):
 
 ```csharp
-BakedDataPath = "res://data/yourclass_skeleton.bin",
-HurtboxBoneScale = 0.01f,  // 0.01 for Mixamo (cm→m), 1.0 for native meters
+AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" }
 ```
 
-### 4b. Define which bones become hurtboxes
+The `AssignClip()` method in `SlopArenaAnimatorGenerator.cs` maps clip names
+to config slots. Ensure your clip name matches one of the case labels.
 
-```csharp
-HurtboxBoneDefs = new HurtboxBoneDef[]
-{
-    new("mixamorig:Head", 0, 0, 0, 0.25f),
-    new("mixamorig:Spine2", 0, 0, 0, 0.3f),
-    new("mixamorig:Hips", 0, 0, 0, 0.3f),
-    new("mixamorig:RightHand", 0, 0, 0, 0.14f),
-    new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
-    new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
-    new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
-};
-```
+### 3e. Baked skeleton data (hurtboxes)
 
-- **Bone names**: use Mixamo/Godot format (`mixamorig:Head` in definition, Godot converts to `mixamorig_Head`)
-- **Offsets**: (OffX, OffY, OffZ) are additive adjustments to the baked bone position (usually 0)
-- **Radius**: hurtbox sphere radius in meters
-- Order must match the `BoneNames` array in `BakeSkeletonTool.cs`
+The `.bin` files at `data/<name>_skeleton.bin` are pre-baked per-character
+(generated via the Godot-era bake tool). No Unity bake step is needed.
 
-### 4c. Run the bake tool
-
-1. Open Godot editor
-2. Open `tools/bake_skeleton.tscn`
-3. Set `CharacterScenePath` to your character's .tscn
-4. Set `OutputPath` to `res://data/yourclass_skeleton.bin`
-5. Update the `BoneNames` array in `Scripts/Tools/BakeSkeletonTool.cs` to match your character's bones
-6. Select the `BakeSkeletonTool` node → in the inspector, check **TriggerBake**
-7. The console will print progress per animation
-
-**What the tool does:**
-- Loads your character scene (Skeleton3D + AnimationPlayer)
-- For each animation, samples bone positions at 60fps
-- Transforms positions into Hips local space via `AffineInverse()`
-- Writes a compact binary file (≈270KB for 11 bones × 19 anims)
-
-### 4d. Integration & visual alignment
-
-After baking, the system auto-computes the visual model offset:
-
-```csharp
-AutoModelYOffset = true,       // compute from baked data
-HurtboxBoneScale = 0.01f,      // Mixamo cm→m conversion
-ModelSoleOffset = 0.47f,       // fine-tune so feet touch ground
-```
-
-The auto-offset scans all bones at idle frame 0, finds the lowest point (toe tip), and positions the model so it touches the capsule bottom. If the feet don't touch the ground, adjust `ModelSoleOffset`.
-
-### 4e. Integration checklist
-
-- [ ] `BakedDataPath` points to the generated .bin
-- [ ] `HurtboxBoneScale` matches your GLB's unit system
-- [ ] `HurtboxBoneDefs` bone names match the skeleton
-- [ ] `.bin` file is committed to the repo (it's small and deterministic)
-- [ ] The `.bin` is regenerated whenever animations change
-
+**If hurtboxes are misaligned:**
+- Verify `HurtboxBoneScale` matches the baked data's export scale
+- Verify `HurtboxBoneDefs` bone names match the skeleton
+- Ensure the `.bin` file is non-empty and was generated from the correct rig
 ---
 
 ## 5. Icon — UI

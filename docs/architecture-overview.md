@@ -27,7 +27,7 @@ SlopArena/
 │   ├── ClientInputPacket.cs ← Client→server input (14 bytes)
 │   ├── InputState.cs        ← Normalized input (MoveX/Y, flags, ActiveSlot)
 │   ├── BakedAnimationData.cs← Offline-baked bone positions per frame
-│   ├── ServerSkeleton.cs    ← GLB JSON parser for skeleton data
+│   ├── ServerSkeleton.cs    ← FBX/GLB JSON parser for skeleton data
 │   ├── ArenaDefinition.cs   ← Arena data (platforms, spawns, kill height)
 │   └── MovementProfiles.cs  ← (deleted — dead code)
 │

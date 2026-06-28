@@ -172,7 +172,7 @@ python tools/read_skeleton_bin.py data/manki_skeleton.bin
 | Symptom | Likely Cause | Check |
 |---------|-------------|-------|
 | Build fails with `Godot` not found | Used `Godot.` import in Shared/ | Remove Godot reference, use `System.MathF` |
-| Character invisible in sandbox | Model not loaded | Check `GlbPath` and `bakedDataPath` in CharacterDefinition |
+| Character invisible in sandbox | Model not loaded | Check `bakedDataPath` in CharacterDefinition |
 | Attacks don't connect | Hitbox offset wrong or TriggerTick > DurationTicks | Check `HitboxEvent` values, check console for `[HITBOX]` log |
 | Opponent doesn't move in PvP | Server not running or wrong entity ID | Check server console, verify `OpponentEntityId = 2` |
 | Rollback spam in console | Prediction threshold too tight or server desync | Check `distSq > 0.25f` threshold in MatchManager |
