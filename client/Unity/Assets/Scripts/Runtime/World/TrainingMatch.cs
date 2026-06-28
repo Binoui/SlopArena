@@ -5,6 +5,8 @@ using SlopArena.Shared;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
+using SlopArena.Client.Combat;
+using SlopArena.Client.UI;
 
 namespace SlopArena.Client.World
 {
@@ -26,6 +28,11 @@ namespace SlopArena.Client.World
         [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
 
         [Header("Debug")]
+        [Header("Combat")]
+        [SerializeField] private CombatFeedback _combatFeedback;
+
+        [Header("HUD")]
+        [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
         private uint _tick;
@@ -55,11 +62,25 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
             _localSim = new ServerSimulation(arena);
+            _combatFeedback.SetSimulation(_localSim);
+            _hudManager?.Initialize(_localSim, PlayerEntityId);
+
 
             var playerDef = CharacterRegistry.Get(_playerClass);
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
+
+            // Set cooldown max ticks from character definition
+            for (int slot = 0; slot < 6; slot++)
+            {
+                var spec = playerDef.GetSlotAbility(slot, airborne: false);
+                if (spec != null)
+                    _hudManager?.SetSlotMaxCooldown(slot, spec.CooldownTicks);
+                var specAir = playerDef.GetSlotAbility(slot, airborne: true);
+                if (specAir != null && specAir.CooldownTicks > spec?.CooldownTicks)
+                    _hudManager?.SetSlotMaxCooldown(slot, specAir.CooldownTicks);
+            }
 
             // Apply model Y offset for visual alignment with capsule
             _playerRenderer.ModelYOffset = playerDef.ModelYOffset;
@@ -92,24 +113,24 @@ namespace SlopArena.Client.World
                 JumpsLeft = playerDef.Movement.MaxJumps,
             }, playerBaked);
 
-            // NPC spawn — 3m in front of player for hit testing
-            var nSpawn = arena.SpawnPoints.Length > 1 ? arena.SpawnPoints[1] : new SpawnPoint();
-            float npcX = pSpawn.X + Mathf.Cos(pSpawn.Yaw) * 3f;
-            float npcZ = pSpawn.Z + Mathf.Sin(pSpawn.Yaw) * 3f;
+            // NPC spawn at fixed position
+            float npcX = 0f;
+            float npcZ = 0f;
             _localSim.RegisterEntity(NpcEntityId, npcDef, new CharacterState
             {
-                PX = npcX, PY = nSpawn.Y, PZ = npcZ,
-                FacingYaw = nSpawn.Yaw + Mathf.PI,
+                PX = npcX, PY = 5f, PZ = npcZ,
+                FacingYaw = Mathf.PI,
                 JumpsLeft = npcDef.Movement.MaxJumps,
             }, npcBaked);
+
 
             // Position renderers
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
             if (_npcRenderer != null)
-                _npcRenderer.transform.position = new Vector3(npcX, nSpawn.Y, npcZ);
+                _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
 
             // Set NPC respawn position to same relative location
-            _localSim.SetRespawnPosition(NpcEntityId, npcX, pSpawn.Y + 2f, npcZ);
+            _localSim.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ);
 
             // Camera
             if (_cameraMount != null)
@@ -152,6 +173,8 @@ namespace SlopArena.Client.World
                 { PlayerEntityId, input },
                 { NpcEntityId, new InputState() }
             });
+            _combatFeedback.OnTick();
+            _hudManager?.Refresh();
 
             _tick++;
             if (_tick % 120 == 1)

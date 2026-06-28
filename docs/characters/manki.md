@@ -34,16 +34,15 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | **RMB** | Aerosol + Lighter | Shake aerosol → cone flame | Charged heavy attack, zone denial |
 | **Air RMB** | Medium kick | Simple air kick | Medium knockback |
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
-| **E** | Dynamite Jump | Throw dynamite → explosion → self-propulsion | Rocket jump, vertical mobility + air jump reset |
-| **R** | Dive Bomb | Put on hard hat → dive head-first → AoE explosion on impact | Fast return to ground + AoE |
-| **F** | Big Boom (ult) | Large bomb / explosive barrel | TBD — large explosive burst |
+| **E** | Dynamite Jump | Throw dynamite → explosion → self-propulsion | Rocket jump, vertical mobility + air jump reset + setup combo potential |
+| **R** | Dive Bomb | Put on hard hat and a jetpack then flies in the air -> target zone on the ground → dive head-first → AoE explosion on impact | Fast return to ground + AoE, usable in the air |
+| **F** | Bazooka | Equip a bazooka, aim then shoot a big rocket -> explosion | big ult |
 
 ## Design Notes
 
 - **RMB**: inspired by improvised flamethrower — aerosol + lighter. During charge, Manki frantically shakes the bomb. On release, cone-shaped flame jet.
 - **E**: rocket jump. On ground = plant dynamite, propelled upward. In air = drop dynamite below, propelled upward. Small explosion hitbox for visuals (~2-3 units), low enemy damage (~5), main effect is propulsion.
 - **R**: Dive Bomb. Manki stops air momentum, pulls out a yellow hard hat, dives head-first toward the ground. AoE explosion on impact. After landing, the helmet disappears.
-- **F**: not fully defined yet — big bomb, to be refined after the rest of the kit is implemented.
 
 ## Animation Names (to create)
 

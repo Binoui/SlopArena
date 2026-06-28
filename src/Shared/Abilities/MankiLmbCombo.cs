@@ -22,8 +22,9 @@ namespace SlopArena.Shared.Abilities
             var stage = GetCurrentStage(def);
 
             s.State = ActionState.Attacking;
-            s.AnimIndex = 0;
+            AnimIndex = 0;
             s.AnimLockTicks = stage.DurationTicks;
+            s.ComboStage = 0;
 
             // Apply initial lunge velocity
             if (stage.LungeForce > 0f)
@@ -58,7 +59,8 @@ namespace SlopArena.Shared.Abilities
                 // Advance to next stage
                 _stage++;
                 _stageTicks = 0;
-                s.AnimIndex = _stage;
+                AnimIndex = _stage;
+                s.ComboStage = _stage;
                 s.AnimLockTicks = stages[_stage].DurationTicks;
 
                 // Apply lunge velocity for new stage
