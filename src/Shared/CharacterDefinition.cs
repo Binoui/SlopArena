@@ -53,8 +53,6 @@ namespace SlopArena.Shared
         /// Each entry defines a sphere at a bone position with an offset.
         /// </summary>
         public HurtboxBoneDef[]? HurtboxBoneDefs;
-        /// <summary>Path to the GLB file containing the skeleton model.</summary>
-        public string GlbPath = "";
         /// <summary>Path to the baked skeleton .bin file (pre-computed bone positions per frame).</summary>
         public string BakedDataPath = "";
         /// <summary>Unity Resources path for the model prefab. E.g. "Characters/Manki"</summary>
