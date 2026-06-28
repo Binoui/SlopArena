@@ -122,7 +122,9 @@ private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (s
     (0, false) => new MankiLmbCombo(),
     (1, false) => new MankiAerosolFlame(),
     (2, _) => new MankiRoundBomb(),
-    (3, _) => new NewAbility(),  // New slot mapping
+    (3, _) => null,          // E — data-driven ExplosiveMineSpec
+    (4, _) => new MankiDiveBomb(),   // R
+    (5, _) => new MankiOverclock(),  // F
     _ => null,
 };
 ```
@@ -144,8 +146,12 @@ The `airborne` parameter allows different abilities for ground vs air (e.g., Man
 private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
 {
     (0, false) => new MankiLmbCombo(),     // Ground LMB
-    (0, true) => new MankiAirPunch(),      // Air LMB
+    (0, true) => null,                      // AirLMB — data-driven fallback
     (1, false) => new MankiAerosolFlame(), // Ground RMB
+    (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
+    (3, _) => null,                         // E — data-driven ExplosiveMineSpec
+    (4, _) => new MankiDiveBomb(),         // R
+    (5, _) => new MankiOverclock(),        // F
     _ => null, // Data-driven fallback for slots without ServerAbility
 };
 ```

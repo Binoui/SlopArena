@@ -155,7 +155,7 @@ All lower case. Underscores for spaces.
 | `spell_q` | Round Bomb (projectile) | Q |
 | `spell_e` | Dynamite Jump (ground launch) | E |
 | `spell_r` | Dive Bomb (air slam) | R |
-| `spell_f` | Big Boom (ult) | F |
+| `spell_f` | Overclock (ult) | F |
 
 Each character defines their own ability animation names in `CharacterDefinition.cs` under `AnimationNames`.
 

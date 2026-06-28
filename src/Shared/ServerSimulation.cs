@@ -240,6 +240,10 @@ namespace SlopArena.Shared
 				ushort cooldown = GetCooldown(state, input.ActiveSlot);
 				if (cooldown > 0) continue;
 
+                // Reject F (Overclock) reactivation while buff already active
+                if (input.ActiveSlot == 6 && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
+                    continue;
+
 				// Server-side ability: try to create via slot mapping
 				if (_activeAbilities.ContainsKey(id)) continue;
 
@@ -381,7 +385,7 @@ namespace SlopArena.Shared
 				ulong id = kvp.Key;
 				var state = kvp.Value;
 				var def = _defs[id];
-				if (state.State != ActionState.Attacking || state.AttackSlot == 0) continue;
+				if (state.State != ActionState.Attacking || state.AttackSlot == 0 || state.IsServerAbility) continue;
 
 				bool airborne = !state.IsGrounded;
 				var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);

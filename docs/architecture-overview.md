@@ -15,7 +15,10 @@ SlopArena/
 │   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
 │   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
 │   │   ├── MankiRoundBomb.cs    ← Manki Q: parabolic projectile
-│   │   └── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
+│   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
+│   │   ├── AimedGroundAbility.cs ← Reusable base: rise → aim → plunge pattern
+│   │   ├── MankiDiveBomb.cs     ← Manki R: air-to-ground slam
+│   │   └── MankiOverclock.cs    ← Manki F: self-buff 8s
 │   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs     ← Hitbox spawn/Tick: sphere-capsule collision math
 │   ├── CharacterState.cs    ← Per-tick entity state (pos, vel, cooldowns, deaths)
