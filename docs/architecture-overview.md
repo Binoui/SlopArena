@@ -9,8 +9,8 @@
 
 ```
 SlopArena/
-├── Shared/              ← Pure C# library. NO Godot deps. The game's brain.
-│   ├── Abilities/           ← ServerAbility implementations (pure C#, no Godot)
+├── Shared/              ← Pure C# library. Compiled to net8.0 DLL for Unity.
+│   ├── Abilities/           ← ServerAbility implementations (pure C#, no Unity deps)
 │   │   ├── ServerAbility.cs     ← Base class: OnStart/Tick/OnEnd lifecycle
 │   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
 │   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
@@ -24,46 +24,39 @@ SlopArena/
 │   ├── CombatMath.cs        ← Knockback, facing, damage scaling
 │   ├── ServerSimulation.cs  ← Wraps Simulation + SpellResolver for server tick
 │   ├── CharacterStatePacket.cs ← UDP packet (39 bytes), FromState/Serialize
-│   ├── ClientInputPacket.cs ← Client→server input (14 bytes, legacy)
+│   ├── ClientInputPacket.cs ← Client→server input (14 bytes)
 │   ├── InputState.cs        ← Normalized input (MoveX/Y, flags, ActiveSlot)
 │   ├── BakedAnimationData.cs← Offline-baked bone positions per frame
 │   ├── ServerSkeleton.cs    ← GLB JSON parser for skeleton data
 │   ├── ArenaDefinition.cs   ← Arena data (platforms, spawns, kill height)
 │   └── MovementProfiles.cs  ← (deleted — dead code)
 │
-├── Scripts/              ← Godot C# client code. Has Godot. imports.
-│   ├── Animation/           ← Custom FSM (State.cs, StateMachine.cs, States/)
-│   ├── Combat/              ← MovementComponent, CombatComponent
-│   ├── Entities/            ← PlayerController (1301 lines, the big one)
-│   ├── World/               ← Main.cs (entry), MatchManager (match orchestration)
-│   ├── InputController.cs   ← Centralized input polling
-│   ├── Camera/              ← CameraMount (orbit cam)
-│   ├── UI/                  ← ActionBarHUD, UnitFrames, Settings
-│   ├── VFX/                 ← SpellVFXManager, FlamethrowerVFX
-│   ├── Network/             ← NetworkClient (UDP send/receive)
-│   ├── Server/              ← LocalServerBridge (sandbox local sim)
-│   ├── Characters/          ← AbilityRegistry, MankiAbilities, BunnyAbilities
-│   └── Debug/               ← DebugHitboxDraw
+├── client/Unity/         ← Unity client (replacing old Godot client)
+│   └── Assets/Scripts/
+│       ├── Runtime/
+│       │   ├── Entities/       ← PlayerRenderer (MonoBehaviour, drives Animator)
+│       │   ├── World/          ← TrainingMatch, MatchBase (match orchestration)
+│       │   ├── Input/          ← InputController (Unity Input → InputState)
+│       │   ├── Camera/         ← CameraMount (orbit cam)
+│       │   ├── Simulation/     ← LocalSimulationBridge (wraps ServerSimulation)
+│       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
+│       ├── Editor/
+│       │   └── SlopArenaAnimatorGenerator.cs ← Generates AnimatorControllers
+│       └── Shared/         ← Mirrors src/Shared/ for Unity compilation
+│           ├── Characters/     ← MankiData, BunnyData (CharacterRegistry)
+│           └── Abilities/      ← AbilityFactory, ServerAbility implementations
 │
-├── Server/               ← Headless .NET server (SlopArena.Server.csproj)
-│   ├── MatchInstance.cs     ← One 2-player match: UDP loop + ServerSimulation
-│   ├── MultiMatchOrchestrator.cs ← Port pooling, concurrent match management
-│   └── GameServerRegistration.cs ← Master server registration
+├── src/
+│   ├── Shared/            ← Source for Shared/ (compiled via dotnet build)
+│   ├── Server/            ← Headless .NET server (MatchInstance, UDP loop)
+│   └── ServerApp/         ← Prototype test server
 │
-├── ServerApp/            ← Prototype test server (single client, no multiplayer)
-│   └── Program.cs
+├── tests/
+│   └── Shared.Tests/      ← xUnit tests (ServerSimulation, SpellResolver, etc.)
 │
-├── tools/                ← Python/GDScript/C# build tools
-│   ├── headless_bake.gd     ← Godot headless skeleton baking
-│   ├── bake_anims.py        ← Blender animation baking
-│   └── BakeArenas.cs        ← Arena data generation
-│
-├── assets/               ← 3D models (.glb), textures, UI
+├── docs/                 ← All documentation
 ├── data/                 ← Baked binary data (.arena, _skeleton.bin)
-└── docs/                 ← All documentation
-│
-├── tests/               ← xUnit simulation tests (.NET 8, pure C#)
-│   └── Shared.Tests/        ← ServerSimulation, SpellResolver, CombatMath, abilities
+└── tools/                ← Python scripts, build tools
 ```
 
 ---
@@ -71,40 +64,29 @@ SlopArena/
 ## Data Flow (one tick at 60Hz)
 
 ```
-┌─ CLIENT (Godot) ─────────────────────────────────┐
-│                                                    │
-│  InputController → InputState                      │
-│       │                                            │
-│       ▼                                            │
-│  MatchManager._PhysicsProcess()                    │
-│    ├── Send input → NetworkClient → UDP            │
-│    ├── Local sim: _localSim.Tick(input)            │
-│    └── Apply predicted state → PlayerController    │
-│                                                    │
-│  MatchManager._Process()                           │
-│    ├── Receive server state ← NetworkClient ← UDP  │
-│    ├── Compare predicted vs server                 │
-│    ├── If mismatch → rollback (re-sim)             │
-│    └── Apply corrected state                       │
-│                                                    │
-└────────────────────────────────────────────────────┘
-         │ UDP                          │ UDP
-         ▼                              ▼
-┌─ SERVER (.NET) ────────────────────────────────────┐
-│                                                    │
-│  MatchInstance.Run()                               │
-│    ├── ReceiveInputs() → parse entityId+tick+input │
-│    ├── Tick():                                     │
-│    │     ├── serverSim.Tick(inputs)                │
-│    │     │     ├── Simulation.SimulateTick() × N   │
-│    │     │     ├── Build entity hurtbox list       │
-│    │     │     ├── Spawn hitboxes from attacks     │
-│    │     │     ├── SpellResolver.Tick() → hits     │
-│    │     │     ├── Apply damage/knockback          │
-│    │     │     └── Void death → respawn            │
-│    │     └── SendState() → both players            │
-│                                                    │
-└────────────────────────────────────────────────────┘
+┌─ CLIENT (Unity) ──────────────────────────────────┐
+│                                                     │
+│  InputController.Poll() → InputState                │
+│       │                                             │
+│       ▼                                             │
+│  MatchBase.FixedUpdate()                            │
+│    ├── TrainingMatch.OnMatchFixedUpdate()            │
+│    │   ├── InputController.ConsumePendingSlotPress()│
+│    │   ├── InputController.BuildInputState()        │
+│    │   ├── LocalSimulationBridge.Tick(inputs)       │
+│    │   │   └── ServerSimulation.Tick()              │
+│    │   │       ├── SimulateMovement()               │
+│    │   │       ├── SimulateAbilities()              │
+│    │   │       └── SpellResolver.Tick()             │
+│    │   └── PlayerRenderer.ApplyServerState(state)   │
+│    │       ├── transform.position/rotation          │
+│    │       └── UpdateAnimationState()               │
+│    │           ├── SetBool("IsGrounded", ...)       │
+│    │           ├── SetFloat("Speed", ...)           │
+│    │           ├── SetTrigger("Attack"/"Dash"/etc)  │
+│    │           └── Animator transitions naturally   │
+│    └── (future) NetworkClient send/receive          │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -197,10 +179,10 @@ dotnet run --project Server/SlopArena.Server.csproj
 
 | Doc | Covers |
 |-----|--------|
+| `docs/systems/animation-system.md` | Unity Animator: 1-layer trigger-driven, generator tool, pitfalls |
 | `docs/systems/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
 | `docs/systems/ability-architecture.md` | ServerAbility pattern, lifecycle, creating new abilities |
+| `docs/systems/combat-systems.md` | Universal combat mechanics |
 | `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
 | `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
-| `docs/systems/animation-system.md` | FSM lifecycle, AnimationTree structure |
-| `docs/systems/combat-systems.md` | Universal combat mechanics |
 | `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no Godot physics) |

@@ -14,17 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Idle: {fileID: -203655887218126122, guid: fe5b79cf131204c7db696e21a3106144, type: 3}
   Run: {fileID: -203655887218126122, guid: fad7b4bf115b05a01bac195213fe6b92, type: 3}
-  Jump: {fileID: -203655887218126122, guid: fad7b4bf115b05a01bac195213fe6b92, type: 3}
-  Fall: {fileID: 0}
+  Jump: {fileID: -203655887218126122, guid: 03f8d30c3e71d48d2a3da998da1a6ecc, type: 3}
+  Fall: {fileID: -203655887218126122, guid: 6b8e30a0f65d4483badc8058faf585c4, type: 3}
   Land: {fileID: 0}
-  Attack1: {fileID: 0}
-  Attack2: {fileID: 0}
-  Attack3: {fileID: 0}
+  Attack1: {fileID: -203655887218126122, guid: e03fe80e3f21cc05b8cd49f0d1ff686f, type: 3}
+  Attack2: {fileID: -203655887218126122, guid: 74a53532aa1c031c1943a1a5f9a73003, type: 3}
+  Attack3: {fileID: -203655887218126122, guid: 04477016919ac615bb755b8f7212a093, type: 3}
   Dash: {fileID: 0}
-  HitSmall: {fileID: 0}
-  HitLarge: {fileID: 0}
+  HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
+  HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
   Death: {fileID: 0}
-  SpellQ: {fileID: 0}
+  SpellQ: {fileID: -203655887218126122, guid: 237f5f3643eb5e75cb73bb505fd20dd6, type: 3}
   SpellE: {fileID: 0}
   SpellR: {fileID: 0}
   SpellF: {fileID: 0}
