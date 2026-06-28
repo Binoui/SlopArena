@@ -209,22 +209,21 @@ Examples: Loki (DKO), Izanami (DKO), Croak (Battlerite), Shifu (Battlerite)
 
 Only one character is active in the codebase. Design others from scratch following these patterns.
 
-### Manki (Rushdown / Agile Brawler)
+### Manki (Explosive Bomber / Rushdown Hybrid)
 
 | Slot | Role | Type | Notes |
 |------|------|------|-------|
-| LMB | Light combo (3-4 hits) | Physical | Fire-infused punches, launcher on final hit |
-| AirLMB | Rising uppercut (1-2 hits) | Physical | Launch follow-up, dash-cancelable |
-| RMB | Charged heavy punch | Physical | ~15 dmg charged, ~10 uncharged |
-| AirRMB | Downward fire slam | Physical | Spike, 1 hit per flight |
-| Q | Round Bomb (projectile) | Ability | Zone / poke, medium range |
-| E | Dynamite Jump (launch) | Ability | Mobility / engage, vertical |
-| R | Dive Bomb (air slam) | Ability | Air-to-ground, area damage |
-| F | Big Boom (ult) | Ability | Big finisher, telegraphed wind-up |
+| LMB | Light combo (3 hits) | Physical | Punch → kick → fire uppercut (launcher) |
+| AirLMB | Air punch | Physical | Air combo filler |
+| RMB | Aerosol + Lighter (charge) | Ability | Charged heavy, cone flame zone denial |
+| AirRMB | Medium air kick | Physical | Medium knockback |
+| Q | Round Bomb (projectile) | Ability | Lobbed arc, explodes on impact — poke/zone |
+| E | Dynamite Jump | Ability | Rocket jump, vertical mobility, knockback on detonation — defensive + combo setup |
+| R | Dive Bomb | Ability | Air-to-ground slam, big damage, risky recovery — dash-invuln counterable |
+| F | Overclock (ult) | Ability | Self-buff 8s — all attacks have enhanced explosive effects |
 | Passive | — | — | (None yet) |
 
-**Gameplan**: rush down → land a CC → air combo → finisher on landing. High mobility, low range. Must commit to engage.
-
+**Gameplan**: poke with Q → go in with E → ground combo → R from air for burst. E knockback doubles as defensive peel. Zone denial with RMB. F is the "win neutral" steroid — no single big hit, makes everything scarier.
 ### Future characters
 
 When designing a new character, start from one of the 4 archetypes defined above, then fill the 8 ability slots (LMB, AirLMB, RMB, AirRMB, Q, E, R, F). Document in `docs/characters/<name>.md`.

@@ -14,7 +14,7 @@ public static partial class CharacterRegistry
             Class = CharacterClass.Bunny,
             DisplayName = "Bunny",
             CapsuleRadius = 0.6f,
-            CapsuleHeight = 1.5f,
+            CapsuleHeight = 1.8f,
             HurtboxRadius = 1f,
             Movement = new MovementStats
             {
@@ -54,9 +54,8 @@ public static partial class CharacterRegistry
                 new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
-            GlbPath = "res://assets/characters/bunny/bunny.glb",
             BakedDataPath = "res://data/bunny_skeleton.bin",
-            VisualScale = 1.5f,
+            VisualScale = 1.3f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,

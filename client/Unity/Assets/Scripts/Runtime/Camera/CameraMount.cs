@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Cinemachine;
+using UnityEngine.InputSystem;
 
 namespace SlopArena.Client.Camera
 {
@@ -22,6 +23,13 @@ namespace SlopArena.Client.Camera
             Cursor.lockState = CursorLockMode.Locked;
         }
 
+        private void Update()
+        {
+            if (_orbital == null) return;
+            float dy = Mouse.current.scroll.ReadValue().y;
+            if (Mathf.Abs(dy) > 0.001f)
+                _orbital.RadialAxis.Value -= dy * 0.05f;
+        }
 
         public void SetTarget(Transform target)
         {

@@ -1,0 +1,14 @@
+# camera
+- needs less movement vertically
+- mouse wheel needs to increase distance
+
+# states
+- right now it feels like character goes into fall state if Y changes at all. there nedds to be less sentisivity because there are micro
+changes in the platform ground. either we have a sensitivity param directly or we count a number of ticks because going into fall
+- double jump seems gone
+
+# respawn
+- respawning seems to change entityId and break projectile parent detection
+
+# characters
+- bunny seems too small, i tried with VisualScale but didn't manage to increase its size. i think the modal is at least 50cm taller than manki

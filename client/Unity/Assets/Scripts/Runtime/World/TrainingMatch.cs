@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System;
 using UnityEngine;
 using SlopArena.Shared;
 using SlopArena.Client.Entities;
@@ -40,6 +41,7 @@ namespace SlopArena.Client.World
         private ArenaDefinition _arenaDef;
         private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
+        private byte _npcLastDeaths;
 
         protected override void OnMatchStart()
         {
@@ -128,6 +130,7 @@ namespace SlopArena.Client.World
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
             if (_npcRenderer != null)
                 _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
+            _npcLastDeaths = 0;
 
             // Set NPC respawn position to same relative location
             _localSim.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ);
@@ -167,12 +170,24 @@ namespace SlopArena.Client.World
                 abilityAimYawRad: null,
                 abilityAimDistance: null,
                 canMove: null);
+            // NPC AI
+            var npcState = _localSim.GetState(NpcEntityId);
+            var playerState = _localSim.GetState(PlayerEntityId);
+            var npcInput = BuildNpcInput(npcState, playerState, _tick);
             // Tick
             _localSim.Tick(new Dictionary<ulong, InputState>
             {
                 { PlayerEntityId, input },
-                { NpcEntityId, new InputState() }
+                { NpcEntityId, npcInput }
             });
+            // Track NPC death for visual feedback
+            var npcStateAfter = _localSim.GetState(NpcEntityId);
+            if (npcStateAfter.Deaths != _npcLastDeaths)
+            {
+                _npcLastDeaths = npcStateAfter.Deaths;
+                if (_npcRenderer != null)
+                    _npcRenderer.OnDeath();
+            }
             _combatFeedback.OnTick();
             _hudManager?.Refresh();
 
@@ -193,6 +208,41 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
+        }
+        /// <summary>
+        /// Builds a synthetic InputState for the NPC dummy.
+        /// Computes world-space direction toward player.
+        /// Server auto-sets FacingYaw from movement velocity.
+        /// </summary>
+        private InputState BuildNpcInput(CharacterState npcState, CharacterState playerState, ulong tick)
+        {
+            // Direction from NPC to player (XZ plane, world space)
+            float dx = playerState.PX - npcState.PX;
+            float dz = playerState.PZ - npcState.PZ;
+            float distSq = dx * dx + dz * dz;
+            float dist = MathF.Sqrt(distSq);
+
+            // Speed: full >3m, stop inside 2m, half-speed in between
+            float speed = distSq > 9f ? 1f : (distSq < 4f ? 0f : 0.5f);
+
+            // Decompose toward-player direction into world-space MoveX (sin) and MoveY (cos)
+            float aimYaw = dist > 0.001f ? MathF.Atan2(dx, dz) : 0f;
+            float moveX = MathF.Sin(aimYaw) * speed;
+            float moveY = MathF.Cos(aimYaw) * speed;
+
+            // Periodically attack (every ~2 seconds = 120 ticks)
+            byte slot = (tick % 120 < 3) ? (byte)1 : (byte)0;
+
+            // Jump if player is on higher platform
+            bool jump = playerState.PY > npcState.PY + 1.5f && tick % 60 == 0;
+
+            return new InputState
+            {
+                MoveX = moveX,
+                MoveY = moveY,
+                ActiveSlot = slot,
+                Jump = jump,
+            };
         }
 
         private void OnDrawGizmos()

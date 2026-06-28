@@ -65,7 +65,7 @@ namespace SlopArena.Shared
         /// How far above the surface the character can be and still land.
         /// Must be small enough that a jump (VY ≈ 10) immediately breaks it in 1-2 frames.
         /// </summary>
-        private const float PlatformLandTolerance = 0.02f;
+        private const float PlatformLandTolerance = 0.1f;
 
         // ── MAIN ENTRY POINT ──
 
