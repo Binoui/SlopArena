@@ -46,6 +46,11 @@ namespace SlopArena.Shared.Abilities
                 float aimCos = MathF.Cos(s.AimYaw);
                 float aimSin = MathF.Sin(s.AimYaw);
 
+                // Read projectile params and apply buff bonuses
+                float projRadius = GetParam(def, "hitbox_radius", 0.6f);
+                float projDamage = GetParam(def, "damage", 8f);
+                ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
+
                 // Spawn projectile hitbox
                 Resolver.Spawn(new Hitbox
                 {
@@ -55,10 +60,10 @@ namespace SlopArena.Shared.Abilities
                     VX = hSpeed * aimSin,
                     VY = vSpeed,
                     VZ = hSpeed * aimCos,
-                    Radius = GetParam(def, "hitbox_radius", 0.6f),
+                    Radius = projRadius,
                     Shape = HitboxShape.Sphere,
                     EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
-                    Damage = GetParam(def, "damage", 8f),
+                    Damage = projDamage,
                     KnockbackForce = GetParam(def, "knockback_force", 10f),
                     KnockbackUpward = GetParam(def, "knockback_upward", 6f),
                     StunTicks = (ushort)GetParam(def, "stun_ticks", 14f),

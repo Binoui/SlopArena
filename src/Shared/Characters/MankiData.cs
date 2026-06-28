@@ -193,13 +193,13 @@ public static partial class CharacterRegistry
                     ["max_range"] = 12f,
                     ["hitbox_radius"] = 0.6f,
                     ["launch_offset_y"] = 1.2f,
-                    ["damage"] = 8f,
+                    ["damage"] = 6f,
                     ["knockback_force"] = 10f,
                     ["knockback_upward"] = 6f,
                     ["stun_ticks"] = 14f,
                     ["max_flight_ticks"] = 90f,
-                    ["explosion_radius"] = 2.5f,
-                    ["explosion_damage"] = 6f,
+                    ["explosion_radius"] = 3.0f,
+                    ["explosion_damage"] = 10f,
                     ["explosion_knockback_force"] = 6f,
                     ["explosion_knockback_upward"] = 4f,
                     ["explosion_stun_ticks"] = 10f,
@@ -210,7 +210,7 @@ public static partial class CharacterRegistry
             E = new ExplosiveMineSpec
             {
                 Name = "Dynamite Mine",
-                CooldownTicks = 30,
+                CooldownTicks = 120,
                 MineRadius = 0.3f,
                 MineDurationTicks = 180,
                 Stages = new AttackStage[]
@@ -240,25 +240,37 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 56, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 31, Radius = 0.8f, OffX = 0, OffY = 0.5f, OffZ = 1.5f, Damage = 14f, KnockbackForce = 18f, KnockbackUpward = 6f, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 6f, WarpRange = 15f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_r" },
                 SpecialEffectKeys = new[] { "MankiDiveBomb" },
+                Params = new()
+                {
+                    ["rise_velocity"] = 14f,
+                    ["aim_window_ticks"] = 30f,
+                    ["max_aim_range"] = 20f,
+                    ["plunge_speed"] = 45f,
+                    ["hitbox_radius"] = 3f,
+                    ["damage"] = 18f,
+                    ["knockback_force"] = 22f,
+                    ["knockback_upward"] = 8f,
+                    ["stun_ticks"] = 20f,
+                    ["hitbox_duration_ticks"] = 20f,
+                },
             },
 
             F = new AbilitySpec
             {
-                Name = "Big Boom",
+                Name = "Overclock",
                 CooldownTicks = 600,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 71, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 41, Radius = 1.2f, OffX = 0, OffY = 0.5f, OffZ = 1.5f, Damage = 20f, KnockbackForce = 22f, KnockbackUpward = 8f, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 6f, WarpRange = 15f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
-                },
+                Stages = System.Array.Empty<AttackStage>(),
                 AnimationNames = new[] { "spell_f" },
-                SpecialEffectKeys = new[] { "MankiBigBoom" },
+                SpecialEffectKeys = new[] { "MankiOverclock" },
+                Params = new()
+                {
+                    ["duration_ticks"] = 480f,   // 8s
+                },
             },
         };
     }

@@ -25,12 +25,13 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        (0, false) => new MankiLmbCombo(),     // LMB
+        (0, false) => new MankiLmbCombo(),     // LMB ground
+        (0, true) => null,                      // AirLMB — data-driven fallback (separate spec)
         (1, false) => new MankiAerosolFlame(), // RMB
         (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
-        // (3, _) => new MankiE(),             // E - TODO
-        // (4, _) => new MankiR(),             // R - TODO
-        // (5, _) => new MankiF(),             // F - TODO
+        (3, _) => null,                         // E — data-driven ExplosiveMineSpec
+        (4, _) => new MankiDiveBomb(),         // R — Dive Bomb
+        (5, _) => new MankiOverclock(),        // F — Overclock
         _ => null, // No ServerAbility = data-driven fallback
     };
 

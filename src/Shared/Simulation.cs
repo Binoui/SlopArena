@@ -329,6 +329,14 @@ namespace SlopArena.Shared
             if (s.Cooldown3 > 0) s.Cooldown3--;
             if (s.Cooldown4 > 0) s.Cooldown4--;
             if (s.Cooldown5 > 0) s.Cooldown5--;
+
+            // Buff timer
+            if (s.BuffRemainingTicks > 0)
+            {
+                s.BuffRemainingTicks--;
+                if (s.BuffRemainingTicks == 0)
+                    s.BuffActiveFlags = 0;
+            }
         }
 
         // ── HITSTUN + DI (Directional Influence) ──

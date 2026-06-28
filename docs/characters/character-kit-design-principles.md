@@ -219,8 +219,8 @@ Only one character is active in the codebase. Design others from scratch followi
 | AirRMB | Medium air kick | Physical | Medium knockback |
 | Q | Round Bomb (projectile) | Ability | Lobbed arc, explodes on impact — poke/zone |
 | E | Dynamite Jump | Ability | Rocket jump, vertical mobility, knockback on detonation — defensive + combo setup |
-| R | Dive Bomb | Ability | Air-to-ground slam, big damage, risky recovery — dash-invuln counterable |
-| F | Overclock (ult) | Ability | Self-buff 8s — all attacks have enhanced explosive effects |
+| R | Dive Bomb | Ability | Rise up, aim downward, then plunge into target zone. Risky recovery if baited; opponent can dash-invuln through it |
+| F | Overclock (ult) | Ability | Self-buff 8s — all attacks deal +3 bonus damage and +0.5m larger hitboxes |
 | Passive | — | — | (None yet) |
 
 **Gameplan**: poke with Q → go in with E → ground combo → R from air for burst. E knockback doubles as defensive peel. Zone denial with RMB. F is the "win neutral" steroid — no single big hit, makes everything scarier.
