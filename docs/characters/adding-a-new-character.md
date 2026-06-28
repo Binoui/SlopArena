@@ -1,8 +1,7 @@
 # Adding a New Character — Full Pipeline
 
-> SlopArena — Godot 4.6 C# (main branch)
+> SlopArena — Unity 6 C# (main branch)
 > Last updated: June 2026
-
 ---
 
 ## Overview
