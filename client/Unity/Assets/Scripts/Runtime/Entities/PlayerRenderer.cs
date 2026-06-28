@@ -123,14 +123,13 @@ namespace SlopArena.Client.Entities
         // ── Tracking state for change detection ──
 
         private CharacterState _lastState;
+        private ActionState _lastAnimState;
+        private byte _lastAttackSlot;
+        private byte _lastComboStage;
         private bool _wasGrounded = true;
-
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
-        private int _animFrame;           // current frame index within the active clip
-        private string _lastAnimClip = ""; // clip name from last tick (to detect transitions)
-        private ushort _startLockTicks;
 
         /// <summary>
         /// Set baked skeleton data for frame-accurate animation.
@@ -163,102 +162,74 @@ namespace SlopArena.Client.Entities
             _lastState = state;
         }
 
-        // ── Animation State Machine ──
-
-        /// <summary>
-        /// Resolve the target animation clip name from current character state.
-        /// Mirrors the logic in ServerSimulation.Tick entity-list building.
-        /// </summary>
-        private string ResolveAnimClip(CharacterState state)
-        {
-            if (state.State == ActionState.Dashing) return "Dash";
-            if (state.State == ActionState.Hitstun) return "Hitstun";
-            if (state.State == ActionState.Attacking && state.AttackSlot > 0 && _charDef != null)
-            {
-                bool airborne = !state.IsGrounded;
-                var spec = _charDef.GetSlotAbility(state.AttackSlot - 1, airborne);
-                int stageIdx = Mathf.Min(state.ComboStage, (byte)(spec.Stages.Length - 1));
-                if (stageIdx >= 0 && stageIdx < spec.AnimationNames.Length)
-                    return spec.AnimationNames[stageIdx];
-                return "Melee";
-            }
-            if (state.State == ActionState.JumpSquat) return "Jump";
-            if (!state.IsGrounded) return state.VY > 0f ? "Jump" : "Fall";
-            float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
-            if (hSpeed > _runSpeedThreshold) return "Movement";
-            return "Movement";
-        }
+        // ── Single-layer parameter-driven Animator ──
+        //
+        // All states (Movement blend, Jump, Fall, Land, Dash, Hitstun, abilities)
+        // live in one state machine. Transitions driven by triggers + params.
+        // On combat end, Idle trigger force-clears back to Movement.
 
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animator == null || _animator.runtimeAnimatorController == null)
                 return;
 
-            bool isGrounded = state.IsGrounded;
-
-            // DEBUG: trace state and ground detection
-            //Debug.Log($"[Anim] {_entityName}({_entityId}) Y={state.PY:F3} VY={state.VY:F3} grounded={isGrounded} state={state.State} warp={state.WarpSpeed:F2}");
-
-            _animator.SetBool("IsGrounded", isGrounded);
-            _animator.SetBool("IsWarping", state.WarpSpeed > 0f);
-
+            // ── Movement params ──
+            _animator.SetBool("IsGrounded", state.IsGrounded);
             float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
             _animator.SetFloat("Speed", hSpeed);
-            _animator.SetBool("IsMoving", hSpeed > _runSpeedThreshold);
 
-            // Resolve target animation clip
-            string targetClip = ResolveAnimClip(state);
+            // Jump trigger — fire once when entering JumpSquat
+            if (state.State == ActionState.JumpSquat && _lastAnimState != ActionState.JumpSquat)
+                _animator.SetTrigger("Jump");
 
-            // Frame-accurate driving for discrete animation states
-            // Movement (idle/run blend tree) uses Play to enter the state, then Speed float drives the blend
-            if (targetClip == "Movement")
+            // ── Combat ──
+            bool isCombat = state.State == ActionState.Attacking
+                || state.State == ActionState.Dashing
+                || state.State == ActionState.Hitstun;
+
+            bool stateChanged = state.State != _lastAnimState
+                || (state.State == ActionState.Attacking && (
+                    state.AttackSlot != _lastAttackSlot || state.ComboStage != _lastComboStage));
+
+            if (isCombat && stateChanged)
             {
-                if (_lastAnimClip != targetClip)
+                // Entering combat — reset triggers, then fire the right one
+                _animator.ResetTrigger("Attack");
+                _animator.ResetTrigger("Dash");
+                _animator.ResetTrigger("Hitstun");
+                _animator.ResetTrigger("Idle");
+
+                if (state.State == ActionState.Attacking)
                 {
-                    _animator.Play("Movement", 0, 0f);
-                    _lastAnimClip = targetClip;
+                    _animator.SetInteger("AttackSlot", state.AttackSlot - 1);
+                    _animator.SetInteger("ComboStage", state.ComboStage);
+                    _animator.SetTrigger("Attack");
+                }
+                else if (state.State == ActionState.Dashing)
+                {
+                    _animator.SetTrigger("Dash");
+                }
+                else if (state.State == ActionState.Hitstun)
+                {
+                    _animator.SetTrigger("Hitstun");
                 }
             }
-            else
+
+            else if (!isCombat && 
+                (_lastAnimState == ActionState.Attacking ||
+                 _lastAnimState == ActionState.Dashing ||
+                 _lastAnimState == ActionState.Hitstun))
             {
-                // Tick-driven and baked-frame fallback for discrete animation states
-                if (_lastAnimClip != targetClip)
-                {
-                    _animFrame = 0;
-                    _lastAnimClip = targetClip;
-                    _startLockTicks = state.AnimLockTicks;
-                }
-
-                // Compute normalized time:
-                // - If AnimLockTicks is set (attack, hitstun, dash): use lock ratio for tick-exact timing
-                // - Otherwise: fall back to baked frame count
-                float normalizedTime;
-                if (_startLockTicks > 0)
-                {
-                    // _startLockTicks captured the initial value; state.AnimLockTicks counts down.
-                    // First frame: (start - (start-1)) / start ≈ 0.  Last frame: (start - 0) / start = 1.
-                    float elapsed = _startLockTicks - state.AnimLockTicks;
-                    normalizedTime = Mathf.Clamp01(elapsed / _startLockTicks);
-                }
-                else
-                {
-                    _animFrame++;
-                    int totalFrames = 30;
-                    if (_bakedData != null)
-                    {
-                        int idx = _bakedData.FindAnimIndex(targetClip);
-                        if (idx >= 0)
-                            totalFrames = _bakedData.Animations[idx].FrameCount;
-                    }
-                    normalizedTime = totalFrames > 0 ? (_animFrame % totalFrames) / (float)totalFrames : 0f;
-                }
-
-                _animator.Play(targetClip, 0, normalizedTime);
-                _animator.Update(0f);
+                // Left combat state — force-clear to Movement
+                _animator.SetTrigger("Idle");
             }
 
-            _wasGrounded = isGrounded;
+            _lastAnimState = state.State;
+            _lastAttackSlot = state.AttackSlot;
+            _lastComboStage = state.ComboStage;
+            _wasGrounded = state.IsGrounded;
         }
+
 
         /// <summary>
         /// Reset animation state to defaults. Useful on respawn.
@@ -267,10 +238,10 @@ namespace SlopArena.Client.Entities
         {
             _animator.Rebind();
             _wasGrounded = true;
-            _animFrame = 0;
-            _lastAnimClip = "";
-            _startLockTicks = 0;
             _lastState = default;
+            _lastAnimState = default;
+            _lastAttackSlot = 0;
+            _lastComboStage = 0;
         }
 
         // ── Gizmos ──
