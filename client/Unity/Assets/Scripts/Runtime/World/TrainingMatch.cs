@@ -235,6 +235,10 @@ namespace SlopArena.Client.World
                                 keyHeld = _inputController.IsQKeyHeld;
                                 keyDiagnostic = $"Q held={keyHeld}";
                                 break;
+                            case 4:
+                                keyHeld = _inputController.IsRKeyHeld;
+                                keyDiagnostic = $"R held={keyHeld}";
+                                break;
                             default:
                                 keyHeld = true;
                                 keyDiagnostic = "default=true";

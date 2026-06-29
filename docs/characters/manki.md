@@ -6,16 +6,16 @@
 
 ## Concept
 
-A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs, dynamite, aerosols. Wears overalls stained with gunpowder and hole-ridden work gloves. A small yellow hard hat appears during the dive bomb.
+A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs, dynamite, aerosols. Wears overalls stained with gunpowder and hole-ridden work gloves.
 
 ## Archetype
 
 **Projectile-heavy rushdown / Explosive bomber** — hybrid between explosive artillery and go-in-for-the-kill brawler.
 - Poke with round bombs, zone with aerosol flame, go in with dynamite jump
-- Vertical mobility is a resource — use E to launch, R to return
-- Gameplan: poke with Q → go in with E → ground combo → R from air for burst
+- Vertical mobility is a resource — use E to launch, R to rain from above
+- Gameplan: poke with Q → go in with E → ground combo → R from air for artillery burst
 - E's knockback doubles as a defensive tool: detonate to break an engage
-- R is a risky recovery option — high damage, easier to land from air, but opponent can dash-invuln through it
+- R is a ranged artillery option from height advantage. Rise up, aim ground target, fire explosive shell. AoE for zoning, direct hits for burst damage.
 - F is a "win neutral" steroid, not a single big hit
 
 ## Palette
@@ -38,14 +38,14 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | **Air RMB** | Medium kick | Simple air kick | Medium knockback |
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
 | **E** | Dynamite Jump | Throw dynamite → explosion → self-propulsion | Rocket jump, vertical mobility + knockback on detonation (defensive + combo setup) |
-| **R** | Dive Bomb | Put on hard hat, jetpack up → aim downward → plunge into target zone → AoE explosion | Rise up, aim downward, then plunge into target zone. Risky recovery if baited; opponent can dash-invuln through it |
+| **R** | Bazooka | Rise up 5m, aim a ground indicator downward, fire a bazooka shell that explodes on ground impact | Ranged artillery from height advantage. Rise 5m from ground (less if already airborne). Fire a ballistic explosive shell toward aimed ground position. Shell explodes on entity hit or ground contact. |
 | **F** | Overclock | Mad scientist inject — eyes glow red, crackling energy | Self-buff 8s: all attacks deal +3 bonus damage and +0.5m larger hitboxes (LMB, RMB, Q bombs) |
 
 ## Design Notes
 
 - **RMB**: inspired by improvised flamethrower — aerosol + lighter. During charge, Manki frantically shakes the bomb. On release, cone-shaped flame jet.
 - **E**: rocket jump. On ground = plant dynamite, propelled upward. In air = drop dynamite below, propelled upward. Explosion has knockback — serves as defensive peel (detonate to break enemy engage) and combo setup. Hitbox needs to be bigger than visual-only.
-- **R**: Dive Bomb. Manki rises upward, stalls to aim at a ground target, then plunges head-first. AoE explosion on impact at the target zone. High damage but telegraphed — opponent can dodge with dash invincibility. Risky recovery option if baited.
+- **R**: Bazooka. Manki rises up ~5m (skips rise if already airborne), hovers to aim a ground indicator, then fires a ballistic explosive shell toward the aimed point. Shell explodes on entity contact or ground impact. AoE explosion for zoning. Projectile has slight gravity arc.
 - **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks deal +3 bonus damage and have +0.5m larger hitboxes. No single big hit, makes his whole kit scarier.
 
 ## Animation Names (to create)
@@ -62,7 +62,9 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | `spell_q` | Throw round bomb | Q (throw animation) |
 | `spell_e_ground` | Plant dynamite on ground | E ground |
 | `spell_e_air` | Drop dynamite below | E air |
-| `spell_r` | Dive bomb helmet | R |
+| `spell_r_start` | Bazooka equip / rise up | R start (rise) |
+| `spell_r_loop` | Bazooka hover aim | R aim (loop) |
+| `spell_r_end` | Bazooka fire recoil | R fire (end) |
 | `spell_f` | Overclock injection | F (ult) |
 
 ## Files

@@ -32,8 +32,7 @@ SlopArena/
 │   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
 │   │   ├── MankiRoundBomb.cs    ← Manki Q: hold-to-aim parabolic bomb
 │   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
-│   │   ├── AimedGroundAbility.cs← Reusable base: rise → aim → plunge pattern
-│   │   ├── MankiDiveBomb.cs     ← Manki R: air-to-ground slam
+│   │   ├── MankiBazooka.cs      ← Manki R: rise-aim-fire bazooka
 │   │   └── MankiOverclock.cs    ← Manki F: self-buff 8s
 │   ├── Simulation.cs        ← shared logic
 │   ├── SpellResolver.cs     ← hitbox collision math

@@ -494,6 +494,42 @@ R:2.0           (radius)
 
 ---
 
+---
+
+### 🌍 Ground collision (projectile explosions)
+
+After entity collision checks in `SpellResolver.Tick()`, a separate pass
+`CheckGroundCollision(ArenaDefinition)` samples the arena heightmap at each
+projectile's XZ position. If the projectile's bottom edge (`Y - Radius`) has
+reached or passed the terrain surface, the projectile's explosion spawns at
+ground height and the projectile is deactivated.
+
+This applies to all gravity-affected projectiles (`Gravity > 0`) with an
+`Explosion` config — covers both Q round bombs and R bazooka shells.
+
+```csharp
+public void CheckGroundCollision(ArenaDefinition arena)
+{
+    for (int i = _hitboxes.Count - 1; i >= 0; i--)
+    {
+        var hb = _hitboxes[i];
+        if (!hb.Active || !hb.Explosion.HasValue || hb.Gravity <= 0f) continue;
+
+        float groundY = arena.Heightmap.Sample(hb.X, hb.Z);
+        if (groundY == float.MinValue) groundY = 0f;
+
+        // Sphere bottom (Y - Radius) below terrain → explode
+        if (hb.Y - hb.Radius > groundY) continue;
+
+        var exp = hb.Explosion.Value;
+        _pendingExplosions.Add((hb.X, groundY, hb.Z, exp, hb.OwnerId));
+        _hitboxes.RemoveAt(i);
+    }
+}
+```
+
+---
+
 ## 📊 Performance notes
 
 - **SpellResolver.Tick()**: O(H × E) where H = active hitboxes, E = entities

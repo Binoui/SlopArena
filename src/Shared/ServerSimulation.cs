@@ -454,11 +454,8 @@ namespace SlopArena.Shared
 		private void ProcessProjectileExplosions()
 		{
 			// ── Step 3b: Projectile explosions (entity hit + ground impact) ──
-			// Ground collision for remaining active projectiles
-			float floorY = _arena.Heightmap.Data != null && _arena.Heightmap.Data.Length > 0
-				? _arena.Heightmap.Data.Min()
-				: 0f;
-			_spellResolver.CheckGroundCollision(floorY);
+            // Ground collision for remaining active projectiles (samples heightmap per projectile)
+            _spellResolver.CheckGroundCollision(_arena);
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
