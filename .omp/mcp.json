@@ -6,5 +6,5 @@
       "url": "http://localhost:26356/mcp"
     }
   },
-  "disabledServers": ["unity-mcp"]
+  "disabledServers": []
 }
