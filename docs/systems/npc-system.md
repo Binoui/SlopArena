@@ -183,7 +183,7 @@ private void ExecuteAttack()
 3. **PlayerController.BuildInputState()**:
    - Checks if NPC with AI input
    - If yes: uses injected input
-   - If no: reads from Godot Input (human player)
+   - If no: reads from Unity Input (human player)
 
 ### Step 3: Advanced Behaviors
 
