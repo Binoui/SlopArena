@@ -3,10 +3,10 @@
 ## About the Dev
 
 - French solo dev, English only communication.
-- Uses Godot 4.6.3 C# with .NET 8.
+- Uses Unity 6 C# with .NET 8. Shared code (`src/Shared/`) targets netstandard2.1, compiled as a DLL imported by Unity via `client/Unity/Assets/Plugins/SlopArena.Shared/`.
 - Uses Blender 5.1 (detected from `~/.config/blender/5.1/extensions/`).
 - Server-authoritative architecture: the server simulation is always the source of truth, never use client-side hacks (position overrides, state checks) for gameplay mechanics.
-- Preference: `dotnet build --nologo` after every change.
+- Preference: `dotnet build src/Shared/ --nologo` after every Shared change (auto-copies DLL to Unity Plugins).
 - Squash commits, then push.
 - NEVER install anything without asking.
 - "Stop saying no to my choices" was a direct correction. Implement numeric choices without arguing. Suggest once only if correctness issue, then implement their value.
@@ -20,72 +20,60 @@ SlopArena is a 3D platform fighter (Smash/DKO-style) with a server-authoritative
 ### Architecture
 
 ```
-Godot Client (renderer + prediction)    ServerApp (.NET console, authority)
+Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
        │                                          │
        │  UDP localhost:9876                      │
        │                                          │
-       ├─ Send(entityId + tick + InputState) ────►│
+       ├─ InputState (22 bytes, 60Hz) ───────────►│
        │                                          ├─ ServerSimulation.Tick()
-       │◄─────────────────────────────────────────├─ Send(entityId + tick + CharacterState)
+       │◄─────────────────────────────────────────├─ CharacterState (44 bytes per entity)
 ```
 
-- `Shared/` is pure C# with zero Godot dependencies. No `Godot.*` imports.
-- All math uses `System.MathF`, not Godot's `Mathf`.
+- `Shared/` is pure C# with zero Unity dependencies. No `UnityEngine.*` imports.
 - All tick durations use `ushort` (max 65535 ticks = ~18 minutes).
 - Packet serialization uses `System.Buffers.Binary.BinaryPrimitives` (little-endian).
-- ClientInputPacket = 14 bytes, CharacterStatePacket = 39 bytes (includes MatchState at offset 38).
+- ClientInputPacket = 22 bytes, CharacterStatePacket = 44 bytes per entity.
 
 ## Key Conventions
 
-### Godot UI
-- Use `TransitionTo(clear+push)` for forward navigation, never bare `PushScreen`.
-- Button font_color = White.
-- Export: `embed_pck=true`, `embed_build_outputs=true`.
-- Linux → Windows cross-compile: `embed_build_outputs` is BROKEN (needs `data_*` folder).
-- CI: `firebelley/godot-export@v8.0.0`.
-- `.bin` files = `EmbeddedResource` in `.csproj`.
-- Exclude `tools/` from exports.
-- UI overwrites `export_presets.cfg` — make ALL changes through the Godot Export UI.
+### Project Structure
+- `src/Shared/` — canonical shared code (netstandard2.1). Real .cs files, single source of truth.
+- `client/Unity/Assets/Plugins/SlopArena.Shared/` — compiled DLL, auto-copied via post-build.
+- `dotnet build src/Shared/` → rebuilds DLL and copies to Unity Plugins.
+- `client/Unity/Assets/Scripts/Runtime/` — Unity MonoBehaviour scripts (Input, Renderer, Camera, UI).
+- `tests/Shared.Tests/` — xUnit tests for simulation.
 
-### FSM
-- FallState animName = "jump" (no fall clip).
-- JumpState: 3-tick ground → run/idle.
-- LandingState removed (ground snap removed — server no longer sets PY = groundY on landing).
-- Hit reaction anims loop (Linear).
-- Godot 4.6.3 rejects self-transitions — fix: `start_offset=0`.
-- All FSM grounded checks use `Movement.IsGrounded` (reads server `CharacterState.IsGrounded`), NOT `Player.IsOnFloor()`.
-- Use `AnimPlayback.Travel()`, not bare `Play()`.
+### Unity Conventions
+- Use `MonoBehaviour.Update/FixedUpdate`, not Godot `_Process`/`_PhysicsProcess`.
+- Animator Controller with trigger-driven 1-layer state machine.
+- Input via Unity InputSystem (`Keyboard.current`, `Mouse.current`).
+- Button text color = White.
 
 ### Movement
-- LungeForce on AttackStage implements forward burst in AbilityExecutor.TryStart.
-- ProcessNormalMovement no longer runs during Attacking (no friction killing lunge).
-- Warp is server-side via ActionState.Warping + Simulation.ProcessWarp.
-- Client sets warp target on MovementComponent.State, synced to local sim.
-- Camera is a world sibling (instantiated by Main.cs), not a child of PlayerController. Camera yaw is absolute — mouse only, never follows player facing.
-- Movement is camera-relative 8-direction (snapped to 45° increments).
-- Ground arrow indicator at feet shows input direction.
+- LungeForce on AttackStage implements forward burst.
+- No normal movement processing during Attacking state.
+- Warp is server-side via Simulation.ProcessWarp.
+- Camera is a world sibling (instantiated by TrainingMatch), absolute yaw — mouse only.
 - Double jump for all classes, dash replaces old air-dodge.
 
 ### Combat
 - Smash-style % system (no HP). DamagePercent 0-999.
 - Knockback scales: `kbScale = 1 + (DamagePercent * 0.01)`.
-- Dual-path ability system: data-driven AbilityExecutor for simple attacks, ServerAbility classes for complex abilities (BackflipRoll, MeleeCombo).
-- Hit detection via pure math (CombatMath.cs), never Godot physics queries on server.
-- Platform-aware ground collision via PlatformDef[] + GetGroundSurfaceY.
+- ServerAbility lifecycle (OnStart/Tick/OnEnd) for complex abilities; data-driven HitboxEvents for simple attacks.
+- Hit detection via pure math (CombatMath.cs, SpellResolver.cs) — no Unity physics queries on server.
 
 ### Input
-- `InputController._pendingSlotPress` (set by _UnhandledInput) → `BuildInputState()` → `input.ActiveSlot`.
-- Sim handles input buffering via `InputBufferWindow=6` ticks.
+- InputController.Poll() + BuildInputState() → SlopArena.Shared.InputState.
+- Sim handles input buffering via InputBufferWindow=6 ticks.
 - Entity IDs: player=1, NPCs=100-104.
 
 ### Animation
-- GLB embedded animations + .tscn wrapper approach.
+- Unity Animator Controller with trigger-driven states.
 - Mixamo FBX exports in cm, Blender uses m — 0.01 scale factor.
 - Mixamo Control Rig constraints on mixamorig bones copy FROM helpers TO mixamorig (reverse direction).
-- Blender 5.1 uses layered actions API (`action.layers[0].strips[0].channelbags[0].fcurves`).
-- `AnimationTreeBuilder` generates FSM from `CharacterDefinition` data at runtime, no .tscn sub-resource editing.
-- Animation state crossfade all at 0.15s.
-- All clip overrides via `AnimationClipConfig` struct.
+- Blender 5.1 uses layered actions API.
+- CharacterAnimationConfig ScriptableObject maps animation names to AnimationClips.
+
 
 ### Debugging Protocol
 1. State the problem (1-2 sentences)
