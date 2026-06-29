@@ -24,6 +24,10 @@ namespace SlopArena.Client.Input
         public bool JumpJustPressed { get; private set; }
         public bool DashJustPressed { get; private set; }
 
+        /// <summary>Whether the Q key is currently held down (for aiming release detection).</summary>
+        public bool IsQKeyHeld { get; private set; }
+        /// <summary>Whether the right mouse button is currently held down (for RMB charge).</summary>
+        public bool IsRmbHeld { get; private set; }
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;
@@ -35,7 +39,6 @@ namespace SlopArena.Client.Input
         // ── Previous-frame held state (for manual edge detection) ──
         private bool _previousSpaceHeld;
         private bool _previousShiftHeld;
-
         // ════════════════════════════════════════════════════════════════
         //  AI control
         // ════════════════════════════════════════════════════════════════
@@ -99,6 +102,18 @@ namespace SlopArena.Client.Input
                 _pendingSlotPress = 5;
             else if (kb.fKey.wasPressedThisFrame)
                 _pendingSlotPress = 6;
+
+            // Track held keys for aiming release detection
+            if (!_aiControlled)
+            {
+                IsQKeyHeld = kb.qKey.isPressed;
+                IsRmbHeld = mouse != null && mouse.rightButton.isPressed;
+            }
+            else
+            {
+                IsQKeyHeld = false;
+                IsRmbHeld = false;
+            }
         }
 
         /// <summary>

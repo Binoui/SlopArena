@@ -14,7 +14,10 @@
     "com.unity.modules.particlesystem": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
     "com.unity.modules.uielements": "1.0.0",
-    "com.ivanmurzak.unity.mcp": "0.82.2"
+    "com.ivanmurzak.unity.mcp": "0.82.2",
+    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.8",
+    "com.ivanmurzak.unity.mcp.cinemachine": "1.0.7",
+    "com.ivanmurzak.unity.mcp.animation": "1.2.22"
   },
   "scopedRegistries": [
     {

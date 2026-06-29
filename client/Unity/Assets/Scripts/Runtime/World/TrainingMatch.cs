@@ -8,9 +8,15 @@ using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
-
+using UnityEngine.InputSystem;
 namespace SlopArena.Client.World
 {
+    public enum NpcAiMode
+    {
+        Attack,
+        Idle
+    }
+    
     public class TrainingMatch : MatchBase
     {
         [Header("Entities")]
@@ -31,8 +37,14 @@ namespace SlopArena.Client.World
         [Header("Debug")]
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
+        [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Attack;
 
-        [Header("HUD")]
+        [Header("Aiming")]
+        [SerializeField] private AimIndicator _aimIndicator;
+        [SerializeField] private LayerMask _aimGroundMask = 1;
+        private float _cachedCameraYaw;
+        private float _cachedCameraPitch;
+        private bool _isAimingThisTick;
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
@@ -144,6 +156,28 @@ namespace SlopArena.Client.World
                 _cameraMount.ResetView(_playerRenderer.transform);
             }
 
+            // Initialize aim indicator (auto-create if not wired in Inspector)
+            if (_aimIndicator == null)
+            {
+                var go = new GameObject("AimIndicator");
+                go.transform.SetParent(transform, false);
+                _aimIndicator = go.AddComponent<AimIndicator>();
+                Debug.Log("[TrainingMatch] Auto-created AimIndicator (no Inspector wiring needed)");
+            }
+            _aimIndicator.SetCharacter(_playerRenderer.transform, playerDef.CapsuleHeight);
+            {
+                var qSpec = playerDef.GetSlotAbility(2, false);
+                var p = qSpec?.Params;
+                float maxRange = p?.GetValueOrDefault("max_range", 12f) ?? 12f;
+                _aimIndicator.SetMaxRange(maxRange);
+                _aimIndicator.SetAbilityParams(
+                    p?.GetValueOrDefault("gravity", 30f) ?? 30f,
+                    p?.GetValueOrDefault("launch_angle", 30f) ?? 30f,
+                    p?.GetValueOrDefault("launch_offset_y", 1.2f) ?? 1.2f
+                );
+            }
+            _aimIndicator.gameObject.SetActive(true);
+
             Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
         }
 
@@ -152,6 +186,17 @@ namespace SlopArena.Client.World
             _inputController.Poll();
             if (_showHitboxes && _localSim != null)
                 DrawHitboxDebug();
+
+            if (_isAimingThisTick && _cameraMount != null)
+            {
+                _cameraMount.SetCameraYawDeg(_cachedCameraYaw);
+                _cameraMount.SetCameraPitchDeg(_cachedCameraPitch);
+            }
+            else if (_cameraMount != null)
+            {
+                _cachedCameraYaw = _cameraMount.GetCameraYawDeg();
+                _cachedCameraPitch = _cameraMount.GetCameraPitchDeg();
+            }
         }
 
         protected override void OnMatchFixedUpdate()
@@ -164,23 +209,97 @@ namespace SlopArena.Client.World
             if (slot > 0)
                 Debug.Log($"[Input] slot={slot} animLock={_localSim.GetState(PlayerEntityId).AnimLockTicks} tick={_tick}");
             bool isAiming = false;
+            byte aimingSlot = 0;
             {
                 var ps = _localSim.GetState(PlayerEntityId);
                 if (ps.State == ActionState.Attacking && ps.AttackSlot > 0)
                 {
-                    var spec = _playerDef.GetSlotAbility(ps.AttackSlot - 1, !ps.IsGrounded);
+                    byte slotIdx = (byte)(ps.AttackSlot - 1);
+                    var spec = _playerDef.GetSlotAbility(slotIdx, !ps.IsGrounded);
                     if (spec != null && (spec.Behavior == AbilityBehavior.AimedProjectile || spec.Behavior == AbilityBehavior.ChargeAttack))
-                        isAiming = true;
+                    {
+                        // Check if the activation key is still held
+                        bool keyHeld;
+                        string keyDiagnostic;
+                        switch (slotIdx)
+                        {
+                            case 0:
+                                keyHeld = Mouse.current != null && Mouse.current.leftButton.isPressed;
+                                keyDiagnostic = $"LMB held={keyHeld} mouse={(Mouse.current != null ? "ok" : "null")}";
+                                break;
+                            case 1:
+                                keyHeld = _inputController.IsRmbHeld;
+                                keyDiagnostic = $"RMB held={keyHeld}";
+                                break;
+                            case 2:
+                                keyHeld = _inputController.IsQKeyHeld;
+                                keyDiagnostic = $"Q held={keyHeld}";
+                                break;
+                            default:
+                                keyHeld = true;
+                                keyDiagnostic = "default=true";
+                                break;
+                        }
+                        // Debug.Log($"[Aim] tick={_tick} slot={slotIdx} {keyDiagnostic} spec={spec.Behavior}");
+                        if (keyHeld)
+                        {
+                            isAiming = true;
+                            aimingSlot = slotIdx;
+                        }
+                        else
+                        {
+                            // Debug.Log($"[Aim] tick={_tick} key NOT held — aiming blocked");
+                        }
+                    }
+                    else
+                    {
+                        // Debug.Log($"[Aim] tick={_tick} spec={(spec?.Behavior.ToString() ?? "null")} is not AimedProjectile");
+                    }
+                }
+                else
+                {
+                    // Debug.Log($"[Aim] tick={_tick} NOT attacking: state={ps.State} slot={ps.AttackSlot}");
                 }
             }
+            _isAimingThisTick = isAiming;
+
+            // During aiming, update the ground indicator and get aim data
+            float? abilityAimYawRad = null;
+            ushort? abilityAimDistance = null;
+
+            // Always capture aim data from indicator BEFORE SetAiming resets _isAiming
+            if (_aimIndicator != null && _aimIndicator.IsAiming)
+            {
+                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
+            }
+
+            if (isAiming && _aimIndicator != null)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+
+                _aimIndicator.SetAiming(true);
+                _aimIndicator.UpdateAim();
+            }
+            else
+            {
+                if (_aimIndicator != null)
+                    _aimIndicator.SetAiming(false);
+                if (Cursor.lockState != CursorLockMode.Locked)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+            }
+
             var (input, _, _) = _inputController.BuildInputState(
                 _cameraMount,
                 _playerRenderer.transform.eulerAngles.y,
                 isNPC: false,
                 isAiming: isAiming,
                 slot,
-                abilityAimYawRad: null,
-                abilityAimDistance: null,
+                abilityAimYawRad: abilityAimYawRad,
+                abilityAimDistance: abilityAimDistance,
                 canMove: null);
             // NPC AI
             var npcState = _localSim.GetState(NpcEntityId);
@@ -227,6 +346,26 @@ namespace SlopArena.Client.World
         /// Server auto-sets FacingYaw from movement velocity.
         /// </summary>
         private InputState BuildNpcInput(CharacterState npcState, CharacterState playerState, ulong tick)
+        {
+            return _npcAiMode switch
+            {
+                NpcAiMode.Idle => BuildIdleInput(),
+                _ => BuildAttackInput(npcState, playerState, tick),
+            };
+        }
+
+        private static InputState BuildIdleInput()
+        {
+            return new InputState
+            {
+                MoveX = 0f,
+                MoveY = 0f,
+                ActiveSlot = 0,
+                Jump = false,
+            };
+        }
+
+        private static InputState BuildAttackInput(CharacterState npcState, CharacterState playerState, ulong tick)
         {
             // Direction from NPC to player (XZ plane, world space)
             float dx = playerState.PX - npcState.PX;
