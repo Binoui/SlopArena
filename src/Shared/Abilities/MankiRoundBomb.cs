@@ -16,7 +16,7 @@ namespace SlopArena.Shared.Abilities
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            s.AnimIndex = 0;
+            AnimIndex = 0;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
             s.IsAiming = true;
@@ -37,7 +37,7 @@ namespace SlopArena.Shared.Abilities
             {
                 if (s.AttackElapsedTicks > 8 && s.AnimIndex != 1)
                 {
-                    s.AnimIndex = 1;
+                    AnimIndex = 1;
                     if (dbg) Simulation.OnDebugLog?.Invoke(
                         $"[MankiQ] Enter loop: ticks={s.AttackElapsedTicks} charge={s.ChargeTicks}");
                 }
@@ -51,7 +51,7 @@ namespace SlopArena.Shared.Abilities
                     _cachedAimDistance = s.AimTargetDistance;
                     _cachedAimYaw = s.AimYaw;
                     s.ComboStage = 1;
-                    s.AnimIndex = 2;
+                    AnimIndex = 2;
                     s.AttackElapsedTicks = 0;
                 }
                 return;

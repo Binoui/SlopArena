@@ -20,7 +20,7 @@ public abstract class AimedGroundAbility : ServerAbility
 
         s.State = ActionState.Attacking;
         s.AttackSlot = (byte)(Slot + 1);
-        s.AnimIndex = 0;
+        AnimIndex = 0;
         s.IsAiming = true;
 
         float riseVelocity = GetParam(def, "rise_velocity", 12f);

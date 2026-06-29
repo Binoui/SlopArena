@@ -72,7 +72,7 @@ public class PhysicsTests
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = GroundPx;
+        state.PY = 2f; // well above ground snap window (0.75), so gravity is the only VY modifier
         state.IsGrounded = false;
         state.JumpsLeft = 0;
         state.VY = 5f;

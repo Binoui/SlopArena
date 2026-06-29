@@ -35,18 +35,9 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
-│  ServerAbility (base class)                          │
-│  ┌────────────────────────────────────────────────┐ │
-│  │ OnStart(ref state, def)  // called once        │ │
-│  │ Tick(ref state, input)   // called per tick   │ │
-│  │ OnEnd(ref state)         // natural end only  │ │
-│  │                                                │ │
-│  │ Helpers:                                       │ │
-│  │ - SetVelocityInFacing()                        │ │
-│  │ - SpawnHitbox()                                │ │
-│  │ - GetParam(key, fallback)                      │ │
-│  │ - EndAbility()                                 │ │
-│  └────────────────────────────────────────────────┘ │
+│  │ OnStart(ref state, def)  // called once; set AnimIndex via AnimIndex property   │
+│  │ Tick(ref state, input)   // called per tick; set AnimIndex on ability instance  │
+│  │ OnEnd(ref state)         // natural end only; no interrupt callback   │
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
@@ -166,32 +157,40 @@ E = new AbilitySpec
 }
 ```
 
-## Lifecycle Details
+### AnimIndex — Set on Ability Instance (Not Struct Field)
+
+`AnimIndex` is a property on `ServerAbility` (the base class). This is the source
+of truth. Set it in `OnStart` and `Tick`:
+```csharp
+AnimIndex = 2;  // sets the property on the ability instance
+```
+
+`ActivateAbility` and `TickAbilities` sync this to `CharacterState.AnimIndex` via
+`state.AnimIndex = ability.AnimIndex`. Writing `s.AnimIndex` directly would be
+overwritten on the next sync.
+
+**Bug history:** Several abilities originally wrote `s.AnimIndex = X` (the struct field),
+which was silently overwritten by the sync. Fixed by changing all sites to `AnimIndex = X`.
+There is only one write path: the ability instance property.
 
 ### OnStart
 - Called once when ability activates
-- Set initial state (State, AnimLockTicks, AnimIndex)
+- Set initial state (State, AnimLockTicks), and AnimIndex via `AnimIndex = X` (ability property, synced to struct)
 - Apply initial velocity if needed
 - Initialize private fields
-
-### Tick
-- Called every sim tick while active
-- Check `s.AttackElapsedTicks` for timing
-- Spawn hitboxes at specific ticks
-- Apply per-tick movement
-- Check for combo chains (read `input.ActiveSlot`)
-- Call `EndAbility()` when done
-
+ 
 ### OnEnd
 - Called ONLY on natural completion (NOT interruption)
 - Override to apply lingering effects
 - Cooldown is applied automatically by ServerSimulation
 
 ### Interruption
-- Hitstun, death, or new ability activation
-- OnEnd is NOT called
+- Hitstun, death, or new ability activation → OnEnd NOT called
 - Ability dropped from `_activeAbilities`
 - Velocity preserved (important for momentum-granting abilities)
+- **Known gap**: No `OnInterrupt` callback. Ability.Tick() runs during hitstun
+  until the ability's own EndAbility fires, which overwrites State=Idle.
+
 
 **Critical implementation detail:** `ActivateAbility` in `ServerSimulation.cs` sets
 `state.AttackSlot = (byte)(slot + 1)` after calling `OnStart`. Individual abilities
@@ -237,7 +236,7 @@ Manki RoundBomb demonstrates the hold-to-aim pattern for `AimedProjectile` abili
 spell_q_start (AnimIndex=0) → spell_q_loop (AnimIndex=1) → spell_q_end (AnimIndex=2)
 ```
 
-1. **OnStart**: Sets `s.State = Attacking`, `s.ComboStage = 0`, `s.AnimIndex = 0`
+1. **OnStart**: Sets `s.State = Attacking`, `s.ComboStage = 0`, `AnimIndex = 0`
 2. **Tick (hold phase)**: After 8 ticks, switches to `AnimIndex=1` (loop). Checks `input.IsAiming`:
    - If `true`: stays in loop, accumulates ChargeTicks
    - If `false`: transitions to throw phase

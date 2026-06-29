@@ -241,13 +241,14 @@ public class ServerSimulationTests
         var t0 = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, t0.State);
 
-        for (int i = 1; i < 60; i++)
+        for (int i = 1; i < 75; i++)
         {
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
             var s = sim.GetState(1);
-            bool shouldBeAttacking = i < 59;
-            Assert.True((s.State == ActionState.Attacking) == shouldBeAttacking,
-                $"tick {i}: expected {(shouldBeAttacking ? "Attacking" : "Idle")} but got {s.State}");
+            // Q: 8-tick hold phase + 60-tick throw phase = ability ends at tick 68
+            bool expectedAttacking = i < 68;
+            Assert.True((s.State == ActionState.Attacking) == expectedAttacking,
+                $"tick {i}: expected {(expectedAttacking ? "Attacking" : "Idle")} but got {s.State}");
         }
     }
 }

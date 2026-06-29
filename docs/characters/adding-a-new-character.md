@@ -180,7 +180,7 @@ namespace SlopArena.Shared.Abilities
         {
             s.State = ActionState.Attacking;
             s.AnimLockTicks = (ushort)GetParam(def, "duration", 30f);
-            s.AnimIndex = 0; // map to animation in CharacterDefinition
+            AnimIndex = 0; // set on ability instance (synced to CharacterState by ActivateAbility/TickAbilities)
         }
         
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
