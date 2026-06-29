@@ -169,6 +169,21 @@ namespace SlopArena.Shared
                 }
             }
 
+            // 5.25 Hold-phase auto-release: advance ComboStage (data-driven abilities only)
+            // ServerAbility classes handle their own state via Tick.
+            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && s.ComboStage == 0 && !s.IsServerAbility)
+            {
+                var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
+                if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
+                {
+                    // Auto-release: after minimum hold window or when fully charged
+                    if (s.AttackElapsedTicks >= 10 || (spec.ChargeHoldTicks > 0 && s.ChargeTicks >= spec.ChargeHoldTicks))
+                    {
+                        s.ComboStage = 1;
+                    }
+                }
+            }
+
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)
@@ -251,6 +266,17 @@ namespace SlopArena.Shared
             if (s.State == ActionState.Idle)
             {
                 ProcessNormalMovement(ref s, stats, input);
+            }
+
+            // 7b. Charge ticks for hold/charge abilities
+            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && s.ChargeTicks < ushort.MaxValue)
+            {
+                var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
+                if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
+                {
+                    if (s.ChargeTicks < spec.ChargeHoldTicks)
+                        s.ChargeTicks++;
+                }
             }
 
             // 8. Gravity

@@ -72,8 +72,6 @@ public static partial class CharacterRegistry
             // Only ClipOverrides needed for custom timelines
             ClipOverrides = new AnimationClipConfig[]
             {
-                new() { Name = "spell_q_loop", LoopMode = ClipLoopMode.PingPong, TimelineLength = 3.0f },
-                new() { Name = "spell_q", StartOffset = 0.5f, TimelineLength = 2.0f },
             },
 
             // ═══ ABILITIES ═══
@@ -117,6 +115,7 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Aerosol + Lighter",
+                Behavior = AbilityBehavior.ChargeAttack,
                 CooldownTicks = 30,
                 Stages = new AttackStage[]
                 {
@@ -175,14 +174,16 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Round Bomb",
+                Behavior = AbilityBehavior.AimedProjectile,
                 CooldownTicks = 90,
+                ChargeHoldTicks = 180,         // 3s max aim
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
                             HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_q" },
+                AnimationNames = new[] { "spell_q_start", "spell_q_loop", "spell_q_end" },
                 SpecialEffectKeys = new[] { "MankiRoundBomb" },
                 Params = new()
                 {
@@ -210,6 +211,7 @@ public static partial class CharacterRegistry
             E = new ExplosiveMineSpec
             {
                 Name = "Dynamite Mine",
+                Behavior = AbilityBehavior.AreaDenial,
                 CooldownTicks = 120,
                 MineRadius = 0.3f,
                 MineDurationTicks = 180,
@@ -236,6 +238,7 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Dive Bomb",
+                Behavior = AbilityBehavior.AirGroundProjectile,
                 CooldownTicks = 240,
                 Stages = new AttackStage[]
                 {
@@ -263,6 +266,7 @@ public static partial class CharacterRegistry
             F = new AbilitySpec
             {
                 Name = "Overclock",
+                Behavior = AbilityBehavior.SelfBuff,
                 CooldownTicks = 600,
                 Stages = System.Array.Empty<AttackStage>(),
                 AnimationNames = new[] { "spell_f" },

@@ -39,6 +39,7 @@ namespace SlopArena.Client.World
         private uint _tick;
         private ServerSimulation _localSim = null!;
         private ArenaDefinition _arenaDef;
+        private CharacterDefinition _playerDef = null!;
         private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
@@ -69,6 +70,7 @@ namespace SlopArena.Client.World
 
 
             var playerDef = CharacterRegistry.Get(_playerClass);
+            _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
@@ -161,11 +163,21 @@ namespace SlopArena.Client.World
             byte slot = _inputController.ConsumePendingSlotPress();
             if (slot > 0)
                 Debug.Log($"[Input] slot={slot} animLock={_localSim.GetState(PlayerEntityId).AnimLockTicks} tick={_tick}");
+            bool isAiming = false;
+            {
+                var ps = _localSim.GetState(PlayerEntityId);
+                if (ps.State == ActionState.Attacking && ps.AttackSlot > 0)
+                {
+                    var spec = _playerDef.GetSlotAbility(ps.AttackSlot - 1, !ps.IsGrounded);
+                    if (spec != null && (spec.Behavior == AbilityBehavior.AimedProjectile || spec.Behavior == AbilityBehavior.ChargeAttack))
+                        isAiming = true;
+                }
+            }
             var (input, _, _) = _inputController.BuildInputState(
                 _cameraMount,
                 _playerRenderer.transform.eulerAngles.y,
                 isNPC: false,
-                isAiming: false,
+                isAiming: isAiming,
                 slot,
                 abilityAimYawRad: null,
                 abilityAimDistance: null,
