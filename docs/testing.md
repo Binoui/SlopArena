@@ -1,7 +1,7 @@
 # Simulation Unit Tests
 
 > **The fastest feedback loop.** All simulation logic in `src/Shared/` is pure C# —
-> testable via xUnit without Godot, a server, or any runtime. Build + test takes <3s.
+> testable via xUnit without Unity, a server, or any runtime. Build + test takes <3s.
 >
 > **Run this first after every `src/Shared/` change.**
 

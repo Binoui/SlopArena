@@ -433,7 +433,7 @@ public struct HitboxEvent
 }
 ```
 
-Hitboxes are spawned at the precise trigger tick (e.g. frame 6 of an attack) and processed by `SpellResolver` each tick during their lifetime. They use pure math (sphere-sphere/capsule collision) — no Godot physics queries.
+Hitboxes are spawned at the precise trigger tick (e.g. frame 6 of an attack) and processed by `SpellResolver` each tick during their lifetime. They use pure math (sphere-sphere/capsule collision) — no engine physics queries.
 
 ---
 
