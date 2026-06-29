@@ -1,9 +1,8 @@
 # SlopArena
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Godot-4.6-478CBF?logo=godotengine&logoColor=white" alt="Godot 4.6">
+  <img src="https://img.shields.io/badge/Unity-6000-FFFFFF?logo=unity&logoColor=white" alt="Unity 6000">
   <img src="https://img.shields.io/badge/C%23-.NET%208-512BD4?logo=dotnet&logoColor=white" alt="C# .NET 8">
-  <img src="https://img.shields.io/github/actions/workflow/status/Binoui/SlopArena/build.yml?branch=main&logo=github&label=build" alt="Build">
   <img src="https://img.shields.io/github/license/Binoui/SlopArena" alt="License">
   <img src="https://img.shields.io/badge/status-playable-2ea043" alt="Status">
 </p>
@@ -11,10 +10,11 @@
 **Brawl your way to the top.** — An open-source 3D Arena Brawler with platform fighter movement.
 
 SlopArena fuses platform fighter movement with
-character kits from hero brawlers. Built with **Godot 4.6 (.NET C#)**, it features
-a data-driven character system with a tick-based simulation shared between client and server.
+character kits from hero brawlers. Built with **Unity 6000**,
+featuring a data-driven character system with a tick-based simulation
+shared between client and server.
 
-> **Status:** Playable prototype — movement, combat, custom FSM, and **Manki** (mad bomber monkey) are functional in sandbox mode.
+> **Status:** Playable prototype — movement, combat, and **Manki** (mad bomber monkey) are functional in training mode.
 
 ---
 
@@ -25,11 +25,9 @@ git clone https://github.com/Binoui/SlopArena.git
 cd SlopArena
 ```
 
-1. Install **Godot 4.6+ (.NET version)** from [godotengine.org](https://godotengine.org)
+1. Install **Unity 6000.0.47f1** from [Unity Hub](https://unity.com/download)
 2. Install **.NET SDK 8.0+** (`sudo pacman -S dotnet-sdk` on Arch)
-3. Open `project.godot` in Godot and press **F5**
-
-No server required — the sandbox runs everything locally with training dummies.
+3. Open `client/Unity/` in Unity Hub and press **Play**
 
 ---
 
@@ -43,7 +41,7 @@ No server required — the sandbox runs everything locally with training dummies
 | **RMB** | Heavy attack (hold to charge) |
 | **Q / E / R** | Abilities |
 | **F** | Ultimate |
-| **Shift** | Dash / Air dodge |
+| **Shift** | Dash |
 | **Tab** | Cycle target |
 | **Scroll Wheel** | Zoom |
 | **Escape** | Pause menu |
@@ -53,22 +51,18 @@ No server required — the sandbox runs everything locally with training dummies
 ## Architecture Overview
 
 ```
-┌─ Godot Client ──────────────────────────────┐
-│  PlayerController (orchestrator)            │
-│   ├─ InputController (centralized polling)  │
-│   ├─ MovementComponent (wraps Simulation)   │
-│   ├─ Custom C# FSM (StateMachine.cs)        │
-│   │   ├─ IdleState / RunState               │
-│   │   ├─ AirState (BlendSpace1D jump↔fall)  │
-│   │   ├─ LandingState / AttackState         │
-│   │   └─ AnimTree (flat StateMachine root)  │
-│   └─ CombatComponent (statuses, hit routing)│
-├─ Shared/ (pure C#, zero Godot deps) ────────┤
+┌─ Unity Client ─────────────────────────────┐
+│  TrainingMatch (orchestrator)               │
+│   ├─ InputController (polling)              │
+│   ├─ LocalSimulationBridge (wraps sim)      │
+│   ├─ PlayerRenderer (drives Animator)       │
+│   └─ CombatFeedback (hit reactions, VFX)   │
+├─ Shared/ (pure C#, zero Unity deps) ────────┤
 │  CharacterDefinition → AbilityData → Stages │
 │  Simulation.SimulateTick()                  │
-│  SpellResolver (cone/circle/beam hits)      │
+│  SpellResolver (hit detection)              │
 │  CharacterState (pos, vel, cooldowns...)    │
-├─ Server/ (headless, WIP) ────────────────── │
+├─ Server/ (headless) ────────────────────────┤
 │  UDP loop at 60Hz                           │
 └─────────────────────────────────────────────┘
 ```
@@ -76,9 +70,8 @@ No server required — the sandbox runs everything locally with training dummies
 Key design decisions:
 - **Data-driven characters** — all stats, abilities, and animations live in `CharacterDefinition.cs`. Adding a new character = writing a factory function.
 - **Tick-based everything** — durations are `ushort` ticks (1/60s). Netcode-ready.
-- **Queue-based input buffer** (max 2) for responsive LMB combos, like souls-like FSM.
-- **InputController** centralizes input polling — states never call `Input.Get*()` directly.
-- **All animation states wrapped in BlendTree+TimeScale** for runtime speed control.
+- **Server-authoritative** — simulation is the source of truth. Client predicts, server reconciles.
+- **Pure C# Shared/** — no Unity dependencies in the core library. Runnable in tests and server independently.
 
 ---
 
@@ -86,23 +79,18 @@ Key design decisions:
 
 ```
 SlopArena/
-├── project.godot / global.json
-├── main.tscn
-├── Scripts/
-│   ├── Animation/           # Custom FSM (State.cs, StateMachine.cs, States/)
-│   ├── Entities/            # PlayerController, AnimationController, DummyManager
-│   ├── Combat/              # MovementComponent, CombatComponent, LocalSimulation
-│   ├── InputController.cs   # Centralized input (Jump, Dash)
-│   ├── Camera/              # CameraMount (h/v SpringArm orbit)
-│   ├── UI/                  # ActionBarHUD, UnitFrames, Settings, EscapeMenu
-│   └── World/               # Main.cs entry point, ArenaManager
-├── Shared/                  # Pure C# library (no Godot)
-│   ├── CharacterDefinition  # Stats, abilities, character registry
-│   ├── Simulation.cs        # SimulateTick() — movement + combat
-│   ├── SpellResolver.cs     # Hit detection math
-│   └── CharacterState.cs    # Per-tick entity state
-├── Server/                  # Headless server (WIP)
-├── assets/                  # 3D models, animations
+├── client/Unity/            # Unity game client
+├── src/
+│   ├── Shared/              # Pure C# library (no Unity deps)
+│   │   ├── Simulation.cs    # SimulateTick() — movement + combat
+│   │   ├── SpellResolver.cs # Hit detection math
+│   │   └── CharacterState.cs# Per-tick entity state
+│   ├── Server/              # Headless server
+│   └── ServerApp/           # Server host (prototype)
+├── tests/                   # xUnit simulation tests
+├── assets/                  # 3D models, textures, UI source
+├── data/                    # Skeleton data, arenas
+├── tools/                   # Asset pipeline scripts
 └── docs/                    # Design docs, research, conventions
 ```
 
@@ -112,7 +100,7 @@ SlopArena/
 
 | Character | Style | Abilities |
 |-----------|-------|-----------|
-| **Manki** | Agile rushdown / mad bomber | 3-hit melee combo, aerosol flamethrower, round bomb, dynamite jump, dive bomb, big boom ult |
+| **Manki** | Agile rushdown / mad bomber | 3-hit melee combo, aerosol flamethrower, round bomb, dynamite jump, dive bomb, overclock ult |
 
 See `docs/characters/manki.md` for the full kit.
 
@@ -123,11 +111,11 @@ See `docs/characters/manki.md` for the full kit.
 1. Add `CharacterClass` enum value in `Shared/CharacterDefinition.cs`
 2. Write a `BuildXxx()` factory with `MovementStats` + 8 `AbilityData` slots
 3. Register it in `BuildRegistry()`
-4. If it needs special effects, add to `AbilityRegistry.cs`
+4. Add CharacterAnimationConfig ScriptableObject in Unity
 
 No changes to gameplay code needed — everything is data-driven.
 
-Full guide: [`docs/adding-a-new-character.md`](docs/adding-a-new-character.md)
+Full guide: [`docs/characters/adding-a-new-character.md`](docs/characters/adding-a-new-character.md)
 
 ---
 
