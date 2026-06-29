@@ -86,11 +86,40 @@ Movement abilities (dash, leap, teleport, sprint) can vary on these axes:
 
 ### Type B — Ground Indicator (Free-aim Arc)
 
-- Shows a **bell-shaped arc indicator** on the ground
-- Player selects a landing point freely (like a bow shot in a TPS)
-- Good for area-denial and lobbed projectiles
-- The indicator is free-moving, not tied to the character's position
++ Shows a **bell-shaped arc indicator** on the ground
++ Player selects a landing point freely (like a bow shot in a TPS)
++ Good for area-denial and lobbed projectiles
++ The indicator is free-moving, not tied to the character's position
 
+#### Manki Q Implementation
+
+Manki's "Round Bomb" uses Type B aiming with a three-phase animation pipeline:
+
+1. **spell_q_start** (AnimIndex=0) — 8-tick minimum start animation
+2. **spell_q_loop** (AnimIndex=1) — loops while Q is held, indicator active
+3. **spell_q_end** (AnimIndex=2) — throw animation, projectile spawns at tick 10
+
+**Flow**:
++ Press Q → ability activates via ServerAbility (MankiRoundBomb)
++ Client shows orange ground ring + parabolic arc via AimIndicator component
++ Mouse cursor unlocked during aiming (Cursor.lockState = None), drives ring position
++ Raycast from mouse to Y=0 ground plane (with height-filtered physics raycast)
++ On Q release: `input.IsAiming` becomes false → server transitions to throw phase
++ Aim distance + yaw cached in private fields (`_cachedAimDistance`, `_cachedAimYaw`) at transition
++ Projectile spawns using cached values (prevents overwrite by SimulateTick)
++ Parabolic trajectory computed via `CombatMath.ComputeProjectileLaunch()`
+
+**Client components**:
++ `AimIndicator.cs` — MonoBehaviour on TrainingMatch, creates procedural ground ring + LineRenderer arc
++ `AimIndicator.SetAbilityParams()` — receives gravity/launchAngle/launchOffsetY from MankiData spec
++ `CameraMount.SetCameraYawDeg()` / `SetCameraPitchDeg()` — camera locked during aiming
++ `InputController.IsQKeyHeld` — tracks held state (set in Poll(), checked in FixedUpdate)
+
+**Cooldown**:
++ Server-side: PreTickAbilities checks `GetCooldown(state, 3)` → `Cooldown2`
++ Client-side: SimulateTick checks cooldown before entering Attacking state
++ `_states[id] = state` persists cooldown struct write-back (CharacterState is a value type)
++ Cooldown decremented in TickTimers (lines 352-357)
 ### Type C — Character-Relative Zone Indicator
 
 - An indicator zone appears **linked to the character's position**

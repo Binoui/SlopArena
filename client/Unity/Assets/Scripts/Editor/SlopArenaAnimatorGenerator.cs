@@ -253,7 +253,10 @@ namespace SlopArena.Client.Editor
                 case "hit_small": config.HitSmall = clip; break;
                 case "hit_large": config.HitLarge = clip; break;
                 case "death": config.Death = clip; break;
-                case "spell_q": config.SpellQ = clip; break;
+                case "spell_q_start": config.SpellQStart = clip; break;
+                case "spell_q_loop": config.SpellQLoop = clip; break;
+                case "spell_q_end": config.SpellQEnd = clip; break;
+                case "spell_q": config.SpellQStart = clip; break;
                 case "spell_e": config.SpellE = clip; break;
                 case "spell_r": config.SpellR = clip; break;
                 case "spell_f": config.SpellF = clip; break;
@@ -264,7 +267,6 @@ namespace SlopArena.Client.Editor
                 case "hit_light": config.HitSmall = clip; break;
                 case "hit_medium": config.HitLarge = clip; break;
                 case "dash_loop": config.Dash = clip; break;
-                case "spell_q_loop": config.SpellQ = clip; break;
             }
         }
 

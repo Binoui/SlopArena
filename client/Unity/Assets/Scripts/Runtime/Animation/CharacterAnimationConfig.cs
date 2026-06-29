@@ -27,7 +27,9 @@ namespace SlopArena.Client.Animation
         public AnimationClip Death;
 
         [Header("Abilities")]
-        public AnimationClip SpellQ;
+        public AnimationClip SpellQStart;
+        public AnimationClip SpellQLoop;
+        public AnimationClip SpellQEnd;
         public AnimationClip SpellE;
         public AnimationClip SpellR;
         public AnimationClip SpellF;
@@ -51,7 +53,10 @@ namespace SlopArena.Client.Animation
                 "hit_small" => HitSmall,
                 "hit_large" => HitLarge,
                 "death" => Death,
-                "spell_q" => SpellQ,
+                "spell_q_start" => SpellQStart,
+                "spell_q_loop" => SpellQLoop,
+                "spell_q_end" => SpellQEnd,
+                "spell_q" => SpellQStart,
                 "spell_e" => SpellE,
                 "spell_r" => SpellR,
                 "spell_f" => SpellF,
