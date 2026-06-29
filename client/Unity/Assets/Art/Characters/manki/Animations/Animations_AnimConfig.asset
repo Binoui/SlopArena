@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 06b0ddd57a57a2001a3df31c73956e2c, type: 3}
-  m_Name: manki_AnimConfig
+  m_Name: Animations_AnimConfig
   m_EditorClassIdentifier: 
   Idle: {fileID: -203655887218126122, guid: fe5b79cf131204c7db696e21a3106144, type: 3}
   Run: {fileID: -203655887218126122, guid: fad7b4bf115b05a01bac195213fe6b92, type: 3}
@@ -24,6 +24,6 @@ MonoBehaviour:
   HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
   Death: {fileID: 0}
   SpellQ: {fileID: 3094330708855449807, guid: 17f1455b384bc28aea4c3506ea4a9f99, type: 3}
-  SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
+  SpellE: {fileID: 0}
   SpellR: {fileID: 0}
-  SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}
+  SpellF: {fileID: 0}
