@@ -126,9 +126,12 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 
 client/Unity/Assets/AnimationPacks
 client/Unity/Assets/AnimationPacks/*
-
-client/Unity/Assets/Plugins
-client/Unity/Assets/Plugins/*
+# Unity Plugins — ignore build artifacts but preserve .meta import settings
+client/Unity/Assets/Plugins/**/*.dll
+client/Unity/Assets/Plugins/**/*.pdb
+client/Unity/Assets/Plugins/**/*.deps.json
+client/Unity/Assets/Plugins/**/*.runtimeconfig.json
+client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 
 # Auto-generated prefabs from symlinked asset packs (regenerate on clone)
 client/Unity/Assets/Prefabs/Arena_*.prefab

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <BaseOutputPath>$(MSBuildProjectDirectory)/../../artifacts/Shared/bin/</BaseOutputPath>
@@ -14,5 +14,13 @@
     <Description>Shared data types for SlopArena — pure C#, no dependencies</Description>
     <RepositoryUrl>https://github.com/Binoui/SlopArena</RepositoryUrl>
   </PropertyGroup>
-
+  
+  <Target Name="CopyToUnity" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFolder="$(MSBuildProjectDirectory)/../../client/Unity/Assets/Plugins/SlopArena.Shared"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb"
+          DestinationFolder="$(MSBuildProjectDirectory)/../../client/Unity/Assets/Plugins/SlopArena.Shared"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
