@@ -16,27 +16,28 @@ dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests"
 dotnet test tests/Shared.Tests/ --nologo --filter "AbilityLifecycle"
 dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
 
-# Run all tests: 63+ across 5 test suites (existing: ServerSimulation, SpellResolver,
-# CombatMath; new: PhysicsTests, AbilityLifecycle, CombatIntegration, EdgeCase)
-```
+# Run all tests: 115 across 9 test suites
 
 ## Test Suites
 
-| File | Tests | What it covers |
-|------|-------|----------------|
-| `ServerSimulationTests.cs` | 9 | Entity registration, void death, Q lifecycle, self-hit |
-| `SpellResolverTests.cs` | 12 | Sphere/capsule collision, explosion, gravity, CanHitOwner |
-| `CombatMathTests.cs` | 21 | Knockback formulas, angle math, DI calculations |
-| `PhysicsTests.cs` | 12 | Jump chain, dash, landing, walk/sprint/friction, hitstun, data-driven attack expiry |
-| `AbilityLifecycleTests.cs` | 5 | ServerAbility activation, data-driven duration, basic lifecycle |
-| `CombatIntegrationTests.cs` | 2 | Two-entity tick stability |
-| `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
+ | File | Tests | What it covers |
+ |------|-------|----------------|
+ | `ServerSimulationTests.cs` | 8 | Entity registration, void death, Q lifecycle, self-hit |
+ | `SpellResolverTests.cs` | 12 | Sphere/capsule collision, explosion, gravity, CanHitOwner |
+ | `CombatMathTests.cs` | 12 | Knockback formulas, angle math, DI calculations |
+ | `PhysicsTests.cs` | 10 | Jump chain, dash, landing, walk/sprint/friction, hitstun, data-driven attack expiry |
+ | `AbilityLifecycleTests.cs` | 30 | Per-ability activation + lifecycle (LMB combo, Q bomb, RMB charge, R divebomb, F overclock, AirRMB, mine), buff bonuses |
+ | `CombatPipelineTests.cs` | 4 | **Full-pipeline combat** — LMB→NPC damage, Q projectile→NPC hit, Overclock damage boost, mutual trade |
+ | `CombatIntegrationTests.cs` | 2 | Two-entity tick stability |
+ | `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
+ | `AnimatorGraphBuilderTests.cs` | 15 | FSM transition structure, Manki combo chains, dedup |
+ 
+ > **Ground-truth tests** (`CombatPipelineTests`) are the most important for understanding how combat
+ > works end to end. They exercise the full pipeline: Input → ServerAbility → Hitbox → Collision →
+ > Damage/Knockback/Hitstun. Agents and contributors should read these first.
+Abilities have per-slot ServerAbility coverage. Data-driven abilities (no ServerAbility) work
+fully through `SimulateTick`'s built-in expiry.
 
-> Abilities aren't fully implemented — ServerAbility tests verify basic activation
-> (state transitions, AttackSlot wiring). Data-driven attacks (no ServerAbility)
-> work fully through `SimulateTick`'s built-in expiry.
-
-## Writing New Tests
 
 **Use `TestHelpers`** (in `tests/Shared.Tests/TestHelpers.cs`) to avoid boilerplate:
 

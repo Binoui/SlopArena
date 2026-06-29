@@ -67,7 +67,7 @@ public static class TestHelpers
     /// Create a minimal input state, defaulting all fields to 0/false.
     /// </summary>
     public static InputState Input(byte activeSlot = 0, bool jump = false, bool dash = false,
-        float moveX = 0f, float moveY = 0f, bool aiming = false)
+        float moveX = 0f, float moveY = 0f, bool aiming = false, ushort aimDistance = 0)
     {
         return new InputState
         {
@@ -77,6 +77,7 @@ public static class TestHelpers
             MoveX = moveX,
             MoveY = moveY,
             IsAiming = aiming,
+            AimDistance = aimDistance,
         };
     }
 
@@ -149,4 +150,57 @@ public static class TestHelpers
         Assert.True(diff <= tolerance,
             $"Expected {expected:F6} ± {tolerance:F6} but got {actual:F6} (diff={diff:F6})");
     }
-}
+
+    /// <summary>
+    /// A fresh CharacterDefinition with Manki's ability specs but simple capsule
+    /// hurtboxes (a standing capsule from feet to head). This lets hitbox collision
+    /// tests run without baked skeleton data.
+    /// Returns a new instance each access — safe to mutate in tests.
+    /// Shared AbilitySpec references are read-only during collision checks.
+    /// </summary>
+    public static CharacterDefinition CombatDef
+    {
+        get
+        {
+            var src = MankiDef;
+            return new CharacterDefinition
+            {
+                Class = src.Class,
+                DisplayName = src.DisplayName,
+                CapsuleRadius = src.CapsuleRadius,
+                CapsuleHeight = src.CapsuleHeight,
+                HurtboxRadius = src.HurtboxRadius,
+                Movement = src.Movement,
+                LMB = src.LMB,
+                RMB = src.RMB,
+                AirLMB = src.AirLMB,
+                AirRMB = src.AirRMB,
+                Q = src.Q,
+                E = src.E,
+                R = src.R,
+                F = src.F,
+                ClipOverrides = src.ClipOverrides,
+                // Use a simple full-body capsule instead of bone-attached hurtboxes
+                HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
+                HurtboxBoneDefs = null,
+                BakedDataPath = "",
+                IdleAnim = src.IdleAnim,
+                RunAnim = src.RunAnim,
+                DashAnim = src.DashAnim,
+                JumpAnim = src.JumpAnim,
+                FallAnim = src.FallAnim,
+                HitSmallAnim = src.HitSmallAnim,
+                HitMediumAnim = src.HitMediumAnim,
+                HitHardAnim = src.HitHardAnim,
+                VisualScale = src.VisualScale,
+                ModelYOffset = src.ModelYOffset,
+                ModelSoleOffset = src.ModelSoleOffset,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Convenience: ground-level PY for CombatDef (height 1.3m).
+    /// </summary>
+    public static float CombatGroundPY => 0f + 1.3f * 0.5f; // 0.65
+    }

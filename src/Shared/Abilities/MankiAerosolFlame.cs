@@ -28,7 +28,7 @@ namespace SlopArena.Shared.Abilities
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            s.AnimIndex = (byte)(_charged ? 1 : 0); // charged anim vs normal anim
+            AnimIndex = (byte)(_charged ? 1 : 0); // charged anim vs normal anim (set on ability instance, survives ActivateAbility overwrite)
             s.AnimLockTicks = (ushort)GetParam(def, _charged ? "charged_duration" : "normal_duration", 50f);
             s.ChargeTicks = 0; // reset charge accumulator
         }

@@ -18,7 +18,7 @@ public sealed class MankiOverclock : ServerAbility
         s.BuffActiveFlags |= (byte)BuffType.Overclock;
         s.BuffRemainingTicks = duration;
         s.AnimLockTicks = 30;  // injection animation lock
-        s.AnimIndex = 0;
+        AnimIndex = 0;
         s.State = ActionState.Attacking;
         s.AttackSlot = (byte)(Slot + 1);
 
