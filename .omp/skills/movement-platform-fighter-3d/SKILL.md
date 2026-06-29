@@ -2,11 +2,11 @@
 name: movement-platform-fighter-3d
 description: >-
   SlopArena — Smash/DKO-style 3D platform fighter movement & combat.
-  ACTIVE: Godot 4.6 C# (main branch). Camera-relative 8-direction movement,
+  ACTIVE: Unity 2022.3 C# (main branch). Camera-relative 8-direction movement,
   Smash-style % system, 1s dash with invincibility, double jump.
 category: game-dev
 tags:
-  - godot-4
+  - unity
   - csharp
   - platform-fighter
   - class-system
@@ -16,10 +16,10 @@ tags:
   - dko
 ---
 
-# SlopArena — Smash/DKO-Style 3D Platform Fighter (Godot 4.6 C#)
+ # SlopArena — Smash/DKO-Style 3D Platform Fighter (Unity C#)
 
 **Repo:** https://github.com/Binoui/SlopArena  
-**Active branch:** `main` — Godot 4.6 C#  
+ **Active branch:** `main` — Unity 2022.3 C#
 **Design ref:** Super Smash Bros (%, knockback scaling) + Divine KO (void arenas, 3D platform fighter format)
 
 ## Core Player Mechanics (June 2026 rewrite)

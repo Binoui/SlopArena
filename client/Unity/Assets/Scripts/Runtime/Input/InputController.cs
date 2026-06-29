@@ -21,9 +21,10 @@ namespace SlopArena.Client.Input
     public class InputController : MonoBehaviour
     {
         // ── Frame state (set by Poll) ──
-        public bool JumpJustPressed { get; private set; }
-        public bool DashJustPressed { get; private set; }
-
+        /// <summary>Pending jump: set by Poll, consumed by BuildInputState.</summary>
+        private bool _pendingJump;
+        /// <summary>Pending dash: set by Poll, consumed by BuildInputState.</summary>
+        private bool _pendingDash;
         /// <summary>Whether the Q key is currently held down (for aiming release detection).</summary>
         public bool IsQKeyHeld { get; private set; }
         /// <summary>Whether the right mouse button is currently held down (for RMB charge).</summary>
@@ -33,16 +34,9 @@ namespace SlopArena.Client.Input
         private InputState _aiInput;
 
         // ── Slot press (set by Poll, consumed via ConsumePendingSlotPress) ──
-        private bool _pendingJump;
         private byte _pendingSlotPress;
 
-        // ── Previous-frame held state (for manual edge detection) ──
-        private bool _previousSpaceHeld;
-        private bool _previousShiftHeld;
         // ════════════════════════════════════════════════════════════════
-        //  AI control
-        // ════════════════════════════════════════════════════════════════
-
         /// <summary>
         /// Inject synthetic input from AI (for NPCs).
         /// Must be called every frame before Poll() if AI-controlled.
@@ -81,14 +75,14 @@ namespace SlopArena.Client.Input
             {
                 // AI-driven: use injected input
                 _pendingJump = _aiInput.Jump;
-                DashJustPressed = _aiInput.Dash;
+                _pendingDash = _aiInput.Dash;
                 return;
             }
 
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             if (kb.spaceKey.wasPressedThisFrame) _pendingJump = true;
-
+            if (kb.shiftKey.wasPressedThisFrame) _pendingDash = true;
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
                 _pendingSlotPress = 1;
@@ -197,6 +191,11 @@ namespace SlopArena.Client.Input
                     input.Jump = true;
                     _pendingJump = false;
                 }
+                if (_pendingDash)
+                {
+                    input.Dash = true;
+                    _pendingDash = false;
+                }
 
                 Vector3 moveDir = new Vector3(move.x, 0f, move.y).normalized;
                 Vector2 snappedDir = new Vector2(move.x, move.y);
@@ -249,7 +248,6 @@ namespace SlopArena.Client.Input
             input.Down = moveDirection.z < -0.3f;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
-            input.Dash = DashJustPressed;
             input.Crouch = kb != null && kb.ctrlKey.isPressed;
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = isAiming;
@@ -289,6 +287,12 @@ namespace SlopArena.Client.Input
                     input.Jump = true;
                     _pendingJump = false;
                     Debug.Log("[Input] _pendingJump consumed -> input.Jump=true");
+                }
+                if (_pendingDash)
+                {
+                    input.Dash = true;
+                    _pendingDash = false;
+                    Debug.Log("[Input] _pendingDash consumed -> input.Dash=true");
                 }
             }
 

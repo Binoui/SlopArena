@@ -147,12 +147,12 @@ SlopArena/
 - `Radius`: hitbox size (sphere) or capsule radius
 ## Common Pitfalls
 
-1. **Don't use `UnityEngine.*` or `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
+1. **Don't use `UnityEngine.*` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
 2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
 3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
 4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
 5. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
-6. **`src/Shared/` files are SYMLINKS to `client/Unity/Assets/Scripts/Shared/`** — edit through the `src/Shared/` path; the `write`/`edit` tools follow the symlink and update the real file in Unity Assets. Unity detects the change and recompiles. NEVER replace a symlink with a direct copy.
+6. **Shared/ is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. The DLL auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target. Unity imports it as a plugin.
 7. **Cooldown struct persistence** — `CharacterState` is a value type. `SetCooldown` modifies a local copy. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
@@ -162,9 +162,9 @@ SlopArena/
 
 ## Common Pitfalls
 
-1. **Don't use `UnityEngine.*` or `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
+1. **Don't use `UnityEngine.*` in `src/Shared/`** — no Unity dependencies allowed.
 # Build Shared library
-dotnet build --nologo
+dotnet build src/Shared/SlopArena.Shared.csproj --nologo
 
 # Run ALL simulation unit tests
 dotnet test tests/Shared.Tests/ --nologo

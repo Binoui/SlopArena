@@ -19,9 +19,9 @@ This project is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). By p
 
 ## Getting Started
 
-SlopArena is a Godot 4 .NET C# project. You'll need:
+SlopArena is a Unity 6 C# project. You'll need:
 
-- **Godot Engine 4.6+ (.NET version)** — [godotengine.org](https://godotengine.org)
+- **Unity 6000.0.47f1** — from [Unity Hub](https://unity.com/download)
 - **.NET SDK 8.0+** — `sudo pacman -S dotnet-sdk` (Arch/CachyOS) or from [dotnet.microsoft.com](https://dotnet.microsoft.com)
 
 ### Clone and Run
@@ -29,42 +29,31 @@ SlopArena is a Godot 4 .NET C# project. You'll need:
 ```bash
 git clone https://github.com/Binoui/SlopArena.git
 cd SlopArena
-git config core.hooksPath .githooks  # Enable pre-commit format check
 ```
 
-1. Open Godot (.NET version)
-2. Click **Import** → select `project.godot`
-3. Press **F5** to run
-
-> The sandbox runs a local simulation with 5 training dummies, 3 playable classes, and platform fighter movement. No server required.
+1. Open `client/Unity/` in Unity Hub and click **Play**
+2. Build shared code with `dotnet build src/Shared/` (auto-copies DLL to Unity Plugins)
 
 ## Project Architecture
 
 ```
 SlopArena/
-├── Scripts/          # Godot client scripts (C#)
-│   ├── World/        # Entry point, arena manager
-│   ├── Entities/     # PlayerController, AnimationController, ClassAbilities
-│   ├── Combat/       # MovementComponent, CombatComponent, LocalSimulation
-│   ├── Characters/   # AbilityRegistry
-│   ├── Spells/       # StatusSpells (visual helpers only)
-│   ├── UI/           # Action bar, unit frames, settings
-│   └── Camera/       # WoW-style camera
-├── Shared/           # Pure C# library (NO Godot dependency)
-│   ├── Simulation.cs # SimulateTick() — movement + combat in pure C#
-│   ├── CharacterDefinition.cs  # Data-driven character stats + abilities
-│   ├── AttackData.cs           # AbilityData, AttackStage structs
-│   ├── CharacterState.cs       # Per-tick entity state (ushort timers)
-│   ├── CombatMath.cs           # IsInCircle, IsInCone, CalculateKnockback
-│   └── SpellResolver.cs        # ResolveConeHit, ResolveCircleHit
-├── Server/           # Headless authoritative server (WIP)
-├── assets/           # 3D models and animations
-└── textures/         # Prototype textures
+├── src/Shared/              ← Pure C# library (netstandard2.1, zero Unity deps)
+│   ├── Simulation.cs        ← SimulateTick(): movement + combat
+│   ├── SpellResolver.cs     ← Hit detection math
+│   ├── CharacterState.cs    ← Per-tick entity state
+│   ├── CharacterDefinition.cs ← Data-driven characters
+│   ├── Abilities/           ← ServerAbility implementations
+│   └── Characters/          ← MankiData, BunnyData
+├── client/Unity/            ← Unity game client
+│   └── Assets/Plugins/SlopArena.Shared/  ← Imported DLL (build artifact)
+├── tests/Shared.Tests/      ← xUnit simulation tests
+├── docs/                    ← Design docs, research, conventions
+├── data/                    ← Baked skeleton data, arenas
+└── tools/                   ← Asset pipeline scripts
 ```
 
 ### Key Design Decisions
-
-- **`Shared/` has zero Godot dependencies** — compiles standalone, usable from client, server, and AI
 - **Data-driven characters** — All stats and abilities in `CharacterRegistry` (CharacterDefinition.cs). Adding a new character is adding data, not gameplay code.
 - **Tick-based simulation** — All timers are `ushort` ticks decremented at 60Hz. No `float -= delta` for gameplay.
 - **Platform fighter movement** — World-space (camera-independent), instant directional speed on ground, air acceleration + drag, dash/air-dodge with resources
@@ -109,13 +98,13 @@ _PhysicsProcess
 - **Nullable:** Enable nullable reference types (`#nullable enable` at file top)
 - **File encoding:** UTF-8 without BOM
 
-### Godot-Specific
+### Unity-Specific
 
-- Use `_Ready()`, `_Process(delta)`, `_PhysicsProcess(delta)` overrides
-- Use `[Export]` for inspector-exposed fields
-- Use `GetNode<T>()` or `GetNodeOrNull<T>()` for node references
-- Prefer `GD.Print()` over `Console.WriteLine()`
-- Keep `_Process()` lightweight — use `_PhysicsProcess()` for physics
+- Use `MonoBehaviour` lifecycle: `Awake()`, `Start()`, `Update()`, `FixedUpdate()`
+- Use `[SerializeField]` for inspector-exposed fields, `[Tooltip]` for descriptions
+- Use `GetComponent<T>()` or `FindAnyObjectByType<T>()` for component lookups
+- Prefer `Debug.Log()` for debug output
+- Keep `Update()` lightweight — use `FixedUpdate()` for physics and sim ticks
 
 ### Debug Logging
 
