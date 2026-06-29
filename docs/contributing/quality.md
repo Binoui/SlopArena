@@ -18,7 +18,7 @@ make test     # Run all simulation unit tests (63+ tests, <3s)
 
 > `dotnet test tests/Shared.Tests/ --nologo` is the **first check** after any
 > `src/Shared/` change. It validates state transitions, ability lifecycles, and
-> hit detection without needing Godot or a server.
+> hit detection without needing Unity or a server.
 
 ## Automated Checks
 
@@ -27,7 +27,7 @@ Runs before every `git commit`:
 - ✅ Build verification
 - ⚠️  Debug log detection (warns if >5 new logs)
 - ⚠️  French comment detection
-- ❌ Godot types in Shared/ (blocks commit)
+- ❌ Engine types in Shared/ (blocks commit)
 
 **Location:** `.githooks/pre-commit`
 
@@ -36,7 +36,7 @@ Runs before every `git commit`:
 ### 2. CI/CD (GitHub Actions)
 Runs on every push/PR:
 - Build check
-- Godot types in Shared/ check
+- Engine types in Shared/ check
 - Debug log count (warning at >50)
 - French comment detection (warning only)
 
@@ -64,7 +64,7 @@ Compile-time checks via Roslynator:
 
 ### ✅ Automatic (Blocks Commit/CI)
 - **Build errors** - Must compile
-- **Godot in Shared/** - Pure C# only
+- **Engine types in Shared/** - Pure C# only
 
 ### ⚠️ Warnings (Prompts User)
 - **Debug logs** - >5 new logs or >50 total

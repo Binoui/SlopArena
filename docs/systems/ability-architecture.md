@@ -207,7 +207,7 @@ deactivate them via the `AttackSlot == 0` check. Fixed in `ActivateAbility`.)
 3. **Read params in OnStart** for performance
 4. **Spawn hitboxes relative to character** (OffX/OffY/OffZ are facing-rotated)
 5. **End explicitly** - call EndAbility() when done
-6. **Don't use Godot types** in Shared/Abilities/
+6. **Don't use engine types** in Shared/Abilities/
 
 ## Warp Movement
 
