@@ -133,3 +133,15 @@ client/Unity/Assets/Prefabs/Arena_*.prefab
 client/Unity/Assets/Prefabs/Arena_*.prefab.meta
 client/Unity/Assets/Prefabs/Bridge_*.prefab
 client/Unity/Assets/Prefabs/Bridge_*.prefab.meta
+
+# Prevent Unity .meta file leaks into pure .NET Shared directory
+src/Shared/**/*.meta
+
+# Orphan Godot .uid metadata
+*.uid.meta
+
+# Unity crash dumps
+client/Unity/mono_crash.mem.*
+
+# Duplicate runtime data (source of truth in /data/)
+client/Unity/data/
