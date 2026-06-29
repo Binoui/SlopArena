@@ -57,6 +57,23 @@ namespace SlopArena.Client.Camera
             return _orbital != null ? _orbital.HorizontalAxis.Value : 0f;
         }
 
+        public void SetCameraYawDeg(float yawDeg)
+        {
+            if (_orbital != null)
+                _orbital.HorizontalAxis.Value = yawDeg;
+        }
+
+        public void SetCameraPitchDeg(float pitchDeg)
+        {
+            if (_orbital != null)
+                _orbital.VerticalAxis.Value = pitchDeg;
+        }
+
+        public float GetCameraPitchDeg()
+        {
+            return _orbital != null ? _orbital.VerticalAxis.Value : 0f;
+        }
+
         public float GetCameraYawRad()
         {
             return GetCameraYawDeg() * Mathf.Deg2Rad;

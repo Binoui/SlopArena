@@ -227,6 +227,41 @@ public override void OnStart(ref CharacterState s, CharacterDefinition def)
 
 The sim will interpolate position each tick until `IsWarping` is cleared or warp completes.
 
+## Hold-to-Aim Ability Pattern (Manki Q)
+
+Manki RoundBomb demonstrates the hold-to-aim pattern for `AimedProjectile` abilities:
+
+### Three-Phase Pipeline
+
+```
+spell_q_start (AnimIndex=0) → spell_q_loop (AnimIndex=1) → spell_q_end (AnimIndex=2)
+```
+
+1. **OnStart**: Sets `s.State = Attacking`, `s.ComboStage = 0`, `s.AnimIndex = 0`
+2. **Tick (hold phase)**: After 8 ticks, switches to `AnimIndex=1` (loop). Checks `input.IsAiming`:
+   - If `true`: stays in loop, accumulates ChargeTicks
+   - If `false`: transitions to throw phase
+3. **Tick (throw phase)**: At `throw_trigger_tick`, spawns projectile. At `throw_duration`, calls `EndAbility`
+
+### Aim Data Caching
+
+Critical detail: `s.AimTargetDistance` and `s.AimYaw` are overwritten every tick by `SimulateTick`.
+The projectile spawns 10 ticks after the release transition. Cache both values at transition time:
+
+```csharp
+_cachedAimDistance = s.AimTargetDistance;
+_cachedAimYaw = s.AimYaw;
+// Use _cachedAimDistance, _cachedAimYaw for spawn, not s.AimTargetDistance/s.AimYaw
+```
+
+### Cooldown
+
+`CharacterState` is a value type. After `SetCooldown(ref state, slot, ticks)`, persist with:
+```csharp
+_states[id] = state;
+```
+Client-side cooldown check in `Simulation.SimulateTick` mirrors the server check in `PreTickAbilities`.
+
 ## Test Coverage
 
 All abilities have matching xUnit tests in `tests/Shared.Tests/`:

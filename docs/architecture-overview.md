@@ -5,34 +5,40 @@
 
 ---
 
-## Directory Map
-
 ```
 SlopArena/
-├── Shared/              ← Pure C# library. Compiled to net8.0 DLL for Unity.
-│   ├── Abilities/           ← ServerAbility implementations (pure C#, no Unity deps)
+├── client/Unity/Assets/Scripts/Shared/  ← REAL files (Unity compiles these directly)
+│   ├── Characters/     ← MankiData, BunnyData (CharacterRegistry)
+│   ├── Abilities/      ← AbilityFactory, ServerAbility implementations
+│   ├── Simulation.cs   ← SimulateTick(): one tick of movement + combat
+│   ├── SpellResolver.cs← Hitbox spawn/Tick: sphere-capsule collision math
+│   ├── CharacterState.cs← Per-tick entity state (pos, vel, cooldowns, deaths)
+│   ├── CharacterDefinition.cs ← Data-driven characters: stats, abilities, hitboxes
+│   ├── AttackData.cs   ← HitboxEvent, AttackStage, AbilityData structs
+│   ├── CombatMath.cs   ← Knockback, facing, damage scaling
+│   ├── ServerSimulation.cs ← Wraps Simulation + SpellResolver for server tick
+│   ├── CharacterStatePacket.cs ← UDP packet (39 bytes), FromState/Serialize
+│   ├── ClientInputPacket.cs ← Client->server input (14 bytes)
+│   ├── InputState.cs   ← Normalized input (MoveX/Y, flags, ActiveSlot)
+│   ├── BakedAnimationData.cs← Offline-baked bone positions per frame
+│   ├── ServerSkeleton.cs← FBX/GLB JSON parser for skeleton data
+│   ├── ArenaDefinition.cs← Arena data (platforms, spawns, kill height)
+│   └── MovementProfiles.cs← (deleted — dead code)
+│
+├── src/Shared/          ← SYMLINKS → client/Unity/Assets/Scripts/Shared/ (shared code root)
+│   ├── Abilities/           ← ServerAbility implementations
 │   │   ├── ServerAbility.cs     ← Base class: OnStart/Tick/OnEnd lifecycle
 │   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
 │   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
-│   │   ├── MankiRoundBomb.cs    ← Manki Q: parabolic projectile
+│   │   ├── MankiRoundBomb.cs    ← Manki Q: hold-to-aim parabolic bomb
 │   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
-│   │   ├── AimedGroundAbility.cs ← Reusable base: rise → aim → plunge pattern
+│   │   ├── AimedGroundAbility.cs← Reusable base: rise → aim → plunge pattern
 │   │   ├── MankiDiveBomb.cs     ← Manki R: air-to-ground slam
 │   │   └── MankiOverclock.cs    ← Manki F: self-buff 8s
-│   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
-│   ├── SpellResolver.cs     ← Hitbox spawn/Tick: sphere-capsule collision math
-│   ├── CharacterState.cs    ← Per-tick entity state (pos, vel, cooldowns, deaths)
-│   ├── CharacterDefinition.cs ← Data-driven characters: stats, abilities, hitboxes
-│   ├── AttackData.cs        ← HitboxEvent, AttackStage, AbilityData structs
-│   ├── CombatMath.cs        ← Knockback, facing, damage scaling
-│   ├── ServerSimulation.cs  ← Wraps Simulation + SpellResolver for server tick
-│   ├── CharacterStatePacket.cs ← UDP packet (39 bytes), FromState/Serialize
-│   ├── ClientInputPacket.cs ← Client→server input (14 bytes)
-│   ├── InputState.cs        ← Normalized input (MoveX/Y, flags, ActiveSlot)
-│   ├── BakedAnimationData.cs← Offline-baked bone positions per frame
-│   ├── ServerSkeleton.cs    ← FBX/GLB JSON parser for skeleton data
-│   ├── ArenaDefinition.cs   ← Arena data (platforms, spawns, kill height)
-│   └── MovementProfiles.cs  ← (deleted — dead code)
+│   ├── Simulation.cs        ← shared logic
+│   ├── SpellResolver.cs     ← hitbox collision math
+│   ├── CharacterState.cs    ← entity state
+│   └── ... (all files are symlinks to client/Unity/Assets/Scripts/Shared/)
 │
 ├── client/Unity/         ← Unity game client
 │   └── Assets/Scripts/
@@ -41,16 +47,17 @@ SlopArena/
 │       │   ├── World/          ← TrainingMatch, MatchBase (match orchestration)
 │       │   ├── Input/          ← InputController (Unity Input → InputState)
 │       │   ├── Camera/         ← CameraMount (orbit cam)
-│       │   ├── Simulation/     ← LocalSimulationBridge (wraps ServerSimulation)
+│       │   ├── Combat/         ← CombatFeedback, AimIndicator
 │       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
 │       ├── Editor/
 │       │   └── SlopArenaAnimatorGenerator.cs ← Generates AnimatorControllers
-│       └── Shared/         ← Mirrors src/Shared/ for Unity compilation
-│           ├── Characters/     ← MankiData, BunnyData (CharacterRegistry)
-│           └── Abilities/      ← AbilityFactory, ServerAbility implementations
+│       └── Shared/         ← REAL FILES (source of truth for Shared code)
+│           ├── Characters/     ← MankiData, BunnyData
+│           ├── Abilities/      ← AbilityFactory, ServerAbility impls
+│           └── ... (all Shared code)
 │
 ├── src/
-│   ├── Shared/            ← Source for Shared/ (compiled via dotnet build)
+│   ├── Shared/            ← SYMLINKS to client/Unity/Assets/Scripts/Shared/
 │   ├── Server/            ← Headless .NET server (MatchInstance, UDP loop)
 │   └── ServerApp/         ← Prototype test server
 │
@@ -64,9 +71,6 @@ SlopArena/
 
 ---
 
-## Data Flow (one tick at 60Hz)
-
-```
 ┌─ CLIENT (Unity) ──────────────────────────────────┐
 │                                                     │
 │  InputController.Poll() → InputState                │
@@ -78,11 +82,25 @@ SlopArena/
 │    │   ├── InputController.BuildInputState()        │
 │    │   ├── LocalSimulationBridge.Tick(inputs)       │
 │    │   │   └── ServerSimulation.Tick()              │
+│    │   │       ├── PreTickAbilities()               │
+│    │   │       │   ├── Check cooldown → skip if >0 │
+│    │   │       │   └── Activate ServerAbility       │
 │    │   │       ├── SimulateMovement()               │
-│    │   │       ├── SimulateAbilities()              │
+│    │   │       │   ├── SimulateTick()               │
+│    │   │       │   │   ├── TickTimers()             │
+│    │   │       │   │   ├── Cooldown check (client)  │
+│    │   │       │   │   └── Gravity, movement        │
+│    │   │       │   └── TickAbilities()              │
+│    │   │       │       └── ServerAbility.Tick()     │
 │    │   │       └── SpellResolver.Tick()             │
 │    │   └── PlayerRenderer.ApplyServerState(state)   │
-│    │       ├── transform.position/rotation          │
+│    │       └── UpdateAnimationState()               │
+│    │           ├── SetBool("IsGrounded", ...)       │
+│    │           ├── SetFloat("Speed", ...)           │
+│    │           ├── SetTrigger("Attack")             │
+│    │           └── Animator transitions             │
+│    └── (future) NetworkClient send/receive          │
+└─────────────────────────────────────────────────────┘
 │    │       └── UpdateAnimationState()               │
 │    │           ├── SetBool("IsGrounded", ...)       │
 │    │           ├── SetFloat("Speed", ...)           │
@@ -127,14 +145,15 @@ SlopArena/
 - `TriggerTick`: when during the animation the hitbox spawns
 - `DurationTicks`: how long it lives
 - `Radius`: hitbox size (sphere) or capsule radius
-- `OffX/OffY/OffZ`: offset from character center (rotated by facing)
-- `Damage`, `KnockbackForce`, `KnockbackUpward`, `StunTicks`
+## Common Pitfalls
 
-### Add a new ability effect (VFX)
-→ `Scripts/Characters/AbilityRegistry.cs` — register the effect key
-→ `Scripts/VFX/` — create a new VFX class
-→ `CharacterDefinition.cs` — add `SpecialEffectKeys` to the ability
-
+1. **Don't use `UnityEngine.*` or `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
+2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
+3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
+4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
+5. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
+6. **`src/Shared/` files are SYMLINKS to `client/Unity/Assets/Scripts/Shared/`** — edit through the `src/Shared/` path; the `write`/`edit` tools follow the symlink and update the real file in Unity Assets. Unity detects the change and recompiles. NEVER replace a symlink with a direct copy.
+7. **Cooldown struct persistence** — `CharacterState` is a value type. `SetCooldown` modifies a local copy. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
 → Quick version: add `CharacterClass` enum value → write `BuildXxx()` → register in `BuildRegistry()`
@@ -144,33 +163,24 @@ SlopArena/
 ## Common Pitfalls
 
 1. **Don't use `UnityEngine.*` or `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
-2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
-3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
-4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
-5. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
-
----
-
-## Verifying Changes
-
-```bash
-# Build Shared library + Server
+# Build Shared library
 dotnet build --nologo
 
-# Run ALL simulation unit tests (63+ tests: physics, abilities, combat, edges)
+# Run ALL simulation unit tests
 dotnet test tests/Shared.Tests/ --nologo
 
 # Run a specific test category
 dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests|AbilityLifecycle"
 
-# Run linter
-make lint
+# NOTE: Shared code lives in client/Unity/Assets/Scripts/Shared/ (real files).
+# src/Shared/ contains symlinks pointing back. Edit through src/Shared/ paths
+# — tools follow the symlink and update Unity Assets directly.
+# After editing, Unity auto-detects the change and recompiles.
 
 # Run Unity client (open client/Unity/ in Unity Hub, press Play)
 
 # Run headless server (separate terminal)
 dotnet run --project Server/SlopArena.Server.csproj
-```
 
 > The simulation tests are the **first thing to run** after any `src/Shared/` change.
 > They validate state transitions, ability lifecycles, and hit detection without
