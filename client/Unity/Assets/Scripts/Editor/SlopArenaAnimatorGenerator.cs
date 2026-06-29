@@ -258,9 +258,11 @@ namespace SlopArena.Client.Editor
                 case "spell_q_end": config.SpellQEnd = clip; break;
                 case "spell_q": config.SpellQStart = clip; break;
                 case "spell_e": config.SpellE = clip; break;
-                case "spell_r": config.SpellR = clip; break;
+                case "spell_r": config.SpellRStart = clip; break;
+                case "spell_r_start": config.SpellRStart = clip; break;
+                case "spell_r_loop": config.SpellRLoop = clip; break;
+                case "spell_r_end": config.SpellREnd = clip; break;
                 case "spell_f": config.SpellF = clip; break;
-                case "spell_lmb_1": config.Attack1 = clip; break;
                 case "spell_lmb_2": config.Attack2 = clip; break;
                 case "spell_lmb_3": config.Attack3 = clip; break;
                 case "spell_lmb_air": config.Attack3 = clip; break;

@@ -29,6 +29,8 @@ namespace SlopArena.Client.Input
         public bool IsQKeyHeld { get; private set; }
         /// <summary>Whether the right mouse button is currently held down (for RMB charge).</summary>
         public bool IsRmbHeld { get; private set; }
+        /// <summary>Whether the R key is currently held down (for R aiming release detection).</summary>
+        public bool IsRKeyHeld { get; private set; }
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;
@@ -102,11 +104,13 @@ namespace SlopArena.Client.Input
             {
                 IsQKeyHeld = kb.qKey.isPressed;
                 IsRmbHeld = mouse != null && mouse.rightButton.isPressed;
+                IsRKeyHeld = kb.rKey.isPressed;
             }
             else
             {
                 IsQKeyHeld = false;
                 IsRmbHeld = false;
+                IsRKeyHeld = false;
             }
         }
 

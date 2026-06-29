@@ -23,7 +23,11 @@ MonoBehaviour:
   HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
   HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
   Death: {fileID: 0}
-  SpellQ: {fileID: 3094330708855449807, guid: 17f1455b384bc28aea4c3506ea4a9f99, type: 3}
+  SpellQStart: {fileID: 3094330708855449807, guid: 735b5f04a7d2ce1fea80f5ffbfbefe45, type: 3}
+  SpellQLoop: {fileID: 3094330708855449807, guid: 17f1455b384bc28aea4c3506ea4a9f99, type: 3}
+  SpellQEnd: {fileID: -3743569049614240450, guid: be0574ee8a19446eaa39d14d45dc2c1c, type: 3}
   SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
-  SpellR: {fileID: 0}
+  SpellRStart: {fileID: -7221273921338402319, guid: bdff79776ddb90bb7ae7571105dd908d, type: 3}
+  SpellRLoop: {fileID: -2774071859138458923, guid: 5153263434348bfe9b4b65f5541c2755, type: 3}
+  SpellREnd: {fileID: 2359611245458126371, guid: c37bf1fea2fbd914e9ff797c1e5557c7, type: 3}
   SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}

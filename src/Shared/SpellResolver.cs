@@ -110,20 +110,29 @@ namespace SlopArena.Shared
 
         /// <summary>
         /// Check remaining active projectiles for ground collision.
-        /// Any projectile with an explosion config that is below the floor Y
-        /// gets an explosion spawned at the floor and is deactivated.
+        /// Samples the arena heightmap at each projectile's XZ position.
+        /// If the projectile has reached or crossed the terrain surface,
+        /// spawns the explosion at ground level and deactivates the projectile.
         /// </summary>
-        public void CheckGroundCollision(float floorY)
+        public void CheckGroundCollision(ArenaDefinition arena)
         {
             for (int i = _hitboxes.Count - 1; i >= 0; i--)
             {
                 var hb = _hitboxes[i];
                 if (!hb.Active || !hb.Explosion.HasValue || hb.Gravity <= 0f) continue;
-                if (hb.Y + (hb.Radius * 0.5f) >= floorY) continue;
 
-                // Below ground: queue explosion, deactivate
+                // Sample ground height at projectile's current XZ
+                float groundY = arena.Heightmap.Data != null && arena.Heightmap.Data.Length > 0
+                    ? arena.Heightmap.Sample(hb.X, hb.Z)
+                    : 0f;
+                // Fallback for invalid sample (outside heightmap bounds)
+                if (groundY == float.MinValue) groundY = 0f;
+
+                if (hb.Y - hb.Radius > groundY) continue;
+
+                // Ground contact: queue explosion at ground level, deactivate
                 var exp = hb.Explosion.Value;
-                _pendingExplosions.Add((hb.X, floorY, hb.Z, exp, hb.OwnerId));
+                _pendingExplosions.Add((hb.X, groundY, hb.Z, exp, hb.OwnerId));
                 _hitboxes.RemoveAt(i);
             }
         }

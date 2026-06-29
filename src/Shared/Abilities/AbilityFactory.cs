@@ -30,7 +30,7 @@ public static class AbilityFactory
         (1, false) => new MankiAerosolFlame(), // RMB
         (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
         (3, _) => null,                         // E — data-driven ExplosiveMineSpec
-        (4, _) => new MankiDiveBomb(),         // R — Dive Bomb
+        (4, _) => new MankiBazooka(),          // R — Bazooka
         (5, _) => new MankiOverclock(),        // F — Overclock
         _ => null, // No ServerAbility = data-driven fallback
     };

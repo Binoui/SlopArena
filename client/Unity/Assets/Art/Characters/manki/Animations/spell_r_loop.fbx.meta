@@ -31,7 +31,7 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: HumanM@Bazooka_AimPrecise01
+      name: spell_r_loop
       takeName: HumanM@Bazooka_AimPrecise01
       internalID: -2774071859138458923
       firstFrame: 0

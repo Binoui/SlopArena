@@ -219,11 +219,11 @@ Only one character is active in the codebase. Design others from scratch followi
 | AirRMB | Medium air kick | Physical | Medium knockback |
 | Q | Round Bomb (projectile) | Ability | Lobbed arc, explodes on impact — poke/zone |
 | E | Dynamite Jump | Ability | Rocket jump, vertical mobility, knockback on detonation — defensive + combo setup |
-| R | Dive Bomb | Ability | Rise up, aim downward, then plunge into target zone. Risky recovery if baited; opponent can dash-invuln through it |
+| R | Bazooka | Ability | Rise ~5m (skips if airborne), aim ground indicator, fire explosive shell. Explodes on entity hit or ground impact. Ranged artillery from height. |
 | F | Overclock (ult) | Ability | Self-buff 8s — all attacks deal +3 bonus damage and +0.5m larger hitboxes |
 | Passive | — | — | (None yet) |
 
-**Gameplan**: poke with Q → go in with E → ground combo → R from air for burst. E knockback doubles as defensive peel. Zone denial with RMB. F is the "win neutral" steroid — no single big hit, makes everything scarier.
+**Gameplan**: poke with Q → go in with E → ground combo → R from air for artillery burst. E knockback doubles as defensive peel. Zone denial with RMB. F is the "win neutral" steroid — no single big hit, makes everything scarier.
 ### Future characters
 
 When designing a new character, start from one of the 4 archetypes defined above, then fill the 8 ability slots (LMB, AirLMB, RMB, AirRMB, Q, E, R, F). Document in `docs/characters/<name>.md`.
