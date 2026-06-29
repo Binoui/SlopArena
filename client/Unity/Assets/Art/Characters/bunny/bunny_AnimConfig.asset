@@ -16,7 +16,6 @@ MonoBehaviour:
   Run: {fileID: -203655887218126122, guid: 7e637bc200fade57b9c8e3d9f2019685, type: 3}
   Jump: {fileID: -203655887218126122, guid: ce90958a00f29b78ba7c075c5377ad0d, type: 3}
   Fall: {fileID: -203655887218126122, guid: d5e3a061b5bb186c3ad2b7a7ef2c5b83, type: 3}
-  Land: {fileID: 0}
   Attack1: {fileID: -203655887218126122, guid: bc51cfdcbd63175dab2224cb575babca, type: 3}
   Attack2: {fileID: -203655887218126122, guid: 68ce0ae61a4f63f8d88f4fb75a30a098, type: 3}
   Attack3: {fileID: -203655887218126122, guid: 529c269afbfaf7bceb5c573ad4dd8e9f, type: 3}

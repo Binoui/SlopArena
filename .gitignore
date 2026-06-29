@@ -124,9 +124,11 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 /UserSettings/
 /Temp/
 
-client/Unity/Assets/LowPolyFantasyArena*
-client/Unity/Assets/LowPolyFantasyArena2*
-client/Unity/Assets/LowPolyMegaBundle*
+client/Unity/Assets/AnimationPacks
+client/Unity/Assets/AnimationPacks/*
+
+client/Unity/Assets/Plugins
+client/Unity/Assets/Plugins/*
 
 # Auto-generated prefabs from symlinked asset packs (regenerate on clone)
 client/Unity/Assets/Prefabs/Arena_*.prefab
