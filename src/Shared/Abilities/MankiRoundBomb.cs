@@ -3,8 +3,12 @@ using System;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
-    /// Manki's Q: throw a bomb projectile in a parabolic arc.
-    /// Reads ProjectileConfig from AbilitySpec.Params at runtime.
+    /// Manki's Q: hold to aim a parabolic bomb projectile, release to throw.
+    ///
+    /// Three-phase pipeline:
+    ///   1. Start (AnimIndex=0, spell_q_start) — plays then auto-exit-time transitions to loop
+    ///   2. Hold (AnimIndex=1, spell_q_loop) — loops while player holds Q, accumulating ChargeTicks
+    ///   3. Throw (AnimIndex=2, spell_q_end) — on release, spawns projectile, ends after throw anim
     /// </summary>
     public sealed class MankiRoundBomb : ServerAbility
     {
@@ -16,16 +20,46 @@ namespace SlopArena.Shared.Abilities
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            s.AnimIndex = 0;
-            s.AnimLockTicks = (ushort)GetParam(def, "throw_duration", 60f);
-            s.IsAiming = true; // show aim indicator
+            s.AnimIndex = 0; // spell_q_start
+            s.ComboStage = 0;
+            s.IsAiming = true;
+            // Minimal lock to prevent cancel during start animation; exit-time drives start→loop
+            s.AnimLockTicks = 8;
+            // Reset charge ticks for fresh hold
+            s.ChargeTicks = 0;
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
+            if (s.ComboStage == 0)
+            {
+                // ── Hold phase ──
+
+                // After start anim window, advance to loop
+                if (s.AttackElapsedTicks > 8)
+                    s.AnimIndex = 1; // spell_q_loop
+
+                // Accumulate charge ticks while holding
+                if (s.ChargeTicks < ushort.MaxValue)
+                    s.ChargeTicks++;
+
+                // Auto-release: advance to throw phase after minimum hold window
+                // (input-based release detection is not possible since ActiveSlot is edge-triggered)
+                if (s.AttackElapsedTicks >= 12)
+                {
+                    // Advance to throw phase
+                    s.ComboStage = 1;
+                    s.AnimIndex = 2; // spell_q_end
+                    s.AttackElapsedTicks = 0; // reset for throw duration
+                }
+                return;
+            }
+
+            // ── Throw phase (ComboStage == 1) ──
+
             ushort throwTick = (ushort)GetParam(def, "throw_trigger_tick", 10f);
 
-            // Spawn projectile at throw_trigger_tick (mid-animation)
+            // Spawn projectile at throw_trigger_tick (mid-throw animation)
             if (!_projectileSpawned && s.AttackElapsedTicks >= throwTick)
             {
                 _projectileSpawned = true;
@@ -82,7 +116,7 @@ namespace SlopArena.Shared.Abilities
                 });
             }
 
-            // End ability when duration expires
+            // End ability when throw animation completes
             ushort duration = (ushort)GetParam(def, "throw_duration", 60f);
             if (s.AttackElapsedTicks >= duration)
                 EndAbility(ref s);

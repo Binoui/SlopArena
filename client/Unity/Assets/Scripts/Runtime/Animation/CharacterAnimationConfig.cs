@@ -16,7 +16,6 @@ namespace SlopArena.Client.Animation
         public AnimationClip Run;
         public AnimationClip Jump;
         public AnimationClip Fall;
-        public AnimationClip Land;
 
         [Header("Combat")]
         public AnimationClip Attack1;
@@ -45,7 +44,6 @@ namespace SlopArena.Client.Animation
                 "run" => Run,
                 "jump" => Jump,
                 "fall" => Fall,
-                "land" => Land,
                 "attack_1" => Attack1,
                 "attack_2" => Attack2,
                 "attack_3" => Attack3,

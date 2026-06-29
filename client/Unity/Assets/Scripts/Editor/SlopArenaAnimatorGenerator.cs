@@ -62,39 +62,6 @@ namespace SlopArena.Client.Editor
             // ── State machine (single layer) ──
             var sm = controller.layers[0].stateMachine;
 
-            // BlendTree
-            var blendTree = new BlendTree();
-            blendTree.name = "MovementBlend";
-            blendTree.blendParameter = "Speed";
-            blendTree.blendType = BlendTreeType.Simple1D;
-            blendTree.AddChild(GetClip(clipMap, "idle") ?? Dummy("idle"), 0f);
-            blendTree.AddChild(GetClip(clipMap, "run") ?? Dummy("run"), 1f);
-            AssetDatabase.AddObjectToAsset(blendTree, controller);
-
-            var moveState = sm.AddState("Movement", new Vector3(250, 100, 0));
-            moveState.motion = blendTree;
-            moveState.writeDefaultValues = false;
-            sm.defaultState = moveState;
-
-            var jumpState = State(sm, "Jump", new Vector3(250, 250, 0), GetClip(clipMap, "jump"));
-            var fallState = State(sm, "Fall", new Vector3(400, 250, 0), GetClip(clipMap, "fall"));
-            var landState = State(sm, "Land", new Vector3(550, 250, 0), GetClip(clipMap, "land"));
-
-            Trans(moveState, jumpState, "Jump", AnimatorConditionMode.If, 0.05f);
-            Trans(moveState, fallState, "IsGrounded", AnimatorConditionMode.IfNot, 0.1f);
-            Trans(jumpState, fallState, "IsGrounded", AnimatorConditionMode.IfNot, 0.1f, exitTime: 0.3f);
-            Trans(fallState, landState, "IsGrounded", AnimatorConditionMode.If, 0.05f);
-            Trans(landState, moveState, null, AnimatorConditionMode.If, 0.05f, exitTime: 0.9f);
-
-            // ── Combat states ──
-            var dashState = State(sm, "Dash", new Vector3(250, 350, 0), GetClip(clipMap, "dash"));
-            var hitstunState = State(sm, "Hitstun", new Vector3(250, 450, 0),
-                GetClip(clipMap, "hit_small") ?? GetClip(clipMap, "hit_light"));
-
-            AutoExit(dashState, moveState);
-            AutoExit(hitstunState, moveState);
-
-            // ── Ability states (pass 1: create states only, NO AnyState) ──
             var charClass = name.ToLowerInvariant() switch
             {
                 "manki" => CharacterClass.Manki,
@@ -102,149 +69,103 @@ namespace SlopArena.Client.Editor
                 _ => CharacterClass.Manki,
             };
             var charDef = CharacterRegistry.Get(charClass);
-            if (charDef != null)
+
+            // ── Build graph from character definition ──
+            var graph = AnimatorGraphBuilder.Build(charDef);
+
+            // ── Create Unity states from graph (pass 1) ──
+            foreach (var gs in graph.States)
             {
-                var seen = new HashSet<string>();
-                int ax = 500, ay = 50;
-                const int stepY = 40;
-
-                for (int slot = 0; slot < 6; slot++)
+                var clip = gs.IsBlendTree ? null : GetClip(clipMap, gs.MotionName);
+                var st = sm.AddState(gs.Name, new Vector3(gs.PositionX, gs.PositionY, 0));
+                if (gs.IsBlendTree)
                 {
-                    foreach (bool airborne in new[] { false, true })
-                    {
-                        var spec = charDef.GetSlotAbility(slot, airborne);
-                        if (spec?.AnimationNames == null) continue;
-                        for (int stage = 0; stage < spec.AnimationNames.Length; stage++)
-                        {
-                            string animName = spec.AnimationNames[stage];
-                            if (string.IsNullOrEmpty(animName) || !seen.Add(animName))
-                                continue;
-
-                            var clip = GetClip(clipMap, animName);
-                            var st = State(sm, animName, new Vector3(ax, ay, 0), clip);
-                            AutoExit(st, moveState);
-                            ay += stepY;
-                        }
-                    }
+                    var bt = new BlendTree();
+                    bt.name = "MovementBlend";
+                    bt.blendParameter = "Speed";
+                    bt.blendType = BlendTreeType.Simple1D;
+                    bt.AddChild(GetClip(clipMap, "idle") ?? Dummy("idle"), 0f);
+                    bt.AddChild(GetClip(clipMap, "run") ?? Dummy("run"), 1f);
+                    AssetDatabase.AddObjectToAsset(bt, controller);
+                    st.motion = bt;
                 }
-
-                // ── Direct stage chain transitions (combo chaining) ──
-                for (int slot = 0; slot < 6; slot++)
+                else if (clip != null)
                 {
-                    foreach (bool airborne in new[] { false, true })
-                    {
-                        var spec = charDef.GetSlotAbility(slot, airborne);
-                        if (spec?.AnimationNames == null || spec.AnimationNames.Length < 2) continue;
-
-                        for (int stage = 0; stage < spec.AnimationNames.Length - 1; stage++)
-                        {
-                            string fromName = spec.AnimationNames[stage];
-                            string toName = spec.AnimationNames[stage + 1];
-                            var fromState = FindState(sm, fromName);
-                            var toState = FindState(sm, toName);
-                            if (fromState == null || toState == null) continue;
-                            if (fromState == toState) continue;
-
-                            var chain = fromState.AddTransition(toState);
-                            chain.conditions = new[]
-                            {
-                                new AnimatorCondition
-                                {
-                                    mode = AnimatorConditionMode.Equals,
-                                    parameter = "ComboStage",
-                                    threshold = stage + 1,
-                                },
-                            };
-                            chain.duration = 0f;
-                            chain.hasExitTime = false;
-                        }
-                    }
+                    st.motion = clip;
                 }
-
-                if (charDef.ClipOverrides != null)
-                {
-                    foreach (var ov in charDef.ClipOverrides)
-                    {
-                        string stateName = ov.Name;
-                        if (string.IsNullOrEmpty(stateName) || !seen.Add(stateName))
-                            continue;
-                        var clip2 = GetClip(clipMap, ov.Name);
-                        var st2 = State(sm, stateName, new Vector3(ax, ay, 0), clip2);
-                        AutoExit(st2, moveState);
-                        ay += stepY;
-                    }
-                }
+                st.writeDefaultValues = false;
+                if (gs.IsDefault)
+                    sm.defaultState = st;
             }
 
-            // Save & reload — bakes internal graph nodes so AnyState edges serialize correctly
+            // Save & reload — bakes internal graph nodes so ALL transitions serialize correctly
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
             sm = controller.layers[0].stateMachine;
 
-            // ── AnyState transitions (pass 2: after reload) ──
-            // Relocate all states from baked graph
-            AnimatorState FindSt(string sname)
+            // ── Pass 2: All transitions after reload ──
+            // (Creating transitions before save causes Edge.WakeUp NRE on reload)
+
+            // ── Direct transitions ──
+            foreach (var dt in graph.DirectTransitions)
             {
-                foreach (var cs in sm.states)
-                    if (cs.state.name == sname) return cs.state;
-                return null;
-            }
-            moveState = FindSt("Movement") ?? sm.AddState("Movement", Vector3.zero);
-            jumpState = FindSt("Jump") ?? jumpState;
-            fallState = FindSt("Fall") ?? fallState;
-            landState = FindSt("Land") ?? landState;
-            dashState = FindSt("Dash") ?? dashState;
-            hitstunState = FindSt("Hitstun") ?? hitstunState;
-
-            // Combat AnyState transitions
-            var aDash = sm.AddAnyStateTransition(dashState);
-            aDash.conditions = new[] { new AnimatorCondition { mode = AnimatorConditionMode.If, parameter = "Dash" } };
-            aDash.duration = 0f;
-            aDash.interruptionSource = TransitionInterruptionSource.Source;
-
-            var aHit = sm.AddAnyStateTransition(hitstunState);
-            aHit.conditions = new[] { new AnimatorCondition { mode = AnimatorConditionMode.If, parameter = "Hitstun" } };
-            aHit.duration = 0f;
-            aHit.interruptionSource = TransitionInterruptionSource.Source;
-
-            var aMove = sm.AddAnyStateTransition(moveState);
-            aMove.conditions = new[] { new AnimatorCondition { mode = AnimatorConditionMode.If, parameter = "Idle" } };
-            aMove.duration = 0f;
-            aMove.interruptionSource = TransitionInterruptionSource.Source;
-
-            // Ability AnyState transitions
-            if (charDef != null)
-            {
-                var seen2 = new HashSet<string>();
-                for (int slot = 0; slot < 6; slot++)
+                var from = FindState(sm, dt.FromState);
+                var to = FindState(sm, dt.ToState);
+                if (from == null || to == null) continue;
+                var t = from.AddTransition(to);
+                if (dt.Conditions.Length > 0)
                 {
-                    foreach (bool airborne in new[] { false, true })
+                    t.conditions = dt.Conditions.Select(c => new AnimatorCondition
                     {
-                        var spec = charDef.GetSlotAbility(slot, airborne);
-                        if (spec?.AnimationNames == null) continue;
-                        for (int stage = 0; stage < spec.AnimationNames.Length; stage++)
-                        {
-                            string animName = spec.AnimationNames[stage];
-                            if (string.IsNullOrEmpty(animName) || !seen2.Add(animName))
-                                continue;
+                        mode = (AnimatorConditionMode)(int)c.Mode,
+                        parameter = c.Parameter,
+                        threshold = c.Mode == AnimConditionMode.If || c.Mode == AnimConditionMode.IfNot ? 0f : c.Threshold,
+                    }).ToArray();
+                }
+                else
+                {
+                    t.conditions = System.Array.Empty<AnimatorCondition>();
+                }
+                t.duration = dt.Duration;
+                t.hasExitTime = dt.HasExitTime;
+                if (dt.HasExitTime) t.exitTime = dt.ExitTime;
+            }
 
-                            var target = FindSt(animName);
-                            if (target == null) continue;
-
-                            var at = sm.AddAnyStateTransition(target);
-                            at.conditions = new[]
-                            {
-                                new AnimatorCondition { mode = AnimatorConditionMode.If, parameter = "Attack" },
-                                new AnimatorCondition { mode = AnimatorConditionMode.Equals, parameter = "AttackSlot", threshold = slot },
-                                new AnimatorCondition { mode = AnimatorConditionMode.Equals, parameter = "ComboStage", threshold = stage },
-                            };
-                            at.duration = 0f;
-                            at.interruptionSource = TransitionInterruptionSource.Source;
-                        }
+            // ── Auto-exit to Movement for states that need it ──
+            var moveState = FindState(sm, "Movement");
+            if (moveState != null)
+            {
+                foreach (var gs in graph.States.Where(s => s.AutoExit))
+                {
+                    var from = FindState(sm, gs.Name);
+                    if (from != null && from != moveState)
+                    {
+                        var t = from.AddTransition(moveState);
+                        t.hasExitTime = true;
+                        t.exitTime = 0.85f;
+                        t.duration = 0.1f;
+                        t.conditions = System.Array.Empty<AnimatorCondition>();
                     }
                 }
+            }
+
+            // ── AnyState transitions ──
+            foreach (var at in graph.AnyTransitions)
+            {
+                var to = FindState(sm, at.ToState);
+                if (to == null) continue;
+                var t = sm.AddAnyStateTransition(to);
+                t.conditions = at.Conditions.Select(c => new AnimatorCondition
+                {
+                    mode = (AnimatorConditionMode)(int)c.Mode,
+                    parameter = c.Parameter,
+                    threshold = c.Mode == AnimConditionMode.If || c.Mode == AnimConditionMode.IfNot ? 0f : c.Threshold,
+                }).ToArray();
+                t.duration = at.Duration;
+                if (at.InterruptionSource)
+                    t.interruptionSource = TransitionInterruptionSource.Source;
             }
 
             EditorUtility.SetDirty(controller);
@@ -265,6 +186,15 @@ namespace SlopArena.Client.Editor
             var selected = Selection.activeObject;
             if (selected == null) return false;
             string path = AssetDatabase.GetAssetPath(selected);
+
+            // Static assert: AnimConditionMode values match Unity's AnimatorConditionMode
+            Debug.Assert((int)AnimConditionMode.If == (int)AnimatorConditionMode.If,
+                "AnimConditionMode.If mismatch with Unity's AnimatorConditionMode");
+            Debug.Assert((int)AnimConditionMode.IfNot == (int)AnimatorConditionMode.IfNot,
+                "AnimConditionMode.IfNot mismatch with Unity's AnimatorConditionMode");
+            Debug.Assert((int)AnimConditionMode.Equals == (int)AnimatorConditionMode.Equals,
+                "AnimConditionMode.Equals mismatch with Unity's AnimatorConditionMode");
+
             return AssetDatabase.IsValidFolder(path);
         }
 
@@ -273,28 +203,18 @@ namespace SlopArena.Client.Editor
         private static Dictionary<string, AnimationClip> BuildClipMap(string rootDir)
         {
             var map = new Dictionary<string, AnimationClip>(System.StringComparer.OrdinalIgnoreCase);
-            var searchDirs = new List<string> { rootDir };
-            string? parent = Path.GetDirectoryName(rootDir);
-            if (parent != null && parent.StartsWith("Assets"))
-                searchDirs.Add(parent);
-
-            foreach (string searchDir in searchDirs.Distinct())
+            foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { rootDir }))
             {
-                foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { searchDir }))
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var clips = AssetDatabase.LoadAllAssetsAtPath(path)
+                    .OfType<AnimationClip>()
+                    .Where(c => !c.name.StartsWith("__preview") && !c.name.StartsWith("_"));
+
+                foreach (var clip in clips)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    var clips = AssetDatabase.LoadAllAssetsAtPath(path)
-                        .OfType<AnimationClip>()
-                        .Where(c => !c.name.StartsWith("__preview") && !c.name.StartsWith("_"));
-                    foreach (var clip in clips)
-                    {
-                        string n = clip.name.Contains("|")
-                            ? clip.name.Split('|').Last() : clip.name;
-                        if (n == "mixamo.com" || n == "mixamo")
-                            n = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
-                        if (!map.ContainsKey(n))
-                            map[n] = clip;
-                    }
+                    string key = clip.name;
+                    if (!map.ContainsKey(key))
+                        map[key] = clip;
                 }
             }
             return map;
@@ -306,38 +226,6 @@ namespace SlopArena.Client.Editor
             return clip;
         }
 
-        private static AnimatorState State(AnimatorStateMachine sm, string name, Vector3 pos, AnimationClip? clip)
-        {
-            var s = sm.AddState(name, pos);
-            if (clip != null)
-                s.motion = clip;
-            else
-                Debug.LogWarning($"[AnimGen] No clip found for state '{name}' — assign manually");
-            s.writeDefaultValues = false;
-            return s;
-        }
-
-        private static void Trans(AnimatorState from, AnimatorState to, string? param,
-            AnimatorConditionMode mode, float duration, float exitTime = -1f)
-        {
-            var t = from.AddTransition(to);
-            if (param != null)
-                t.conditions = new[] { new AnimatorCondition { mode = mode, parameter = param } };
-            if (exitTime >= 0f)
-            {
-                t.hasExitTime = true;
-                t.exitTime = exitTime;
-            }
-            t.duration = duration;
-        }
-
-        private static void AutoExit(AnimatorState from, AnimatorState to)
-        {
-            var t = from.AddTransition(to);
-            t.hasExitTime = true;
-            t.exitTime = 0.85f;
-            t.duration = 0.1f;
-        }
 
         /// <summary>
         /// Find an AnimatorState by name in the state machine.
@@ -358,7 +246,6 @@ namespace SlopArena.Client.Editor
                 case "run": config.Run = clip; break;
                 case "jump": config.Jump = clip; break;
                 case "fall": config.Fall = clip; break;
-                case "land": config.Land = clip; break;
                 case "attack_1": config.Attack1 = clip; break;
                 case "attack_2": config.Attack2 = clip; break;
                 case "attack_3": config.Attack3 = clip; break;
