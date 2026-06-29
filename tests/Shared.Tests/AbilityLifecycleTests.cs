@@ -446,4 +446,110 @@ public class AbilityLifecycleTests
         Assert.True(after.AnimLockTicks > 25 && after.AnimLockTicks <= 30,
             $"Expected AnimLockTicks ~29 (30 set, 1 decremented by TickTimers), got {after.AnimLockTicks}");
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ── AirRMB (slot 2, airborne): data-driven — basic lifecycle ──
+    // ══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void MankiAirRMB_BasicActivationAndExpiry()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f; // airborne
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
+        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal((byte)2, t0.AttackSlot);
+
+        // AirRMB DurationTicks=28, wait 35 for margin
+        for (int i = 0; i < 35; i++)
+            TestHelpers.TickDefault(sim, 1);
+
+        var ended = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, ended.State);
+        Assert.Equal((byte)0, ended.AttackSlot);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ── RMB (slot 2): charge vs normal — basic activation ──
+    // ══════════════════════════════════════════════════════════════════
+    // MankiAerosolFlame.OnStart checks s.ChargeTicks >= chargeThreshold
+    // (45) to decide charged variant. Normal = AnimIndex 0, Charged = 1.
+
+    [Fact]
+    public void MankiRMB_Normal_AnimIndexZero()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        state.ChargeTicks = 0; // explicitly uncharged
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
+        Assert.Equal(ActionState.Attacking, t0.State);
+        // Normal variant: AnimIndex=0
+        Assert.Equal(0, t0.AnimIndex);
+    }
+
+    [Fact]
+    public void MankiRMB_Charged_AnimIndexOne()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        state.ChargeTicks = 50; // >= charge_threshold (45)
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
+        Assert.Equal(ActionState.Attacking, t0.State);
+        // Charged variant: AnimIndex=1
+        Assert.Equal(1, t0.AnimIndex);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ── E (slot 4): ExplosiveMine — basic mine placement ──
+    // ══════════════════════════════════════════════════════════════════
+    // ExplosiveMineSpec overrides SpawnHitbox. At TriggerTick=0, the
+    // data-driven path calls SpawnHitbox, which places a static mine
+    // hitbox (no gravity, has explosion config) in the resolver.
+
+    // NOTE: TriggerTick=0 in the spec means "spawn on activation tick", but
+    // TickTimers increments AttackElapsedTicks to 1 before SpawnHitboxEvents runs,
+    // so TriggerTick=0 never matches. Mine placement via SpawnHitbox override
+    // is blocked by this timing issue (known bug). We verify basic lifecycle.
+
+    [Fact]
+    public void MankiE_BasicActivation()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
+        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal((byte)4, t0.AttackSlot);
+    }
+
+    [Fact]
+    public void MankiE_ExpiresToIdle()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+
+        // E has no ServerAbility → data-driven: DurationTicks=20
+        for (int i = 0; i < 30; i++)
+            TestHelpers.TickDefault(sim, 1);
+
+        var ended = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, ended.State);
+    }
 }
