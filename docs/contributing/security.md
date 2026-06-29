@@ -19,14 +19,14 @@ timeline for a fix.
 ## Scope
 
 This policy covers:
-- The game client (Godot 4 .NET C# project)
+- The game client (Unity 6 C# project)
 - The headless server (`Server/`)
 - The `Shared/` C# library
 - CI/CD workflows and infrastructure
 
 ## Out of Scope
 
-- Issues in Godot Engine itself (report upstream)
+- Issues in Unity Editor itself (report upstream)
 - Vulnerabilities in .NET runtime (report to Microsoft)
 - General feature requests or bugs (open a regular issue)
 

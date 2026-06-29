@@ -34,7 +34,7 @@ SlopArena/
 │   ├── ArenaDefinition.cs   ← Arena data (platforms, spawns, kill height)
 │   └── MovementProfiles.cs  ← (deleted — dead code)
 │
-├── client/Unity/         ← Unity client (replacing old Godot client)
+├── client/Unity/         ← Unity game client
 │   └── Assets/Scripts/
 │       ├── Runtime/
 │       │   ├── Entities/       ← PlayerRenderer (MonoBehaviour, drives Animator)
@@ -143,7 +143,7 @@ SlopArena/
 
 ## Common Pitfalls
 
-1. **Don't use `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
+1. **Don't use `UnityEngine.*` or `Godot.` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
 2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
 3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
 4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
@@ -154,7 +154,7 @@ SlopArena/
 ## Verifying Changes
 
 ```bash
-# Build all projects (Shared + Godot client + Server)
+# Build Shared library + Server
 dotnet build --nologo
 
 # Run ALL simulation unit tests (63+ tests: physics, abilities, combat, edges)
@@ -166,7 +166,7 @@ dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests|AbilityLifecycle
 # Run linter
 make lint
 
-# Run sandbox (Godot editor → F5)
+# Run Unity client (open client/Unity/ in Unity Hub, press Play)
 
 # Run headless server (separate terminal)
 dotnet run --project Server/SlopArena.Server.csproj
@@ -174,7 +174,7 @@ dotnet run --project Server/SlopArena.Server.csproj
 
 > The simulation tests are the **first thing to run** after any `src/Shared/` change.
 > They validate state transitions, ability lifecycles, and hit detection without
-> needing Godot or a server. Build & test together takes <3 seconds.
+> needing Unity or a server. Build & test together takes <3 seconds.
 
 ---
 
@@ -188,4 +188,4 @@ dotnet run --project Server/SlopArena.Server.csproj
 | `docs/systems/combat-systems.md` | Universal combat mechanics |
 | `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
 | `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
-| `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no Godot physics) |
+| `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no engine physics in Shared/) |

@@ -66,18 +66,18 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ```bash
 dotnet test tests/Shared.Tests/ --nologo
 ```
-63+ tests cover physics (jump/dash/land), ability lifecycles, combat integration,
-and edge cases — all pure C#, no Godot needed. Build + test completes in <3s.
+93+ tests cover physics, ability lifecycles, combat integration, and edge cases
+— all pure C#, no Unity needed. Build + test completes in <3s.
 
 SlopArena uses a server-authoritative 60Hz UDP model with client-side prediction + reconciliation.
 Every line of gameplay code must be written to work deterministically on both client and server.
 
 ### 5a. Shared/ is Sacred
 
-`Shared/` is a pure C# library with **zero** Godot dependencies. This is enforced by `SlopArena.Shared.csproj` which does not reference any Godot packages. Rules:
-- No `Godot.` imports in any Shared/ file — ever
-- All math uses `System.MathF`, `System.Math` (not Godot's `Mathf`)
-- All data types use plain C# structs (not Godot's `Vector3`, `Transform3D`, etc.)
+`Shared/` is a pure C# library with **zero** Unity dependencies. Rules:
+- No `UnityEngine.*` or `Godot.*` imports in any Shared/ file — ever
+- All math uses `System.MathF`, `System.Math` (not Unity/Godot's `Mathf`)
+- All data types use plain C# structs (not Unity's `Vector3`, Godot's `Transform3D`)
 - All hit detection, knockback, physics simulation goes in Shared/
 - If a function computes a gameplay result (damage, knockback, position), it takes primitives and returns primitives
 
@@ -96,12 +96,10 @@ dashCooldown -= delta;
 
 Use `ushort` for tick counts (max 65535 ticks = ~18 minutes, enough for any cooldown).
 
-### 5c. No Godot Physics Queries on Server
-
-Server-side hit detection NEVER uses `GetWorld3D().DirectSpaceState.IntersectRay()` or any Godot physics node.
-All hit detection is done via `CombatMath.cs` and `SpellResolver.cs` in Shared/ using pure math.
-
-The client CAN use Godot physics for rendering/prediction, but the server is the authority with pure math.
+### 5c. No Unity/Godot Physics Queries on Server
+Server-side hit detection uses pure math via `CombatMath.cs` and `SpellResolver.cs`.
+No engine physics queries on the server.
+The client CAN use Unity physics for rendering/prediction, but the server is the authority with pure math.
 
 ### 5d. Deterministic Float Math
 
@@ -113,7 +111,7 @@ The client CAN use Godot physics for rendering/prediction, but the server is the
 
 - All network packets use `System.Buffers.Binary.BinaryPrimitives` for explicit little-endian serialization
 - Packet size is a compile-time constant (`Size`)
-- No Godot types in packet structs — serialize as primitives (float, int, byte, ushort)
+- No Unity/Godot types in packet structs — serialize as primitives (float, int, byte, ushort)
 - Client sends `ClientInputPacket` (14 bytes), server responds with `CharacterStatePacket` (38 bytes)
 
 ### 5f. Don't Mix Rendering with Logic
@@ -126,8 +124,8 @@ The client CAN use Godot physics for rendering/prediction, but the server is the
 
 ```
 ┌─────────────────────┐      UDP       ┌─────────────────────┐
-│   Godot Client       │ ◄──────────►   │   .NET Server       │
-│   Scripts/           │                │   Server/            │
+│   Unity Client       │ ◄──────────►   │   .NET Server       │
+│   client/Unity/      │                │   Server/            │
 │   ┌───────────────┐  │  InputPacket  │   ┌───────────────┐  │
 │   │ Prediction    │  │   Character   │   │ SimulateTick  │  │
 │   │ + Rendering   │  │   StatePacket │   │ (authority)   │  │

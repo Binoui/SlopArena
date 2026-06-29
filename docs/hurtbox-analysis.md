@@ -2,12 +2,12 @@
 
 ## The Core Problem
 
-Character hurtboxes (server-side, from baked data) don't align with the visual model (client-side, from Godot skeleton). The user sees hurtboxes floating above or below the rendered character.
+Character hurtboxes (server-side, from baked data) don't align with the visual model (client-side, from Unity Animator). The user sees hurtboxes floating above or below the rendered character.
 
 ## Architecture
 
 ```
-Server (pure C#)                              Client (Godot)
+Server (pure C#)                              Client (Unity)
 ─────────────────                              ──────────────
 CharacterDefinition                            CharacterDefinition
   - CapsuleHeight, CapsuleRadius                 - same
@@ -15,11 +15,10 @@ CharacterDefinition                            CharacterDefinition
   - ModelSoleOffset                             - ModelSoleOffset
   - ModelYOffset (computed or manual)           - AutoModelYOffset + ComputeModelYOffset()
 
-BakedAnimationData (.bin)                       GLB file imported in Godot
-  - Bone positions per frame                     - Skeleton3D with bones
-  - Recorded at 60fps via headless_bake.gd       - Bone transforms via Godot scene tree
-  - Uses get_bone_global_pose()                  - Bones rendered through Skeleton3D → Armature → GLB instance hierarchy
-
+BakedAnimationData (.bin)                       GLB file imported in Unity
+  - Bone positions per frame                     - Animator with bones
+  - Recorded at 60fps via legacy bake tool       - Bone transforms via Unity's Animator
+  - Uses get_bone_global_pose()                  - Bones rendered through Animator → model hierarchy
 ServerSimulation.Tick():                        PlayerModel.Load():
   for each bone:                                  modelNode.Scale = VisualScale
     bx, by, bz = baked.GetBonePosition(...)       modelNode.Position.Y = ComputeModelYOffset()
