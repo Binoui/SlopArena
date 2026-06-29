@@ -9,8 +9,20 @@ namespace SlopArena.Shared
     /// The server reads Stages/HitboxEvents/CooldownTicks from this.
     /// The client wraps this in an Ability subclass for input/indicators.
     /// </summary>
+    public enum AbilityBehavior : byte
+    {
+        MeleeCombo,          // Multi-stage LMB combo, chained on input
+        ChargeAttack,        // Hold briefly to charge (2 anims: attack, charged). RMB.
+        AimedProjectile,     // Hold to aim parabola, release to throw (3 anims: start, loop, throw). Q.
+        Projectile,          // Fire-and-forget projectile. Single anim.
+        AirGroundProjectile, // Behaves differently when airborne vs grounded.
+        SelfBuff,            // Applies a buff to self.
+        AreaDenial,          // Places persistent hazard (mine, flame wall).
+    }
+
     public class AbilitySpec
     {
+        public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public string Name = "";
         /// <summary>
         /// DEPRECATED: No longer used since slot-based mapping.
