@@ -31,7 +31,9 @@ namespace SlopArena.Client.Animation
         public AnimationClip SpellQLoop;
         public AnimationClip SpellQEnd;
         public AnimationClip SpellE;
-        public AnimationClip SpellR;
+        public AnimationClip SpellRStart;
+        public AnimationClip SpellRLoop;
+        public AnimationClip SpellREnd;
         public AnimationClip SpellF;
 
         /// <summary>
@@ -58,7 +60,9 @@ namespace SlopArena.Client.Animation
                 "spell_q_end" => SpellQEnd,
                 "spell_q" => SpellQStart,
                 "spell_e" => SpellE,
-                "spell_r" => SpellR,
+                "spell_r_start" => SpellRStart,
+                "spell_r_loop" => SpellRLoop,
+                "spell_r_end" => SpellREnd,
                 "spell_f" => SpellF,
                 _ => null,
             };

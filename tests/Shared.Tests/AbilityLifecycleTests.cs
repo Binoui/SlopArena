@@ -301,7 +301,7 @@ public class AbilityLifecycleTests
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // ── R: Dive Bomb — ability lifecycle ──
+    // ── R: Bazooka — ability lifecycle ──
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -310,13 +310,11 @@ public class AbilityLifecycleTests
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = 5f; // well above ground
+        state.PY = 5f;
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Press R (slot 5, index 4) while airborne
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 1);
-
         Assert.Equal(ActionState.Attacking, after.State);
         Assert.Equal((byte)5, after.AttackSlot);
     }
@@ -327,93 +325,17 @@ public class AbilityLifecycleTests
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = 5f; // well above ground
+        state.PY = 3f; // below riseHeight (5m) so rise is applied
         state.IsGrounded = false;
         state.VY = 0f;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Press R — should rise upward with rise_velocity (14f)
         var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 2);
-
-        // VY should be positive (upward) from rise velocity
         Assert.True(t1.VY > 0f,
             $"Expected upward velocity (rise), got VY={t1.VY}");
-        Assert.True(t1.PY > 5f,
+        Assert.True(t1.PY > 3f,
             $"Expected position to rise above start, got PY={t1.PY}");
     }
-
-    [Fact]
-    public void MankiR_AimPhase_SetsIsAiming()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // During aim window, IsAiming should be true
-        // TickN with aim input that has aiming=true + some aim distance
-        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5, aiming: true), 3);
-
-        Assert.True(t1.IsAiming,
-            "IsAiming should be true during the aim window");
-    }
-
-    [Fact]
-    public void MankiR_TransitionsFromAimingToResolving()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        state.VY = 0f;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Press R with aim input
-        var afterRise = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5, aiming: true), 1);
-
-        // Tick through aim window (30 ticks)
-        for (int i = 0; i < 35; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var afterAim = sim.GetState(1);
-
-        // After aim window, IsAiming should be false and character should be plunging down
-        Assert.False(afterAim.IsAiming,
-            "IsAiming should be false after aim window expires");
-        Assert.True(afterAim.VY < 0f,
-            $"Should be plunging downward after aim window, got VY={afterAim.VY}");
-    }
-
-    [Fact]
-    public void MankiR_EndsOnGroundContact()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        state.VY = 0f;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Press R
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5, aiming: true), 1);
-
-        // Tick through aim window (~30) + plunge to ground (~10-20)
-        for (int i = 0; i < 80; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var landed = sim.GetState(1);
-
-        // Ability should have ended — character should be Idle
-        Assert.Equal(ActionState.Idle, landed.State);
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // ── AimedGroundAbility — edge cases ──
-    // ══════════════════════════════════════════════════════════════════
 
     [Fact]
     public void MankiR_GroundedStart_StillLaunchesUpward()
@@ -425,15 +347,33 @@ public class AbilityLifecycleTests
         state.IsGrounded = true;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Press R while grounded — should still launch upward
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 2);
-
         Assert.True(after.VY > 0f,
             $"Grounded start should still launch upward, got VY={after.VY}");
     }
 
     [Fact]
-    public void MankiR_AnimLockSetDuringAim()
+    public void MankiR_RisesToTargetHeight()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 3f; // airborne below riseHeight so rise is applied
+        state.IsGrounded = false;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Press R and tick through rising phase
+        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
+        var after = TestHelpers.TickN(sim, aimInput, 60);
+
+        // Should have risen at least 4m above start (riseHeight=5, physics makes exact hard)
+        Assert.True(after.PY >= 7f,
+            $"Expected PY >= 7.0 (3+4), got PY={after.PY:F2}");
+    }
+
+    [Fact]
+    public void MankiR_MaintainsIsAimingDuringRiseAndAim()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -442,9 +382,62 @@ public class AbilityLifecycleTests
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 2);
-        Assert.True(after.AnimLockTicks > 25 && after.AnimLockTicks <= 30,
-            $"Expected AnimLockTicks ~29 (30 set, 1 decremented by TickTimers), got {after.AnimLockTicks}");
+        // Use manual loop so aim input is consistent every tick
+        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
+        for (int i = 0; i < 3; i++)
+            sim.Tick(new() { { 1, aimInput }, { 100, default } });
+
+        var t1 = sim.GetState(1);
+        Assert.True(t1.IsAiming,
+            "IsAiming should be true during rise and aim phases");
+    }
+
+    [Fact]
+    public void MankiR_FiresProjectileOnRelease()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
+
+        // Rise for 60 ticks (enough to reach riseHeight=10 from PY=5 with floatGravity=6)
+        for (int i = 0; i < 60; i++)
+            sim.Tick(new() { { 1, aimInput }, { 100, default } });
+
+        // Release R (IsAiming=false) — should transition to firing phase
+        var releaseInput = new InputState { ActiveSlot = 5, AimDistance = 500, IsAiming = false };
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new() { { 1, releaseInput }, { 100, default } });
+
+        var afterRelease = sim.GetState(1);
+        // After trigger tick (5), should be in ComboStage=1 (firing)
+        Assert.Equal((byte)1, afterRelease.ComboStage);
+    }
+
+    [Fact]
+    public void MankiR_EndsAfterFiringDuration()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        state.VY = 0f;
+        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
+        for (int i = 0; i < 60; i++)
+            sim.Tick(new() { { 1, aimInput }, { 100, default } });
+
+        // Release R to fire
+        var releaseInput = new InputState { ActiveSlot = 5, AimDistance = 500, IsAiming = false };
+        for (int i = 0; i < 80; i++)
+            sim.Tick(new() { { 1, releaseInput }, { 100, default } });
+        var ended = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, ended.State);
     }
 
     // ══════════════════════════════════════════════════════════════════

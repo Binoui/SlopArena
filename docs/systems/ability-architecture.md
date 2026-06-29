@@ -114,7 +114,7 @@ private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (s
     (1, false) => new MankiAerosolFlame(),
     (2, _) => new MankiRoundBomb(),
     (3, _) => null,          // E — data-driven ExplosiveMineSpec
-    (4, _) => new MankiDiveBomb(),   // R
+    (4, _) => new MankiBazooka(),   // R — rise-aim-fire bazooka
     (5, _) => new MankiOverclock(),  // F
     _ => null,
 };
@@ -141,7 +141,7 @@ private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (s
     (1, false) => new MankiAerosolFlame(), // Ground RMB
     (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
     (3, _) => null,                         // E — data-driven ExplosiveMineSpec
-    (4, _) => new MankiDiveBomb(),         // R
+    (4, _) => new MankiBazooka(),   // R — rise-aim-fire bazooka
     (5, _) => new MankiOverclock(),        // F
     _ => null, // Data-driven fallback for slots without ServerAbility
 };

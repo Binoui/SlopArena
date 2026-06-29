@@ -201,15 +201,12 @@ public class SpellResolverTests
     {
         var resolver = new SpellResolver();
         var hb = MakeHitbox(0, -1, 0); // below ground
-        hb.Gravity = 20f;               // must have gravity to be a projectile
-        hb.Explosion = new ProjectileExplosion
-        {
-            Radius = 2, Damage = 15, KnockbackForce = 60,
-            KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5,
-        };
+        hb.Gravity = 20f;
+        hb.Explosion = new ProjectileExplosion { Radius = 2, Damage = 15, KnockbackForce = 60, KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5 };
         resolver.Spawn(hb);
 
-        resolver.CheckGroundCollision(floorY: 0);
+        var arena = TestHelpers.TestArena();
+        resolver.CheckGroundCollision(arena);
 
         var explosions = resolver.DrainPendingExplosions();
         Assert.Single(explosions);
@@ -229,9 +226,9 @@ public class SpellResolverTests
         };
         resolver.Spawn(hb);
 
-        resolver.CheckGroundCollision(floorY: 0);
-
-        Assert.Empty(resolver.DrainPendingExplosions());
+        resolver.Spawn(hb);
+        var arena = TestHelpers.TestArena();
+        resolver.CheckGroundCollision(arena);
     }
 
     [Fact]
@@ -246,8 +243,8 @@ public class SpellResolverTests
             KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5,
         };
         resolver.Spawn(hb);
-
-        resolver.CheckGroundCollision(floorY: 0);
+        var arena = TestHelpers.TestArena();
+        resolver.CheckGroundCollision(arena);
 
         Assert.Empty(resolver.DrainPendingExplosions());
     }

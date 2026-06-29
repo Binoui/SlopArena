@@ -154,7 +154,9 @@ All lower case. Underscores for spaces.
 | `attack_heavy_release` | Charged punch release | RMB release |
 | `spell_q` | Round Bomb (projectile) | Q |
 | `spell_e` | Dynamite Jump (ground launch) | E |
-| `spell_r` | Dive Bomb (air slam) | R |
+| `spell_r_start` | Bazooka rise | R (start) |
+| `spell_r_loop` | Bazooka aim hover | R (loop) |
+| `spell_r_end` | Bazooka fire | R (end) |
 | `spell_f` | Overclock (ult) | F |
 
 Each character defines their own ability animation names in `CharacterDefinition.cs` under `AnimationNames`.
