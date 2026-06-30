@@ -214,7 +214,7 @@ public static partial class CharacterRegistry
                 Behavior = AbilityBehavior.AreaDenial,
                 CooldownTicks = 120,
                 MineRadius = 0.3f,
-                MineDurationTicks = 180,
+                MineDurationTicks = 600,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 20, ChainWindowTicks = 0,
