@@ -31,6 +31,17 @@ namespace SlopArena.Shared.Abilities
         /// </summary>
         public virtual void OnEnd(ref CharacterState s) { }
 
+
+        /// <summary>
+        /// Called when this ability's hitbox connects with a target entity.
+        /// Override to apply status effects, conditional damage, or other
+        /// hit-time effects (e.g., Bunny R mark consumption).
+        /// </summary>
+        public virtual void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
+            CharacterDefinition attackerDef,
+            ref float damage, ref float knockbackForce)
+        {
+        }
         // ── Metadata (set by factory after construction) ──
 
         /// <summary>Which ability slot (0-5).</summary>
@@ -45,6 +56,10 @@ namespace SlopArena.Shared.Abilities
         /// Set this in Tick() to change the client's animation.
         /// </summary>
         public byte AnimIndex { get; protected set; }
+
+        /// <summary>All entity states (set by ServerSimulation). Used by abilities that need
+        /// to inspect other entities (e.g., Bunny Jade Hare pull, homing).</summary>
+        public Dictionary<ulong, CharacterState>? SimulationStates { get; set; }
 
         /// <summary>Animation names from the spec. Indexed by AnimIndex.</summary>
         public string[] AnimationNames { get; set; } = Array.Empty<string>();
