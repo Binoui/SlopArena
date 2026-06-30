@@ -8,6 +8,8 @@ public static class TestHelpers
 {
     public static CharacterDefinition MankiDef => CharacterRegistry.Get(CharacterClass.Manki);
 
+    public static CharacterDefinition BunnyDef => CharacterRegistry.Get(CharacterClass.Bunny);
+
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests
     /// that need grounded must set PY = floorY + def.CapsuleHeight * 0.5f.
