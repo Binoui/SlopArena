@@ -44,7 +44,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 ## Design Notes
 
 - **RMB**: inspired by improvised flamethrower — aerosol + lighter. During charge, Manki frantically shakes the bomb. On release, cone-shaped flame jet.
-- **E**: rocket jump. On ground = plant dynamite, propelled upward. In air = drop dynamite below, propelled upward. Explosion has knockback — serves as defensive peel (detonate to break enemy engage) and combo setup. Hitbox needs to be bigger than visual-only.
+- **E**: rocket jump / area denial. On ground = plant dynamite mine (10s auto-detonate), can press E again to detonate early. Explosion launches self upward and knocks back enemies (CanHitOwner). Serves as defensive peel (detonate to break enemy engage), combo setup (bait opponent onto mine), and mobility (rocket jump). In air = drop dynamite below, propelled upward.
 - **R**: Bazooka. Manki rises up ~5m (skips rise if already airborne), hovers to aim a ground indicator, then fires a ballistic explosive shell toward the aimed point. Shell explodes on entity contact or ground impact. AoE explosion for zoning. Projectile has slight gravity arc.
 - **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks deal +3 bonus damage and have +0.5m larger hitboxes. No single big hit, makes his whole kit scarier.
 
