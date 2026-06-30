@@ -97,7 +97,7 @@ namespace SlopArena.Shared.Abilities
         /// Call before SpawnHitbox or Resolver.Spawn in any ability.
         /// Overclock adds +3 damage and +0.5 radius.
         /// </summary>
-        protected void ApplyBuffBonuses(ref CharacterState s, ref float damage, ref float radius)
+        public static void ApplyBuffBonuses(ref CharacterState s, ref float damage, ref float radius)
         {
             if ((s.BuffActiveFlags & (byte)BuffType.Overclock) != 0)
             {

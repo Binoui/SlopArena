@@ -37,8 +37,10 @@ namespace SlopArena.Shared
         public MatchState MatchState;
         /// <summary>Buff timer remaining (0 = no active buff). Set by Overclock etc.</summary>
         public ushort BuffRemainingTicks;
-        /// <summary>42 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2;
+        /// <summary>Active buff flags bitfield (see BuffType enum).</summary>
+        public byte BuffActiveFlags;
+        /// <summary>43 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -56,6 +58,7 @@ namespace SlopArena.Shared
                 IsGrounded = s.IsGrounded,
                 StateDurationFrames = s.StateTicks,
                 BuffRemainingTicks = s.BuffRemainingTicks,
+                BuffActiveFlags = s.BuffActiveFlags,
             };
         }
 
@@ -75,6 +78,7 @@ namespace SlopArena.Shared
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
                 BuffRemainingTicks = BuffRemainingTicks,
+                BuffActiveFlags = BuffActiveFlags,
             };
         }
 
@@ -98,6 +102,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(34, 4), BitConverter.SingleToInt32Bits(FacingYaw));
             buffer[38] = (byte)MatchState;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
+            buffer[42] = BuffActiveFlags;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -121,6 +126,7 @@ namespace SlopArena.Shared
             packet.FacingYaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(34, 4)));
             packet.MatchState = (MatchState)buffer[38];
             packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
+            packet.BuffActiveFlags = buffer[42];
             return packet;
         }
     }
