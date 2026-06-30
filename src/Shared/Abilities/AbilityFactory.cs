@@ -37,7 +37,13 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        // TODO: Implement Bunny abilities
+        (0, false) => new BunnyLmbCombo(),         // LMB — 3-hit combo
+        (0, true) => null,                          // AirLMB — data-driven
+        (1, _) => null,                             // RMB/AirRMB — data-driven
+        (2, _) => new BunnyWhirlingCarrot(),        // Q — aimed projectile
+        (3, _) => new BunnyFlipKick(),              // E — backward disengage
+        (4, _) => new BunnyDragonKick(),            // R — conditional finisher
+        (5, _) => new BunnyJadeHare(),              // F — ultimate
         _ => null,
     };
 

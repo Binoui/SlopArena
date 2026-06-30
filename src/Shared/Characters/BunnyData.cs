@@ -86,6 +86,7 @@ public static partial class CharacterRegistry
                             AttackRange = 5f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
+                Params = new() { ["lunge_duration"] = 8f, },
             },
 
             AirLMB = new AbilitySpec
@@ -132,6 +133,7 @@ public static partial class CharacterRegistry
             {
                 Name = "Whirling Carrot",
                 CooldownTicks = 90,
+                Behavior = AbilityBehavior.AimedProjectile,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
@@ -140,6 +142,28 @@ public static partial class CharacterRegistry
                 },
                 AnimationNames = new[] { "spell_q" },
                 SpecialEffectKeys = new[] { "BunnyWhirlingCarrot" },
+                Params = new()
+                {
+                    ["charge_hold_ticks"] = 180f,    // 3s max aim
+                    ["throw_duration"] = 60f,
+                    ["throw_trigger_tick"] = 10f,
+                    ["launch_angle"] = 30f,
+                    ["gravity"] = 30f,
+                    ["max_range"] = 15f,
+                    ["hitbox_radius"] = 0.5f,
+                    ["damage"] = 6f,
+                    ["knockback_force"] = 3f,
+                    ["knockback_upward"] = 2f,
+                    ["stun_ticks"] = 6f,
+                    ["max_flight_ticks"] = 90f,
+                    ["mark_duration_ticks"] = 300f,  // 5s
+                    ["explosion_radius"] = 2.5f,
+                    ["explosion_damage"] = 4f,
+                    ["explosion_knockback_force"] = 3f,
+                    ["explosion_knockback_upward"] = 2f,
+                    ["explosion_stun_ticks"] = 4f,
+                    ["explosion_duration_ticks"] = 6f,
+                },
             },
 
             E = new AbilitySpec
@@ -154,6 +178,12 @@ public static partial class CharacterRegistry
                 },
                 AnimationNames = new[] { "spell_e" },
                 SpecialEffectKeys = new[] { "BunnyFlipKick" },
+                Params = new()
+                {
+                    ["self_backward_speed"] = 12f,
+                    ["self_upward_velocity"] = 4f,
+                    ["duration_ticks"] = 40f,
+                },
             },
 
             R = new AbilitySpec
@@ -168,6 +198,21 @@ public static partial class CharacterRegistry
                 },
                 AnimationNames = new[] { "spell_f" },
                 SpecialEffectKeys = new[] { "BunnyDragonKick" },
+                Params = new()
+                {
+                    ["mark_multiplier"] = 1.5f,
+                    ["forward_speed"] = 20f,
+                    ["homing_speed"] = 24f,
+                    ["homing_accel"] = 2f,
+                    ["max_flight_ticks"] = 120f,
+                    ["min_ticks_before_cancel"] = 10f,
+                    ["impact_aoe_radius"] = 2f,
+                    ["impact_aoe_duration"] = 8f,
+                    ["impact_aoe_damage"] = 6f,
+                    ["impact_aoe_knockback"] = 8f,
+                    ["impact_aoe_upward"] = 6f,
+                    ["impact_aoe_stun"] = 10f,
+                },
             },
 
             F = new AbilitySpec
@@ -187,6 +232,18 @@ public static partial class CharacterRegistry
                 },
                 AnimationNames = new[] { "spell_f" },
                 SpecialEffectKeys = new[] { "BunnyJadeHare" },
+                Params = new()
+                {
+                    ["pull_radius"] = 3.5f,
+                    ["pull_force"] = 3f,
+                    ["pull_interval_ticks"] = 10f,
+                    ["launcher_damage"] = 8f,
+                    ["launcher_knockback"] = 12f,
+                    ["launcher_knockback_up"] = 18f,
+                    ["launcher_stun_ticks"] = 18f,
+                    ["windup_ticks"] = 8f,
+                    ["spin_duration_ticks"] = 60f,
+                },
             },
         };
     }
