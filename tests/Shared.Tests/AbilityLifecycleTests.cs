@@ -249,25 +249,41 @@ public class AbilityLifecycleTests
         Assert.Equal((byte)1, lmbAfter.AttackSlot);
     }
 
+    [Fact]
+    public void Overclock_DeathClearsBuff()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        var state = TestHelpers.PlayerState();
+        state.PY = 0.65f; // grounded
+        sim.RegisterEntity(1, def, state);
+
+        // Activate Overclock
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 6) } });
+        var afterBuff = sim.GetState(1);
+        Assert.True((afterBuff.BuffActiveFlags & (byte)BuffType.Overclock) != 0,
+            "Overclock should be active after F press");
+        Assert.True(afterBuff.BuffRemainingTicks > 0,
+            "Buff ticks should be > 0");
+
+        // Force below kill height, next tick kills them
+        afterBuff.PY = -30f;
+        sim.SetState(1, afterBuff);
+        sim.Tick(new() { { 1, default } });
+
+        var afterDeath = sim.GetState(1);
+        Assert.Equal((byte)0, afterDeath.BuffActiveFlags);
+        Assert.Equal((ushort)0, afterDeath.BuffRemainingTicks);
+        Assert.Equal(1, afterDeath.Deaths);
+    }
+
     // ══════════════════════════════════════════════════════════════════
     // ── ApplyBuffBonuses — pure math validation ──
     // ══════════════════════════════════════════════════════════════════
-
-    private sealed class BuffTestAbility : ServerAbility
-    {
-        public override void OnStart(ref CharacterState s, CharacterDefinition def) { }
-        public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def) { }
-
-        public void ExposeApplyBuffBonuses(ref CharacterState s, ref float damage, ref float radius)
-        {
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
-        }
-    }
-
     [Fact]
     public void OverclockBuffs_AddsDamageAndRadius()
     {
-        var ability = new BuffTestAbility();
         var state = new CharacterState
         {
             BuffActiveFlags = (byte)BuffType.Overclock,
@@ -276,7 +292,7 @@ public class AbilityLifecycleTests
 
         float damage = 10f;
         float radius = 2f;
-        ability.ExposeApplyBuffBonuses(ref state, ref damage, ref radius);
+        ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
 
         Assert.Equal(13f, damage);  // 10 + 3
         Assert.Equal(2.5f, radius); // 2 + 0.5
@@ -285,7 +301,6 @@ public class AbilityLifecycleTests
     [Fact]
     public void OverclockBuffs_DoesNotApplyWithoutBuff()
     {
-        var ability = new BuffTestAbility();
         var state = new CharacterState
         {
             BuffActiveFlags = 0,
@@ -294,12 +309,31 @@ public class AbilityLifecycleTests
 
         float damage = 10f;
         float radius = 2f;
-        ability.ExposeApplyBuffBonuses(ref state, ref damage, ref radius);
+        ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
 
         Assert.Equal(10f, damage);  // unchanged
         Assert.Equal(2f, radius);   // unchanged
     }
 
+
+
+    [Fact]
+    public void CharacterStatePacket_RoundTripsBuffActiveFlags()
+    {
+        var original = new CharacterStatePacket
+        {
+            TickNumber = 42,
+            BuffRemainingTicks = 400,
+            BuffActiveFlags = (byte)BuffType.Overclock,
+            PositionX = 1, PositionY = 2, PositionZ = 3,
+            CurrentActionState = 1, IsGrounded = true, StateDurationFrames = 10,
+        };
+        Span<byte> buf = stackalloc byte[CharacterStatePacket.Size];
+        original.Serialize(buf);
+        var deserialized = CharacterStatePacket.Deserialize(buf);
+        Assert.Equal(original.BuffActiveFlags, deserialized.BuffActiveFlags);
+        Assert.Equal(original.BuffRemainingTicks, deserialized.BuffRemainingTicks);
+    }
     // ══════════════════════════════════════════════════════════════════
     // ── R: Bazooka — ability lifecycle ──
     // ══════════════════════════════════════════════════════════════════
