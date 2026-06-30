@@ -421,13 +421,16 @@ namespace SlopArena.Shared
 						float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
 						float hey = hy + evt.EndOffY;
 						float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
-						_spellResolver.Spawn(new Hitbox
-						{
-							X = hx, Y = hy, Z = hz, Radius = evt.Radius, Shape = evt.Shape,
-							EndX = hex, EndY = hey, EndZ = hez, Damage = evt.Damage,
-							KnockbackForce = evt.KnockbackForce, KnockbackUpward = evt.KnockbackUpward,
-							StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
-						});
+                        float damage = evt.Damage;
+                        float radius = evt.Radius;
+                        ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
+                        _spellResolver.Spawn(new Hitbox
+                        {
+                            X = hx, Y = hy, Z = hz, Radius = radius, Shape = evt.Shape,
+                            EndX = hex, EndY = hey, EndZ = hez, Damage = damage,
+                            KnockbackForce = evt.KnockbackForce, KnockbackUpward = evt.KnockbackUpward,
+                            StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
+                        });
 					}
 				}
 			}
@@ -458,6 +461,12 @@ namespace SlopArena.Shared
             _spellResolver.CheckGroundCollision(_arena);
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
+            // NOTE: Explosion damage/radius from projectiles (bazooka/roundbomb ground impact)
+            // does NOT get Overclock buff bonuses. Explosions are secondary effects detached
+            // from the owner's state — the ProjectileExplosion config is baked at spawn time.
+            // Direct projectile hits DO get the bonus (applied in MankiBazooka/MankiRoundBomb
+            // before Resolver.Spawn). If explosion buffs are desired, propagate owner buff
+            // flags alongside projectile data and check at explosion time.
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
 			{
 				_spellResolver.Spawn(new Hitbox

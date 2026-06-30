@@ -19,13 +19,17 @@ namespace SlopArena.Shared
             bool detonated = resolver.RemoveHitbox(ownerId, hb => hb.Gravity == 0f && hb.Explosion.HasValue);
             if (!detonated)
             {
+                // Apply active buff bonuses (Overclock) to explosion damage/radius at placement time
+                var explosion = ExplosionConfig;
+                Abilities.ServerAbility.ApplyBuffBonuses(ref state, ref explosion.Damage, ref explosion.Radius);
+
                 resolver.Spawn(new Hitbox
                 {
                     X = state.PX, Y = state.PY, Z = state.PZ,
                     Radius = MineRadius, Shape = HitboxShape.Sphere,
                     DurationTicks = MineDurationTicks, OwnerId = ownerId,
                     Gravity = 0,
-                    Explosion = ExplosionConfig,
+                    Explosion = explosion,
                 });
             }
             return true;

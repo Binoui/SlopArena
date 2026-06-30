@@ -130,4 +130,36 @@ public class MankiExplosiveMineTests
         Assert.Single(hitboxes);
         Assert.Equal((ulong)2, hitboxes[0].OwnerId);
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ── Overclock buff + mine explosion ──
+    // ══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Place_DuringOverclock_BuffsExplosionDamage()
+    {
+        var (state, spec, evt, resolver) = Setup();
+        state.BuffActiveFlags = (byte)BuffType.Overclock;
+        state.BuffRemainingTicks = 400;
+
+        spec.SpawnHitbox(evt, state, Def, resolver, 1);
+
+        var mine = resolver.GetActiveHitboxes()[0];
+        Assert.True(mine.Explosion.HasValue);
+        Assert.Equal(8f, mine.Explosion.Value.Damage);   // 5 + 3
+        Assert.Equal(3f, mine.Explosion.Value.Radius);   // 2.5 + 0.5
+    }
+
+    [Fact]
+    public void Place_WithoutOverclock_NormalExplosionDamage()
+    {
+        var (state, spec, evt, resolver) = Setup();
+
+        spec.SpawnHitbox(evt, state, Def, resolver, 1);
+
+        var mine = resolver.GetActiveHitboxes()[0];
+        Assert.True(mine.Explosion.HasValue);
+        Assert.Equal(5f, mine.Explosion.Value.Damage);   // base 5
+        Assert.Equal(2.5f, mine.Explosion.Value.Radius); // base 2.5
+    }
 }
