@@ -65,6 +65,7 @@ namespace SlopArena.Shared
 		{
 			if (!_states.TryGetValue(entityId, out var state)) return;
 			ability.Resolver = _spellResolver;
+			ability.SimulationStates = _states;
 			ability.Slot = slot;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
@@ -450,6 +451,19 @@ namespace SlopArena.Shared
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
 				Simulation.ApplyKnockback(ref targetState, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
 				targetState.HitstunTicks = hit.StunTicks;
+
+				// Let the attacker's active ability apply hit effects (e.g., Bunny R mark consumption)
+				if (_activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
+				    && _states.TryGetValue(hit.OwnerEntityId, out var attackerState)
+				    && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
+				{
+					float kbForce = hit.KnockbackX != 0 || hit.KnockbackZ != 0
+						? MathF.Sqrt(hit.KnockbackX * hit.KnockbackX + hit.KnockbackZ * hit.KnockbackZ)
+						: 0f;
+					attackerAbility.OnHitEntity(ref attackerState, ref targetState, attackerDef, ref finalDamage, ref kbForce);
+					_states[hit.OwnerEntityId] = attackerState;
+				}
+
 				_states[hit.TargetEntityId] = targetState;
 			}
 		}

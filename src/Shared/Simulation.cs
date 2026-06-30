@@ -378,6 +378,14 @@ namespace SlopArena.Shared
                 if (s.BuffRemainingTicks == 0)
                     s.BuffActiveFlags = 0;
             }
+
+            // Status timer
+            if (s.StatusRemainingTicks > 0)
+            {
+                s.StatusRemainingTicks--;
+                if (s.StatusRemainingTicks == 0)
+                    s.StatusFlags = 0;  // clear all statuses when timer expires
+            }
         }
 
         // ── HITSTUN + DI (Directional Influence) ──

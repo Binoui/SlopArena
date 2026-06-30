@@ -151,5 +151,10 @@ namespace SlopArena.Shared
         /// </summary>
         public ushort BuffRemainingTicks;  // 0 = no active buff
         public byte BuffActiveFlags;        // bitfield, see BuffType enum
+        /// <summary>
+        /// ── Status effects (Marked, Slowed, etc.) ──
+        /// </summary>
+        public byte StatusFlags;           // bitfield, see StatusType enum
+        public ushort StatusRemainingTicks; // shared countdown for all statuses; 0 = no active status
     }
 }
