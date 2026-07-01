@@ -197,7 +197,8 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 28, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 2.0f, Damage = 12f, KnockbackForce = 20f, KnockbackUpward = 6f, StunTicks = 18, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                 },
-                AnimationNames = new[] { "spell_r" },
+                AnimationNames = new[] { "spell_r_start", "spell_r_loop", "spell_r_end" },
+                ChargeHoldTicks = 120,
                 SpecialEffectKeys = new[] { "BunnyDragonKick" },
                 Params = new()
                 {

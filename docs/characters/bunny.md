@@ -33,7 +33,7 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 | **Air RMB** | Helicopter | `spell_air_rmb` | Spinning wheel kick in air | Air combo extender, downward spike knockback |
 | **Q** | Whirling Carrot | `spell_q` | Throw spinning carrot like a boomerang | Projectile poke, marks target for R |
 | **E** | Tornado Kick | `spell_e` | Powerful spinning kick | Forward engage, high stun for combo setup |
-| **R** | Dragon's Kick | `spell_r` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
+| **R** | Dragon's Kick | `spell_r_start/loop/end` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
 | **F** | Tempest of the Hare (ult) | `spell_f` | Rapid spin in place, cyclone visual | Kicks pull nearby enemies toward center over 1.5s, then a final launcher kick. Bunny cannot move during it. Big damage + knockback if enemy is caught |
 
 ## Stats
