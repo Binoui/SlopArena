@@ -38,6 +38,7 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 │  │ OnStart(ref state, def)  // called once; set AnimIndex via AnimIndex property   │
 │  │ Tick(ref state, input)   // called per tick; set AnimIndex on ability instance  │
 │  │ OnEnd(ref state)         // natural end only; no interrupt callback   │
+│  │ OnHitEntity(ref attacker, ref target, attackerDef, ref damage, ref kbForce) // called when hitbox connects   │
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
@@ -133,19 +134,17 @@ Each ability is mapped by (CharacterClass, slot, airborne) tuple:
 The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air punch when airborne).
 
 **Example:**
-```csharp
-private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
+private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
 {
-    (0, false) => new MankiLmbCombo(),     // Ground LMB
-    (0, true) => null,                      // AirLMB — data-driven fallback
-    (1, false) => new MankiAerosolFlame(), // Ground RMB
-    (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
-    (3, _) => null,                         // E — data-driven ExplosiveMineSpec
-    (4, _) => new MankiBazooka(),   // R — rise-aim-fire bazooka
-    (5, _) => new MankiOverclock(),        // F
+    (0, false) => new BunnyLmbCombo(),
+    (0, true) => null,   // AirLMB — data-driven
+    (1, _) => null,       // RMB — data-driven
+    (2, _) => new BunnyWhirlingCarrot(),   // Q
+    (3, _) => new BunnyFlipKick(),          // E
+    (4, _) => new BunnyDragonKick(),        // R
+    (5, _) => new BunnyJadeHare(),          // F
     _ => null, // Data-driven fallback for slots without ServerAbility
 };
-```
 
 3. **Add to CharacterDefinition:**
 ```csharp
@@ -197,6 +196,36 @@ There is only one write path: the ability instance property.
 `should NOT set AttackSlot in OnStart` — rely on ActivateAbility. (Bug: MankiLmbCombo
 and MankiAerosolFlame originally didn't set it, causing TickAbilities to immediately
 deactivate them via the `AttackSlot == 0` check. Fixed in `ActivateAbility`.)
+
+### OnHitEntity — Hit-Time Effects
+
+New in this branch: `OnHitEntity` is called when an ability's hitbox connects with a target.
+Override to apply status effects (Marked), conditional damage, or spawn secondary hitboxes (AoE).
+
+Example — BunnyDragonKick:
+```csharp
+public override void OnHitEntity(...)
+{
+    if ((target.StatusFlags & MARK_BIT) != 0)
+    {
+        target.StatusFlags &= ~MARK_BIT;     // consume mark
+        target.StatusRemainingTicks = 0;
+        Resolver.Spawn(AoE hitbox);           // spawn secondary explosion
+    }
+}
+```
+
+### StatusFlags — Marked, Slowed, etc.
+
+`CharacterState.StatusFlags` (byte bitfield) and `StatusRemainingTicks` (ushort)
+provide a generic status effect system. Currently used for Bunny Q's Marked status (bit 2).
+Flag is auto-cleared when `StatusRemainingTicks` reaches 0.
+
+### SimulationStates — Cross-Entity Inspection
+
+`ServerAbility.SimulationStates` is set by `ServerSimulation` before each tick.
+Abilities can inspect other entities' state for homing (Bunny R), area pull (Bunny F), etc.
+Returns `Dictionary<ulong, CharacterState>` — do NOT mutate other entities' state directly.
 
 
 ## Best Practices
@@ -273,6 +302,8 @@ All abilities have matching xUnit tests in `tests/Shared.Tests/`:
 | `SpellResolverTests.cs` | Hitbox collision, CanHitOwner, explosions |
 | `ServerSimulationTests.cs` | Ability lifetime, self-hit prevention |
 | `CombatMathTests.cs` | Knockback formulas, DI, projectile math |
+| `MankiExplosiveMineTests.cs` | 11 | Mine placement, detonation, auto-detonate, Overclock buff bonus |
+| `BunnyAbilityTests.cs` | 25 | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
 
 **Run after every ability change:**
 ```bash
