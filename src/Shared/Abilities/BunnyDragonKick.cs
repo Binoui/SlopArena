@@ -22,7 +22,7 @@ namespace SlopArena.Shared.Abilities
             _postImpactTicks = 0;
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0; // spell_r_start
+            AnimIndex = 0; // spell_r_loop
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
 
@@ -53,11 +53,14 @@ namespace SlopArena.Shared.Abilities
                 return;
             }
 
-            // ── Duration expiration ──
-            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 120f);
+            // ── Duration expiration → spell_r_end ──
+            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 180f);
             if (_flightTicks >= maxTicks)
             {
-                EndAbility(ref s);
+                AnimIndex = 2; // spell_r_end
+                s.ComboStage = 2;
+                _hasImpacted = true; // re-use impact timer for end anim
+                _postImpactTicks = 10;
                 return;
             }
 
