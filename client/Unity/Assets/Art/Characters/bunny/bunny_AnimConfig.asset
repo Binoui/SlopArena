@@ -23,7 +23,11 @@ MonoBehaviour:
   HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
   HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
   Death: {fileID: 0}
-  SpellQ: {fileID: -203655887218126122, guid: 46fb5c189668e5dda8834a076fa3cc90, type: 3}
+  SpellQStart: {fileID: -203655887218126122, guid: 46fb5c189668e5dda8834a076fa3cc90, type: 3}
+  SpellQLoop: {fileID: 0}
+  SpellQEnd: {fileID: 0}
   SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
-  SpellR: {fileID: 0}
+  SpellRStart: {fileID: 0}
+  SpellRLoop: {fileID: 0}
+  SpellREnd: {fileID: 0}
   SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}
