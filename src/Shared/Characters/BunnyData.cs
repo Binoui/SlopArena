@@ -43,11 +43,11 @@ public static partial class CharacterRegistry
                 new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
-            VisualScale = 1f,
+            VisualScale = 2f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,
-            ModelYOffset = -0.3f,
+            ModelYOffset = 0f,
             ModelResourcePath = "Characters/Bunny",
 
             // ═══ ABILITIES ═══
