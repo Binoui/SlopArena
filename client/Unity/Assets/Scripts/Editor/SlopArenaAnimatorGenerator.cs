@@ -203,6 +203,8 @@ namespace SlopArena.Client.Editor
         private static Dictionary<string, AnimationClip> BuildClipMap(string rootDir)
         {
             var map = new Dictionary<string, AnimationClip>(System.StringComparer.OrdinalIgnoreCase);
+
+            // Load clips from FBX/GLB models
             foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { rootDir }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -217,6 +219,16 @@ namespace SlopArena.Client.Editor
                         map[key] = clip;
                 }
             }
+
+            // Also load standalone .anim files
+            foreach (string guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { rootDir }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+                if (clip != null && !map.ContainsKey(clip.name))
+                    map[clip.name] = clip;
+            }
+
             return map;
         }
 
