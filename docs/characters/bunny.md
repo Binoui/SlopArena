@@ -33,7 +33,7 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 | **Air RMB** | Helicopter | `spell_air_rmb` | Spinning wheel kick in air | Air combo extender, downward spike knockback |
 | **Q** | Whirling Carrot | `spell_q` | Throw spinning carrot like a boomerang | Projectile poke, marks target for R |
 | **E** | Tornado Kick | `spell_e` | Powerful spinning kick | Forward engage, high stun for combo setup |
-| **R** | Dragon's Kick | `spell_f` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
+| **R** | Dragon's Kick | `spell_r` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
 | **F** | Tempest of the Hare (ult) | `spell_f` | Rapid spin in place, cyclone visual | Kicks pull nearby enemies toward center over 1.5s, then a final launcher kick. Bunny cannot move during it. Big damage + knockback if enemy is caught |
 
 ## Stats
@@ -108,8 +108,7 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 - [ ] Custom hit reaction animation FBX files (currently uses shared Manki `hit_light`/`hit_medium`)
 
 - [x] E Tornado Kick: forward engage + high stun implemented
-- [ ] F ult (Tempest of the Hare) needs its own animation clip — currently shares R's `spell_f`
-- [x] Carrot boomerang Q mark consumed by R for homing (OnHitEntity)
+- [ ] F ult (Tempest of the Hare) needs its own animation clip — currently no dedicated clip (R now uses `spell_r`)
 - [ ] Some Mixamo attack animations could be replaced with custom ones
 - [ ] Carrot weapon model not attached as separate bone child
 - [ ] Future: consider separating this kit from rabbit model — kit leans generic martial artist, rabbit theme could go to a different character
