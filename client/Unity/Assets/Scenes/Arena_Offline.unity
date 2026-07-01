@@ -989,7 +989,7 @@ PrefabInstance:
       objectReference: {fileID: 1399963925}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _playerClass
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _aimIndicator
@@ -1048,9 +1048,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _maxRange: 12
   _minRange: 1
-  _groundMask:
-    serializedVersion: 2
-    m_Bits: 1
 --- !u!1001 &3217259389550734977
 PrefabInstance:
   m_ObjectHideFlags: 0

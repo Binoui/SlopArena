@@ -168,21 +168,22 @@ public static partial class CharacterRegistry
 
             E = new AbilitySpec
             {
-                Name = "Flip Kick",
-                CooldownTicks = 75,
+                Name = "Tornado Kick",
+                CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 40, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 28, Radius = 0.6f, OffX = 0, OffY = 0.8f, OffZ = -1.0f, Damage = 4f, KnockbackForce = 8f, KnockbackUpward = 2f, StunTicks = 8, Interruptible = true } },
+                    new() { DurationTicks = 35, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 18, Radius = 0.7f, OffX = 0, OffY = 0.8f, OffZ = 1.8f, Damage = 6f, KnockbackForce = 6f, KnockbackUpward = 2f, StunTicks = 28, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_e" },
-                SpecialEffectKeys = new[] { "BunnyFlipKick" },
+                SpecialEffectKeys = new[] { "BunnyTornadoKick" },
                 Params = new()
                 {
-                    ["self_backward_speed"] = 12f,
-                    ["self_upward_velocity"] = 4f,
-                    ["duration_ticks"] = 40f,
+                    ["forward_speed"] = 14f,
+                    ["lunge_duration"] = 10f,
+                    ["windup_ticks"] = 8f,
+                    ["duration_ticks"] = 35f,
                 },
             },
 

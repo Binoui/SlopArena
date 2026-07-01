@@ -170,10 +170,10 @@ public class BunnyAbilityTests
         Assert.Equal((byte)(1 << 2), after.StatusFlags);
     }
 
-    // ── E (BunnyFlipKick) ──
+    // ── E (BunnyTornadoKick) ──
 
     [Fact]
-    public void BunnyFlipKick_Activates()
+    public void BunnyTornadoKick_Activates()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -185,20 +185,20 @@ public class BunnyAbilityTests
     }
 
     [Fact]
-    public void BunnyFlipKick_AppliesBackwardVelocity()
+    public void BunnyTornadoKick_AppliesForwardLunge()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
         state.FacingYaw = 0f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.BunnyDef, state);
-        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 2);
-        Assert.True(t1.VZ < 0f, $"Expected VZ<0 (backward), got VZ={t1.VZ:F3}");
-        Assert.True(t1.VY > 0f, $"Expected VY>0 (upward), got VY={t1.VY:F3}");
+        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 3);
+        Assert.True(t1.VZ > 5f, $"Expected VZ>5 (forward lunge), got VZ={t1.VZ:F3}");
+        Assert.True(t1.PZ > 0.1f, $"Expected forward position change, got PZ={t1.PZ:F3}");
     }
 
     [Fact]
-    public void BunnyFlipKick_HitboxSpawnsBehind()
+    public void BunnyTornadoKick_HitboxInFrontStuns()
     {
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
@@ -206,20 +206,22 @@ public class BunnyAbilityTests
         player.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.BunnyDef, player);
 
-        // NPC behind player (OffZ=-1.0 for hitbox, NPC at Z=-2.5)
-        var npc = TestHelpers.NpcState(0f, -2.5f);
+        // NPC in front (OffZ=1.8 hitbox, player lunges forward)
+        var npc = TestHelpers.NpcState(0f, 3f);
         npc.PY = GroundPY;
         npc.DamagePercent = 0;
         sim.RegisterEntity(100, TestHelpers.BunnyDef, npc);
 
-        // Press E and tick past hitbox trigger (tick 6)
+        // Press E and tick past hitbox trigger (tick 10, after windup)
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 15; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var npcAfter = sim.GetState(100);
         Assert.True(npcAfter.DamagePercent > 0,
-            $"NPC behind player should take damage from FlipKick, got {npcAfter.DamagePercent}");
+            $"NPC should take damage from Tornado Kick, got {npcAfter.DamagePercent}");
+        Assert.True(npcAfter.HitstunTicks >= 20,
+            $"Expected HitstunTicks >= 20 (stun), got {npcAfter.HitstunTicks}");
     }
 
     // ── R (BunnyDragonKick) ──

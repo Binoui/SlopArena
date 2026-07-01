@@ -41,7 +41,7 @@ public static class AbilityFactory
         (0, true) => null,                          // AirLMB — data-driven
         (1, _) => null,                             // RMB/AirRMB — data-driven
         (2, _) => new BunnyWhirlingCarrot(),        // Q — aimed projectile
-        (3, _) => new BunnyFlipKick(),              // E — backward disengage
+        (3, _) => new BunnyTornadoKick(),           // E — forward engage + stun
         (4, _) => new BunnyDragonKick(),            // R — conditional finisher
         (5, _) => new BunnyJadeHare(),              // F — ultimate
         _ => null,
