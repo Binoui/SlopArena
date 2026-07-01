@@ -107,9 +107,9 @@ The character's "silliness" comes from the **carrot** (weapon, projectile, slam)
 
 - [ ] Custom hit reaction animation FBX files (currently uses shared Manki `hit_light`/`hit_medium`)
 - [ ] Dash animation FBX (currently placeholder 1-frame clip)
-- [ ] F ult movement lock + cancel not wired
+- [x] F ult movement lock (VX=VZ=0 each tick) implemented
 - [ ] F ult (Tempest of the Hare) needs its own animation clip — currently shares R's `spell_f`
-- [ ] Carrot boomerang Q mark consumed by R not yet implemented (status effect system)
+- [x] Carrot boomerang Q mark consumed by R for homing + AoE (OnHitEntity)
 - [ ] Some Mixamo attack animations could be replaced with custom ones
 - [ ] Carrot weapon model not attached as separate bone child
 - [ ] Future: consider separating this kit from rabbit model — kit leans generic martial artist, rabbit theme could go to a different character

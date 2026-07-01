@@ -16,7 +16,7 @@ dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests"
 dotnet test tests/Shared.Tests/ --nologo --filter "AbilityLifecycle"
 dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
 
-# Run all tests: 115 across 9 test suites
+# Run all tests: 151 across 11 test suites
 
 ## Test Suites
 
@@ -26,11 +26,13 @@ dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
  | `SpellResolverTests.cs` | 12 | Sphere/capsule collision, explosion, gravity, CanHitOwner |
  | `CombatMathTests.cs` | 12 | Knockback formulas, angle math, DI calculations |
  | `PhysicsTests.cs` | 10 | Jump chain, dash, landing, walk/sprint/friction, hitstun, data-driven attack expiry |
- | `AbilityLifecycleTests.cs` | 30 | Per-ability activation + lifecycle (LMB combo, Q bomb, RMB charge, R divebomb, F overclock, AirRMB, mine), buff bonuses |
+ | `AbilityLifecycleTests.cs` | 28 | Per-ability activation + lifecycle (LMB combo, Q bomb, RMB charge, R divebomb, F overclock, AirRMB, mine), buff bonuses |
  | `CombatPipelineTests.cs` | 4 | **Full-pipeline combat** — LMB→NPC damage, Q projectile→NPC hit, Overclock damage boost, mutual trade |
  | `CombatIntegrationTests.cs` | 2 | Two-entity tick stability |
  | `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
  | `AnimatorGraphBuilderTests.cs` | 15 | FSM transition structure, Manki combo chains, dedup |
+ | `MankiExplosiveMineTests.cs` | 11 | Mine placement, detonation, auto-detonate, Overclock bonus, owner isolation |
+ | `BunnyAbilityTests.cs` | 25 | Bunny LMB/Q/E/R/F activation, hitbox collision, damage, mark system, homing, launcher |
  
  > **Ground-truth tests** (`CombatPipelineTests`) are the most important for understanding how combat
  > works end to end. They exercise the full pipeline: Input → ServerAbility → Hitbox → Collision →
