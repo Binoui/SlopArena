@@ -43,6 +43,16 @@ public static partial class CharacterRegistry
                 new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
+
+            HurtboxCapsules = new HurtboxCapsule[]
+            {
+                new(0f, 0.2f, 0f, 0f, 0.9f, 0f, 0.3f),
+                new(0f, 1.2f, 0f, 0f, 1.2f, 0f, 0.22f),
+                new(0.3f, 0.8f, 0f, 0.6f, 0.6f, 0.2f, 0.12f),
+                new(-0.3f, 0.8f, 0f, -0.6f, 0.6f, 0.2f, 0.12f),
+                new(0.15f, 0f, 0f, 0.15f, -0.8f, 0f, 0.16f),
+                new(-0.15f, 0f, 0f, -0.15f, -0.8f, 0f, 0.16f),
+            },
             VisualScale = 2f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
@@ -180,8 +190,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 28, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 2.0f, Damage = 12f, KnockbackForce = 20f, KnockbackUpward = 6f, StunTicks = 18, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                 },
-                AnimationNames = new[] { "spell_r_start", "spell_r_loop", "spell_r_end" },
-                ChargeHoldTicks = 120,
+                AnimationNames = new[] { "spell_r", "spell_r_attack" },
                 SpecialEffectKeys = new[] { "BunnyDragonKick" },
                 Params = new()
                 {
