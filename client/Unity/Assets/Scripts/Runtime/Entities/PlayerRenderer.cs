@@ -300,7 +300,7 @@ namespace SlopArena.Client.Entities
 
             // ── Collision capsule ──
             Gizmos.color = new Color(0f, 1f, 0f, 0.6f);
-            Vector3 capCenter = transform.position;
+            Vector3 capCenter = transform.position - Vector3.up * _modelYOffset;
             float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
             Vector3 top = capCenter + Vector3.up * halfH;
             Vector3 bot = capCenter - Vector3.up * halfH;

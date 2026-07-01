@@ -29,7 +29,7 @@ public static partial class CharacterRegistry
         {
             Class = CharacterClass.Manki,
             DisplayName = "Manki",
-            CapsuleRadius = 0.6f,
+            CapsuleRadius = 0.2f,
             CapsuleHeight = 1.3f,
             HurtboxRadius = 1.0f,
             Movement = new MovementStats
@@ -66,7 +66,7 @@ public static partial class CharacterRegistry
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,
-            ModelYOffset = -0.52f,
+            ModelYOffset = -0.62f,
 
             // Default animation names match Mixamo: idle, run, dash, jump, fall, small_hit, medium_hit, hard_hit
             // Only ClipOverrides needed for custom timelines
