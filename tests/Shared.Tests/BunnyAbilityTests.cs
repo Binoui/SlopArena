@@ -353,6 +353,64 @@ public class BunnyAbilityTests
         Assert.Equal((byte)5, after.AttackSlot);
     }
 
+    [Fact]
+    public void BunnyDragonKick_OnHit_SwitchesToAttackAnimAndStops()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f; state.IsGrounded = false;
+        state.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.BunnyDef, state);
+
+        // Marked NPC in front
+        var npc = TestHelpers.NpcState(0f, 5f);
+        npc.PY = 5f; npc.IsGrounded = false;
+        npc.DamagePercent = 0;
+        npc.StatusFlags = (1 << 2);
+        npc.StatusRemainingTicks = 300;
+        sim.RegisterEntity(100, TestHelpers.BunnyDef, npc);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        for (int i = 0; i < 15; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var after = sim.GetState(1);
+        Assert.Equal((byte)1, after.AnimIndex);
+        Assert.Equal(0f, after.VX);
+        Assert.Equal(0f, after.VZ);
+        Assert.Equal(0f, after.VY);
+    }
+
+    [Fact]
+    public void BunnyDragonKick_Timeout_PlaysEndAnimThenEnds()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f; state.IsGrounded = false;
+        state.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.BunnyDef, state);
+
+        // No NPC — timeout after max_flight_ticks (180)
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
+        // Tick to just after timeout (180 flight + 5 into end anim)
+        for (int i = 0; i < 185; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var mid = sim.GetState(1);
+        Assert.Equal((byte)2, mid.AnimIndex); // spell_r_end
+        Assert.Equal(ActionState.Attacking, mid.State);
+        Assert.True(mid.PZ > 20f,
+            $"Expected player to travel >20m during 3s flight, got PZ={mid.PZ:F1}");
+
+        // Tick past end anim (10 ticks) + margin
+        for (int i = 0; i < 15; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var ended = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, ended.State);
+        Assert.Equal((byte)0, ended.AttackSlot);
+    }
+
     // ── F (BunnyJadeHare) ──
 
     [Fact]

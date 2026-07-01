@@ -15,11 +15,13 @@ namespace SlopArena.Shared.Abilities
         private bool _hasImpacted;
         private ushort _flightTicks;
         private ushort _postImpactTicks;
+
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _hasImpacted = false;
             _flightTicks = 0;
             _postImpactTicks = 0;
+
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
             AnimIndex = 0; // spell_r_loop
@@ -29,20 +31,43 @@ namespace SlopArena.Shared.Abilities
             // Start with forward lunge (will switch to homing if mark exists)
             float forwardSpeed = GetParam(def, "forward_speed", 20f);
             SetVelocityInFacing(ref s, forwardSpeed);
+
+            Simulation.OnDebugLog?.Invoke(
+                $"[DragonKick] OnStart: forwardSpeed={forwardSpeed} VZ={s.VZ:F1} VX={s.VX:F1} pos=({s.PX:F1},{s.PY:F2},{s.PZ:F1})");
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
             if (_hasImpacted)
             {
+                s.VX = 0f; s.VZ = 0f; s.VY = 0f;
                 _postImpactTicks--;
                 if (_postImpactTicks == 0)
                     EndAbility(ref s);
                 return;
             }
+
             _flightTicks++;
 
+            // Maintain forward speed without overriding direction (preserves homing steering)
+            float forwardSpeed = GetParam(def, "forward_speed", 20f);
+            float currentHSpeed = MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
+            if (currentHSpeed < forwardSpeed && currentHSpeed > 0.01f)
+            {
+                float scale = forwardSpeed / currentHSpeed;
+                s.VX *= scale;
+                s.VZ *= scale;
+            }
+            else if (currentHSpeed < 0.01f)
+            {
+                SetVelocityInFacing(ref s, forwardSpeed);
+            }
 
+            // ── Periodic flight log ──
+            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 180f);
+            if (_flightTicks % 30 == 0)
+                Simulation.OnDebugLog?.Invoke(
+                    $"[DragonKick] Flight tick={_flightTicks}/{maxTicks} VZ={s.VZ:F1} VX={s.VX:F1} pos=({s.PX:F1},{s.PY:F2},{s.PZ:F1})");
 
             // ── Recast-to-cancel ──
             ushort minCancel = (ushort)GetParam(def, "min_ticks_before_cancel", 10f);
@@ -54,12 +79,11 @@ namespace SlopArena.Shared.Abilities
             }
 
             // ── Duration expiration → spell_r_end ──
-            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 180f);
             if (_flightTicks >= maxTicks)
             {
-                AnimIndex = 2; // spell_r_end
+                AnimIndex = 2;
                 s.ComboStage = 2;
-                _hasImpacted = true; // re-use impact timer for end anim
+                _hasImpacted = true;
                 _postImpactTicks = 10;
                 return;
             }
@@ -67,7 +91,6 @@ namespace SlopArena.Shared.Abilities
             // ── Homing: find closest marked entity ──
             ulong closestMarked = 0;
             float closestDist = float.MaxValue;
-
             if (SimulationStates != null)
             {
                 foreach (var kvp in SimulationStates)
@@ -75,36 +98,25 @@ namespace SlopArena.Shared.Abilities
                     ulong otherId = kvp.Key;
                     var other = kvp.Value;
                     if (otherId == s.EntityId) continue;
-                    if ((other.StatusFlags & (1 << 2)) == 0) continue; // not marked
-
+                    if ((other.StatusFlags & (1 << 2)) == 0) continue;
                     float dx = other.PX - s.PX;
                     float dz = other.PZ - s.PZ;
                     float distSq = dx * dx + dz * dz;
-                    if (distSq < closestDist)
-                    {
-                        closestDist = distSq;
-                        closestMarked = otherId;
-                    }
+                    if (distSq < closestDist) { closestDist = distSq; closestMarked = otherId; }
                 }
             }
-
             if (closestMarked != 0)
             {
-                // Homing mode: steer toward marked target
                 var target = SimulationStates![closestMarked];
                 float homingSpeed = GetParam(def, "homing_speed", 24f);
                 float homingAccel = GetParam(def, "homing_accel", 2f);
-
                 float dx = target.PX - s.PX;
                 float dz = target.PZ - s.PZ;
                 float dist = MathF.Sqrt(dx * dx + dz * dz);
-
                 if (dist > 0.1f)
                 {
                     float targetVX = (dx / dist) * homingSpeed;
                     float targetVZ = (dz / dist) * homingSpeed;
-
-                    // Smooth steer toward target
                     s.VX += (targetVX - s.VX) * Math.Clamp(homingAccel * Simulation.TickDt, 0f, 1f);
                     s.VZ += (targetVZ - s.VZ) * Math.Clamp(homingAccel * Simulation.TickDt, 0f, 1f);
                 }
@@ -133,11 +145,8 @@ namespace SlopArena.Shared.Abilities
 
             if (isMarked)
             {
-                // Consume mark
                 target.StatusFlags = (byte)(target.StatusFlags & ~(1 << 2));
                 target.StatusRemainingTicks = 0;
-
-                // Multiply damage
                 float multiplier = GetParam(attackerDef, "mark_multiplier", 1.5f);
                 damage *= multiplier;
             }
@@ -164,6 +173,7 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = aoeStun,
                 OwnerId = attacker.EntityId,
             });
+
             // Switch to impact animation (spell_r_attack), stop forward motion
             AnimIndex = 1;
             attacker.ComboStage = 1;
@@ -172,7 +182,7 @@ namespace SlopArena.Shared.Abilities
             attacker.VY = 0f;
 
             _hasImpacted = true;
-            _postImpactTicks = 10; // play attack anim for ~0.17s then end
+            _postImpactTicks = 10;
         }
     }
 }

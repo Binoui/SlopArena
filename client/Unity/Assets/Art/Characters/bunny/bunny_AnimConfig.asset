@@ -28,6 +28,6 @@ MonoBehaviour:
   SpellQEnd: {fileID: 0}
   SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
   SpellRStart: {fileID: 8993902097722301239, guid: fd5680e1f9997bde6b545ed7e198e706, type: 3}
-  SpellRLoop: {fileID: 8993902097722301239, guid: ecabaa446fe3ae943960c22f646a2d28, type: 3}
-  SpellREnd: {fileID: 8993902097722301239, guid: b30d563cff068019cb395dcda02da3f2, type: 3}
+  SpellRLoop: {fileID: 7400000, guid: aa4ef5d568e48478cb33a64ccdbf36fc, type: 2}
+  SpellREnd: {fileID: 7400000, guid: 4e20d2ae6549ff9f49f171c054ad4d77, type: 2}
   SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}
