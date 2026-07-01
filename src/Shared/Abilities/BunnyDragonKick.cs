@@ -22,7 +22,7 @@ namespace SlopArena.Shared.Abilities
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0;
+            AnimIndex = 0; // spell_r_start
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
 
@@ -37,6 +37,13 @@ namespace SlopArena.Shared.Abilities
                 return;
 
             _flightTicks++;
+
+            // Transition animation from start → loop after initial windup
+            if (_flightTicks == 15 && AnimIndex == 0)
+            {
+                AnimIndex = 1; // spell_r_loop
+                s.ComboStage = 0;
+            }
 
             // ── Recast-to-cancel ──
             ushort minCancel = (ushort)GetParam(def, "min_ticks_before_cancel", 10f);
@@ -155,6 +162,10 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = aoeStun,
                 OwnerId = attacker.EntityId,
             });
+            // Switch to impact animation (spell_r_end) for the animator
+            AnimIndex = 2;
+            attacker.ComboStage = 1; // triggers animator transition loop → end
+
 
             _hasImpacted = true;
             EndAbility(ref attacker);
