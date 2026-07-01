@@ -14,12 +14,12 @@ namespace SlopArena.Shared.Abilities
     {
         private bool _hasImpacted;
         private ushort _flightTicks;
-
+        private ushort _postImpactTicks;
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _hasImpacted = false;
             _flightTicks = 0;
-
+            _postImpactTicks = 0;
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
             AnimIndex = 0; // spell_r_start
@@ -34,16 +34,15 @@ namespace SlopArena.Shared.Abilities
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
             if (_hasImpacted)
+            {
+                _postImpactTicks--;
+                if (_postImpactTicks == 0)
+                    EndAbility(ref s);
                 return;
-
+            }
             _flightTicks++;
 
-            // Transition animation from start → loop after initial windup
-            if (_flightTicks == 15 && AnimIndex == 0)
-            {
-                AnimIndex = 1; // spell_r_loop
-                s.ComboStage = 0;
-            }
+
 
             // ── Recast-to-cancel ──
             ushort minCancel = (ushort)GetParam(def, "min_ticks_before_cancel", 10f);
@@ -162,13 +161,15 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = aoeStun,
                 OwnerId = attacker.EntityId,
             });
-            // Switch to impact animation (spell_r_end) for the animator
-            AnimIndex = 2;
-            attacker.ComboStage = 1; // triggers animator transition loop → end
-
+            // Switch to impact animation (spell_r_attack), stop forward motion
+            AnimIndex = 1;
+            attacker.ComboStage = 1;
+            attacker.VX = 0f;
+            attacker.VZ = 0f;
+            attacker.VY = 0f;
 
             _hasImpacted = true;
-            EndAbility(ref attacker);
+            _postImpactTicks = 10; // play attack anim for ~0.17s then end
         }
     }
 }
