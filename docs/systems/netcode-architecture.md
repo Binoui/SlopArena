@@ -112,7 +112,7 @@ _Process(delta):
   1. Receive server states (non-bloquant)
      → Net.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(38) = 50B
+     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(43) = 55B
 
   2. For player's server state:
      a. Find predicted state for same tick
@@ -172,7 +172,7 @@ Tick():
   6. Broadcast to all clients
      → For each client:
        → For each entity:
-         → Packet: entityId(8) + tick(4) + CharacterStatePacket(38) = 50B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(43) = 55B
          → tick = client's own tick number (echoed back)
        → Client filters by entityId
 ```
@@ -214,7 +214,7 @@ Total: 22 bytes
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(38) = 50 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(43) = 55 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
@@ -228,10 +228,10 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(38) = 50
 [40]     CurrentActionState (byte)      ← Idle, Dashing, Hitstun, etc.
 [41]     IsGrounded        (byte)       ← 0 or 1
 [42..43] StateDurationFrames (ushort)   ← remaining ticks in state
-Total: 44 bytes per entity
+Total: 55 bytes per entity
 ```
 
-**CharacterStatePacket layout (38 bytes):**
+**CharacterStatePacket layout (43 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0      | uint    | TickNumber          | Echoed client tick (for matching) |
@@ -247,6 +247,9 @@ Total: 44 bytes per entity
 | 32     | byte    | AttackSlot          | 0=none, 1-6=LMB/RMB/Q/E/R/F      |
 | 33     | byte    | ComboStage          | 0-3 combo chain stage             |
 | 34-37  | float   | FacingYaw           | Server-authoritative facing yaw   |
+| 38     | byte    | MatchState          | Match lifecycle                     |
+| 39-40  | ushort  | BuffRemainingTicks  | Overclock timer                      |
+| 41     | byte    | BuffActiveFlags     | BuffType bitfield                   |
 
 **Le serveur envoie TOUS les états à chaque client.** Le client ignore ceux qui ne le concernent pas. Pas de overhead de routing.
 
@@ -256,7 +259,7 @@ Total: 44 bytes per entity
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (126 bytes in memory, 32 serialized) is the full per-tick state of one entity:
+`CharacterState` (126 bytes in memory, 43 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|
@@ -289,7 +292,7 @@ Total: 44 bytes per entity
 | EntityId            | ulong   | 0 = unassigned                       |
 | ...                 |         |                                      |
 
-Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, and facing yaw are serialized. The remaining fields (jumps, dodges, DI, knockback, etc.) are computed locally.
+Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, facing yaw, match state, buff remaining ticks, and buff active flags are serialized. The remaining fields (jumps, dodges, DI, knockback, etc.) are computed locally.
 
 ---
 
