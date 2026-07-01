@@ -13,8 +13,8 @@ public static partial class CharacterRegistry
         {
             Class = CharacterClass.Bunny,
             DisplayName = "Bunny",
-            CapsuleRadius = 0.6f,
-            CapsuleHeight = 1.8f,
+            CapsuleRadius = 0.35f,
+            CapsuleHeight = 1.7f,
             HurtboxRadius = 1f,
             Movement = new MovementStats
             {
@@ -33,17 +33,6 @@ public static partial class CharacterRegistry
                 MaxJumps = 2,
                 JumpSquatTicks = 4,
             },
-
-            HurtboxCapsules = new HurtboxCapsule[]
-            {
-                new(0f, 0.2f, 0f, 0f, 0.9f, 0f, 0.3f),
-                new(0f, 1.2f, 0f, 0f, 1.2f, 0f, 0.22f),
-                new(0.3f, 0.8f, 0f, 0.6f, 0.6f, 0.2f, 0.12f),
-                new(-0.3f, 0.8f, 0f, -0.6f, 0.6f, 0.2f, 0.12f),
-                new(0.15f, 0f, 0f, 0.15f, -0.8f, 0f, 0.16f),
-                new(-0.15f, 0f, 0f, -0.15f, -0.8f, 0f, 0.16f),
-            },
-
             HurtboxBoneDefs = new HurtboxBoneDef[]
             {
                 new("mixamorig:Head", 0, 0, 0, 0.25f),
@@ -54,18 +43,12 @@ public static partial class CharacterRegistry
                 new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
-            BakedDataPath = "res://data/bunny_skeleton.bin",
             VisualScale = 1f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,
-            ModelYOffset = -0.52f,
+            ModelYOffset = -0.3f,
             ModelResourcePath = "Characters/Bunny",
-
-            // Bunny GLB uses "hit_small"/"hit_medium"/"hit_hard" (not Mixamo defaults)
-            HitSmallAnim = "hit_small",
-            HitMediumAnim = "hit_medium",
-            HitHardAnim = "hit_hard",
 
             // ═══ ABILITIES ═══
 
