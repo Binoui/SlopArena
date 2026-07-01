@@ -27,7 +27,7 @@ MonoBehaviour:
   SpellQLoop: {fileID: 0}
   SpellQEnd: {fileID: 0}
   SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
-  SpellRStart: {fileID: 0}
-  SpellRLoop: {fileID: 0}
-  SpellREnd: {fileID: 0}
+  SpellRStart: {fileID: 8993902097722301239, guid: fd5680e1f9997bde6b545ed7e198e706, type: 3}
+  SpellRLoop: {fileID: 8993902097722301239, guid: ecabaa446fe3ae943960c22f646a2d28, type: 3}
+  SpellREnd: {fileID: 8993902097722301239, guid: b30d563cff068019cb395dcda02da3f2, type: 3}
   SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}

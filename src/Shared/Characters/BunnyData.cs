@@ -55,11 +55,11 @@ public static partial class CharacterRegistry
                 new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
             },
             BakedDataPath = "res://data/bunny_skeleton.bin",
-            VisualScale = 1.3f,
+            VisualScale = 1f,
             HurtboxBoneScale = 0.01f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = false,
-            ModelYOffset = 0f,
+            ModelYOffset = -0.52f,
             ModelResourcePath = "Characters/Bunny",
 
             // Bunny GLB uses "hit_small"/"hit_medium"/"hit_hard" (not Mixamo defaults)

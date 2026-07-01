@@ -23,8 +23,25 @@ ModelImporter:
       will be discarded.\n\t'spine_03' has translation animation that will be discarded.\n\t'calf_l'
       has translation animation that will be discarded.\n\t'calf_r' has translation
       animation that will be discarded.\n"
-    animationRetargetingWarnings: 
-    animationDoRetargetingWarnings: 0
+    animationRetargetingWarnings: "\nRetargeting quality report for clip 'Unreal
+      Take':\n\tLeftLowerLeg average position error 2.6 mm and maximum position error
+      4.0 mm at time 0:12 (30.0%) Frame 12\n\tLeftFoot average position error 2.6
+      mm and maximum position error 4.1 mm at time 0:12 (30.0%) Frame 12\n\tRightLowerLeg
+      average position error 1.7 mm and maximum position error 3.8 mm at time 0:
+      8 (20.0%) Frame 8\n\tRightFoot average position error 1.7 mm and maximum position
+      error 3.8 mm at time 0: 8 (20.0%) Frame 8\n\tLeftUpperArm average position
+      error 11.7 mm and maximum position error 20.2 mm at time 0:15 (37.5%) Frame
+      15\n\tLeftLowerArm average position error 11.3 mm and maximum position error
+      19.4 mm at time 0:16 (40.0%) Frame 16\n\tLeftHand average position error 11.7
+      mm and maximum position error 20.1 mm at time 0:15 (37.5%) Frame 15\n\tRightUpperArm
+      average position error 11.7 mm and maximum position error 20.2 mm at time 0:15
+      (37.5%) Frame 15\n\tRightLowerArm average position error 11.7 mm and maximum
+      position error 20.1 mm at time 0:15 (37.5%) Frame 15\n\tRightHand average position
+      error 11.7 mm and maximum position error 20.2 mm at time 0:15 (37.5%) Frame
+      15\n\tHead average position error 11.7 mm and maximum position error 20.2 mm
+      at time 0:15 (37.5%) Frame 15\n\tLeftFoot average orientation error 35.2 deg
+      and maximum orientation error 122.7 deg at time 0:19 (47.5%) Frame 19\n"
+    animationDoRetargetingWarnings: 1
     importAnimatedCustomProperties: 0
     importConstraints: 0
     animationCompression: 3
@@ -877,7 +894,7 @@ ModelImporter:
     feetSpacing: 0
     globalScale: 1
     rootMotionBoneName: 
-    hasTranslationDoF: 0
+    hasTranslationDoF: 1
     hasExtraRoot: 1
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
