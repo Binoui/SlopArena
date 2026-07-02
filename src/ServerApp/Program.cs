@@ -47,17 +47,28 @@ class Program
         var charDef = CharacterRegistry.Get(CharacterClass.Manki);
         var p1Spawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : new SpawnPoint();
         var p2Spawn = arena.SpawnPoints.Length > 1 ? arena.SpawnPoints[1] : new SpawnPoint();
+        var bakedDataDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        BakedAnimationData? LoadBakedData(CharacterDefinition d)
+        {
+            if (string.IsNullOrEmpty(d.BakedDataPath)) return null;
+            string path = Path.GetFullPath(Path.Combine(bakedDataDir, d.BakedDataPath.Replace("res://", "")));
+            if (!File.Exists(path)) { Console.Error.WriteLine($"[Server] No baked data at {path}"); return null; }
+            try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
+            catch (Exception ex) { Console.Error.WriteLine($"[Server] Failed to load baked data {path}: {ex.Message}"); return null; }
+        }
+        var p1Baked = LoadBakedData(charDef);
+        var p2Baked = LoadBakedData(charDef);
 
         sim.RegisterEntity(1, charDef, new CharacterState
         {
             PX = p1Spawn.X, PY = p1Spawn.Y + 5f, PZ = p1Spawn.Z,
             FacingYaw = p1Spawn.Yaw, JumpsLeft = charDef.Movement.MaxJumps,
-        });
+        }, p1Baked);
         sim.RegisterEntity(2, charDef, new CharacterState
         {
             PX = p2Spawn.X, PY = p2Spawn.Y + 1f, PZ = p2Spawn.Z,
             FacingYaw = p2Spawn.Yaw, JumpsLeft = charDef.Movement.MaxJumps,
-        });
+        }, p2Baked);
         var udp = new UdpClient();
         udp.Client.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.ReuseAddress, true);
         udp.Client.Bind(new IPEndPoint(IPAddress.Any, port));

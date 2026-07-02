@@ -58,6 +58,7 @@ namespace SlopArena.Client.Editor
             controller.AddParameter("Dash", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Hitstun", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Idle", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("AnimSpeed", AnimatorControllerParameterType.Float);
 
             // ── State machine (single layer) ──
             var sm = controller.layers[0].stateMachine;
@@ -94,6 +95,11 @@ namespace SlopArena.Client.Editor
                     st.motion = clip;
                 }
                 st.writeDefaultValues = false;
+                if (gs.SpeedParameter != null)
+                {
+                    st.speedParameterActive = true;
+                    st.speedParameter = gs.SpeedParameter;
+                }
                 if (gs.IsDefault)
                     sm.defaultState = st;
             }
@@ -275,6 +281,7 @@ namespace SlopArena.Client.Editor
                 case "spell_r_loop": config.SpellRLoop = clip; break;
                 case "spell_r_end": config.SpellREnd = clip; break;
                 case "spell_f": config.SpellF = clip; break;
+                case "spell_lmb_1": config.Attack1 = clip; break;
                 case "spell_lmb_2": config.Attack2 = clip; break;
                 case "spell_lmb_3": config.Attack3 = clip; break;
                 case "spell_lmb_air": config.Attack3 = clip; break;

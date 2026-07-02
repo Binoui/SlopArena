@@ -34,6 +34,7 @@ ModelImporter:
       name: spell_r_start
       takeName: HumanM@Bazooka_Reload01
       internalID: -7221273921338402319
+      sampleRate: 60
       firstFrame: 0
       lastFrame: 51
       wrapMode: 0

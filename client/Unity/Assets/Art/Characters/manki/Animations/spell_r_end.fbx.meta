@@ -34,6 +34,7 @@ ModelImporter:
       name: spell_r_end
       takeName: HumanM@Bazooka_AimPrecise01_Shoot01
       internalID: 2359611245458126371
+      sampleRate: 60
       firstFrame: 0
       lastFrame: 24
       wrapMode: 0

@@ -34,6 +34,7 @@ ModelImporter:
       name: spell_r_loop
       takeName: HumanM@Bazooka_AimPrecise01
       internalID: -2774071859138458923
+      sampleRate: 60
       firstFrame: 0
       lastFrame: 70
       wrapMode: 0

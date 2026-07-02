@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using UnityEngine;
 using SlopArena.Shared;
@@ -27,7 +28,15 @@ namespace SlopArena.Client.World
             if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
             string path = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", def.BakedDataPath.Replace("res://", "")));
             if (!File.Exists(path)) return null;
-            return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
+            try
+            {
+                return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[MatchBase] Failed to load baked data from {path}: {ex.Message}. Falling back to capsule hurtboxes.");
+                return null;
+            }
         }
     }
 }

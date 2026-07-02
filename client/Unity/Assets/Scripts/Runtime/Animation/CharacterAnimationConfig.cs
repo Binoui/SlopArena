@@ -1,6 +1,6 @@
 using UnityEngine;
+using System.Collections.Generic;
 using SlopArena.Shared;
-
 namespace SlopArena.Client.Animation
 {
     /// <summary>
@@ -64,8 +64,12 @@ namespace SlopArena.Client.Animation
                 "spell_r_loop" => SpellRLoop,
                 "spell_r_end" => SpellREnd,
                 "spell_f" => SpellF,
+                "spell_lmb_1" => Attack1,
+                "spell_lmb_2" => Attack2,
+                "spell_lmb_3" => Attack3,
                 _ => null,
             };
         }
     }
 }
+

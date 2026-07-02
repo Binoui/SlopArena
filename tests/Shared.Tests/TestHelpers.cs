@@ -205,4 +205,58 @@ public static class TestHelpers
     /// Convenience: ground-level PY for CombatDef (height 1.3m).
     /// </summary>
     public static float CombatGroundPY => 0f + 1.3f * 0.5f; // 0.65
+
+    /// <summary>
+    /// A CharacterDefinition with Manki's specs, HurtboxBoneDefs set (for BoneName lookup),
+    /// but no baked data path. Falls back to capsule hurtboxes for collision.
+    /// Useful for testing bone-attached hitbox fallback behavior.
+    /// </summary>
+    public static CharacterDefinition BoneHitboxTestDef
+    {
+        get
+        {
+            var src = MankiDef;
+            return new CharacterDefinition
+            {
+                Class = src.Class,
+                DisplayName = src.DisplayName,
+                CapsuleRadius = src.CapsuleRadius,
+                CapsuleHeight = src.CapsuleHeight,
+                HurtboxRadius = src.HurtboxRadius,
+                Movement = src.Movement,
+                LMB = src.LMB,
+                RMB = src.RMB,
+                AirLMB = src.AirLMB,
+                AirRMB = src.AirRMB,
+                Q = src.Q,
+                E = src.E,
+                R = src.R,
+                F = src.F,
+                ClipOverrides = src.ClipOverrides,
+                // HurtboxBoneDefs for BoneName lookup
+                HurtboxBoneDefs = new HurtboxBoneDef[]
+                {
+                    new("mixamorig:Head", 0, 0, 0, 0.25f),
+                    new("mixamorig:Spine2", 0, 0, 0, 0.3f),
+                    new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
+                    new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
+                },
+                // No baked data — bone hitboxes will be skipped
+                BakedDataPath = "",
+                // Fallback capsule for regular collision
+                HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
+                IdleAnim = src.IdleAnim,
+                RunAnim = src.RunAnim,
+                DashAnim = src.DashAnim,
+                JumpAnim = src.JumpAnim,
+                FallAnim = src.FallAnim,
+                HitSmallAnim = src.HitSmallAnim,
+                HitMediumAnim = src.HitMediumAnim,
+                HitHardAnim = src.HitHardAnim,
+                VisualScale = src.VisualScale,
+                ModelYOffset = src.ModelYOffset,
+                ModelSoleOffset = src.ModelSoleOffset,
+            };
+        }
+    }
     }

@@ -34,6 +34,7 @@ ModelImporter:
       name: spell_q_end
       takeName: HumanM@ThrowBall01_R
       internalID: -3743569049614240450
+      sampleRate: 60
       firstFrame: 19.1
       lastFrame: 45
       wrapMode: 0

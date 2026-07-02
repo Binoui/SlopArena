@@ -34,6 +34,7 @@ ModelImporter:
       name: fall
       takeName: mixamo.com
       internalID: -203655887218126122
+      sampleRate: 60
       firstFrame: 0
       lastFrame: 21
       wrapMode: 0

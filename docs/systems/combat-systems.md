@@ -40,6 +40,7 @@
 
 ---
 
+
 ## 2. Aerial Ability Usage
 
 ### One Use Per Flight
@@ -194,3 +195,61 @@ This is the primary risk-reward loop of finisher abilities:
 - `character-kit-design-principles.md` — per-character kit design, keybindings, archetypes
 - `conventions.md` — animation naming, bone naming, file structure
 - `research/dko-mechanics.md` — full DKO systems reference (clash, interrupt, super armor, etc.)
+
+---
+
+## 9. Soft-Lock Targeting System
+
+SlopArena uses a **soft-lock targeting system** that auto-selects the nearest enemy close to screen center. The target is used for warp, camera tracking, and can be queried by abilities.
+
+### 9a. Target Acquisition
+
+**Client-side** — `TrainingMatch.PickScreenTarget()` runs every fixed-update tick:
+1. Projects all enemy renderers to screen space via `UnityEngine.Camera.WorldToScreenPoint()`
+2. Filters out targets behind the camera (`screenPos.z < 0`)
+3. Selects the enemy closest to screen center within 20m world distance
+4. Result: entity ID (byte, 0 = none) passed into `InputState.TargetEntityId`
+
+**Server-side** — `ServerSimulation.ProcessTargetLock()` runs during each tick:
+1. If `InputState.TargetEntityId > 0` (client-provided screen-center target): uses that ID directly, verifying it's within search range
+2. Otherwise: falls back to `FindClosestEnemy()` brute-force nearest scan
+3. Stores result in `CharacterState.TargetEntityId` for abilities to query
+4. Clears to 0 at the start of each entity's processing (no stale targets)
+
+### 9b. Packet Protocol
+
+`InputState` grew from 16 → 17 bytes:
+
+| Offset | Type   | Field           | Notes                              |
+|--------|--------|-----------------|------------------------------------|
+| 0-3    | float  | MoveX           | Horizontal analog input            |
+| 4-7    | float  | MoveY           | Vertical analog input              |
+| 8      | byte   | flags           | 8 boolean buttons (bitfield)       |
+| 9      | byte   | ActiveSlot      | 1-6 for ability slots              |
+| 10-11  | short  | FacingYaw       | Degrees × 100                      |
+| 12-13  | short  | AimYaw          | Aim yaw (overrides FacingYaw)      |
+| 14-15  | ushort | AimDistance     | Aim distance in cm (0-6500 = 0-65m)|
+| 16     | byte   | TargetEntityId  | Client-selected target (0 = none)  |
+
+Deserialize is backward-compatible: checks `buf.Length >= 17` before reading offset 16.
+
+### 9c. Server-Side Behavior
+
+`ProcessTargetLock()` drives three features from `AttackStage` data:
+- **Warp**: if entity is within `WarpRange` but outside `AttackRange`, auto-dashes toward target (`WarpSpeed = 0.3` = 30% of remaining distance per tick)
+- **Rotation**: if `RotateTowardTarget` is set, smoothly rotates `FacingYaw` toward target using `TrackingStrength` × `TickDt`
+- **Persistence**: `CharacterState.TargetEntityId` is set each tick while attacking with `UseTargetLock` enabled; zero otherwise
+
+### 9d. Client-Side Visualization
+
+| Component | File | Behavior |
+|-----------|------|----------|
+| TargetIndicator | `Combat/TargetIndicator.cs` | Red semi-transparent ring under targeted enemy. Created as flat cylinder (Sprite/Default shader), follows target position every frame. Hidden when target = 0. |
+| Camera rotation | `TrainingMatch.Update()` | Calls `CameraMount.LerpTowardDirection()` at 90°/s to smoothly rotate camera yaw toward target. Camera stays behind character (CinemachineOrbitalFollow handles that); yaw adjusts to keep target on screen. |
+
+### 9e. Edge Cases
+
+- **No enemies in range**: TargetEntityId = 0 → no ring, no camera rotation, no warp. All existing behavior unchanged.
+- **Target dies/respawns**: ProcessTargetLock clears/recomputes each tick, so a respawned entity is immediately re-targetable.
+- **Multiple targets at equal distance**: screen-center proximity breaks ties (client) / first-found wins (server fallback).
+- **Older clients**: Deserialize ignores missing TargetEntityId byte (checks length) — defaults to 0, server falls back to nearest scan.

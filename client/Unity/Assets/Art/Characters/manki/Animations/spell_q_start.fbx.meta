@@ -34,6 +34,7 @@ ModelImporter:
       name: spell_q_start
       takeName: Untitled
       internalID: 3094330708855449807
+      sampleRate: 60
       firstFrame: 0
       lastFrame: 15
       wrapMode: 0

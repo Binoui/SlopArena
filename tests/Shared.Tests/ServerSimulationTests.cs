@@ -251,4 +251,227 @@ public class ServerSimulationTests
                 $"tick {i}: expected {(expectedAttacking ? "Attacking" : "Idle")} but got {s.State}");
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ── Soft-lock Targeting ──
+    // ═══════════════════════════════════════════════════════════════
+    //
+    // ProcessTargetLock() reads state.State/AttackSlot and input.TargetEntityId
+    // to set state.TargetEntityId each tick. Tests use Manki LMB (stage 1:
+    // UseTargetLock=true, WarpRange=10, AttackRange=5, RotateTowardTarget=true).
+
+    [Fact]
+    public void TargetEntityId_ZeroWhenNoEnemyInRange()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        sim.RegisterEntity(1, def, MakeIdleState(1));
+        var npc = MakeIdleState(100);
+        npc.PZ = 25f; // beyond 20m search range
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(0ul, state.TargetEntityId);
+    }
+
+    [Fact]
+    public void TargetEntityId_SetOnLmbAttack_NpcInRange()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npc = MakeIdleState(100);
+        npc.PZ = 5f; // within WarpRange=10, outside AttackRange=5
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        // Tick 0: press LMB (slot 1)
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, state.State);
+        Assert.Equal(100ul, state.TargetEntityId);
+    }
+
+    [Fact]
+    public void TargetEntityId_NotSetWhenNpcOutOfRange()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npc = MakeIdleState(100);
+        npc.PZ = 25f; // beyond WarpRange=10
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(0ul, state.TargetEntityId);
+    }
+
+    [Fact]
+    public void TargetEntityId_UsesClientProvidedTarget()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npc = MakeIdleState(100);
+        npc.PZ = 5f;
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        // Client explicitly targets NPC 100 via TargetEntityId in input
+        var input = new InputState { ActiveSlot = 1, TargetEntityId = 100 };
+        sim.Tick(new() { { 1, input }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(100ul, state.TargetEntityId);
+    }
+
+    [Fact]
+    public void TargetEntityId_ClientTargetPreferredOverNearerNpc()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npcNear = MakeIdleState(100);
+        npcNear.PZ = 3f;
+        var npcFar = MakeIdleState(200);
+        npcFar.PZ = 8f;
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npcNear);
+        sim.RegisterEntity(200, def, npcFar);
+
+        // Client targets the farther NPC, not the nearest
+        var input = new InputState { ActiveSlot = 1, TargetEntityId = 200 };
+        sim.Tick(new() { { 1, input }, { 100, default }, { 200, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(200ul, state.TargetEntityId);
+    }
+
+
+    [Fact]
+    public void TargetEntityId_SetOnLmbAttack_NpcAtWarpRange()
+    {
+        // Manki LMB is a ServerAbility, so !state.IsServerAbility blocks warp.
+        // This test verifies TargetEntityId IS set even though warp is skipped.
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npc = MakeIdleState(100);
+        npc.PZ = 7f; // within WarpRange=10, outside AttackRange=5
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(100ul, state.TargetEntityId);
+        // Warp is set only for non-ServerAbility. Manki LMB is ServerAbility → no warp
+        Assert.Equal(0f, state.WarpSpeed);
+    }
+
+    [Fact]
+    public void TargetEntityId_RotationTowardNpc()
+    {
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        player.FacingYaw = 0f; // facing +Z
+        var npc = MakeIdleState(100);
+        npc.PX = 5f; // to the right (+X) from player
+        npc.PZ = 0f;
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        // LMB with RotateTowardTarget=true, TrackingStrength=0.9
+        // Target is at (+X, 0Z) → expected yaw should rotate toward +X (π/2 rad)
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
+        sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(100ul, state.TargetEntityId);
+        // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
+        Assert.True(state.FacingYaw > 0.01f,
+            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
+    }
+    // ── Target lock rotation (3-zone) ──
+
+    [Fact]
+    public void Tick_TargetLock_FarAway_NoRotation()
+    {
+        // Zone 1: dist > WarpRange → no rotation, no warp
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        player.FacingYaw = 0f; // facing +Z
+        var npc = MakeIdleState(100);
+        npc.PX = 5f; // off-axis so rotation would happen if not gated
+        npc.PZ = 15f; // distance ≈ 15.8 > WarpRange=10
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        // LMB stage 1: WarpRange=10, AttackRange=2
+        var input = TestHelpers.Input(activeSlot: 1);
+        sim.Tick(new() { { 1, input }, { 100, default } });
+
+        var state = sim.GetState(1);
+        // FacingYaw should remain 0 — distance exceeds rotation range
+        TestHelpers.AssertNear(0f, state.FacingYaw, tolerance: 0.0001f);
+        Assert.Equal(0f, state.WarpSpeed); // no warp (too far + ServerAbility)
+    }
+
+    [Fact]
+    public void Tick_TargetLock_InWarpRange_Rotates()
+    {
+        // Zone 2: AttackRange < dist ≤ WarpRange → rotates toward target
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        player.FacingYaw = 0f; // facing +Z
+        var npc = MakeIdleState(100);
+        npc.PX = 5f; // to the right (+X), at distance 5
+        npc.PZ = 0f; // within WarpRange=10, outside AttackRange=2
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        var input = TestHelpers.Input(activeSlot: 1);
+        sim.Tick(new() { { 1, input }, { 100, default } });
+
+        var state = sim.GetState(1);
+        // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
+        Assert.True(state.FacingYaw > 0.01f,
+            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
+        // Warp is not set for ServerAbility even when in warp range
+        Assert.Equal(0f, state.WarpSpeed);
+    }
+
+    [Fact]
+    public void Tick_TargetLock_InAttackRange_Rotates()
+    {
+        // Zone 3: dist ≤ AttackRange → rotates toward target, no warp
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        player.FacingYaw = 0f; // facing +Z
+        var npc = MakeIdleState(100);
+        npc.PX = 1f; // to the right (+X), distance 1
+        npc.PZ = 0f; // within AttackRange=2
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        var input = TestHelpers.Input(activeSlot: 1);
+        sim.Tick(new() { { 1, input }, { 100, default } });
+
+        var state = sim.GetState(1);
+        // FacingYaw should have rotated toward the NPC
+        Assert.True(state.FacingYaw > 0.01f,
+            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
+        // No warp — already within attack range
+        Assert.Equal(0f, state.WarpSpeed);
+    }
 }

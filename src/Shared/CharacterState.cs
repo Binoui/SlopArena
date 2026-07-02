@@ -141,6 +141,11 @@ namespace SlopArena.Shared
         /// ── Entity ID (0 = unassigned) ──
         /// </summary>
         public ulong EntityId;
+        /// <summary>
+        /// ── Targeting ──
+        /// </summary>
+        /// <summary>Soft-lock target entity ID. 0 = none.</summary>
+        public ulong TargetEntityId;
 
         /// <summary>
         /// ── Per-slot cooldowns (0-5) ──

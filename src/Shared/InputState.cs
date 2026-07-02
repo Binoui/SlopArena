@@ -23,14 +23,16 @@ namespace SlopArena.Shared
         public short AimYaw;
         /// <summary>Aim distance in cm (ushort, 0-6500, i.e. 0-65m). Set by client during targeted-aiming state.</summary>
         public ushort AimDistance;
+        /// <summary>Client's selected target entity ID (0=none). Computed from screen-center proximity.</summary>
+        public byte TargetEntityId;
 
         /// <summary>Warp target position (local-only, not networked).</summary>
         public float WarpTargetX, WarpTargetZ;
         public float WarpSpeed;
         public float WarpAttackRange;
 
-        /// <summary>14 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 distance)</summary>
-        public const int Size = 8 + 1 + 1 + 2 + 2 + 2;
+        /// <summary>17 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 distance + 1 target)</summary>
+        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 1;
 
         public void Write(Span<byte> buf)
         {
@@ -50,6 +52,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(10), FacingYaw);
             BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(12), AimYaw);
             BinaryPrimitives.WriteUInt16LittleEndian(buf.Slice(14), AimDistance);
+            buf[16] = TargetEntityId;
         }
 
         public static InputState Deserialize(ReadOnlySpan<byte> buf)
@@ -72,6 +75,7 @@ namespace SlopArena.Shared
             input.FacingYaw = buf.Length >= 12 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(10)) : (short)0;
             input.AimYaw = buf.Length >= 14 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(12)) : (short)0;
             input.AimDistance = buf.Length >= 16 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(14)) : (ushort)0;
+            input.TargetEntityId = buf.Length >= 17 ? buf[16] : (byte)0;
             return input;
         }
     }

@@ -31,6 +31,8 @@ public struct GraphState
     public bool AutoExit;
     /// <summary>Hold-phase loop state — no AutoExit, skipped by AnyState pass.</summary>
     public bool IsHoldLoop;
+    /// <summary>If set, this state's speed is driven by this float parameter (for runtime speed modulation).</summary>
+    public string? SpeedParameter;
 }
 
 public struct GraphDirectTransition
