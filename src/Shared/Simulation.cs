@@ -103,9 +103,7 @@ namespace SlopArena.Shared
                     s.IsGrounded = false;
                     s.State = ActionState.Idle;
                 }
-                // During squat: no horizontal movement, stay grounded
-                s.VX = 0f;
-                s.VZ = 0f;
+                // During squat: preserve horizontal momentum, no acceleration
             }
             s.IsAiming = input.IsAiming;
 
@@ -210,8 +208,7 @@ namespace SlopArena.Shared
                     s.State = ActionState.JumpSquat;
                     s.StateTicks = stats.JumpSquatTicks;
                     s.JumpsLeft--;
-                    s.VX = 0f;
-                    s.VZ = 0f;
+                    // VX, VZ preserved — momentum carries through squat into air
                     // VY stays 0 — applied when squat expires
                 }
                 else
@@ -422,6 +419,18 @@ namespace SlopArena.Shared
                 s.KVZ += s.DIY * DIStrength;
                 s.DIX = 0f;
                 s.DIY = 0f;
+
+                // Transfer remaining knockback to main velocity and clear KV.
+                // Without this, HasKnockback() returns true and ProcessKnockback's
+                // early return blocks all movement/action processing for 9+ seconds
+                // while KV exponentially decays toward zero.
+                s.VX = s.KVX;
+                s.VY = s.KVY;
+                s.VZ = s.KVZ;
+                s.KVX = 0f;
+                s.KVY = 0f;
+                s.KVZ = 0f;
+
                 s.State = ActionState.Idle;
             }
         }
