@@ -3,8 +3,9 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Tests for Manki's LMB combo (MankiLmbCombo ServerAbility).
-/// 3-hit melee chain with forward lunge, hitbox spawning, and chain windows.
+/// Tests for Manki's LMB combo (LmbCombo via StageChainAbility).
+/// 3-hit melee chain with forward lunge, bone hitboxes, and input buffering.
+/// Chain input at ANY point during a stage is buffered; chain fires on stage end.
 /// </summary>
 public class MankiLmbTests
 {
@@ -42,6 +43,7 @@ public class MankiLmbTests
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
 
         // AnimLockTicks is decremented by the sim after ability Tick runs
+        // Stage1.DurationTicks = 14
         Assert.Equal(Stage1.DurationTicks - 1, after.AnimLockTicks);
     }
 
@@ -69,7 +71,7 @@ public class MankiLmbTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        const int lungeTicks = 10; // lunge_duration param
+        const int lungeTicks = 6; // lunge_duration param
         const int extraTicks = 20;
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), lungeTicks + extraTicks);
 
@@ -96,30 +98,29 @@ public class MankiLmbTests
     // ── Stage 1 → 2 chain ──
 
     [Fact]
-    public void Stage1_ChainsToStage2_WhenInputDuringChainWindow()
+    public void Stage1_ChainsToStage2_WhenInputBuffered()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        int chainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
+        // Tick 0: LMB to start stage 1
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        for (int i = 0; i <= chainTick; i++)
-        {
-            var input = i == 0
-                ? TestHelpers.Input(activeSlot: 1)
-                : i == chainTick
-                    ? TestHelpers.Input(activeSlot: 1)
-                    : default;
-            sim.Tick(new() { { 1, input } });
-        }
+        // Tick 1: LMB again — gets buffered (any point during stage works)
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 1 end (12 more ticks, total 14)
+        for (int i = 2; i < Stage1.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
 
         var after = sim.GetState(1);
 
         // Should be attacking still (stage 2), not idle
         Assert.Equal(ActionState.Attacking, after.State);
         Assert.Equal((byte)1, after.AttackSlot);
+        Assert.Equal((byte)1, after.ComboStage);
     }
 
     [Fact]
@@ -130,17 +131,15 @@ public class MankiLmbTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        int chainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-
-        // Tick 0: LMB
+        // Tick 0: LMB to start stage 1
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Ticks 1..chainTick-1: default input
-        for (int i = 1; i < chainTick; i++)
+        // Tick 1: buffer chain input
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 1 end — chains to stage 2
+        for (int i = 2; i < Stage1.DurationTicks; i++)
             sim.Tick(new() { { 1, default } });
-
-        // Tick chainTick: LMB → chain to stage 2
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
         // Let stage 2 expire + margin
         for (int i = 0; i < Stage2.DurationTicks + 10; i++)
@@ -153,35 +152,26 @@ public class MankiLmbTests
     // ── Stage 2 → 3 chain ──
 
     [Fact]
-    public void Stage2_ChainsToStage3_WhenInputDuringChainWindow()
+    public void Stage2_ChainsToStage3_WhenInputBuffered()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        int stage1ChainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-        int stage2ChainTick = Stage2.DurationTicks - Stage2.ChainWindowTicks;
+        // Chain through stage 1 → 2
+        ChainToStage2(sim);
 
-        // Tick 0: LMB → stage 1
+        // Buffer chain input on tick 1 of stage 2
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Ticks 1..stage1ChainTick-1: idle
-        for (int i = 1; i < stage1ChainTick; i++)
+        // Run to stage 2 end (15 more ticks, total 16) — chains to stage 3
+        for (int i = 1; i < Stage2.DurationTicks; i++)
             sim.Tick(new() { { 1, default } });
-
-        // Tick stage1ChainTick: LMB → stage 2
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-
-        // Ticks after chain, up to stage 2 chain window: idle
-        for (int i = 0; i < stage2ChainTick - 1; i++)
-            sim.Tick(new() { { 1, default } });
-
-        // Tick at stage 2 chain window: LMB → stage 3
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
         var afterChain = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, afterChain.State);
+        Assert.Equal((byte)2, afterChain.ComboStage);
     }
 
     // ── Stage 3 is final ──
@@ -219,7 +209,7 @@ public class MankiLmbTests
         // Press LMB on tick 0 — ability OnStart + Tick run, _stageTicks becomes 1
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        int triggerTick = Stage1.HitboxEvents[0].TriggerTick; // 6
+        int triggerTick = Stage1.HitboxEvents[0].TriggerTick; // 5
 
         // Run ticks up to triggerTick-1: no hitbox
         for (int i = 1; i < triggerTick; i++)
@@ -242,14 +232,10 @@ public class MankiLmbTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        int chainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-        int stage2Trigger = Stage2.HitboxEvents[0].TriggerTick; // 8
+        int stage2Trigger = Stage2.HitboxEvents[0].TriggerTick; // 6
 
         // Start stage 1 and chain to stage 2
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-        for (int i = 1; i < chainTick; i++)
-            sim.Tick(new() { { 1, default } });
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+        ChainToStage2(sim);
 
         // Run ticks up to triggerTick-1: no hitbox
         for (int i = 1; i < stage2Trigger; i++)
@@ -264,10 +250,10 @@ public class MankiLmbTests
         Assert.NotEmpty(hitboxes);
     }
 
-    // ── Not chaining before chain window ──
+    // ── Early input buffering ──
 
     [Fact]
-    public void Stage1_DoesNotChain_BeforeChainWindow()
+    public void Stage1_DoesNotChain_BeforeStageEnd()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -277,20 +263,52 @@ public class MankiLmbTests
         // Press LMB to start stage 1
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Feed LMB early (before chain window opens at tick 42) — should NOT chain
-        for (int i = 0; i < 10; i++)
-        {
-            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-            var mid = sim.GetState(1);
-            Assert.Equal(ActionState.Attacking, mid.State);
-        }
+        // Feed LMB early (tick 3) — should buffer but NOT chain immediately
+        for (int i = 0; i < 3; i++)
+            sim.Tick(new() { { 1, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Let stage 1 fully expire without chain input in window
-        for (int i = 0; i < Stage1.DurationTicks; i++)
+        // At tick 5, should still be stage 1 (chain hasn't fired yet)
+        var mid = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, mid.State);
+        Assert.Equal((byte)0, mid.ComboStage);
+
+        // Run to stage 1 end — chain should fire
+        for (int i = 5; i < Stage1.DurationTicks; i++)
             sim.Tick(new() { { 1, default } });
 
-        var final = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, final.State);
+        var afterChain = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, afterChain.State);
+        Assert.Equal((byte)1, afterChain.ComboStage);
+    }
+
+    [Fact]
+    public void LMB_EarlyInput_IsBuffered_NotImmediate()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPy;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Tick 0: LMB to activate
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Ticks 1-3: spam LMB (should all be buffered, not immediate chains)
+        for (int i = 1; i <= 3; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Tick 4: should still be stage 0 (no immediate chain despite early input)
+        var mid = sim.GetState(1);
+        Assert.Equal((byte)0, mid.ComboStage);
+
+        // Run to stage 1 end
+        for (int i = 4; i < Stage1.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
+
+        // Should now be stage 2 (chain fired on stage end)
+        var after = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, after.State);
+        Assert.Equal((byte)1, after.ComboStage);
     }
 
     // ── Input consumption ──
@@ -303,17 +321,15 @@ public class MankiLmbTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        int chainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-
         // Start stage 1
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Default input until chain window
-        for (int i = 1; i < chainTick; i++)
-            sim.Tick(new() { { 1, default } });
-
-        // Feed LMB at chain window
+        // Buffer chain input
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 1 end — chain fires
+        for (int i = 2; i < Stage1.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
 
         // After chain, should still be in stage 2 (not idle)
         // If input wasn't consumed, ActivateAbility would start a new combo
@@ -336,19 +352,21 @@ public class MankiLmbTests
         var s1 = sim.GetState(1);
         Assert.Equal(0, s1.ComboStage);
 
-        // Chain to stage 2: ComboStage = 1
-        int stage1ChainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-        for (int i = 1; i < stage1ChainTick; i++)
-            sim.Tick(new() { { 1, default } });
+        // Buffer chain for stage 2
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 1 end — chains to stage 2: ComboStage = 1
+        for (int i = 2; i < Stage1.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
         var s2 = sim.GetState(1);
         Assert.Equal(1, s2.ComboStage);
 
-        // Chain to stage 3: ComboStage = 2
-        int stage2ChainTick = Stage2.DurationTicks - Stage2.ChainWindowTicks;
-        for (int i = 0; i < stage2ChainTick - 1; i++)
-            sim.Tick(new() { { 1, default } });
+        // Buffer chain for stage 3
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 2 end — chains to stage 3: ComboStage = 2
+        for (int i = 1; i < Stage2.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
         var s3 = sim.GetState(1);
         Assert.Equal(2, s3.ComboStage);
 
@@ -358,30 +376,37 @@ public class MankiLmbTests
         var done = sim.GetState(1);
         Assert.Equal(ActionState.Idle, done.State);
         Assert.Equal(0, done.ComboStage);
-
     }
     // ── Helpers ──
 
     /// <summary>
-    /// Chain from stage 1 → 2 → 3 by feeding LMB input at each chain window.
-    /// Leaves sim at the start of stage 3.
+    /// Chain from stage 1 → 2. Leaves sim at the start of stage 2.
+    /// </summary>
+    private static void ChainToStage2(ServerSimulation sim)
+    {
+        // Stage 1 start
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Buffer chain input early in stage 1
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Run to stage 1 end (12 more ticks, total 14) — chains to stage 2
+        for (int i = 2; i < Stage1.DurationTicks; i++)
+            sim.Tick(new() { { 1, default } });
+    }
+
+    /// <summary>
+    /// Chain from stage 1 → 2 → 3. Leaves sim at the start of stage 3.
     /// </summary>
     private static void ChainToStage3(ServerSimulation sim)
     {
-        int stage1ChainTick = Stage1.DurationTicks - Stage1.ChainWindowTicks;
-        int stage2ChainTick = Stage2.DurationTicks - Stage2.ChainWindowTicks;
+        ChainToStage2(sim);
 
-        // Stage 1
+        // Buffer chain input early in stage 2
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Chain to stage 2
-        for (int i = 1; i < stage1ChainTick; i++)
+        // Run to stage 2 end (15 more ticks, total 16) — chains to stage 3
+        for (int i = 1; i < Stage2.DurationTicks; i++)
             sim.Tick(new() { { 1, default } });
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-
-        // Chain to stage 3
-        for (int i = 0; i < stage2ChainTick - 1; i++)
-            sim.Tick(new() { { 1, default } });
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
     }
 }

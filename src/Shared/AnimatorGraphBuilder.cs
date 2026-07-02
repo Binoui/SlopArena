@@ -70,6 +70,7 @@ public static class AnimatorGraphBuilder
                         PositionY = ay,
                         AutoExit = autoExit,
                         IsHoldLoop = isHoldLoop,
+                        SpeedParameter = "AnimSpeed",
                     });
                     ay += stepY;
                 }

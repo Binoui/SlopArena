@@ -178,6 +178,13 @@ namespace SlopArena.Client.World
             }
             _aimIndicator.gameObject.SetActive(true);
 
+            // Init target indicator (soft-lock visual ring)
+            var targetIndicator = gameObject.AddComponent<TargetIndicator>();
+            targetIndicator.Init(
+                _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
+                _localSim,
+                PlayerEntityId);
+
             Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
         }
 
@@ -197,6 +204,7 @@ namespace SlopArena.Client.World
                 _cachedCameraYaw = _cameraMount.GetCameraYawDeg();
                 _cachedCameraPitch = _cameraMount.GetCameraPitchDeg();
             }
+
         }
 
         protected override void OnMatchFixedUpdate()
@@ -296,6 +304,11 @@ namespace SlopArena.Client.World
                 }
             }
 
+            // Compute screen-center target for soft-lock
+            byte targetEntityId = PickScreenTarget(
+                _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
+                UnityEngine.Camera.main);
+
             var (input, _, _) = _inputController.BuildInputState(
                 _cameraMount,
                 _playerRenderer.transform.eulerAngles.y,
@@ -304,7 +317,8 @@ namespace SlopArena.Client.World
                 slot,
                 abilityAimYawRad: abilityAimYawRad,
                 abilityAimDistance: abilityAimDistance,
-                canMove: null);
+                canMove: null,
+                targetEntityId: targetEntityId);
             // NPC AI
             var npcState = _localSim.GetState(NpcEntityId);
             var playerState = _localSim.GetState(PlayerEntityId);
@@ -398,6 +412,45 @@ namespace SlopArena.Client.World
                 ActiveSlot = slot,
                 Jump = jump,
             };
+        }
+
+        /// <summary>
+        /// Pick the nearest enemy within 20m that is closest to screen center.
+        /// Returns entity ID (cast to byte) or 0 if none found.
+        /// </summary>
+        private byte PickScreenTarget(PlayerRenderer[] renderers, UnityEngine.Camera cam)
+        {
+            if (cam == null || renderers == null || renderers.Length == 0 || _playerRenderer == null)
+                return 0;
+
+            byte bestId = 0;
+            float bestScreenDist = float.MaxValue;
+            Vector2 screenCenter = new(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f);
+            Vector3 playerPos = _playerRenderer.transform.position;
+
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null || renderer == _playerRenderer || renderer.EntityId == 0)
+                    continue;
+
+                Vector3 worldPos = renderer.transform.position;
+                Vector2 screenPos = cam.WorldToScreenPoint(worldPos);
+
+                // Behind camera
+                Vector3 screenPos3 = cam.WorldToScreenPoint(worldPos);
+                if (screenPos3.z < 0) continue;
+
+                float screenDist = Vector2.Distance(new Vector2(screenPos3.x, screenPos3.y), screenCenter);
+                float worldDist = Vector3.Distance(playerPos, worldPos);
+
+                if (screenDist < bestScreenDist && worldDist <= 20f)
+                {
+                    bestScreenDist = screenDist;
+                    bestId = (byte)renderer.EntityId;
+                }
+            }
+
+            return bestId;
         }
 
         private void OnDrawGizmos()

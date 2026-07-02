@@ -25,7 +25,7 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        (0, false) => new MankiLmbCombo(),     // LMB ground
+        (0, false) => new LmbCombo(),     // LMB ground
         (0, true) => null,                      // AirLMB — data-driven fallback (separate spec)
         (1, false) => new MankiAerosolFlame(), // RMB
         (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
@@ -37,7 +37,7 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        (0, false) => new BunnyLmbCombo(),         // LMB — 3-hit combo
+        (0, false) => new LmbCombo(),         // LMB — 3-hit combo
         (0, true) => null,                          // AirLMB — data-driven
         (1, _) => null,                             // RMB/AirRMB — data-driven
         (2, _) => new BunnyWhirlingCarrot(),        // Q — aimed projectile

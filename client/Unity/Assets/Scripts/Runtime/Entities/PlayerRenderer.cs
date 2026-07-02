@@ -239,6 +239,28 @@ namespace SlopArena.Client.Entities
                     _animator.SetInteger("AttackSlot", state.AttackSlot - 1);
                     _animator.SetInteger("ComboStage", state.ComboStage);
                     _animator.SetTrigger("Attack");
+
+                    // Runtime speed modulation: match animation duration to server stage duration
+                    // speed = bakedFrameCount / desriedDurationTicks (both at 60fps)
+                    float animSpeed = 1f;
+                    if (_charDef != null && _bakedData != null)
+                    {
+                        byte slot = (byte)(state.AttackSlot - 1);
+                        var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
+                        if (spec?.Stages != null && state.ComboStage < spec.Stages.Length)
+                        {
+                            string animName = spec.GetAnimationName(state.ComboStage);
+                            int bakedIdx = _bakedData.FindAnimIndex(animName);
+                            if (bakedIdx >= 0)
+                            {
+                                int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
+                                int durationTicks = spec.Stages[state.ComboStage].DurationTicks;
+                                if (durationTicks > 0)
+                                    animSpeed = (float)frameCount / durationTicks;
+                            }
+                        }
+                    }
+                    _animator.SetFloat("AnimSpeed", animSpeed);
                 }
                 else if (state.State == ActionState.Dashing)
                 {
@@ -255,7 +277,8 @@ namespace SlopArena.Client.Entities
                  _lastAnimState == ActionState.Dashing ||
                  _lastAnimState == ActionState.Hitstun))
             {
-                // Left combat state — force-clear to Movement
+                // Left combat state — reset speed to normal, force-clear to Movement
+                _animator.SetFloat("AnimSpeed", 1f);
                 _animator.SetTrigger("Idle");
             }
 

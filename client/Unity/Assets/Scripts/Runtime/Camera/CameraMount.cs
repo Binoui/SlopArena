@@ -92,5 +92,22 @@ namespace SlopArena.Client.Camera
             right.y = 0f;
             return right.normalized;
         }
+
+        /// <summary>
+        /// Smoothly rotate camera yaw toward a world-space target position.
+        /// Clamps rotation speed so the camera doesn't snap.
+        /// </summary>
+        public void LerpTowardDirection(Vector3 fromPos, Vector3 targetPos, float lerpSpeedDegPerSec)
+        {
+            float dx = targetPos.x - fromPos.x;
+            float dz = targetPos.z - fromPos.z;
+            if (dx * dx + dz * dz < 0.01f) return;
+            float targetYaw = Mathf.Atan2(dx, dz) * Mathf.Rad2Deg;
+            float currentYaw = GetCameraYawDeg();
+            float diff = Mathf.DeltaAngle(currentYaw, targetYaw);
+            float maxStep = lerpSpeedDegPerSec * Time.deltaTime;
+            float newYaw = currentYaw + Mathf.Clamp(diff, -maxStep, maxStep);
+            SetCameraYawDeg(newYaw);
+        }
     }
 }

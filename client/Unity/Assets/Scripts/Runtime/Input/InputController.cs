@@ -174,7 +174,8 @@ namespace SlopArena.Client.Input
             byte pendingSlotPress,
             float? abilityAimYawRad,
             ushort? abilityAimDistance,
-            Func<bool>? canMove)
+            Func<bool>? canMove,
+            byte targetEntityId = 0)
         {
             var input = new InputState();
 
@@ -203,6 +204,7 @@ namespace SlopArena.Client.Input
 
                 Vector3 moveDir = new Vector3(move.x, 0f, move.y).normalized;
                 Vector2 snappedDir = new Vector2(move.x, move.y);
+                input.TargetEntityId = targetEntityId;
                 return (input, moveDir, snappedDir);
             }
 
@@ -300,6 +302,7 @@ namespace SlopArena.Client.Input
                 }
             }
 
+            input.TargetEntityId = targetEntityId;
             return (input, moveDirection, snappedInputDirection);
         }
     }

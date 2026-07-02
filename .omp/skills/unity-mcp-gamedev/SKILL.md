@@ -2,6 +2,22 @@
 
 Server: `gamedev-mcp-server` at `http://localhost:26356/mcp`. Configured in `.omp/mcp.json`.
 
+
+## Quick Reference (session start)
+
+```bash
+source scripts/mcp-init.sh   # → sets $SID
+scripts/mcp-exec.sh 'using... public class Script { public static string Main() { ... }}'
+scripts/mcp-exec.sh 'Debug.Log("hi");' true   # body mode
+scripts/mcp-call.sh assets-refresh '{}'
+```
+
+Scripts in `scripts/mcp-*.sh`:
+| Script | Purpose |
+|--------|---------|
+| `mcp-init.sh` | Init session → sets `$SID` |
+| `mcp-call.sh` | Call any tool by name |
+| `mcp-exec.sh` | Shorthand for `script-execute` |
 ## Config
 
 ```json
