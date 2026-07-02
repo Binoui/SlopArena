@@ -163,7 +163,22 @@ namespace SlopArena.Shared
 							Simulation.OnDebugLog.Invoke(
 								$"[Cooldown] Set slot={(byte)(ability.Slot + 1)} cooldown={ability.Cooldown} entity={id}");
 					}
-					_states[id] = state; // Persist cooldown (CharacterState is a struct)
+
+					// Clear buffered slot to prevent data-driven re-trigger.
+					// Without this, a LMB press during the last stage gets buffered by
+					// SimulateTick's input buffer (line 268) before the ability expires.
+					// On the next tick, the buffered slot creates a data-driven attack
+					// with no ServerAbility — the character appears stuck in Attacking
+					// with no animation for the full stage duration.
+					if (state.BufferedSlot > 0)
+					{
+						state.BufferedSlot = 0;
+						if (Simulation.OnDebugLog != null)
+							Simulation.OnDebugLog.Invoke(
+								$"[AbilityEnd] entity={id} cleared BufferedSlot — prevented data-driven re-trigger");
+					}
+
+					_states[id] = state; // Persist cooldown + buffered slot clear
 				}
 				_activeAbilities.Remove(id);
 			}
@@ -318,8 +333,21 @@ namespace SlopArena.Shared
 				if (_activeAbilities.ContainsKey(id)) continue;
 
 				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
-				if (ability == null) continue; // No ServerAbility for this slot, skip (data-driven fallback)
-
+				if (ability == null)
+				{
+				    // Data-driven attack (no ServerAbility). When state is already Attacking,
+				    // consume the input to prevent SimulateTick from immediately re-triggering
+				    // the attack on the expiry tick (SimulateTick line 246).
+				    // Without this, the Idle state set by expiry is immediately overwritten
+				    // and the client never receives an Idle state packet.
+				    if (state.State == ActionState.Attacking)
+				    {
+				        var consumed = input;
+				        consumed.ActiveSlot = 0;
+				        inputs[id] = consumed;
+				    }
+				    continue;
+				}
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 				// Consume input so SimulateTick doesn't also try to start an attack

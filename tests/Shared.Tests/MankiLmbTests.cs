@@ -377,6 +377,34 @@ public class MankiLmbTests
         Assert.Equal(ActionState.Idle, done.State);
         Assert.Equal(0, done.ComboStage);
     }
+
+    // ── Last-stage edge case ──
+
+    [Fact]
+    public void LMB_PressDuringStage3_DoesNotReTrigger_AfterExpiry()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPy;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Chain through to stage 3 (LMB3, the last stage)
+        ChainToStage3(sim);
+
+        // Press LMB during stage 3 — should NOT re-trigger a new combo
+        // This press gets buffered by SimulateTick's input buffer (line 268)
+        // because AnimLockTicks ≤ InputBufferWindow(6) near the end.
+        // The fix: TickAbilities clears BufferedSlot when the ability ends.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
+        // Let stage 3 expire fully
+        for (int i = 1; i < Stage3.DurationTicks + 10; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var after = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, after.State);
+        Assert.Equal((byte)0, after.AttackSlot);
+    }
     // ── Helpers ──
 
     /// <summary>

@@ -9,29 +9,26 @@ namespace SlopArena.Shared.Abilities;
 /// ticked down by Simulation.TickTimers.
 /// While active: attacks gain +3 damage and +0.5 radius (via ServerAbility.ApplyBuffBonuses).
 /// </summary>
-public sealed class MankiOverclock : ServerAbility
-{
-    public override void OnStart(ref CharacterState s, CharacterDefinition def)
+    public sealed class MankiOverclock : ServerAbility
     {
-        ushort duration = (ushort)GetParam(def, "duration_ticks", 480f);
+        private ushort _totalDuration;
 
-        s.BuffActiveFlags |= (byte)BuffType.Overclock;
-        s.BuffRemainingTicks = duration;
-        s.AnimLockTicks = 30;  // injection animation lock
-        AnimIndex = 0;
-        s.State = ActionState.Attacking;
-        s.AttackSlot = (byte)(Slot + 1);
+        public override void OnStart(ref CharacterState s, CharacterDefinition def)
+        {
+            ushort duration = (ushort)GetParam(def, "duration_ticks", 480f);
 
-        // Don't call EndAbility here — ActivateAbility would overwrite AttackSlot.
-        // Let Tick() handle it when animation lock expires.
+            s.BuffActiveFlags |= (byte)BuffType.Overclock;
+            s.BuffRemainingTicks = duration;
+            _totalDuration = 30;  // injection animation lock
+            s.AnimLockTicks = _totalDuration;
+            AnimIndex = 0;
+            s.State = ActionState.Attacking;
+            s.AttackSlot = (byte)(Slot + 1);
+        }
+
+        public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+        {
+            if (s.AttackElapsedTicks >= _totalDuration)
+                EndAbility(ref s);
+        }
     }
-
-    public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
-    {
-        if (s.AttackElapsedTicks >= s.AnimLockTicks)
-            EndAbility(ref s);
-    }
-
-    // OnEnd: no-op. Buff fields persist on CharacterState,
-    // cleared by Simulation.TickTimers when BuffRemainingTicks expires.
-}

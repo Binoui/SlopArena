@@ -55,11 +55,21 @@ namespace SlopArena.Shared.Abilities
                     SpawnHitbox(ref s, evt);
             }
 
-            // Buffer phase — any LMB press during the stage is buffered
+            // Buffer phase — any LMB press during the stage is buffered for chain.
+            // Always consume the input to prevent leaking into the next tick
+            // (which would create a fresh combo via PreTickAbilities).
             var stages = GetStages(def);
-            if (input.ActiveSlot == (Slot + 1) && _stage < stages.Length - 1)
+            if (input.ActiveSlot == (Slot + 1))
             {
-                _chainBuffered = true;
+                if (_stage < stages.Length - 1)
+                {
+                    _chainBuffered = true;
+                }
+                else if (Simulation.OnDebugLog != null)
+                {
+                    Simulation.OnDebugLog.Invoke(
+                        $"[StageChainAbility] entity={s.EntityId} slot={Slot} stage={_stage} (last) — consumed LMB press without chaining");
+                }
                 input.ActiveSlot = 0;
             }
 
