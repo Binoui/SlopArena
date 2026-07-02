@@ -1,5 +1,6 @@
 using SlopArena.Shared;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SlopArena.Client.Entities
 {
@@ -35,6 +36,19 @@ namespace SlopArena.Client.Entities
             set => _capsuleHeight = value;
         }
         private HurtboxBoneDef[] _hurtboxBoneDefs = System.Array.Empty<HurtboxBoneDef>();
+
+        // ── State color mapping for gizmo visualization ──
+
+        private static readonly Dictionary<ActionState, Color> StateColors = new()
+        {
+            { ActionState.Idle,       new Color(1f, 1f, 1f, 0.8f) },       // white
+            { ActionState.Dashing,    new Color(0f, 1f, 1f, 0.8f) },       // cyan
+            { ActionState.Hitstun,    new Color(1f, 0.2f, 0.2f, 0.8f) },   // red
+            { ActionState.Sliding,    new Color(0.5f, 0.5f, 0.5f, 0.8f) }, // gray
+            { ActionState.Attacking,  new Color(1f, 0.6f, 0f, 0.8f) },     // orange
+            { ActionState.AirDodging, new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
+            { ActionState.JumpSquat,  new Color(0.8f, 0.3f, 1f, 0.8f) },   // purple
+        };
 
         [Header("Visual Offset")]
         [SerializeField] private float _modelYOffset;
@@ -216,6 +230,9 @@ namespace SlopArena.Client.Entities
             // Jump trigger — fire once when entering JumpSquat
             if (state.State == ActionState.JumpSquat && _lastAnimState != ActionState.JumpSquat)
                 _animator.SetTrigger("Jump");
+            // Double jump detection: upward impulse while airborne
+            if (!state.IsGrounded && state.VY > 2f && _lastState.VY <= 0f && state.State != ActionState.JumpSquat)
+                _animator.SetTrigger("Jump");
 
             // ── Combat ──
             bool isCombat = state.State == ActionState.Attacking
@@ -316,13 +333,20 @@ namespace SlopArena.Client.Entities
 
         private void OnDrawGizmos()
         {
+            // ── Lookup color for current state ──
+            Color stateColor = StateColors.GetValueOrDefault(_lastState.State, Color.white);
+
             // ── Entity name label ──
             Gizmos.color = Color.white;
             Vector3 labelPos = transform.position + Vector3.up * 2.5f;
-            UnityEditor.Handles.Label(labelPos, _entityName);
+            UnityEditor.Handles.Label(labelPos, $"{_entityName} [{_lastState.State}]");
+
+            // ── State color indicator sphere (above label) ──
+            Gizmos.color = stateColor;
+            Gizmos.DrawSphere(transform.position + Vector3.up * 3.2f, 0.25f);
 
             // ── Collision capsule ──
-            Gizmos.color = new Color(0f, 1f, 0f, 0.6f);
+            Gizmos.color = stateColor;
             Vector3 capCenter = transform.position - Vector3.up * _modelYOffset;
             float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
             Vector3 top = capCenter + Vector3.up * halfH;

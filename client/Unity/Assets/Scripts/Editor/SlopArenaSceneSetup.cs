@@ -41,7 +41,7 @@ namespace SlopArena.Client.Editor
             var camMountGO = new GameObject("CameraMount");
             var cmCam = camMountGO.AddComponent<CinemachineCamera>();
             var orbital = camMountGO.AddComponent<CinemachineOrbitalFollow>();
-            orbital.VerticalAxis.Range = new Vector2(-5f, 30f);
+            orbital.VerticalAxis.Range = new Vector2(10f, 30f);
             orbital.RadialAxis.Range = new Vector2(0.3f, 1.5f);
             var camMount = camMountGO.AddComponent<CameraMount>();
             var camGO = new GameObject("Main Camera", typeof(UnityEngine.Camera), typeof(AudioListener));

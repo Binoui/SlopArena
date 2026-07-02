@@ -2,6 +2,8 @@
 
 Server: `gamedev-mcp-server` at `http://localhost:26356/mcp`. Configured in `.omp/mcp.json`.
 
+> **Warning:** The `com.ivanmurzak.unity.mcp` package in Unity exposes separate AI tools (`Unity_*`, `Unity_Camera_*`, `Unity_AssetGeneration_*`, etc.) — these are NEVER used. Only the tools documented in this skill file from the custom `gamedev-mcp-server`.
+
 
 ## Quick Reference (session start)
 

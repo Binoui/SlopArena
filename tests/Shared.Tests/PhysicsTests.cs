@@ -67,6 +67,35 @@ public class PhysicsTests
     }
 
     [Fact]
+    public void GroundJump_PreservesHorizontalMomentum()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPx;
+        state.VX = Move.WalkSpeed; // running at walk speed
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Enter JumpSquat — VX preserved (not zeroed)
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
+        Assert.Equal(ActionState.JumpSquat, t0.State);
+        Assert.Equal(Move.WalkSpeed, t0.VX);
+
+        // Remainder of JumpSquat — VX stays at walk speed (no friction during squat)
+        for (int i = 1; i < Move.JumpSquatTicks; i++)
+        {
+            var s = TestHelpers.TickDefault(sim, 1);
+            Assert.Equal(ActionState.JumpSquat, s.State);
+            Assert.Equal(Move.WalkSpeed, s.VX);
+        }
+
+        // Squat expires → airborne, momentum preserved (air drag reduces slightly)
+        var tJump = TestHelpers.TickDefault(sim, 1);
+        Assert.False(tJump.IsGrounded);
+        Assert.True(tJump.VX > 0f, $"Expected VX > 0 after jump, got {tJump.VX:F3}");
+    }
+
+    [Fact]
     public void JumpBlocked_NoJumpsLeft()
     {
         var arena = TestHelpers.TestArena();

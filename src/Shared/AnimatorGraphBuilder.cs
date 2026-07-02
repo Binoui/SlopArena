@@ -27,8 +27,13 @@ public static class AnimatorGraphBuilder
         directs.Add(new GraphDirectTransition { FromState = "Jump", ToState = "Fall",
             Conditions = new[] { new GraphCondition { Parameter = "IsGrounded", Mode = AnimConditionMode.IfNot } },
             Duration = 0.1f, HasExitTime = true, ExitTime = 0.3f });
+        directs.Add(new GraphDirectTransition { FromState = "Jump", ToState = "Jump",
+            Conditions = new[] { new GraphCondition { Parameter = "Jump", Mode = AnimConditionMode.If } }, Duration = 0f });
         directs.Add(new GraphDirectTransition { FromState = "Fall", ToState = "Movement",
             Conditions = new[] { new GraphCondition { Parameter = "IsGrounded", Mode = AnimConditionMode.If } }, Duration = 0.1f });
+        directs.Add(new GraphDirectTransition { FromState = "Jump", ToState = "Movement",
+            Conditions = new[] { new GraphCondition { Parameter = "IsGrounded", Mode = AnimConditionMode.If } },
+            Duration = 0.1f });
 
         // Default AnyState transitions
         anys.Add(new GraphAnyTransition { ToState = "Dash",
