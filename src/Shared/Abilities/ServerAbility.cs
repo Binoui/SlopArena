@@ -68,22 +68,76 @@ namespace SlopArena.Shared.Abilities
 
         /// <summary>Hitbox resolver. Set by ServerSimulation before activation.</summary>
         public ISpellResolver Resolver { get; set; } = null!;
+        /// <summary>Baked animation data for bone-attached hitbox resolution. Set by ServerSimulation.</summary>
+        public BakedAnimationData? BakedData { get; set; }
+        /// <summary>Character definition for the ability owner. Set by ServerSimulation.</summary>
+        public CharacterDefinition? CharacterDef { get; set; }
 
         // ── Helpers (call from Tick) ──
 
         /// <summary>
         /// Spawn a hitbox at the character's position + facing-relative offsets.
-        /// The hitbox is registered with the SpellResolver for this tick.
+        /// When evt.BoneName is set and baked data is available, positions at the
+        /// bone's world position instead of the fixed OffX/Y/Z offset.
         /// </summary>
         protected void SpawnHitbox(ref CharacterState s, HitboxEvent evt)
         {
             float cos = MathF.Cos(s.FacingYaw);
             float sin = MathF.Sin(s.FacingYaw);
 
-            float wx = s.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
-            float wy = s.PY + evt.OffY;
-            float wz = s.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
+            float wx, wy, wz;
 
+            // ── Bone-attached hitbox path (requires baked data + HurtboxBoneDefs) ──
+            if (evt.BoneName != null && BakedData != null && CharacterDef?.HurtboxBoneDefs != null)
+            {
+                int bi = -1;
+                for (int i = 0; i < CharacterDef.HurtboxBoneDefs.Length; i++)
+                {
+                    if (CharacterDef.HurtboxBoneDefs[i].BoneName == evt.BoneName) { bi = i; break; }
+                }
+
+                if (bi >= 0)
+                {
+                    // Resolve animation name from AnimIndex
+                    string targetAnim = AnimationNames.Length > AnimIndex ? AnimationNames[AnimIndex] : "idle";
+                    int animIdx = BakedData.FindAnimIndex(targetAnim);
+                    if (animIdx < 0) { targetAnim = "idle"; animIdx = BakedData.FindAnimIndex(targetAnim); }
+
+                    if (animIdx >= 0)
+                    {
+                        int fc = BakedData.Animations[animIdx].FrameCount;
+                        // Use current stage's duration via AnimIndex, with guard against OOB
+                        var spec = CharacterDef?.GetSlotAbility(Slot, false);
+                        int durationTicks = (spec != null && AnimIndex < spec.Stages.Length)
+                            ? spec.Stages[AnimIndex].DurationTicks
+                            : 60;
+                        int bakedFrame = durationTicks > 0
+                            ? Math.Min(s.AttackElapsedTicks * fc / durationTicks, fc - 1)
+                            : Math.Min(s.AttackElapsedTicks, fc - 1);
+                        if (bakedFrame >= fc) bakedFrame = fc - 1;
+
+                        if (BakedData.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz))
+                        {
+                            float scale = CharacterDef.HurtboxBoneScale;
+                            bx *= scale; by *= scale; bz *= scale;
+                            wx = s.PX + ((bx * cos) + (bz * sin));
+                            wy = s.PY - CharacterDef.CapsuleHeight * 0.5f + by;
+                            wz = s.PZ + ((-bx * sin) + (bz * cos));
+                            wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin);
+                            wy += evt.BoneOffY;
+                            wz += (-evt.BoneOffX * sin) + (evt.BoneOffZ * cos);
+                            goto spawnHitbox;
+                        }
+                    }
+                }
+            }
+
+            // ── Fallback: entity-relative offset (standard path) ──
+            wx = s.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
+            wy = s.PY + evt.OffY;
+            wz = s.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
+
+        spawnHitbox:
             float wex = wx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
             float wey = wy + evt.EndOffY;
             float wez = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
@@ -95,11 +149,16 @@ namespace SlopArena.Shared.Abilities
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
+                // Bone-attached hitboxes get velocity to follow the character
+                VX = evt.BoneName != null ? s.VX : 0f,
+                VY = evt.BoneName != null ? s.VY : 0f,
+                VZ = evt.BoneName != null ? s.VZ : 0f,
                 Radius = radius,
                 Shape = evt.Shape,
                 EndX = wex, EndY = wey, EndZ = wez,
                 Damage = damage,
-                KnockbackForce = evt.KnockbackForce,
+                BaseKnockback = evt.BaseKnockback,
+                KnockbackGrowth = evt.KnockbackGrowth,
                 KnockbackUpward = evt.KnockbackUpward,
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,

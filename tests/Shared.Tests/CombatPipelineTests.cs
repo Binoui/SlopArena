@@ -33,7 +33,7 @@ public class CombatPipelineTests
     // Manki LMB stage 1:
     //   Hitbox: sphere at Z=0.9 (in front), radius 1.0
     //   TriggerTick: 6 (hitbox appears on the 6th Tick call)
-    //   Damage: 4, KnockbackForce: 3, KnockbackUpward: 2, StunTicks: 10
+    //   Damage: 4, BaseKnockback: 1.5, KnockbackGrowth: 2.5, KnockbackUpward: 1, StunTicks: 10
     //
     // NPC is placed at Z=1.5 with a 0.3-radius capsule hurtbox.
     //   NPC Hurbox capsule: (0, -0.65, 1.5) → (0, 0.65, 1.5), Radius 0.3
@@ -58,7 +58,7 @@ public class CombatPipelineTests
         player.PY = Gpy;
         sim.RegisterEntity(1, def, player);
 
-        var npc = TestHelpers.NpcState(0f, 1.5f);
+        var npc = TestHelpers.NpcState(0f, 2.2f);
         npc.PY = Gpy;
         sim.RegisterEntity(100, def, npc);
 
@@ -70,8 +70,8 @@ public class CombatPipelineTests
         };
         sim.Tick(inputs);
 
-        // Ticks 1-4: default input (no hitbox yet, _stageTicks < 6)
-        for (int i = 0; i < 4; i++)
+        // Ticks 1-10: default input (no hitbox yet, _stageTicks < 12)
+        for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         // Before trigger tick: NPC is unharmed
@@ -80,7 +80,7 @@ public class CombatPipelineTests
         Assert.Equal(0f, beforeHit.KVX);
         Assert.Equal(0f, beforeHit.KVZ);
 
-        // Tick 5: _stageTicks=6 → hitbox spawns → collision → damage resolved
+        // Tick 11: _stageTicks=12 (10 extra ticks, total 12 ticks) → hitbox spawns → collision → damage resolved
         sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterHit = sim.GetState(100);
@@ -202,7 +202,7 @@ public class CombatPipelineTests
         player.PY = Gpy;
         sim.RegisterEntity(1, def, player);
 
-        var npc = TestHelpers.NpcState(0f, 1.5f);
+        var npc = TestHelpers.NpcState(0f, 2.2f);
         npc.PY = Gpy;
         sim.RegisterEntity(100, def, npc);
 
@@ -232,15 +232,15 @@ public class CombatPipelineTests
             { 100, default },
         });
 
-        // Ticks 1-4: no hitbox yet
-        for (int i = 0; i < 4; i++)
+        // Ticks 1-10: no hitbox yet (TriggerTick=12, so ticks 1-10 have _stageTicks 2-11)
+        for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         // Before trigger: NPC still unharmed
         var beforeHit = sim.GetState(100);
         Assert.Equal(0u, beforeHit.DamagePercent);
 
-        // Tick 5: hitbox spawns with +3 damage bonus
+        // Tick 11: hitbox spawns with +3 damage bonus
         sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterHit = sim.GetState(100);
@@ -293,8 +293,8 @@ public class CombatPipelineTests
         };
         sim.Tick(inputs);
 
-        // Run through trigger ticks and resolution
-        for (int i = 0; i < 15; i++)
+        // Run through trigger ticks, resolution, and stage expiry (22 ticks total) plus margin
+        for (int i = 0; i < 25; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var pState = sim.GetState(1);
@@ -306,9 +306,9 @@ public class CombatPipelineTests
             "At least one entity should have taken damage from mutual LMB trade. " +
             $"Player: {pState.DamagePercent}, NPC: {nState.DamagePercent}");
 
-        Assert.True(pState.State >= ActionState.Idle && pState.State <= ActionState.Hitstun,
+        Assert.True(pState.State >= ActionState.Idle && pState.State <= ActionState.Attacking,
             $"Player state corrupted: {pState.State}");
-        Assert.True(nState.State >= ActionState.Idle && nState.State <= ActionState.Hitstun,
+        Assert.True(nState.State >= ActionState.Idle && nState.State <= ActionState.Attacking,
             $"NPC state corrupted: {nState.State}");
 
         // No entity should have negative damage

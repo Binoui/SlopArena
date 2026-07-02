@@ -37,7 +37,8 @@ namespace SlopArena.Shared
         /// Damage data
         /// </summary>
         public float Damage;
-        public float KnockbackForce;
+        public float BaseKnockback;
+        public float KnockbackGrowth;
         public float KnockbackUpward;
         public ushort StunTicks;
         public ulong OwnerId;

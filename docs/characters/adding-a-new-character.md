@@ -88,7 +88,8 @@ private static CharacterDefinition BuildYourClass()
                     Range = 2.8f,          // Cone range in meters
                     HitAngleDeg = 45f,     // Cone half-angle
                     Radius = 0f,           // Only used for CircleAOE/Projectile
-                    KnockbackForce = 3f,
+                    BaseKnockback = 1.2f,
+                    KnockbackGrowth = 1.8f,
                     KnockbackUpward = 2f,
                     LungeForce = 12f,      // Forward burst
                     StunTicks = 12,        // Hitstun in 16.6ms ticks
@@ -115,7 +116,7 @@ private static CharacterDefinition BuildYourClass()
             CooldownTicks = 0,
             Stages = new AttackStage[]
             {
-                new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, KnockbackForce = 8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, DurationTicks = 8, ChainWindowTicks = 0 },
+                new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, DurationTicks = 8, ChainWindowTicks = 0 },
             }
         },
 
@@ -126,7 +127,7 @@ private static CharacterDefinition BuildYourClass()
             CooldownTicks = 0,
             Stages = new AttackStage[]
             {
-                new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, KnockbackForce = 15f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, DurationTicks = 10, ChainWindowTicks = 0 },
+                new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, BaseKnockback = 6f, KnockbackGrowth = 9f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, DurationTicks = 10, ChainWindowTicks = 0 },
             }
         },
 
@@ -147,7 +148,8 @@ private static CharacterDefinition BuildYourClass()
 | `Range` | float | Cone range / projectile distance | Meters |
 | `HitAngleDeg` | float | Cone half-angle | 45° = 90° total cone |
 | `Radius` | float | Circle AoE radius / projectile hitbox | Used when Shape != MeleeCone |
-| `KnockbackForce` | float | Horizontal knockback | Scaled by target's damage% |
+| `BaseKnockback` | float | Base horizontal knockback | Minimum launch power; not scaled by damage% |
+| `KnockbackGrowth` | float | Knockback scaling per damage% | Effective = baseKB + growthKB * (dmg% * 0.01) |
 | `KnockbackUpward` | float | Vertical knockback | Negative = spike downward |
 | `LungeForce` | float | Self-forward burst | Moves attacker forward |
 | `StunTicks` | ushort | Hitstun duration on target | 1 tick = 16.6ms |

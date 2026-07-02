@@ -86,6 +86,10 @@ namespace SlopArena.Shared.Abilities
                 float projRadius = GetParam(def, "hitbox_radius", 0.6f);
                 float projDamage = GetParam(def, "damage", 8f);
                 ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
+                float kbBase = GetParam(def, "knockback_base", 4f);
+                float kbGrowth = GetParam(def, "knockback_growth", 6f);
+                float explosionKbBase = GetParam(def, "explosion_kb_base", 2.4f);
+                float explosionKbGrowth = GetParam(def, "explosion_kb_growth", 3.6f);
 
                 Resolver.Spawn(new Hitbox
                 {
@@ -99,7 +103,7 @@ namespace SlopArena.Shared.Abilities
                     Shape = HitboxShape.Sphere,
                     EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
                     Damage = projDamage,
-                    KnockbackForce = GetParam(def, "knockback_force", 10f),
+                    BaseKnockback = kbBase, KnockbackGrowth = kbGrowth,
                     KnockbackUpward = GetParam(def, "knockback_upward", 6f),
                     StunTicks = (ushort)GetParam(def, "stun_ticks", 14f),
                     DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 90f),
@@ -109,7 +113,7 @@ namespace SlopArena.Shared.Abilities
                     {
                         Radius = GetParam(def, "explosion_radius", 3f),
                         Damage = GetParam(def, "explosion_damage", 25f),
-                        KnockbackForce = GetParam(def, "explosion_knockback_force", 18f),
+                        BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth,
                         KnockbackUpward = GetParam(def, "explosion_knockback_upward", 12f),
                         StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
                         DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),

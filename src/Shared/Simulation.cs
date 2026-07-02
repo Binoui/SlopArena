@@ -34,7 +34,7 @@ namespace SlopArena.Shared
         /// <summary>
         /// 8.0/s at 60Hz
         /// </summary>
-        private const float KnockbackDecayPerTick = 0.1333f;
+        private const float KnockbackDecayPerTick = 0.02f;
         private const float KnockbackMinGravity = 9.8f;
         private const byte MaxAirDodges = 1;
 
@@ -397,10 +397,18 @@ namespace SlopArena.Shared
         /// </summary>
         private static void ProcessHitstun(ref CharacterState s, InputState input)
         {
-            // Apply knockback immediately — don't freeze the victim
+            // Apply knockback force plus gravity toward velocity
             s.VX = s.KVX;
-            s.VY = s.KVY;
             s.VZ = s.KVZ;
+
+            // Apply gravity to KVY during hitstun so the target doesn't
+            // coast upward at constant speed for the full duration.
+            // Without this, gravity only starts in ProcessKnockback after
+            // hitstun expires, making upward trajectories feel floaty.
+            // No clamp: downward KB (spikes) should accelerate downward.
+            if (!s.IsGrounded)
+                s.KVY -= KnockbackMinGravity * TickDt;
+            s.VY = s.KVY;
 
             // Store current input for DI (applied when hitstun expires)
             s.DIX = input.MoveX;
@@ -716,37 +724,38 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
-        /// Apply knockback force, scaled by damage percent (Smash-style).
-        /// Knockback = baseForce * (1 + DamagePercent * 0.01)
-        /// So at 0%: 1x, at 100%: 2x, at 200%: 3x, etc.
-        /// If baseForce is ~0 (no-KB moves), knockback stays minimal.
-        /// Triggers hitstun first (freeze + DI window), then knockback applies.
+        /// Apply knockback using BaseKnockback + KnockbackGrowth (Smash-style).
+        /// effectiveHorizontal = baseKB + growthKB * (DamagePercent * 0.01)
+        /// effectiveUpward = kbUpward * (1 + DamagePercent * 0.01)
+        /// Hitstun gates on stunTicks > 0 from the hitbox data, not a magic threshold.
+        /// StunTicks from the hitbox acts as a per-move max hitstun cap.
         /// </summary>
-        public static void ApplyKnockback(ref CharacterState s, float kbX, float kbY, float kbZ)
+        public static void ApplyKnockback(ref CharacterState s, float dirX, float dirZ,
+            float kbUpward, float baseKB, float growthKB, ushort stunTicks)
         {
-            float kbScale = 1f + (s.DamagePercent * 0.01f);
+            float scaling = 1f + (s.DamagePercent * 0.01f);
+            float effectiveHorizontal = baseKB + growthKB * (s.DamagePercent * 0.01f);
+            float effectiveUpward = kbUpward * scaling;
 
-            // Store scaled knockback (will be applied after hitstun)
-            s.KVX = kbX * kbScale;
-            s.KVY = kbY * kbScale;
-            s.KVZ = kbZ * kbScale;
+            s.KVX = dirX * effectiveHorizontal;
+            s.KVY = effectiveUpward;
+            s.KVZ = dirZ * effectiveHorizontal;
 
-            // Calculate hitstun duration based on knockback strength
-            float kbMagnitude = MathF.Sqrt((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
+            float kbMagnitude = MathF.Sqrt(
+                (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
 
-            // Hitstun formula: 8-20 frames depending on knockback strength
-            // Weak hits: 8 frames, Strong hits: 20+ frames
-            ushort hitstunFrames = (ushort)Math.Clamp(8 + (int)(kbMagnitude * 0.5f), 8, 25);
-
-            // Only apply hitstun if knockback is significant (not weak jabs)
-            if (kbMagnitude > 3f)
+            // Hitstun gates on StunTicks from the hitbox data, not arbitrary 3f threshold.
+            // If StunTicks=0, no hitstun (true weak jab). Any positive = hitstun triggers.
+            // kbMagnitude < 0.5f is a safety floor (near-zero KB with hitstun looks glitchy).
+            if (stunTicks > 0 && kbMagnitude > 0.5f)
             {
-                s.HitstunTicks = hitstunFrames;
+                ushort hitstunFromKB = (ushort)Math.Clamp(8 + (int)(kbMagnitude * 0.5f), 8, 60);
+                ushort hitstunFinal = Math.Min(hitstunFromKB, stunTicks); // cap at stage's StunTicks
+                s.HitstunTicks = hitstunFinal;
                 s.State = ActionState.Hitstun;
             }
             else
             {
-                // Weak hit: skip hitstun, apply knockback immediately
                 s.State = ActionState.Idle;
             }
 

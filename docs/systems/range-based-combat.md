@@ -73,17 +73,20 @@ Server-authoritative auto-dash toward target when in warp range but outside atta
 ### Behavior
 ```
 Player presses attack button:
-├─ Target distance ≤ AttackRange (4m)
-│  └─> Execute attack immediately
+├─ Zone 3: distance ≤ AttackRange (2m)
+│  ├─ ✅ Rotate toward target
+│  ├─ ❌ Warp (already in range)
+│  └─ ✅ Lunge toward target
 │
-├─ AttackRange < distance ≤ WarpRange (4-12m)
-│  ├─> ServerAbility sets IsWarping = true + WarpTarget
-│  ├─> Simulation.ProcessWarp() interpolates position per tick
-│  ├─> Stop at AttackRange distance
-│  └─> Execute attack
+├─ Zone 2: AttackRange < distance ≤ WarpRange (2-10m)
+│  ├─ ✅ Rotate toward target
+│  ├─ ✅ Warp (auto-dash to AttackRange)
+│  └─ ✅ Lunge toward target (after warp)
 │
-└─ Distance > WarpRange (12m+)
-   └─> Attack in place (likely miss)
+└─ Zone 1: distance > WarpRange (10m+)
+   ├─ ❌ No rotation (no snap-turn)
+   ├─ ❌ No warp (too far)
+   └─ ✅ Lunge in current facing direction
 ```
 
 ### Features
@@ -145,7 +148,8 @@ public struct HitboxEvent
     public float Radius;
     public float OffX, OffY, OffZ;   // Offset from attacker center
     public float Damage;
-    public float KnockbackForce;
+    public float BaseKnockback;
+    public float KnockbackGrowth;
     public float KnockbackUpward;
     public ushort StunTicks;
     public bool Interruptible;       // false = persists even if attacker is hit
@@ -169,7 +173,7 @@ new AttackStage
         {
             TriggerTick = 8, DurationTicks = 2, Radius = 0.5f,
             OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
-            Damage = 12f, KnockbackForce = 25f,
+            Damage = 12f, BaseKnockback = 10f, KnockbackGrowth = 15f,
             KnockbackUpward = 5f, StunTicks = 30,
             Interruptible = true,
         },
@@ -198,7 +202,7 @@ new AttackStage
         {
             TriggerTick = 20, DurationTicks = 3, Radius = 0.8f,
             OffX = 2.5f, OffY = 1.0f, OffZ = 0f,
-            Damage = 25f, KnockbackForce = 50f,
+            Damage = 25f, BaseKnockback = 20f, KnockbackGrowth = 30f,
             KnockbackUpward = 10f, StunTicks = 60,
             Interruptible = true,
         },
@@ -227,7 +231,7 @@ new AttackStage
         {
             TriggerTick = 5, DurationTicks = 1, Radius = 2f,
             OffX = 3f, OffY = 1.5f, OffZ = 0f,
-            Damage = 8f, KnockbackForce = 5f,
+            Damage = 8f, BaseKnockback = 2f, KnockbackGrowth = 3f,
             KnockbackUpward = 0f, StunTicks = 10,
             Interruptible = true,
         },
@@ -322,7 +326,7 @@ new AbilityData
                 {
                     TriggerTick = 6, DurationTicks = 2, Radius = 0.5f,
                     OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
-                    Damage = 4f, KnockbackForce = 3f,
+            Damage = 4f, BaseKnockback = 1.2f, KnockbackGrowth = 1.8f,
                     KnockbackUpward = 2f, StunTicks = 10,
                     Interruptible = true,
                 },

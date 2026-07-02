@@ -80,7 +80,8 @@ namespace SlopArena.Shared.Abilities
             if (spinElapsed == _spinDuration)
             {
                 float launcherDamage = GetParam(def, "launcher_damage", 8f);
-                float launcherKB = GetParam(def, "launcher_knockback", 12f);
+                float launcherKBBase = GetParam(def, "launcher_kb_base", 4.8f);
+                float launcherKBGrowth = GetParam(def, "launcher_kb_growth", 7.2f);
                 float launcherUp = GetParam(def, "launcher_knockback_up", 18f);
                 ushort launcherStun = (ushort)GetParam(def, "launcher_stun_ticks", 18f);
 
@@ -91,7 +92,8 @@ namespace SlopArena.Shared.Abilities
                     Shape = HitboxShape.Sphere,
                     DurationTicks = 4,
                     Damage = launcherDamage,
-                    KnockbackForce = launcherKB,
+                    BaseKnockback = launcherKBBase,
+                    KnockbackGrowth = launcherKBGrowth,
                     KnockbackUpward = launcherUp,
                     StunTicks = launcherStun,
                     OwnerId = s.EntityId,
