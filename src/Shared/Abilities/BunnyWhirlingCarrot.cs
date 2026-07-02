@@ -78,6 +78,18 @@ namespace SlopArena.Shared.Abilities
                 float projDamage = GetParam(def, "damage", 6f);
                 ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
 
+                float kbBase = GetParam(def, "knockback_base", 1.2f);
+                float kbGrowth = GetParam(def, "knockback_growth", 1.8f);
+                float kbUpward = GetParam(def, "knockback_upward", 2f);
+                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 6f);
+                ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
+
+                float explosionKbBase = GetParam(def, "explosion_kb_base", 1.2f);
+                float explosionKbGrowth = GetParam(def, "explosion_kb_growth", 1.8f);
+                float explosionKbUpward = GetParam(def, "explosion_knockback_upward", 2f);
+                ushort explosionStun = (ushort)GetParam(def, "explosion_stun_ticks", 4f);
+                ushort explosionDuration = (ushort)GetParam(def, "explosion_duration_ticks", 6f);
+
                 Resolver.Spawn(new Hitbox
                 {
                     X = s.PX,
@@ -90,20 +102,22 @@ namespace SlopArena.Shared.Abilities
                     Shape = HitboxShape.Sphere,
                     EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
                     Damage = projDamage,
-                    KnockbackForce = GetParam(def, "knockback_force", 3f),
-                    KnockbackUpward = GetParam(def, "knockback_upward", 2f),
-                    StunTicks = (ushort)GetParam(def, "stun_ticks", 6f),
-                    DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 90f),
+                    BaseKnockback = kbBase,
+                    KnockbackGrowth = kbGrowth,
+                    KnockbackUpward = kbUpward,
+                    StunTicks = stunTicks,
+                    DurationTicks = maxFlight,
                     OwnerId = s.EntityId,
                     Gravity = g,
                     Explosion = new ProjectileExplosion
                     {
                         Radius = GetParam(def, "explosion_radius", 2.5f),
-                        Damage = GetParam(def, "explosion_damage", 4f),
-                        KnockbackForce = GetParam(def, "explosion_knockback_force", 3f),
-                        KnockbackUpward = GetParam(def, "explosion_knockback_upward", 2f),
-                        StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 4f),
-                        DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
+                        Damage = GetParam(def, "explosion_damage", 8f),
+                        BaseKnockback = explosionKbBase,
+                        KnockbackGrowth = explosionKbGrowth,
+                        KnockbackUpward = explosionKbUpward,
+                        StunTicks = explosionStun,
+                        DurationTicks = explosionDuration,
                     },
                 });
             }

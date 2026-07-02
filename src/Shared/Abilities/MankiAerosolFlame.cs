@@ -47,6 +47,8 @@ namespace SlopArena.Shared.Abilities
                 float endOffZ = GetParam(def, _charged ? "charged_end_off_z" : "normal_end_off_z", 4.0f);
                 float radius = GetParam(def, _charged ? "charged_radius" : "normal_radius", 1.0f);
                 ushort duration = (ushort)GetParam(def, _charged ? "charged_hitbox_duration" : "normal_hitbox_duration", 30f);
+                float kbBase = GetParam(def, _charged ? "charged_kb_base" : "normal_kb_base", 9.6f);
+                float kbGrowth = GetParam(def, _charged ? "charged_kb_growth" : "normal_kb_growth", 14.4f);
 
                 SpawnHitbox(ref s, new HitboxEvent
                 {
@@ -61,7 +63,8 @@ namespace SlopArena.Shared.Abilities
                     EndOffY = 0,
                     EndOffZ = endOffZ - offZ, // relative to start
                     Damage = GetParam(def, _charged ? "charged_damage" : "normal_damage", 14f),
-                    KnockbackForce = GetParam(def, _charged ? "charged_knockback" : "normal_knockback", 24f),
+                    BaseKnockback = kbBase,
+                    KnockbackGrowth = kbGrowth,
                     KnockbackUpward = GetParam(def, _charged ? "charged_knockback_up" : "normal_knockback_up", 8f),
                     StunTicks = (ushort)GetParam(def, _charged ? "charged_stun" : "normal_stun", 20f),
                     Interruptible = true,

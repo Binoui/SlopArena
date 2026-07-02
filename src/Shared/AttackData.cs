@@ -17,8 +17,13 @@ namespace SlopArena.Shared
         public float OffX, OffY, OffZ;
         /// <summary>Capsule end offset (relative to OffX/Y/Z, rotated by facing yaw).</summary>
         public float EndOffX, EndOffY, EndOffZ;
+        /// <summary>If set, position hitbox at this bone's world position instead of OffX/Y/Z. Null = use existing entity-relative offset.</summary>
+        public string? BoneName;
+        /// <summary>Local offset from bone origin (applied after bone position is resolved).</summary>
+        public float BoneOffX, BoneOffY, BoneOffZ;
         public float Damage;
-        public float KnockbackForce;
+        public float BaseKnockback;
+        public float KnockbackGrowth;
         public float KnockbackUpward;
         public ushort StunTicks;
         /// <summary>If false: persists even if attacker is hit during startup.</summary>
@@ -80,8 +85,10 @@ namespace SlopArena.Shared
         public float LaunchOffsetY;
         /// <summary>Damage on direct hit.</summary>
         public float Damage;
-        /// <summary>Horizontal knockback force.</summary>
-        public float KnockbackForce;
+        /// <summary>Minimum horizontal knockback (at 0% damage).</summary>
+        public float BaseKnockback;
+        /// <summary>Additional knockback per (damage% * 0.01).</summary>
+        public float KnockbackGrowth;
         /// <summary>Vertical knockback (upward).</summary>
         public float KnockbackUpward;
         /// <summary>Stun ticks on hit.</summary>
@@ -103,7 +110,8 @@ namespace SlopArena.Shared
     {
         public float Radius;
         public float Damage;
-        public float KnockbackForce;
+        public float BaseKnockback;
+        public float KnockbackGrowth;
         public float KnockbackUpward;
         public ushort StunTicks;
         public ushort DurationTicks;

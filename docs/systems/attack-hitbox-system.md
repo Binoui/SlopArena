@@ -24,7 +24,8 @@ public struct HitboxEvent
     public float Radius;            // Hitbox size
     public float OffsetX, OffsetY, OffsetZ;  // Position relative to attacker
     public float Damage;
-    public float KnockbackForce;
+    public float BaseKnockback;
+    public float KnockbackGrowth;
     public float KnockbackUpward;
     public ushort StunTicks;
     public bool Interruptible;      // Cleared if the player gets hit

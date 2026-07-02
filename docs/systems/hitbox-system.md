@@ -63,8 +63,8 @@ public struct Hitbox
     public float EndX, EndY, EndZ;    // Capsule end point (ignored for Sphere)
 
     public float Damage;              // Damage amount
-    public float KnockbackForce;      // Horizontal knockback force
-    public float KnockbackUpward;     // Vertical knockback force
+    public float BaseKnockback;        // Base horizontal knockback (minimum at 0% damage)
+    public float KnockbackGrowth;      // Additional knockback per dmg% * 0.01
     public ushort StunTicks;          // Stun duration in ticks
     public ulong OwnerId;             // Attacker's ID (to skip self-hit)
 
@@ -95,9 +95,12 @@ public struct HitboxEvent
     public ushort DurationTicks;       // How many frames the hitbox stays active
     public float Radius;               // Hitbox radius
     public float OffX, OffY, OffZ;     // Offset from attacker center (rotated by facing yaw)
+    public float EndOffX, EndOffY, EndOffZ; // Capsule end offset (relative to OffX/Y/Z)
+    public string? BoneName;            // If set, position hitbox at this bone instead of OffX/Y/Z
+    public float BoneOffX, BoneOffY, BoneOffZ; // Local offset from bone origin (rotated by facing yaw)
     public float Damage;
-    public float KnockbackForce;
-    public float KnockbackUpward;
+    public float BaseKnockback;
+    public float KnockbackGrowth;
     public ushort StunTicks;
     public bool Interruptible;         // If false: persists even if attacker is hit during startup
 }
@@ -138,7 +141,7 @@ new AbilityData
                 {
                     TriggerTick = 6, DurationTicks = 2, Radius = 0.5f,
                     OffX = 1.5f, OffY = 1.0f, OffZ = 0f,
-                    Damage = 4, KnockbackForce = 8, KnockbackUpward = 3,
+                    Damage = 4, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 3,
                     StunTicks = 10, Interruptible = true
                 }
             },
@@ -154,7 +157,7 @@ new AbilityData
                 {
                     TriggerTick = 8, DurationTicks = 2, Radius = 0.7f,
                     OffX = 2.0f, OffY = 1.0f, OffZ = 0f,
-                    Damage = 6, KnockbackForce = 12, KnockbackUpward = 5,
+                    Damage = 6, BaseKnockback = 4.8f, KnockbackGrowth = 7.2f, KnockbackUpward = 5,
                     StunTicks = 15, Interruptible = true
                 }
             },
@@ -170,7 +173,7 @@ new AbilityData
                 {
                     TriggerTick = 8, DurationTicks = 3, Radius = 0.8f,
                     OffX = 2.5f, OffY = 0.5f, OffZ = 0f,
-                    Damage = 12, KnockbackForce = 20, KnockbackUpward = 10,
+                    Damage = 12, BaseKnockback = 8.0f, KnockbackGrowth = 12.0f, KnockbackUpward = 10,
                     StunTicks = 20, Interruptible = true
                 }
             },
@@ -222,8 +225,8 @@ foreach (var kvp in _states)
                             Shape = HitboxShape.Sphere,
                             EndX = hx, EndY = hy, EndZ = hz,
                             Damage = evt.Damage,
-                            KnockbackForce = evt.KnockbackForce,
-                            KnockbackUpward = evt.KnockbackUpward,
+                            BaseKnockback = evt.BaseKnockback,
+                            KnockbackGrowth = evt.KnockbackGrowth,
                             StunTicks = evt.StunTicks,
                             DurationTicks = evt.DurationTicks,
                             OwnerId = id,
@@ -244,6 +247,53 @@ foreach (var kvp in _states)
 - **Interruptible**: currently handled at the SpellResolver level (future: hitstun clears interruptible events)
 - **Client role**: client only renders the animation FSM (ActionState) — does not spawn hitboxes for standard attacks
 
+
+### Bone-attached hitboxes
+
+Since v0.13, `HitboxEvent` supports bone-attached hitboxes. When `BoneName` is set, the hitbox is positioned at the character skeleton bone's world position (from baked animation data) instead of the fixed `OffX/Y/Z` entity-relative offset.
+
+⚠️ **Melee Pivot Decoherence Warning:** Spawning a server-side hitbox on a bone transform occurs on the *first trigger tick only*. Afterward, unless updated dynamically, the hitbox remains anchored statically in world space (modulo entity linear velocity), while the visual skeletal mesh continues its swipe movement. This can separate the visual swing from the physical damage bubble.
+To avoid this mismatch, standard basic melee combos must always utilize rapid-active entity-relative offsets (`OffX/Y/Z`) for high-performance timing (e.g., active windows of 3-8 ticks). Save bone-attached patterns strictly for specific tracking-startup indicators or target-seeking cinematics (e.g., Dragon's Kick) where precise initial targeting is needed but decoherence isn't an issue.
+
+**Fields:**
+- `BoneName` (string?): Bone name in the skeleton (e.g. `"mixamorig:RightFoot"`). Null = standard entity-relative positioning via `OffX/Y/Z`.
+- `BoneOffX/Y/Z` (float): Local offset applied after bone position is resolved. Follows the same facing-yaw rotation convention as `OffX/Y/Z` (X=right, Z=forward).
+
+**Spawning behavior:**
+- When `BoneName != null`, the bone-index is looked up from `CharacterDefinition.HurtboxBoneDefs[]`. The bone's world position is resolved from `BakedAnimationData` (the same `.bin` file used for hurtbox positions).
+- The `EndOffX/Y/Z` capsule-end fields still apply — they are rotated by facing yaw relative to the bone position, allowing capsule-shaped bone-attached hitboxes.
+- `Damage`, `BaseKnockback`, `KnockbackGrowth`, `Radius`, `StunTicks`, `Interruptible` — all unchanged.
+
+**Requires baked skeleton data:**
+Bone-attached hitboxes require a `BakedDataPath` (`.bin` file) and `HurtboxBoneDefs` on the `CharacterDefinition`. If baked data is missing, the hitbox is silently skipped and a debug log is emitted:
+```
+[SpawnHitboxEvents] Bone hitbox for 'mixamorig:RightFoot' skipped — no baked data for entity N
+```
+The ability still runs normally — only the bone-attached hitbox events are skipped. Standard `OffX/Y/Z` hitboxes in the same stage are unaffected.
+
+**Sweet/sour spot pattern:**
+Define multiple `HitboxEvent` entries on the same stage with the same `TriggerTick` but targeting different bones or different damage values:
+
+```csharp
+HitboxEvents = new[]
+{
+    new HitboxEvent {
+        TriggerTick = 10, DurationTicks = 28, Radius = 0.8f,
+        BoneName = "mixamorig:RightFoot", BoneOffY = 0.1f,
+        Damage = 14f, BaseKnockback = 8.8f, KnockbackGrowth = 13.2f, KnockbackUpward = 8f,
+        StunTicks = 22, Interruptible = true
+    },
+    new HitboxEvent {
+        TriggerTick = 10, DurationTicks = 28, Radius = 0.6f,
+        BoneName = "mixamorig:LeftFoot",
+        Damage = 8f, BaseKnockback = 5.6f, KnockbackGrowth = 8.4f, KnockbackUpward = 4f,
+        StunTicks = 14, Interruptible = true
+    },
+},
+```
+
+**ServerAbility limitation:**
+ServerAbility subclasses (e.g., `BunnyDragonKick`, `MankiBazooka`) manage their own hitbox spawning in `Tick()` via `ServerAbility.SpawnHitbox()`, which always uses entity-relative `OffX/Y/Z`. Bone-attached `HitboxEvent` fields on a ServerAbility's data are ignored. ServerAbilities that need bone-attached hitboxes must resolve baked data and call `Resolver.Spawn()` directly.
 ---
 
 ## 🔵 Hurtbox (target)
@@ -411,17 +461,19 @@ public static List<HitResult> Tick(List<EntityData> entities)
             if (hit)
             {
                 // Calculate knockback direction
-                float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
-                float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : 0f;
+                float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
+                float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
 
                 results.Add(new HitResult
                 {
                     TargetEntityId = entity.Id,
                     OwnerEntityId = hb.OwnerId,
                     Damage = hb.Damage,
-                    KnockbackX = kbX,
+                    DirX = dirXNorm,
                     KnockbackY = hb.KnockbackUpward,
-                    KnockbackZ = kbZ,
+                    DirZ = dirZNorm,
+                    BaseKnockback = hb.BaseKnockback,
+                    KnockbackGrowth = hb.KnockbackGrowth,
                     StunTicks = hb.StunTicks,
                 });
 
@@ -464,7 +516,9 @@ public struct HitResult
     public ulong TargetEntityId;
     public ulong OwnerEntityId;
     public float Damage;
-    public float KnockbackX, KnockbackY, KnockbackZ;
+    public float DirX, KnockbackY, DirZ;
+    public float BaseKnockback;
+    public float KnockbackGrowth;
     public ushort StunTicks;
 }
 ```
@@ -599,8 +653,8 @@ new AbilityData
                     Radius = 3f,              // Big slam radius
                     OffX = 0f, OffY = 0.5f, OffZ = 0f,  // At feet
                     Damage = 50f,
-                    KnockbackForce = 30f,
-                    KnockbackUpward = 10f,
+                    BaseKnockback = 12.0f,
+                    KnockbackGrowth = 18.0f,
                     StunTicks = 60,           // 1s stun
                     Interruptible = false,    // Cannot be cancelled
                 }

@@ -155,7 +155,8 @@ namespace SlopArena.Shared.Abilities
             float aoeRadius = GetParam(attackerDef, "impact_aoe_radius", 2f);
             float aoeDuration = GetParam(attackerDef, "impact_aoe_duration", 8f);
             float aoeDamage = GetParam(attackerDef, "impact_aoe_damage", 6f);
-            float aoeKnockback = GetParam(attackerDef, "impact_aoe_knockback", 8f);
+            float aoeKbBase = GetParam(attackerDef, "impact_aoe_kb_base", 3.2f);
+            float aoeKbGrowth = GetParam(attackerDef, "impact_aoe_kb_growth", 4.8f);
             float aoeUpward = GetParam(attackerDef, "impact_aoe_upward", 6f);
             ushort aoeStun = (ushort)GetParam(attackerDef, "impact_aoe_stun", 10f);
 
@@ -168,7 +169,8 @@ namespace SlopArena.Shared.Abilities
                 Shape = HitboxShape.Sphere,
                 DurationTicks = (ushort)aoeDuration,
                 Damage = aoeDamage,
-                KnockbackForce = aoeKnockback,
+                BaseKnockback = aoeKbBase,
+                KnockbackGrowth = aoeKbGrowth,
                 KnockbackUpward = aoeUpward,
                 StunTicks = aoeStun,
                 OwnerId = attacker.EntityId,

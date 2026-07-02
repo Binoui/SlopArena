@@ -6,16 +6,20 @@ Smash Bros-style hitstun with Directional Influence (DI) for competitive depth.
 
 ### Hit Sequence
 ```
-Attack lands → Hitstun (8-25 frames) → Knockback (influenced by DI)
+Attack lands → Hitstun (8-60 frames) → Knockback (influenced by DI)
 ```
 
 **1. Hitstun Phase** (ActionState.Hitstun)
 - Victim is **frozen in place** (VX = VZ = 0)
-- Duration: 8-25 frames based on knockback strength
-  - Weak jabs (<3 KB): No hitstun (instant knockback)
-  - Medium hits (3-10 KB): 8-12 frames
-  - Strong hits (10-20 KB): 12-18 frames
-  - Kill moves (>20 KB): 18-25 frames
+- Duration: 8-60 frames based on knockback strength
+- **Gate:** Controlled by `StunTicks > 0` from the hitbox data (not an arbitrary KB threshold)
+  - `StunTicks = 0`: No hitstun (true weak jab -- instant knockback recovery)
+  - `StunTicks > 0`: Hitstun triggers if knockback magnitude > 0.5 (floor to prevent glitchy near-zero push)
+- **Maximum** hitstun is `min(computedFromKB, StunTicks)` -- StunTicks acts as a per-move cap
+- **Examples at default settings:**
+  - Base 1.5 + Growth 2.5 (combo jab): ~8-10 frames
+  - Base 7 + Growth 18 (launcher at 100%): ~25-40 frames
+  - Kill moves at high %: up to 60 frames (1 second)
 - **Visual:** White flash on victim
 
 **2. DI Window**
@@ -25,7 +29,8 @@ Attack lands → Hitstun (8-25 frames) → Knockback (influenced by DI)
 - Just hold the stick where you want to go
 
 **3. Knockback Application**
-- Base knockback scales with damage % (Smash formula: 1 + dmg% * 0.01)
+- Effective horizontal: `effectiveHorizontal = baseKB + growthKB * (dmg% * 0.01)`
+- Effective upward: `effectiveUpward = kbUpward * (1 + dmg% * 0.01)`
 - DI influence applied: `KBX += DIX * 3.5`, `KBZ += DIY * 3.5`
 - Victim enters knockback state
 
@@ -76,18 +81,29 @@ s.State = ActionState.Idle;  // Exit to knockback
 
 **Simulation.cs ApplyKnockback():**
 ```csharp
-// Calculate hitstun duration
-float kbMagnitude = sqrt(KVX² + KVY² + KVZ²);
-ushort frames = clamp(8 + kbMagnitude * 0.5, 8, 25);
+// New Smash-style formula: effectiveHorizontal = baseKB + growthKB * (dmg% * 0.01)
+float scaling = 1f + (s.DamagePercent * 0.01f);
+float effectiveHorizontal = baseKB + growthKB * (s.DamagePercent * 0.01f);
+float effectiveUpward = kbUpward * scaling;
 
-if (kbMagnitude > 3f)
+s.KVX = dirX * effectiveHorizontal;
+s.KVY = effectiveUpward;
+s.KVZ = dirZ * effectiveHorizontal;
+
+float kbMagnitude = sqrt(KVX² + KVY² + KVZ²);
+
+// Gate: hitstun triggers on StunTicks > 0 (not an arbitrary KB threshold)
+// The 0.5f floor prevents glitchy near-zero push with hitstun
+if (stunTicks > 0 && kbMagnitude > 0.5f)
 {
-    s.HitstunTicks = frames;
+    ushort hitstunFromKB = (ushort)clamp(8 + (int)(kbMagnitude * 0.5f), 8, 60);
+    ushort hitstunFinal = min(hitstunFromKB, stunTicks); // cap at stage's StunTicks
+    s.HitstunTicks = hitstunFinal;
     s.State = ActionState.Hitstun;  // Enter freeze
 }
 else
 {
-    // Weak hit: skip hitstun
+    s.State = ActionState.Idle;    // Skip hitstun
 }
 ```
 
@@ -97,21 +113,26 @@ else
 ```csharp
 const float DIStrength = 3.5f;           // DI multiplier (line 157)
 const float MinHitstun = 8f;             // Min frames (line 475)
-const float MaxHitstun = 25f;            // Max frames (line 475)
-const float HitstunThreshold = 3f;       // KB magnitude to trigger hitstun (line 478)
+const float MaxHitstun = 60f;            // Max frames (1 second, was 25)
 const float HitstunScaling = 0.5f;       // KB → frames conversion (line 475)
 ```
 
+> **Hitstun gate removed:** `HitstunThreshold = 3f` is gone. Hitstun now gates on `StunTicks > 0` from the hitbox data (see Hitstun Phase above). Set `StunTicks = 0` on a hitbox to skip hitstun entirely.
+
 **To increase DI influence:** Raise `DIStrength` (default 3.5)
 **To make hitstun longer:** Raise `HitstunScaling` or `MaxHitstun`
-**To make weak hits have hitstun:** Lower `HitstunThreshold`
-
+**To make weak hits have hitstun:** Increase `StunTicks` on the hitbox data
 ## Balancing
 
-### Current Values (v1.0)
+### Current Values (v1.1)
 - **DIStrength:** 3.5 (strong influence, rewards good DI)
-- **Hitstun range:** 8-25 frames (0.13-0.42 seconds at 60Hz)
-- **Threshold:** 3 KB (most moves trigger hitstun)
+- **Hitstun range:** 8-60 frames (0.13-1.0 seconds at 60Hz)
+- **Hitstun gate:** `StunTicks > 0` from hitbox data (designer-controlled per move)
+- **Knockback decay:** 2% per tick (was 13.3% -- flight lasts ~1s instead of 0.25s)
+- **Manki LMB example (stage 1/2/3):**
+  - S1: Base 1.5 + Growth 2.5, Up 1, Stun 10 -- combo starter, gentle at all %
+  - S2: Base 3 + Growth 5, Up 1.5, Stun 14 -- moderate pop, links into S3
+  - S3: Base 7 + Growth 18, Up 6, Stun 22 -- launcher, ~37 m/s at 150%
 
 ### Competitive Considerations
 
@@ -142,13 +163,12 @@ const float HitstunScaling = 0.5f;       // KB → frames conversion (line 475)
 - Input display during hitstun (show held direction)
 - DI trajectory preview (arrow showing modified angle)
 - Hitstun sound effect (metal clang)
-
 ## Testing
 
 **Test scenarios:**
 
-1. **Weak jab spam:**
-   - Should NOT freeze victim (instant knockback)
+1. **Weak jab spam (StunTicks = 0):**
+   - Should NOT freeze victim (instant knockback recovery)
    - Fast, responsive combos
 
 2. **Strong smash attack at 100%:**

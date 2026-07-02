@@ -35,9 +35,11 @@ namespace SlopArena.Shared
             public ulong TargetEntityId;
             public ulong OwnerEntityId;
             public float Damage;
-            public float KnockbackX;
+            public float DirX;
             public float KnockbackY;
-            public float KnockbackZ;
+            public float DirZ;
+            public float BaseKnockback;
+            public float KnockbackGrowth;
             public ushort StunTicks;
         }
 
@@ -208,18 +210,20 @@ namespace SlopArena.Shared
 
                     if (hit)
                     {
-                        // Calculate knockback direction
-                        float kbX = dist > 0.001f ? (dx / dist) * hb.KnockbackForce : 0f;
-                        float kbZ = dist > 0.001f ? (dz / dist) * hb.KnockbackForce : 0f;
+                        // Calculate knockback direction (normalized, no force multiplier)
+                        float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
+                        float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
 
                         results.Add(new HitResult
                         {
                             TargetEntityId = entity.Id,
                             OwnerEntityId = hb.OwnerId,
                             Damage = hb.Damage,
-                            KnockbackX = kbX,
+                            DirX = dirXNorm,
                             KnockbackY = hb.KnockbackUpward,
-                            KnockbackZ = kbZ,
+                            DirZ = dirZNorm,
+                            BaseKnockback = hb.BaseKnockback,
+                            KnockbackGrowth = hb.KnockbackGrowth,
                             StunTicks = hb.StunTicks,
                         });
 

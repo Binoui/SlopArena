@@ -66,6 +66,8 @@ namespace SlopArena.Shared
 			if (!_states.TryGetValue(entityId, out var state)) return;
 			ability.Resolver = _spellResolver;
 			ability.SimulationStates = _states;
+			ability.BakedData = _bakedData.TryGetValue(entityId, out var b) ? b : null;
+			ability.CharacterDef = def;
 			ability.Slot = slot;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
@@ -224,6 +226,63 @@ namespace SlopArena.Shared
 			return list;
 		}
 
+        /// <summary>
+        /// Resolve the animation name and baked frame for hitbox/hurtbox bone lookup.
+        /// Returns false when there's no valid baked data for this entity or animation index is invalid.
+        /// Side effects: advances _animFrames and _prevAnimIndex for the entity.
+        /// </summary>
+        private bool ResolveBoneAnimFrame(ulong id, CharacterState state, CharacterDefinition def,
+            out BakedAnimationData baked, out string targetAnim, out int bakedFrame)
+        {
+            baked = null!;
+            targetAnim = null!;
+            bakedFrame = 0;
+
+            if (!_bakedData.TryGetValue(id, out baked!) || def.HurtboxBoneDefs == null || def.HurtboxBoneDefs.Length == 0)
+                return false;
+
+            // Resolve animation name based on current state
+            if (state.State == ActionState.Dashing) targetAnim = "dash";
+            else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+            {
+                bool airborne = !state.IsGrounded;
+                var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                targetAnim = (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length) ? ability.AnimationNames[stageIdx] : "melee";
+            }
+            else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
+            else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
+            else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
+            else targetAnim = "idle";
+
+            int animIdx = baked.FindAnimIndex(targetAnim);
+            if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
+            if (animIdx < 0) return false;
+
+            int fc = baked.Animations[animIdx].FrameCount;
+            int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
+            int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
+            if (prevAnim != animIdx) { frame = 0; _prevAnimIndex[id] = animIdx; }
+            int nextFrame = frame + 1;
+            if (nextFrame >= fc) nextFrame = 0;
+            _animFrames[id] = nextFrame;
+
+            bakedFrame = frame;
+            if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+            {
+                bool airborne = !state.IsGrounded;
+                var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                {
+                    int durationTicks = ability.Stages[stageIdx].DurationTicks;
+                    if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                }
+            }
+
+            return true;
+        }
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -289,6 +348,116 @@ namespace SlopArena.Shared
 			TickAbilities(inputs);
 		}
 
+		/// <summary>
+		/// Find the closest enemy entity ID for target lock.
+		/// Scans all registered entities, skipping self.
+		/// </summary>
+		private ulong FindClosestEnemy(ulong selfId, float selfX, float selfZ, float maxRange, out float outDist)
+		{
+			ulong closest = 0;
+			float best = maxRange * maxRange;
+			foreach (var kvp in _states)
+			{
+				if (kvp.Key == selfId) continue;
+				float dx = kvp.Value.PX - selfX;
+				float dz = kvp.Value.PZ - selfZ;
+				float distSq = dx * dx + dz * dz;
+				if (distSq < best) { best = distSq; closest = kvp.Key; }
+			}
+			outDist = MathF.Sqrt(best);
+			return closest;
+		}
+
+		/// <summary>
+		/// Compute soft-lock target for every entity each tick.
+		/// Prefers client-provided target (from screen-center) when input.TargetEntityId > 0,
+		/// otherwise brute-force scans for nearest enemy within 20m.
+		/// Stores the result in state.TargetEntityId for abilities, camera, and indicator to query.
+		///
+		/// When the entity is attacking with UseTargetLock=true, also processes warp
+		/// (auto-dash toward target) and rotation (face toward target).
+		/// </summary>
+		private void ProcessTargetLock(Dictionary<ulong, InputState> inputs)
+		{
+			// Snapshot keys to avoid InvalidOperationException when writing _states[id] = state
+			ulong[] ids = new ulong[_states.Count];
+			_states.Keys.CopyTo(ids, 0);
+			foreach (var id in ids)
+			{
+				if (!_states.TryGetValue(id, out var state)) continue;
+
+				// ── Find target ──
+				// Check if client provided a target (screen-center override)
+				ulong targetId = 0;
+				if (inputs.TryGetValue(id, out var input) && input.TargetEntityId > 0)
+				{
+					ulong candidateId = input.TargetEntityId;
+					if (_states.ContainsKey(candidateId))
+						targetId = candidateId;
+				}
+
+				// Fall back to nearest scan if no client target
+				if (targetId == 0)
+				{
+					float searchRange = 20f;
+					targetId = FindClosestEnemy(id, state.PX, state.PZ, searchRange, out _);
+				}
+
+				state.TargetEntityId = targetId;
+				if (targetId == 0) { _states[id] = state; continue; }
+
+				// ── Attacking-only behaviors (warp, rotation) ──
+				if (state.State != ActionState.Attacking || state.AttackSlot == 0)
+				{
+					_states[id] = state;
+					continue;
+				}
+
+				var def = _defs[id];
+				bool airborne = !state.IsGrounded;
+				var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+				if (spec == null) { _states[id] = state; continue; }
+
+				int stageIdx = Math.Min(state.ComboStage, (byte)(spec.Stages.Length - 1));
+				if (stageIdx < 0 || stageIdx >= spec.Stages.Length) { _states[id] = state; continue; }
+				var stage = spec.Stages[stageIdx];
+
+				// Only process warp/rotation if target lock is enabled for this stage
+				if (!stage.UseTargetLock) { _states[id] = state; continue; }
+
+				var target = _states[targetId];
+				float dx = target.PX - state.PX;
+				float dz = target.PZ - state.PZ;
+				float dist = MathF.Sqrt(dx * dx + dz * dz);
+
+				// ── Warp toward target if within WarpRange but outside AttackRange ──
+				if (stage.WarpRange > 0f && dist > stage.AttackRange && dist <= stage.WarpRange
+				    && !state.IsServerAbility)
+				{
+					state.WarpTargetX = target.PX;
+					state.WarpTargetZ = target.PZ;
+					state.WarpAttackRange = stage.AttackRange;
+					state.WarpSpeed = 0.3f; // 30% of remaining distance per tick
+				}
+
+				// ── Rotate toward target each tick ──
+				float rotRange = stage.WarpRange > 0f ? stage.WarpRange : stage.AttackRange;
+				if (stage.RotateTowardTarget && stage.TrackingStrength > 0f && dist <= rotRange)
+				{
+					if (dx * dx + dz * dz > 0.001f)
+					{
+						float targetYaw = MathF.Atan2(dx, dz);
+						float diff = targetYaw - state.FacingYaw;
+						while (diff > MathF.PI) diff -= 2f * MathF.PI;
+						while (diff < -MathF.PI) diff += 2f * MathF.PI;
+						state.FacingYaw += diff * stage.TrackingStrength * Simulation.TickDt;
+					}
+				}
+
+				_states[id] = state;
+			}
+		}
+
 		private List<SpellResolver.EntityData> BuildHurtboxList()
 		{
 			// ── Step 2: Build entity list for hit detection ──
@@ -299,46 +468,8 @@ namespace SlopArena.Shared
 				var state = kvp.Value;
 				var def = _defs[id];
 
-				if (_bakedData.TryGetValue(id, out var baked) && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
+				if (ResolveBoneAnimFrame(id, state, def, out var baked, out var targetAnim, out var bakedFrame))
 				{
-					string targetAnim;
-					if (state.State == ActionState.Dashing) targetAnim = "dash";
-					else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
-					{
-						bool airborne = !state.IsGrounded;
-						var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-						int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-						targetAnim = (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length) ? ability.AnimationNames[stageIdx] : "melee";
-					}
-					else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
-					else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
-					else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
-					else targetAnim = "idle";
-
-					int animIdx = baked.FindAnimIndex(targetAnim);
-					if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
-					if (animIdx >= 0)
-					{
-						int fc = baked.Animations[animIdx].FrameCount;
-						int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
-						int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
-						if (prevAnim != animIdx) { frame = 0; _prevAnimIndex[id] = animIdx; }
-						int nextFrame = frame + 1;
-						if (nextFrame >= fc) nextFrame = 0;
-						_animFrames[id] = nextFrame;
-
-						int bakedFrame = frame;
-						if (state.State == ActionState.Attacking && state.AttackSlot > 0)
-						{
-							bool airborne = !state.IsGrounded;
-							var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-							int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-							if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
-							{
-								int durationTicks = ability.Stages[stageIdx].DurationTicks;
-								if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
-							}
-						}
 
 						float px = state.PX, py = state.PY, pz = state.PZ;
 						float yaw = state.FacingYaw;
@@ -361,7 +492,6 @@ namespace SlopArena.Shared
 								EndX = wx, EndY = wy, EndZ = wz, Active = true,
 							});
 						}
-					}
 				}
 				else if (def.HurtboxCapsules != null)
 				{
@@ -411,6 +541,88 @@ namespace SlopArena.Shared
 				foreach (var evt in stage.HitboxEvents)
 				{
 					if (state.AttackElapsedTicks != evt.TriggerTick) continue;
+					// ── Bone-attached hitbox path ──
+					if (evt.BoneName != null)
+					{
+						if (!_bakedData.TryGetValue(id, out var baked) || def.HurtboxBoneDefs == null)
+						{
+							Simulation.OnDebugLog?.Invoke($"[SpawnHitboxEvents] Bone hitbox for '{evt.BoneName}' skipped — no baked data for entity {id}");
+							continue;
+						}
+
+						// Find bone def index by name
+						int bi = -1;
+						for (int i = 0; i < def.HurtboxBoneDefs.Length; i++)
+						{
+							if (def.HurtboxBoneDefs[i].BoneName == evt.BoneName) { bi = i; break; }
+						}
+						if (bi < 0)
+						{
+							Simulation.OnDebugLog?.Invoke($"[SpawnHitboxEvents] Bone '{evt.BoneName}' not found in HurtboxBoneDefs for entity {id}");
+							continue;
+						}
+
+						// Resolve animation name (same mapping as BuildHurtboxList — read-only, no frame advance)
+						string targetAnim;
+						if (state.State == ActionState.Dashing) targetAnim = "dash";
+						else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+						{
+							bool airborneBone = !state.IsGrounded;
+							var boneAbility = def.GetSlotAbility(state.AttackSlot - 1, airborneBone);
+							int boneStageIdx = Math.Min(state.ComboStage, (byte)(boneAbility.Stages.Length - 1));
+							targetAnim = (boneStageIdx >= 0 && boneStageIdx < boneAbility.AnimationNames.Length) ? boneAbility.AnimationNames[boneStageIdx] : "melee";
+						}
+						else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
+						else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
+						else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
+						else targetAnim = "idle";
+
+						int animIdx = baked.FindAnimIndex(targetAnim);
+						if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
+						if (animIdx < 0) continue;
+
+						// Compute baked frame from attack elapsed ticks (no anim frame side effects)
+						int fc = baked.Animations[animIdx].FrameCount;
+						int bakedFrame = 0;
+						if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+						{
+							bool airborneBone2 = !state.IsGrounded;
+							var boneAbility2 = def.GetSlotAbility(state.AttackSlot - 1, airborneBone2);
+							int boneStageIdx2 = Math.Min(state.ComboStage, (byte)(boneAbility2.Stages.Length - 1));
+							if (boneStageIdx2 >= 0 && boneStageIdx2 < boneAbility2.Stages.Length)
+							{
+								int durationTicks = boneAbility2.Stages[boneStageIdx2].DurationTicks;
+								if (durationTicks > 0) bakedFrame = Math.Min(state.AttackElapsedTicks * fc / durationTicks, fc - 1);
+							}
+						}
+						if (bakedFrame >= fc) bakedFrame = fc - 1;
+
+						// Resolve bone position in world space
+						if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz)) continue;
+						float boneScale = def.HurtboxBoneScale;
+						bx *= boneScale; by *= boneScale; bz *= boneScale;
+						float wx = state.PX + ((bx * cos) + (bz * sin));
+						float wy = state.PY - def.CapsuleHeight * 0.5f + by;
+						float wz = state.PZ + ((-bx * sin) + (bz * cos));
+						wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin); wy += evt.BoneOffY; wz += (-evt.BoneOffX * sin) + (evt.BoneOffZ * cos);
+
+						float boneDamage = evt.Damage;
+						float boneRadius = evt.Radius;
+						ServerAbility.ApplyBuffBonuses(ref state, ref boneDamage, ref boneRadius);
+
+						_spellResolver.Spawn(new Hitbox
+						{
+							X = wx, Y = wy, Z = wz, Radius = boneRadius, Shape = evt.Shape,
+							EndX = wx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin)),
+							EndY = wy + evt.EndOffY,
+							EndZ = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos)),
+							Damage = boneDamage,
+							BaseKnockback = evt.BaseKnockback, KnockbackGrowth = evt.KnockbackGrowth, KnockbackUpward = evt.KnockbackUpward,
+							StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
+						});
+
+						continue; // Skip ability.SpawnHitbox and default melee path for this evt
+					}
 
 					// Let the AbilitySpec decide: true = handled, false = use default melee
 					if (!ability.SpawnHitbox(evt, state, def, _spellResolver, id))
@@ -429,7 +641,7 @@ namespace SlopArena.Shared
                         {
                             X = hx, Y = hy, Z = hz, Radius = radius, Shape = evt.Shape,
                             EndX = hex, EndY = hey, EndZ = hez, Damage = damage,
-                            KnockbackForce = evt.KnockbackForce, KnockbackUpward = evt.KnockbackUpward,
+                            BaseKnockback = evt.BaseKnockback, KnockbackGrowth = evt.KnockbackGrowth, KnockbackUpward = evt.KnockbackUpward,
                             StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
                         });
 					}
@@ -446,20 +658,36 @@ namespace SlopArena.Shared
 			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
+
+				// Knockback direction: from attacker to target (not hitbox to target).
+				// The hitbox offset can place it past the target, inverting the direction.
+				// Smash convention: always push away from the attacker.
+				float dirX = hit.DirX;
+				float dirZ = hit.DirZ;
+				if (_states.TryGetValue(hit.OwnerEntityId, out var attackerState))
+				{
+					float aDx = targetState.PX - attackerState.PX;
+					float aDz = targetState.PZ - attackerState.PZ;
+					float aDist = MathF.Sqrt(aDx * aDx + aDz * aDz);
+					if (aDist > 0.001f)
+					{
+						dirX = aDx / aDist;
+						dirZ = aDz / aDist;
+					}
+				}
+
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
-				Simulation.ApplyKnockback(ref targetState, hit.KnockbackX, hit.KnockbackY, hit.KnockbackZ);
+				Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
+				    hit.KnockbackY, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
 				targetState.HitstunTicks = hit.StunTicks;
 
 				// Let the attacker's active ability apply hit effects (e.g., Bunny R mark consumption)
 				if (_activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
-				    && _states.TryGetValue(hit.OwnerEntityId, out var attackerState)
 				    && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
 				{
-					float kbForce = hit.KnockbackX != 0 || hit.KnockbackZ != 0
-						? MathF.Sqrt(hit.KnockbackX * hit.KnockbackX + hit.KnockbackZ * hit.KnockbackZ)
-						: 0f;
+					float kbForce = hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
 					attackerAbility.OnHitEntity(ref attackerState, ref targetState, attackerDef, ref finalDamage, ref kbForce);
 					_states[hit.OwnerEntityId] = attackerState;
 				}
@@ -489,7 +717,8 @@ namespace SlopArena.Shared
 					Radius = explosion.Radius, Shape = HitboxShape.Sphere,
 					EndX = ex, EndY = ey, EndZ = ez,
 					Damage = explosion.Damage,
-					KnockbackForce = explosion.KnockbackForce,
+					BaseKnockback = explosion.BaseKnockback,
+					KnockbackGrowth = explosion.KnockbackGrowth,
 					KnockbackUpward = explosion.KnockbackUpward,
 					StunTicks = explosion.StunTicks,
 					DurationTicks = explosion.DurationTicks,
@@ -527,6 +756,8 @@ namespace SlopArena.Shared
 			PreTickAbilities(inputs);
 
 			SimulateMovement(inputs);
+
+			ProcessTargetLock(inputs);
 
 			var entityList = BuildHurtboxList();
 			SpawnHitboxEvents();

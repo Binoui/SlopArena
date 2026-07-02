@@ -203,13 +203,17 @@ Send packet: entityId(8) + tick(4) + InputState(10) = 22 bytes
 Total: 22 bytes
 ```
 
-**InputState layout (10 bytes):**
-| Offset | Type   | Field        | Notes                        |
-|--------|--------|--------------|------------------------------|
-| 0      | float  | MoveX        | Horizontal analog input      |
-| 4      | float  | MoveY        | Vertical analog input        |
-| 8      | byte   | flags        | 8 boolean buttons (bitfield) |
-| 9      | byte   | ActiveSlot   | 1-6 for ability slots        |
+**InputState layout (17 bytes):**
+| Offset | Type    | Field           | Notes                              |
+|--------|---------|-----------------|------------------------------------|
+| 0      | float   | MoveX           | Horizontal analog input            |
+| 4      | float   | MoveY           | Vertical analog input              |
+| 8      | byte    | flags           | 8 boolean buttons (bitfield)       |
+| 9      | byte    | ActiveSlot      | 1-6 for ability slots              |
+| 10-11  | short   | FacingYaw       | Degrees × 100                      |
+| 12-13  | short   | AimYaw          | Aim yaw (overrides FacingYaw)      |
+| 14-15  | ushort  | AimDistance     | Aim distance in cm (0-6500 = 0-65m)|
+| 16     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
 
 ### 4b. Server → Client (per entity)
 
@@ -259,7 +263,7 @@ Total: 55 bytes per entity
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (126 bytes in memory, 43 serialized) is the full per-tick state of one entity:
+`CharacterState` (144 bytes in memory, 43 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|
@@ -290,6 +294,7 @@ Total: 55 bytes per entity
 | FacingYaw           | float   | Radians, +Z = 0                      |
 | Cooldown0-5         | ushort  | Per-slot cooldowns (abilities)       |
 | EntityId            | ulong   | 0 = unassigned                       |
+| **TargetEntityId**  | **ulong**| **Soft-lock target (0 = none, set server-side per tick)** |
 | ...                 |         |                                      |
 
 Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, facing yaw, match state, buff remaining ticks, and buff active flags are serialized. The remaining fields (jumps, dodges, DI, knockback, etc.) are computed locally.
@@ -430,7 +435,7 @@ public struct HitboxEvent
     public float Radius;
     public float OffX, OffY, OffZ;  // Local offset from entity center
     public float Damage;
-    public float KnockbackForce, KnockbackUpward;
+    public float BaseKnockback, KnockbackGrowth, KnockbackUpward;
     public ushort StunTicks;
     public bool Interruptible;
 }

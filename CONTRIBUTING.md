@@ -208,7 +208,7 @@ public struct AttackStage
 {
     public AttackShape Shape;        // MeleeCone, CircleAOE, Projectile, Beam, SelfBuff
     public float Damage, Range, HitAngleDeg, Radius;
-    public float KnockbackForce, KnockbackUpward, LungeForce;
+    public float BaseKnockback, KnockbackGrowth, KnockbackUpward, LungeForce;
     public ushort StunTicks, SelfLockTicks, ChainWindowTicks;
 }
 ```
