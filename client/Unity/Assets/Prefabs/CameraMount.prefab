@@ -249,7 +249,7 @@ MonoBehaviour:
   VerticalAxis:
     Value: 17.5
     Center: 17.5
-    Range: {x: -10, y: 45}
+    Range: {x: 10, y: 30}
     Wrap: 0
     Recentering:
       Enabled: 0
@@ -278,6 +278,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 920e321ce107d8c0fa05b1abf0346b9e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _yawSpeed: 180
-  _pitchSpeed: 120
-  _zoomSpeed: 8

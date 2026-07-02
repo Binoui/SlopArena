@@ -396,7 +396,7 @@ MonoBehaviour:
   VerticalAxis:
     Value: 17.5
     Center: 17.5
-    Range: {x: -10, y: 45}
+    Range: {x: 10, y: 30}
     Wrap: 0
     Recentering:
       Enabled: 0
