@@ -514,5 +514,5 @@ def generate_html(md_path, out_html_path, image_name):
 
 if __name__ == "__main__":
     os.makedirs("docs/characters", exist_ok=True)
-    generate_html("docs/characters/manki.md", "docs/characters/manki_sheet.html", "manki_action.png")
-    generate_html("docs/characters/bunny.md", "docs/characters/bunny_sheet.html", "bunny_action.png")
+    generate_html("docs/characters/manki.md", "docs/characters/manki_sheet.html", "manki_front.png")
+    generate_html("docs/characters/bunny.md", "docs/characters/bunny_sheet.html", "bunny_front.png")
