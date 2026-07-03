@@ -22,6 +22,8 @@ namespace SlopArena.Shared
         /// remaining ticks in current state
         /// </summary>
         public ushort StateTicks;
+        /// <summary>Match lifecycle state (Waiting, Countdown, Playing, Ended).</summary>
+        public MatchState MatchState;
 
         /// <summary>
         /// ── Resources ──

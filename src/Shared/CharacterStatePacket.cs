@@ -59,13 +59,17 @@ namespace SlopArena.Shared
                 CurrentActionState = (byte)s.State,
                 IsGrounded = s.IsGrounded,
                 StateDurationFrames = s.StateTicks,
+                AttackSlot = s.AttackSlot,
+                ComboStage = s.ComboStage,
+                FacingYaw = s.FacingYaw,
+                AnimIndex = s.AnimIndex,
+                MatchState = s.MatchState,
                 BuffRemainingTicks = s.BuffRemainingTicks,
                 BuffActiveFlags = s.BuffActiveFlags,
                 HitstunLevel = s.HitstunLevel,
             };
         }
 
-        /// <summary>Convert back to CharacterState.</summary>
         public CharacterState ToState()
         {
             return new CharacterState
@@ -80,6 +84,10 @@ namespace SlopArena.Shared
                 IsGrounded = IsGrounded,
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
+                ComboStage = ComboStage,
+                FacingYaw = FacingYaw,
+                AnimIndex = AnimIndex,
+                MatchState = MatchState,
                 BuffRemainingTicks = BuffRemainingTicks,
                 BuffActiveFlags = BuffActiveFlags,
                 HitstunLevel = HitstunLevel,
