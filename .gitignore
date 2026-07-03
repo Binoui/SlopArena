@@ -150,3 +150,7 @@ client/Unity/mono_crash.mem.*
 
 # Duplicate runtime data (source of truth in /data/)
 client/Unity/data/
+
+
+# Paid asset — do not commit
+client/Unity/Packages/com.kybernetik.animancer/
