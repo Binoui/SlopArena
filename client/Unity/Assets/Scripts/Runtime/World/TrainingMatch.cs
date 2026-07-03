@@ -84,6 +84,7 @@ namespace SlopArena.Client.World
 
             var playerDef = CharacterRegistry.Get(_playerClass);
             _playerDef = playerDef;
+            _hudManager?.SetCharacterDefinition(playerDef);
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
@@ -111,6 +112,7 @@ namespace SlopArena.Client.World
             _playerRenderer.SetBakedData(playerBaked);
             _playerRenderer.SetCharacterDefinition(playerDef);
             _playerRenderer.LoadModel(playerDef);
+
             if (_npcRenderer != null)
             {
                 _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
@@ -119,6 +121,7 @@ namespace SlopArena.Client.World
                 _npcRenderer.SetBakedData(npcBaked);
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
+                _npcRenderer.InitBillboard(_localSim, NpcEntityId);
             }
 
             // Player spawn

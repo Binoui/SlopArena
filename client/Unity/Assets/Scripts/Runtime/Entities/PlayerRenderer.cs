@@ -1,6 +1,10 @@
 using SlopArena.Shared;
 using UnityEngine;
 using System.Collections.Generic;
+using Animancer;
+
+using SlopArena.Client.Animation;
+
 
 namespace SlopArena.Client.Entities
 {
@@ -16,7 +20,9 @@ namespace SlopArena.Client.Entities
         [SerializeField] private ulong _entityId;
 
         [Header("Animation")]
-        [SerializeField] private Animator _animator;
+        [SerializeField] private AnimancerComponent _animancer;
+
+        [SerializeField] private CharacterAnimationConfig _charConfig;
 
         [Header("Thresholds")]
         [SerializeField] private float _runSpeedThreshold = 0.1f;
@@ -66,6 +72,21 @@ namespace SlopArena.Client.Entities
         private GameObject _modelInstance;
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
+        private StatusBillboard _billboard;
+
+        /// <summary>
+        /// Initialize the world-space status billboard (damage% + entity name).
+        /// Safe to call multiple times — no-op after first init.
+        /// </summary>
+        public void InitBillboard(ServerSimulation sim, ulong entityId)
+        {
+            if (_billboard == null)
+            {
+                _billboard = gameObject.AddComponent<StatusBillboard>();
+                _billboard.Init(this, sim, entityId);
+            }
+        }
+
         public float ModelYOffset
         {
             get => _modelYOffset;
@@ -106,9 +127,9 @@ namespace SlopArena.Client.Entities
 
             instance.transform.localScale = Vector3.one * def.VisualScale;
 
-            _animator = instance.GetComponent<Animator>();
-            if (_animator == null)
-                Debug.LogError($"[PlayerRenderer] Instantiated model has no Animator component");
+            _animancer = instance.GetComponent<AnimancerComponent>();
+            if (_animancer == null)
+                _animancer = instance.AddComponent<AnimancerComponent>();
         }
 
         /// <summary>Hurtbox bone definitions for debug visualization.</summary>
@@ -133,7 +154,7 @@ namespace SlopArena.Client.Entities
         }
 
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
-        public Animator Animator => _animator;
+        public Animator Animator => _animancer != null ? _animancer.Animator : null;
 
         // ── Tracking state for change detection ──
 
@@ -158,8 +179,8 @@ namespace SlopArena.Client.Entities
 
         private void Awake()
         {
-            if (_animator == null)
-                _animator = GetComponent<Animator>();
+            if (_animancer == null)
+                _animancer = GetComponent<AnimancerComponent>();
         }
 
         // ── Public API ──
@@ -211,100 +232,120 @@ namespace SlopArena.Client.Entities
             _lastState = state;
         }
 
-        // ── Single-layer parameter-driven Animator ──
+        // ── Animancer-driven animation ──
         //
-        // All states (Movement blend, Jump, Fall, Land, Dash, Hitstun, abilities)
-        // live in one state machine. Transitions driven by triggers + params.
-        // On combat end, Idle trigger force-clears back to Movement.
+        // All states play AnimationClips directly via AnimancerComponent.Play().
+        // No AnimatorController, no triggers, no blend tree.
+        // Movement uses simple idle/run crossfade (no linear mixer needed for
+        // a platform fighter where speed is a threshold, not a smooth gradient).
 
         private void UpdateAnimationState(CharacterState state)
         {
-            if (_animator == null || _animator.runtimeAnimatorController == null)
+            if (_animancer == null || _charConfig == null)
                 return;
 
-            // ── Movement params ──
-            _animator.SetBool("IsGrounded", state.IsGrounded);
             float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
-            _animator.SetFloat("Speed", hSpeed);
 
-            // Jump trigger — fire once when entering JumpSquat
-            if (state.State == ActionState.JumpSquat && _lastAnimState != ActionState.JumpSquat)
-                _animator.SetTrigger("Jump");
-            // Double jump detection: upward impulse while airborne
-            if (!state.IsGrounded && state.VY > 2f && _lastState.VY <= 0f && state.State != ActionState.JumpSquat)
-                _animator.SetTrigger("Jump");
-
-            // ── Combat ──
+            // ── Combat (Attacking / Dashing / Hitstun) ──
             bool isCombat = state.State == ActionState.Attacking
                 || state.State == ActionState.Dashing
                 || state.State == ActionState.Hitstun;
 
+            // ── Non-combat: ground/air state machine ──
+            if (!isCombat)
+            {
+                if (state.State == ActionState.JumpSquat && _lastAnimState != ActionState.JumpSquat)
+                {
+                    // JumpSquat entry — play jump
+                    var clip = _charConfig.GetClipByName("jump");
+                    if (clip != null)
+                        _animancer.Play(clip, 0.05f);
+                }
+                else if (!state.IsGrounded)
+                {
+                    // Airborne (fall / post-jump) — play fall
+                    var clip = _charConfig.GetClipByName("fall");
+                    if (clip != null)
+                        _animancer.Play(clip, 0.1f);
+                }
+                else
+                {
+                    // Grounded — idle/run crossfade
+                    var clip = hSpeed > _runSpeedThreshold
+                        ? _charConfig.GetClipByName("run")
+                        : _charConfig.GetClipByName("idle");
+                    if (clip != null)
+                        _animancer.Play(clip, 0.1f);
+                }
+            }
+
+            // Double jump: upward impulse while airborne (overrides fall)
+            if (!state.IsGrounded && state.VY > 2f && _lastState.VY <= 0f && state.State != ActionState.JumpSquat)
+            {
+                var clip = _charConfig.GetClipByName("jump");
+                if (clip != null)
+                    _animancer.Play(clip, 0.05f);
+            }
+
+            // ── Combat state changes ──
             bool stateChanged = state.State != _lastAnimState
                 || (state.State == ActionState.Attacking && (
                     state.AttackSlot != _lastAttackSlot || state.ComboStage != _lastComboStage));
 
             if (isCombat && stateChanged)
             {
-                // Entering combat — reset triggers, then fire the right one
-                _animator.ResetTrigger("Attack");
-                _animator.ResetTrigger("Dash");
-                _animator.ResetTrigger("HitstunSmall");
-                _animator.ResetTrigger("HitstunMedium");
-                _animator.ResetTrigger("HitstunHard");
-                _animator.ResetTrigger("Idle");
-
                 if (state.State == ActionState.Attacking)
                 {
-                    _animator.SetInteger("AttackSlot", state.AttackSlot - 1);
-                    _animator.SetInteger("ComboStage", state.ComboStage);
-                    _animator.SetTrigger("Attack");
-
-                    // Runtime speed modulation: match animation duration to server stage duration
-                    // speed = bakedFrameCount / desriedDurationTicks (both at 60fps)
+                    // Look up clip from character definition
+                    string animName = "melee";
                     float animSpeed = 1f;
-                    if (_charDef != null && _bakedData != null)
+                    if (_charDef != null)
                     {
                         byte slot = (byte)(state.AttackSlot - 1);
                         var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
                         if (spec?.Stages != null && state.ComboStage < spec.Stages.Length)
                         {
-                            string animName = spec.GetAnimationName(state.ComboStage);
-                            int bakedIdx = _bakedData.FindAnimIndex(animName);
-                            if (bakedIdx >= 0)
+                            animName = spec.GetAnimationName(state.ComboStage);
+                            // Runtime speed modulation: match animation duration to server stage duration
+                            if (_bakedData != null)
                             {
-                                int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
-                                int durationTicks = spec.Stages[state.ComboStage].DurationTicks;
-                                if (durationTicks > 0)
-                                    animSpeed = (float)frameCount / durationTicks;
+                                int bakedIdx = _bakedData.FindAnimIndex(animName);
+                                if (bakedIdx >= 0)
+                                {
+                                    int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
+                                    int durationTicks = spec.Stages[state.ComboStage].DurationTicks;
+                                    if (durationTicks > 0)
+                                        animSpeed = (float)frameCount / durationTicks;
+                                }
                             }
                         }
                     }
-                    _animator.SetFloat("AnimSpeed", animSpeed);
+
+                    var clip = _charConfig.GetClipByName(animName);
+                    if (clip != null)
+                    {
+                        var animState = _animancer.Play(clip, 0.05f);
+                        animState.Speed = animSpeed;
+                    }
                 }
                 else if (state.State == ActionState.Dashing)
                 {
-                    _animator.SetTrigger("Dash");
+                    var clip = _charConfig.GetClipByName("dash");
+                    if (clip != null)
+                        _animancer.Play(clip, 0f);
                 }
                 else if (state.State == ActionState.Hitstun)
                 {
-                    string trigger = state.HitstunLevel switch
+                    string hitName = state.HitstunLevel switch
                     {
-                        1 => "HitstunMedium",
-                        2 => "HitstunHard",
-                        _ => "HitstunSmall"
+                        1 => "hit_medium",
+                        2 => "hit_hard",
+                        _ => "hit_small"
                     };
-                    _animator.SetTrigger(trigger);
+                    var clip = _charConfig.GetClipByName(hitName);
+                    if (clip != null)
+                        _animancer.Play(clip, 0f);
                 }
-            }
-
-            else if (!isCombat && 
-                (_lastAnimState == ActionState.Attacking ||
-                 _lastAnimState == ActionState.Dashing ||
-                 _lastAnimState == ActionState.Hitstun))
-            {
-                // Left combat state — reset speed to normal, force-clear to Movement
-                _animator.SetFloat("AnimSpeed", 1f);
-                _animator.SetTrigger("Idle");
             }
 
             _lastAnimState = state.State;
@@ -319,7 +360,7 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void ResetAnimationState()
         {
-            _animator.Rebind();
+            _animancer.Stop();
             _wasGrounded = true;
             _lastState = default;
             _lastAnimState = default;

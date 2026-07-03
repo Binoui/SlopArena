@@ -16,6 +16,7 @@ namespace SlopArena.Client.UI
         private VisualElement[] _slotIcons = new VisualElement[6];
         private VisualElement[] _slotCooldownFills = new VisualElement[6];
         private ushort[] _slotMaxCooldowns = new ushort[6];
+        private CharacterDefinition? _charDef;
 
         private static readonly string[] SlotKeys = { "LMB", "RMB", "Q", "E", "R", "F" };
 
@@ -44,6 +45,29 @@ namespace SlopArena.Client.UI
         {
             if (slot >= 0 && slot < 6)
                 _slotMaxCooldowns[slot] = ticks;
+        }
+
+        public void SetCharacterDefinition(CharacterDefinition def)
+        {
+            _charDef = def;
+            LoadIcons();
+        }
+
+        private void LoadIcons()
+        {
+            if (_charDef == null || _slotIcons == null) return;
+            for (int i = 0; i < 6; i++)
+            {
+                var spec = _charDef.GetSlotAbility(i, airborne: false);
+                if (spec == null || string.IsNullOrEmpty(spec.IconName)) continue;
+
+                string path = $"Icons/{_charDef.Class}/{spec.IconName}";
+                var tex = Resources.Load<Texture2D>(path);
+                if (tex != null)
+                    _slotIcons[i].style.backgroundImage = new StyleBackground(tex);
+                else
+                    Debug.LogWarning($"[HUD] Icon not found: {path}");
+            }
         }
 
         public void Refresh()
