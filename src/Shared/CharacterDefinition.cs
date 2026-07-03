@@ -103,11 +103,11 @@ namespace SlopArena.Shared
         /// <summary>Fall animation clip (BlendSpace1D position +1). Default: "fall"</summary>
         public string FallAnim = "fall";
         /// <summary>Small hit reaction clip. Default: "small_hit"</summary>
-        public string HitSmallAnim = "small_hit";
+        public string HitSmallAnim = "hit_light";
         /// <summary>Medium hit reaction clip. Default: "medium_hit"</summary>
-        public string HitMediumAnim = "medium_hit";
+        public string HitMediumAnim = "hit_medium";
         /// <summary>Hard hit reaction clip. Default: "hard_hit"</summary>
-        public string HitHardAnim = "hard_hit";
+        public string HitHardAnim = "hit_hard";
         /// <summary>Landing uses JumpAnim clip with this start offset (seconds). Default: 0.49f</summary>
         public float LandStartOffset = 0.49f;
         /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>

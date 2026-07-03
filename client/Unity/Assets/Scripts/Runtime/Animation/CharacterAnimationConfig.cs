@@ -23,7 +23,8 @@ namespace SlopArena.Client.Animation
         public AnimationClip Attack3;
         public AnimationClip Dash;
         public AnimationClip HitSmall;
-        public AnimationClip HitLarge;
+        public AnimationClip HitMedium;
+        public AnimationClip HitHard;
         public AnimationClip Death;
 
         [Header("Abilities")]
@@ -53,7 +54,9 @@ namespace SlopArena.Client.Animation
                 "attack_3" => Attack3,
                 "dash" => Dash,
                 "hit_small" => HitSmall,
-                "hit_large" => HitLarge,
+                "hit_medium" => HitMedium,
+                "hit_hard" => HitHard,
+                "hit_light" => HitSmall,
                 "death" => Death,
                 "spell_q_start" => SpellQStart,
                 "spell_q_loop" => SpellQLoop,

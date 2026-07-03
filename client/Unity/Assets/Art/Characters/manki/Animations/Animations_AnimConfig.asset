@@ -21,7 +21,8 @@ MonoBehaviour:
   Attack3: {fileID: -203655887218126122, guid: 04477016919ac615bb755b8f7212a093, type: 3}
   Dash: {fileID: 0}
   HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
-  HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
+  HitMedium: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
+  HitHard: {fileID: -203655887218126122, guid: d84164ddf890c95e2861ac63e404d2b9, type: 3}
   Death: {fileID: 0}
   SpellQStart: {fileID: 3094330708855449807, guid: 735b5f04a7d2ce1fea80f5ffbfbefe45, type: 3}
   SpellQLoop: {fileID: 3094330708855449807, guid: 17f1455b384bc28aea4c3506ea4a9f99, type: 3}

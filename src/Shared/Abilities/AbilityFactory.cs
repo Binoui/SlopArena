@@ -27,7 +27,7 @@ public static class AbilityFactory
     {
         (0, false) => new LmbCombo(),     // LMB ground
         (0, true) => null,                      // AirLMB — data-driven fallback (separate spec)
-        (1, false) => new MankiAerosolFlame(), // RMB
+        (1, false) => null,                     // RMB — data-driven ChargeAttack
         (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
         (3, _) => null,                         // E — data-driven ExplosiveMineSpec
         (4, _) => new MankiBazooka(),          // R — Bazooka

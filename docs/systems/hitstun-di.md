@@ -215,9 +215,73 @@ A: Doesn't matter. System reads held direction at END of hitstun.
 **Q: Does DI affect damage taken?**
 A: No. DI only affects knockback trajectory, not damage.
 
+
+## Animation Tiers
+
+Hitstun has 3 animation tiers based on the damage of the attack that hits, providing visual feedback proportional to impact strength:
+
+| Tier | Damage Range | `HitstunLevel` | Anim Clip       | Trigger          |
+|------|-------------|----------------|-----------------|------------------|
+| Light  | < 5        | 0              | `hit_light`     | `HitstunSmall`   |
+| Medium | 5–14       | 1              | `hit_medium`    | `HitstunMedium`  |
+| Hard   | ≥ 15       | 2              | `hit_hard`      | `HitstunHard`    |
+
+### How It Works
+
+1. **Server-side computation:** When a hit lands in `ServerSimulation.ResolveHits()`, `HitstunLevel` is computed from the raw damage of the hitbox event (before any damage modifiers):
+   ```csharp
+   targetState.HitstunLevel = finalDamage < 5f ? (byte)0 :
+                               finalDamage < 15f ? (byte)1 : (byte)2;
+   ```
+2. **Set once:** The level is set at hit time, not re-derived from `DamagePercent`. This prevents flicker if another hit lands during hitstun.
+3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 44). The client receives it every tick during hitstun.
+4. **Client renderer:** `PlayerRenderer` maps `HitstunLevel` to the corresponding animator trigger:
+   - Level 0 → `HitstunSmall`, Level 1 → `HitstunMedium`, Level 2 → `HitstunHard`
+5. **Server bone resolution:** Both bone-animation spots in `ServerSimulation` use the same switch to pick the clip name for hurtbox alignment.
+
+### CharacterDefinition Defaults
+
+```csharp
+public string HitSmallAnim = "hit_light";   // Clip name in GLB
+public string HitMediumAnim = "hit_medium";
+public string HitHardAnim = "hit_hard";
+```
+
+These map to the actual FBX clip names. Per-character overrides go in `CharacterDefinition.ClipOverrides`.
+
+### Animator Layer
+
+The animator controller has 3 independent AnyState transitions, one per tier. All are `AutoExit = true`.
+```
+AnyState ──HitstunSmall──→ HitstunSmallState (hit_light)  AutoExit
+AnyState ──HitstunMedium─→ HitstunMediumState (hit_medium) AutoExit
+AnyState ──HitstunHard───→ HitstunHardState (hit_hard)     AutoExit
+```
+
+### Configuration Assets
+
+`CharacterAnimationConfig` ScriptableObject exposes:
+- `HitSmall` — clip for light hits (< 5 damage)
+- `HitMedium` — clip for medium hits (5–14 damage)
+- `HitHard` — clip for hard hits (≥ 15 damage)
+
+The animator generator (`SlopArenaAnimatorGenerator.AssignClip`) maps these names:
+- `hit_light`, `hit_small` → `HitSmall` (aliases)
+- `hit_medium` → `HitMedium`
+- `hit_hard`, `hit_large` → `HitHard` (backward alias for `hit_large`)
+
+### Testing
+
+See `tests/Shared.Tests/HitstunAnimationTierTests.cs` for:
+- Boundary tests for damage→level computation
+- End-to-end LMB S1 pipeline (damage=4 → level 0), Q projectile (damage≥6 → level 1)
+
 ## References
 
-- **CharacterState.cs:** Line 47-48 (HitstunTicks, DIX, DIY)
+- **CharacterState.cs:** Line 47-48 (HitstunTicks, DIX, DIY), Line 102 (HitstunLevel)
 - **ActionState.cs:** Line 7 (Hitstun enum)
 - **Simulation.cs:** Line 61-67 (ProcessHitstun call), Line 141-176 (ProcessHitstun function), Line 462-495 (ApplyKnockback with hitstun)
+- **CharacterStatePacket.cs:** Offset 43 (HitstunLevel), Size 44
 - **PlayerController.cs:** Line 526-547 (Visual white flash)
+- **PlayerRenderer.cs:** Lines 288-297 (HitstunLevel switch → trigger)
+- **HitstunAnimationTierTests.cs:** Full unit + integration coverage

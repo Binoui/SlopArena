@@ -41,13 +41,19 @@ public class AnimatorGraphBuilderTests
         Assert.NotNull(FindState(graph.States, "Jump"));
         Assert.NotNull(FindState(graph.States, "Fall"));
         Assert.NotNull(FindState(graph.States, "Dash"));
-        Assert.NotNull(FindState(graph.States, "Hitstun"));
+        Assert.NotNull(FindState(graph.States, "HitstunSmall"));
+        Assert.NotNull(FindState(graph.States, "HitstunMedium"));
+        Assert.NotNull(FindState(graph.States, "HitstunHard"));
 
         var dash = FindState(graph.States, "Dash");
         Assert.True(dash!.Value.AutoExit);
 
-        var hitstun = FindState(graph.States, "Hitstun");
-        Assert.True(hitstun!.Value.AutoExit);
+        var hitstunSmall = FindState(graph.States, "HitstunSmall");
+        Assert.True(hitstunSmall!.Value.AutoExit);
+        var hitstunMedium = FindState(graph.States, "HitstunMedium");
+        Assert.True(hitstunMedium!.Value.AutoExit);
+        var hitstunHard = FindState(graph.States, "HitstunHard");
+        Assert.True(hitstunHard!.Value.AutoExit);
     }
 
     [Fact]
@@ -74,7 +80,9 @@ public class AnimatorGraphBuilderTests
         var graph = AnimatorGraphBuilder.Build(TestHelpers.MankiDef);
 
         Assert.NotNull(FindAny(graph.AnyTransitions, "Dash"));
-        Assert.NotNull(FindAny(graph.AnyTransitions, "Hitstun"));
+        Assert.NotNull(FindAny(graph.AnyTransitions, "HitstunSmall"));
+        Assert.NotNull(FindAny(graph.AnyTransitions, "HitstunMedium"));
+        Assert.NotNull(FindAny(graph.AnyTransitions, "HitstunHard"));
         Assert.NotNull(FindAny(graph.AnyTransitions, "Movement"));
     }
 
@@ -171,11 +179,11 @@ public class AnimatorGraphBuilderTests
     }
 
     [Fact]
-    public void MankiRMB_UsesComboChainNotHoldPhase()
+    public void MankiRMB_UsesHoldReleaseNotComboChain()
     {
         var graph = AnimatorGraphBuilder.Build(TestHelpers.MankiDef);
 
-        var t = FindDirect(graph.DirectTransitions, "spell_rmb_attack", "spell_rmb_charged");
+        var t = FindDirect(graph.DirectTransitions, "spell_rmb_charged", "spell_rmb_attack");
         Assert.NotNull(t);
         Assert.NotEmpty(t!.Value.Conditions);
         Assert.Contains(t!.Value.Conditions,

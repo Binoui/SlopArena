@@ -17,7 +17,9 @@ public static class AnimatorGraphBuilder
         states.Add(new GraphState { Name = "Jump", MotionName = "jump", PositionX = 250, PositionY = 250, AutoExit = false });
         states.Add(new GraphState { Name = "Fall", MotionName = "fall", PositionX = 400, PositionY = 250, AutoExit = false });
         states.Add(new GraphState { Name = "Dash", MotionName = "dash", PositionX = 250, PositionY = 350, AutoExit = true });
-        states.Add(new GraphState { Name = "Hitstun", MotionName = "hit_small", PositionX = 250, PositionY = 450, AutoExit = true });
+        states.Add(new GraphState { Name = "HitstunSmall",  MotionName = def.HitSmallAnim,  PositionX = 250, PositionY = 450, AutoExit = true });
+        states.Add(new GraphState { Name = "HitstunMedium", MotionName = def.HitMediumAnim, PositionX = 250, PositionY = 520, AutoExit = true });
+        states.Add(new GraphState { Name = "HitstunHard",   MotionName = def.HitHardAnim,   PositionX = 250, PositionY = 590, AutoExit = true });
 
         // Default direct transitions
         directs.Add(new GraphDirectTransition { FromState = "Movement", ToState = "Jump",
@@ -39,8 +41,14 @@ public static class AnimatorGraphBuilder
         anys.Add(new GraphAnyTransition { ToState = "Dash",
             Conditions = new[] { new GraphCondition { Parameter = "Dash", Mode = AnimConditionMode.If } },
             Duration = 0f, InterruptionSource = true });
-        anys.Add(new GraphAnyTransition { ToState = "Hitstun",
-            Conditions = new[] { new GraphCondition { Parameter = "Hitstun", Mode = AnimConditionMode.If } },
+        anys.Add(new GraphAnyTransition { ToState = "HitstunSmall",
+            Conditions = new[] { new GraphCondition { Parameter = "HitstunSmall", Mode = AnimConditionMode.If } },
+            Duration = 0f, InterruptionSource = true });
+        anys.Add(new GraphAnyTransition { ToState = "HitstunMedium",
+            Conditions = new[] { new GraphCondition { Parameter = "HitstunMedium", Mode = AnimConditionMode.If } },
+            Duration = 0f, InterruptionSource = true });
+        anys.Add(new GraphAnyTransition { ToState = "HitstunHard",
+            Conditions = new[] { new GraphCondition { Parameter = "HitstunHard", Mode = AnimConditionMode.If } },
             Duration = 0f, InterruptionSource = true });
         anys.Add(new GraphAnyTransition { ToState = "Movement",
             Conditions = new[] { new GraphCondition { Parameter = "Idle", Mode = AnimConditionMode.If } },
@@ -113,6 +121,26 @@ public static class AnimatorGraphBuilder
             }
         }
 
+        // ── 3b. 2-anim ChargeAttack: charge → attack on ComboStage change ──
+        for (int slot = 0; slot < 6; slot++)
+        {
+            foreach (bool airborne in new[] { false, true })
+            {
+                var spec = def.GetSlotAbility(slot, airborne);
+                if (spec?.AnimationNames == null || spec.AnimationNames.Length < 2) continue;
+                if (spec.Behavior != AbilityBehavior.ChargeAttack) continue;
+                if (!directSeen.Add((spec.AnimationNames[0], spec.AnimationNames[1]))) continue;
+
+                directs.Add(new GraphDirectTransition
+                {
+                    FromState = spec.AnimationNames[0],
+                    ToState = spec.AnimationNames[1],
+                    Conditions = new[] { new GraphCondition { Parameter = "ComboStage", Mode = AnimConditionMode.Equals, Threshold = 1 } },
+                    Duration = 0.05f,
+                });
+            }
+        }
+
         // ── 4. Combo chain direct transitions (non-hold only) ──
         for (int slot = 0; slot < 6; slot++)
         {
@@ -121,6 +149,7 @@ public static class AnimatorGraphBuilder
                 var spec = def.GetSlotAbility(slot, airborne);
                 if (spec?.AnimationNames == null || spec.AnimationNames.Length < 2) continue;
                 if (spec.ChargeHoldTicks > 0 && spec.AnimationNames.Length >= 3) continue; // hold-phase: skip
+                if (spec.Behavior == AbilityBehavior.ChargeAttack) continue; // ChargeAttack: hold-release, not auto-chain
 
                 for (int stage = 0; stage < spec.AnimationNames.Length - 1; stage++)
                 {

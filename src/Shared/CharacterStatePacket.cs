@@ -39,8 +39,10 @@ namespace SlopArena.Shared
         public ushort BuffRemainingTicks;
         /// <summary>Active buff flags bitfield (see BuffType enum).</summary>
         public byte BuffActiveFlags;
-        /// <summary>43 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1;
+        /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard.</summary>
+        public byte HitstunLevel;
+        /// <summary>44 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -59,6 +61,7 @@ namespace SlopArena.Shared
                 StateDurationFrames = s.StateTicks,
                 BuffRemainingTicks = s.BuffRemainingTicks,
                 BuffActiveFlags = s.BuffActiveFlags,
+                HitstunLevel = s.HitstunLevel,
             };
         }
 
@@ -79,6 +82,7 @@ namespace SlopArena.Shared
                 AttackSlot = AttackSlot,
                 BuffRemainingTicks = BuffRemainingTicks,
                 BuffActiveFlags = BuffActiveFlags,
+                HitstunLevel = HitstunLevel,
             };
         }
 
@@ -103,6 +107,7 @@ namespace SlopArena.Shared
             buffer[38] = (byte)MatchState;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
             buffer[42] = BuffActiveFlags;
+            buffer[43] = HitstunLevel;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -127,6 +132,7 @@ namespace SlopArena.Shared
             packet.MatchState = (MatchState)buffer[38];
             packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
             packet.BuffActiveFlags = buffer[42];
+            packet.HitstunLevel = buffer[43];
             return packet;
         }
     }

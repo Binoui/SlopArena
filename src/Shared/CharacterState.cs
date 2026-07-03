@@ -98,6 +98,8 @@ namespace SlopArena.Shared
         /// ── Hitstun + DI (Directional Influence) ──
         /// </summary>
         public ushort HitstunTicks;     // frames frozen before knockback starts
+        /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard. Set at hit time.</summary>
+        public byte HitstunLevel;
         /// <summary>
         /// accumulated DI input during hitstun
         /// </summary>

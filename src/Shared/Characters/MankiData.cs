@@ -83,14 +83,14 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 40, ChainWindowTicks = 12, LungeForce = 8f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 4, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, BaseKnockback = 1.5f, KnockbackGrowth = 2.5f, KnockbackUpward = 1f, StunTicks = 10, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, BaseKnockback = 1.5f, KnockbackGrowth = 2.5f, KnockbackUpward = 1f, StunTicks = 10, Interruptible = true } },
+                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                     new() { DurationTicks = 35, ChainWindowTicks = 14, LungeForce = 2f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 4, Radius = 0.7f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, BaseKnockback = 3f, KnockbackGrowth = 5f, KnockbackUpward = 1.5f, StunTicks = 14, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 0.7f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, BaseKnockback = 3f, KnockbackGrowth = 5f, KnockbackUpward = 1.5f, StunTicks = 14, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                     new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 8f,
                             HitboxEvents = new[] {
-                                new HitboxEvent { TriggerTick = 16, DurationTicks = 6, Radius = 0.8f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 11f, BaseKnockback = 7f, KnockbackGrowth = 18f, KnockbackUpward = 6f, StunTicks = 22, Interruptible = true }
+                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 0.8f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 11f, BaseKnockback = 7f, KnockbackGrowth = 18f, KnockbackUpward = 6f, StunTicks = 22, Interruptible = true }
                             },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
@@ -108,7 +108,7 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 20, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 4, DurationTicks = 12, Radius = 0.6f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 8f, StunTicks = 14, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 12, Radius = 0.6f, OffX = 0, OffY = 0f, OffZ = 1f, Damage = 6f, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 8f, StunTicks = 14, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_air" },
@@ -121,43 +121,49 @@ public static partial class CharacterRegistry
                 CooldownTicks = 30,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 58, ChainWindowTicks = 0,
+                    new() { DurationTicks = 128, ChainWindowTicks = 0,     // Stage 0: charge phase
                             HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 6f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                            AttackRange = 6f, WarpRange = 0f, UseTargetLock = false,
+                            RotateTowardTarget = false, TrackingStrength = 0f },
+                    new() { DurationTicks = 58, ChainWindowTicks = 0,      // Stage 1: normal attack
+                        HitboxEvents = new[]
+                        {
+                            new HitboxEvent
+                            {
+                                TriggerTick = 8, DurationTicks = 38,
+                                Shape = HitboxShape.Capsule, Radius = 0.8f,
+                                OffX = 0, OffY = 1.0f, OffZ = 2.0f,
+                                EndOffX = 0, EndOffY = 0, EndOffZ = 1.0f,
+                                Damage = 8f,
+                                BaseKnockback = 5.6f, KnockbackGrowth = 8.4f,
+                                KnockbackUpward = 8f,
+                                StunTicks = 20, Interruptible = true,
+                            },
+                        },
+                            AttackRange = 6f, WarpRange = 0f, UseTargetLock = false,
+                            RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargedStages = new AttackStage[]
                 {
                     new() { DurationTicks = 50, ChainWindowTicks = 0,
-                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            HitboxEvents = new[]
+                            {
+                                new HitboxEvent
+                                {
+                                    TriggerTick = 10, DurationTicks = 30,
+                                    Shape = HitboxShape.Capsule, Radius = 1.0f,
+                                    OffX = 0, OffY = 1.0f, OffZ = 2.5f,
+                                    EndOffX = 0, EndOffY = 0, EndOffZ = 1.5f,
+                                    Damage = 14f,
+                                    BaseKnockback = 9.6f, KnockbackGrowth = 14.4f,
+                                    KnockbackUpward = 8f,
+                                    StunTicks = 20, Interruptible = true,
+                                },
+                            },
                             AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargeHoldTicks = 45,
-                AnimationNames = new[] { "spell_rmb_attack", "spell_rmb_charged" },
-                SpecialEffectKeys = new[] { "MankiAerosolFlame" },
-                Params = new()
-                {
-                    ["charge_threshold"] = 45f,
-                    ["normal_duration"] = 58f,
-                    ["normal_trigger_tick"] = 8f,
-                    ["normal_off_z"] = 2.0f,
-                    ["normal_end_off_z"] = 3.0f,
-                    ["normal_radius"] = 0.8f,
-                    ["normal_hitbox_duration"] = 38f,
-                    ["normal_damage"] = 8f,
-                    ["normal_kb_base"] = 5.6f,
-                    ["normal_kb_growth"] = 8.4f,
-                    ["charged_duration"] = 50f,
-                    ["charged_trigger_tick"] = 10f,
-                    ["charged_off_z"] = 2.5f,
-                    ["charged_end_off_z"] = 4.0f,
-                    ["charged_radius"] = 1.0f,
-                    ["charged_hitbox_duration"] = 30f,
-                    ["charged_damage"] = 14f,
-                    ["charged_kb_base"] = 9.6f,
-                    ["charged_kb_growth"] = 14.4f,
-                    ["charged_knockback_up"] = 8f,
-                    ["charged_stun"] = 20f,
-                },
+                AnimationNames = new[] { "spell_rmb_charged", "spell_rmb_attack" },
             },
 
             AirRMB = new AbilitySpec
