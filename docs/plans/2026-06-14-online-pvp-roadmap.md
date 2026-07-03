@@ -1,3 +1,9 @@
+> ⚠️ **DEPRECATED** — Contents are stale. This doc predates the Unity migration and describes
+> a Godot-era PvP plan that no longer reflects the codebase. The server is vastly more
+> advanced (MatchInstance, MultiMatchOrchestrator, GameServerRegistration, Jitter2 collision)
+> and client progress is beyond several phases here.
+> See `docs/plans/2026-07-03-pvp-roadmap.md` for the current, audited roadmap.
+
 # SlopArena — Online PvP Implementation Roadmap
 
 > **Goal:** Build the full online PvP experience with 2 characters (Manki + Bunny).
@@ -458,3 +464,5 @@ Print summary every 600 ticks (10 seconds):
 - Test manually after each phase, not just at the end.
 - Phases 0-1 can be done in any order within the phase.
 - Phases 2-4 are sequential — each builds on the previous.
+
+> ⚠️ **DEPRECATED** — See `docs/plans/2026-07-03-pvp-roadmap.md` for the current roadmap.
