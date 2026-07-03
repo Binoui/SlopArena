@@ -73,6 +73,21 @@ namespace SlopArena.Shared
         private const float PlatformLandTolerance = 0.1f;
 
         /// <summary>
+        /// Horizontal search radius for ledge snap (meters).
+        /// 0.8m ≈ character width — avoids magnetic pull across small platforms.
+        /// </summary>
+        private const float LedgeSnapRange = 0.8f;
+        /// <summary>
+        /// Upward velocity on ledge snap (m/s).
+        /// </summary>
+        private const float LedgeSnapUpwardBoost = 5f;
+        /// <summary>
+        /// Max Y below surface edge to snap.
+        /// Prevents snap from deep below the stage.
+        /// </summary>
+        private const float LedgeGrabTolerance = 2.5f;
+
+        /// <summary>
         /// Resolve the effective AttackStage for a data-driven ability.
         /// For ChargeAttack with ChargedStages: uses ChargedStages[ComboStage-1] when
         /// ChargeTicks >= ChargeHoldTicks and ComboStage >= 1 (attack phase).
@@ -372,6 +387,12 @@ namespace SlopArena.Shared
                 s.State = ActionState.Idle;
             }
 
+            // 12. Ledge snap (auto-grab when near stage edge)
+            if (!s.IsGrounded && s.HitstunTicks == 0 && !HasKnockback(s))
+            {
+                TryLedgeSnap(ref s, arena, capsuleHalf);
+             }
+
             // DEBUG: log ground collision data (every 60 ticks = ~1/sec per entity)
             if (_logCounter++ % 60 == 0)
                 OnDebugLog?.Invoke(
@@ -482,6 +503,62 @@ namespace SlopArena.Shared
         private static bool HasKnockback(CharacterState s)
         {
             return ((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ)) > 0.0001f;
+        }
+
+        private static bool TryLedgeSnap(ref CharacterState s, ArenaDefinition arena, float capsuleHalf)
+        {
+            // 1. Already grounded or in hitstun — skip (caller also guards, but be safe)
+            if (s.IsGrounded || s.State == ActionState.Hitstun) return false;
+
+            // 2. Active knockback without hitstun — skip (rare but possible with stunTicks=0)
+            if (HasKnockback(s)) return false;
+
+            // 3. Check if currently over a platform — if so, not a ledge scenario
+            float centerSurface = arena.Heightmap.Data != null
+                ? arena.Heightmap.Sample(s.PX, s.PZ)
+                : float.MinValue;
+            if (centerSurface > float.MinValue)
+                return false; // over a platform — normal ground collision handles it
+
+            // 4. Search 4 cardinal neighbors for a valid surface edge
+            float[] offsets = { LedgeSnapRange, -LedgeSnapRange };
+            foreach (float dx in offsets)
+            {
+                float neighborSurface = arena.Heightmap.Sample(s.PX + dx, s.PZ);
+                if (neighborSurface > float.MinValue)
+                {
+                    float ledgeY = neighborSurface + capsuleHalf;
+                    if (s.PY >= ledgeY - LedgeGrabTolerance && s.PY <= ledgeY + 0.5f)
+                    {
+                        s.PY = ledgeY;
+                        s.IsGrounded = true;
+                        s.VY = LedgeSnapUpwardBoost;
+                        s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
+                        if (s.State == ActionState.AirDodging)
+                            s.State = ActionState.Idle;
+                        return true;
+                    }
+                }
+            }
+            foreach (float dz in offsets)
+            {
+                float neighborSurface = arena.Heightmap.Sample(s.PX, s.PZ + dz);
+                if (neighborSurface > float.MinValue)
+                {
+                    float ledgeY = neighborSurface + capsuleHalf;
+                    if (s.PY >= ledgeY - LedgeGrabTolerance && s.PY <= ledgeY + 0.5f)
+                    {
+                        s.PY = ledgeY;
+                        s.IsGrounded = true;
+                        s.VY = LedgeSnapUpwardBoost;
+                        s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
+                        if (s.State == ActionState.AirDodging)
+                            s.State = ActionState.Idle;
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
