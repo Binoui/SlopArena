@@ -44,9 +44,9 @@ namespace SlopArena.Shared.Abilities
             var stage = GetCurrentStage(def);
             _stageTicks++;
 
-            // Apply lunge velocity for first N ticks
-            if (_stageTicks <= _lungeDuration && stage.LungeForce > 0f)
-                SetVelocityInFacing(ref s, stage.LungeForce);
+			// Apply lunge velocity for first N ticks (skip when warp is active — warp handles movement)
+			if (s.WarpSpeed <= 0f && _stageTicks <= _lungeDuration && stage.LungeForce > 0f)
+				SetVelocityInFacing(ref s, stage.LungeForce);
 
             // Spawn hitboxes at their trigger ticks
             foreach (var evt in stage.HitboxEvents)
@@ -86,9 +86,9 @@ namespace SlopArena.Shared.Abilities
                     s.AnimLockTicks = stages[_stage].DurationTicks;
                     s.AttackElapsedTicks = 0;
 
-                    // Apply lunge velocity for new stage
-                    if (stages[_stage].LungeForce > 0f)
-                        SetVelocityInFacing(ref s, stages[_stage].LungeForce);
+					// Apply lunge velocity for new stage (skip when warp is active)
+					if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
+						SetVelocityInFacing(ref s, stages[_stage].LungeForce);
                 }
                 else
                 {

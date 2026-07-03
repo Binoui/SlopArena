@@ -465,8 +465,7 @@ namespace SlopArena.Shared
 				float dist = MathF.Sqrt(dx * dx + dz * dz);
 
 				// ── Warp toward target if within WarpRange but outside AttackRange ──
-				if (stage.WarpRange > 0f && dist > stage.AttackRange && dist <= stage.WarpRange
-				    && !state.IsServerAbility)
+				if (stage.WarpRange > 0f && dist > stage.AttackRange && dist <= stage.WarpRange)
 				{
 					state.WarpTargetX = target.PX;
 					state.WarpTargetZ = target.PZ;
@@ -795,9 +794,9 @@ namespace SlopArena.Shared
 		{
 			PreTickAbilities(inputs);
 
-			SimulateMovement(inputs);
-
 			ProcessTargetLock(inputs);
+
+			SimulateMovement(inputs);
 
 			var entityList = BuildHurtboxList();
 			SpawnHitboxEvents();

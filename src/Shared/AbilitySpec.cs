@@ -24,6 +24,8 @@ namespace SlopArena.Shared
     {
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public string Name = "";
+        /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>
+        public string? IconName;
         /// <summary>
         /// DEPRECATED: No longer used since slot-based mapping.
         /// Factory now maps by (CharacterClass, slot) instead of global typeId.
