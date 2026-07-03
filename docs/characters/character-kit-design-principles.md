@@ -77,19 +77,43 @@ Different games map abilities differently. The common thread across all of them:
 
 | Game | LMB | RMB | Q | E | R | F | Shift |
 |------|-----|-----|--|--|--|--|-------|
-| **DKO** | Light | Heavy | Ability | Ability | Ability | **ULT** | Dodge |
+| **DKO** | Light | Heavy¹ | Ability² (aimed) | Ability³ (mobility) | Ability⁴ (burst) | **ULT** | Dodge |
 | **Battlerite** | Basic attack | Secondary | Main spell | Main spell | **ULT** | EX version | — |
 | **Supervive** | Basic attack | Sprint atk | Ability | Ability | **ULT** | Ability | — |
 | **Fangs** | Light | Heavy | Ability | Ability | **ULT** | — | Dodge |
 | **Omega Strikers** | Basic attack | — | Ability | Ability | **ULT** | — | Dodge |
 
+
+**Footnotes:**
+¹ **RMB base damage ~10% uncharged** — the standard heavy attack damage across DKO
+² **Q = aimed spell, often recovery** — aimed skillshots go on Q for muscle memory; many recovery abilities also on Q (the most accessible key for frequent use). Cancel aimed Q spells with RMB (quick cancel, not charge).
+³ **E = mobility/utility** — gap closers, movement tech, self-buffs. CD ~16s.
+⁴ **R = burst/spam tool** — lower CD (~12s), often the highest DPS ability. Spammable finisher or poke.
+
+---
+
+## Cooldown Templates (DKO Baseline)
+
+| Slot | CD | Role |
+|------|----|------|
+| Q | 21s | Aimed ability, often recovery. Highest CD of the 3 ability slots because it's the most accessible key and often defines the character's identity |
+| E | 16s | Mobility, utility, setup. Mid-range CD — frequent enough to use each engage, long enough to punish whiffs |
+| R | 12s | Burst/spam tool. Lowest CD — repeatable threat, defines DPS pattern |
+| F | 25-35s | Ultimate. Impact-per-use, not spam |
+
+These are **baseline values**. They shift per character identity and class archetype:
+- Rushdown characters tend to have lower CDs on engage tools
+- Control/zone characters have longer CDs on area-denial tools
+- Assassins have shorter CDs on mobility, longer on burst
+
 ### Key Takeaways
 
-- **Q = engage/CC** is the most solid pattern across all games
-- **E = mobility/recovery** is extremely frequent — Battlerite, Fangs, DKO, Supervive all use it this way
-- **R = ult** is the general pattern across most games
+- **Q = engage/CC** across most games; **DKO standard is aimed + recovery** on Q — the most accessible key for frequent-use abilities. Cancel aimed Q spells with RMB (quick cancel, not charge).
+- **E = mobility/recovery** is extremely frequent — Battlerite, Fangs, DKO, Supervive all use it this way. DKO baseline CD: ~16s.
+- **R = burst/spam tool** in DKO (lowest CD at ~12s, defines DPS pattern). Other games map R = ult.
 - **DKO is the exception**: ult on **F**, with R being a regular (but often strong) ability
 - **Shift = dodge / physical roll** — never a spell, always a universal mechanic
+- **RMB baseline: ~10% uncharged** across DKO. The exact value can vary per character but 10 is the tuning anchor.
 
 ---
 

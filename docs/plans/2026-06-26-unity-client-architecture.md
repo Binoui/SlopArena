@@ -1,3 +1,6 @@
+> ⚠️ **DEPRECATED** — Contents are stale. The doc was written after Phase 1 and never updated.
+> See `docs/plans/2026-07-03-pvp-roadmap.md` for the current, audited roadmap.
+
 # Unity Client Architecture Plan
 
 > **Goal:** Replace the hacky offline mode with a clean architecture where training and PvP share the same simulation pipeline. Training = local `ServerSimulation` without network. PvP = network-backed `ServerSimulation` with prediction/rollback.
@@ -390,3 +393,5 @@ SlopArena/
 ├── docs/                               (Documentation)
 └── .github/workflows/                  (NuGet + notifications CI)
 ```
+
+> ⚠️ **DEPRECATED** — See `docs/plans/2026-07-03-pvp-roadmap.md` for the current roadmap.

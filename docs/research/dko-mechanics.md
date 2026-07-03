@@ -218,3 +218,36 @@ The damage percentage determines knockback distance.
 6. **CC: Fear, Slow, Toss-up** (6) — expands status effect options
 7. **Heal** (10) — specific to certain character kits
 8. **Invisibility** (14) — specific to certain character kits
+
+---
+
+## 19. Ability Input Conventions
+
+DKO-specific patterns observed across the 13-character roster.
+
+### Cancel
+
+Aimed spells (skillshot ground indicators, reticle-aimed attacks) can be **cancelled with RMB**. This is a quick cancel — not the charge system. It lets the player abort a mis-aimed ability without committing the cooldown.
+
+**Status:** ❌ Not implemented. No ability cancellation once ExecuteSlot begins.
+
+### Keybind Conventions
+
+| Slot | Role | CD | Note |
+|------|------|----|------|
+| **Q** | Aimed ability, often recovery | ~21s | Most aimed skillshots on Q. Recovery abilities also favor Q for muscle memory reability. |
+| **E** | Mobility / utility | ~16s | Gap closers, self-buffs, movement tech. |
+| **R** | Burst / spam tool | ~12s | Lowest CD of the 3 slots. Defines DPS pattern — spammable finisher. |
+| **F** | Ultimate | 25-35s | Big impact, long cooldown. |
+
+### Cancel Pattern
+
+- Most aimed Q abilities cancel on RMB press
+- No mana cost on cancel
+- Cooldown is NOT consumed on cancel (the spell never fires)
+
+**Implies:** Quick-cancel is a separate input pattern from the charge-hold system on RMB. The two systems don't overlap — aimed Q uses one input pattern (press Q → aim → RMB to cancel or LMB to confirm), RMB heavy uses another (hold to charge → release to fire).
+
+### Cooldown Philosophy
+
+Q has the highest CD (21s) because it's the most accessible key and often defines the character's identity — the ability you build around. R has the lowest (12s) because it's a repeatable threat, the bread-and-butter damage tool. E sits in the middle (16s) — powerful enough to be impactful, gated enough to punish misuse.
