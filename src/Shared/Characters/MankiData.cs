@@ -38,7 +38,7 @@ public static partial class CharacterRegistry
                 SprintSpeed = 12f,
                 DashSpeed = 30f,
                 AirAcceleration = 14f,
-                JumpForce = 7f,
+                JumpForce = 10f,
                 Gravity = 35f,
                 AirFloatGravity = 6f,
                 DashDurationTicks = 15,
@@ -79,18 +79,19 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Monkey Combo",
+                IconName = "lmb",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 40, ChainWindowTicks = 12, LungeForce = 8f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, BaseKnockback = 1.5f, KnockbackGrowth = 2.5f, KnockbackUpward = 1f, StunTicks = 10, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, BaseKnockback = 15f, KnockbackGrowth = 2f, KnockbackUpward = 3f, StunTicks = 16, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                     new() { DurationTicks = 35, ChainWindowTicks = 14, LungeForce = 2f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 0.7f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, BaseKnockback = 3f, KnockbackGrowth = 5f, KnockbackUpward = 1.5f, StunTicks = 14, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, BaseKnockback = 15f, KnockbackGrowth = 3f, KnockbackUpward = 5f, StunTicks = 20, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
-                    new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 8f,
+                    new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 10f,
                             HitboxEvents = new[] {
-                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 0.8f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 11f, BaseKnockback = 7f, KnockbackGrowth = 18f, KnockbackUpward = 6f, StunTicks = 22, Interruptible = true }
+                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, BaseKnockback = 21f, KnockbackGrowth = 5f, KnockbackUpward = 10f, StunTicks = 22, Interruptible = true }
                             },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
@@ -117,6 +118,7 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Aerosol + Lighter",
+                IconName = "rmb",
                 Behavior = AbilityBehavior.ChargeAttack,
                 CooldownTicks = 30,
                 Stages = new AttackStage[]
@@ -182,6 +184,7 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Round Bomb",
+                IconName = "q",
                 Behavior = AbilityBehavior.AimedProjectile,
                 CooldownTicks = 300,
                 ChargeHoldTicks = 180,         // 3s max aim
@@ -221,6 +224,7 @@ public static partial class CharacterRegistry
             E = new ExplosiveMineSpec
             {
                 Name = "Dynamite Mine",
+                IconName = "e",
                 Behavior = AbilityBehavior.AreaDenial,
                 CooldownTicks = 120,
                 MineRadius = 0.3f,
@@ -249,6 +253,7 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Bazooka",
+                IconName = "r",
                 Behavior = AbilityBehavior.AimedProjectile,
                 CooldownTicks = 240,
                 ChargeHoldTicks = 180,
@@ -291,6 +296,7 @@ public static partial class CharacterRegistry
             F = new AbilitySpec
             {
                 Name = "Overclock",
+                IconName = "f",
                 Behavior = AbilityBehavior.SelfBuff,
                 CooldownTicks = 600,
                 Stages = System.Array.Empty<AttackStage>(),

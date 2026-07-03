@@ -66,6 +66,7 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Rabbit Combo",
+                IconName = "lmb",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -99,6 +100,7 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Carrot Slam",
+                IconName = "rmb",
                 CooldownTicks = 45,
                 Stages = new AttackStage[]
                 {
@@ -126,6 +128,7 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Whirling Carrot",
+                IconName = "q",
                 CooldownTicks = 90,
                 Behavior = AbilityBehavior.AimedProjectile,
                 Stages = new AttackStage[]
@@ -164,6 +167,7 @@ public static partial class CharacterRegistry
             E = new AbilitySpec
             {
                 Name = "Tornado Kick",
+                IconName = "e",
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
                 {
@@ -185,6 +189,7 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Dragon's Kick",
+                IconName = "r",
                 CooldownTicks = 120,
                 Stages = new AttackStage[]
                 {
@@ -236,6 +241,7 @@ public static partial class CharacterRegistry
             F = new AbilitySpec
             {
                 Name = "Jade Hare",
+                IconName = "f",
                 CooldownTicks = 450,
                 Stages = new AttackStage[]
                 {
