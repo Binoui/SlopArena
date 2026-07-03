@@ -142,6 +142,19 @@ public static class TestHelpers
     /// </summary>
     public static float MankiGroundPY => 0f + MankiDef.CapsuleHeight * 0.5f; // 0.65
 
+
+        /// <summary>
+        /// Create a state near the edge of the test arena (X=200 boundary), airborne and falling.
+        /// posX: edge-adjacent position. py: starting Y. vy: downward velocity.
+        /// </summary>
+        public static CharacterState EdgeState(float posX = 199.5f, float py = 0.65f, float vy = -5f)
+        {
+            var state = PlayerState(posX, 0);
+            state.PY = py;
+            state.VY = vy;
+            state.IsGrounded = false;
+            return state;
+        }
     /// <summary>
     /// Approximate float equality within tolerance.
     /// Use this instead of Assert.Equal(float, float, int) which checks decimal precision.
