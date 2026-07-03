@@ -357,8 +357,7 @@ public class ServerSimulationTests
     [Fact]
     public void TargetEntityId_SetOnLmbAttack_NpcAtWarpRange()
     {
-        // Manki LMB is a ServerAbility, so !state.IsServerAbility blocks warp.
-        // This test verifies TargetEntityId IS set even though warp is skipped.
+        // Manki LMB is a ServerAbility — warp is now active for all attacks with UseTargetLock
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
@@ -371,8 +370,8 @@ public class ServerSimulationTests
 
         var state = sim.GetState(1);
         Assert.Equal(100ul, state.TargetEntityId);
-        // Warp is set only for non-ServerAbility. Manki LMB is ServerAbility → no warp
-        Assert.Equal(0f, state.WarpSpeed);
+        // Warp IS set for ServerAbility attacks now — should activate when within WarpRange
+        Assert.True(state.WarpSpeed > 0f, $"Expected WarpSpeed > 0 (warp active for ServerAbility), got {state.WarpSpeed}");
     }
 
     [Fact]
@@ -428,7 +427,7 @@ public class ServerSimulationTests
     [Fact]
     public void Tick_TargetLock_InWarpRange_Rotates()
     {
-        // Zone 2: AttackRange < dist ≤ WarpRange → rotates toward target
+        // Zone 2: AttackRange < dist ≤ WarpRange → rotates toward target + warps toward target
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
@@ -446,10 +445,10 @@ public class ServerSimulationTests
         // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
         Assert.True(state.FacingYaw > 0.01f,
             $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
-        // Warp is not set for ServerAbility even when in warp range
-        Assert.Equal(0f, state.WarpSpeed);
-    }
+        // Warp IS set for ServerAbility attacks now — should activate when in WarpRange
+        Assert.True(state.WarpSpeed > 0f, $"Expected WarpSpeed > 0 (warp active), got {state.WarpSpeed}");
 
+    }
     [Fact]
     public void Tick_TargetLock_InAttackRange_Rotates()
     {
