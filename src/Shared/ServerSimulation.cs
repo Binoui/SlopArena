@@ -178,6 +178,8 @@ namespace SlopArena.Shared
 								$"[AbilityEnd] entity={id} cleared BufferedSlot — prevented data-driven re-trigger");
 					}
 
+					state.AnimLockTicks = 0; // Unlock input for next data-driven attack
+					state.IsServerAbility = false; // Allow data-driven attacks to work after ServerAbility ends
 					_states[id] = state; // Persist cooldown + buffered slot clear
 				}
 				_activeAbilities.Remove(id);
@@ -265,7 +267,12 @@ namespace SlopArena.Shared
                 int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
                 targetAnim = (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length) ? ability.AnimationNames[stageIdx] : "melee";
             }
-            else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
+            else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
+            {
+                1 => def.HitMediumAnim,
+                2 => def.HitHardAnim,
+                _ => def.HitSmallAnim,
+            };
             else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
             else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
             else targetAnim = "idle";
@@ -446,9 +453,8 @@ namespace SlopArena.Shared
 				var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne);
 				if (spec == null) { _states[id] = state; continue; }
 
-				int stageIdx = Math.Min(state.ComboStage, (byte)(spec.Stages.Length - 1));
-				if (stageIdx < 0 || stageIdx >= spec.Stages.Length) { _states[id] = state; continue; }
-				var stage = spec.Stages[stageIdx];
+				if (spec.Stages == null || spec.Stages.Length == 0) { _states[id] = state; continue; }
+				var stage = Simulation.ResolveStage(spec, state);
 
 				// Only process warp/rotation if target lock is enabled for this stage
 				if (!stage.UseTargetLock) { _states[id] = state; continue; }
@@ -559,9 +565,7 @@ namespace SlopArena.Shared
 				bool airborne = !state.IsGrounded;
 				var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
 				if (ability == null) continue;
-				int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-
-				var stage = ability.Stages[stageIdx];
+				var stage = Simulation.ResolveStage(ability, state);
 				if (stage.HitboxEvents == null) continue;
 
 				float cos = MathF.Cos(state.FacingYaw);
@@ -600,7 +604,12 @@ namespace SlopArena.Shared
 							int boneStageIdx = Math.Min(state.ComboStage, (byte)(boneAbility.Stages.Length - 1));
 							targetAnim = (boneStageIdx >= 0 && boneStageIdx < boneAbility.AnimationNames.Length) ? boneAbility.AnimationNames[boneStageIdx] : "melee";
 						}
-						else if (state.State == ActionState.Hitstun) targetAnim = "small_hit";
+						else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
+						{
+						    1 => def.HitMediumAnim,
+						    2 => def.HitHardAnim,
+						    _ => def.HitSmallAnim,
+						};
 						else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
 						else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
 						else targetAnim = "idle";
@@ -707,6 +716,9 @@ namespace SlopArena.Shared
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
+				// Resolve hitstun animation tier from damage
+				targetState.HitstunLevel = finalDamage < 5f ? (byte)0 :
+				    finalDamage < 15f ? (byte)1 : (byte)2;
 				Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
 				    hit.KnockbackY, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
 				targetState.HitstunTicks = hit.StunTicks;

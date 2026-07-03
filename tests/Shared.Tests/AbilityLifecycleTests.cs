@@ -501,41 +501,291 @@ public class AbilityLifecycleTests
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // ── RMB (slot 2): charge vs normal — basic activation ──
+    // ── RMB (slot 2): Two-phase charge-hold architecture ──
     // ══════════════════════════════════════════════════════════════════
-    // MankiAerosolFlame.OnStart checks s.ChargeTicks >= chargeThreshold
-    // (45) to decide charged variant. Normal = AnimIndex 0, Charged = 1.
+    // MankiAerosolFlame has two phases:
+    //   Phase 1 (ComboStage=0, AnimIndex=0) = charge hold
+    //   Phase 2 (ComboStage=1, AnimIndex=1) = release-to-attack
+    // Both normal and charged releases play spell_rmb_charged (AnimIndex=1).
+    // Tap release (instant skip if !IsAiming) or hold past charge_threshold=45.
+
 
     [Fact]
-    public void MankiRMB_Normal_AnimIndexZero()
+    public void MankiRMB_Charged_HoldThenRelease()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
-        state.ChargeTicks = 0; // explicitly uncharged
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        // Normal variant: AnimIndex=0
-        Assert.Equal(0, t0.AnimIndex);
+        // Hold RMB with IsAiming=true for 50 ticks using manual loop
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 50; i++)
+            sim.Tick(holdInputs);
+
+        // Release (input without aiming) — should fire charged
+        var releaseInput = TestHelpers.Input(activeSlot: 2);
+        var released = TestHelpers.TickN(sim, releaseInput, 1);
+        Assert.Equal(ActionState.Attacking, released.State);
+        Assert.Equal((byte)1, released.ComboStage);
     }
 
     [Fact]
-    public void MankiRMB_Charged_AnimIndexOne()
+    public void MankiRMB_TapRelease_SpawnsNormalHitbox()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
-        state.ChargeTicks = 50; // >= charge_threshold (45)
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        // Charged variant: AnimIndex=1
-        Assert.Equal(1, t0.AnimIndex);
+        // Hold with aiming=false for 5 ticks (manual release debounce)
+        // triggerTick=8 for normal spawns hitbox at AttackElapsedTicks=8
+        // 5 hold ticks + 12 release ticks = hitbox active
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 5);
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 12);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Normal hitbox params per MankiData
+        Assert.Equal(8f, hb.Damage);
+        Assert.Equal(0.8f, hb.Radius);
+        Assert.Equal(5.6f, hb.BaseKnockback);
+        Assert.Equal(8.4f, hb.KnockbackGrowth);
     }
 
+    [Fact]
+    public void MankiRMB_HoldRelease_SpawnsChargedHitbox()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming for 55 ticks using direct sim.Tick loop
+        // (TickN resets input to default after tick 1, dropping IsAiming)
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 50; i++)
+            sim.Tick(holdInputs);
+
+        // Release — charged attack starts, triggerTick=10, wait 13 ticks
+        var releaseInput = TestHelpers.Input(activeSlot: 2);
+        var relInputs = new Dictionary<ulong, InputState> { { 1, releaseInput } };
+        for (int i = 0; i < 13; i++)
+            sim.Tick(relInputs);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Charged hitbox params per MankiData
+        Assert.Equal(14f, hb.Damage);
+        Assert.Equal(1.0f, hb.Radius);
+        Assert.Equal(9.6f, hb.BaseKnockback);
+        Assert.Equal(14.4f, hb.KnockbackGrowth);
+    }
+
+    [Fact]
+    public void MankiRMB_ReleaseUnderThreshold_StaysNormal()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming for 5 ticks (way under charge_threshold=45)
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 5; i++)
+            sim.Tick(holdInputs);
+
+        // Release — should fire as normal (under threshold)
+        var releaseInput = TestHelpers.Input(activeSlot: 2);
+        var relInputs = new Dictionary<ulong, InputState> { { 1, releaseInput } };
+        for (int i = 0; i < 12; i++) // + wait past triggerTick=8
+            sim.Tick(relInputs);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Should be normal params (not charged)
+        Assert.Equal(8f, hb.Damage);
+        Assert.Equal(0.8f, hb.Radius);
+    }
+
+    [Fact]
+    public void MankiRMB_AutoRelease_AtMaxHold()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming for 125 ticks (past max_hold_ticks=120)
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 125; i++)
+            sim.Tick(holdInputs);
+
+        // Should auto-release as charged — wait past charged triggerTick=10
+        var postHoldInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var postInputs = new Dictionary<ulong, InputState> { { 1, postHoldInput } };
+        for (int i = 0; i < 13; i++)
+            sim.Tick(postInputs);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Should be charged params (auto-release past max_hold_ticks = always charged)
+        Assert.Equal(14f, hb.Damage);
+        Assert.Equal(1.0f, hb.Radius);
+    }
+
+    [Fact]
+    public void MankiRMB_ChargePhase_HasAnimIndexZero()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming — stays in charge phase (ComboStage=0, AnimIndex=0)
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var inputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 10; i++)
+            sim.Tick(inputs);
+
+        var duringCharge = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, duringCharge.State);
+        Assert.Equal((byte)0, duringCharge.ComboStage);  // charge phase
+        Assert.Equal((byte)0, duringCharge.ComboStage);
+    }
+
+    [Fact]
+    public void MankiRMB_CooldownApplied()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Tap RMB — instant skip, normal attack (normal_duration=58)
+        // Wait enough ticks for attack to complete + a few more
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 70);
+
+        // After attack ends, slot 2 (RMB, Cooldown1) should have cooldown=30
+        var afterIdle = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, afterIdle.State);
+        Assert.True(afterIdle.Cooldown1 > 0 && afterIdle.Cooldown1 <= 30,
+            $"Expected cooldown 1-30 on slot 2, got Cooldown1={afterIdle.Cooldown1}");
+    }
+
+    [Fact]
+    public void MankiRMB_HoldRelease_WithNoAiming()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming=false for 5 ticks → manual release → ComboStage=1
+        var releaseInput = TestHelpers.Input(activeSlot: 2);
+        for (int i = 0; i < 6; i++)
+        {
+            var inputs = new Dictionary<ulong, InputState> { { 1, releaseInput } };
+            sim.Tick(inputs);
+        }
+
+        var afterRelease = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, afterRelease.State);
+        Assert.Equal((byte)1, afterRelease.ComboStage);
+
+        // Hitbox should be approaching trigger_tick=8 — run 9 more ticks
+        for (int i = 0; i < 9; i++)
+            sim.Tick(new() { { 1, releaseInput } });
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        Assert.Equal(8f, hitboxes[0].Damage); // normal params
+    }
+
+    [Fact]
+    public void MankiRMB_ChargePhase_NoHitbox()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming — stays in charge phase
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var inputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 10; i++)
+            sim.Tick(inputs);
+
+        var duringCharge = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, duringCharge.State);
+        Assert.Equal(0, duringCharge.AnimIndex);
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+    }
+
+    [Fact]
+    public void MankiRMB_Charged_HitsBeyondNormalRange()
+    {
+        // Place NPC at z=4.5 — outside normal RMB range (~4.1) but inside charged range (~5.3)
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        var gpy = TestHelpers.CombatGroundPY;
+        var player = TestHelpers.PlayerState(0f, 0f);
+        player.PY = gpy;
+        sim.RegisterEntity(1, def, player);
+        var npc = TestHelpers.NpcState(0f, 4.5f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        // ── Part A: Uncharged RMB (instant skip) should NOT hit NPC at 4.5m ──
+        // Tick 0: tap RMB (no aiming), instant skip to Phase 2
+        var tapInput = new Dictionary<ulong, InputState>
+        {
+            { 1, TestHelpers.Input(activeSlot: 2) },
+            { 100, default },
+        };
+        sim.Tick(tapInput);
+        // Tick 1-20: normal attack phase, hitbox active from tick 8→46
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var npcAfterUncharged = sim.GetState(100);
+        Assert.Equal(0u, npcAfterUncharged.DamagePercent);
+
+        // ── Part B: Charged RMB should hit NPC at 4.5m ──
+        // New sim for clean state
+        var sim2 = TestHelpers.MakeSim(arena);
+        var player2 = TestHelpers.PlayerState(0f, 0f);
+        player2.PY = gpy;
+        sim2.RegisterEntity(1, def, player2);
+        var npc2 = TestHelpers.NpcState(0f, 4.5f);
+        npc2.PY = gpy;
+        sim2.RegisterEntity(100, def, npc2);
+
+        // Hold with aiming for 55 ticks (past charge_threshold=45)
+        var holdInput2 = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs2 = new Dictionary<ulong, InputState> { { 1, holdInput2 }, { 100, default } };
+        for (int i = 0; i < 55; i++)
+            sim2.Tick(holdInputs2);
+
+        // Release — charged attack starts, triggerTick=10 → hitbox active from tick 11
+        var releaseInput2 = TestHelpers.Input(activeSlot: 2);
+        var relInputs2 = new Dictionary<ulong, InputState> { { 1, releaseInput2 }, { 100, default } };
+        for (int i = 0; i < 15; i++)
+            sim2.Tick(relInputs2); // 15 ticks = AttackElapsedTicks=15, past trigger=10
+
+        var npcAfterCharged = sim2.GetState(100);
+        Assert.True(npcAfterCharged.DamagePercent > 0,
+            $"Charged RMB should hit NPC at 4.5m (charged range ~5.3m), got damage={npcAfterCharged.DamagePercent}");
+    }
     // ══════════════════════════════════════════════════════════════════
     // ── E (slot 4): ExplosiveMine — basic mine placement ──
     // ══════════════════════════════════════════════════════════════════

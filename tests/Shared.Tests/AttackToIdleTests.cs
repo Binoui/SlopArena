@@ -84,7 +84,7 @@ public class AttackToIdleTests
         TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2),
-            MankiDef.RMB!.Stages[0].DurationTicks + 30);
+            5 + MankiDef.RMB!.Stages[1].DurationTicks + 20);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);
@@ -96,10 +96,15 @@ public class AttackToIdleTests
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = MankiGroundPy;
-        state.ChargeTicks = 60; // above charge_threshold (45)
         TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2),
+        // Hold RMB with IsAiming=true for 55 ticks (past charge_threshold=45)
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        TestHelpers.TickN(sim, holdInput, 55);
+
+        // Release — charged attack lasts charged_duration (50) ticks
+        var releaseInput = TestHelpers.Input(activeSlot: 2);
+        var after = TestHelpers.TickN(sim, releaseInput,
             MankiDef.RMB!.ChargedStages![0].DurationTicks + 30);
 
         Assert.Equal(ActionState.Idle, after.State);

@@ -248,7 +248,9 @@ namespace SlopArena.Client.Entities
                 // Entering combat — reset triggers, then fire the right one
                 _animator.ResetTrigger("Attack");
                 _animator.ResetTrigger("Dash");
-                _animator.ResetTrigger("Hitstun");
+                _animator.ResetTrigger("HitstunSmall");
+                _animator.ResetTrigger("HitstunMedium");
+                _animator.ResetTrigger("HitstunHard");
                 _animator.ResetTrigger("Idle");
 
                 if (state.State == ActionState.Attacking)
@@ -285,7 +287,13 @@ namespace SlopArena.Client.Entities
                 }
                 else if (state.State == ActionState.Hitstun)
                 {
-                    _animator.SetTrigger("Hitstun");
+                    string trigger = state.HitstunLevel switch
+                    {
+                        1 => "HitstunMedium",
+                        2 => "HitstunHard",
+                        _ => "HitstunSmall"
+                    };
+                    _animator.SetTrigger(trigger);
                 }
             }
 

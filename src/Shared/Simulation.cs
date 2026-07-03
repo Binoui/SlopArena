@@ -72,6 +72,24 @@ namespace SlopArena.Shared
         /// </summary>
         private const float PlatformLandTolerance = 0.1f;
 
+        /// <summary>
+        /// Resolve the effective AttackStage for a data-driven ability.
+        /// For ChargeAttack with ChargedStages: uses ChargedStages[ComboStage-1] when
+        /// ChargeTicks >= ChargeHoldTicks and ComboStage >= 1 (attack phase).
+        /// Otherwise returns spec.Stages[Clamped(ComboStage)].
+        /// </summary>
+        public static AttackStage ResolveStage(AbilitySpec spec, in CharacterState state)
+        {
+            if (spec.Behavior == AbilityBehavior.ChargeAttack && spec.ChargedStages != null && spec.ChargedStages.Length > 0
+                && state.ComboStage >= 1 && state.ChargeTicks >= spec.ChargeHoldTicks)
+            {
+                int chargedIdx = Math.Min(state.ComboStage - 1, spec.ChargedStages.Length - 1);
+                return spec.ChargedStages[chargedIdx];
+            }
+            int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+            return spec.Stages[stageIdx];
+        }
+
         // ── MAIN ENTRY POINT ──
 
         /// <summary>
@@ -160,10 +178,22 @@ namespace SlopArena.Shared
                 var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
                 if (spec != null)
                 {
-                    int stageIdx = Math.Min(s.ComboStage, (byte)(spec.Stages.Length - 1));
-                    var stage = spec.Stages[stageIdx];
+                    var stage = Simulation.ResolveStage(spec, s);
                     if (s.AttackElapsedTicks >= stage.DurationTicks)
                     {
+                        // Apply cooldown before clearing slot
+                        if (spec.CooldownTicks > 0)
+                        {
+                            switch (s.AttackSlot)
+                            {
+                                case 1: s.Cooldown0 = spec.CooldownTicks; break;
+                                case 2: s.Cooldown1 = spec.CooldownTicks; break;
+                                case 3: s.Cooldown2 = spec.CooldownTicks; break;
+                                case 4: s.Cooldown3 = spec.CooldownTicks; break;
+                                case 5: s.Cooldown4 = spec.CooldownTicks; break;
+                                case 6: s.Cooldown5 = spec.CooldownTicks; break;
+                            }
+                        }
                         s.State = ActionState.Idle;
                         s.AttackSlot = 0;
                         s.ComboStage = 0;
@@ -179,10 +209,20 @@ namespace SlopArena.Shared
                 var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
                 if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
                 {
-                    // Auto-release: after minimum hold window or when fully charged
-                    if (s.AttackElapsedTicks >= 10 || (spec.ChargeHoldTicks > 0 && s.ChargeTicks >= spec.ChargeHoldTicks))
+                    bool shouldRelease = false;
+
+                    // Manual release: button released before full charge (minimum 5 ticks to debounce)
+                    if (!input.IsAiming && s.AttackElapsedTicks >= 5)
+                        shouldRelease = true;
+
+                    // Auto-release: fully charged or safety net (5 second max hold)
+                    if ((spec.ChargeHoldTicks > 0 && s.ChargeTicks >= spec.ChargeHoldTicks) || s.AttackElapsedTicks >= 300)
+                        shouldRelease = true;
+
+                    if (shouldRelease)
                     {
                         s.ComboStage = 1;
+                        s.AttackElapsedTicks = 0; // Reset so hitbox TriggerTick is relative to attack start
                     }
                 }
             }
@@ -256,6 +296,8 @@ namespace SlopArena.Shared
                     {
                         s.State = ActionState.Attacking;
                         s.AttackSlot = input.ActiveSlot;
+                        s.IsServerAbility = false; // Clear stale flag from previous ServerAbility
+                        s.StateTicks = 0;  // Prevent generic expiry from interrupting attack
                     }
                 }
             }
@@ -286,7 +328,7 @@ namespace SlopArena.Shared
                 var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
                 if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
                 {
-                    if (s.ChargeTicks < spec.ChargeHoldTicks)
+                    if (input.IsAiming && s.ChargeTicks < spec.ChargeHoldTicks)
                         s.ChargeTicks++;
                 }
             }

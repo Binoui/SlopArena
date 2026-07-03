@@ -56,7 +56,9 @@ namespace SlopArena.Client.Editor
             controller.AddParameter("ComboStage", AnimatorControllerParameterType.Int);
             controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Dash", AnimatorControllerParameterType.Trigger);
-            controller.AddParameter("Hitstun", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("HitstunSmall", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("HitstunMedium", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("HitstunHard", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Idle", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("AnimSpeed", AnimatorControllerParameterType.Float);
 
@@ -269,7 +271,7 @@ namespace SlopArena.Client.Editor
                 case "attack_3": config.Attack3 = clip; break;
                 case "dash": config.Dash = clip; break;
                 case "hit_small": config.HitSmall = clip; break;
-                case "hit_large": config.HitLarge = clip; break;
+                case "hit_large": config.HitHard = clip; break;
                 case "death": config.Death = clip; break;
                 case "spell_q_start": config.SpellQStart = clip; break;
                 case "spell_q_loop": config.SpellQLoop = clip; break;
@@ -286,7 +288,8 @@ namespace SlopArena.Client.Editor
                 case "spell_lmb_3": config.Attack3 = clip; break;
                 case "spell_lmb_air": config.Attack3 = clip; break;
                 case "hit_light": config.HitSmall = clip; break;
-                case "hit_medium": config.HitLarge = clip; break;
+                case "hit_medium": config.HitMedium = clip; break;
+                case "hit_hard": config.HitHard = clip; break;
                 case "dash_loop": config.Dash = clip; break;
             }
         }

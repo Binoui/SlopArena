@@ -30,7 +30,7 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 │  ┌────────────────────────────────────────────────┐ │
 │  │ Manki + slot 0 => new MankiLmbCombo()          │ │
 │  │ Manki + slot 2 => new MankiRoundBomb()         │ │
-│  │ Manki + slot 1 => new MankiAerosolFlame()      │ │
+│  │ Manki + slot 1 => null (data-driven ChargeAtk)  │ │
 │  └────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
                     ▼
@@ -58,9 +58,9 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 - Input-driven state (hold to charge)
 
 **Examples:**
-- MankiLmbCombo: Lunges forward for first 10 ticks of each stage
-- MankiRoundBomb: Spawns projectile at specific tick
-- MankiAerosolFlame: Checks ChargeTicks to select variant
+  - **MankiLmbCombo**: Lunges forward for first 10 ticks of each stage
+  - **MankiRoundBomb**: Spawns projectile at specific tick, three-phase aim-hold pipeline
+  // Manki RMB is now data-driven ChargeAttack (see Hold-to-Charge section)
 
 ## Data-Driven Parameters
 
@@ -112,7 +112,7 @@ public sealed class NewAbility : ServerAbility
 private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
 {
     (0, false) => new MankiLmbCombo(),
-    (1, false) => new MankiAerosolFlame(),
+    (1, false) => null,              // RMB — data-driven ChargeAttack
     (2, _) => new MankiRoundBomb(),
     (3, _) => null,          // E — data-driven ExplosiveMineSpec
     (4, _) => new MankiBazooka(),   // R — rise-aim-fire bazooka
@@ -290,20 +290,76 @@ _states[id] = state;
 ```
 Client-side cooldown check in `Simulation.SimulateTick` mirrors the server check in `PreTickAbilities`.
 
+## Hold-to-Charge Ability Pattern (Manki RMB)
+
+Manki RMB is a data-driven `ChargeAttack` behavior. No `ServerAbility` class — the pipeline
+handles charging, release detection, and stage selection automatically.
+
+### Two-Phase Lifecycle
+
+```
+Phase 1: spell_rmb_charged (ComboStage=0) → charge hold
+Phase 2: spell_rmb_attack   (ComboStage=1) → release-to-attack
+```
+
+**Phase 1 — Charge hold** (ComboStage=0):
+- The data-driven pipeline detects `ChargeAttack` behavior and holds at ComboStage=0.
+- `ChargeTicks` accumulates each tick while `input.IsAiming` is true.
+- ChargeTicks is capped at `ChargeHoldTicks` (45 ticks = 0.75s).
+- The stage used for hitbox/expiry is `Stages[0]` (no `ChargedStages` during charge phase).
+
+**Release conditions** (in `Simulation.SimulateTick`):
+- **Manual release** (`!input.IsAiming && AttackElapsedTicks >= 5`): Player released RMB key,
+  fires as normal or charged depending on accumulated ChargeTicks.
+- **Auto-release** (`AttackElapsedTicks >= 10 || ChargeTicks >= ChargeHoldTicks`): Fallback
+  that prevents infinite charge. At ChargeHoldTicks the attack fires automatically.
+- On release: `ComboStage = 1`, `AttackElapsedTicks = 0`.
+
+**Phase 2 — Attack** (ComboStage=1):
+- Stage selection uses `ResolveStage()`:
+  - `ChargeTicks >= ChargeHoldTicks` → `ChargedStages[0]` (charged variant)
+  - Otherwise → `Stages[1]` (normal variant)
+- Same as standard data-driven attack: spawn hitbox at `triggerTick`, end when
+  `AttackElapsedTicks >= stage.DurationTicks`.
+
+### Key Differences from Hold-to-Aim (Manki Q)
+
+| Aspect | Hold-to-Aim (Q) | Hold-to-Charge (RMB) |
+|--------|-----------------|----------------------|
+| Input signal | `input.IsAiming` = release-to-throw | `input.IsAiming` = hold-to-charge |
+| Client indicator | Ground ring + arc via AimIndicator | No indicator (hidden behind `aimingSlot >= 2`) |
+| Camera lock | Locked during aiming | Not locked (camera follows player) |
+| Animation phases | 3 phases (start/loop/end) | 2 phases (charge/release) |
+| Variants | Always same projectile | Normal vs charged (damage, range, radius) |
+
+### Cooldown
+
+Cooldown (30 ticks) starts after the attack ends. Total commitment time =
+`hold_duration + attack_duration`, so RMB cannot re-fire during the active ability.
+
+### Client Integration (TrainingMatch)
+
+The client detects `ChargeAttack` behavior in `OnMatchFixedUpdate` and sets `input.IsAiming = true`
+while the RMB key is held. Unlike Q/R (slots 2+), RMB (slot 1) gates:
+- **No AimIndicator**: `aimingSlot >= 2` check hides the ground indicator and cursor unlock
+- **No camera lock**: `_aimingSlot >= 2` check in `Update()` lets the camera follow freely
+
 ## Test Coverage
 
 All abilities have matching xUnit tests in `tests/Shared.Tests/`:
 
 | Test file | What it covers |
 |---|---|
-| `AbilityLifecycleTests.cs` | Activation, AttackSlot wiring, data-driven expiry |
+| `AbilityLifecycleTests.cs` | Activation, data-driven expiry, RMB charge-hold lifecycle (8 tests: normal/charged hitbox params, under-threshold hold, auto-release, cooldown, hold-release) |
+| `AttackToIdleTests.cs` | State transitions back to idle after attacks |
+| `AnimatorGraphBuilderTests.cs` | Animation graph transition correctness |
 | `PhysicsTests.cs` | State transitions during attacks, hitstun knockback |
 | `CombatIntegrationTests.cs` | Two-entity stability during attacks |
 | `SpellResolverTests.cs` | Hitbox collision, CanHitOwner, explosions |
 | `ServerSimulationTests.cs` | Ability lifetime, self-hit prevention |
 | `CombatMathTests.cs` | Knockback formulas, DI, projectile math |
-| `MankiExplosiveMineTests.cs` | 11 | Mine placement, detonation, auto-detonate, Overclock buff bonus |
-| `BunnyAbilityTests.cs` | 25 | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
+| `MankiExplosiveMineTests.cs` | Mine placement, detonation, auto-detonate, Overclock buff bonus |
+| `BunnyAbilityTests.cs` | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
 
 **Run after every ability change:**
 ```bash

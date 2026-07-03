@@ -17,13 +17,20 @@
 - Range: ~10 units
 - Aim assist: most attacks have **directional snap** to help connect in 3D space
 
-### RMB — Heavy Attack
 
-- Can be **charged or uncharged** depending on the character
-  - Uncharged: ~10 damage
-  - Charged: ~15 damage
-- Range: ~10 units
-- Slower startup than LMB, stronger knockback
+### RMB — Heavy Attack (Charge Variant)
+
+- Uses a **two-phase hold-to-charge** lifecycle via `ServerAbility`:
+  - **Phase 1 (charge hold)**: Player holds RMB, character enters charge pose animation.
+    Server accumulates `_chargeTicks` each tick while `input.IsAiming=true`.
+  - **Phase 2 (release-to-attack)**: On button release (`input.IsAiming=false`), fires the attack.
+    If charge time >= threshold (45 ticks = 0.75s), fire **charged** variant (more damage, larger range/radius).
+    Otherwise, fire **normal** variant.
+- NPC path: instant skip — fires normal immediately (no charge delay)
+- Auto-release: forced charged at max hold (120 ticks = 2s)
+- Cooldown: 30 ticks, starts after attack phase ends
+- Range: ~6 units (normal), ~8 units (charged)
+- Damage: ~8 (normal), ~14 (charged)
 - Aim assist: yes
 
 ### Air LMB

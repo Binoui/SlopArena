@@ -108,7 +108,7 @@ public class AttackIdleReTriggerTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
-        ushort expectedDuration = (ushort)MankiDef.RMB!.Params!["normal_duration"]; // 58
+        ushort expectedDuration = MankiDef.RMB!.Stages[1].DurationTicks; // 58
 
         // Tick 0: activate RMB
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) } });

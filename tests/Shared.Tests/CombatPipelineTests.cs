@@ -100,6 +100,8 @@ public class CombatPipelineTests
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // regardless of ApplyKnockback's internal logic.
         Assert.Equal(10, (int)afterHit.HitstunTicks);
+        // Stage 1 damage = 4 → HitstunLevel = 0 (small tier)
+        Assert.Equal(0, (int)afterHit.HitstunLevel);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -175,6 +177,8 @@ public class CombatPipelineTests
         // Direct projectile hit = 6 damage minimum (not stacking with explosion 10)
         Assert.True(npcAfter.DamagePercent >= 6,
             $"Direct projectile hit = 6 damage minimum, got {npcAfter.DamagePercent}");
+        // Both direct hit (6) and explosion (10) are in 5-15 range → HitstunLevel = 1
+        Assert.Equal(1, (int)npcAfter.HitstunLevel);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -251,6 +255,8 @@ public class CombatPipelineTests
         // ApplyBuffBonuses is called in ServerAbility.SpawnHitbox BEFORE the hitbox
         // enters the resolver, so Hitbox.Damage = 7. ResolveHits applies it directly.
         Assert.InRange((int)afterHit.DamagePercent, 7, 7);
+        // Base 4 + Overclock 3 = 7 → HitstunLevel = 1 (medium tier)
+        Assert.Equal(1, (int)afterHit.HitstunLevel);
     }
     // ═══════════════════════════════════════════════════════════════════
     // EDGE CASE: Mutual combat — two entities attack each other

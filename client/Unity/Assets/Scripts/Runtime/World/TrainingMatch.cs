@@ -45,6 +45,7 @@ namespace SlopArena.Client.World
         private float _cachedCameraYaw;
         private float _cachedCameraPitch;
         private bool _isAimingThisTick;
+        private byte _aimingSlot;
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
@@ -194,7 +195,7 @@ namespace SlopArena.Client.World
             if (_showHitboxes && _localSim != null)
                 DrawHitboxDebug();
 
-            if (_isAimingThisTick && _cameraMount != null)
+            if (_isAimingThisTick && _aimingSlot >= 2 && _cameraMount != null)
             {
                 _cameraMount.SetCameraYawDeg(_cachedCameraYaw);
                 _cameraMount.SetCameraPitchDeg(_cachedCameraPitch);
@@ -274,6 +275,7 @@ namespace SlopArena.Client.World
                 }
             }
             _isAimingThisTick = isAiming;
+            _aimingSlot = aimingSlot;
 
             // During aiming, update the ground indicator and get aim data
             float? abilityAimYawRad = null;
@@ -285,7 +287,7 @@ namespace SlopArena.Client.World
                 (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
             }
 
-            if (isAiming && _aimIndicator != null)
+            if (isAiming && _aimIndicator != null && aimingSlot >= 2)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
