@@ -41,8 +41,10 @@ namespace SlopArena.Shared
         public byte BuffActiveFlags;
         /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard.</summary>
         public byte HitstunLevel;
-        /// <summary>44 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1;
+        /// <summary>Aim pitch in radians, from server authority.</summary>
+        public float AimPitch;
+        /// <summary>48 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -67,6 +69,7 @@ namespace SlopArena.Shared
                 BuffRemainingTicks = s.BuffRemainingTicks,
                 BuffActiveFlags = s.BuffActiveFlags,
                 HitstunLevel = s.HitstunLevel,
+                AimPitch = s.AimPitch,
             };
         }
 
@@ -91,6 +94,7 @@ namespace SlopArena.Shared
                 BuffRemainingTicks = BuffRemainingTicks,
                 BuffActiveFlags = BuffActiveFlags,
                 HitstunLevel = HitstunLevel,
+                AimPitch = AimPitch,
             };
         }
 
@@ -116,6 +120,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
             buffer[42] = BuffActiveFlags;
             buffer[43] = HitstunLevel;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(44, 4), BitConverter.SingleToInt32Bits(AimPitch));
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -141,6 +146,7 @@ namespace SlopArena.Shared
             packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
             packet.BuffActiveFlags = buffer[42];
             packet.HitstunLevel = buffer[43];
+            packet.AimPitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(44, 4)));
             return packet;
         }
     }

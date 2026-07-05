@@ -350,6 +350,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .type-mobility {{ color: #69f0ae; }}
         .type-charge {{ color: #ffd740; }}
         .type-ultimate {{ color: #e040fb; }}
+        .type-artillery {{ color: #ff5252; }}
         .type-buff {{ color: #ffab40; }}
         .type-aoe {{ color: #b2ff59; }}
         .type-engage {{ color: #ff6e40; }}
@@ -512,7 +513,24 @@ def generate_html(md_path, out_html_path, image_name):
         f.write(formatted)
     print(f"Generated HTML sheet: {out_html_path}")
 
+def html_to_png(html_path, png_path):
+    """Render an HTML file to a full-page PNG via Playwright headless Chromium."""
+    from playwright.sync_api import sync_playwright
+    abs_html = os.path.abspath(html_path)
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1200, "height": 1})
+        page.goto(f"file://{abs_html}")
+        page.screenshot(path=png_path, full_page=True)
+        browser.close()
+    print(f"Generated PNG sheet: {png_path}")
+
+
 if __name__ == "__main__":
     os.makedirs("docs/characters", exist_ok=True)
-    generate_html("docs/characters/manki.md", "docs/characters/manki_sheet.html", "manki_front.png")
-    generate_html("docs/characters/bunny.md", "docs/characters/bunny_sheet.html", "bunny_front.png")
+    for name, img in [("manki", "manki_demo.jpg"), ("bunny", "bunny_front.jpg")]:
+        md = f"docs/characters/{name}.md"
+        html = f"docs/characters/{name}_sheet.html"
+        png = f"docs/characters/{name}_sheet.png"
+        generate_html(md, html, img)
+        html_to_png(html, png)

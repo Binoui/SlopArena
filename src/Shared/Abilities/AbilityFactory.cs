@@ -26,10 +26,10 @@ public static class AbilityFactory
     private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
         (0, false) => new LmbCombo(),     // LMB ground
-        (0, true) => null,                      // AirLMB — data-driven fallback (separate spec)
+        (0, true) => new AirLmbCombo(),            // AirLMB — multi-hit air combo (stages from spec)
         (1, false) => null,                     // RMB — data-driven ChargeAttack
         (2, _) => new MankiRoundBomb(),        // Q (same ground/air)
-        (3, _) => null,                         // E — data-driven ExplosiveMineSpec
+        (3, _) => new MankiGrapple(),          // E — Grapple Gun
         (4, _) => new MankiBazooka(),          // R — Bazooka
         (5, _) => new MankiOverclock(),        // F — Overclock
         _ => null, // No ServerAbility = data-driven fallback
@@ -38,7 +38,7 @@ public static class AbilityFactory
     private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
         (0, false) => new LmbCombo(),         // LMB — 3-hit combo
-        (0, true) => null,                          // AirLMB — data-driven
+        (0, true) => new AirLmbCombo(),             // AirLMB — multi-hit air combo
         (1, _) => null,                             // RMB/AirRMB — data-driven
         (2, _) => new BunnyWhirlingCarrot(),        // Q — aimed projectile
         (3, _) => new BunnyTornadoKick(),           // E — forward engage + stun

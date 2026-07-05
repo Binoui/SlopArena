@@ -49,6 +49,8 @@ namespace SlopArena.Client.World
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
+        private bool _showCrosshair;
+        private bool _prevIsAiming;
         private uint _tick;
         private ServerSimulation _localSim = null!;
         private ArenaDefinition _arenaDef;
@@ -56,7 +58,11 @@ namespace SlopArena.Client.World
         private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
+        private UnityEngine.Camera _mainCamera;
+        private float? _cursorAimYawRad;
+        private float? _cursorAimPitchRad;
 
+        private byte _prevAimingSlot;
         protected override void OnMatchStart()
         {
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
@@ -190,6 +196,7 @@ namespace SlopArena.Client.World
                 PlayerEntityId);
 
             Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
+            _mainCamera = _cameraMount != null ? _cameraMount.RenderCamera : null;
         }
 
         private void Update()
@@ -198,7 +205,7 @@ namespace SlopArena.Client.World
             if (_showHitboxes && _localSim != null)
                 DrawHitboxDebug();
 
-            if (_isAimingThisTick && _aimingSlot >= 2 && _cameraMount != null)
+            if (_isAimingThisTick && _aimingSlot == 2 && _cameraMount != null)
             {
                 _cameraMount.SetCameraYawDeg(_cachedCameraYaw);
                 _cameraMount.SetCameraPitchDeg(_cachedCameraPitch);
@@ -207,8 +214,9 @@ namespace SlopArena.Client.World
             {
                 _cachedCameraYaw = _cameraMount.GetCameraYawDeg();
                 _cachedCameraPitch = _cameraMount.GetCameraPitchDeg();
+                if (_isAimingThisTick && (_aimingSlot == 3 || _aimingSlot == 4) && _tick % 60 == 0 && _tick > 0)
+                    Debug.Log($"[Camera] tick={_tick} FREE yaw={_cachedCameraYaw:F1} pitch={_cachedCameraPitch:F1} aimingSlot={_aimingSlot}");
             }
-
         }
 
         protected override void OnMatchFixedUpdate()
@@ -222,13 +230,25 @@ namespace SlopArena.Client.World
                 Debug.Log($"[Input] slot={slot} animLock={_localSim.GetState(PlayerEntityId).AnimLockTicks} tick={_tick}");
             bool isAiming = false;
             byte aimingSlot = 0;
+
+            // Pre-set isAiming for hold-to-aim abilities (Q=3, E=4, R=5) when the key
+            // was just pressed and is still held — the hold-to-aim loop below can't
+            // run yet because ps.State == Idle (ability not activated).
+            isAiming = slot switch
+            {
+                3 => _inputController.IsQKeyHeld,
+                4 => _inputController.IsEKeyHeld,
+                5 => _inputController.IsRKeyHeld,
+                _ => false,
+            };
+            if (isAiming) aimingSlot = (byte)(slot - 1);
             {
                 var ps = _localSim.GetState(PlayerEntityId);
                 if (ps.State == ActionState.Attacking && ps.AttackSlot > 0)
                 {
                     byte slotIdx = (byte)(ps.AttackSlot - 1);
                     var spec = _playerDef.GetSlotAbility(slotIdx, !ps.IsGrounded);
-                    if (spec != null && (spec.Behavior == AbilityBehavior.AimedProjectile || spec.Behavior == AbilityBehavior.ChargeAttack))
+                    if (spec != null && (spec.Behavior == AbilityBehavior.AimedProjectile || spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.Projectile))
                     {
                         // Check if the activation key is still held
                         bool keyHeld;
@@ -247,7 +267,11 @@ namespace SlopArena.Client.World
                                 keyHeld = _inputController.IsQKeyHeld;
                                 keyDiagnostic = $"Q held={keyHeld}";
                                 break;
-                            case 4:
+                            case 3:
+                                keyHeld = _inputController.IsEKeyHeld;
+                                keyDiagnostic = $"E held={keyHeld}";
+                                break;
+                            case 4:  // R — Bazooka (hold-to-aim)
                                 keyHeld = _inputController.IsRKeyHeld;
                                 keyDiagnostic = $"R held={keyHeld}";
                                 break;
@@ -280,25 +304,61 @@ namespace SlopArena.Client.World
             _isAimingThisTick = isAiming;
             _aimingSlot = aimingSlot;
 
-            // During aiming, update the ground indicator and get aim data
-            float? abilityAimYawRad = null;
-            ushort? abilityAimDistance = null;
+            _showCrosshair = isAiming && (aimingSlot == 3 || aimingSlot == 4) && _cameraMount != null;
+            if (isAiming != _prevIsAiming && (aimingSlot == 3 || aimingSlot == 4))
+                Debug.Log($"[Crosshair] tick={_tick} show={_showCrosshair} isAiming={isAiming} aimingSlot={aimingSlot}");
 
-            // Always capture aim data from indicator BEFORE SetAiming resets _isAiming
-            if (_aimIndicator != null && _aimIndicator.IsAiming)
+            // Debug: log aiming state changes
+            if (isAiming != _prevIsAiming)
             {
-                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
+                var psDbg = _localSim.GetState(PlayerEntityId);
+                Debug.Log($"[Aim] tick={_tick} isAiming={isAiming} slot={slot} aimingSlot={aimingSlot} attackSlot={psDbg.AttackSlot} state={psDbg.State}");
+                _prevIsAiming = isAiming;
+            }
+            if (isAiming && _tick % 10 == 0)
+            {
+                float yaw = _cameraMount != null ? _cameraMount.GetCameraYawDeg() : 0f;
+                float pitch = _cameraMount != null ? _cameraMount.GetCameraPitchDeg() : 0f;
+                Debug.Log($"[Aim] tick={_tick} camera yaw={yaw:F1} pitch={pitch:F1} slot={aimingSlot}");
             }
 
-            if (isAiming && _aimIndicator != null && aimingSlot >= 2)
+            // During aiming, update the ground indicator and get aim data
+            float? abilityAimYawRad = null;
+            float? abilityAimPitchRad = null;
+            ushort? abilityAimDistance = null;
+
+            if (isAiming && _aimIndicator != null && aimingSlot == 2)  // Q — ground indicator
             {
+                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
+
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
 
                 _aimIndicator.SetAiming(true);
                 _aimIndicator.UpdateAim();
             }
-            else
+            else if (isAiming && (aimingSlot == 3 || aimingSlot == 4))  // E/R — TPS camera aim
+            {
+                if (_aimIndicator != null)
+                    _aimIndicator.SetAiming(false);
+
+                // Cursor stays locked; visible cursor doesn't work with Locked mode
+                if (Cursor.lockState != CursorLockMode.Locked)
+                    Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+
+                // Aim direction = camera forward (player looks where camera points)
+                // Negate pitch: Cinemachine VerticalAxis positive = camera above target (looking down),
+                // but server expects positive pitch = looking UP.
+                if (_cameraMount != null)
+                {
+                    abilityAimYawRad = _cameraMount.GetCameraYawRad();
+                    abilityAimPitchRad = -_cameraMount.GetCameraPitchDeg() * Mathf.Deg2Rad;
+                    _cursorAimYawRad = abilityAimYawRad;
+                    _cursorAimPitchRad = abilityAimPitchRad;
+                }
+            }
+            else  // Not aiming or other slots — cursor locked
             {
                 if (_aimIndicator != null)
                     _aimIndicator.SetAiming(false);
@@ -307,12 +367,25 @@ namespace SlopArena.Client.World
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                 }
+                // Clear stored R/E aim unless this is the release frame
+                if (_prevAimingSlot != 3 && _prevAimingSlot != 4)
+                {
+                    _cursorAimYawRad = null;
+                    _cursorAimPitchRad = null;
+                }
+            }
+
+            // Override with stored cursor aim from R/E (survives release frame)
+            if (_cursorAimYawRad.HasValue)
+            {
+                abilityAimYawRad = _cursorAimYawRad;
+                abilityAimPitchRad = _cursorAimPitchRad;
             }
 
             // Compute screen-center target for soft-lock
             byte targetEntityId = PickScreenTarget(
                 _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
-                UnityEngine.Camera.main);
+                _mainCamera ??= _cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
 
             var (input, _, _) = _inputController.BuildInputState(
                 _cameraMount,
@@ -322,6 +395,7 @@ namespace SlopArena.Client.World
                 slot,
                 abilityAimYawRad: abilityAimYawRad,
                 abilityAimDistance: abilityAimDistance,
+                abilityAimPitchRad: abilityAimPitchRad,
                 canMove: null,
                 targetEntityId: targetEntityId);
             // NPC AI
@@ -348,8 +422,8 @@ namespace SlopArena.Client.World
             _tick++;
             if (_tick % 120 == 1)
             {
-                var ps = _localSim.GetState(PlayerEntityId);
-                Debug.Log($"[Training] tick={_tick} pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) vy={ps.VY:F2} grounded={ps.IsGrounded}");
+                var ps3 = _localSim.GetState(PlayerEntityId);
+                Debug.Log($"[Training] tick={_tick} pos=({ps3.PX:F1},{ps3.PY:F2},{ps3.PZ:F1}) vy={ps3.VY:F2} grounded={ps3.IsGrounded}");
             }
 
 #if UNITY_EDITOR
@@ -362,6 +436,7 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
+            _prevAimingSlot = aimingSlot;
         }
         /// <summary>
         /// Builds a synthetic InputState for the NPC dummy.
@@ -536,6 +611,22 @@ namespace SlopArena.Client.World
                     prev = p;
                 }
             }
+        }
+
+        private void OnGUI()
+        {
+            if (!_showCrosshair) return;
+
+            float cx = Screen.width * 0.5f;
+            float cy = Screen.height * 0.5f;
+
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 28,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = Color.white }
+            };
+            GUI.Label(new Rect(cx - 20, cy - 20, 40, 40), "+", style);
         }
     }
 }

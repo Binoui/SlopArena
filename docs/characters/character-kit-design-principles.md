@@ -238,16 +238,16 @@ Only one character is active in the codebase. Design others from scratch followi
 | Slot | Role | Type | Notes |
 |------|------|------|-------|
 | LMB | Light combo (3 hits) | Physical | Punch → kick → fire uppercut (launcher) |
-| AirLMB | Air punch | Physical | Air combo filler |
+| AirLMB | Air Kick (2 hits) | Physical | 2-hit air combo, first kick lunges, second has higher KB |
 | RMB | Aerosol + Lighter (charge) | Ability | Charged heavy, cone flame zone denial |
-| AirRMB | Medium air kick | Physical | Medium knockback |
+| AirRMB | Knuckle Spike | Physical | Slow windup downward spike, high KB |
 | Q | Round Bomb (projectile) | Ability | Lobbed arc, explodes on impact — poke/zone |
-| E | Dynamite Jump | Ability | Rocket jump, vertical mobility, knockback on detonation — defensive + combo setup |
-| R | Bazooka | Ability | Rise ~5m (skips if airborne), aim ground indicator, fire explosive shell. Explodes on entity hit or ground impact. Ranged artillery from height. |
+| E | Grapple Gun | Ability | Fire tether, reel toward enemy or terrain. 3 dmg, no stun. |
+| R | Bazooka | Ability | Fire rocket in aim direction, arcs with gravity, explodes on contact. Rocket jump via self-damage (4). |
 | F | Overclock (ult) | Ability | Self-buff 8s — all attacks deal +3 bonus damage and +0.5m larger hitboxes |
 | Passive | — | — | (None yet) |
 
-**Gameplan**: poke with Q → go in with E → ground combo → R from air for artillery burst. E knockback doubles as defensive peel. Zone denial with RMB. F is the "win neutral" steroid — no single big hit, makes everything scarier.
+**Gameplan**: poke with Q → close gap with grapple → ground combo → rocket jump for air follow-up. E grapple is gap closer AND escape tool.
 ### Future characters
 
 When designing a new character, start from one of the 4 archetypes defined above, then fill the 8 ability slots (LMB, AirLMB, RMB, AirRMB, Q, E, R, F). Document in `docs/characters/<name>.md`.

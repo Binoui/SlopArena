@@ -31,6 +31,8 @@ namespace SlopArena.Client.Input
         public bool IsRmbHeld { get; private set; }
         /// <summary>Whether the R key is currently held down (for R aiming release detection).</summary>
         public bool IsRKeyHeld { get; private set; }
+        /// <summary>Whether the E key is currently held down (for E aiming release detection).</summary>
+        public bool IsEKeyHeld { get; private set; }
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;
@@ -105,12 +107,14 @@ namespace SlopArena.Client.Input
                 IsQKeyHeld = kb.qKey.isPressed;
                 IsRmbHeld = mouse != null && mouse.rightButton.isPressed;
                 IsRKeyHeld = kb.rKey.isPressed;
+                IsEKeyHeld = kb.eKey.isPressed;
             }
             else
             {
                 IsQKeyHeld = false;
                 IsRmbHeld = false;
                 IsRKeyHeld = false;
+                IsEKeyHeld = false;
             }
         }
 
@@ -175,7 +179,8 @@ namespace SlopArena.Client.Input
             float? abilityAimYawRad,
             ushort? abilityAimDistance,
             Func<bool>? canMove,
-            byte targetEntityId = 0)
+            byte targetEntityId = 0,
+            float? abilityAimPitchRad = null)
         {
             var input = new InputState();
 
@@ -205,6 +210,8 @@ namespace SlopArena.Client.Input
                 Vector3 moveDir = new Vector3(move.x, 0f, move.y).normalized;
                 Vector2 snappedDir = new Vector2(move.x, move.y);
                 input.TargetEntityId = targetEntityId;
+                input.AimPitch = 0;  // NPCs aim horizontally
+
                 return (input, moveDir, snappedDir);
             }
 
@@ -265,6 +272,14 @@ namespace SlopArena.Client.Input
             // Aim yaw from camera (combat facing), overridden by active ability
             float aimDeg = camera != null ? camera.GetCameraYawDeg() : deg;
             input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768f, 32767f);
+            // Aim pitch from camera (vertical aim), overridden by active ability
+            float aimPitchDeg = camera != null ? camera.GetCameraPitchDeg() : 0f;
+            input.AimPitch = (short)Math.Clamp(aimPitchDeg * 100f, -9000f, 9000f);
+            if (abilityAimPitchRad.HasValue)
+            {
+                float pitchDeg = abilityAimPitchRad.Value * Mathf.Rad2Deg;
+                input.AimPitch = (short)Math.Clamp(pitchDeg * 100f, -9000f, 9000f);
+            }
             input.AimDistance = 0;
 
             // Active ability overrides aim data

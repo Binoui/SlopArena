@@ -106,8 +106,8 @@ public class HitstunAnimationTierTests
     [Fact]
     public void CharacterStatePacket_Size_IncludesHitstunLevel()
     {
-        // Size should be 44 for the new packet layout (43 + 1 for HitstunLevel)
-        Assert.Equal(44, CharacterStatePacket.Size);
+        // Size should be 48 for the new packet layout (44 + 4 for AimPitch)
+        Assert.Equal(48, CharacterStatePacket.Size);
     }
 
     // ═══════════════════════════════════════════════════════════════════
