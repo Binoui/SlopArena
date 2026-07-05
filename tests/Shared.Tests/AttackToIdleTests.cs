@@ -178,44 +178,19 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI R — MankiBazooka (rise → aim → fire)
+    //  MANKI R — MankiBazooka (FPS fire-and-forget)
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void MankiR_RiseAimAndFire_ReturnsToIdle()
+    public void MankiR_CastAndRecovery_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = MankiGroundPy;
         TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5, aiming: true) } });
-
-        for (int i = 0; i < 20; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 0, aiming: true) } });
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 0, aiming: false) } });
-
-        for (int i = 0; i < 70; i++)
-            sim.Tick(new() { { 1, default } });
-
-        var after = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    [Fact]
-    public void MankiR_GroundToRiseAndAutoRelease_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = MankiGroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        // No aiming input — auto-release via charge_hold_ticks=180 timeout
-        // rise_height=5m at rise_velocity=14f under float gravity → ~40 ticks to rise
-        // Then aim hold for 180 ticks, then auto-release, then throw_duration=60
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 300);
+        // Activate R, tick through cast (20) + recovery (15) + buffer
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 40);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);

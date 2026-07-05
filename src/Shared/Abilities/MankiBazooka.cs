@@ -3,219 +3,161 @@ using System;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
-    /// Manki's R (slot 4): Bazooka — rise high into the air (5m max, less if already airborne),
-    /// downward, fire a projectile on release.
+    /// Manki's R (slot 4): Bazooka — hold to aim (camera direction), release to fire.
+    /// 
+    /// Phases:
+    ///   0 (Aiming): Hold key, show loop animation, camera controls aim direction.
+    ///     Transition to Firing on release (input.IsAiming == false).
+    ///   1 (Firing): Short cast animation, spawn rocket at trigger tick in AimYaw/AimPitch direction.
+    ///   2 (Recovery): Endlag, then EndAbility.
     ///
-    /// FSM (matches animator generator pattern):
-    ///   ComboStage=0 (Rising → Aiming): shows spell_r_start, auto-transitions to
-    ///     spell_r_loop when start anim finishes. Maintains height, shows ground
-    ///     indicator. On release → ComboStage=1.
-    ///   ComboStage=1 (Firing): shows spell_r_end, spawns projectile at trigger tick,
-    ///     then ends.
+    /// Projectile has gravity + ground collision + explosion with CanHitOwner=true.
+    /// Rocket jump: aim at feet → projectile ground-collides near self → explosion.
     /// </summary>
     public sealed class MankiBazooka : ServerAbility
     {
+        private enum BazookaPhase { Aiming, Firing, Recovery }
+        private BazookaPhase _phase;
         private bool _projectileSpawned;
-        private float _cachedAimDistance;
-        private float _cachedAimYaw;
-        private float _startPY;
-        private bool _riseComplete;
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
+            _phase = BazookaPhase.Aiming;
             _projectileSpawned = false;
-            _cachedAimDistance = 0f;
-            _cachedAimYaw = 0f;
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0;
+            AnimIndex = 0;  // spell_r (loop or start)
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
             s.IsAiming = true;
-            _startPY = s.PY;
-
-            float riseHeight = GetParam(def, "rise_height", 5f);
-            float riseVelocity = GetParam(def, "rise_velocity", 14f);
-
-            // Already airborne above rise height — skip the rise, go straight to hover-aim
-            if (!s.IsGrounded && s.PY >= riseHeight)
-            {
-                _riseComplete = true;
-                s.AnimLockTicks = 180;
-                SetVelocityInFacing(ref s, 0f, 0f);
-
-                if (Simulation.OnDebugLog != null)
-                    Simulation.OnDebugLog.Invoke(
-                        $"[MankiBazooka] Airborne above height — skipping rise");
-            }
-            else
-            {
-                _riseComplete = false;
-                s.AnimLockTicks = 50;
-                SetVelocityInFacing(ref s, 0f, riseVelocity);
-            }
-
-            if (Simulation.OnDebugLog != null)
-                Simulation.OnDebugLog.Invoke(
-                    $"[MankiBazooka] OnStart slot={Slot+1} startPY={_startPY:F2} riseVel={riseVelocity}");
+            // Lock input for max hold duration (charge_hold_ticks or 180 = 3s)
+            s.AnimLockTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
         }
 
         public override void OnEnd(ref CharacterState s)
         {
             s.IsAiming = false;
+            s.VX = 0f;
+            s.VY = 0f;
+            s.VZ = 0f;
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
-            if (s.ComboStage == 0)
+            switch (_phase)
             {
-                TickRiseAndAim(ref s, input, def);
-            }
-            else
-            {
-                TickFiring(ref s, input, def);
+                case BazookaPhase.Aiming:
+                    TickAiming(ref s, input, def);
+                    break;
+                case BazookaPhase.Firing:
+                    TickFiring(ref s, def);
+                    break;
+                case BazookaPhase.Recovery:
+                    TickRecovery(ref s, def);
+                    break;
             }
         }
 
-        private void TickRiseAndAim(ref CharacterState s, InputState input, CharacterDefinition def)
+        private void TickAiming(ref CharacterState s, InputState input, CharacterDefinition def)
         {
-            float riseHeight = GetParam(def, "rise_height", 10f);
-            ushort minRiseTicks = (ushort)GetParam(def, "min_rise_ticks", 8f);
-            bool reachedHeight = s.PY >= _startPY + riseHeight;
-            bool minTimeElapsed = s.AttackElapsedTicks >= minRiseTicks;
-
-            // Maintain IsAiming so ground indicator stays visible (sim may override from input)
             s.IsAiming = true;
-            if (!_riseComplete)
+
+            if (!input.IsAiming)
             {
-                if (reachedHeight && minTimeElapsed)
-                {
-                    _riseComplete = true;
-                    // Hover in place
-                    SetVelocityInFacing(ref s, 0f, 0f);
-                    s.AnimLockTicks = 180; // allow indefinite aiming
-
-                    if (Simulation.OnDebugLog != null)
-                        Simulation.OnDebugLog.Invoke(
-                            $"[MankiBazooka] Rise complete -> Aiming at height={s.PY:F2}");
-                }
-                // AnimIndex stays 0 (spell_r_start) — HasExitTime transition
-                // takes us to spell_r_loop automatically
-            }
-
-            // Check for release: input.IsAiming goes false when player lifts R key
-            ushort maxHoldTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
-
-            // But don't allow release during initial rise (minRiseTicks needed)
-            if (_riseComplete && (!input.IsAiming || (maxHoldTicks > 0 && s.ChargeTicks >= maxHoldTicks)))
-            {
-                _cachedAimDistance = s.AimTargetDistance;
-                _cachedAimYaw = s.AimYaw;
-
-                s.ComboStage = 1;
-                AnimIndex = 2; // spell_r_end
+                _phase = BazookaPhase.Firing;
                 s.AttackElapsedTicks = 0;
-                s.AnimLockTicks = 50;
-
-                if (Simulation.OnDebugLog != null)
-                    Simulation.OnDebugLog.Invoke(
-                        $"[MankiBazooka] Release -> Firing! " +
-                        $"aimDist={_cachedAimDistance:F2} yaw={_cachedAimYaw:F2}");
+                AnimIndex = 0;
+                s.AnimLockTicks = (ushort)GetParam(def, "cast_duration", 20f);
             }
         }
 
-        private void TickFiring(ref CharacterState s, InputState input, CharacterDefinition def)
+        private void TickFiring(ref CharacterState s, CharacterDefinition def)
         {
-            ushort triggerTick = (ushort)GetParam(def, "fire_trigger_tick", 5f);
+            ushort fireTriggerTick = (ushort)GetParam(def, "fire_trigger_tick", 6f);
+            ushort castDuration = (ushort)GetParam(def, "cast_duration", 20f);
 
-            if (!_projectileSpawned && s.AttackElapsedTicks >= triggerTick)
+            if (!_projectileSpawned && s.AttackElapsedTicks >= fireTriggerTick)
             {
                 _projectileSpawned = true;
-                s.IsAiming = false;
-
-                if (Simulation.OnDebugLog != null)
-                    Simulation.OnDebugLog.Invoke(
-                        $"[MankiBazooka] Firing projectile! dist={_cachedAimDistance:F2} yaw={_cachedAimYaw:F2}");
-
-                // Compute target position from cached aim data
-                float maxRange = GetParam(def, "max_aim_range", 20f);
-                float aimDist = Math.Clamp(_cachedAimDistance, 0.5f, maxRange);
-                if (_cachedAimDistance <= 0.001f)
-                    aimDist = 5f; // default
-
-                float aimCos = MathF.Cos(_cachedAimYaw);
-                float aimSin = MathF.Sin(_cachedAimYaw);
-                float targetX = s.PX + aimDist * aimSin;
-                float targetZ = s.PZ + aimDist * aimCos;
-
-                // Compute projectile velocity toward ground target
-                float dx = targetX - s.PX;
-                float dz = targetZ - s.PZ;
-                float hDist = MathF.Sqrt((dx * dx) + (dz * dz));
-
-                float g = GetParam(def, "projectile_gravity", 10f);
-                float speed = GetParam(def, "projectile_speed", 35f);
-
-                float vx, vy, vz;
-                if (hDist > 0.01f)
-                {
-                    float hSpeed = speed;
-                    float vSpeed = -speed * 0.4f; // slight downward component
-                    vx = (dx / hDist) * hSpeed;
-                    vz = (dz / hDist) * hSpeed;
-                    vy = vSpeed;
-                }
-                else
-                {
-                    vx = 0f;
-                    vz = 0f;
-                    vy = -speed * 0.6f;
-                }
-
-                float projRadius = GetParam(def, "hitbox_radius", 1.5f);
-                float projDamage = GetParam(def, "damage", 15f);
-                ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
-
-                Resolver.Spawn(new Hitbox
-                {
-                    X = s.PX,
-                    Y = s.PY + 0.8f,
-                    Z = s.PZ,
-                    VX = vx,
-                    VY = vy,
-                    VZ = vz,
-                    Radius = projRadius,
-                    Shape = HitboxShape.Sphere,
-                    EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
-                    Damage = projDamage,
-                    BaseKnockback = GetParam(def, "knockback_base", 8f),
-                    KnockbackGrowth = GetParam(def, "knockback_growth", 12f),
-                    KnockbackUpward = GetParam(def, "knockback_upward", 12f),
-                    StunTicks = (ushort)GetParam(def, "stun_ticks", 25f),
-                    DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 60f),
-                    OwnerId = s.EntityId,
-                    Gravity = g,
-                    Explosion = new ProjectileExplosion
-                    {
-                        Radius = GetParam(def, "explosion_radius", 3f),
-                        Damage = GetParam(def, "explosion_damage", 25f),
-                        BaseKnockback = GetParam(def, "explosion_kb_base", 7.2f),
-                        KnockbackGrowth = GetParam(def, "explosion_kb_growth", 10.8f),
-                        KnockbackUpward = GetParam(def, "explosion_knockback_upward", 14f),
-                        StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
-                        DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
-                    },
-                });
+                SpawnRocket(ref s, def);
             }
 
-            ushort duration = (ushort)GetParam(def, "throw_duration", 60f);
-            if (s.AttackElapsedTicks >= duration)
+            if (s.AttackElapsedTicks >= castDuration)
             {
-                if (Simulation.OnDebugLog != null)
-                    Simulation.OnDebugLog.Invoke(
-                        $"[MankiBazooka] Ability end (firing complete)");
+                _phase = BazookaPhase.Recovery;
+                s.AttackElapsedTicks = 0;
+                s.AnimLockTicks = (ushort)GetParam(def, "recovery_duration", 15f);
+            }
+        }
+
+        private void TickRecovery(ref CharacterState s, CharacterDefinition def)
+        {
+            ushort recoveryDuration = (ushort)GetParam(def, "recovery_duration", 15f);
+            if (s.AttackElapsedTicks >= recoveryDuration)
+            {
                 EndAbility(ref s);
+            }
+        }
+
+        private void SpawnRocket(ref CharacterState s, CharacterDefinition def)
+        {
+            float speed = GetParam(def, "projectile_speed", 40f);
+            float pitch = s.AimPitch;
+            float yaw = s.AimYaw;
+
+            float cosPitch = MathF.Cos(pitch);
+            float vx = speed * cosPitch * MathF.Sin(yaw);
+            float vy = speed * MathF.Sin(pitch);
+            float vz = speed * cosPitch * MathF.Cos(yaw);
+
+            if (Simulation.OnDebugLog != null)
+                Simulation.OnDebugLog.Invoke(
+                    $"[MankiBazooka] Firing! pitch={pitch:F3}({pitch*(180f/MathF.PI):F1}°) yaw={yaw:F3}({yaw*(180f/MathF.PI):F1}°) vy={vy:F2} vz={vz:F2}");
+
+            float radius = GetParam(def, "hitbox_radius", 0.6f);
+            float damage = GetParam(def, "damage", 15f);
+            ApplyBuffBonuses(ref s, ref damage, ref radius);
+
+            Resolver.Spawn(new Hitbox
+            {
+                X = s.PX,
+                Y = s.PY + 1.0f,
+                Z = s.PZ,
+                VX = vx, VY = vy, VZ = vz,
+                Radius = radius,
+                Shape = HitboxShape.Sphere,
+                EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
+                Damage = damage,
+                BaseKnockback = GetParam(def, "knockback_base", 6f),
+                KnockbackGrowth = GetParam(def, "knockback_growth", 9f),
+                KnockbackUpward = GetParam(def, "knockback_upward", 12f),
+                StunTicks = (ushort)GetParam(def, "stun_ticks", 25f),
+                DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 45f),
+                OwnerId = s.EntityId,
+                Gravity = GetParam(def, "gravity", 15f),
+                Explosion = new ProjectileExplosion
+                {
+                    Radius = GetParam(def, "explosion_radius", 3f),
+                    Damage = GetParam(def, "explosion_damage", 10f),
+                    BaseKnockback = GetParam(def, "explosion_kb_base", 6f),
+                    KnockbackGrowth = GetParam(def, "explosion_kb_growth", 9f),
+                    KnockbackUpward = GetParam(def, "explosion_knockback_upward", 14f),
+                    StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
+                    DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
+                    CanHitOwner = true,
+                },
+            });
+        }
+
+        public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
+            CharacterDefinition attackerDef, ref float damage, ref float knockbackForce)
+        {
+            if (target.EntityId == attacker.EntityId)
+            {
+                float selfDmg = GetParam(attackerDef, "self_damage", 4f);
+                int corrected = target.DamagePercent - (ushort)damage + (ushort)selfDmg;
+                target.DamagePercent = (ushort)Math.Clamp(corrected, 0, 999);
             }
         }
     }

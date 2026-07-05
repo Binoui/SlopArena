@@ -272,29 +272,6 @@ public class PhysicsTests
 
     // ── Data-driven attack expiry ──
 
-    [Fact]
-    public void DataDrivenAttack_EndsAfterDurationTicks()
-    {
-        // Manki E (slot 4) has no ServerAbility → data-driven: DurationTicks=20
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPx;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
-        var s = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, s.State);
-
-        // Tick past duration
-        // After AttackElapsedTicks >= 20, data-driven expiry fires
-        for (int i = 0; i < 25; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var ended = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, ended.State);
-        Assert.Equal((byte)0, ended.AttackSlot);
-    }
 
     // ── Hitstun ──
 

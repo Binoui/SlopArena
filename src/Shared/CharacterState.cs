@@ -115,6 +115,9 @@ namespace SlopArena.Shared
         public float AimYaw;
         /// <summary>Target distance for projectile aim (meters). Set from InputState.AimDistance each tick.</summary>
         public float AimTargetDistance;
+        /// <summary>Combat aim pitch in radians — sent by client, used for projectile direction.</summary>
+        public float AimPitch;
+
         /// <summary>True while player is holding an aim-to-fire ability (RMB charge, Q throw).</summary>
         public bool IsAiming;
 

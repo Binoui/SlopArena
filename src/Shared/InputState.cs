@@ -23,6 +23,9 @@ namespace SlopArena.Shared
         public short AimYaw;
         /// <summary>Aim distance in cm (ushort, 0-6500, i.e. 0-65m). Set by client during targeted-aiming state.</summary>
         public ushort AimDistance;
+        /// <summary>Aim pitch in degrees × 100 (short, -9000 to 9000). Camera-relative vertical aim.</summary>
+        public short AimPitch;
+
         /// <summary>Client's selected target entity ID (0=none). Computed from screen-center proximity.</summary>
         public byte TargetEntityId;
 
@@ -31,8 +34,8 @@ namespace SlopArena.Shared
         public float WarpSpeed;
         public float WarpAttackRange;
 
-        /// <summary>17 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 distance + 1 target)</summary>
-        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 1;
+        /// <summary>19 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 pitch + 2 distance + 1 target)</summary>
+        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1;
 
         public void Write(Span<byte> buf)
         {
@@ -51,8 +54,9 @@ namespace SlopArena.Shared
             buf[9] = ActiveSlot;
             BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(10), FacingYaw);
             BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(12), AimYaw);
-            BinaryPrimitives.WriteUInt16LittleEndian(buf.Slice(14), AimDistance);
-            buf[16] = TargetEntityId;
+            BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(14), AimPitch);
+            BinaryPrimitives.WriteUInt16LittleEndian(buf.Slice(16), AimDistance);
+            buf[18] = TargetEntityId;
         }
 
         public static InputState Deserialize(ReadOnlySpan<byte> buf)
@@ -74,8 +78,9 @@ namespace SlopArena.Shared
             input.ActiveSlot = buf[9];
             input.FacingYaw = buf.Length >= 12 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(10)) : (short)0;
             input.AimYaw = buf.Length >= 14 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(12)) : (short)0;
-            input.AimDistance = buf.Length >= 16 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(14)) : (ushort)0;
-            input.TargetEntityId = buf.Length >= 17 ? buf[16] : (byte)0;
+            input.AimPitch = buf.Length >= 16 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(14)) : (short)0;
+            input.AimDistance = buf.Length >= 18 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(16)) : (ushort)0;
+            input.TargetEntityId = buf.Length >= 19 ? buf[18] : (byte)0;
             return input;
         }
     }

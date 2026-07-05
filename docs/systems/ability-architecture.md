@@ -114,8 +114,8 @@ private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (s
     (0, false) => new MankiLmbCombo(),
     (1, false) => null,              // RMB — data-driven ChargeAttack
     (2, _) => new MankiRoundBomb(),
-    (3, _) => null,          // E — data-driven ExplosiveMineSpec
-    (4, _) => new MankiBazooka(),   // R — rise-aim-fire bazooka
+    (3, _) => new MankiGrapple(),    // E — Grapple Gun
+    (4, _) => new MankiBazooka(),   // R — FPS rocket launcher (no rise)
     (5, _) => new MankiOverclock(),  // F
     _ => null,
 };
@@ -131,13 +131,13 @@ Each ability is mapped by (CharacterClass, slot, airborne) tuple:
 - Slot 4 = R
 - Slot 5 = F
 
-The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air punch when airborne).
+The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air combo via AirLmbCombo when airborne).
 
 **Example:**
 private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
 {
     (0, false) => new BunnyLmbCombo(),
-    (0, true) => null,   // AirLMB — data-driven
+    (0, true) => new AirLmbCombo(),   // AirLMB — multi-hit air combo
     (1, _) => null,       // RMB — data-driven
     (2, _) => new BunnyWhirlingCarrot(),   // Q
     (3, _) => new BunnyFlipKick(),          // E

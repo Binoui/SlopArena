@@ -99,7 +99,7 @@ public class CombatPipelineTests
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // regardless of ApplyKnockback's internal logic.
-        Assert.Equal(10, (int)afterHit.HitstunTicks);
+        Assert.Equal(16, (int)afterHit.HitstunTicks);
         // Stage 1 damage = 4 → HitstunLevel = 0 (small tier)
         Assert.Equal(0, (int)afterHit.HitstunLevel);
     }

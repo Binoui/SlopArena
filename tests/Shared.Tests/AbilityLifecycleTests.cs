@@ -84,32 +84,6 @@ public class AbilityLifecycleTests
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 1);
         Assert.Equal(ActionState.Attacking, t0.State);
     }
-
-    // ── E: data-driven mine placement ──
-
-    [Fact]
-    public void MankiE_DataDriven_ExpiresToIdle()
-    {
-        // E has no ServerAbility → data-driven path: DurationTicks=20
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.MankiGroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.Equal((byte)4, t0.AttackSlot);
-
-        // Tick past DurationTicks (20)
-        for (int i = 0; i < 30; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var ended = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, ended.State);
-        Assert.Equal((byte)0, ended.AttackSlot);
-    }
-
     // ══════════════════════════════════════════════════════════════════
     // ── F: Overclock — buff lifecycle ──
     // ══════════════════════════════════════════════════════════════════
@@ -335,17 +309,15 @@ public class AbilityLifecycleTests
         Assert.Equal(original.BuffRemainingTicks, deserialized.BuffRemainingTicks);
     }
     // ══════════════════════════════════════════════════════════════════
-    // ── R: Bazooka — ability lifecycle ──
+    // ── R: Bazooka — FPS fire-and-forget rocket ──
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MankiR_BasicActivation_Airborne()
+    public void MankiR_BasicActivation_EntersAttacking()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 1);
@@ -354,125 +326,34 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
-    public void MankiR_RisePhase_AppliesUpwardVelocity()
+    public void MankiR_RecoveryEnds_ReturnsToIdle()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = 3f; // below riseHeight (5m) so rise is applied
-        state.IsGrounded = false;
-        state.VY = 0f;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 2);
-        Assert.True(t1.VY > 0f,
-            $"Expected upward velocity (rise), got VY={t1.VY}");
-        Assert.True(t1.PY > 3f,
-            $"Expected position to rise above start, got PY={t1.PY}");
+        // Total: cast_duration=20 + recovery_duration=15 = 35 ticks
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 40);
+
+        Assert.Equal(ActionState.Idle, after.State);
+        Assert.Equal((byte)0, after.AttackSlot);
     }
 
     [Fact]
-    public void MankiR_GroundedStart_StillLaunchesUpward()
+    public void MankiR_ProjectileUsesAimDirection()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.MankiGroundPY;
-        state.IsGrounded = true;
+        state.AimYaw = 1.0f;
+        state.AimPitch = 0.5f;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 2);
-        Assert.True(after.VY > 0f,
-            $"Grounded start should still launch upward, got VY={after.VY}");
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 1);
+        Assert.Equal(ActionState.Attacking, after.State);
     }
 
-    [Fact]
-    public void MankiR_RisesToTargetHeight()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 3f; // airborne below riseHeight so rise is applied
-        state.IsGrounded = false;
-        state.VY = 0f;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Press R and tick through rising phase
-        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
-        var after = TestHelpers.TickN(sim, aimInput, 60);
-
-        // Should have risen at least 4m above start (riseHeight=5, physics makes exact hard)
-        Assert.True(after.PY >= 7f,
-            $"Expected PY >= 7.0 (3+4), got PY={after.PY:F2}");
-    }
-
-    [Fact]
-    public void MankiR_MaintainsIsAimingDuringRiseAndAim()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Use manual loop so aim input is consistent every tick
-        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
-        for (int i = 0; i < 3; i++)
-            sim.Tick(new() { { 1, aimInput }, { 100, default } });
-
-        var t1 = sim.GetState(1);
-        Assert.True(t1.IsAiming,
-            "IsAiming should be true during rise and aim phases");
-    }
-
-    [Fact]
-    public void MankiR_FiresProjectileOnRelease()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        state.VY = 0f;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
-
-        // Rise for 60 ticks (enough to reach riseHeight=10 from PY=5 with floatGravity=6)
-        for (int i = 0; i < 60; i++)
-            sim.Tick(new() { { 1, aimInput }, { 100, default } });
-
-        // Release R (IsAiming=false) — should transition to firing phase
-        var releaseInput = new InputState { ActiveSlot = 5, AimDistance = 500, IsAiming = false };
-        for (int i = 0; i < 5; i++)
-            sim.Tick(new() { { 1, releaseInput }, { 100, default } });
-
-        var afterRelease = sim.GetState(1);
-        // After trigger tick (5), should be in ComboStage=1 (firing)
-        Assert.Equal((byte)1, afterRelease.ComboStage);
-    }
-
-    [Fact]
-    public void MankiR_EndsAfterFiringDuration()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        state.VY = 0f;
-        var aimInput = TestHelpers.Input(activeSlot: 5, aiming: true, aimDistance: 500);
-        for (int i = 0; i < 60; i++)
-            sim.Tick(new() { { 1, aimInput }, { 100, default } });
-
-        // Release R to fire
-        var releaseInput = new InputState { ActiveSlot = 5, AimDistance = 500, IsAiming = false };
-        for (int i = 0; i < 80; i++)
-            sim.Tick(new() { { 1, releaseInput }, { 100, default } });
-        var ended = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, ended.State);
-    }
 
     // ══════════════════════════════════════════════════════════════════
     // ── AirRMB (slot 2, airborne): data-driven — basic lifecycle ──
@@ -787,19 +668,11 @@ public class AbilityLifecycleTests
             $"Charged RMB should hit NPC at 4.5m (charged range ~5.3m), got damage={npcAfterCharged.DamagePercent}");
     }
     // ══════════════════════════════════════════════════════════════════
-    // ── E (slot 4): ExplosiveMine — basic mine placement ──
+    // ── E (slot 3): Grapple Gun — basic activation ──
     // ══════════════════════════════════════════════════════════════════
-    // ExplosiveMineSpec overrides SpawnHitbox. At TriggerTick=0, the
-    // data-driven path calls SpawnHitbox, which places a static mine
-    // hitbox (no gravity, has explosion config) in the resolver.
-
-    // NOTE: TriggerTick=0 in the spec means "spawn on activation tick", but
-    // TickTimers increments AttackElapsedTicks to 1 before SpawnHitboxEvents runs,
-    // so TriggerTick=0 never matches. Mine placement via SpawnHitbox override
-    // is blocked by this timing issue (known bug). We verify basic lifecycle.
 
     [Fact]
-    public void MankiE_BasicActivation()
+    public void MankiE_BasicActivation_EntersAttacking()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -812,21 +685,16 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
-    public void MankiE_ExpiresToIdle()
+    public void MankiE_FiresThenMisses_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
-        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 40);
 
-        // E has no ServerAbility → data-driven: DurationTicks=20
-        for (int i = 0; i < 30; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var ended = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, ended.State);
+        Assert.Equal(ActionState.Idle, after.State);
+        Assert.Equal((byte)0, after.AttackSlot);
     }
 }

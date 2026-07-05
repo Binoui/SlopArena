@@ -125,6 +125,9 @@ namespace SlopArena.Shared
             s.AimYaw = aimDeg * (MathF.PI / 180f);
             // Store aim target distance (cm → m) for projectile abilities
             s.AimTargetDistance = input.AimDistance * 0.01f;
+            // Apply combat aim pitch from input (degrees * 100 → radians)
+            s.AimPitch = input.AimPitch * 0.01f * (MathF.PI / 180f);
+
 
             // 2.5 JumpSquat: tick down, apply jump force on expiry
             if (s.State == ActionState.JumpSquat)
@@ -637,7 +640,8 @@ namespace SlopArena.Shared
             else
             {
                 s.State = ActionState.Idle;
-                // Coast naturally — no abrupt stop. Air drag or ground friction handles the rest.
+                s.VX = 0f;
+                s.VZ = 0f;
             }
             UpdateFacing(ref s);
         }

@@ -26,6 +26,9 @@ namespace SlopArena.Shared
         /// Position is the last known position before deactivation.
         /// </summary>
         private readonly List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId)> _pendingExplosions = new();
+        /// <summary>Fired when any hitbox is removed. Args: the hitbox, its last position, removal reason.</summary>
+        public Action<Hitbox, float, float, float>? OnHitboxRemoved;
+
 
         /// <summary>
         /// Result of a single hitbox-entity collision.
@@ -88,6 +91,7 @@ namespace SlopArena.Shared
 
                 if (hb.Explosion.HasValue)
                     _pendingExplosions.Add((hb.X, hb.Y, hb.Z, hb.Explosion.Value, hb.OwnerId));
+                OnHitboxRemoved?.Invoke(hb, hb.X, hb.Y, hb.Z);
                 _hitboxes.RemoveAt(i);
                 return true;
             }
@@ -135,6 +139,7 @@ namespace SlopArena.Shared
                 // Ground contact: queue explosion at ground level, deactivate
                 var exp = hb.Explosion.Value;
                 _pendingExplosions.Add((hb.X, groundY, hb.Z, exp, hb.OwnerId));
+                OnHitboxRemoved?.Invoke(hb, hb.X, groundY, hb.Z);
                 _hitboxes.RemoveAt(i);
             }
         }
@@ -240,6 +245,7 @@ namespace SlopArena.Shared
                     // Queue explosion if this has one (use pre-move position)
                     if (hb.Explosion.HasValue)
                         _pendingExplosions.Add((prevX, prevY, prevZ, hb.Explosion.Value, hb.OwnerId));
+                    OnHitboxRemoved?.Invoke(hb, prevX, prevY, prevZ);
                     _hitboxes.RemoveAt(i);
                 }
                 else

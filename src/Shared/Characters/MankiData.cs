@@ -104,15 +104,18 @@ public static partial class CharacterRegistry
 
             AirLMB = new AbilitySpec
             {
-                Name = "Air Punch",
+                Name = "Air Kick",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 20, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 12, Radius = 0.6f, OffX = 0, OffY = 0f, OffZ = 1f, Damage = 6f, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 8f, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                    new() { DurationTicks = 16, ChainWindowTicks = 10,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 4f, BaseKnockback = 8f, KnockbackGrowth = 2f, KnockbackUpward = 5f, StunTicks = 12, Interruptible = true } },
+                            AttackRange = 5f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f },
+                    new() { DurationTicks = 18, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Radius = 0.8f, OffX = 0, OffY = 0.4f, OffZ = 1.2f, Damage = 6f, BaseKnockback = 12f, KnockbackGrowth = 3f, KnockbackUpward = 8f, StunTicks = 16, Interruptible = true } },
+                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_lmb_air" },
+                AnimationNames = new[] { "spell_lmb_air", "spell_lmb_air" },
             },
 
             RMB = new AbilitySpec
@@ -170,13 +173,13 @@ public static partial class CharacterRegistry
 
             AirRMB = new AbilitySpec
             {
-                Name = "Drop Kick",
+                Name = "Knuckle Spike",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 28, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.7f, OffX = 0, OffY = 1.0f, OffZ = 1.8f, Damage = 8f, BaseKnockback = 4.8f, KnockbackGrowth = 7.2f, KnockbackUpward = -8f, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                    new() { DurationTicks = 30, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 8, Radius = 0.8f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.5f, EndOffZ = 0, Damage = 10f, BaseKnockback = 20f, KnockbackGrowth = 5f, KnockbackUpward = -12f, StunTicks = 16, Interruptible = true } },
+                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
                 },
                 AnimationNames = new[] { "spell_rmb_air" },
             },
@@ -221,32 +224,34 @@ public static partial class CharacterRegistry
                 },
             },
 
-            E = new ExplosiveMineSpec
+            E = new AbilitySpec
             {
-                Name = "Dynamite Mine",
+                Name = "Grapple Gun",
                 IconName = "e",
-                Behavior = AbilityBehavior.AreaDenial,
-                CooldownTicks = 120,
-                MineRadius = 0.3f,
-                MineDurationTicks = 600,
+                Behavior = AbilityBehavior.Projectile,
+                CooldownTicks = 210,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 20, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 1, Radius = 0.1f } },
-                            AttackRange = 0, WarpRange = 0, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                    new() { DurationTicks = 30, ChainWindowTicks = 0,
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 15f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_e" },
-                SpecialEffectKeys = new[] { "MankiPlaceMine" },
-                ExplosionConfig = new ProjectileExplosion
+                Params = new()
                 {
-                    Radius = 2.5f,
-                    Damage = 5f,
-                    BaseKnockback = 2f,
-                    KnockbackGrowth = 3f,
-                    KnockbackUpward = 20f,
-                    StunTicks = 30,
-                    DurationTicks = 8,
-                    CanHitOwner = true,
+                    ["fire_trigger_tick"] = 8f,
+                    ["tether_speed"] = 40f,
+                    ["hitbox_radius"] = 0.3f,
+                    ["max_flight_ticks"] = 30f,
+                    ["max_range"] = 15f,
+                    ["reel_speed"] = 25f,
+                    ["arrival_threshold"] = 0.5f,
+                    ["damage"] = 3f,
+                    ["stun_ticks"] = 0f,
+                    ["knockback_base"] = 0f,
+                    ["knockback_growth"] = 0f,
+                    ["knockback_upward"] = 0f,
+                    ["cast_duration"] = 30f,
                 },
             },
 
@@ -254,42 +259,37 @@ public static partial class CharacterRegistry
             {
                 Name = "Bazooka",
                 IconName = "r",
-                Behavior = AbilityBehavior.AimedProjectile,
+                Behavior = AbilityBehavior.Projectile,
                 CooldownTicks = 240,
-                ChargeHoldTicks = 180,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 100, ChainWindowTicks = 0,
+                    new() { DurationTicks = 35, ChainWindowTicks = 0,
                             HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                            AttackRange = 40f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_r_start", "spell_r_loop", "spell_r_end" },
-                SpecialEffectKeys = new[] { "MankiBazooka" },
+                AnimationNames = new[] { "spell_r" },
                 Params = new()
                 {
-                ["rise_height"] = 5f,
-                ["rise_velocity"] = 14f,
-                ["min_rise_ticks"] = 8f,
-                ["max_aim_range"] = 20f,
-                ["charge_hold_ticks"] = 180f,
-                ["projectile_speed"] = 35f,
-                ["fire_trigger_tick"] = 5f,
-                ["damage"] = 15f,
-                ["hitbox_radius"] = 1.5f,
-                ["knockback_base"] = 8f,
-                ["knockback_growth"] = 12f,
-                ["knockback_upward"] = 12f,
-                ["stun_ticks"] = 25f,
-                ["projectile_gravity"] = 10f,
-                ["max_flight_ticks"] = 60f,
-                ["throw_duration"] = 60f,
-                ["explosion_radius"] = 3f,
-                ["explosion_damage"] = 25f,
-                ["explosion_kb_base"] = 7.2f,
-                ["explosion_kb_growth"] = 10.8f,
-                ["explosion_knockback_upward"] = 14f,
-                ["explosion_stun_ticks"] = 20f,
-                ["explosion_duration_ticks"] = 6f,
+                    ["fire_trigger_tick"] = 6f,
+                    ["projectile_speed"] = 40f,
+                    ["hitbox_radius"] = 0.6f,
+                    ["damage"] = 15f,
+                    ["gravity"] = 15f,
+                    ["max_flight_ticks"] = 45f,
+                    ["knockback_base"] = 6f,
+                    ["knockback_growth"] = 9f,
+                    ["knockback_upward"] = 12f,
+                    ["stun_ticks"] = 25f,
+                    ["explosion_radius"] = 3f,
+                    ["explosion_damage"] = 10f,
+                    ["explosion_kb_base"] = 6f,
+                    ["explosion_kb_growth"] = 9f,
+                    ["explosion_knockback_upward"] = 14f,
+                    ["explosion_stun_ticks"] = 20f,
+                    ["explosion_duration_ticks"] = 6f,
+                    ["self_damage"] = 4f,
+                    ["cast_duration"] = 20f,
+                    ["recovery_duration"] = 15f,
                 },
             },
 

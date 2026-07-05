@@ -16,8 +16,15 @@ namespace SlopArena.Client.Camera
         {
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
+            // Allow camera to orbit below target (negative VerticalAxis = looking UP)
+            if (_orbital != null)
+                _orbital.VerticalAxis.Range = new Vector2(-30f, 50f);
         }
-
+        
+        /// <summary>
+        /// The real Unity Camera that this mount drives.
+        /// </summary>
+        public UnityEngine.Camera RenderCamera => GetComponent<UnityEngine.Camera>();
         private void Start()
         {
             Cursor.lockState = CursorLockMode.Locked;
@@ -26,9 +33,18 @@ namespace SlopArena.Client.Camera
         private void Update()
         {
             if (_orbital == null) return;
+            
+            // Scroll wheel zoom
             float dy = Mouse.current.scroll.ReadValue().y;
             if (Mathf.Abs(dy) > 0.001f)
                 _orbital.RadialAxis.Value -= dy * 0.05f;
+
+            // Manual vertical mouse look using Input System delta.
+            // -= gives FPS-style: mouse UP → VerticalAxis decreases → camera orbits lower → looks up.
+            // Awake() sets Range(-80,80) so camera can go below target (negative = looking up).
+            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+            if (Mathf.Abs(mouseDelta.y) > 0.001f)
+                _orbital.VerticalAxis.Value -= mouseDelta.y * 0.1f;
         }
 
         public void SetTarget(Transform target)
