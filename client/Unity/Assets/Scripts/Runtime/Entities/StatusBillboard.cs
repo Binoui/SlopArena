@@ -35,25 +35,29 @@ namespace SlopArena.Client.Entities
             _textMesh.characterSize = 0.06f; // world-space scale per character
             _textMesh.color = Color.white;
 
-            // Cache camera transform for LookAt
-            _cameraTransform = UnityEngine.Camera.main?.transform;
-            if (_cameraTransform == null)
-                Debug.LogError("[StatusBillboard] No main camera found — billboard won't face camera");
+            // Camera resolved lazily in LateUpdate — Camera.main may not be ready
+            // during OnMatchStart() due to Unity component initialization order.
+            _cameraTransform = null;
         }
 
         private void LateUpdate()
         {
             if (_sim == null || _entityId == 0) return;
 
+            // Lazy camera resolve — Camera.main may not be available at Init time
+            if (_cameraTransform == null)
+            {
+                var cam = UnityEngine.Camera.main;
+                if (cam == null) return; // still unavailable, try next frame
+                _cameraTransform = cam.transform;
+            }
+
             var state = _sim.GetState(_entityId);
             _textMesh.text = $"{state.DamagePercent}%";
-            if (_cameraTransform != null)
-            {
-                // Face the camera perfectly — use camera's forward direction
-                // so text is always in the camera's view plane and readable.
-                _textMesh.transform.rotation = Quaternion.LookRotation(
-                    _cameraTransform.forward, _cameraTransform.up);
-            }
+            // Face the camera perfectly — use camera's forward direction
+            // so text is always in the camera's view plane and readable.
+            _textMesh.transform.rotation = Quaternion.LookRotation(
+                _cameraTransform.forward, _cameraTransform.up);
         }
     }
 }

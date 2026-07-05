@@ -130,6 +130,15 @@ namespace SlopArena.Client.Entities
             _animancer = instance.GetComponent<AnimancerComponent>();
             if (_animancer == null)
                 _animancer = instance.AddComponent<AnimancerComponent>();
+
+            // Auto-load CharacterAnimationConfig by class convention if not wired in Inspector
+            if (_charConfig == null)
+            {
+                string path = $"AnimationConfigs/{def.Class}_AnimConfig";
+                _charConfig = Resources.Load<CharacterAnimationConfig>(path);
+                if (_charConfig == null)
+                    Debug.LogError($"[PlayerRenderer] AnimConfig not found at Resources/{path}");
+            }
         }
 
         /// <summary>Hurtbox bone definitions for debug visualization.</summary>
