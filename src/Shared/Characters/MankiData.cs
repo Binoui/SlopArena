@@ -91,7 +91,7 @@ public static partial class CharacterRegistry
                             AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
                     new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 10f,
                             HitboxEvents = new[] {
-                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, BaseKnockback = 21f, KnockbackGrowth = 5f, KnockbackUpward = 10f, StunTicks = 22, Interruptible = true }
+                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1.5f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, BaseKnockback = 21f, KnockbackGrowth = 5f, KnockbackUpward = 10f, StunTicks = 22, Interruptible = true }
                             },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },

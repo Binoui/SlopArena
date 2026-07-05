@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06b0ddd57a57a2001a3df31c73956e2c, type: 3}
+  m_Name: manki_AnimConfig
+  m_EditorClassIdentifier: 
+  Idle: {fileID: -203655887218126122, guid: fe5b79cf131204c7db696e21a3106144, type: 3}
+  Run: {fileID: -203655887218126122, guid: fad7b4bf115b05a01bac195213fe6b92, type: 3}
+  Jump: {fileID: -203655887218126122, guid: 03f8d30c3e71d48d2a3da998da1a6ecc, type: 3}
+  Fall: {fileID: -203655887218126122, guid: 6b8e30a0f65d4483badc8058faf585c4, type: 3}
+  Attack1: {fileID: -203655887218126122, guid: e03fe80e3f21cc05b8cd49f0d1ff686f, type: 3}
+  Attack2: {fileID: -203655887218126122, guid: 74a53532aa1c031c1943a1a5f9a73003, type: 3}
+  Attack3: {fileID: -203655887218126122, guid: 04477016919ac615bb755b8f7212a093, type: 3}
+  Dash: {fileID: 0}
+  HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
+  HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
+  Death: {fileID: 0}
+  SpellQStart: {fileID: 3094330708855449807, guid: 735b5f04a7d2ce1fea80f5ffbfbefe45, type: 3}
+  SpellQLoop: {fileID: 3094330708855449807, guid: 17f1455b384bc28aea4c3506ea4a9f99, type: 3}
+  SpellQEnd: {fileID: -3743569049614240450, guid: be0574ee8a19446eaa39d14d45dc2c1c, type: 3}
+  SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
+  SpellRStart: {fileID: -7221273921338402319, guid: bdff79776ddb90bb7ae7571105dd908d, type: 3}
+  SpellRLoop: {fileID: -2774071859138458923, guid: 5153263434348bfe9b4b65f5541c2755, type: 3}
+  SpellREnd: {fileID: 2359611245458126371, guid: c37bf1fea2fbd914e9ff797c1e5557c7, type: 3}
+  SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}
