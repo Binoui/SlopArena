@@ -39,9 +39,7 @@ namespace SlopArena.Client.World
         [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Attack;
 
         [Header("Aiming")]
-        [SerializeField] private AimIndicator _aimIndicator;
-        [SerializeField] private LayerMask _aimGroundMask = 1;
-        private CameraMode _activeCameraMode = CameraMode.Normal;
+        [SerializeField] private AimHandler _aimHandler;
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
@@ -76,7 +74,7 @@ namespace SlopArena.Client.World
             _arenaDef = arena;
             _localSim = new ServerSimulation(arena);
             _combatFeedback.SetSimulation(_localSim);
-            _hudManager?.Initialize(_localSim, PlayerEntityId);
+            _hudManager?.Initialize(() => _localSim.GetState(PlayerEntityId));
 
 
             var playerDef = CharacterRegistry.Get(_playerClass);
@@ -157,44 +155,8 @@ namespace SlopArena.Client.World
                 _cameraMount.ResetView(_playerRenderer.transform);
             }
 
-            // Initialize aim indicator (auto-create if not wired in Inspector)
-            if (_aimIndicator == null)
-            {
-                var go = new GameObject("AimIndicator");
-                go.transform.SetParent(transform, false);
-                _aimIndicator = go.AddComponent<AimIndicator>();
-                Debug.Log("[TrainingMatch] Auto-created AimIndicator (no Inspector wiring needed)");
-            }
-            _aimIndicator.SetCharacter(_playerRenderer.transform, playerDef.CapsuleHeight);
-            {
-                var qSpec = playerDef.GetSlotAbility(2, false);
-                var p = qSpec?.Params;
-                float maxRange = p?.GetValueOrDefault("max_range", 12f) ?? 12f;
-                _aimIndicator.SetMaxRange(maxRange);
-                _aimIndicator.SetAbilityParams(
-                    p?.GetValueOrDefault("gravity", 30f) ?? 30f,
-                    p?.GetValueOrDefault("launch_angle", 30f) ?? 30f,
-                    p?.GetValueOrDefault("launch_offset_y", 1.2f) ?? 1.2f
-                );
-            }
-            _aimIndicator.gameObject.SetActive(true);
-
-            // Init target indicator (soft-lock visual ring)
-            var targetIndicator = gameObject.AddComponent<TargetIndicator>();
-            targetIndicator.Init(
-                _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
-                _localSim,
-                PlayerEntityId);
-
-            Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
-            _mainCamera = _cameraMount != null ? _cameraMount.RenderCamera : null;
-            if (_aimIndicator != null && _mainCamera != null)
-                _aimIndicator.SetCamera(_mainCamera);
-            if (_cameraMount != null)
-            {
-                _cameraMount.SetMode(CameraMode.Normal);
-                _activeCameraMode = CameraMode.Normal;
-            }
+            // Init AimHandler — owns AimIndicator + camera mode transitions
+            _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera);
         }
 
         private void Update()
@@ -212,81 +174,14 @@ namespace SlopArena.Client.World
             // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
 
-            // ── Resolve active aim mode ──
-            AimMode currentAimMode = AimMode.None;
-            byte aimingSlot = 0;
+            // ── Aim ──
+            var playerState = _localSim.GetState(PlayerEntityId);
+            var aimCtx = _aimHandler != null
+                ? _aimHandler.Evaluate(playerState, slot, _playerDef, _inputController)
+                : AimContext.None;
+            _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
 
-            // Check: was a slot just pressed with a hold-aim key still down?
-            if (slot > 0)
-            {
-                byte slotIdx = (byte)(slot - 1);
-                bool keyHeld = _inputController.IsSlotKeyHeld(slotIdx);
-                var spec = _playerDef.GetSlotAbility(slotIdx, !_localSim.GetState(PlayerEntityId).IsGrounded);
-                if (spec != null && keyHeld && (spec.AimMode == AimMode.GroundCursor || spec.AimMode == AimMode.CameraForward3D))
-                {
-                    currentAimMode = spec.AimMode;
-                    aimingSlot = slotIdx;
-                }
-            }
-
-            // Check: already attacking with an aim ability and key still held
-            if (currentAimMode == AimMode.None)
-            {
-                var ps = _localSim.GetState(PlayerEntityId);
-                if (ps.State == ActionState.Attacking && ps.AttackSlot > 0)
-                {
-                    byte slotIdx = (byte)(ps.AttackSlot - 1);
-                    var spec = _playerDef.GetSlotAbility(slotIdx, !ps.IsGrounded);
-                    if (spec != null && _inputController.IsSlotKeyHeld(slotIdx))
-                    {
-                        currentAimMode = spec.AimMode;
-                        aimingSlot = slotIdx;
-                    }
-                }
-            }
-
-            bool isAiming = currentAimMode != AimMode.None;
-
-            // ── Drive camera mode (transitions only) ──
-            CameraMode desiredCameraMode = currentAimMode switch
-            {
-                AimMode.GroundCursor    => CameraMode.FreeCursor,
-                AimMode.CameraForward3D => CameraMode.Frozen,
-                _                       => CameraMode.Normal,
-            };
-            if (desiredCameraMode != _activeCameraMode)
-            {
-                if (desiredCameraMode == CameraMode.Frozen)
-                    _cameraMount.FreezeAtCurrentAngles();
-                _cameraMount.SetMode(desiredCameraMode);
-                _activeCameraMode = desiredCameraMode;
-            }
-
-            // ── Collect aim data ──
-            float? abilityAimYawRad = null;
-            float? abilityAimPitchRad = null;
-            ushort? abilityAimDistance = null;
-
-            if (currentAimMode == AimMode.GroundCursor && _aimIndicator != null)
-            {
-                _aimIndicator.SetAiming(true);
-                _aimIndicator.UpdateAim();
-                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
-            }
-            else
-            {
-                if (_aimIndicator != null) _aimIndicator.SetAiming(false);
-
-                if (currentAimMode == AimMode.CameraForward3D && _cameraMount != null)
-                {
-                    abilityAimYawRad   = _cameraMount.GetCameraYawRad();
-                    abilityAimPitchRad = -_cameraMount.GetCameraPitchDeg() * Mathf.Deg2Rad;
-                }
-            }
-
-            _showCrosshair = currentAimMode == AimMode.CameraForward3D;
-
-            // Compute screen-center target for soft-lock
+            // ── Build input ──
             byte targetEntityId = PickScreenTarget(
                 _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
                 _mainCamera ??= _cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
@@ -295,11 +190,8 @@ namespace SlopArena.Client.World
                 _cameraMount,
                 _playerRenderer.transform.eulerAngles.y,
                 isNPC: false,
-                isAiming: isAiming,
-                slot,
-                abilityAimYawRad: abilityAimYawRad,
-                abilityAimDistance: abilityAimDistance,
-                abilityAimPitchRad: abilityAimPitchRad,
+                pendingSlotPress: slot,
+                aimCtx: aimCtx,
                 canMove: null,
                 targetEntityId: targetEntityId);
             // NPC AI
