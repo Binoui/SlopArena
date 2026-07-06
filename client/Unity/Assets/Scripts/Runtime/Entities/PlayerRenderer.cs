@@ -306,7 +306,7 @@ namespace SlopArena.Client.Entities
                 if (state.State == ActionState.Attacking)
                 {
                     // Look up clip from character definition
-                    string animName = "melee";
+                    string animName = "spell_lmb_1";
                     float animSpeed = 1f;
                     if (_charDef != null)
                     {

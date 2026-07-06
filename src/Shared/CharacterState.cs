@@ -122,13 +122,15 @@ namespace SlopArena.Shared
         public bool IsAiming;
 
         /// <summary>
-        /// ── Warp (auto-dash toward target before attacking) ──
+        /// Warp speed as a fraction of remaining distance closed per tick.
+        /// e.g. 0.3 = 30% of remaining distance toward target each tick.
+        /// Velocity is computed as: V = dx * WarpSpeed / TickDt in ProcessWarp.
+        /// Set to 0 by ProcessWarp on arrival (within AttackRange).
         /// </summary>
         public float WarpTargetX;
         public float WarpTargetZ;
         public float WarpSpeed;
         public float WarpAttackRange;  // stop warping when this close
-
         /// <summary>
         /// ── Sprint / Dash-dance ──
         /// </summary>
