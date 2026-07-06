@@ -189,6 +189,7 @@ public static partial class CharacterRegistry
                 Name = "Round Bomb",
                 IconName = "q",
                 Behavior = AbilityBehavior.AimedProjectile,
+                AimMode = AimMode.GroundCursor,
                 CooldownTicks = 300,
                 ChargeHoldTicks = 180,         // 3s max aim
                 Stages = new AttackStage[]
@@ -229,6 +230,7 @@ public static partial class CharacterRegistry
                 Name = "Grapple Gun",
                 IconName = "e",
                 Behavior = AbilityBehavior.Projectile,
+                AimMode = AimMode.CameraForward3D,
                 CooldownTicks = 210,
                 Stages = new AttackStage[]
                 {
@@ -260,6 +262,7 @@ public static partial class CharacterRegistry
                 Name = "Bazooka",
                 IconName = "r",
                 Behavior = AbilityBehavior.Projectile,
+                AimMode = AimMode.CameraForward3D,
                 CooldownTicks = 240,
                 Stages = new AttackStage[]
                 {

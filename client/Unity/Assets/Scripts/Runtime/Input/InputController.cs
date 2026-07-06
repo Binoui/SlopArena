@@ -33,6 +33,19 @@ namespace SlopArena.Client.Input
         public bool IsRKeyHeld { get; private set; }
         /// <summary>Whether the E key is currently held down (for E aiming release detection).</summary>
         public bool IsEKeyHeld { get; private set; }
+        /// <summary>
+        /// Returns true if the key/button for the given slot index (0-based) is currently held.
+        /// Slot 0 = LMB, 1 = RMB, 2 = Q, 3 = E, 4 = R, 5 = F.
+        /// </summary>
+        public bool IsSlotKeyHeld(byte slotIdx) => slotIdx switch
+        {
+            0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
+            1 => IsRmbHeld,
+            2 => IsQKeyHeld,
+            3 => IsEKeyHeld,
+            4 => IsRKeyHeld,
+            _ => false,
+        };
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;

@@ -9,6 +9,13 @@ namespace SlopArena.Shared
     /// The server reads Stages/HitboxEvents/CooldownTicks from this.
     /// The client wraps this in an Ability subclass for input/indicators.
     /// </summary>
+    public enum AimMode : byte
+    {
+        None,            // No aim input; camera free, cursor locked
+        GroundCursor,    // Cursor unlocked; raycast ground → AimYaw + AimDistance
+        CameraForward3D, // Cursor locked; camera yaw+pitch → AimYaw + AimPitch
+    }
+
     public enum AbilityBehavior : byte
     {
         MeleeCombo,          // Multi-stage LMB combo, chained on input
@@ -23,6 +30,7 @@ namespace SlopArena.Shared
     public class AbilitySpec
     {
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
+        public AimMode AimMode = AimMode.None;
         public string Name = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>
         public string? IconName;

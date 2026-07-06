@@ -16,6 +16,7 @@ namespace SlopArena.Client.Combat
         private Transform _character;
         private float _capsuleHeight = 1.3f;
         private bool _visualsCreated;
+        private UnityEngine.Camera _camera;
 
         public float AimYawRad { get; private set; }
         public float AimDistance { get; private set; }
@@ -70,6 +71,7 @@ namespace SlopArena.Client.Combat
         }
 
         public void SetMaxRange(float range) => _maxRange = range;
+        public void SetCamera(UnityEngine.Camera camera) => _camera = camera;
         public bool IsAiming => _isAiming;
 
         public void SetAbilityParams(float gravity, float launchAngleDeg, float launchOffsetY)
@@ -95,7 +97,7 @@ namespace SlopArena.Client.Combat
             EnsureVisuals();
             if (!_isAiming || _character == null) return;
 
-            var unityCam = UnityEngine.Object.FindFirstObjectByType<UnityEngine.Camera>();
+            var unityCam = _camera != null ? _camera : UnityEngine.Camera.main;
             if (unityCam == null) return;
 
             var mouseRay = unityCam.ScreenPointToRay(UnityEngine.Input.mousePosition);

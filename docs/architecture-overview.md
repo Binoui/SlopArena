@@ -45,7 +45,7 @@ SlopArena/
 │       │   ├── Entities/       ← PlayerRenderer (MonoBehaviour, drives Animator)
 │       │   ├── World/          ← TrainingMatch, MatchBase (match orchestration)
 │       │   ├── Input/          ← InputController (Unity Input → InputState)
-│       │   ├── Camera/         ← CameraMount (orbit cam)
+│       │   ├── Camera/         ← CameraMount (orbit cam, CameraMode enum, AimContext)
 │       │   ├── Combat/         ← CombatFeedback, AimIndicator
 │       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
 │       ├── Editor/
@@ -151,8 +151,10 @@ SlopArena/
 3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
 4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
 5. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
-6. **Shared/ is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. The DLL auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target. Unity imports it as a plugin.
+6. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. The DLL auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target. Unity imports it as a plugin.
 7. **Cooldown struct persistence** — `CharacterState` is a value type. `SetCooldown` modifies a local copy. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
+8. **Dash duration comes from `MovementStats.DashDurationTicks`** — `StartDash` uses `stats.DashDurationTicks`, not the const `Simulation.DashDurationTicks` (15). Each character's `DashDurationTicks` in their definition is authoritative.
+9. **Proportional friction (`MoveToward(V, 0, |V| * f)`) is asymptotic** — it never reaches exactly zero in floating point. A `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0 when both components are below threshold. Applied after ground friction and air drag.
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
 → Quick version: add `CharacterClass` enum value → write `BuildXxx()` → register in `BuildRegistry()`
