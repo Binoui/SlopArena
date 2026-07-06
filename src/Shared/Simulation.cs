@@ -62,6 +62,12 @@ namespace SlopArena.Shared
         private const ushort TurnaroundLagTicks = 6;
 
         /// <summary>
+        /// Horizontal speed dead zone. Below this, velocity is snapped to zero
+        /// to prevent residual drifting from asymptotic friction decay.
+        /// </summary>
+        private const float VelocityDeadZone = 0.015f;
+
+        /// <summary>
         /// Tolerance for snapping to platform surfaces (units).
         /// Characters must be within this window above the surface to snap.
         /// </summary>
@@ -654,6 +660,19 @@ namespace SlopArena.Shared
             // Natural drift/end handled by state tick expiry
         }
 
+        /// <summary>
+        /// Snap horizontal velocity to zero when below the dead zone threshold.
+        /// Prevents residual drift from asymptotic friction/drag decay.
+        /// </summary>
+        private static void ApplyVelocityDeadZone(ref CharacterState s)
+        {
+            if (Math.Abs(s.VX) < VelocityDeadZone && Math.Abs(s.VZ) < VelocityDeadZone)
+            {
+                s.VX = 0f;
+                s.VZ = 0f;
+            }
+        }
+
         // ── NORMAL MOVEMENT ──
 
         private static void ProcessNormalMovement(
@@ -719,7 +738,7 @@ namespace SlopArena.Shared
                     // Turnaround lag: decelerate
                     float friction = stats.GroundFriction * TickDt;
                     s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
-                    s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
+                    ApplyVelocityDeadZone(ref s);
                 }
                 else
                 {
@@ -740,6 +759,7 @@ namespace SlopArena.Shared
                 s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
             }
+            ApplyVelocityDeadZone(ref s);
 
             UpdateFacing(ref s);
         }
@@ -761,6 +781,7 @@ namespace SlopArena.Shared
             const float drag = AirDrag * TickDt;
             s.VX *= (1f - drag);
             s.VZ *= (1f - drag);
+            ApplyVelocityDeadZone(ref s);
 
             // Dash initiation is handled by PlayerController outside of Simulation
             // (works both ground and air, has cooldown, grants invincibility)
@@ -806,9 +827,11 @@ namespace SlopArena.Shared
             return false; // still warping
         }
 
-        /// <summary>
         /// Start a dash (ground or air). 1 second duration, grants invincibility.
         /// Can be used on ground or in air.
+        /// Clears attack state if interrupting an attack (AttackSlot, AnimLockTicks, ability).
+        /// Deactivation of the server-side ability instance is handled by the caller
+        /// (ServerSimulation) — StartDash only clears the state fields.
         /// </summary>
         public static void StartDash(ref CharacterState s, MovementStats stats, float dirX, float dirZ)
         {
@@ -816,6 +839,17 @@ namespace SlopArena.Shared
             if (s.State != ActionState.Idle && s.State != ActionState.Attacking && s.State != ActionState.Dashing) return;
             if (s.InvincibilityTicks > 0) return; // already invincible
             if (HasKnockback(s)) return;
+
+            // Clear attack state when dash interrupts an attack
+            // (ServerSimulation deactivates the ServerAbility separately via _activeAbilities removal)
+            if (s.State == ActionState.Attacking)
+            {
+                s.AttackSlot = 0;
+                s.ComboStage = 0;
+                s.AttackElapsedTicks = 0;
+                s.IsServerAbility = false;
+                s.AnimLockTicks = 0;
+            }
 
             // Normalize direction
             float len = MathF.Sqrt((dirX * dirX) + (dirZ * dirZ));
@@ -833,7 +867,7 @@ namespace SlopArena.Shared
 
             s.DashDirX = dirX;
             s.DashDirZ = dirZ;
-            s.DashDurationTicks = DashDurationTicks;
+            s.DashDurationTicks = stats.DashDurationTicks;
             s.DashCooldownTicks = stats.DashCooldownTicks;
             s.InvincibilityTicks = DashInvincibilityTicks; // invincible for full dash
             s.State = ActionState.Dashing;

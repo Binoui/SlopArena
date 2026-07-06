@@ -119,6 +119,8 @@ namespace SlopArena.Shared
 		/// <summary>
 		/// Tick all active abilities. Called after simulation each frame.
 		/// Abilities that set AttackSlot=0 (via EndAbility) are auto-deactivated.
+		/// Abilities are also interrupted (without calling OnEnd) when the state
+		/// is no longer Attacking — e.g. dash cancelling an attack, or idle.
 		/// </summary>
 		public void TickAbilities(Dictionary<ulong, InputState> inputs)
 		{
@@ -131,6 +133,19 @@ namespace SlopArena.Shared
 				var ability = kvp.Value;
 				if (!_states.TryGetValue(id, out var state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue;
+
+				// Interrupt: if state left Attacking (dash, idle, or other), deactivate without OnEnd.
+				// StartDash clears AttackSlot/AnimLockTicks/IsServerAbility, so the ability
+				// won't see stale attack fields — just remove it cleanly.
+				if (state.State != ActionState.Attacking)
+				{
+					ended.Add(id);
+					if (Simulation.OnDebugLog != null)
+						Simulation.OnDebugLog.Invoke(
+							$"[AbilityInterrupt] entity={id} slot={ability.Slot} state={state.State} — deactivated");
+					continue;
+				}
+
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
 
 				ability.Tick(ref state, ref input, def);
@@ -154,7 +169,11 @@ namespace SlopArena.Shared
 				if (_activeAbilities.TryGetValue(id, out var ability)
 				    && _states.TryGetValue(id, out var state))
 				{
-					// OnEnd already called by EndAbility, skip the duplicate
+					// OnEnd already called by EndAbility, skip the duplicate.
+					// For interrupted abilities (dash/interrupt): OnEnd was NOT called — but
+					// StartDash already cleared AttackSlot/AnimLockTicks/IsServerAbility, so
+					// the clean-up below (cooldown, buffered slot, AnimLockTicks) is still correct.
+					
 					// Apply cooldown
 					if (ability.Slot < 6)
 					{
