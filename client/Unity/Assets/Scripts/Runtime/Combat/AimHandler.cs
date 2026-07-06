@@ -2,6 +2,7 @@ using SlopArena.Shared;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Input;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace SlopArena.Client.Combat
 {
@@ -22,6 +23,7 @@ namespace SlopArena.Client.Combat
 
         private CameraMode _activeMode = CameraMode.Normal;
         private byte _aimingSlot;
+        private float _aimPitchOffsetDeg;
 
         /// <summary>True when a CameraForward3D ability is active — caller draws the crosshair.</summary>
         public bool ShowCrosshair { get; private set; }
@@ -30,11 +32,14 @@ namespace SlopArena.Client.Combat
         /// Wire camera into AimIndicator once the scene is ready.
         /// Call from OnMatchStart after the camera hierarchy exists.
         /// </summary>
-        public void Init(CameraMount cameraMount, UnityEngine.Camera renderCamera)
+        public void Init(CameraMount cameraMount, UnityEngine.Camera renderCamera, Transform characterTransform, float capsuleHeight)
         {
             _cameraMount = cameraMount;
             if (_aimIndicator != null)
+            {
                 _aimIndicator.SetCamera(renderCamera);
+                _aimIndicator.SetCharacter(characterTransform, capsuleHeight);
+            }
             _cameraMount?.SetMode(CameraMode.Normal);
             _activeMode = CameraMode.Normal;
         }
@@ -96,8 +101,12 @@ namespace SlopArena.Client.Combat
 
             if (desired != _activeMode)
             {
-                if (desired == CameraMode.Frozen)
+                // Capture camera angles before any mode switch that freezes orientation
+                if (desired is CameraMode.Frozen or CameraMode.FreeCursor)
                     _cameraMount?.FreezeAtCurrentAngles();
+                // Reset reticle pitch offset when entering camera-relative aim
+                if (desired == CameraMode.Frozen)
+                    _aimPitchOffsetDeg = 0f;
                 _cameraMount?.SetMode(desired);
                 _activeMode = desired;
             }
@@ -123,16 +132,21 @@ namespace SlopArena.Client.Combat
 
                 if (aimMode == AimMode.CameraForward3D && _cameraMount != null)
                 {
+                    // Accumulate mouse Y as pitch offset (camera stays frozen)
+                    Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+                    if (Mathf.Abs(mouseDelta.y) > 0.001f)
+                        _aimPitchOffsetDeg -= mouseDelta.y * 0.1f;
+
                     ctx = new AimContext
                     {
                         IsAiming    = true,
                         AimYawRad   = _cameraMount.GetCameraYawRad(),
-                        AimPitchRad = -_cameraMount.GetCameraPitchDeg() * Mathf.Deg2Rad,
+                        AimPitchRad = -(_cameraMount.GetCameraPitchDeg() + _aimPitchOffsetDeg) * Mathf.Deg2Rad,
                     };
                 }
             }
 
-            ShowCrosshair = aimMode == AimMode.CameraForward3D;
+            ShowCrosshair = aimMode != AimMode.None;
             return ctx;
         }
     }

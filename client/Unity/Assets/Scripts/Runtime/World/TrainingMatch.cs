@@ -156,7 +156,7 @@ namespace SlopArena.Client.World
             }
 
             // Init AimHandler — owns AimIndicator + camera mode transitions
-            _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera);
+            _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera, _playerRenderer.transform, playerDef.CapsuleHeight);
         }
 
         private void Update()

@@ -20,7 +20,7 @@ namespace SlopArena.Client.Camera
 
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
-        private float _frozenPitch;
+        private float _frozenPitch = 17.5f;
 
         private void Awake()
         {
@@ -44,21 +44,24 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
 
-            // Only process mouse input in Normal mode
+            // Normal — pitch locked, scroll still works for zoom
             if (_mode == CameraMode.Normal)
             {
                 float dy = Mouse.current.scroll.ReadValue().y;
                 if (Mathf.Abs(dy) > 0.001f)
                     _orbital.RadialAxis.Value -= dy * 0.05f;
 
-                Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                if (Mathf.Abs(mouseDelta.y) > 0.001f)
-                    _orbital.VerticalAxis.Value -= mouseDelta.y * 0.1f;
+                // Lock pitch — re-apply cached value each frame
+                SetCameraPitchDeg(_frozenPitch);
             }
-
-            // In Frozen/FreeCursor modes, re-apply cached angles to resist Cinemachine drift
-            if (_mode == CameraMode.Frozen || _mode == CameraMode.FreeCursor)
+            else if (_mode == CameraMode.Frozen)
             {
+                // Lock pitch — camera stays at frozen angles (reticle moves, not camera)
+                SetCameraPitchDeg(_frozenPitch);
+            }
+            else if (_mode == CameraMode.FreeCursor)
+            {
+                // Re-apply cached angles (cursor controls ground marker, not camera)
                 SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
