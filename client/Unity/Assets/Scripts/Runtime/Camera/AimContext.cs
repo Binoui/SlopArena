@@ -1,8 +1,9 @@
 namespace SlopArena.Client.Camera
 {
     /// <summary>
-    /// Result produced each FixedUpdate tick by an aim handler.
-    /// Null fields mean "not set by this handler"; TrainingMatch passes them as null to BuildInputState.
+    /// Aim data produced each FixedUpdate tick by <see cref="AimHandler"/>.
+    /// Passed directly into <see cref="Input.InputController.BuildInputState"/>.
+    /// Null fields mean "use camera default" — only set by an active aimed ability.
     /// </summary>
     public struct AimContext
     {
@@ -10,5 +11,8 @@ namespace SlopArena.Client.Camera
         public float? AimPitchRad;
         public ushort? AimDistanceCm;
         public bool IsAiming;
+
+        /// <summary>No active aim — camera-driven defaults.</summary>
+        public static readonly AimContext None = new AimContext { IsAiming = false };
     }
 }

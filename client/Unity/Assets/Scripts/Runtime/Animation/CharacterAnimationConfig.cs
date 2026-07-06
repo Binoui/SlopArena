@@ -1,16 +1,30 @@
 using UnityEngine;
 using System.Collections.Generic;
-using SlopArena.Shared;
+
 namespace SlopArena.Client.Animation
 {
     /// <summary>
-    /// Maps character animation clips to the states PlayerRenderer expects.
-    /// Create one asset per character via the generator tool
-    /// (right-click model → Create SlopArena Animator).
+    /// Maps animation clips to the names PlayerRenderer looks up via GetClipByName().
+    ///
+    /// Standard clips (idle/run/jump/fall/dash/hit/death) are named fields — every character
+    /// always has these, and the generator wires them automatically.
+    ///
+    /// Ability clips are character-specific: wire them in the AbilityClips list using the exact
+    /// AnimationNames strings from AbilitySpec (e.g. "spell_q_start", "spell_r_loop").
+    /// Adding a new character means creating a config asset and filling the list — no code changes.
     /// </summary>
     [CreateAssetMenu(fileName = "NewCharacterAnimConfig", menuName = "SlopArena/Character Animation Config")]
     public class CharacterAnimationConfig : ScriptableObject
     {
+        [System.Serializable]
+        public struct AbilityClipEntry
+        {
+            public string Name;
+            public AnimationClip Clip;
+        }
+
+        // ── Standard clips (always present, generator-wired) ──
+
         [Header("Movement")]
         public AnimationClip Idle;
         public AnimationClip Run;
@@ -18,61 +32,59 @@ namespace SlopArena.Client.Animation
         public AnimationClip Fall;
 
         [Header("Combat")]
-        public AnimationClip Attack1;
-        public AnimationClip Attack2;
-        public AnimationClip Attack3;
         public AnimationClip Dash;
         public AnimationClip HitSmall;
         public AnimationClip HitMedium;
         public AnimationClip HitHard;
         public AnimationClip Death;
 
-        [Header("Abilities")]
-        public AnimationClip SpellQStart;
-        public AnimationClip SpellQLoop;
-        public AnimationClip SpellQEnd;
-        public AnimationClip SpellE;
-        public AnimationClip SpellRStart;
-        public AnimationClip SpellRLoop;
-        public AnimationClip SpellREnd;
-        public AnimationClip SpellF;
+        // ── Ability clips (character-specific, fill per character) ──
+
+        [Header("Ability Clips")]
+        [Tooltip("One entry per AnimationNames string in AbilitySpec. Key must match exactly.")]
+        public List<AbilityClipEntry> AbilityClips = new();
+
+        // ── Lookup ──
+
+        private Dictionary<string, AnimationClip> _abilityLookup;
+
+        private void OnEnable() => BuildLookup();
+        private void OnValidate() => BuildLookup();
+
+        private void BuildLookup()
+        {
+            _abilityLookup = new Dictionary<string, AnimationClip>(AbilityClips?.Count ?? 0);
+            if (AbilityClips == null) return;
+            foreach (var entry in AbilityClips)
+                if (!string.IsNullOrEmpty(entry.Name) && entry.Clip != null)
+                    _abilityLookup[entry.Name] = entry.Clip;
+        }
 
         /// <summary>
-        /// Look up a clip by animation name (matches GLB embedded clip names).
+        /// Look up a clip by animation name (matches AnimationNames strings in AbilitySpec).
+        /// Checks standard clips first, then the ability dictionary.
         /// Returns null if not found.
         /// </summary>
         public AnimationClip GetClipByName(string name)
         {
-            return name switch
+            // Standard clips — checked first, zero allocation
+            switch (name)
             {
-                "idle" => Idle,
-                "run" => Run,
-                "jump" => Jump,
-                "fall" => Fall,
-                "attack_1" => Attack1,
-                "attack_2" => Attack2,
-                "attack_3" => Attack3,
-                "dash" => Dash,
-                "hit_small" => HitSmall,
-                "hit_medium" => HitMedium,
-                "hit_hard" => HitHard,
-                "hit_light" => HitSmall,
-                "death" => Death,
-                "spell_q_start" => SpellQStart,
-                "spell_q_loop" => SpellQLoop,
-                "spell_q_end" => SpellQEnd,
-                "spell_q" => SpellQStart,
-                "spell_e" => SpellE,
-                "spell_r_start" => SpellRStart,
-                "spell_r_loop" => SpellRLoop,
-                "spell_r_end" => SpellREnd,
-                "spell_f" => SpellF,
-                "spell_lmb_1" => Attack1,
-                "spell_lmb_2" => Attack2,
-                "spell_lmb_3" => Attack3,
-                _ => null,
-            };
+                case "idle":        return Idle;
+                case "run":         return Run;
+                case "jump":        return Jump;
+                case "fall":        return Fall;
+                case "dash":        return Dash;
+                case "hit_small":
+                case "hit_light":   return HitSmall;
+                case "hit_medium":  return HitMedium;
+                case "hit_hard":    return HitHard;
+                case "death":       return Death;
+            }
+
+            // Ability clips — character-specific dictionary
+            if (_abilityLookup == null) BuildLookup();
+            return _abilityLookup!.TryGetValue(name, out var clip) ? clip : null;
         }
     }
 }
-

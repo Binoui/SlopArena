@@ -1,3 +1,4 @@
+using System;
 using SlopArena.Shared;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -8,9 +9,7 @@ namespace SlopArena.Client.UI
     {
         [SerializeField] private UIDocument _uiDocument;
 
-        private ServerSimulation _sim;
-        private ulong _playerEntityId;
-
+        private Func<CharacterState> _getState;
         // Queried elements
         private Label _damagePercentLabel;
         private VisualElement[] _slotIcons = new VisualElement[6];
@@ -20,11 +19,14 @@ namespace SlopArena.Client.UI
 
         private static readonly string[] SlotKeys = { "LMB", "RMB", "Q", "E", "R", "F" };
 
-        public void Initialize(ServerSimulation sim, ulong playerEntityId)
+        /// <summary>
+        /// Initialize the HUD.
+        /// <paramref name="getState"/> is called each Refresh() — pass a lambda over whatever
+        /// simulation source owns the player state (local sim, network client, replay reader).
+        /// </summary>
+        public void Initialize(Func<CharacterState> getState)
         {
-            _sim = sim;
-            _playerEntityId = playerEntityId;
-
+            _getState = getState;
             if (_uiDocument == null)
             {
                 Debug.LogWarning("[HUD] No UIDocument assigned");
@@ -72,9 +74,9 @@ namespace SlopArena.Client.UI
 
         public void Refresh()
         {
-            if (_sim == null || _uiDocument == null) return;
+            if (_getState == null || _uiDocument == null) return;
 
-            var state = _sim.GetState(_playerEntityId);
+            var state = _getState();
 
             // Damage %
             if (_damagePercentLabel != null)

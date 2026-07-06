@@ -187,13 +187,10 @@ namespace SlopArena.Client.Input
             Camera.CameraMount? camera,
             float bodyYawDeg,
             bool isNPC,
-            bool isAiming,
             byte pendingSlotPress,
-            float? abilityAimYawRad,
-            ushort? abilityAimDistance,
+            Camera.AimContext aimCtx,
             Func<bool>? canMove,
-            byte targetEntityId = 0,
-            float? abilityAimPitchRad = null)
+            byte targetEntityId = 0)
         {
             var input = new InputState();
 
@@ -276,33 +273,25 @@ namespace SlopArena.Client.Input
             input.Right = moveDirection.x > 0.3f;
             input.Crouch = kb != null && kb.ctrlKey.isPressed;
             input.ActiveSlot = pendingSlotPress;
-            input.IsAiming = isAiming;
+            input.IsAiming = aimCtx.IsAiming;
 
             // Facing yaw from body rotation
             float deg = bodyYawDeg;
             input.FacingYaw = (short)Math.Clamp(deg * 100f, -32768f, 32767f);
 
-            // Aim yaw from camera (combat facing), overridden by active ability
+            // Aim yaw: camera default, overridden by active ability
             float aimDeg = camera != null ? camera.GetCameraYawDeg() : deg;
             input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768f, 32767f);
-            // Aim pitch from camera (vertical aim), overridden by active ability
+            if (aimCtx.AimYawRad.HasValue)
+                input.AimYaw = (short)Math.Clamp(aimCtx.AimYawRad.Value * Mathf.Rad2Deg * 100f, -32768f, 32767f);
+
+            // Aim pitch: camera default, overridden by active ability
             float aimPitchDeg = camera != null ? camera.GetCameraPitchDeg() : 0f;
             input.AimPitch = (short)Math.Clamp(aimPitchDeg * 100f, -9000f, 9000f);
-            if (abilityAimPitchRad.HasValue)
-            {
-                float pitchDeg = abilityAimPitchRad.Value * Mathf.Rad2Deg;
-                input.AimPitch = (short)Math.Clamp(pitchDeg * 100f, -9000f, 9000f);
-            }
-            input.AimDistance = 0;
+            if (aimCtx.AimPitchRad.HasValue)
+                input.AimPitch = (short)Math.Clamp(aimCtx.AimPitchRad.Value * Mathf.Rad2Deg * 100f, -9000f, 9000f);
 
-            // Active ability overrides aim data
-            if (abilityAimYawRad.HasValue)
-            {
-                float throwDeg = abilityAimYawRad.Value * Mathf.Rad2Deg;
-                input.AimYaw = (short)Math.Clamp(throwDeg * 100f, -32768f, 32767f);
-            }
-            if (abilityAimDistance.HasValue)
-                input.AimDistance = abilityAimDistance.Value;
+            input.AimDistance = aimCtx.AimDistanceCm ?? 0;
             // FSM movement gate: zero out input if state disallows movement
             if (canMove != null && !canMove())
             {
