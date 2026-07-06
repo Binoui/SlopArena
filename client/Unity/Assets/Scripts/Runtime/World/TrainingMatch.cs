@@ -196,7 +196,7 @@ namespace SlopArena.Client.World
                 targetEntityId: targetEntityId);
             // NPC AI
             var npcState = _localSim.GetState(NpcEntityId);
-            var playerState = _localSim.GetState(PlayerEntityId);
+            playerState = _localSim.GetState(PlayerEntityId);
             var npcInput = BuildNpcInput(npcState, playerState, _tick);
             // Tick
             _localSim.Tick(new Dictionary<ulong, InputState>

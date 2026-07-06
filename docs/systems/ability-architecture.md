@@ -239,21 +239,19 @@ Returns `Dictionary<ulong, CharacterState>` — do NOT mutate other entities' st
 
 ## Warp Movement
 
-Warp movement (dash, teleport, lunge) is now server-side in `Simulation.ProcessWarp()`:
+Warp movement (auto-dash toward target before attacking) is server-side in `Simulation.ProcessWarp()`:
+
+Warp parameters (`WarpTargetX`, `WarpTargetZ`, `WarpSpeed`) are set by `ProcessTargetLock()` when the target is within `WarpRange` but outside `AttackRange`. The ability `OnStart` does NOT set warp — it is set by the sim before abilities tick.
 
 ```csharp
-public override void OnStart(ref CharacterState s, CharacterDefinition def)
-{
-    // Set warp parameters
-    s.WarpTargetX = s.PX + (s.FacingX * 5f);
-    s.WarpTargetY = s.PY;
-    s.WarpTargetZ = s.PZ + (s.FacingZ * 5f);
-    s.WarpSpeed = 0.3f;  // 30% per tick
-    s.IsWarping = true;
-}
+// Not in OnStart — warp is set by ServerSimulation.ProcessTargetLock() each tick
+// s.WarpSpeed = 0.3f;   // done in ProcessTargetLock, not OnStart
 ```
 
-The sim will interpolate position each tick until `IsWarping` is cleared or warp completes.
+The sim interpolates position each tick using exponential convergence:
+- Each tick closes `WarpSpeed` fraction of remaining distance: `V = dx * WarpSpeed / TickDt`
+- At `WarpSpeed = 0.3`, warp reaches attack range in ~3 ticks
+- Once warp completes (within `WarpAttackRange`), `WarpSpeed` is cleared and the ability's lunge phase auto-kicks in on the next tick
 
 ## Hold-to-Aim Ability Pattern (Manki Q)
 

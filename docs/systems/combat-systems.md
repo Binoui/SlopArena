@@ -242,9 +242,7 @@ Deserialize is backward-compatible: checks `buf.Length >= 17` before reading off
 
 ### 9c. Server-Side Behavior
 
-`ProcessTargetLock()` drives three features from `AttackStage` data:
-- **Warp**: if entity is within `WarpRange` but outside `AttackRange`, auto-dashes toward target (`WarpSpeed = 0.3` = 30% of remaining distance per tick)
-- **Rotation**: if `RotateTowardTarget` is set, smoothly rotates `FacingYaw` toward target using `TrackingStrength` × `TickDt`
+- **Warp**: if entity is within `WarpRange` but outside `AttackRange`, auto-dashes toward target (`WarpSpeed = 0.3` = 30% of *remaining* distance per tick, computed as `V = dx * WarpSpeed / TickDt` for exponential convergence)
 - **Persistence**: `CharacterState.TargetEntityId` is set each tick while attacking with `UseTargetLock` enabled; zero otherwise
 
 ### 9d. Client-Side Visualization

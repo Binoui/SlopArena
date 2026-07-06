@@ -93,20 +93,40 @@ Player presses attack button:
 - **Server-authoritative**: Warp movement runs in `Simulation.SimulateTick()`
 - **Tick-based interpolation**: `WarpSpeed` controls interpolation factor per tick
 - **Prediction-friendly**: Client simulates same warp logic for smooth rendering
-- **Cancellable**: Cleared on hitstun or death
+### Warp Formula
 
-### Usage (in ServerAbility)
+Warp uses **exponential convergence**: each tick closes `WarpSpeed` fraction of remaining distance.
+
 ```csharp
-public override void OnStart(ref CharacterState s, CharacterDefinition def)
-{
-    // Set warp destination
-    s.WarpTargetX = targetPosX;
-    s.WarpTargetY = targetPosY;
-    s.WarpTargetZ = targetPosZ;
-    s.WarpSpeed = 0.3f;  // 30% of remaining distance per tick
-    s.IsWarping = true;
-}
+// Velocity = dx * WarpSpeed / TickDt
+// After each tick: distance_remaining *= (1 - WarpSpeed)
+s.VX = dx * s.WarpSpeed / TickDt;
+s.VZ = dz * s.WarpSpeed / TickDt;
 ```
+
+At `WarpSpeed = 0.3`:
+- Tick 1: closes 30% of remaining distance
+- Tick 2: closes 30% of what remains
+- Arrival in ~3 ticks for a 7m gap (within AttackRange=4)
+
+After warp completes, the ability's lunge phase applies naturally (guarded by `WarpSpeed <= 0f`).
+
+### Usage
+
+Warp parameters are set by `ServerSimulation.ProcessTargetLock()`, not by `OnStart`:
+
+```csharp
+// ProcessTargetLock sets these when target within WarpRange:
+// s.WarpSpeed = 0.3f;
+// s.WarpTargetX = target.PX;
+// s.WarpTargetZ = target.PZ;
+```
+
+### Features
+- **Server-authoritative**: Warp movement runs in `Simulation.SimulateTick()`
+- **Tick-based interpolation**: `WarpSpeed` controls exponential convergence factor per tick
+- **Prediction-friendly**: Client simulates same warp logic for smooth rendering
+- **Cancellable**: Cleared on hitstun or death
 
 ---
 

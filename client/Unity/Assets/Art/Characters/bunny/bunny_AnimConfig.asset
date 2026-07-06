@@ -16,18 +16,27 @@ MonoBehaviour:
   Run: {fileID: -203655887218126122, guid: 7e637bc200fade57b9c8e3d9f2019685, type: 3}
   Jump: {fileID: -203655887218126122, guid: ce90958a00f29b78ba7c075c5377ad0d, type: 3}
   Fall: {fileID: -203655887218126122, guid: d5e3a061b5bb186c3ad2b7a7ef2c5b83, type: 3}
-  Attack1: {fileID: -203655887218126122, guid: bc51cfdcbd63175dab2224cb575babca, type: 3}
-  Attack2: {fileID: -203655887218126122, guid: 68ce0ae61a4f63f8d88f4fb75a30a098, type: 3}
-  Attack3: {fileID: -203655887218126122, guid: 529c269afbfaf7bceb5c573ad4dd8e9f, type: 3}
   Dash: {fileID: 0}
   HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
-  HitLarge: {fileID: -203655887218126122, guid: 8944d148996d53c418457112bfee40d4, type: 3}
+  HitMedium: {fileID: 0}
+  HitHard: {fileID: 0}
   Death: {fileID: 0}
-  SpellQStart: {fileID: -203655887218126122, guid: 46fb5c189668e5dda8834a076fa3cc90, type: 3}
-  SpellQLoop: {fileID: 0}
-  SpellQEnd: {fileID: 0}
-  SpellE: {fileID: -203655887218126122, guid: 36bea0f7abcda94bfb9ef27169b7b118, type: 3}
-  SpellRStart: {fileID: 8993902097722301239, guid: fd5680e1f9997bde6b545ed7e198e706, type: 3}
-  SpellRLoop: {fileID: 7400000, guid: aa4ef5d568e48478cb33a64ccdbf36fc, type: 2}
-  SpellREnd: {fileID: 7400000, guid: 4e20d2ae6549ff9f49f171c054ad4d77, type: 2}
-  SpellF: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}
+  AbilityClips:
+  - Name: spell_lmb_1
+    Clip: {fileID: -203655887218126122, guid: bc51cfdcbd63175dab2224cb575babca, type: 3}
+  - Name: spell_lmb_2
+    Clip: {fileID: -203655887218126122, guid: 68ce0ae61a4f63f8d88f4fb75a30a098, type: 3}
+  - Name: spell_lmb_3
+    Clip: {fileID: -203655887218126122, guid: 529c269afbfaf7bceb5c573ad4dd8e9f, type: 3}
+  - Name: spell_q
+    Clip: {fileID: -203655887218126122, guid: 46fb5c189668e5dda8834a076fa3cc90, type: 3}
+  - Name: spell_e
+    Clip: {fileID: -203655887218126122, guid: 4b80c764395584071903b1d7a8886a2c, type: 3}
+  - Name: spell_r_loop
+    Clip: {fileID: 7400000, guid: aa4ef5d568e48478cb33a64ccdbf36fc, type: 2}
+  - Name: spell_r_attack
+    Clip: {fileID: 7400000, guid: 277794de491b4f3aa8c3914fd9fb8070, type: 2}
+  - Name: spell_r_end
+    Clip: {fileID: 7400000, guid: 4e20d2ae6549ff9f49f171c054ad4d77, type: 2}
+  - Name: spell_f
+    Clip: {fileID: -203655887218126122, guid: eda07a0e7997c08db82c0e4099efe2dd, type: 3}

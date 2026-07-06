@@ -172,9 +172,9 @@ namespace SlopArena.Shared
                 bool warpComplete = ProcessWarp(ref s, def, arena);
                 if (warpComplete)
                 {
-                    // Warp arrival: ability activation is handled by ServerAbility.OnStart
-                    // Just clear warp state here
-                    s.State = ActionState.Idle;
+                    // Warp arrival: velocity cleared, WarpSpeed=0.
+                    // Let the ability continue — lunge and hitboxes are still pending.
+                    // TickAbilities (called after SimulateTick) handles the rest.
                 }
             }
             // Only process state machine if not warping
@@ -218,6 +218,10 @@ namespace SlopArena.Shared
                                 case 6: s.Cooldown5 = spec.CooldownTicks; break;
                             }
                         }
+                        // Zero residual velocity from data-driven lunge/charge attacks
+                        // to prevent drift when transitioning to Idle.
+                        s.VX = 0f;
+                        s.VZ = 0f;
                         s.State = ActionState.Idle;
                         s.AttackSlot = 0;
                         s.ComboStage = 0;
@@ -815,10 +819,10 @@ namespace SlopArena.Shared
                 return true;
             }
 
-            // Set velocity toward target
-            float dist = MathF.Sqrt(distSq);
-            s.VX = (dx / dist) * s.WarpSpeed;
-            s.VZ = (dz / dist) * s.WarpSpeed;
+            // Set velocity toward target: exponential convergence
+            // V = dx * WarpSpeed / TickDt → closes WarpSpeed fraction of remaining distance per tick
+            s.VX = dx * s.WarpSpeed / TickDt;
+            s.VZ = dz * s.WarpSpeed / TickDt;
             s.FacingYaw = MathF.Atan2(dx, dz);
 
             // Position update and collision handled by main SimulateTick loop (steps 5-7)
