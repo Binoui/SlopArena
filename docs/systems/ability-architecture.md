@@ -271,7 +271,27 @@ spell_q_start (AnimIndex=0) → spell_q_loop (AnimIndex=1) → spell_q_end (Anim
    - If `false`: transitions to throw phase
 3. **Tick (throw phase)**: At `throw_trigger_tick`, spawns projectile. At `throw_duration`, calls `EndAbility`
 
-### Aim Data Caching
+### AimMode — Client-Side Camera Routing
+
+Each `AbilitySpec` carries an `AimMode` field (defined in `AbilitySpec.cs`):
+
+```csharp
+public enum AimMode : byte
+{
+    None,            // No aim input; camera free, cursor locked
+    GroundCursor,    // Cursor unlocked; raycast ground → AimYaw + AimDistance
+    CameraForward3D, // Cursor locked; camera yaw+pitch → AimYaw + AimPitch
+}
+```
+
+`TrainingMatch.OnMatchFixedUpdate` reads `spec.AimMode` and routes to `CameraMount.SetMode`:
+- `GroundCursor` → `CameraMode.FreeCursor` (cursor unlocks, `AimIndicator` drives ground ring)
+- `CameraForward3D` → `CameraMode.Frozen` (camera angle held, crosshair drawn, yaw+pitch read from camera)
+- `None` → `CameraMode.Normal` (camera free, cursor locked)
+
+**When adding a new aimed ability**, set `AimMode` on its `AbilitySpec` — no changes to `TrainingMatch` needed.
+
+### Aim Data Caching (server side)
 
 Critical detail: `s.AimTargetDistance` and `s.AimYaw` are overwritten every tick by `SimulateTick`.
 The projectile spawns 10 ticks after the release transition. Cache both values at transition time:
@@ -339,11 +359,9 @@ Cooldown (30 ticks) starts after the attack ends. Total commitment time =
 
 ### Client Integration (TrainingMatch)
 
-The client detects `ChargeAttack` behavior in `OnMatchFixedUpdate` and sets `input.IsAiming = true`
-while the RMB key is held. Unlike Q/R (slots 2+), RMB (slot 1) gates:
-- **No AimIndicator**: `aimingSlot >= 2` check hides the ground indicator and cursor unlock
-- **No camera lock**: `_aimingSlot >= 2` check in `Update()` lets the camera follow freely
-
+`TrainingMatch` reads `spec.AimMode` (not `spec.Behavior`) to determine camera/cursor state.
+RMB has `AimMode = AimMode.None`, so it never triggers cursor unlock or camera freeze — the
+camera follows freely during the charge hold, which is correct.
 ## Test Coverage
 
 All abilities have matching xUnit tests in `tests/Shared.Tests/`:

@@ -8,7 +8,6 @@ using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
-using UnityEngine.InputSystem;
 namespace SlopArena.Client.World
 {
     public enum NpcAiMode
@@ -42,15 +41,11 @@ namespace SlopArena.Client.World
         [Header("Aiming")]
         [SerializeField] private AimIndicator _aimIndicator;
         [SerializeField] private LayerMask _aimGroundMask = 1;
-        private float _cachedCameraYaw;
-        private float _cachedCameraPitch;
-        private bool _isAimingThisTick;
-        private byte _aimingSlot;
+        private CameraMode _activeCameraMode = CameraMode.Normal;
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
 
         private bool _showCrosshair;
-        private bool _prevIsAiming;
         private uint _tick;
         private ServerSimulation _localSim = null!;
         private ArenaDefinition _arenaDef;
@@ -59,10 +54,6 @@ namespace SlopArena.Client.World
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
         private UnityEngine.Camera _mainCamera;
-        private float? _cursorAimYawRad;
-        private float? _cursorAimPitchRad;
-
-        private byte _prevAimingSlot;
         protected override void OnMatchStart()
         {
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
@@ -197,6 +188,13 @@ namespace SlopArena.Client.World
 
             Debug.Log($"[TrainingMatch] Started — arena: {arena.Name}, player at ({pSpawn.X:F1},{pSpawn.Y:F1})");
             _mainCamera = _cameraMount != null ? _cameraMount.RenderCamera : null;
+            if (_aimIndicator != null && _mainCamera != null)
+                _aimIndicator.SetCamera(_mainCamera);
+            if (_cameraMount != null)
+            {
+                _cameraMount.SetMode(CameraMode.Normal);
+                _activeCameraMode = CameraMode.Normal;
+            }
         }
 
         private void Update()
@@ -204,19 +202,6 @@ namespace SlopArena.Client.World
             _inputController.Poll();
             if (_showHitboxes && _localSim != null)
                 DrawHitboxDebug();
-
-            if (_isAimingThisTick && _aimingSlot == 2 && _cameraMount != null)
-            {
-                _cameraMount.SetCameraYawDeg(_cachedCameraYaw);
-                _cameraMount.SetCameraPitchDeg(_cachedCameraPitch);
-            }
-            else if (_cameraMount != null)
-            {
-                _cachedCameraYaw = _cameraMount.GetCameraYawDeg();
-                _cachedCameraPitch = _cameraMount.GetCameraPitchDeg();
-                if (_isAimingThisTick && (_aimingSlot == 3 || _aimingSlot == 4) && _tick % 60 == 0 && _tick > 0)
-                    Debug.Log($"[Camera] tick={_tick} FREE yaw={_cachedCameraYaw:F1} pitch={_cachedCameraPitch:F1} aimingSlot={_aimingSlot}");
-            }
         }
 
         protected override void OnMatchFixedUpdate()
@@ -226,161 +211,80 @@ namespace SlopArena.Client.World
             // Input
             // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
-            if (slot > 0)
-                Debug.Log($"[Input] slot={slot} animLock={_localSim.GetState(PlayerEntityId).AnimLockTicks} tick={_tick}");
-            bool isAiming = false;
+
+            // ── Resolve active aim mode ──
+            AimMode currentAimMode = AimMode.None;
             byte aimingSlot = 0;
 
-            // Pre-set isAiming for hold-to-aim abilities (Q=3, E=4, R=5) when the key
-            // was just pressed and is still held — the hold-to-aim loop below can't
-            // run yet because ps.State == Idle (ability not activated).
-            isAiming = slot switch
+            // Check: was a slot just pressed with a hold-aim key still down?
+            if (slot > 0)
             {
-                3 => _inputController.IsQKeyHeld,
-                4 => _inputController.IsEKeyHeld,
-                5 => _inputController.IsRKeyHeld,
-                _ => false,
-            };
-            if (isAiming) aimingSlot = (byte)(slot - 1);
+                byte slotIdx = (byte)(slot - 1);
+                bool keyHeld = _inputController.IsSlotKeyHeld(slotIdx);
+                var spec = _playerDef.GetSlotAbility(slotIdx, !_localSim.GetState(PlayerEntityId).IsGrounded);
+                if (spec != null && keyHeld && (spec.AimMode == AimMode.GroundCursor || spec.AimMode == AimMode.CameraForward3D))
+                {
+                    currentAimMode = spec.AimMode;
+                    aimingSlot = slotIdx;
+                }
+            }
+
+            // Check: already attacking with an aim ability and key still held
+            if (currentAimMode == AimMode.None)
             {
                 var ps = _localSim.GetState(PlayerEntityId);
                 if (ps.State == ActionState.Attacking && ps.AttackSlot > 0)
                 {
                     byte slotIdx = (byte)(ps.AttackSlot - 1);
                     var spec = _playerDef.GetSlotAbility(slotIdx, !ps.IsGrounded);
-                    if (spec != null && (spec.Behavior == AbilityBehavior.AimedProjectile || spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.Projectile))
+                    if (spec != null && _inputController.IsSlotKeyHeld(slotIdx))
                     {
-                        // Check if the activation key is still held
-                        bool keyHeld;
-                        string keyDiagnostic;
-                        switch (slotIdx)
-                        {
-                            case 0:
-                                keyHeld = Mouse.current != null && Mouse.current.leftButton.isPressed;
-                                keyDiagnostic = $"LMB held={keyHeld} mouse={(Mouse.current != null ? "ok" : "null")}";
-                                break;
-                            case 1:
-                                keyHeld = _inputController.IsRmbHeld;
-                                keyDiagnostic = $"RMB held={keyHeld}";
-                                break;
-                            case 2:
-                                keyHeld = _inputController.IsQKeyHeld;
-                                keyDiagnostic = $"Q held={keyHeld}";
-                                break;
-                            case 3:
-                                keyHeld = _inputController.IsEKeyHeld;
-                                keyDiagnostic = $"E held={keyHeld}";
-                                break;
-                            case 4:  // R — Bazooka (hold-to-aim)
-                                keyHeld = _inputController.IsRKeyHeld;
-                                keyDiagnostic = $"R held={keyHeld}";
-                                break;
-                            default:
-                                keyHeld = true;
-                                keyDiagnostic = "default=true";
-                                break;
-                        }
-                        // Debug.Log($"[Aim] tick={_tick} slot={slotIdx} {keyDiagnostic} spec={spec.Behavior}");
-                        if (keyHeld)
-                        {
-                            isAiming = true;
-                            aimingSlot = slotIdx;
-                        }
-                        else
-                        {
-                            // Debug.Log($"[Aim] tick={_tick} key NOT held — aiming blocked");
-                        }
-                    }
-                    else
-                    {
-                        // Debug.Log($"[Aim] tick={_tick} spec={(spec?.Behavior.ToString() ?? "null")} is not AimedProjectile");
+                        currentAimMode = spec.AimMode;
+                        aimingSlot = slotIdx;
                     }
                 }
-                else
-                {
-                    // Debug.Log($"[Aim] tick={_tick} NOT attacking: state={ps.State} slot={ps.AttackSlot}");
-                }
             }
-            _isAimingThisTick = isAiming;
-            _aimingSlot = aimingSlot;
 
-            _showCrosshair = isAiming && (aimingSlot == 3 || aimingSlot == 4) && _cameraMount != null;
-            if (isAiming != _prevIsAiming && (aimingSlot == 3 || aimingSlot == 4))
-                Debug.Log($"[Crosshair] tick={_tick} show={_showCrosshair} isAiming={isAiming} aimingSlot={aimingSlot}");
+            bool isAiming = currentAimMode != AimMode.None;
 
-            // Debug: log aiming state changes
-            if (isAiming != _prevIsAiming)
+            // ── Drive camera mode (transitions only) ──
+            CameraMode desiredCameraMode = currentAimMode switch
             {
-                var psDbg = _localSim.GetState(PlayerEntityId);
-                Debug.Log($"[Aim] tick={_tick} isAiming={isAiming} slot={slot} aimingSlot={aimingSlot} attackSlot={psDbg.AttackSlot} state={psDbg.State}");
-                _prevIsAiming = isAiming;
-            }
-            if (isAiming && _tick % 10 == 0)
+                AimMode.GroundCursor    => CameraMode.FreeCursor,
+                AimMode.CameraForward3D => CameraMode.Frozen,
+                _                       => CameraMode.Normal,
+            };
+            if (desiredCameraMode != _activeCameraMode)
             {
-                float yaw = _cameraMount != null ? _cameraMount.GetCameraYawDeg() : 0f;
-                float pitch = _cameraMount != null ? _cameraMount.GetCameraPitchDeg() : 0f;
-                Debug.Log($"[Aim] tick={_tick} camera yaw={yaw:F1} pitch={pitch:F1} slot={aimingSlot}");
+                if (desiredCameraMode == CameraMode.Frozen)
+                    _cameraMount.FreezeAtCurrentAngles();
+                _cameraMount.SetMode(desiredCameraMode);
+                _activeCameraMode = desiredCameraMode;
             }
 
-            // During aiming, update the ground indicator and get aim data
+            // ── Collect aim data ──
             float? abilityAimYawRad = null;
             float? abilityAimPitchRad = null;
             ushort? abilityAimDistance = null;
 
-            if (isAiming && _aimIndicator != null && aimingSlot == 2)  // Q — ground indicator
+            if (currentAimMode == AimMode.GroundCursor && _aimIndicator != null)
             {
-                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
-
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-
                 _aimIndicator.SetAiming(true);
                 _aimIndicator.UpdateAim();
+                (abilityAimYawRad, abilityAimDistance) = _aimIndicator.GetAimInput();
             }
-            else if (isAiming && (aimingSlot == 3 || aimingSlot == 4))  // E/R — TPS camera aim
+            else
             {
-                if (_aimIndicator != null)
-                    _aimIndicator.SetAiming(false);
+                if (_aimIndicator != null) _aimIndicator.SetAiming(false);
 
-                // Cursor stays locked; visible cursor doesn't work with Locked mode
-                if (Cursor.lockState != CursorLockMode.Locked)
-                    Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-
-                // Aim direction = camera forward (player looks where camera points)
-                // Negate pitch: Cinemachine VerticalAxis positive = camera above target (looking down),
-                // but server expects positive pitch = looking UP.
-                if (_cameraMount != null)
+                if (currentAimMode == AimMode.CameraForward3D && _cameraMount != null)
                 {
-                    abilityAimYawRad = _cameraMount.GetCameraYawRad();
+                    abilityAimYawRad   = _cameraMount.GetCameraYawRad();
                     abilityAimPitchRad = -_cameraMount.GetCameraPitchDeg() * Mathf.Deg2Rad;
-                    _cursorAimYawRad = abilityAimYawRad;
-                    _cursorAimPitchRad = abilityAimPitchRad;
-                }
-            }
-            else  // Not aiming or other slots — cursor locked
-            {
-                if (_aimIndicator != null)
-                    _aimIndicator.SetAiming(false);
-                if (Cursor.lockState != CursorLockMode.Locked)
-                {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
-                }
-                // Clear stored R/E aim unless this is the release frame
-                if (_prevAimingSlot != 3 && _prevAimingSlot != 4)
-                {
-                    _cursorAimYawRad = null;
-                    _cursorAimPitchRad = null;
                 }
             }
 
-            // Override with stored cursor aim from R/E (survives release frame)
-            if (_cursorAimYawRad.HasValue)
-            {
-                abilityAimYawRad = _cursorAimYawRad;
-                abilityAimPitchRad = _cursorAimPitchRad;
-            }
+            _showCrosshair = currentAimMode == AimMode.CameraForward3D;
 
             // Compute screen-center target for soft-lock
             byte targetEntityId = PickScreenTarget(
@@ -436,7 +340,6 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
-            _prevAimingSlot = aimingSlot;
         }
         /// <summary>
         /// Builds a synthetic InputState for the NPC dummy.

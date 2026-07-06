@@ -4,13 +4,23 @@ using UnityEngine.InputSystem;
 
 namespace SlopArena.Client.Camera
 {
+    public enum CameraMode
+    {
+        Normal,       // Cursor locked, camera orbits freely
+        Frozen,       // Cursor locked, camera yaw/pitch held constant
+        FreeCursor,   // Cursor unlocked, camera yaw/pitch held constant
+    }
+
     [RequireComponent(typeof(CinemachineCamera))]
     [RequireComponent(typeof(CinemachineOrbitalFollow))]
     public class CameraMount : MonoBehaviour
     {
-
         private CinemachineCamera _cmCam;
         private CinemachineOrbitalFollow _orbital;
+
+        private CameraMode _mode = CameraMode.Normal;
+        private float _frozenYaw;
+        private float _frozenPitch;
 
         private void Awake()
         {
@@ -24,28 +34,61 @@ namespace SlopArena.Client.Camera
         /// <summary>
         /// The real Unity Camera that this mount drives.
         /// </summary>
-        public UnityEngine.Camera RenderCamera => GetComponent<UnityEngine.Camera>();
+        public UnityEngine.Camera RenderCamera => GetComponentInChildren<UnityEngine.Camera>();
         private void Start()
         {
-            Cursor.lockState = CursorLockMode.Locked;
+            SetMode(CameraMode.Normal);
         }
 
         private void Update()
         {
             if (_orbital == null) return;
-            
-            // Scroll wheel zoom
-            float dy = Mouse.current.scroll.ReadValue().y;
-            if (Mathf.Abs(dy) > 0.001f)
-                _orbital.RadialAxis.Value -= dy * 0.05f;
 
-            // Manual vertical mouse look using Input System delta.
-            // -= gives FPS-style: mouse UP → VerticalAxis decreases → camera orbits lower → looks up.
-            // Awake() sets Range(-80,80) so camera can go below target (negative = looking up).
-            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-            if (Mathf.Abs(mouseDelta.y) > 0.001f)
-                _orbital.VerticalAxis.Value -= mouseDelta.y * 0.1f;
+            // Only process mouse input in Normal mode
+            if (_mode == CameraMode.Normal)
+            {
+                float dy = Mouse.current.scroll.ReadValue().y;
+                if (Mathf.Abs(dy) > 0.001f)
+                    _orbital.RadialAxis.Value -= dy * 0.05f;
+
+                Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+                if (Mathf.Abs(mouseDelta.y) > 0.001f)
+                    _orbital.VerticalAxis.Value -= mouseDelta.y * 0.1f;
+            }
+
+            // In Frozen/FreeCursor modes, re-apply cached angles to resist Cinemachine drift
+            if (_mode == CameraMode.Frozen || _mode == CameraMode.FreeCursor)
+            {
+                SetCameraYawDeg(_frozenYaw);
+                SetCameraPitchDeg(_frozenPitch);
+            }
         }
+        public void SetMode(CameraMode mode)
+        {
+            _mode = mode;
+            switch (mode)
+            {
+                case CameraMode.Normal:
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                    break;
+                case CameraMode.Frozen:
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                    break;
+                case CameraMode.FreeCursor:
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    break;
+            }
+        }
+
+        public void FreezeAtCurrentAngles()
+        {
+            _frozenYaw = GetCameraYawDeg();
+            _frozenPitch = GetCameraPitchDeg();
+        }
+
 
         public void SetTarget(Transform target)
         {
