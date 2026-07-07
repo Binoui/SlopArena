@@ -3,7 +3,7 @@ using SlopArena.Shared;
 
 namespace SlopArena.Client.Simulation
 {
-    public class LocalSimulationBridge
+    public class LocalSimulationBridge : ISimulationBridge
     {
         private readonly ServerSimulation _server;
         private readonly ArenaDefinition _arena;
@@ -22,6 +22,6 @@ namespace SlopArena.Client.Simulation
 
         public CharacterState GetState(ulong id) => _server.GetState(id);
         public Dictionary<ulong, CharacterState> GetAllStates() => _server.GetAllStates();
-        public SpellResolver Resolver => _server.Resolver;
+        public SpellResolver? Resolver => _server.Resolver;
     }
 }

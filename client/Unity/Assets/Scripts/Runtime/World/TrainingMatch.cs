@@ -175,9 +175,8 @@ namespace SlopArena.Client.World
             byte slot = _inputController.ConsumePendingSlotPress();
 
             // ── Aim ──
-            var playerState = _localSim.GetState(PlayerEntityId);
             var aimCtx = _aimHandler != null
-                ? _aimHandler.Evaluate(playerState, slot, _playerDef, _inputController)
+                ? _aimHandler.Evaluate(_localSim.GetState(PlayerEntityId), slot, _playerDef, _inputController)
                 : AimContext.None;
             _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
 
