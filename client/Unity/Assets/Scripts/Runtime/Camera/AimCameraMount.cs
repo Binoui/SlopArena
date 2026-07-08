@@ -38,6 +38,10 @@ namespace SlopArena.Client.Camera
         [Tooltip("Up offset in pivot-local space. Raises the aim camera slightly above eye level.")]
         [SerializeField] private float _shoulderOffsetY = 0.3f;
 
+        [Header("Launch Height")]
+        [Tooltip("Vertical offset applied to the pivot origin. Match the projectile spawn Y offset so the aim ray originates from the same height as the projectile. Default 1.0 matches the server-side 1m launch offset.")]
+        [SerializeField] private float _pivotHeightOffset = 1.0f;
+
         private bool _active;
         private float _yawDeg;
         private float _pitchDeg;
@@ -66,7 +70,7 @@ namespace SlopArena.Client.Camera
 
             // Seed pivot so ForceCameraPosition starts from the right spot — prevents the blend
             // from jumping if Cinemachine sampled the previous position before priority raised.
-            _pivot.position = player.position;
+            _pivot.position = player.position + Vector3.up * _pivotHeightOffset;
             _pivot.rotation = Quaternion.Euler(_pitchDeg, _yawDeg, 0f);
 
             ApplyCameraTransform();
@@ -94,7 +98,7 @@ namespace SlopArena.Client.Camera
         public void Tick(Transform player)
         {
             if (!_active || _pivot == null) return;
-            _pivot.position = player.position;
+            _pivot.position = player.position + Vector3.up * _pivotHeightOffset;
             ApplyCameraTransform();
         }
 
