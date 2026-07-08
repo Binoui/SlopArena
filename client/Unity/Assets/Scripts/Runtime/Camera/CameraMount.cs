@@ -45,19 +45,18 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
 
-            // Normal — pitch locked, scroll still works for zoom
+            // Normal — mouse controls yaw+pitch freely, scroll still works for zoom
             if (_mode == CameraMode.Normal)
             {
                 float dy = Mouse.current.scroll.ReadValue().y;
                 if (Mathf.Abs(dy) > 0.001f)
                     _orbital.RadialAxis.Value -= dy * 0.05f;
-
-                // Lock pitch — re-apply cached value each frame
-                SetCameraPitchDeg(_frozenPitch);
+                // Pitch and yaw handled by Cinemachine's built-in orbital input
             }
             else if (_mode == CameraMode.Frozen)
             {
-                // Lock pitch — camera stays at frozen angles (reticle moves, not camera)
+                // Lock both yaw and pitch — camera stays put, crosshair moves on screen
+                SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
             else if (_mode == CameraMode.FreeCursor)
@@ -96,6 +95,19 @@ namespace SlopArena.Client.Camera
         {
             _frozenYaw = GetCameraYawDeg();
             _frozenPitch = GetCameraPitchDeg();
+        }
+
+        /// <summary>
+        /// Accumulate mouse delta into the frozen camera orbit angles.
+        /// Only meaningful in Frozen mode — updates _frozenYaw and _frozenPitch.
+        /// deltaDeg = delta pixels * sensitivity (already scaled).
+        /// </summary>
+        public void OrbitFrozen(Vector2 deltaDeg)
+        {
+            if (_mode != CameraMode.Frozen) return;
+            _frozenYaw += deltaDeg.x;
+            _frozenPitch -= deltaDeg.y;
+            _frozenPitch = Mathf.Clamp(_frozenPitch, -60f, 60f);
         }
 
 
@@ -141,7 +153,12 @@ namespace SlopArena.Client.Camera
         {
             return _orbital != null ? _orbital.VerticalAxis.Value : 0f;
         }
-
+        public float GetOrbitRadius()
+        {
+            if (_orbital == null) return 2.5f;
+            // Actual camera distance = base Radius multiplied by scroll-adjusted RadialAxis
+            return _orbital.Radius * _orbital.RadialAxis.Value;
+        }
         public float GetCameraYawRad()
         {
             return GetCameraYawDeg() * Mathf.Deg2Rad;

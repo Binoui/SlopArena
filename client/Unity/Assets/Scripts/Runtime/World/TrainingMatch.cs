@@ -44,6 +44,7 @@ namespace SlopArena.Client.World
         [SerializeField] private bool _showHitboxes;
         [SerializeField] private Texture2D _crosshairTexture;
         [SerializeField] private float _crosshairSize = 32f;
+        [SerializeField] private float _crosshairOffsetX = 30f;
 
         private bool _showCrosshair;
         private uint _tick;
@@ -414,7 +415,7 @@ namespace SlopArena.Client.World
         {
             if (!_showCrosshair) return;
 
-            float cx = Screen.width  * 0.5f;
+            float cx = Screen.width  * 0.5f + _crosshairOffsetX;
             float cy = Screen.height * 0.5f;
 
             if (_crosshairTexture != null)
