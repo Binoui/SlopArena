@@ -18,6 +18,7 @@ namespace SlopArena.Client.Camera
     {
         private CinemachineCamera _cmCam;
         private CinemachineOrbitalFollow _orbital;
+        private InputAxisController _inputAxisController;
 
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
@@ -27,6 +28,7 @@ namespace SlopArena.Client.Camera
         {
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
+            _inputAxisController = GetComponent<InputAxisController>();
             // Clamp pitch so camera stays above the stage floor level
             if (_orbital != null)
                 _orbital.VerticalAxis.Range = new Vector2(0f, 45f);
@@ -75,18 +77,27 @@ namespace SlopArena.Client.Camera
                 case CameraMode.Normal:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Frozen:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.FreeCursor:
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Aiming:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    // Disable InputAxisController so the orbital camera stops consuming
+                    // mouse input in the background while AimCameraMount owns the mouse.
+                    if (_inputAxisController != null) _inputAxisController.enabled = false;
+                    // Freeze orbital at current angles so it's ready to blend back to
+                    // the right position when aiming ends.
+                    FreezeAtCurrentAngles();
                     break;
             }
         }
