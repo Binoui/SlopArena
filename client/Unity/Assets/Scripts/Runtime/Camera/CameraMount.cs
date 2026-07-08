@@ -9,6 +9,7 @@ namespace SlopArena.Client.Camera
         Normal,       // Cursor locked, camera orbits freely
         Frozen,       // Cursor locked, camera yaw/pitch held constant
         FreeCursor,   // Cursor unlocked, camera yaw/pitch held constant
+        Aiming,       // Cursor locked, orbital camera frozen, AimCameraMount drives aim camera
     }
 
     [RequireComponent(typeof(CinemachineCamera))]
@@ -65,6 +66,7 @@ namespace SlopArena.Client.Camera
                 SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
+            // CameraMode.Aiming: do nothing — AimCameraMount owns all mouse input
         }
         public void SetMode(CameraMode mode)
         {
@@ -82,6 +84,10 @@ namespace SlopArena.Client.Camera
                 case CameraMode.FreeCursor:
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+                    break;
+                case CameraMode.Aiming:
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
                     break;
             }
         }
