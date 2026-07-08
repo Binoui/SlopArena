@@ -28,6 +28,10 @@ namespace SlopArena.Client.Camera
         [SerializeField] private float _pitchMin = -60f;
         [SerializeField] private float _pitchMax =  60f;
 
+        [Header("Aim Defaults")]
+        [Tooltip("Starting pitch when aim camera activates. Positive = above horizon. 10 puts crosshair roughly at enemy chest height at range.")]
+        [SerializeField] private float _defaultPitchDeg = 10f;
+
         [Header("Shoulder Offset")]
         [Tooltip("Right offset in pivot-local space. Positive = right shoulder. Character ends up left of center.")]
         [SerializeField] private float _shoulderOffsetX = 0.5f;
@@ -58,7 +62,7 @@ namespace SlopArena.Client.Camera
 
             _followDistance = followDistance;
             _yawDeg         = facingYawRad * Mathf.Rad2Deg;
-            _pitchDeg       = 0f;
+            _pitchDeg       = -_defaultPitchDeg; // negative: Unity Euler positive-X = tilt down
 
             // Seed pivot so ForceCameraPosition starts from the right spot — prevents the blend
             // from jumping if Cinemachine sampled the previous position before priority raised.

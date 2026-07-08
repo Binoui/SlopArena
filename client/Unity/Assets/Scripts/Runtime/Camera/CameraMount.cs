@@ -21,15 +21,15 @@ namespace SlopArena.Client.Camera
 
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
-        private float _frozenPitch = 17.5f;
+        private float _frozenPitch = 15f;
 
         private void Awake()
         {
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
-            // Allow camera to orbit below target (negative VerticalAxis = looking UP)
+            // Clamp pitch so camera stays above the stage floor level
             if (_orbital != null)
-                _orbital.VerticalAxis.Range = new Vector2(-30f, 50f);
+                _orbital.VerticalAxis.Range = new Vector2(0f, 45f);
         }
         
         /// <summary>
@@ -128,7 +128,7 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
             _orbital.HorizontalAxis.Value = target.eulerAngles.y;
-            _orbital.VerticalAxis.Value = 17.5f;
+            _orbital.VerticalAxis.Value = 15f;
         }
 
 
