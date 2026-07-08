@@ -154,10 +154,10 @@ Assign the crosshair asset in the Inspector. `ShowCrosshair` is already `true` f
 ## Wiring in Inspector (Arena_Offline scene)
 
 1. Create `AimCamera` GameObject as child of `CameraRig`
-2. Add `CinemachineCamera` + `CinemachineFollow` components; set priority = 0
-3. Create `AimPivot` GameObject (world-sibling of player); assign to `AimCameraMount._pivot`
+2. Add `CinemachineCamera` + `CinemachineFollow` + `AimCameraMount` components to `AimCamera`; set priority = 0
+3. Create `AimPivot` empty GameObject as child of `CameraRig`; assign to `AimCameraMount._pivot`
 4. Set `AimCamera` Follow target = `AimPivot`; set LookAt = player capsule root
-5. Add `AimCameraMount` component; wire `_aimCinemachineCamera` = `AimCamera`
+5. Wire `AimCameraMount._aimCinemachineCamera` = the `CinemachineCamera` on the same object
 6. In `TrainingMatch` Inspector: wire `_aimCameraMount`, assign `_crosshairTexture`
 7. In `AimHandler` Inspector: wire `_aimCameraMount`
 
