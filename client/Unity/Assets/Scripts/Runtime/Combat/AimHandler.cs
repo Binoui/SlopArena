@@ -20,10 +20,12 @@ namespace SlopArena.Client.Combat
     {
         [SerializeField] private AimIndicator _aimIndicator;
         [SerializeField] private CameraMount _cameraMount;
+        [SerializeField] private AimCameraMount _aimCameraMount;
+        [SerializeField] private float _aimSensitivity = 0.15f;
 
         private CameraMode _activeMode = CameraMode.Normal;
         private byte _aimingSlot;
-        private float _aimPitchOffsetDeg;
+        private Transform _characterTransform;
 
         /// <summary>True when a CameraForward3D ability is active — caller draws the crosshair.</summary>
         public bool ShowCrosshair { get; private set; }
@@ -35,6 +37,7 @@ namespace SlopArena.Client.Combat
         public void Init(CameraMount cameraMount, UnityEngine.Camera renderCamera, Transform characterTransform, float capsuleHeight)
         {
             _cameraMount = cameraMount;
+            _characterTransform = characterTransform;
             if (_aimIndicator != null)
             {
                 _aimIndicator.SetCamera(renderCamera);
@@ -95,18 +98,31 @@ namespace SlopArena.Client.Combat
             CameraMode desired = aimMode switch
             {
                 AimMode.GroundCursor    => CameraMode.FreeCursor,
-                AimMode.CameraForward3D => CameraMode.Frozen,
+                AimMode.CameraForward3D => CameraMode.Aiming,
                 _                       => CameraMode.Normal,
             };
 
             if (desired != _activeMode)
             {
-                // Capture camera angles before any mode switch that freezes orientation
-                if (desired is CameraMode.Frozen or CameraMode.FreeCursor)
+                if (desired == CameraMode.Aiming && _characterTransform != null)
+                {
+                    // Snap aim camera behind character, then let Cinemachine blend
+                    _aimCameraMount?.Activate(_characterTransform, playerState.FacingYaw);
+                }
+                else if (_activeMode == CameraMode.Aiming)
+                {
+                    // Leaving aim mode — lower aim camera priority
+                    _aimCameraMount?.Deactivate();
+                }
+
+                // GroundCursor still needs FreezeAtCurrentAngles for the orbital camera
+                if (desired == CameraMode.FreeCursor)
                     _cameraMount?.FreezeAtCurrentAngles();
-                // Reset reticle pitch offset when entering camera-relative aim
+
+                // Frozen mode (not used by CameraForward3D anymore) still needs angle capture
                 if (desired == CameraMode.Frozen)
-                    _aimPitchOffsetDeg = 0f;
+                    _cameraMount?.FreezeAtCurrentAngles();
+
                 _cameraMount?.SetMode(desired);
                 _activeMode = desired;
             }
@@ -130,18 +146,17 @@ namespace SlopArena.Client.Combat
             {
                 if (_aimIndicator != null) _aimIndicator.SetAiming(false);
 
-                if (aimMode == AimMode.CameraForward3D && _cameraMount != null)
+                if (aimMode == AimMode.CameraForward3D && _aimCameraMount != null)
                 {
-                    // Accumulate mouse Y as pitch offset (camera stays frozen)
+                    _aimCameraMount.Tick(_characterTransform);
                     Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                    if (Mathf.Abs(mouseDelta.y) > 0.001f)
-                        _aimPitchOffsetDeg -= mouseDelta.y * 0.1f;
+                    _aimCameraMount.ApplyMouseDelta(mouseDelta, _aimSensitivity);
 
                     ctx = new AimContext
                     {
                         IsAiming    = true,
-                        AimYawRad   = _cameraMount.GetCameraYawRad(),
-                        AimPitchRad = -(_cameraMount.GetCameraPitchDeg() + _aimPitchOffsetDeg) * Mathf.Deg2Rad,
+                        AimYawRad   = _aimCameraMount.GetAimYawRad(),
+                        AimPitchRad = _aimCameraMount.GetAimPitchRad(),
                     };
                 }
             }
