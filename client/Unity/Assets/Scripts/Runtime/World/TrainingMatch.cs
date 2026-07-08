@@ -42,6 +42,8 @@ namespace SlopArena.Client.World
         [SerializeField] private AimHandler _aimHandler;
         [SerializeField] private HUDManager _hudManager;
         [SerializeField] private bool _showHitboxes;
+        [SerializeField] private Texture2D _crosshairTexture;
+        [SerializeField] private float _crosshairSize = 32f;
 
         private bool _showCrosshair;
         private uint _tick;
@@ -412,16 +414,25 @@ namespace SlopArena.Client.World
         {
             if (!_showCrosshair) return;
 
-            float cx = Screen.width * 0.5f;
+            float cx = Screen.width  * 0.5f;
             float cy = Screen.height * 0.5f;
 
-            var style = new GUIStyle(GUI.skin.label)
+            if (_crosshairTexture != null)
             {
-                fontSize = 28,
-                alignment = TextAnchor.MiddleCenter,
-                normal = { textColor = Color.white }
-            };
-            GUI.Label(new Rect(cx - 20, cy - 20, 40, 40), "+", style);
+                float half = _crosshairSize * 0.5f;
+                GUI.DrawTexture(new Rect(cx - half, cy - half, _crosshairSize, _crosshairSize), _crosshairTexture);
+            }
+            else
+            {
+                // Fallback: plain + label until texture is assigned in Inspector
+                var style = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 28,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = Color.white }
+                };
+                GUI.Label(new Rect(cx - 20, cy - 20, 40, 40), "+", style);
+            }
         }
     }
 }
