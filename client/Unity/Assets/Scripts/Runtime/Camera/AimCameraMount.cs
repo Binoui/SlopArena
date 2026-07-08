@@ -6,13 +6,19 @@ namespace SlopArena.Client.Camera
     /// <summary>
     /// Owns the dedicated aim camera for CameraForward3D abilities (Bazooka, Grapple).
     ///
-    /// Attach to the AimCamera GameObject alongside CinemachineCamera + CinemachineFollow.
+    /// Attach to the AimCamera GameObject alongside CinemachineCamera only.
+    /// Do NOT add CinemachineFollow — position is driven manually via ForceCameraPosition
+    /// so the camera sits at orbital distance with a shoulder offset, without Cinemachine fighting it.
+    ///
+    /// Pivot follows the player and rotates with mouse input.
+    /// Camera = pivot.position + pivot.rotation * (shoulderX, shoulderY, -followDistance)
+    /// Camera rotation = pivot.rotation  →  screen center = aim ray = projectile direction.
     ///
     /// Usage:
-    ///   Activate(playerTransform, facingYawRad)  — snap behind character, raise priority
-    ///   Tick(playerTransform)                    — called every FixedUpdate while active
-    ///   ApplyMouseDelta(delta, sensitivity)       — rotate pivot from mouse input
-    ///   Deactivate()                             — lower priority, Cinemachine blends back
+    ///   Activate(playerTransform, facingYawRad, followDistance)  — snap behind character, raise priority
+    ///   Tick(playerTransform)                                     — called every FixedUpdate while active
+    ///   ApplyMouseDelta(delta, sensitivity)                       — rotate pivot from mouse input
+    ///   Deactivate()                                              — lower priority, Cinemachine blends back
     /// </summary>
     public class AimCameraMount : MonoBehaviour
     {
@@ -21,11 +27,17 @@ namespace SlopArena.Client.Camera
 
         [SerializeField] private float _pitchMin = -60f;
         [SerializeField] private float _pitchMax =  60f;
-        [SerializeField] private bool _inheritOrbitDistance = true;
+
+        [Header("Shoulder Offset")]
+        [Tooltip("Right offset in pivot-local space. Positive = right shoulder. Character ends up left of center.")]
+        [SerializeField] private float _shoulderOffsetX = 0.5f;
+        [Tooltip("Up offset in pivot-local space. Raises the aim camera slightly above eye level.")]
+        [SerializeField] private float _shoulderOffsetY = 0.3f;
+
         private bool _active;
         private float _yawDeg;
         private float _pitchDeg;
-        private CinemachineFollow _follow;
+        private float _followDistance = 2.5f;
 
         private void Awake()
         {
@@ -33,30 +45,27 @@ namespace SlopArena.Client.Camera
             // Activate raises to 20; Deactivate drops back to -1.
             if (_aimCinemachineCamera != null)
                 _aimCinemachineCamera.Priority = -1;
-            _follow = GetComponent<CinemachineFollow>();
         }
+
         /// <summary>
         /// Snap the aim camera behind the character and raise priority so Cinemachine blends in.
-        /// facingYawRad: camera's current yaw direction in radians.
+        /// facingYawRad: camera's current yaw in radians — aim camera inherits this so the blend is seamless.
         /// followDistance: orbital camera's current zoom radius — aim camera inherits this distance.
         /// </summary>
         public void Activate(Transform player, float facingYawRad, float followDistance = 2.5f)
         {
             if (_pivot == null || _aimCinemachineCamera == null) return;
 
-            _yawDeg   = facingYawRad * Mathf.Rad2Deg;
-            _pitchDeg = 0f;
+            _followDistance = followDistance;
+            _yawDeg         = facingYawRad * Mathf.Rad2Deg;
+            _pitchDeg       = 0f;
 
+            // Seed pivot so ForceCameraPosition starts from the right spot — prevents the blend
+            // from jumping if Cinemachine sampled the previous position before priority raised.
             _pivot.position = player.position;
             _pivot.rotation = Quaternion.Euler(_pitchDeg, _yawDeg, 0f);
 
-            // Inherit orbital zoom distance so aim camera feels like the same zoom level
-            if (_inheritOrbitDistance && _follow != null)
-            {
-                Vector3 offset = _follow.FollowOffset;
-                offset.z = -followDistance;
-                _follow.FollowOffset = offset;
-            }
+            ApplyCameraTransform();
 
             _aimCinemachineCamera.Priority = 20;
             _active = true;
@@ -64,7 +73,7 @@ namespace SlopArena.Client.Camera
 
         /// <summary>
         /// Lower priority so Cinemachine blends back to the orbital camera.
-        /// Uses -1 so orbital's 0 is always higher — avoids priority tie where Brain may stay on aim cam.
+        /// Uses -1 so orbital's 0 is always higher.
         /// </summary>
         public void Deactivate()
         {
@@ -74,18 +83,15 @@ namespace SlopArena.Client.Camera
         }
 
         /// <summary>
-        /// Reposition the pivot to track the player each FixedUpdate tick.
-        /// The player moves during aiming — keep the camera following.
-        /// Also faces the AimCamera in the aim direction (no HardLookAt on scene).
+        /// Reposition the pivot to track the player each FixedUpdate tick, then push
+        /// the computed camera position+rotation to Cinemachine via ForceCameraPosition.
+        /// Call before ApplyMouseDelta.
         /// </summary>
         public void Tick(Transform player)
         {
             if (!_active || _pivot == null) return;
             _pivot.position = player.position;
-
-            // Camera faces the aim direction so crosshair at screen center = projectile direction
-            if (_aimCinemachineCamera != null)
-                _aimCinemachineCamera.transform.rotation = _pivot.rotation;
+            ApplyCameraTransform();
         }
 
         /// <summary>
@@ -98,13 +104,31 @@ namespace SlopArena.Client.Camera
 
             _yawDeg   += delta.x * sensitivity;
             _pitchDeg -= delta.y * sensitivity; // invert Y: mouse down = aim down
+            _pitchDeg  = Mathf.Clamp(_pitchDeg, _pitchMin, _pitchMax);
 
-            _pitchDeg = Mathf.Clamp(_pitchDeg, _pitchMin, _pitchMax);
             _pivot.rotation = Quaternion.Euler(_pitchDeg, _yawDeg, 0f);
+            ApplyCameraTransform();
+        }
+
+        /// <summary>
+        /// Compute world-space camera position (pivot + shoulder offset at follow distance)
+        /// and push it to the CinemachineCamera via ForceCameraPosition.
+        /// This bypasses CinemachineFollow so Cinemachine cannot fight the placement.
+        /// </summary>
+        private void ApplyCameraTransform()
+        {
+            if (_aimCinemachineCamera == null || _pivot == null) return;
+
+            // Shoulder offset in pivot-local space: right, up, back
+            Vector3 localOffset = new Vector3(_shoulderOffsetX, _shoulderOffsetY, -_followDistance);
+            Vector3 worldPos    = _pivot.position + _pivot.rotation * localOffset;
+            Quaternion worldRot = _pivot.rotation;
+
+            _aimCinemachineCamera.ForceCameraPosition(worldPos, worldRot);
         }
 
         /// <summary>Aim yaw in radians — fed into AimContext.AimYawRad.</summary>
-        public float GetAimYawRad()   => _yawDeg * Mathf.Deg2Rad;
+        public float GetAimYawRad() => _yawDeg * Mathf.Deg2Rad;
 
         /// <summary>
         /// Aim pitch in radians — fed into AimContext.AimPitchRad.

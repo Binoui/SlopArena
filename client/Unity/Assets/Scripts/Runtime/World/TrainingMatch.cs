@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Unity.Cinemachine;
 using System;
 using UnityEngine;
 using SlopArena.Shared;
@@ -44,7 +45,6 @@ namespace SlopArena.Client.World
         [SerializeField] private bool _showHitboxes;
         [SerializeField] private Texture2D _crosshairTexture;
         [SerializeField] private float _crosshairSize = 32f;
-        [SerializeField] private float _crosshairOffsetX = 30f;
 
         private bool _showCrosshair;
         private uint _tick;
@@ -157,6 +157,11 @@ namespace SlopArena.Client.World
                 _cameraMount.SetTarget(_playerRenderer.transform);
                 _cameraMount.ResetView(_playerRenderer.transform);
             }
+
+            // Set a short blend so the aim camera transition feels smooth but not sluggish
+            var brain = FindFirstObjectByType<CinemachineBrain>();
+            if (brain != null)
+                brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.2f);
 
             // Init AimHandler — owns AimIndicator + camera mode transitions
             _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera, _playerRenderer.transform, playerDef.CapsuleHeight);
@@ -415,7 +420,7 @@ namespace SlopArena.Client.World
         {
             if (!_showCrosshair) return;
 
-            float cx = Screen.width  * 0.5f + _crosshairOffsetX;
+            float cx = Screen.width  * 0.5f;
             float cy = Screen.height * 0.5f;
 
             if (_crosshairTexture != null)
