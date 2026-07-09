@@ -18,36 +18,20 @@ namespace SlopArena.Client.World
     /// </summary>
     public class PvPMatch : MatchBase
     {
-        [Header("Entities")]
-        [SerializeField] private PlayerRenderer _playerRenderer;
+        [Header("Entities (Opponent)")]
         [SerializeField] private PlayerRenderer _opponentRenderer;
 
-        [Header("Input")]
-        [SerializeField] private InputController _inputController;
-        [SerializeField] private CameraMount _cameraMount;
+        [Header("Characters (Opponent)")]
+        [SerializeField] private CharacterClass _opponentClass = CharacterClass.Manki;
 
         [Header("Network")]
         [SerializeField] private NetworkClient _networkClient;
 
-        [Header("Arena")]
-        [SerializeField] private string _arenaName = "training";
-
-        [Header("Characters")]
-        [SerializeField] private CharacterClass _playerClass = CharacterClass.Manki;
-        [SerializeField] private CharacterClass _opponentClass = CharacterClass.Manki;
-
-        [Header("Aiming")]
-        [SerializeField] private AimHandler _aimHandler;
-        [SerializeField] private HUDManager _hudManager;
-
-        private const ulong PlayerEntityId = 1;
         private const ulong OpponentEntityId = 2;
 
-        private bool _showCrosshair;
         private uint _tick;
-        private CharacterDefinition _playerDef = null!;
         private NetworkSimulationBridge _bridge = null!;
-        private UnityEngine.Camera _mainCamera;
+        protected override ISimulationBridge Bridge => _bridge;
 
         protected override void OnMatchStart()
         {
@@ -77,31 +61,12 @@ namespace SlopArena.Client.World
             var playerDef = CharacterRegistry.Get(_playerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
-
             var opponentDef = CharacterRegistry.Get(_opponentClass);
             var opponentBaked = LoadBakedData(opponentDef);
 
-            // HUD
-            _hudManager?.Initialize(() => _bridge.GetState(PlayerEntityId));
-            _hudManager?.SetCharacterDefinition(playerDef);
-            for (int slot = 0; slot < 6; slot++)
-            {
-                var spec = playerDef.GetSlotAbility(slot, airborne: false);
-                if (spec != null)
-                    _hudManager?.SetSlotMaxCooldown(slot, spec.CooldownTicks);
-                var specAir = playerDef.GetSlotAbility(slot, airborne: true);
-                if (specAir != null && specAir.CooldownTicks > spec?.CooldownTicks)
-                    _hudManager?.SetSlotMaxCooldown(slot, specAir.CooldownTicks);
-            }
-
-            // Player renderer
-            _playerRenderer.ModelYOffset = playerDef.ModelYOffset;
-            _playerRenderer.CapsuleRadius = playerDef.CapsuleRadius;
-            _playerRenderer.CapsuleHeight = playerDef.CapsuleHeight;
-            _playerRenderer.HurtboxBoneDefs = playerDef.HurtboxBoneDefs;
-            _playerRenderer.SetBakedData(playerBaked);
-            _playerRenderer.SetCharacterDefinition(playerDef);
-            _playerRenderer.LoadModel(playerDef);
+            // Shared player renderer + HUD setup
+            SetupPlayerRenderer(playerDef, playerBaked);
+            SetupHUD(playerDef);
 
             // Opponent renderer
             if (_opponentRenderer != null)
@@ -122,15 +87,9 @@ namespace SlopArena.Client.World
             if (_opponentRenderer != null && spawnPoints.Length > 1)
                 _opponentRenderer.transform.position = new Vector3(spawnPoints[1].X, spawnPoints[1].Y, spawnPoints[1].Z);
 
-            // Camera
-            if (_cameraMount != null)
-            {
-                _cameraMount.SetTarget(_playerRenderer.transform);
-                _cameraMount.ResetView(_playerRenderer.transform);
-            }
-
-            // Aim
-            _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera);
+            // Shared camera + aim setup
+            SetupCamera();
+            SetupAimHandler(playerDef);
         }
 
         private void Update()
@@ -182,51 +141,6 @@ namespace SlopArena.Client.World
                 Debug.Log($"[PvP] tick={_tick} connected={_networkClient.IsServerConnected} " +
                           $"pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) serverTick={_networkClient.LastServerTick}");
             }
-        }
-
-        private byte PickScreenTarget(PlayerRenderer[] renderers, UnityEngine.Camera cam)
-        {
-            if (cam == null || renderers == null || renderers.Length == 0 || _playerRenderer == null)
-                return 0;
-
-            byte bestId = 0;
-            float bestScreenDist = float.MaxValue;
-            Vector2 screenCenter = new(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f);
-            Vector3 playerPos = _playerRenderer.transform.position;
-
-            foreach (var renderer in renderers)
-            {
-                if (renderer == null || renderer == _playerRenderer || renderer.EntityId == 0)
-                    continue;
-
-                Vector3 worldPos = renderer.transform.position;
-                Vector3 screenPos3 = cam.WorldToScreenPoint(worldPos);
-                if (screenPos3.z < 0) continue;
-
-                float screenDist = Vector2.Distance(new Vector2(screenPos3.x, screenPos3.y), screenCenter);
-                float worldDist = Vector3.Distance(playerPos, worldPos);
-
-                if (screenDist < bestScreenDist && worldDist <= 20f)
-                {
-                    bestScreenDist = screenDist;
-                    bestId = (byte)renderer.EntityId;
-                }
-            }
-            return bestId;
-        }
-
-        private void OnGUI()
-        {
-            if (!_showCrosshair) return;
-            float cx = Screen.width * 0.5f;
-            float cy = Screen.height * 0.5f;
-            var style = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 28,
-                alignment = TextAnchor.MiddleCenter,
-                normal = { textColor = Color.white }
-            };
-            GUI.Label(new Rect(cx - 20, cy - 20, 40, 40), "+", style);
         }
     }
 }

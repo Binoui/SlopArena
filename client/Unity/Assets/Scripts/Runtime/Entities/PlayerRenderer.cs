@@ -1,3 +1,4 @@
+using System;
 using SlopArena.Shared;
 using UnityEngine;
 using System.Collections.Generic;
@@ -78,12 +79,12 @@ namespace SlopArena.Client.Entities
         /// Initialize the world-space status billboard (damage% + entity name).
         /// Safe to call multiple times — no-op after first init.
         /// </summary>
-        public void InitBillboard(ServerSimulation sim, ulong entityId)
+        public void InitBillboard(Func<ulong, CharacterState> getState, ulong entityId)
         {
             if (_billboard == null)
             {
                 _billboard = gameObject.AddComponent<StatusBillboard>();
-                _billboard.Init(this, sim, entityId);
+                _billboard.Init(this, getState, entityId);
             }
         }
 
