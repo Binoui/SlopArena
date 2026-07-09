@@ -435,7 +435,7 @@ namespace SlopArena.Shared
                 {
                     Name = "cross",
                     DisplayName = "Crossroads",
-                    PreviewColor = "#1a1a2e",
+                    PreviewColor = "#1a2a3e",
                     ScenePath = "res://assets/arenas/arena_cross.tscn",
                     KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
                     MinX = 0f, MaxX = 60f,
@@ -457,7 +457,7 @@ namespace SlopArena.Shared
                 {
                     Name = "split",
                     DisplayName = "The Split",
-                    PreviewColor = "#1a1a2e",
+                    PreviewColor = "#2e1a1a",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
                     KillHeight = -6f,   // Shallow blast zone (60x60 small competitive stage)
                     MinX = 0f, MaxX = 60f,
@@ -477,7 +477,7 @@ namespace SlopArena.Shared
                 {
                     Name = "training",
                     DisplayName = "Training Room",
-                    PreviewColor = "#1a1a2e",
+                    PreviewColor = "#1a1a1a",
                     KillHeight = -15f,
                     MinX = -25f, MaxX = 25f,
                     MinZ = -25f, MaxZ = 25f,
@@ -493,7 +493,7 @@ namespace SlopArena.Shared
                 {
                     Name = "sanctum",
                     DisplayName = "Sanctum",
-                    PreviewColor = "#1a1a2e",
+                    PreviewColor = "#2a1a2e",
                     ScenePath = "res://assets/arenas/arena_sanctum.tscn",
                     KillHeight = -20f,
                     MinX = 0f, MaxX = 200f,
