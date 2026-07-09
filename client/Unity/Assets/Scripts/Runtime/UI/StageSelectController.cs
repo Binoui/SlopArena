@@ -78,6 +78,7 @@ namespace SlopArena.Client.UI
 
         private static UnityEngine.Color ParseHex(string hex)
         {
+            if (string.IsNullOrEmpty(hex)) return UnityEngine.Color.gray;
             hex = hex.TrimStart('#');
             if (hex.Length != 6) return UnityEngine.Color.gray;
             float r = System.Convert.ToInt32(hex.Substring(0, 2), 16) / 255f;
