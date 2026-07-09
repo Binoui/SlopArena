@@ -62,6 +62,8 @@ namespace SlopArena.Shared.Abilities
         private void TickAiming(ref CharacterState s, InputState input, CharacterDefinition def)
         {
             s.IsAiming = true;
+            // Server no longer enforces facing = aim direction — character
+            // faces naturally based on movement direction.
 
             if (!input.IsAiming)
             {
