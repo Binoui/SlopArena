@@ -66,6 +66,7 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Rabbit Combo",
+                Description = "Fast three-hit punch-kick combo",
                 IconName = "lmb",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
@@ -87,6 +88,7 @@ public static partial class CharacterRegistry
             AirLMB = new AbilitySpec
             {
                 Name = "Rising Bun",
+                Description = "Airborne rising kick that launches enemies upward",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -100,6 +102,7 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Carrot Slam",
+                Description = "Slam the ground with a carrot — shockwave hits nearby enemies",
                 IconName = "rmb",
                 CooldownTicks = 45,
                 Stages = new AttackStage[]
@@ -115,6 +118,7 @@ public static partial class CharacterRegistry
             AirRMB = new AbilitySpec
             {
                 Name = "Helicopter",
+                Description = "Aerial spinning heel drop that spikes enemies downward",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -128,6 +132,7 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Whirling Carrot",
+                Description = "Throw a boomerang carrot that marks the target for bonus damage",
                 IconName = "q",
                 CooldownTicks = 90,
                 Behavior = AbilityBehavior.AimedProjectile,
@@ -167,6 +172,7 @@ public static partial class CharacterRegistry
             E = new AbilitySpec
             {
                 Name = "Tornado Kick",
+                Description = "Dash forward with a rapid spinning kick",
                 IconName = "e",
                 CooldownTicks = 90,
                 Stages = new AttackStage[]
@@ -189,6 +195,7 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Dragon's Kick",
+                Description = "Home in on a marked enemy with a flying kick that deals bonus damage",
                 IconName = "r",
                 CooldownTicks = 120,
                 Stages = new AttackStage[]
@@ -241,6 +248,7 @@ public static partial class CharacterRegistry
             F = new AbilitySpec
             {
                 Name = "Jade Hare",
+                Description = "Spin and pull nearby enemies inward, then launch them skyward",
                 IconName = "f",
                 CooldownTicks = 450,
                 Stages = new AttackStage[]

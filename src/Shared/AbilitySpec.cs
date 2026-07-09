@@ -32,6 +32,7 @@ namespace SlopArena.Shared
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public AimMode AimMode = AimMode.None;
         public string Name = "";
+        public string Description = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>
         public string? IconName;
         /// <summary>

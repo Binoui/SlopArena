@@ -79,6 +79,7 @@ public static partial class CharacterRegistry
             LMB = new AbilitySpec
             {
                 Name = "Monkey Combo",
+                Description = "Three-hit melee combo with target-locking lunges",
                 IconName = "lmb",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
@@ -105,6 +106,7 @@ public static partial class CharacterRegistry
             AirLMB = new AbilitySpec
             {
                 Name = "Air Kick",
+                Description = "Quick aerial kick combo",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -121,6 +123,7 @@ public static partial class CharacterRegistry
             RMB = new AbilitySpec
             {
                 Name = "Aerosol + Lighter",
+                Description = "Charge aerosol and ignite — hold to release a larger flame burst",
                 IconName = "rmb",
                 Behavior = AbilityBehavior.ChargeAttack,
                 CooldownTicks = 30,
@@ -174,6 +177,7 @@ public static partial class CharacterRegistry
             AirRMB = new AbilitySpec
             {
                 Name = "Knuckle Spike",
+                Description = "Downward spike punch that launches enemies straight down",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
@@ -187,6 +191,7 @@ public static partial class CharacterRegistry
             Q = new AbilitySpec
             {
                 Name = "Round Bomb",
+                Description = "Throw a timed explosive round bomb at a ground target",
                 IconName = "q",
                 Behavior = AbilityBehavior.AimedProjectile,
                 AimMode = AimMode.GroundCursor,
@@ -228,6 +233,7 @@ public static partial class CharacterRegistry
             E = new AbilitySpec
             {
                 Name = "Grapple Gun",
+                Description = "Fire a grapple hook that pulls Manki toward the hit point",
                 IconName = "e",
                 Behavior = AbilityBehavior.Projectile,
                 AimMode = AimMode.CameraForward3D,
@@ -260,6 +266,7 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Bazooka",
+                Description = "Launch a rocket that explodes on impact",
                 IconName = "r",
                 Behavior = AbilityBehavior.Projectile,
                 AimMode = AimMode.CameraForward3D,
@@ -299,6 +306,7 @@ public static partial class CharacterRegistry
             F = new AbilitySpec
             {
                 Name = "Overclock",
+                Description = "Briefly overclock speed and attack power",
                 IconName = "f",
                 Behavior = AbilityBehavior.SelfBuff,
                 CooldownTicks = 600,
