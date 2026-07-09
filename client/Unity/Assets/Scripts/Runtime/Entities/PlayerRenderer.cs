@@ -162,6 +162,16 @@ namespace SlopArena.Client.Entities
             set => _entityId = value;
         }
 
+        /// <summary>
+        /// Last applied action state. Read by weapon attach components.
+        /// </summary>
+        public ActionState CurrentActionState => _lastAnimState;
+
+        /// <summary>
+        /// Last applied attack slot (1-6). 0 when not attacking. Read by weapon attach components.
+        /// </summary>
+        public byte CurrentAttackSlot => _lastAttackSlot;
+
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
         public Animator Animator => _animancer != null ? _animancer.Animator : null;
 
