@@ -43,19 +43,20 @@ namespace SlopArena.Client.World
 
         protected override void OnMatchStart()
         {
+            Debug.Log($"[MatchBase] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
-            string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", _arenaName + ".arena"));
+            string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
             ArenaDefinition arena;
             if (File.Exists(arenaPath))
             {
                 var loaded = ArenaBinaryFormat.LoadFromFile(arenaPath);
-                arena = loaded ?? ArenaRegistry.Get(_arenaName);
+                arena = loaded ?? ArenaRegistry.Get(MatchConfig.ArenaName);
                 Debug.Log($"[TrainingMatch] Loaded arena from file: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
             }
             else
             {
-                arena = ArenaRegistry.Get(_arenaName);
-                Debug.Log($"[TrainingMatch] Using hardcoded arena: {_arenaName} — no file at {arenaPath}");
+                arena = ArenaRegistry.Get(MatchConfig.ArenaName);
+                Debug.Log($"[TrainingMatch] Using hardcoded arena: {MatchConfig.ArenaName} — no file at {arenaPath}");
             }
 
             // Wire sim debug logging to Unity console
@@ -66,7 +67,7 @@ namespace SlopArena.Client.World
             _bridge = new LocalSimulationBridge(arena);
             _combatFeedback.SetSimulation(_bridge.InternalSim);
 
-            var playerDef = CharacterRegistry.Get(_playerClass);
+            var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);

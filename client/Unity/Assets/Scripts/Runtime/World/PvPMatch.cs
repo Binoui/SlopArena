@@ -35,20 +35,21 @@ namespace SlopArena.Client.World
 
         protected override void OnMatchStart()
         {
+            Debug.Log($"[MatchBase] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
             // Arena
             string arenaPath = Path.GetFullPath(Path.Combine(
-                Application.dataPath, "..", "..", "..", "data", "arenas", _arenaName + ".arena"));
+                Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
             ArenaDefinition arena;
             if (File.Exists(arenaPath))
             {
                 var loaded = ArenaBinaryFormat.LoadFromFile(arenaPath);
-                arena = loaded ?? ArenaRegistry.Get(_arenaName);
+                arena = loaded ?? ArenaRegistry.Get(MatchConfig.ArenaName);
                 Debug.Log($"[PvPMatch] Loaded arena: {arenaPath}");
             }
             else
             {
-                arena = ArenaRegistry.Get(_arenaName);
-                Debug.Log($"[PvPMatch] Using hardcoded arena: {_arenaName}");
+                arena = ArenaRegistry.Get(MatchConfig.ArenaName);
+                Debug.Log($"[PvPMatch] Using hardcoded arena: {MatchConfig.ArenaName}");
             }
 
             Simulation.OnDebugLog = msg => Debug.Log(msg);
@@ -56,9 +57,10 @@ namespace SlopArena.Client.World
             // Bridge
             _networkClient.EntityId = PlayerEntityId;
             _bridge = new NetworkSimulationBridge(_networkClient, PlayerEntityId);
+            _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
 
             // Character definitions
-            var playerDef = CharacterRegistry.Get(_playerClass);
+            var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
             var opponentDef = CharacterRegistry.Get(_opponentClass);
