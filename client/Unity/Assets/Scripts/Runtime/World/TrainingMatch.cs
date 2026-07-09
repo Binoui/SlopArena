@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using Unity.Cinemachine;
 using System;
 using UnityEngine;
 using SlopArena.Shared;
@@ -9,6 +8,7 @@ using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
+using SlopArena.Client.Simulation;
 namespace SlopArena.Client.World
 {
     public enum NpcAiMode
@@ -19,19 +19,10 @@ namespace SlopArena.Client.World
     
     public class TrainingMatch : MatchBase
     {
-        [Header("Entities")]
-        [SerializeField] private PlayerRenderer _playerRenderer;
+        [Header("Entities (NPC)")]
         [SerializeField] private PlayerRenderer _npcRenderer;
 
-        [Header("Input")]
-        [SerializeField] private InputController _inputController;
-        [SerializeField] private CameraMount _cameraMount;
-
-        [Header("Arena")]
-        [SerializeField] private string _arenaName = "training";
-
-        [Header("Characters")]
-        [SerializeField] private CharacterClass _playerClass = CharacterClass.Manki;
+        [Header("Characters (NPC)")]
         [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
 
         [Header("Debug")]
@@ -39,22 +30,17 @@ namespace SlopArena.Client.World
         [SerializeField] private CombatFeedback _combatFeedback;
         [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Attack;
 
-        [Header("Aiming")]
-        [SerializeField] private AimHandler _aimHandler;
-        [SerializeField] private HUDManager _hudManager;
+        [Header("Hitboxes")]
         [SerializeField] private bool _showHitboxes;
-        [SerializeField] private Texture2D _crosshairTexture;
-        [SerializeField] private float _crosshairSize = 32f;
 
-        private bool _showCrosshair;
+        private LocalSimulationBridge _bridge = null!;
+        protected override ISimulationBridge Bridge => _bridge;
+
         private uint _tick;
-        private ServerSimulation _localSim = null!;
         private ArenaDefinition _arenaDef;
-        private CharacterDefinition _playerDef = null!;
-        private const ulong PlayerEntityId = 1;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
-        private UnityEngine.Camera _mainCamera;
+
         protected override void OnMatchStart()
         {
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
@@ -75,62 +61,39 @@ namespace SlopArena.Client.World
             // Wire sim debug logging to Unity console
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
-            _localSim = new ServerSimulation(arena);
-            _combatFeedback.SetSimulation(_localSim);
-            _hudManager?.Initialize(() => _localSim.GetState(PlayerEntityId));
 
+            // Bridge (local)
+            _bridge = new LocalSimulationBridge(arena);
+            _combatFeedback.SetSimulation(_bridge.InternalSim);
 
             var playerDef = CharacterRegistry.Get(_playerClass);
             _playerDef = playerDef;
-            _hudManager?.SetCharacterDefinition(playerDef);
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
 
-            // Set cooldown max ticks from character definition
-            for (int slot = 0; slot < 6; slot++)
-            {
-                var spec = playerDef.GetSlotAbility(slot, airborne: false);
-                if (spec != null)
-                    _hudManager?.SetSlotMaxCooldown(slot, spec.CooldownTicks);
-                var specAir = playerDef.GetSlotAbility(slot, airborne: true);
-                if (specAir != null && specAir.CooldownTicks > spec?.CooldownTicks)
-                    _hudManager?.SetSlotMaxCooldown(slot, specAir.CooldownTicks);
-            }
+            // Shared player renderer + HUD setup
+            SetupPlayerRenderer(playerDef, playerBaked);
+            SetupHUD(playerDef);
 
-            // Apply model Y offset for visual alignment with capsule
-            _playerRenderer.ModelYOffset = playerDef.ModelYOffset;
+            // NPC renderer
             if (_npcRenderer != null)
+            {
                 _npcRenderer.ModelYOffset = npcDef.ModelYOffset;
-
-            // Wire capsule size + hurtbox data for debug visualization
-            _playerRenderer.CapsuleRadius = playerDef.CapsuleRadius;
-            _playerRenderer.CapsuleHeight = playerDef.CapsuleHeight;
-            _playerRenderer.HurtboxBoneDefs = playerDef.HurtboxBoneDefs;
-            _playerRenderer.SetBakedData(playerBaked);
-            _playerRenderer.SetCharacterDefinition(playerDef);
-            _playerRenderer.LoadModel(playerDef);
-
-            _playerRenderer.GetComponent<WeaponAttach>()
-                ?.Init(_playerRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_playerClass}"));
-
-            if (_npcRenderer != null)
-            {
                 _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
                 _npcRenderer.CapsuleHeight = npcDef.CapsuleHeight;
                 _npcRenderer.HurtboxBoneDefs = npcDef.HurtboxBoneDefs;
                 _npcRenderer.SetBakedData(npcBaked);
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
-
                 _npcRenderer.GetComponent<WeaponAttach>()
                     ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_npcClass}"));
-                _npcRenderer.InitBillboard(_localSim, NpcEntityId);
+                _npcRenderer.InitBillboard(_bridge.InternalSim.GetState, NpcEntityId);
             }
 
             // Player spawn
             var pSpawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : new SpawnPoint();
-            _localSim.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
+            _bridge.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
             {
                 PX = pSpawn.X, PY = pSpawn.Y, PZ = pSpawn.Z,
                 FacingYaw = pSpawn.Yaw,
@@ -140,13 +103,12 @@ namespace SlopArena.Client.World
             // NPC spawn at fixed position
             float npcX = 0f;
             float npcZ = 0f;
-            _localSim.RegisterEntity(NpcEntityId, npcDef, new CharacterState
+            _bridge.RegisterEntity(NpcEntityId, npcDef, new CharacterState
             {
                 PX = npcX, PY = 5f, PZ = npcZ,
                 FacingYaw = Mathf.PI,
                 JumpsLeft = npcDef.Movement.MaxJumps,
             }, npcBaked);
-
 
             // Position renderers
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
@@ -154,43 +116,31 @@ namespace SlopArena.Client.World
                 _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
             _npcLastDeaths = 0;
 
-            // Set NPC respawn position to same relative location
-            _localSim.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ);
+            // Set NPC respawn position
+            _bridge.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ);
 
-            // Camera
-            if (_cameraMount != null)
-            {
-                _cameraMount.SetTarget(_playerRenderer.transform);
-                _cameraMount.ResetView(_playerRenderer.transform);
-            }
-
-            // Set a short blend so the aim camera transition feels smooth but not sluggish
-            var brain = FindFirstObjectByType<CinemachineBrain>();
-            if (brain != null)
-                brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.2f);
-
-            // Init AimHandler — owns AimIndicator + camera mode transitions
-            _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera, _playerRenderer.transform, playerDef.CapsuleHeight);
+            // Shared camera + aim setup
+            SetupCamera();
+            SetupAimHandler(playerDef);
         }
 
         private void Update()
         {
             _inputController.Poll();
-            if (_showHitboxes && _localSim != null)
+            if (_showHitboxes && _bridge != null)
                 DrawHitboxDebug();
         }
 
         protected override void OnMatchFixedUpdate()
         {
-            if (_localSim == null || _playerRenderer == null) return;
+            if (_bridge == null || _playerRenderer == null) return;
 
-            // Input
             // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
 
             // ── Aim ──
             var aimCtx = _aimHandler != null
-                ? _aimHandler.Evaluate(_localSim.GetState(PlayerEntityId), slot, _playerDef, _inputController)
+                ? _aimHandler.Evaluate(_bridge.GetState(PlayerEntityId), slot, _playerDef, _inputController)
                 : AimContext.None;
             _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
 
@@ -207,18 +157,21 @@ namespace SlopArena.Client.World
                 aimCtx: aimCtx,
                 canMove: null,
                 targetEntityId: targetEntityId);
+
             // NPC AI
-            var npcState = _localSim.GetState(NpcEntityId);
-            playerState = _localSim.GetState(PlayerEntityId);
+            var npcState = _bridge.GetState(NpcEntityId);
+            var playerState = _bridge.GetState(PlayerEntityId);
             var npcInput = BuildNpcInput(npcState, playerState, _tick);
+
             // Tick
-            _localSim.Tick(new Dictionary<ulong, InputState>
+            _bridge.Tick(new Dictionary<ulong, InputState>
             {
                 { PlayerEntityId, input },
                 { NpcEntityId, npcInput }
             });
+
             // Track NPC death for visual feedback
-            var npcStateAfter = _localSim.GetState(NpcEntityId);
+            var npcStateAfter = _bridge.GetState(NpcEntityId);
             if (npcStateAfter.Deaths != _npcLastDeaths)
             {
                 _npcLastDeaths = npcStateAfter.Deaths;
@@ -231,21 +184,22 @@ namespace SlopArena.Client.World
             _tick++;
             if (_tick % 120 == 1)
             {
-                var ps3 = _localSim.GetState(PlayerEntityId);
+                var ps3 = _bridge.GetState(PlayerEntityId);
                 Debug.Log($"[Training] tick={_tick} pos=({ps3.PX:F1},{ps3.PY:F2},{ps3.PZ:F1}) vy={ps3.VY:F2} grounded={ps3.IsGrounded}");
             }
 
 #if UNITY_EDITOR
-            var hitState = _localSim.GetState(NpcEntityId);
+            var hitState = _bridge.GetState(NpcEntityId);
             if (hitState.HitstunTicks > 0)
                 Debug.Log($"[Combat] NPC hit! damage={hitState.DamagePercent:F1} hitstun={hitState.HitstunTicks}");
 #endif
 
             // Apply states
-            _playerRenderer.ApplyServerState(_localSim.GetState(PlayerEntityId));
+            _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             if (_npcRenderer != null)
-                _npcRenderer.ApplyServerState(_localSim.GetState(NpcEntityId));
+                _npcRenderer.ApplyServerState(_bridge.GetState(NpcEntityId));
         }
+
         /// <summary>
         /// Builds a synthetic InputState for the NPC dummy.
         /// Computes world-space direction toward player.
@@ -302,54 +256,15 @@ namespace SlopArena.Client.World
             };
         }
 
-        /// <summary>
-        /// Pick the nearest enemy within 20m that is closest to screen center.
-        /// Returns entity ID (cast to byte) or 0 if none found.
-        /// </summary>
-        private byte PickScreenTarget(PlayerRenderer[] renderers, UnityEngine.Camera cam)
-        {
-            if (cam == null || renderers == null || renderers.Length == 0 || _playerRenderer == null)
-                return 0;
-
-            byte bestId = 0;
-            float bestScreenDist = float.MaxValue;
-            Vector2 screenCenter = new(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f);
-            Vector3 playerPos = _playerRenderer.transform.position;
-
-            foreach (var renderer in renderers)
-            {
-                if (renderer == null || renderer == _playerRenderer || renderer.EntityId == 0)
-                    continue;
-
-                Vector3 worldPos = renderer.transform.position;
-                Vector2 screenPos = cam.WorldToScreenPoint(worldPos);
-
-                // Behind camera
-                Vector3 screenPos3 = cam.WorldToScreenPoint(worldPos);
-                if (screenPos3.z < 0) continue;
-
-                float screenDist = Vector2.Distance(new Vector2(screenPos3.x, screenPos3.y), screenCenter);
-                float worldDist = Vector3.Distance(playerPos, worldPos);
-
-                if (screenDist < bestScreenDist && worldDist <= 20f)
-                {
-                    bestScreenDist = screenDist;
-                    bestId = (byte)renderer.EntityId;
-                }
-            }
-
-            return bestId;
-        }
-
         private void OnDrawGizmos()
         {
-            if (_localSim == null) return;
+            if (_bridge == null) return;
             DrawHitboxGizmos();
         }
 
         private void DrawHitboxGizmos()
         {
-            var hitboxes = _localSim.Resolver.GetActiveHitboxes();
+            var hitboxes = _bridge.InternalSim.Resolver.GetActiveHitboxes();
             Gizmos.color = new Color(1f, 0.3f, 0f, 0.6f);
             foreach (var hb in hitboxes)
             {
@@ -370,7 +285,7 @@ namespace SlopArena.Client.World
 
         private void DrawHitboxDebug()
         {
-            var hitboxes = _localSim.Resolver.GetActiveHitboxes();
+            var hitboxes = _bridge.InternalSim.Resolver.GetActiveHitboxes();
             Color color = new Color(1f, 0.3f, 0f, 0.6f);
             foreach (var hb in hitboxes)
             {
@@ -420,31 +335,5 @@ namespace SlopArena.Client.World
                 }
             }
         }
-
-        private void OnGUI()
-        {
-            if (!_showCrosshair) return;
-
-            float cx = Screen.width  * 0.5f;
-            float cy = Screen.height * 0.5f;
-
-            if (_crosshairTexture != null)
-            {
-                float half = _crosshairSize * 0.5f;
-                GUI.DrawTexture(new Rect(cx - half, cy - half, _crosshairSize, _crosshairSize), _crosshairTexture);
-            }
-            else
-            {
-                // Fallback: plain + label until texture is assigned in Inspector
-                var style = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = 28,
-                    alignment = TextAnchor.MiddleCenter,
-                    normal = { textColor = Color.white }
-                };
-                GUI.Label(new Rect(cx - 20, cy - 20, 40, 40), "+", style);
-            }
-        }
     }
 }
-

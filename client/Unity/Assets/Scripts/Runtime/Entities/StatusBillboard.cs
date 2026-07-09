@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using SlopArena.Shared;
 
@@ -12,14 +13,14 @@ namespace SlopArena.Client.Entities
     {
         [SerializeField] private PlayerRenderer _owner;
         private TextMesh _textMesh;
-        private ServerSimulation _sim;
+        private Func<ulong, CharacterState> _getState;
         private ulong _entityId;
         private Transform _cameraTransform;
 
-        public void Init(PlayerRenderer owner, ServerSimulation sim, ulong entityId)
+        public void Init(PlayerRenderer owner, Func<ulong, CharacterState> getState, ulong entityId)
         {
             _owner = owner;
-            _sim = sim;
+            _getState = getState;
             _entityId = entityId;
 
             // Create TextMesh child
@@ -42,7 +43,7 @@ namespace SlopArena.Client.Entities
 
         private void LateUpdate()
         {
-            if (_sim == null || _entityId == 0) return;
+            if (_getState == null || _entityId == 0) return;
 
             // Lazy camera resolve — Camera.main may not be available at Init time
             if (_cameraTransform == null)
@@ -52,7 +53,7 @@ namespace SlopArena.Client.Entities
                 _cameraTransform = cam.transform;
             }
 
-            var state = _sim.GetState(_entityId);
+            var state = _getState(_entityId);
             _textMesh.text = $"{state.DamagePercent}%";
             // Face the camera perfectly — use camera's forward direction
             // so text is always in the camera's view plane and readable.
