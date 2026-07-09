@@ -1,0 +1,16 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="root" class="screen">
+        <ui:Label name="title" text="SLOPARENA" class="title" />
+        <ui:VisualElement name="menu" class="menu-list">
+            <ui:Button name="btn-training" text="TRAINING MODE" class="menu-item menu-item--active" />
+            <ui:Button name="btn-multiplayer" text="MULTIPLAYER ›" class="menu-item" />
+            <ui:VisualElement name="submenu" class="submenu" style="display: none;">
+                <ui:Button name="btn-host" text="HOST GAME" class="menu-item menu-item--sub" />
+                <ui:VisualElement name="join-row" class="join-row">
+                    <ui:Button name="btn-join" text="JOIN GAME" class="menu-item menu-item--sub" />
+                    <ui:TextField name="ip-field" value="127.0.0.1" class="ip-input" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
