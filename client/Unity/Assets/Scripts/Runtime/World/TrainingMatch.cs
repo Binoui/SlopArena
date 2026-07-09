@@ -9,7 +9,6 @@ using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
-using SlopArena.Client.Characters;
 namespace SlopArena.Client.World
 {
     public enum NpcAiMode
@@ -112,13 +111,8 @@ namespace SlopArena.Client.World
             _playerRenderer.SetCharacterDefinition(playerDef);
             _playerRenderer.LoadModel(playerDef);
 
-            // Wire weapon attach for Manki player
-            if (_playerClass == CharacterClass.Manki)
-            {
-                var weaponAttach = _playerRenderer.GetComponent<MankiWeaponAttach>();
-                if (weaponAttach != null)
-                    weaponAttach.Init(_playerRenderer);
-            }
+            _playerRenderer.GetComponent<WeaponAttach>()
+                ?.Init(_playerRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_playerClass}"));
 
             if (_npcRenderer != null)
             {
@@ -129,13 +123,8 @@ namespace SlopArena.Client.World
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
 
-                // Wire weapon attach for Manki NPC
-                if (_npcClass == CharacterClass.Manki)
-                {
-                    var weaponAttach = _npcRenderer.GetComponent<MankiWeaponAttach>();
-                    if (weaponAttach != null)
-                        weaponAttach.Init(_npcRenderer);
-                }
+                _npcRenderer.GetComponent<WeaponAttach>()
+                    ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_npcClass}"));
                 _npcRenderer.InitBillboard(_localSim, NpcEntityId);
             }
 
