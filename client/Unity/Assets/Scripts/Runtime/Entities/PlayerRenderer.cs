@@ -162,6 +162,16 @@ namespace SlopArena.Client.Entities
             set => _entityId = value;
         }
 
+        /// <summary>
+        /// Last applied action state. Read by weapon attach components.
+        /// </summary>
+        public ActionState CurrentActionState => _lastAnimState;
+
+        /// <summary>
+        /// Last applied attack slot (1-6). 0 when not attacking. Read by weapon attach components.
+        /// </summary>
+        public byte CurrentAttackSlot => _lastAttackSlot;
+
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
         public Animator Animator => _animancer != null ? _animancer.Animator : null;
 
@@ -401,7 +411,7 @@ namespace SlopArena.Client.Entities
 
             // ── State color indicator sphere (above label) ──
             Gizmos.color = stateColor;
-            Gizmos.DrawSphere(transform.position + Vector3.up * 3.2f, 0.25f);
+            //Gizmos.DrawSphere(transform.position + Vector3.up * 3.2f, 0.25f);
 
             // ── Collision capsule ──
             Gizmos.color = stateColor;
@@ -409,13 +419,6 @@ namespace SlopArena.Client.Entities
             float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
             Vector3 top = capCenter + Vector3.up * halfH;
             Vector3 bot = capCenter - Vector3.up * halfH;
-
-            UnityEditor.Handles.DrawWireDisc(top, Vector3.up, _capsuleRadius);
-            UnityEditor.Handles.DrawWireDisc(bot, Vector3.up, _capsuleRadius);
-            UnityEditor.Handles.DrawLine(top + Vector3.right * _capsuleRadius, bot + Vector3.right * _capsuleRadius);
-            UnityEditor.Handles.DrawLine(top - Vector3.right * _capsuleRadius, bot - Vector3.right * _capsuleRadius);
-            UnityEditor.Handles.DrawLine(top + Vector3.forward * _capsuleRadius, bot + Vector3.forward * _capsuleRadius);
-            UnityEditor.Handles.DrawLine(top - Vector3.forward * _capsuleRadius, bot - Vector3.forward * _capsuleRadius);
 
             // ── Hurtbox spheres at bone positions ──
             if (_hurtboxBoneDefs != null)
@@ -427,7 +430,7 @@ namespace SlopArena.Client.Entities
                     if (bone != null)
                     {
                         Vector3 localOffset = transform.InverseTransformDirection(new Vector3(def.OffX, def.OffY, def.OffZ));
-                        Gizmos.DrawWireSphere(bone.position + localOffset, def.Radius);
+                        //Gizmos.DrawWireSphere(bone.position + localOffset, def.Radius);
                     }
                 }
             }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Unity.Cinemachine;
 using System;
 using UnityEngine;
 using SlopArena.Shared;
@@ -110,6 +111,9 @@ namespace SlopArena.Client.World
             _playerRenderer.SetCharacterDefinition(playerDef);
             _playerRenderer.LoadModel(playerDef);
 
+            _playerRenderer.GetComponent<WeaponAttach>()
+                ?.Init(_playerRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_playerClass}"));
+
             if (_npcRenderer != null)
             {
                 _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
@@ -118,6 +122,9 @@ namespace SlopArena.Client.World
                 _npcRenderer.SetBakedData(npcBaked);
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
+
+                _npcRenderer.GetComponent<WeaponAttach>()
+                    ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_npcClass}"));
                 _npcRenderer.InitBillboard(_localSim, NpcEntityId);
             }
 
@@ -156,6 +163,11 @@ namespace SlopArena.Client.World
                 _cameraMount.SetTarget(_playerRenderer.transform);
                 _cameraMount.ResetView(_playerRenderer.transform);
             }
+
+            // Set a short blend so the aim camera transition feels smooth but not sluggish
+            var brain = FindFirstObjectByType<CinemachineBrain>();
+            if (brain != null)
+                brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.2f);
 
             // Init AimHandler — owns AimIndicator + camera mode transitions
             _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera, _playerRenderer.transform, playerDef.CapsuleHeight);

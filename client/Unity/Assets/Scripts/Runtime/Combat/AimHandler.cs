@@ -9,9 +9,10 @@ namespace SlopArena.Client.Combat
     /// <summary>
     /// Owns the full aim pipeline for the local player each FixedUpdate tick:
     ///   1. Resolves which AbilitySpec is currently active (just-pressed or held during attack)
-    ///   2. Transitions CameraMount mode (Normal / Frozen / FreeCursor)
-    ///   3. Updates AimIndicator
-    ///   4. Returns AimContext for InputController.BuildInputState
+    ///   2. Transitions CameraMount mode (Normal / FreeCursor / Aiming)
+    ///   3. Activates/deactivates AimCameraMount for CameraForward3D abilities
+    ///   4. Updates AimIndicator for GroundCursor abilities
+    ///   5. Returns AimContext for InputController.BuildInputState
     ///
     /// TrainingMatch (and future match types) call Init() once then Evaluate() each tick.
     /// Zero aim logic leaks back to the caller.
@@ -26,7 +27,10 @@ namespace SlopArena.Client.Combat
         private CameraMode _activeMode = CameraMode.Normal;
         private byte _aimingSlot;
         private Transform _characterTransform;
-
+        /// <summary>Cached aim values — persist after key release so server gets right direction during fire delay.</summary>
+        private float _lastAimYawRad;
+        private float _lastAimPitchRad;
+        private byte _lastAimingSlot;
         /// <summary>True when a CameraForward3D ability is active — caller draws the crosshair.</summary>
         public bool ShowCrosshair { get; private set; }
 
@@ -104,24 +108,23 @@ namespace SlopArena.Client.Combat
 
             if (desired != _activeMode)
             {
-                if (desired == CameraMode.Aiming && _characterTransform != null)
-                {
-                    // Snap aim camera behind character, then let Cinemachine blend
-                    _aimCameraMount?.Activate(_characterTransform, playerState.FacingYaw);
-                }
-                else if (_activeMode == CameraMode.Aiming)
-                {
-                    // Leaving aim mode — lower aim camera priority
+                // Leaving Aiming — deactivate aim camera so Cinemachine blends back to orbital
+                if (_activeMode == CameraMode.Aiming)
                     _aimCameraMount?.Deactivate();
-                }
 
-                // GroundCursor still needs FreezeAtCurrentAngles for the orbital camera
+                // Entering GroundCursor — freeze orbital at current angles (cursor controls ground marker)
                 if (desired == CameraMode.FreeCursor)
                     _cameraMount?.FreezeAtCurrentAngles();
 
-                // Frozen mode (not used by CameraForward3D anymore) still needs angle capture
-                if (desired == CameraMode.Frozen)
-                    _cameraMount?.FreezeAtCurrentAngles();
+                // Entering Aiming — activate aim camera, inherit current yaw + zoom distance
+                if (desired == CameraMode.Aiming && _characterTransform != null)
+                {
+                    float yawRad      = _cameraMount?.GetCameraYawRad() ?? 0f;
+                    float orbitRadius = _cameraMount?.GetOrbitRadius()  ?? 2.5f;
+                    _aimCameraMount?.Activate(_characterTransform, yawRad, orbitRadius);
+                    _lastAimYawRad   = yawRad;
+                    _lastAimPitchRad = 0f;
+                }
 
                 _cameraMount?.SetMode(desired);
                 _activeMode = desired;
@@ -148,15 +151,29 @@ namespace SlopArena.Client.Combat
 
                 if (aimMode == AimMode.CameraForward3D && _aimCameraMount != null)
                 {
+                    Vector2 delta = Mouse.current.delta.ReadValue();
                     _aimCameraMount.Tick(_characterTransform);
-                    Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                    _aimCameraMount.ApplyMouseDelta(mouseDelta, _aimSensitivity);
+                    _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity);
+
+                    _lastAimYawRad   = _aimCameraMount.GetAimYawRad();
+                    _lastAimPitchRad = _aimCameraMount.GetAimPitchRad();
+                    _lastAimingSlot  = _aimingSlot;
 
                     ctx = new AimContext
                     {
                         IsAiming    = true,
-                        AimYawRad   = _aimCameraMount.GetAimYawRad(),
-                        AimPitchRad = _aimCameraMount.GetAimPitchRad(),
+                        AimYawRad   = _lastAimYawRad,
+                        AimPitchRad = _lastAimPitchRad,
+                    };
+                }
+                else if (_lastAimingSlot > 0 && playerState.State == ActionState.Attacking && playerState.AttackSlot == (byte)(_lastAimingSlot + 1))
+                {
+                    // Key released but server hasn't fired yet — send last known aim direction
+                    ctx = new AimContext
+                    {
+                        IsAiming    = false,
+                        AimYawRad   = _lastAimYawRad,
+                        AimPitchRad = _lastAimPitchRad,
                     };
                 }
             }

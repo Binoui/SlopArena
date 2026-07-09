@@ -18,18 +18,20 @@ namespace SlopArena.Client.Camera
     {
         private CinemachineCamera _cmCam;
         private CinemachineOrbitalFollow _orbital;
+        private InputAxisController _inputAxisController;
 
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
-        private float _frozenPitch = 17.5f;
+        private float _frozenPitch = 15f;
 
         private void Awake()
         {
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
-            // Allow camera to orbit below target (negative VerticalAxis = looking UP)
+            _inputAxisController = GetComponent<InputAxisController>();
+            // Clamp pitch so camera stays above the stage floor level
             if (_orbital != null)
-                _orbital.VerticalAxis.Range = new Vector2(-30f, 50f);
+                _orbital.VerticalAxis.Range = new Vector2(0f, 45f);
         }
         
         /// <summary>
@@ -45,19 +47,18 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
 
-            // Normal — pitch locked, scroll still works for zoom
+            // Normal — mouse controls yaw+pitch freely, scroll still works for zoom
             if (_mode == CameraMode.Normal)
             {
                 float dy = Mouse.current.scroll.ReadValue().y;
                 if (Mathf.Abs(dy) > 0.001f)
                     _orbital.RadialAxis.Value -= dy * 0.05f;
-
-                // Lock pitch — re-apply cached value each frame
-                SetCameraPitchDeg(_frozenPitch);
+                // Pitch and yaw handled by Cinemachine's built-in orbital input
             }
             else if (_mode == CameraMode.Frozen)
             {
-                // Lock pitch — camera stays at frozen angles (reticle moves, not camera)
+                // Lock both yaw and pitch — camera stays put, crosshair moves on screen
+                SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
             else if (_mode == CameraMode.FreeCursor)
@@ -76,18 +77,27 @@ namespace SlopArena.Client.Camera
                 case CameraMode.Normal:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Frozen:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.FreeCursor:
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Aiming:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
+                    // Disable InputAxisController so the orbital camera stops consuming
+                    // mouse input in the background while AimCameraMount owns the mouse.
+                    if (_inputAxisController != null) _inputAxisController.enabled = false;
+                    // Freeze orbital at current angles so it's ready to blend back to
+                    // the right position when aiming ends.
+                    FreezeAtCurrentAngles();
                     break;
             }
         }
@@ -96,6 +106,19 @@ namespace SlopArena.Client.Camera
         {
             _frozenYaw = GetCameraYawDeg();
             _frozenPitch = GetCameraPitchDeg();
+        }
+
+        /// <summary>
+        /// Accumulate mouse delta into the frozen camera orbit angles.
+        /// Only meaningful in Frozen mode — updates _frozenYaw and _frozenPitch.
+        /// deltaDeg = delta pixels * sensitivity (already scaled).
+        /// </summary>
+        public void OrbitFrozen(Vector2 deltaDeg)
+        {
+            if (_mode != CameraMode.Frozen) return;
+            _frozenYaw += deltaDeg.x;
+            _frozenPitch -= deltaDeg.y;
+            _frozenPitch = Mathf.Clamp(_frozenPitch, -60f, 60f);
         }
 
 
@@ -116,7 +139,7 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
             _orbital.HorizontalAxis.Value = target.eulerAngles.y;
-            _orbital.VerticalAxis.Value = 17.5f;
+            _orbital.VerticalAxis.Value = 15f;
         }
 
 
@@ -141,7 +164,12 @@ namespace SlopArena.Client.Camera
         {
             return _orbital != null ? _orbital.VerticalAxis.Value : 0f;
         }
-
+        public float GetOrbitRadius()
+        {
+            if (_orbital == null) return 2.5f;
+            // Actual camera distance = base Radius multiplied by scroll-adjusted RadialAxis
+            return _orbital.Radius * _orbital.RadialAxis.Value;
+        }
         public float GetCameraYawRad()
         {
             return GetCameraYawDeg() * Mathf.Deg2Rad;
