@@ -39,8 +39,9 @@ namespace SlopArena.Client.UI
                 // Color swatch placeholder thumbnail
                 var swatch = new VisualElement();
                 swatch.AddToClassList("stage-swatch");
-                if (!string.IsNullOrEmpty(arena.PreviewColor))
-                    swatch.style.backgroundColor = ParseHex(arena.PreviewColor);
+                if (!string.IsNullOrEmpty(arena.PreviewColor) &&
+                    ColorUtility.TryParseHtmlString(arena.PreviewColor, out var swatchColor))
+                    swatch.style.backgroundColor = swatchColor;
 
                 var label = new Label(arena.DisplayName ?? arena.Name.ToUpper());
                 label.AddToClassList("stage-name");
@@ -76,15 +77,5 @@ namespace SlopArena.Client.UI
             btnConfirm.style.display = DisplayStyle.Flex;
         }
 
-        private static UnityEngine.Color ParseHex(string hex)
-        {
-            if (string.IsNullOrEmpty(hex)) return UnityEngine.Color.gray;
-            hex = hex.TrimStart('#');
-            if (hex.Length != 6) return UnityEngine.Color.gray;
-            float r = System.Convert.ToInt32(hex.Substring(0, 2), 16) / 255f;
-            float g = System.Convert.ToInt32(hex.Substring(2, 2), 16) / 255f;
-            float b = System.Convert.ToInt32(hex.Substring(4, 2), 16) / 255f;
-            return new UnityEngine.Color(r, g, b);
-        }
     }
 }

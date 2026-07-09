@@ -27,13 +27,12 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- Center: name + 3D render texture + tagline -->
+            <!-- Center: name + 3D render texture -->
             <ui:VisualElement name="model-col" class="model-col">
                 <ui:Label name="char-name" text="—" class="char-name" />
                 <ui:VisualElement name="model-viewport" class="model-viewport">
                     <ui:VisualElement name="model-image" class="model-image" />
                 </ui:VisualElement>
-                <ui:Label name="char-tagline" text="" class="char-tagline" />
             </ui:VisualElement>
 
             <!-- Right: R and F abilities -->

@@ -28,8 +28,10 @@ namespace SlopArena.Client.UI
 
         private void OnEnable()
         {
+            _gridButtons.Clear();
             var root = _uiDocument.rootVisualElement;
             var grid = root.Q<VisualElement>("char-grid");
+            grid.Clear();
 
             // Build portrait buttons for each known character class
             foreach (var cls in Classes)

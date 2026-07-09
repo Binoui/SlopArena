@@ -72,14 +72,18 @@ namespace SlopArena.Client.UI
                 if (!MatchConfig.IsHost && connected)
                 {
                     _lblWaiting.text = "Server connected — press Ready when host starts";
-                    var btnReady = new Button(() => SceneManager.LoadScene("CharSelect"))
+                    var root = _uiDocument.rootVisualElement.Q<VisualElement>("root");
+                    if (root.Q<Button>("btn-ready") == null)
                     {
-                        text = "READY",
-                        name = "btn-ready"
-                    };
-                    btnReady.AddToClassList("btn-primary");
-                    _uiDocument.rootVisualElement.Q<VisualElement>("root").Add(btnReady);
-                    yield break; // stop polling once shown
+                        var btnReady = new Button(() => SceneManager.LoadScene("CharSelect"))
+                        {
+                            text = "READY",
+                            name = "btn-ready"
+                        };
+                        btnReady.AddToClassList("btn-primary");
+                        root.Add(btnReady);
+                    }
+                    yield break;
                 }
             }
         }
