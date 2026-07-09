@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="root" class="screen">
+        <ui:Label name="title" text="LOBBY" class="title" />
+        <ui:VisualElement name="players" class="player-list">
+            <ui:VisualElement name="p1-row" class="player-row">
+                <ui:Label name="p1-label" text="P1" class="player-id" />
+                <ui:Label name="p1-status" text="Connected" class="player-status player-status--connected" />
+            </ui:VisualElement>
+            <ui:VisualElement name="p2-row" class="player-row">
+                <ui:Label name="p2-label" text="P2" class="player-id" />
+                <ui:Label name="p2-status" text="Waiting..." class="player-status player-status--waiting" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Button name="btn-start" text="START" class="btn-primary" style="display: none;" />
+        <ui:Label name="lbl-waiting" text="Waiting for host to start..." class="subtitle" style="display: none;" />
+        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+    </ui:VisualElement>
+</ui:UXML>
