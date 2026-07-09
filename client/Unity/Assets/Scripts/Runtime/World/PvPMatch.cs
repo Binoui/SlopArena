@@ -21,9 +21,6 @@ namespace SlopArena.Client.World
         [Header("Entities (Opponent)")]
         [SerializeField] private PlayerRenderer _opponentRenderer;
 
-        [Header("Characters (Opponent)")]
-        [SerializeField] private CharacterClass _opponentClass = CharacterClass.Manki;
-
         [Header("Network")]
         [SerializeField] private NetworkClient _networkClient;
 
@@ -35,7 +32,7 @@ namespace SlopArena.Client.World
 
         protected override void OnMatchStart()
         {
-            Debug.Log($"[MatchBase] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
+            Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
             // Arena
             string arenaPath = Path.GetFullPath(Path.Combine(
                 Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
@@ -63,7 +60,7 @@ namespace SlopArena.Client.World
             var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
-            var opponentDef = CharacterRegistry.Get(_opponentClass);
+            var opponentDef = CharacterRegistry.Get(MatchConfig.OpponentClass);
             var opponentBaked = LoadBakedData(opponentDef);
 
             // Shared player renderer + HUD setup

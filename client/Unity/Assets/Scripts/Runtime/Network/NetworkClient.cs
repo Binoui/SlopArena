@@ -16,7 +16,7 @@ namespace SlopArena.Client.Network
         [SerializeField] private string _serverIp = "127.0.0.1";
         [SerializeField] private int _serverPort = 9876;
 
-        private UdpClient? _udp;
+        private volatile UdpClient? _udp;
         private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876);
         private ulong _entityId = 1;
         private bool _connected;
@@ -88,7 +88,6 @@ namespace SlopArena.Client.Network
             _serverPort = port;
             _serverEp = new IPEndPoint(IPAddress.Parse(ip), port);
             CreateSocket();
-            _running = true;
             StartReceiveThread();
         }
 

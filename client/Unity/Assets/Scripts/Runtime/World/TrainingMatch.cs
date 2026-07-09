@@ -43,7 +43,7 @@ namespace SlopArena.Client.World
 
         protected override void OnMatchStart()
         {
-            Debug.Log($"[MatchBase] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
+            Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
             string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
             ArenaDefinition arena;
