@@ -525,7 +525,7 @@ git commit -m "feat: Lobby scene with connection polling and host start flow"
 
         <!-- Panel 2: preview -->
         <ui:VisualElement name="preview-panel" class="preview-panel">
-            <!-- Left: Q and W abilities -->
+            <!-- Left: Q and E abilities -->
             <ui:VisualElement name="abilities-left" class="abilities-col">
                 <ui:VisualElement name="ability-q" class="ability-card">
                     <ui:Label name="ability-q-key" text="Q" class="ability-key" />
@@ -534,11 +534,11 @@ git commit -m "feat: Lobby scene with connection polling and host start flow"
                         <ui:Label name="ability-q-desc" text="" class="ability-desc" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ability-w" class="ability-card">
-                    <ui:Label name="ability-w-key" text="W" class="ability-key" />
+                <ui:VisualElement name="ability-e" class="ability-card">
+                    <ui:Label name="ability-e-key" text="E" class="ability-key" />
                     <ui:VisualElement class="ability-info">
-                        <ui:Label name="ability-w-name" text="—" class="ability-name" />
-                        <ui:Label name="ability-w-desc" text="" class="ability-desc" />
+                        <ui:Label name="ability-e-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-e-desc" text="" class="ability-desc" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -552,20 +552,20 @@ git commit -m "feat: Lobby scene with connection polling and host start flow"
                 <ui:Label name="char-tagline" text="" class="char-tagline" />
             </ui:VisualElement>
 
-            <!-- Right: E and R abilities -->
+            <!-- Right: R and F abilities -->
             <ui:VisualElement name="abilities-right" class="abilities-col">
-                <ui:VisualElement name="ability-e" class="ability-card">
-                    <ui:Label name="ability-e-key" text="E" class="ability-key" />
-                    <ui:VisualElement class="ability-info">
-                        <ui:Label name="ability-e-name" text="—" class="ability-name" />
-                        <ui:Label name="ability-e-desc" text="" class="ability-desc" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
                 <ui:VisualElement name="ability-r" class="ability-card">
                     <ui:Label name="ability-r-key" text="R" class="ability-key" />
                     <ui:VisualElement class="ability-info">
                         <ui:Label name="ability-r-name" text="—" class="ability-name" />
                         <ui:Label name="ability-r-desc" text="" class="ability-desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="ability-f" class="ability-card">
+                    <ui:Label name="ability-f-key" text="F" class="ability-key" />
+                    <ui:VisualElement class="ability-info">
+                        <ui:Label name="ability-f-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-f-desc" text="" class="ability-desc" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -603,9 +603,9 @@ namespace SlopArena.Client.UI
         private GameObject _currentModel;
 
         private static readonly CharacterClass[] Classes = (CharacterClass[])System.Enum.GetValues(typeof(CharacterClass));
-        // Slot index → key label (slots 3–6 = Q, W, E, R)
-        private static readonly string[] AbilityKeys = { "Q", "W", "E", "R" };
-        private static readonly string[] AbilitySlots = { "ability-q", "ability-w", "ability-e", "ability-r" };
+        // Slot index → key label: Q=2, E=3, R=4, F=5 (matches GetSlotAbility)
+        private static readonly string[] AbilityKeys = { "Q", "E", "R", "F" };
+        private static readonly string[] AbilitySlots = { "ability-q", "ability-e", "ability-r", "ability-f" };
 
         private void OnEnable()
         {
@@ -662,14 +662,12 @@ namespace SlopArena.Client.UI
             // Update name + tagline
             root.Q<Label>("char-name").text = cls.ToString().ToUpper();
 
-            // Load ability data (slots 3–6 = Q W E R in CharacterDefinition)
+            // Load ability data: Q=slot2, E=slot3, R=slot4, F=slot5 (GetSlotAbility indices)
             var def = CharacterRegistry.Get(cls);
-            var slotNames = new[] { "ability-q", "ability-w", "ability-e", "ability-r" };
-            int[] slotIndices = { 3, 4, 5, 6 }; // Q=3, W=4(if exists), E=4 or 5, R=5 or 6
-            // Use slots 3,4,5,6 — match what's defined in the character def
+            var slotNames = new[] { "ability-q", "ability-e", "ability-r", "ability-f" };
             for (int i = 0; i < 4; i++)
             {
-                var spec = def.GetSlotAbility(i + 3, airborne: false);
+                var spec = def.GetSlotAbility(i + 2, airborne: false);
                 var card = root.Q<VisualElement>(slotNames[i]);
                 if (card == null) continue;
                 card.Q<Label>($"{slotNames[i]}-name").text = spec?.Name ?? "—";
