@@ -235,44 +235,15 @@ PvPMatch → owns NetworkSimulationBridge → wraps NetworkClient
 
 ---
 
-## Phase 4 — UI Flow (medium priority)
+## Phase 4 — UI Flow ✅ (superseded)
 
-**Deliverable:** Main Menu → Character Select → (Training / PvP) match. Full screen flow.
+**Superseded by:** `docs/superpowers/specs/2026-07-09-menu-ui-flow-design.md` and `docs/superpowers/plans/2026-07-09-menu-ui-flow.md`
 
-### T4.1: Main Menu scene + script
+**What shipped:** MainMenu (nested list with Training/Multiplayer/Host/Join) → Lobby → CharSelect (2-panel: grid + 3D preview with ability cards) → StageSelect → match. `MatchConfig` static class carries char/arena across scene loads. `MatchBase` no longer uses Inspector fields for char/arena.
 
-**What:** `Scenes/MainMenu.unity` with two buttons: "Training" and "Online PvP". "Online PvP" shows IP/port input field or connects to default `localhost:7777`.
+**Branch:** `feature/menu-ui-flow` (Tasks 1–7 merged; Tasks 8–9 require Unity Editor scene wiring).
 
-**Files:**
-- Create: `Scenes/MainMenu.unity`
-- Create: `Runtime/UI/MainMenuUI.cs`
-- Modify: `EditorBuildSettings.asset` — add MainMenu as scene 0
-
-**Verify:** Run game → Main Menu appears. Click Training → loads Arena_Offline.
-
-### T4.2: Character Select scene
-
-**What:** `Scenes/CharacterSelect.unity` with Manki + Bunny portraits. Player picks, then match starts.
-
-**Files:**
-- Create: `Scenes/CharacterSelect.unity`
-- Create: `Runtime/UI/CharacterSelectUI.cs`
-- Create: `Runtime/World/MatchOrchestrator.cs` — handles scene transitions, passes selected character class
-
-**Verify:** Main Menu → Character Select → pick Manki → loads TrainingMatch with Manki.
-
-### T4.3: Scene load integration
-
-**What:** Wire `SceneManager.LoadSceneAsync` with a loading screen overlay. Both training and PvP matches receive selected character via `MatchOrchestrator`.
-
-**Files:**
-- Modify: `MatchBase.cs` — accept `CharacterClass` parameter
-- Modify: `TrainingMatch.cs` — use passed character class instead of hardcoded `CharacterClass.Manki`
-- Modify: `PvPMatch.cs` — same
-
-**Verify:** Pick Bunny in Character Select → Training starts with Bunny.
-
----
+~~T4.1, T4.2, T4.3~~ — replaced by the above. The old design (two buttons, no lobby, no stage select, hardcoded IP) was superseded before implementation.
 
 ## Phase 5 — Bunny (low priority)
 

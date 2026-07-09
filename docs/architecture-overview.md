@@ -42,11 +42,14 @@ SlopArena/
 ├── client/Unity/         ← Unity game client
 │   └── Assets/Scripts/
 │       ├── Runtime/
-│       │   ├── Entities/       ← PlayerRenderer (MonoBehaviour, drives Animator)
-│       │   ├── World/          ← TrainingMatch, MatchBase (match orchestration)
+│       │   ├── Entities/       ← PlayerRenderer, StatusBillboard, WeaponAttach
+│       │   ├── World/          ← MatchBase, TrainingMatch, PvPMatch (match orchestration)
+│       │   ├── Simulation/     ← LocalSimulationBridge, NetworkSimulationBridge, ISimulationBridge
+│       │   ├── Network/        ← NetworkClient (UDP, Connect/SendInput/ReceiveStates)
+│       │   ├── UI/             ← MatchConfig, MainMenuController, LobbyController, CharSelectController, StageSelectController, HUDManager
 │       │   ├── Input/          ← InputController (Unity Input → InputState)
-│       │   ├── Camera/         ← CameraMount (orbit cam, CameraMode enum, AimContext)
-│       │   ├── Combat/         ← CombatFeedback, AimIndicator
+│       │   ├── Camera/         ← CameraMount, AimCameraMount (orbit + aim camera)
+│       │   ├── Combat/         ← CombatFeedback, AimHandler, AimIndicator
 │       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
 │       ├── Editor/
 │       │   └── SlopArenaAnimatorGenerator.cs ← Generates AnimatorControllers
@@ -70,44 +73,23 @@ SlopArena/
 
 ---
 
-┌─ CLIENT (Unity) ──────────────────────────────────┐
-│                                                     │
-│  InputController.Poll() → InputState                │
-│       │                                             │
-│       ▼                                             │
-│  MatchBase.FixedUpdate()                            │
-│    ├── TrainingMatch.OnMatchFixedUpdate()            │
-│    │   ├── InputController.ConsumePendingSlotPress()│
-│    │   ├── InputController.BuildInputState()        │
-│    │   ├── LocalSimulationBridge.Tick(inputs)       │
-│    │   │   └── ServerSimulation.Tick()              │
-│    │   │       ├── PreTickAbilities()               │
-│    │   │       │   ├── Check cooldown → skip if >0 │
-│    │   │       │   └── Activate ServerAbility       │
-│    │   │       ├── SimulateMovement()               │
-│    │   │       │   ├── SimulateTick()               │
-│    │   │       │   │   ├── TickTimers()             │
-│    │   │       │   │   ├── Cooldown check (client)  │
-│    │   │       │   │   └── Gravity, movement        │
-│    │   │       │   └── TickAbilities()              │
-│    │   │       │       └── ServerAbility.Tick()     │
-│    │   │       └── SpellResolver.Tick()             │
-│    │   └── PlayerRenderer.ApplyServerState(state)   │
-│    │       └── UpdateAnimationState()               │
-│    │           ├── SetBool("IsGrounded", ...)       │
-│    │           ├── SetFloat("Speed", ...)           │
-│    │           ├── SetTrigger("Attack")             │
-│    │           └── Animator transitions             │
-│    └── (future) NetworkClient send/receive          │
-└─────────────────────────────────────────────────────┘
-│    │       └── UpdateAnimationState()               │
-│    │           ├── SetBool("IsGrounded", ...)       │
-│    │           ├── SetFloat("Speed", ...)           │
-│    │           ├── SetTrigger("Attack"/"Dash"/etc)  │
-│    │           └── Animator transitions naturally   │
-│    └── (future) NetworkClient send/receive          │
-└─────────────────────────────────────────────────────┘
-```
+┌─ CLIENT (Unity) ──────────────────────────────────────────────┐
+│                                                                  │
+│  MainMenu → Lobby → CharSelect → StageSelect                    │
+│       ↓ (MatchConfig: Mode, PlayerClass, ArenaName, ServerIP)   │
+│  MatchBase.Start() → OnMatchStart()                             │
+│    ├── TrainingMatch  → LocalSimulationBridge.Tick(inputs)      │
+│    │   └── ServerSimulation.Tick()                              │
+│    │       ├── PreTickAbilities() / SimulateMovement()           │
+│    │       └── SpellResolver.Tick()                             │
+│    └── PvPMatch  → NetworkSimulationBridge.Tick(inputs)         │
+│                     ├── NetworkClient.SendInput()               │
+│                     └── NetworkClient.ReceiveStates()           │
+│                                                                  │
+│  InputController.Poll() → InputState                            │
+│  PlayerRenderer.ApplyServerState(state)                         │
+│       └── UpdateAnimationState() → Animator transitions         │
+└──────────────────────────────────────────────────────────────────┘
 
 ---
 
@@ -148,44 +130,32 @@ SlopArena/
 
 1. **Don't use `UnityEngine.*` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
 2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
-3. **Don't modify `CharacterDefinition.cs` values without understanding them** — they're the source of truth for balance and hit registration.
-4. **`MatchManager` is hybrid** — it supports both sandbox (NPCs) and PvP (opponent). Future: split into `TrainingMatch` and `PvPMatch`.
-5. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
-6. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. The DLL auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target. Unity imports it as a plugin.
-7. **Cooldown struct persistence** — `CharacterState` is a value type. `SetCooldown` modifies a local copy. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
-8. **Dash duration comes from `MovementStats.DashDurationTicks`** — `StartDash` uses `stats.DashDurationTicks`, not the const `Simulation.DashDurationTicks` (15). Each character's `DashDurationTicks` in their definition is authoritative.
-9. **Proportional friction (`MoveToward(V, 0, |V| * f)`) is asymptotic** — it never reaches exactly zero in floating point. A `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0 when both components are below threshold. Applied after ground friction and air drag.
+3. **Don't modify `CharacterDefinition.cs` values without understanding them** — source of truth for balance and hit registration.
+4. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
+5. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. Auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target.
+6. **Cooldown struct persistence** — `CharacterState` is a value type. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
+7. **Dash duration comes from `MovementStats.DashDurationTicks`** — not the const `Simulation.DashDurationTicks`. Character definition is authoritative.
+8. **Proportional friction is asymptotic** — `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0. Applied after ground friction and air drag.
+9. **`MatchConfig` is static** — it persists across scene loads. Call `MatchConfig.Reset()` in `MainMenuController.OnEnable` so stale values from a previous match don't leak into the next one.
+
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
-→ Quick version: add `CharacterClass` enum value → write `BuildXxx()` → register in `BuildRegistry()`
+→ Quick version: add `CharacterClass` enum value → write `BuildXxx()` in `CharacterDefinition.cs` → register in `BuildRegistry()` → add `AbilitySpec.Description` for each ability slot → create `CharacterAnimationConfig` ScriptableObject.
 
 ---
 
-## Common Pitfalls
+## Quick Commands
 
-1. **Don't use `UnityEngine.*` in `src/Shared/`** — no Unity dependencies allowed.
-# Build Shared library
-dotnet build src/Shared/SlopArena.Shared.csproj --nologo
+```bash
+# Build Shared library (run after any src/Shared/ change)
+dotnet build src/Shared/ --nologo
 
-# Run ALL simulation unit tests
+# Run simulation unit tests
 dotnet test tests/Shared.Tests/ --nologo
 
-# Run a specific test category
-dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests|AbilityLifecycle"
-
-# NOTE: Shared code lives in client/Unity/Assets/Scripts/Shared/ (real files).
-# src/Shared/ contains symlinks pointing back. Edit through src/Shared/ paths
-# — tools follow the symlink and update Unity Assets directly.
-# After editing, Unity auto-detects the change and recompiles.
-
-# Run Unity client (open client/Unity/ in Unity Hub, press Play)
-
-# Run headless server (separate terminal)
-dotnet run --project Server/SlopArena.Server.csproj
-
-> The simulation tests are the **first thing to run** after any `src/Shared/` change.
-> They validate state transitions, ability lifecycles, and hit detection without
-> needing Unity or a server. Build & test together takes <3 seconds.
+# Run headless server
+dotnet run --project src/Server/
+```
 
 ---
 
@@ -199,4 +169,6 @@ dotnet run --project Server/SlopArena.Server.csproj
 | `docs/systems/combat-systems.md` | Universal combat mechanics |
 | `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
 | `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
+| `docs/superpowers/specs/2026-07-09-menu-ui-flow-design.md` | Menu flow design: MainMenu → Lobby → CharSelect → StageSelect |
+| `docs/plans/match-architecture.md` | MatchBase/ISimulationBridge seam design |
 | `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no engine physics in Shared/) |
