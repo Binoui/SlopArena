@@ -154,3 +154,4 @@ client/Unity/data/
 
 # Paid asset — do not commit
 client/Unity/Packages/com.kybernetik.animancer/
+.worktrees/
