@@ -51,7 +51,7 @@ namespace SlopArena.Client.World
                 Debug.Log($"[PvPMatch] Using hardcoded arena: {_arenaName}");
             }
 
-            Simulation.OnDebugLog = msg => Debug.Log(msg);
+            SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
 
             // Bridge
             _networkClient.EntityId = PlayerEntityId;
