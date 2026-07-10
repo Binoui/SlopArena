@@ -95,16 +95,15 @@ namespace SlopArena.Client.UI
                 card.Q<Label>($"{AbilitySlots[i]}-desc").text = spec?.Description ?? "";
             }
 
-            SwapPreviewModel(cls);
+            SwapPreviewModel(def);
         }
 
-        private void SwapPreviewModel(CharacterClass cls)
+        private void SwapPreviewModel(CharacterDefinition def)
         {
             if (_previewModelRoot == null) return;
             if (_currentModel != null) Destroy(_currentModel);
 
-            // Try to load model prefab from Resources; fall back to capsule placeholder
-            var prefab = Resources.Load<GameObject>($"Characters/{cls}/Model");
+            var prefab = Resources.Load<GameObject>(def.ModelResourcePath);
             if (prefab != null)
             {
                 _currentModel = Instantiate(prefab, _previewModelRoot);
@@ -117,6 +116,12 @@ namespace SlopArena.Client.UI
                 _currentModel.transform.SetParent(_previewModelRoot, false);
                 _currentModel.transform.localPosition = Vector3.zero;
             }
+
+            // Isolate to CharPreview layer so this model only appears in the preview camera
+            int layer = LayerMask.NameToLayer("CharPreview");
+            if (layer >= 0)
+                foreach (var t in _currentModel.GetComponentsInChildren<Transform>(true))
+                    t.gameObject.layer = layer;
         }
 
         private void OnDisable()
