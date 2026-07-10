@@ -6,13 +6,23 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 4fe0e4adea82d9abba67ad4c41368259
+  - enabled: 1
+    path: Assets/Scenes/Lobby.unity
+    guid: 851dcd98f6cb46fa994f32db6fe308fe
+  - enabled: 1
+    path: Assets/Scenes/CharSelect.unity
+    guid: 7fcef98c65c321890a86b77ae7445403
+  - enabled: 1
+    path: Assets/Scenes/StageSelect.unity
+    guid: ae7cf36f2a1f1b8aa83fa8ac3faa6ffa
+  - enabled: 1
     path: Assets/Scenes/Arena_Offline.unity
     guid: 6144c43a70fbb81c4863dbcb54df49aa
-    buildIndex: 0
   - enabled: 1
     path: Assets/Scenes/Arena_PvP.unity
     guid: 9e50f62b09564aadb793e9ec9345e6c6
-    buildIndex: 1
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
   m_UseUCBPForAssetBundles: 0

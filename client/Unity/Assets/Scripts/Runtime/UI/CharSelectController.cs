@@ -12,7 +12,7 @@ namespace SlopArena.Client.UI
         [SerializeField] private UIDocument _uiDocument;
 
         // Off-screen camera + model for 3D preview
-        [SerializeField] private Camera _previewCamera;
+        [SerializeField] private UnityEngine.Camera _previewCamera;
         [SerializeField] private RenderTexture _previewRenderTexture;
         [SerializeField] private Transform _previewModelRoot;
 

@@ -281,7 +281,10 @@ MonoBehaviour:
   _pivot: {fileID: 1386413333}
   _pitchMin: -60
   _pitchMax: 60
-  _inheritOrbitDistance: 1
+  _defaultPitchDeg: 10
+  _shoulderOffsetX: 0.5
+  _shoulderOffsetY: 0.3
+  _pivotHeightOffset: 1
 --- !u!114 &543287388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1370,6 +1373,10 @@ PrefabInstance:
     - target: {fileID: 2626569396940563197, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
       propertyPath: m_LocalRotation.z
       value: -0.015649773
+      objectReference: {fileID: 0}
+    - target: {fileID: 4646404746901770375, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
+      propertyPath: m_CullingMask.m_Bits
+      value: 55
       objectReference: {fileID: 0}
     - target: {fileID: 5504645932548669358, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
       propertyPath: FollowOffset.x
