@@ -528,7 +528,7 @@ def html_to_png(html_path, png_path):
 
 if __name__ == "__main__":
     os.makedirs("docs/characters", exist_ok=True)
-    for name, img in [("manki", "manki_demo.jpg"), ("bunny", "bunny_front.jpg")]:
+    for name, img in [("manki", "manki_demo.jpg"), ("fightguy", "fightguy_front.jpg")]:
         md = f"docs/characters/{name}.md"
         html = f"docs/characters/{name}_sheet.html"
         png = f"docs/characters/{name}_sheet.png"

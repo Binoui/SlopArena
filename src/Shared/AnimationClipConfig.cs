@@ -2,33 +2,32 @@
 
 namespace SlopArena.Shared
 {
-    /// <summary>Matches Godot's Animation.LoopModeEnum without importing Godot.</summary>
-    public enum ClipLoopMode : byte
+    /// <summary>
+    /// How a clip behaves when its natural length is exceeded.
+    /// </summary>
+    public enum ExtrapolationMode : byte
     {
+        /// <summary>Stop at end (Animancer default, holds last frame).</summary>
         None = 0,
-        Linear = 1,
-        PingPong = 2,
+        /// <summary>Explicit hold at last frame (same result as None).</summary>
+        Hold = 1,
+        /// <summary>Continue curve trajectory via last two position keyframes.</summary>
+        Continuous = 2,
     }
 
     /// <summary>
-    /// Per-clip override for AnimationNodeAnimation properties.
+    /// Per-clip override for animation settings.
     /// Set only the fields that differ from defaults.
     /// </summary>
     public struct AnimationClipConfig
     {
-        /// <summary>Animation name (must match the GLB animation clip name).</summary>
+        /// <summary>Animation name (must match the clip name in the config resource).</summary>
         public string Name;
 
-        /// <summary>Overrides the default loop mode for this clip.</summary>
-        public ClipLoopMode? LoopMode;
+        /// <summary>How this clip behaves past its natural length.</summary>
+        public ExtrapolationMode Extrapolation;
 
-        /// <summary>Custom timeline start offset in seconds.</summary>
-        public float? StartOffset;
-
-        /// <summary>Custom timeline length in seconds.</summary>
-        public float? TimelineLength;
-
-        /// <summary>Stretch the clip to fill the custom timeline. Default: false.</summary>
-        public bool StretchTimeScale;
+        /// <summary>Override playback speed (frames per second). 0 = use clip's native framerate.</summary>
+        public float FrameRateOverride;
     }
 }

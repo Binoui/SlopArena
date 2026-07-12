@@ -575,7 +575,7 @@ Always rebuild BOTH:
 cd ServerApp && dotnet build && cd .. && dotnet build
 ```
 
-**Without this:** the server runs the OLD DLL with hardcoded CharacterClass.Manki. Client predicts Bunny stats but server uses Manki stats overshoot desync.
+**Without this:** the server runs the OLD DLL with hardcoded CharacterClass.Manki. Client predicts FightGuy stats but server uses Manki stats overshoot desync.
 
 ## Hurtbox Y Alignment — Bake-Time Normalization + Server Formula
 
@@ -605,7 +605,7 @@ The old code had `Tick()` using `wy = py + by + soleY` (missing `-capsuleHalf`) 
 | Character | HurtboxBoneScale | idle lowest bone | ModelSoleOffset | Notes |
 |-----------|-----------------|-----------------|-----------------|-------|
 | Manki | 0.01 | ≈ 0.0 (RightToeBase) | ~0.04–0.08 (physical sole) | |
-| Bunny | 0.022 | ≈ 0.0 (RightToe_End) | ~0.04–0.08 (physical sole) | digitigrade — toe end is ground contact |
+| FightGuy | 0.022 | ≈ 0.0 (RightToe_End) | ~0.04–0.08 (physical sole) | digitigrade — toe end is ground contact |
 
 Large `ModelSoleOffset` values (>0.2) are diagnostic — bake normalization was wrong.
 

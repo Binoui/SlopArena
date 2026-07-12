@@ -45,7 +45,7 @@ Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
 
 ### Unity Conventions
 - Use `MonoBehaviour.Update/FixedUpdate`, not Godot `_Process`/`_PhysicsProcess`.
-- Animator Controller with trigger-driven 1-layer state machine.
+- AnimancerComponent plays clips directly. No AnimatorController.
 - Input via Unity InputSystem (`Keyboard.current`, `Mouse.current`).
 - Button text color = White.
 
@@ -68,11 +68,12 @@ Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
 - Entity IDs: player=1, NPCs=100-104.
 
 ### Animation
-- Unity Animator Controller with trigger-driven states.
-- Mixamo FBX exports in cm, Blender uses m — 0.01 scale factor.
-- Mixamo Control Rig constraints on mixamorig bones copy FROM helpers TO mixamorig (reverse direction).
-- Blender 5.1 uses layered actions API.
-- CharacterAnimationConfig ScriptableObject maps animation names to AnimationClips.
+- **Animancer** (third-party) — `PlayerRenderer` calls `_animancer.Play(clip)` directly. No AnimatorController, no triggers.
+- `CharacterAnimationConfig` ScriptableObject maps name → `AnimationClip`. Auto-loaded from `Resources/AnimationConfigs/{Class}_AnimConfig`.
+- Clip playback speed modulated per-stage: `animSpeed = frameCount / DurationTicks` (server timing).
+- Per-clip overrides (`AnimationClipConfig` on `CharacterDefinition`) for loop/extrapolation settings.
+- Idle/run crossfade (no blend tree). Jump/Fall/Dash/Hitstun play once. Ability clips per `AnimationNames[]`.
+- Mixamo FBX scale: cm (0.01 factor). Blender 5.1 uses layered actions API.
 
 
 ### Debugging Protocol
@@ -87,6 +88,6 @@ Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
 - `docs/systems/netcode-architecture.md` — UDP protocol, rollback, packet layout
 - `docs/systems/combat-systems.md` — universal combat mechanics
 - `docs/systems/hitbox-system.md` — hit detection, hurtboxes, collision math
-- `docs/systems/animation-system.md` — FSM lifecycle, AnimationTree
+- `docs/systems/animation-system.md` — Animancer clip playback, extrapolation, speed modulation
 - `docs/contributing/conventions.md` — art direction, naming, pipeline
 - `docs/plans/` — active refactor plans (ability refactor, AnimationTree builder, online PvP roadmap)

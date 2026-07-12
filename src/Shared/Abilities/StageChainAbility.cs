@@ -73,7 +73,27 @@ namespace SlopArena.Shared.Abilities
                 input.ActiveSlot = 0;
             }
 
-            // End phase — stage expired, chain if buffered
+            // Early chain — input buffered and within chain window, chain immediately
+            if (_chainBuffered && _stage < stages.Length - 1
+                && stage.ChainWindowTicks > 0
+                && _stageTicks >= (ushort)(stage.DurationTicks - stage.ChainWindowTicks))
+            {
+                _stage++;
+                _stageTicks = 0;
+                _chainBuffered = false;
+                AnimIndex = _stage;
+                s.ComboStage = _stage;
+                s.AnimLockTicks = stages[_stage].DurationTicks;
+                s.AttackElapsedTicks = 0;
+
+                // Apply lunge velocity for new stage (skip when warp is active)
+                if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
+                    SetVelocityInFacing(ref s, stages[_stage].LungeForce);
+
+                return;
+            }
+
+            // End phase — stage fully expired, chain if buffered
             if (_stageTicks >= stage.DurationTicks)
             {
                 if (_chainBuffered && _stage < stages.Length - 1)
@@ -86,9 +106,9 @@ namespace SlopArena.Shared.Abilities
                     s.AnimLockTicks = stages[_stage].DurationTicks;
                     s.AttackElapsedTicks = 0;
 
-					// Apply lunge velocity for new stage (skip when warp is active)
-					if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
-						SetVelocityInFacing(ref s, stages[_stage].LungeForce);
+                    // Apply lunge velocity for new stage (skip when warp is active)
+                    if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
+                        SetVelocityInFacing(ref s, stages[_stage].LungeForce);
                 }
                 else
                 {

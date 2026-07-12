@@ -213,14 +213,14 @@ npc.Position = ...;                        // ❌ No SetBakedData() call
 When `_bakedData` is null, `PlayerModel.ComputeModelYOffset()` falls back to `ModelYOffset = 0` (default), meaning the visual model sits at capsule center instead of being pushed down to align feet with capsule bottom. Symptoms:
 
 - **Hurtboxes float ~0.5m above the character's feet** (model at Y=0 when it should be at a negative offset)
-- **Symptom is character-dependent** — Manki's default `ModelYOffset=0` happens to be close enough to the auto-computed value (feet near Y=0 in mesh), so it looks fine. Bunny's auto-computed offset is very different from 0, making the float visible.
+- **Symptom is character-dependent** — Manki's default `ModelYOffset=0` happens to be close enough to the auto-computed value (feet near Y=0 in mesh), so it looks fine. FightGuy's auto-computed offset is very different from 0, making the float visible.
 - **NPC baked data must match the NPC's character class**, not the player's. If NPC class differs from player class, using player's baked data gives wrong skeleton proportions.
 
 **Fix pattern** — load baked data per-NPC class:
 
 ```csharp
 // In SpawnNPCs():
-var npcClass = i % 2 == 0 ? CharacterClass.Manki : CharacterClass.Bunny;
+var npcClass = i % 2 == 0 ? CharacterClass.Manki : CharacterClass.FightGuy;
 npc.SetClass(npcClass);
 var npcDef = CharacterRegistry.Get(npcClass);
 var npcBaked = LoadBakedDataFromDef(npcDef);

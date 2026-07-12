@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-
+using SlopArena.Shared;
 namespace SlopArena.Client.Animation
 {
     /// <summary>
@@ -21,6 +21,7 @@ namespace SlopArena.Client.Animation
         {
             public string Name;
             public AnimationClip Clip;
+            public ExtrapolationMode Extrapolation;
         }
 
         // ── Standard clips (always present, generator-wired) ──

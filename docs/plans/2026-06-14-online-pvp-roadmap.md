@@ -6,7 +6,7 @@
 
 # SlopArena — Online PvP Implementation Roadmap
 
-> **Goal:** Build the full online PvP experience with 2 characters (Manki + Bunny).
+> **Goal:** Build the full online PvP experience with 2 characters (Manki + FightGuy).
 > **Prerequisite:** Complete before starting new character design work.
 > **Approach:** Incremental phases, each producing a verifiable result. Agent-friendly — each task is bite-sized.
 

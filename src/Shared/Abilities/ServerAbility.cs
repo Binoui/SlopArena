@@ -35,7 +35,7 @@ namespace SlopArena.Shared.Abilities
         /// <summary>
         /// Called when this ability's hitbox connects with a target entity.
         /// Override to apply status effects, conditional damage, or other
-        /// hit-time effects (e.g., Bunny R mark consumption).
+        /// hit-time effects (e.g., FightGuy R mark consumption).
         /// </summary>
         public virtual void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
             CharacterDefinition attackerDef,
@@ -58,7 +58,7 @@ namespace SlopArena.Shared.Abilities
         public byte AnimIndex { get; protected set; }
 
         /// <summary>All entity states (set by ServerSimulation). Used by abilities that need
-        /// to inspect other entities (e.g., Bunny Jade Hare pull, homing).</summary>
+        /// to inspect other entities (e.g., FightGuy Tempest pull, homing).</summary>
         public Dictionary<ulong, CharacterState>? SimulationStates { get; set; }
 
         /// <summary>Animation names from the spec. Indexed by AnimIndex.</summary>
@@ -121,7 +121,7 @@ namespace SlopArena.Shared.Abilities
                             float scale = CharacterDef.HurtboxBoneScale;
                             bx *= scale; by *= scale; bz *= scale;
                             wx = s.PX + ((bx * cos) + (bz * sin));
-                            wy = s.PY - CharacterDef.CapsuleHeight * 0.5f + by;
+                            wy = CharacterDef.BoneYToWorldY(s.PY, by);
                             wz = s.PZ + ((-bx * sin) + (bz * cos));
                             wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin);
                             wy += evt.BoneOffY;

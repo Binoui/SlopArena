@@ -1,0 +1,12 @@
+{
+    "asset": "d54faf51bab2b8e82b7755deac1bfa58",
+    "fileName": "019f53da-89b8-7d61-adcf-a3b064bffbd3.pose.json",
+    "prompt": "jump, action, game, fast, movement, cartoon",
+    "negativePrompt": "walk, in place, lazy",
+    "model": "unity-text-to-motion",
+    "modelName": "Text to Motion",
+    "customSeed": 616415428,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "isTrimmed": false
+}

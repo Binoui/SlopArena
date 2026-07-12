@@ -155,3 +155,6 @@ client/Unity/data/
 # Paid asset — do not commit
 client/Unity/Packages/com.kybernetik.animancer/
 .worktrees/
+
+# Boxophobic Unity asset (external/paid, should not be tracked)
+client/Unity/Assets/BOXOPHOBIC/

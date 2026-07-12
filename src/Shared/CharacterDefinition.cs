@@ -7,7 +7,7 @@ namespace SlopArena.Shared
     public enum CharacterClass : byte
     {
         Manki,
-        Bunny
+        FightGuy
     }
 
     [Serializable]
@@ -41,6 +41,22 @@ namespace SlopArena.Shared
 
         public float CapsuleRadius;
         public float CapsuleHeight;
+
+        /// <summary>
+        /// Y distance from character feet (ground contact) to Hips bone, in meters.
+        /// Bridges the gap between capsule center (py) and the Hips-relative origin
+        /// of baked bone data. Derived from abs(lowest bone Y) at idle frame 0.
+        /// Manki: 0.50f, FightGuy: 0.82f.
+        /// </summary>
+        public float HipHeight;
+
+        /// <summary>
+        /// Convert a bone-local Y (Hips-relative from baked data) to world-space Y.
+        /// Formula: capsuleCenterY - CapsuleHeight/2 + HipHeight + boneLocalY.
+        /// When grounded (capsuleCenterY = CapsuleHeight/2), this reduces to HipHeight + boneLocalY.
+        /// </summary>
+        public float BoneYToWorldY(float capsuleCenterY, float boneLocalY)
+            => capsuleCenterY - CapsuleHeight * 0.5f + HipHeight + boneLocalY;
         public float HurtboxRadius;
 
         /// <summary>
@@ -86,7 +102,7 @@ namespace SlopArena.Shared
         /// Applied to both the visual model node and the baked bone positions
         /// so hurtboxes and visuals stay aligned.
         /// Manki: 1.0 (Mixamo cm→m handled by GLB import).
-        /// Bunny: ~0.022 (Tripo/Hunyuan export in raw units).
+        /// FightGuy: 2.0 (custom export scale).
         /// </summary>
         public float VisualScale = 1.0f;
 
@@ -162,7 +178,7 @@ namespace SlopArena.Shared
             return new CharacterDefinition[]
             {
                 BuildManki(),
-                BuildBunny(),
+                BuildFightGuy(),
             };
         }
     }

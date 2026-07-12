@@ -23,13 +23,6 @@ namespace SlopArena.Client.World
         [Header("Input")]
         [SerializeField] protected InputController _inputController;
         [SerializeField] protected CameraMount _cameraMount;
-
-        [Header("Arena")]
-        [SerializeField] protected string _arenaName = "training";
-
-        [Header("Characters")]
-        [SerializeField] protected CharacterClass _playerClass = CharacterClass.Manki;
-
         [Header("Aiming")]
         [SerializeField] protected AimHandler _aimHandler;
         [SerializeField] protected HUDManager _hudManager;

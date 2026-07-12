@@ -32,7 +32,7 @@ dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
  | `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
  | `AnimatorGraphBuilderTests.cs` | 15 | FSM transition structure, Manki combo chains, dedup |
  | `MankiExplosiveMineTests.cs` | 11 | Mine placement, detonation, auto-detonate, Overclock bonus, owner isolation |
- | `BunnyAbilityTests.cs` | 25 | Bunny LMB/Q/E/R/F activation, hitbox collision, damage, mark system, homing, launcher |
+ | `FightGuyAbilityTests.cs` | 25 | FightGuy LMB/Q/E/R/F activation, hitbox collision, damage, mark system, homing, launcher |
  
  > **Ground-truth tests** (`CombatPipelineTests`) are the most important for understanding how combat
  > works end to end. They exercise the full pipeline: Input → ServerAbility → Hitbox → Collision →
@@ -94,7 +94,7 @@ The fastest way to test gameplay changes:
 
 1. Open `client/Unity/` in Unity Hub
 2. Press **Play**
-3. Select a character (Manki or Bunny)
+3. Select a character (Manki or FightGuy)
 
 **What to test:**
 - Movement: WASD, space (jump/double jump), shift (dash)
@@ -137,7 +137,7 @@ Build the Unity client (`File → Build Settings → Build`) and run two instanc
 dotnet run --project Server/SlopArena.Server.csproj
 
 # Default port: 9876, arena: pit, both players: Manki
-# Future CLI args: --port 8765 --arena split --class Bunny
+# Future CLI args: --port 8765 --arena split --class FightGuy
 ```
 
 The server runs at 60Hz with `ServerSimulation` (hit detection + hurtboxes + void death).

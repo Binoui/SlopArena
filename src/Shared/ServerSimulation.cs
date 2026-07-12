@@ -228,7 +228,7 @@ namespace SlopArena.Shared
 						if (!baked.GetBonePosition(targetAnim, animFrame, bi, out float bx, out float by, out float bz)) continue;
 						bx *= scale; by *= scale; bz *= scale;
 						float wx = px + ((bx * cos) + (bz * sin));
-						float wy = py - def.CapsuleHeight * 0.5f + by;
+						float wy = def.BoneYToWorldY(py, by);
 						float wz = pz + ((-bx * sin) + (bz * cos));
 						list.Add(new SpellResolver.EntityData
 						{
@@ -534,7 +534,7 @@ namespace SlopArena.Shared
 							float scale = def.HurtboxBoneScale;
 							bx *= scale; by *= scale; bz *= scale;
 							float wx = px + ((bx * cos) + (bz * sin));
-							float wy = py - def.CapsuleHeight * 0.5f + by;
+							float wy = def.BoneYToWorldY(py, by);
 							float wz = pz + ((-bx * sin) + (bz * cos));
 							wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
 							entityList.Add(new SpellResolver.EntityData
@@ -657,7 +657,7 @@ namespace SlopArena.Shared
 						float boneScale = def.HurtboxBoneScale;
 						bx *= boneScale; by *= boneScale; bz *= boneScale;
 						float wx = state.PX + ((bx * cos) + (bz * sin));
-						float wy = state.PY - def.CapsuleHeight * 0.5f + by;
+						float wy = def.BoneYToWorldY(state.PY, by);
 						float wz = state.PZ + ((-bx * sin) + (bz * cos));
 						wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin); wy += evt.BoneOffY; wz += (-evt.BoneOffX * sin) + (evt.BoneOffZ * cos);
 
@@ -741,7 +741,7 @@ namespace SlopArena.Shared
 				    hit.KnockbackY, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
 				targetState.HitstunTicks = hit.StunTicks;
 
-				// Let the attacker's active ability apply hit effects (e.g., Bunny R mark consumption)
+				// Let the attacker's active ability apply hit effects (e.g., FightGuy R mark consumption)
 				if (_activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
 				    && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
 				{

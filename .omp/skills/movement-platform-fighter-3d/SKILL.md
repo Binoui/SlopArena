@@ -459,7 +459,7 @@ public struct MovementStats
 {
     // ... existing fields ...
     public ushort JumpDurationTicks;  // rising phase duration in ticks
-    // Manki: 24 ticks (~0.4s), Bunny: 28 ticks (~0.47s)
+    // Manki: 24 ticks (~0.4s), FightGuy: 28 ticks (~0.47s)
 }
 ```
 

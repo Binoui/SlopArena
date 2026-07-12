@@ -825,7 +825,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _entityName: Player
   _entityId: 1
-  _animator: {fileID: 1512223013}
+  _animancer: {fileID: 0}
+  _charConfig: {fileID: 0}
   _runSpeedThreshold: 0.1
   _capsuleRadius: 0.6
   _capsuleHeight: 1.3
@@ -899,7 +900,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _entityName: Opponent
   _entityId: 2
-  _animator: {fileID: 1554294299}
+  _animancer: {fileID: 0}
+  _charConfig: {fileID: 0}
   _runSpeedThreshold: 0.1
   _capsuleRadius: 0.6
   _capsuleHeight: 1.3

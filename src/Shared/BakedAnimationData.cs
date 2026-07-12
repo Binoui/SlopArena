@@ -125,6 +125,30 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
+        /// Returns the minimum Y across all bones at frame 0 of the "idle" animation.
+        /// Negative = feet/toes below Hips. Used to compute HipHeight for character defs.
+        /// Returns 0 if idle animation is not found.
+        /// </summary>
+        public float GetMinBoneY()
+        {
+            for (int a = 0; a < Animations.Length; a++)
+            {
+                if (Animations[a].Name == "idle")
+                {
+                    int stride = BoneNames.Length * 3;
+                    float minY = float.MaxValue;
+                    for (int b = 0; b < BoneNames.Length; b++)
+                    {
+                        float y = Animations[a].Frames[0][b * 3 + 1];
+                        if (y < minY) minY = y;
+                    }
+                    return minY;
+                }
+            }
+            return 0f;
+        }
+
+        /// <summary>
         /// Find animation index by name, or -1.
         /// </summary>
         public int FindAnimIndex(string name)

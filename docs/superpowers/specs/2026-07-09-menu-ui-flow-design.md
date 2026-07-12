@@ -204,7 +204,7 @@ public string DisplayName;   // e.g. "Grapple", "Bazooka"
 public string Description;   // e.g. "Grab & throw enemy", one line
 ```
 
-Fill these in `MankiData.cs` and `BunnyData.cs`. `CharSelectController` reads them for the ability cards in Panel 2.
+Fill these in `MankiData.cs` and `FightGuyData.cs`. `CharSelectController` reads them for the ability cards in Panel 2.
 
 ---
 

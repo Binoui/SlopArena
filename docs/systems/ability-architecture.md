@@ -134,15 +134,15 @@ Each ability is mapped by (CharacterClass, slot, airborne) tuple:
 The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air combo via AirLmbCombo when airborne).
 
 **Example:**
-private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
+private static ServerAbility? CreateFightGuyAbility(byte slot, bool airborne) => (slot, airborne) switch
 {
-    (0, false) => new BunnyLmbCombo(),
+    (0, false) => new FightGuyLmbCombo(),
     (0, true) => new AirLmbCombo(),   // AirLMB — multi-hit air combo
     (1, _) => null,       // RMB — data-driven
-    (2, _) => new BunnyWhirlingCarrot(),   // Q
-    (3, _) => new BunnyFlipKick(),          // E
-    (4, _) => new BunnyDragonKick(),        // R
-    (5, _) => new BunnyJadeHare(),          // F
+    (2, _) => new FightGuyKiShot(),   // Q
+    (3, _) => new FightGuyCycloneKick(),          // E
+    (4, _) => new FightGuyDragonKick(),        // R
+    (5, _) => new FightGuyTempest(),          // F
     _ => null, // Data-driven fallback for slots without ServerAbility
 };
 
@@ -202,7 +202,7 @@ deactivate them via the `AttackSlot == 0` check. Fixed in `ActivateAbility`.)
 New in this branch: `OnHitEntity` is called when an ability's hitbox connects with a target.
 Override to apply status effects (Marked), conditional damage, or spawn secondary hitboxes (AoE).
 
-Example — BunnyDragonKick:
+Example — FightGuyDragonKick:
 ```csharp
 public override void OnHitEntity(...)
 {
@@ -218,13 +218,13 @@ public override void OnHitEntity(...)
 ### StatusFlags — Marked, Slowed, etc.
 
 `CharacterState.StatusFlags` (byte bitfield) and `StatusRemainingTicks` (ushort)
-provide a generic status effect system. Currently used for Bunny Q's Marked status (bit 2).
+provide a generic status effect system. Currently used for FightGuy Q's Marked status (bit 2).
 Flag is auto-cleared when `StatusRemainingTicks` reaches 0.
 
 ### SimulationStates — Cross-Entity Inspection
 
 `ServerAbility.SimulationStates` is set by `ServerSimulation` before each tick.
-Abilities can inspect other entities' state for homing (Bunny R), area pull (Bunny F), etc.
+Abilities can inspect other entities' state for homing (FightGuy R), area pull (FightGuy F), etc.
 Returns `Dictionary<ulong, CharacterState>` — do NOT mutate other entities' state directly.
 
 
@@ -375,7 +375,7 @@ All abilities have matching xUnit tests in `tests/Shared.Tests/`:
 | `ServerSimulationTests.cs` | Ability lifetime, self-hit prevention |
 | `CombatMathTests.cs` | Knockback formulas, DI, projectile math |
 | `MankiExplosiveMineTests.cs` | Mine placement, detonation, auto-detonate, Overclock buff bonus |
-| `BunnyAbilityTests.cs` | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
+| `FightGuyAbilityTests.cs` | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
 
 **Run after every ability change:**
 ```bash

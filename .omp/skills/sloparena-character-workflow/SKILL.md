@@ -115,7 +115,7 @@ When importing a new character, verify its mesh dimensions match existing charac
 | Character | VisualScale | HurtboxBoneScale | Result |
 |-----------|------------|------------------|--------|
 | Manki | 1.0 | 0.01 | ✅ Works — Mixamo cm→m handled by GLB import, VisualScale=1, baked data in cm, HurtboxBoneScale=0.01 converts |
-| Bunny | **0.022** | **0.022** | ✅ Must be equal — non-Mixamo GLB units need same conversion on both sides |
+| FightGuy | **0.022** | **0.022** | ✅ Must be equal — non-Mixamo GLB units need same conversion on both sides |
 
 **⚠️ Client and server compute hurtbox positions from DIFFERENT sources:** the client reads the actual skeleton (`Skeleton3D.GetBoneGlobalPose()` at visual scale), while the server reads baked data (`BakedAnimationData × HurtboxBoneScale`). If these scales differ, the foot hurtbox on the server is at a different Y than the foot hurtbox on the client. See `sloparena-combat-engine` → "Client/server hurtbox scale agreement" for the full diagnostics table.
 
@@ -124,7 +124,7 @@ When importing a new character, verify its mesh dimensions match existing charac
 | Character | Bone foot relative to capsule bottom | SoleOffset meaning |
 |-----------|--------------------------------------|-------------------|
 | Manki | Bone foot is **inside capsule** (0.116 above capsule bottom) | SoleOffset = 0.47 = extra downward push from bone to mesh surface |
-| Bunny | Bone foot is **below capsule** (0.113 below capsule bottom) | SoleOffset = 0.35 = correction to align bone-based hurtbox with visual sole |
+| FightGuy | Bone foot is **below capsule** (0.113 below capsule bottom) | SoleOffset = 0.35 = correction to align bone-based hurtbox with visual sole |
 
 **Rule of thumb:** If after setting VisualScale = HurtboxBoneScale the model's bones sit inside the capsule, SoleOffset should be positive (push visual down to ground). If bones sit below the capsule already, SoleOffset is negative/smaller to pull the visual up.
 
@@ -249,7 +249,7 @@ Before the builder existed, states were added via raw `.tscn` text patching. Thi
 | File | Change |
 |------|--------|
 | Shared/CharacterDefinition.cs | Enum + BuildRegistry + BuildX() — set `VisualScale` and `HurtboxBoneScale` to the same value |
-| Shared/Characters/XData.cs | Set `VisualScale` (Manki=1.0, Bunny=0.022, etc.), `ModelSoleOffset` (0.0 default), and ability data including optional `ProjectileConfig` for targeted throw Q abilities |
+| Shared/Characters/XData.cs | Set `VisualScale` (Manki=1.0, FightGuy=0.022, etc.), `ModelSoleOffset` (0.0 default), and ability data including optional `ProjectileConfig` for targeted throw Q abilities |
 | Scripts/Abilities/XAbility.cs | Create an ability class per unique gameplay mechanic — see `sloparena-combat-engine` skill for the `Ability` base class API (OnActivate, Tick, OnDeactivate). Simple instant abilities just set `ActiveSlot` in Tick; aimed abilities use GroundCircle/ArcDrawer/GroundCone helpers |
 | Scripts/Entities/PlayerModel.cs | `ComputeModelYOffset()` — scans baked idle frame 0 for lowest bone Y; model scale = `_charDef.VisualScale` |
 | Scripts/Entities/PlayerController.cs | `ApplyAnimationTimeScales()` computes TimeScale from baked frame count / DurationTicks |
@@ -391,7 +391,7 @@ This iterates all 8 ability slots (LMB, RMB, AirLMB, AirRMB, Q, E, R, F) and eac
 - The baked `.bin` must contain the animation (frame count loaded from `BakedAnimationData`)
 - Looping animations (idle/run/jump/fall) stay at 1.0× (not covered by DurationTicks)
 
-**Example — Bunny LMB stage 1:**
+**Example — FightGuy LMB stage 1:**
 - Baked: "spell_lmb_1" = 93 frames
 - Definition: DurationTicks = 50
 - TimeScale = 93 / 50 = **1.86×**
@@ -519,7 +519,7 @@ Missing either causes a Parse Error at scene load: the Godot parser tries to res
 
 Can get accidentally changed by `replace_all=true` patches. After any large-scale text patch, verify:
 - Manki: `VisualScale = 1.0f`, `HurtboxBoneScale = 0.01f`, `ModelSoleOffset = 0.0f`
-- Bunny: `VisualScale = 0.022f`, `HurtboxBoneScale = 0.022f`, `ModelSoleOffset = 0.0f`
+- FightGuy: `VisualScale = 0.022f`, `HurtboxBoneScale = 0.022f`, `ModelSoleOffset = 0.0f`
 
 VisualScale and HurtboxBoneScale MUST be equal for non-Mixamo characters. `ModelSoleOffset` is a visual tunable (sole thickness), NOT a server physics value — the server uses `py - capsuleHalf + by` which is universal when bake normalization is correct (lowest idle bone ≈ 0).
 
@@ -552,7 +552,7 @@ See `references/dash-direction-trace.md` for full trace.
 
 ### NPCs use player's `_charDef` in simulation — FIXED
 
-**Issue (TrainingMatch):** `RegisterEntity(100, _charDef, ...)` used the player's CharacterDefinition for the NPC. When playing as Bunny, the NPC Manki was simulated with Bunny's capsule (1.5m height) and HurtboxBoneScale (0.02) instead of Manki's (1.3m, 0.01). This caused the NPC's physics position to diverge from its visual.
+**Issue (TrainingMatch):** `RegisterEntity(100, _charDef, ...)` used the player's CharacterDefinition for the NPC. When playing as FightGuy, the NPC Manki was simulated with FightGuy's capsule (1.5m height) and HurtboxBoneScale (0.02) instead of Manki's (1.3m, 0.01). This caused the NPC's physics position to diverge from its visual.
 
 **Fix:** Register the NPC with its own CharacterDefinition matching its visual class:
 ```csharp

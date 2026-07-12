@@ -293,7 +293,7 @@ HitboxEvents = new[]
 ```
 
 **ServerAbility limitation:**
-ServerAbility subclasses (e.g., `BunnyDragonKick`, `MankiBazooka`) manage their own hitbox spawning in `Tick()` via `ServerAbility.SpawnHitbox()`, which always uses entity-relative `OffX/Y/Z`. Bone-attached `HitboxEvent` fields on a ServerAbility's data are ignored. ServerAbilities that need bone-attached hitboxes must resolve baked data and call `Resolver.Spawn()` directly.
+ServerAbility subclasses (e.g., `FightGuyDragonKick`, `MankiBazooka`) manage their own hitbox spawning in `Tick()` via `ServerAbility.SpawnHitbox()`, which always uses entity-relative `OffX/Y/Z`. Bone-attached `HitboxEvent` fields on a ServerAbility's data are ignored. ServerAbilities that need bone-attached hitboxes must resolve baked data and call `Resolver.Spawn()` directly.
 ---
 
 ## 🔵 Hurtbox (target)
@@ -382,7 +382,7 @@ if (_bakedData.TryGetValue(id, out var baked) && def.HurtboxBoneDefs?.Length > 0
         // Bone → world: rotate by yaw, add position
         float cos = MathF.Cos(state.FacingYaw), sin = MathF.Sin(state.FacingYaw);
         float wx = state.PX + (bx * cos + bz * sin);
-        float wy = state.PY + by;
+        float wy = def.BoneYToWorldY(state.PY, by);
         float wz = state.PZ + (-bx * sin + bz * cos);
 
         entityList.Add(new EntityData { PosX = wx, ... });

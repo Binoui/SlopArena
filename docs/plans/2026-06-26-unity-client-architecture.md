@@ -277,7 +277,7 @@ simulation truth debuggable in <3s without opening the editor.
 
 ---
 
-## Phase 8 — Bunny + Polish
+## Phase 8 — FightGuy + Polish
 
 **Deliverable:** Second character fully playable. Remaining polish.
 
@@ -285,17 +285,17 @@ simulation truth debuggable in <3s without opening the editor.
 
 | Unity file | Reads from Godot |
 |---|---|
-| Bunny AnimatorController | `assets/characters/bunny/bunny.glb` — model + animations |
-| | `Scripts/Characters/Bunny/BunnyAbilities.cs` — special effects |
+| FightGuy AnimatorController | `assets/characters/bunny/bunny.glb` — model + animations |
+| | `Scripts/Characters/FightGuy/FightGuyAbilities.cs` — special effects |
 
 **Files to create:**
-- Bunny FBX import + material + `CharacterAnimationConfig`
-- Bunny AnimatorController (via `SlopArenaAnimatorGenerator`)
+- FightGuy FBX import + material + `CharacterAnimationConfig`
+- FightGuy AnimatorController (via `SlopArenaAnimatorGenerator`)
 
 **Godot files deleted after this phase:**
-- `Scripts/Characters/Bunny/BunnyAbilities.cs`
+- `Scripts/Characters/FightGuy/FightGuyAbilities.cs`
 
-**Test:** Select Bunny → all animations play correctly, abilities function identically to Manki.
+**Test:** Select FightGuy → all animations play correctly, abilities function identically to Manki.
 
 ---
 
@@ -320,7 +320,7 @@ Pre-Phase (Infrastructure Cleanup)
         │     └── Phase 5 (VFX)
         ├── Phase 6 (Network)
         │     └── Phase 7 (UI Flow)
-        ├── Phase 8 (Bunny)
+        ├── Phase 8 (FightGuy)
         └── Phase 9 (Cleanup)
 ```
 
@@ -339,7 +339,7 @@ Phases 2–5 can run in parallel after Phase 1. Phase 6 is independent of 2–5.
 | 5 | `Scripts/VFX/SpellVFXManager.cs`, `Scripts/VFX/FlamethrowerVFX.cs`, `Scripts/Abilities/RoundBomb.cs` |
 | 6 | `Scripts/World/MatchManager.cs`, `Scripts/World/PvPMatch.cs` |
 | 7 | `Scripts/World/Main.cs`, `Scripts/UI/CharacterSelectUI.cs`, `Scripts/UI/MainMenuUI.cs` |
-| 8 | `Scripts/Characters/Bunny/BunnyAbilities.cs` |
+| 8 | `Scripts/Characters/FightGuy/FightGuyAbilities.cs` |
 | 9 | Everything remaining in `Scripts/` |
 
 ---

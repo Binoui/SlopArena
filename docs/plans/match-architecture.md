@@ -170,7 +170,8 @@ public class NetworkMatch : MatchBase
 - `_npcAiMode` inspector toggle (Attack / Idle)
 - `_npcLastDeaths` tracking + `OnDeath()` call
 - Debug tick log every 120 ticks
-- `DrawHitboxGizmos` / `DrawHitboxDebug` / `DebugDrawWireSphere`
+    - `DrawHitboxGizmos` / `DrawHitboxDebug` / `DebugDrawWireSphere` (hitboxes from `GetActiveHitboxes()`)
+    - `DrawHurtboxGizmos` / `DrawHurtboxDebug` (hurtboxes from `GetLastEntityData()`)
 - `_showHitboxes` inspector flag
 
 These are dev/training tools. They never belong in another match type.

@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06b0ddd57a57a2001a3df31c73956e2c, type: 3}
+  m_Name: FightGuy_AnimConfig
+  m_EditorClassIdentifier: 
+  Idle: {fileID: -203655887218126122, guid: 1c79c3f7ea06586d7a54165baa385b63, type: 3}
+  Run: {fileID: 6200578666267062213, guid: b5f48c04d10d43274a8d5b2ff56f1840, type: 3}
+  Jump: {fileID: 7400000, guid: c0e91d6138f429cfabe18ad13b1543bf, type: 2}
+  Fall: {fileID: -203655887218126122, guid: f5d91b50068e35631a0b4064627bee6f, type: 3}
+  Dash: {fileID: 8993902097722301239, guid: b3c57710929491dbb9440e11202d221a, type: 3}
+  HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
+  HitMedium: {fileID: 0}
+  HitHard: {fileID: 0}
+  Death: {fileID: 8993902097722301239, guid: e2eb8871bf81bb449ab74e86581b3f3a, type: 3}
+  AbilityClips:
+  - Name: spell_lmb_1
+    Clip: {fileID: 7400000, guid: eb14612d3e2086d5dbbc4f6176ca362d, type: 2}
+  - Name: spell_lmb_2
+    Clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
+  - Name: spell_lmb_3
+    Clip: {fileID: 7400000, guid: da8f21f261cb15302898c2b46af8a4a9, type: 2}
+  - Name: spell_lmb_4
+    Clip: {fileID: 7400000, guid: 85dfb50c9840100369920ab6a4a2b4c8, type: 2}
+  - Name: spell_lmb_air_1
+    Clip: {fileID: 7400000, guid: ef68c8deeec6feeb7be8cdd4f6263483, type: 2}
+  - Name: spell_lmb_air_2
+    Clip: {fileID: 7400000, guid: 4ada0a01199bdd0c99902bc886c34f37, type: 2}
+  - Name: spell_q_attack
+    Clip: {fileID: 3094330708855449807, guid: e40302a18e6c6e526bf471320e9fd420, type: 3}
+  - Name: spell_q_loop
+    Clip: {fileID: 3094330708855449807, guid: 579ec584c5beef4bf8c560f408b7f1a4, type: 3}
+  - Name: spell_e
+    Clip: {fileID: -203655887218126122, guid: 8fe5da62a5c9b2dc2b783a67dc2f4b45, type: 3}
+  - Name: spell_r_loop
+    Clip: {fileID: 7400000, guid: 77d4d58ee803888c7a35013b8f5a6102, type: 2}
+  - Name: spell_r_attack
+    Clip: {fileID: 7400000, guid: 69934ad2f98bf5210baa234ffa6d554d, type: 2}
+  - Name: spell_r_end
+    Clip: {fileID: 7400000, guid: a3d2138d3ede5473190a5465894efdc2, type: 2}
+  - Name: spell_f
+    Clip: {fileID: -203655887218126122, guid: d3c32a81f3abaf985a22e03e3968fd01, type: 3}

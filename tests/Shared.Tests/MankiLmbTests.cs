@@ -409,6 +409,7 @@ public class MankiLmbTests
 
     /// <summary>
     /// Chain from stage 1 → 2. Leaves sim at the start of stage 2.
+    /// Account for early chain at DurationTicks - ChainWindowTicks.
     /// </summary>
     private static void ChainToStage2(ServerSimulation sim)
     {
@@ -418,8 +419,9 @@ public class MankiLmbTests
         // Buffer chain input early in stage 1
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Run to stage 1 end (12 more ticks, total 14) — chains to stage 2
-        for (int i = 2; i < Stage1.DurationTicks; i++)
+        // Run to early chain point (DurationTicks - ChainWindowTicks = 40 - 12 = 28)
+        int chainAt = Stage1.DurationTicks - Stage1.ChainWindowTicks;
+        for (int i = 2; i < chainAt; i++)
             sim.Tick(new() { { 1, default } });
     }
 
@@ -433,8 +435,9 @@ public class MankiLmbTests
         // Buffer chain input early in stage 2
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
 
-        // Run to stage 2 end (15 more ticks, total 16) — chains to stage 3
-        for (int i = 1; i < Stage2.DurationTicks; i++)
+        // Run to early chain point (DurationTicks - ChainWindowTicks = 35 - 14 = 21)
+        int chainAt = Stage2.DurationTicks - Stage2.ChainWindowTicks;
+        for (int i = 1; i < chainAt; i++)
             sim.Tick(new() { { 1, default } });
     }
 }

@@ -92,7 +92,7 @@ namespace SlopArena.Client.Camera
                 case CameraMode.Aiming:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
-                    // Disable InputAxisController so the orbital camera stops consuming
+                    // Disable CinemachineInputAxisController so the orbital camera stops consuming
                     // mouse input in the background while AimCameraMount owns the mouse.
                     if (_inputAxisController != null) _inputAxisController.enabled = false;
                     // Freeze orbital at current angles so it's ready to blend back to
