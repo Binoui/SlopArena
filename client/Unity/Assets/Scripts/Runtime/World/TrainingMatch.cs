@@ -129,7 +129,10 @@ namespace SlopArena.Client.World
         {
             _inputController.Poll();
             if (_showHitboxes && _bridge != null)
+            {
                 DrawHitboxDebug();
+                DrawHurtboxDebug();
+            }
         }
 
         protected override void OnMatchFixedUpdate()
@@ -261,6 +264,34 @@ namespace SlopArena.Client.World
         {
             if (_bridge == null) return;
             DrawHitboxGizmos();
+            DrawHurtboxGizmos();
+        }
+
+        private void DrawHurtboxGizmos()
+        {
+            var entities = _bridge.InternalSim.GetLastEntityData();
+            foreach (var ed in entities)
+            {
+                // Color by entity: player=green, NPC=red, others=blue
+                Gizmos.color = ed.Id switch
+                {
+                    PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
+                    NpcEntityId    => new Color(1f, 0.3f, 0.3f, 0.5f),
+                    _              => new Color(0.3f, 0.3f, 1f, 0.5f),
+                };
+                var center = new Vector3(ed.PosX, ed.PosY, ed.PosZ);
+                if (ed.Shape == HitboxShape.Sphere)
+                {
+                    Gizmos.DrawWireSphere(center, ed.Radius);
+                }
+                else
+                {
+                    var end = new Vector3(ed.EndX, ed.EndY, ed.EndZ);
+                    Gizmos.DrawWireSphere(center, ed.Radius);
+                    Gizmos.DrawWireSphere(end, ed.Radius);
+                    Gizmos.DrawLine(center, end);
+                }
+            }
         }
 
         private void DrawHitboxGizmos()
@@ -300,6 +331,32 @@ namespace SlopArena.Client.World
                     var end = new Vector3(hb.EndX, hb.EndY, hb.EndZ);
                     DebugDrawWireSphere(center, hb.Radius, color);
                     DebugDrawWireSphere(end, hb.Radius, color);
+                    Debug.DrawLine(center, end, color);
+                }
+            }
+        }
+
+        private void DrawHurtboxDebug()
+        {
+            var entities = _bridge.InternalSim.GetLastEntityData();
+            foreach (var ed in entities)
+            {
+                Color color = ed.Id switch
+                {
+                    PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
+                    NpcEntityId    => new Color(1f, 0.3f, 0.3f, 0.5f),
+                    _              => new Color(0.3f, 0.3f, 1f, 0.5f),
+                };
+                var center = new Vector3(ed.PosX, ed.PosY, ed.PosZ);
+                if (ed.Shape == HitboxShape.Sphere)
+                {
+                    DebugDrawWireSphere(center, ed.Radius, color);
+                }
+                else
+                {
+                    var end = new Vector3(ed.EndX, ed.EndY, ed.EndZ);
+                    DebugDrawWireSphere(center, ed.Radius, color);
+                    DebugDrawWireSphere(end, ed.Radius, color);
                     Debug.DrawLine(center, end, color);
                 }
             }

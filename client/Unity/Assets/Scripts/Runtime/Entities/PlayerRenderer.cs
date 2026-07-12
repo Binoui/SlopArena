@@ -420,21 +420,6 @@ namespace SlopArena.Client.Entities
             float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
             Vector3 top = capCenter + Vector3.up * halfH;
             Vector3 bot = capCenter - Vector3.up * halfH;
-
-            // ── Hurtbox spheres at bone positions ──
-            if (_hurtboxBoneDefs != null)
-            {
-                Gizmos.color = new Color(1f, 0.3f, 0.3f, 0.5f);
-                foreach (var def in _hurtboxBoneDefs)
-                {
-                    Transform bone = FindBone(def.BoneName);
-                    if (bone != null)
-                    {
-                        Vector3 localOffset = transform.InverseTransformDirection(new Vector3(def.OffX, def.OffY, def.OffZ));
-                        //Gizmos.DrawWireSphere(bone.position + localOffset, def.Radius);
-                    }
-                }
-            }
         }
 
         private Transform FindBone(string name)
