@@ -162,4 +162,65 @@ public class BakedAnimationDataTests
         var badBytes = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 };
         Assert.Throws<Exception>(() => BakedAnimationData.LoadFromBin(badBytes));
     }
+
+    [Fact]
+    public void GetMinBoneY_ReturnsLowestBoneY()
+    {
+        string[] boneNames = { "mixamorig:Head", "mixamorig:Hips", "mixamorig:RightFoot" };
+        // Hips=0, Head above, Foot below
+        var positions = new float[]
+        {
+            0f, 0.5f, 0f,  // Head
+            0f, 0f,   0f,  // Hips
+            0f, -0.4f, 0f, // Foot
+        };
+        var bin = BuildTestBin(boneNames, new[] { ("idle", 1) }, positions);
+        var baked = BakedAnimationData.LoadFromBin(bin);
+
+        float minY = baked.GetMinBoneY();
+
+        Assert.Equal(-0.4f, minY, 3);
+    }
+
+    [Fact]
+    public void GetMinBoneY_NoIdleAnim_ReturnsZero()
+    {
+        string[] boneNames = { "mixamorig:Hips" };
+        var positions = new float[] { 0f, 0f, 0f };
+        var bin = BuildTestBin(boneNames, new[] { ("run", 1) }, positions);
+        var baked = BakedAnimationData.LoadFromBin(bin);
+
+        float minY = baked.GetMinBoneY();
+
+        Assert.Equal(0f, minY);
+    }
+
+    [Fact]
+    public void BuildEntitiesFromState_HipsHurtboxAtHipHeight()
+    {
+        var def = new CharacterDefinition
+        {
+            CapsuleHeight = 1.5f,
+            HipHeight = 0.50f,
+            HurtboxBoneDefs = new HurtboxBoneDef[]
+            {
+                new("mixamorig:Hips", 0, 0, 0, 0.3f),
+            },
+        };
+        string[] boneNames = { "mixamorig:Hips" };
+        var positions = new float[] { 0f, 0f, 0f }; // Hips at (0,0,0) in baked data
+        var bin = BuildTestBin(boneNames, new[] { ("idle", 1) }, positions);
+        var baked = BakedAnimationData.LoadFromBin(bin);
+
+        var state = new CharacterState
+        {
+            PX = 0, PY = 0.75f, PZ = 0, // capsule center = CapsuleHeight/2
+            FacingYaw = 0,
+        };
+
+        var entities = ServerSimulation.BuildEntitiesFromState(state, def, baked, "idle", 0);
+
+        Assert.Single(entities);
+        Assert.Equal(0.50f, entities[0].PosY, 3); // HipHeight, not 0
+    }
 }

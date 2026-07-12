@@ -11,7 +11,7 @@ namespace SlopArena.Shared;
 ///   - All durations are ushort TICKS (1 tick = 1/60s ≈ 16.6ms)
 ///     60 ticks = 1 second, 180 ticks = 3 seconds, 600 ticks = 10 seconds
 ///   - All positions/distances are METERS (Godot world units = meters)
-///   - HurtboxBoneScale: Scale factor applied to baked bones. Set to matching character VisualScale (1.0f for Manki, 2.0f for Bunny).
+///   - HurtboxBoneScale: Scale factor applied to baked bones. Set to matching character VisualScale (1.0f for Manki, 2.0f for FightGuy).
 ///   - Hitbox Offsets: (OffX, OffY, OffZ) from character center, rotated by facing yaw
 ///     Positive OffZ = in front, OffY = up from feet
 ///   - Capsule shape: OffX/OffY/OffZ = start, EndOffX/Y/Z = capsule end (relative to Off)
@@ -31,6 +31,7 @@ public static partial class CharacterRegistry
             DisplayName = "Manki",
             CapsuleRadius = 0.3f,
             CapsuleHeight = 1.5f,
+            HipHeight = 0.50f,
             HurtboxRadius = 1.0f,
             Movement = new MovementStats
             {
@@ -65,8 +66,8 @@ public static partial class CharacterRegistry
             VisualScale = 1.0f,
             HurtboxBoneScale = 1.0f,
             ModelSoleOffset = 0.0f,
-            AutoModelYOffset = false,
-            ModelYOffset = -0.70f,
+            AutoModelYOffset = true,
+            ModelYOffset = 0f,
 
             // Default animation names match Mixamo: idle, run, dash, jump, fall, small_hit, medium_hit, hard_hit
             // Only ClipOverrides needed for custom timelines
