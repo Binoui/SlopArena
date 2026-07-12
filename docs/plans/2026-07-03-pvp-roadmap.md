@@ -235,13 +235,11 @@ PvPMatch → owns NetworkSimulationBridge → wraps NetworkClient
 
 ---
 
-## Phase 4 — UI Flow (medium priority)
+## Phase 4 — UI Flow ✅ (superseded)
 
-**Deliverable:** Main Menu → Character Select → (Training / PvP) match. Full screen flow.
+**Superseded by:** `docs/superpowers/specs/2026-07-09-menu-ui-flow-design.md` and `docs/superpowers/plans/2026-07-09-menu-ui-flow.md`
 
-### T4.1: Main Menu scene + script
-
-**What:** `Scenes/MainMenu.unity` with two buttons: "Training" and "Online PvP". "Online PvP" shows IP/port input field or connects to default `localhost:7777`.
+**What shipped:** MainMenu (nested list with Training/Multiplayer/Host/Join) → Lobby → CharSelect (2-panel: grid + 3D preview with ability cards) → StageSelect → match. `MatchConfig` static class carries char/arena across scene loads. `MatchBase` no longer uses Inspector fields for char/arena.
 
 **Files:**
 - Create: `Scenes/MainMenu.unity`
