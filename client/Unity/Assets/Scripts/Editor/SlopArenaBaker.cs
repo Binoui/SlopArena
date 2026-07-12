@@ -172,6 +172,8 @@ public class SlopArenaBaker : EditorWindow
                     tempBoneTransforms[b] = tempGO.transform;
             }
 
+
+
             // Sample each clip
             foreach (var (logicalName, clip) in clips)
             {
@@ -187,15 +189,13 @@ public class SlopArenaBaker : EditorWindow
                 {
                     float time = frame * frameTime;
                     clip.SampleAnimation(tempGO, time);
-
                     Vector3 hipsPos = tempHips.position;
-                    Quaternion invHipsRot = Quaternion.Inverse(tempHips.rotation);
 
                     for (int b = 0; b < transforms.Count; b++)
                     {
                         Transform tempT = tempBoneTransforms[b];
                         Vector3 worldPos = tempT.position;
-                        Vector3 localPos = invHipsRot * (worldPos - hipsPos);
+                        Vector3 localPos = worldPos - hipsPos;
                         stream.Write(BitConverter.GetBytes(localPos.x), 0, 4);
                         stream.Write(BitConverter.GetBytes(localPos.y), 0, 4);
                         stream.Write(BitConverter.GetBytes(localPos.z), 0, 4);

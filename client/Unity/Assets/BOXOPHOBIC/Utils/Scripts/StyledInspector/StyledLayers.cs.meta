@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 846c011559e38824090c713c729cfec1
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Utils/Scripts/StyledInspector/StyledLayers.cs
+  uploadId: 878720

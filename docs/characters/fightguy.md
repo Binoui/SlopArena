@@ -35,7 +35,7 @@ FightGuy's theme is **martial arts mastery** — every ability channels ki throu
 | **AirLMB** | Rising Kick | `spell_lmb_3` | Airborne rising kick | Launches enemies upward |
 | **RMB** | Heavy Strike | `spell_rmb` | Ki-infused ground slam | Shockwave AoE |
 | **Q** | Ki Shot | `spell_q` | Aimed ki projectile | Hold to aim; marks targets for 5s on hit |
-| **E** | Cyclone Kick | `spell_e` | Forward spinning kick engage | High stun, risk-reward lunge |
+| **E** | Cyclone Kick | `spell_e` | Forward lunge ~10m. Dual hitboxes (body + foot). Stuns enemies passed through. | High stun, risk-reward lunge |
 | **R** | Dragon's Kick | `spell_r_loop/attack/end` | Powerful flying kick | Hard hit finisher; boosted if target has Q mark (mark lasts ~5s) |
 | **F** | Tempest (ult) | `spell_f` | Rapid spin in place, cyclone visual | Kicks pull nearby enemies toward center over 1.5s, then a final launcher kick. FightGuy cannot move during it. Big damage + knockback if enemy is caught |
 

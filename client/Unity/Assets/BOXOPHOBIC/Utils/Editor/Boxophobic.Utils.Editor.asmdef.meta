@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 10f1dd4cfd6afb54da274d7d818bd8f6
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Utils/Editor/Boxophobic.Utils.Editor.asmdef
+  uploadId: 878720

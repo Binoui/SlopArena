@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7b2bba9d34548bb4f991d6820c71a653
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Utils/Settings/Standard Volume.asset
+  uploadId: 878720

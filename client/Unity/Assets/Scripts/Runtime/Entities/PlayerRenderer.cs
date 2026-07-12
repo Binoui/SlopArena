@@ -185,6 +185,9 @@ namespace SlopArena.Client.Entities
         private int _deathFlashTicks;
         private const int DeathFlashDuration = 6;
         private bool _wasGrounded = true;
+        private ClipExtrapolator? _activeExtrapolator;
+        private ExtrapolationMode _currentExtrapolationMode;
+        private AnimancerState? _currentAnimState;
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
@@ -263,6 +266,10 @@ namespace SlopArena.Client.Entities
         {
             if (_animancer == null || _charConfig == null)
                 return;
+            // Clear extrapolation on any state change — new clip starts
+            _activeExtrapolator = null;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            _currentAnimState = null;
 
             float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
 
@@ -338,6 +345,9 @@ namespace SlopArena.Client.Entities
                                         animSpeed = (float)frameCount / durationTicks;
                                 }
                             }
+                            // AnimSpeed override: server abilities set explicit playback speed
+                            if (spec.AnimSpeed > 0f)
+                                animSpeed = spec.AnimSpeed;
                         }
                     }
 
@@ -346,6 +356,34 @@ namespace SlopArena.Client.Entities
                     {
                         var animState = _animancer.Play(clip, 0.05f);
                         animState.Speed = animSpeed;
+                        _currentAnimState = animState;
+                        _currentExtrapolationMode = ExtrapolationMode.None;
+                        // Check ClipOverrides (from CharacterDefinition) 
+                        if (_charDef?.ClipOverrides != null)
+                        {
+                            foreach (var cfg in _charDef.ClipOverrides)
+                            {
+                                if (cfg.Name == animName && cfg.Extrapolation == ExtrapolationMode.Continuous)
+                                {
+                                    _currentExtrapolationMode = ExtrapolationMode.Continuous;
+                                    _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
+                                    break;
+                                }
+                            }
+                        }
+                        // Check AbilityClips (from CharacterAnimationConfig asset)
+                        if (_currentExtrapolationMode == ExtrapolationMode.None && _charConfig?.AbilityClips != null)
+                        {
+                            foreach (var entry in _charConfig.AbilityClips)
+                            {
+                                if (entry.Name == animName && entry.Extrapolation == ExtrapolationMode.Continuous)
+                                {
+                                    _currentExtrapolationMode = ExtrapolationMode.Continuous;
+                                    _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
                 else if (state.State == ActionState.Dashing)
@@ -374,6 +412,24 @@ namespace SlopArena.Client.Entities
             _wasGrounded = state.IsGrounded;
         }
 
+        private void LateUpdate()
+        {
+            if (_activeExtrapolator != null && _currentAnimState != null
+                && _currentExtrapolationMode == ExtrapolationMode.Continuous
+                && _currentAnimState.IsPlaying)
+            {
+                float currentTime = (float)_currentAnimState.Time;
+                float clipLength = (float)_currentAnimState.Length;
+                if (currentTime > clipLength)
+                {
+                    float extraTime = currentTime - clipLength;
+                    Transform rootBone = FindBone("mixamorig:Hips");
+                    if (rootBone != null)
+                        _activeExtrapolator.Apply(rootBone, extraTime);
+                }
+            }
+        }
+
 
         /// <summary>
         /// Reset animation state to defaults. Useful on respawn.
@@ -386,6 +442,9 @@ namespace SlopArena.Client.Entities
             _lastAnimState = default;
             _lastAttackSlot = 0;
             _lastComboStage = 0;
+            _activeExtrapolator = null;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            _currentAnimState = null;
         }
 
         /// <summary>

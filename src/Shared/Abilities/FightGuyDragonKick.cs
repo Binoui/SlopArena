@@ -3,92 +3,53 @@ using System;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
-    /// FightGuy's R — Dragon's Kick: conditional finisher.
-    /// Two modes:
-    ///   - No mark: straight forward lunge kick (SetVelocityInFacing).
-    ///   - Marked target exists: homes toward the closest marked entity.
-    /// On entity hit: consumes mark for 1.5× damage, spawns AoE explosion.
-    /// Recast (press R again) cancels early after min_ticks_before_cancel.
+    /// FightGuy's R — Dragon's Kick: dash forward with 3-phase ability.
+    /// Phase Loop: dash forward with forward capsule hitbox to detect enemies.
+    /// Phase Attack: (on enemy hit) 3-hit aerial combo; hits 1-2 no knockback, hit 3 big knockback.
+    /// Phase End: (whiff) recovery animation, then end.
     /// </summary>
     public class FightGuyDragonKick : ServerAbility
     {
-        private bool _hasImpacted;
-        private ushort _flightTicks;
-        private ushort _postImpactTicks;
+        private enum Phase { Loop, Attack, End }
+        private Phase _phase;
+        private ushort _phaseTicks;
+        private bool _hitDuringLoop;
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
-            _hasImpacted = false;
-            _flightTicks = 0;
-            _postImpactTicks = 0;
+            _phase = Phase.Loop;
+            _phaseTicks = 0;
+            _hitDuringLoop = false;
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0; // spell_r_loop
+            AnimIndex = 0;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
 
-            // Start with forward lunge (will switch to homing if mark exists)
             float forwardSpeed = GetParam(def, "forward_speed", 20f);
             SetVelocityInFacing(ref s, forwardSpeed);
 
-            Simulation.OnDebugLog?.Invoke(
-                $"[DragonKick] OnStart: forwardSpeed={forwardSpeed} VZ={s.VZ:F1} VX={s.VX:F1} pos=({s.PX:F1},{s.PY:F2},{s.PZ:F1})");
+            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 60f);
+            s.AnimLockTicks = maxTicks;
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
-            if (_hasImpacted)
+            _phaseTicks++;
+
+            switch (_phase)
             {
-                s.VX = 0f; s.VZ = 0f; s.VY = 0f;
-                _postImpactTicks--;
-                if (_postImpactTicks == 0)
-                    EndAbility(ref s);
-                return;
+                case Phase.Loop: TickLoop(ref s, ref input, def); break;
+                case Phase.Attack: TickAttack(ref s, def); break;
+                case Phase.End: TickEnd(ref s, def); break;
             }
+        }
 
-            _flightTicks++;
-
-            // Maintain forward speed without overriding direction (preserves homing steering)
-            float forwardSpeed = GetParam(def, "forward_speed", 20f);
-            float currentHSpeed = MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
-            if (currentHSpeed < forwardSpeed && currentHSpeed > 0.01f)
-            {
-                float scale = forwardSpeed / currentHSpeed;
-                s.VX *= scale;
-                s.VZ *= scale;
-            }
-            else if (currentHSpeed < 0.01f)
-            {
-                SetVelocityInFacing(ref s, forwardSpeed);
-            }
-
-            // ── Periodic flight log ──
-            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 180f);
-            if (_flightTicks % 30 == 0)
-                Simulation.OnDebugLog?.Invoke(
-                    $"[DragonKick] Flight tick={_flightTicks}/{maxTicks} VZ={s.VZ:F1} VX={s.VX:F1} pos=({s.PX:F1},{s.PY:F2},{s.PZ:F1})");
-
-            // ── Recast-to-cancel ──
-            ushort minCancel = (ushort)GetParam(def, "min_ticks_before_cancel", 10f);
-            if (_flightTicks >= minCancel && input.ActiveSlot == (Slot + 1))
-            {
-                input.ActiveSlot = 0;
-                EndAbility(ref s);
-                return;
-            }
-
-            // ── Duration expiration → spell_r_end ──
-            if (_flightTicks >= maxTicks)
-            {
-                AnimIndex = 2;
-                s.ComboStage = 2;
-                _hasImpacted = true;
-                _postImpactTicks = 10;
-                return;
-            }
-
-            // ── Homing: find closest marked entity ──
+        private void TickLoop(ref CharacterState s, ref InputState input, CharacterDefinition def)
+        {
+            // Homing: steer toward closest marked entity (applied by Q)
+            // If no marked target, maintain forward speed
             ulong closestMarked = 0;
             float closestDist = float.MaxValue;
             if (SimulationStates != null)
@@ -108,83 +69,161 @@ namespace SlopArena.Shared.Abilities
             if (closestMarked != 0)
             {
                 var target = SimulationStates![closestMarked];
-                float homingSpeed = GetParam(def, "homing_speed", 24f);
-                float homingAccel = GetParam(def, "homing_accel", 2f);
+                float speed = GetParam(def, "forward_speed", 20f);
                 float dx = target.PX - s.PX;
                 float dz = target.PZ - s.PZ;
                 float dist = MathF.Sqrt(dx * dx + dz * dz);
                 if (dist > 0.1f)
                 {
-                    float targetVX = (dx / dist) * homingSpeed;
-                    float targetVZ = (dz / dist) * homingSpeed;
-                    s.VX += (targetVX - s.VX) * Math.Clamp(homingAccel * Simulation.TickDt, 0f, 1f);
-                    s.VZ += (targetVZ - s.VZ) * Math.Clamp(homingAccel * Simulation.TickDt, 0f, 1f);
+                    s.VX = (dx / dist) * speed;
+                    s.VZ = (dz / dist) * speed;
+                }
+            }
+            else
+            {
+                // No marked target: maintain forward speed
+                float forwardSpeed = GetParam(def, "forward_speed", 20f);
+                float currentHSpeed = MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
+                if (currentHSpeed < forwardSpeed && currentHSpeed > 0.01f)
+                {
+                    float scale = forwardSpeed / currentHSpeed;
+                    s.VX *= scale; s.VZ *= scale;
+                }
+                else if (currentHSpeed < 0.01f)
+                {
+                    SetVelocityInFacing(ref s, forwardSpeed);
                 }
             }
 
-            // Spawn hitbox events from spec
-            var stage = def.GetSlotAbility(Slot, false).Stages[0];
-            foreach (var evt in stage.HitboxEvents)
+            // Hit detected during loop → just wait (OnHitEntity already transitioned)
+            if (_hitDuringLoop)
+                return;
+
+            // Recast-to-cancel
+            ushort minCancel = (ushort)GetParam(def, "min_ticks_before_cancel", 10f);
+            if (_phaseTicks >= minCancel && input.ActiveSlot == (Slot + 1))
             {
-                if (evt.TriggerTick == _flightTicks)
-                    SpawnHitbox(ref s, evt);
+                input.ActiveSlot = 0;
+                EndAbility(ref s);
+                return;
             }
+
+            // Timeout → end phase
+            ushort maxTicks = (ushort)GetParam(def, "max_flight_ticks", 60f);
+            if (_phaseTicks >= maxTicks)
+            {
+                TransitionToEnd(ref s, def);
+                return;
+            }
+
+            // Spawn forward capsule hitbox each tick (moves with player velocity)
+            float cos = MathF.Cos(s.FacingYaw);
+            float sin = MathF.Sin(s.FacingYaw);
+            Resolver.Spawn(new Hitbox
+            {
+                X = s.PX + (sin * 0.5f), Y = s.PY + 0.5f, Z = s.PZ + (cos * 0.5f),
+                VX = s.VX, VY = s.VY, VZ = s.VZ,
+                EndX = s.PX + (sin * 1.5f), EndY = s.PY + 0.5f, EndZ = s.PZ + (cos * 1.5f),
+                Radius = 0.6f, Shape = HitboxShape.Capsule,
+                Damage = 5f, StunTicks = 14,
+                DurationTicks = 2, OwnerId = s.EntityId,
+            });
         }
 
-        /// <summary>
-        /// On hit: consume mark, multiply damage, spawn AoE explosion at target position.
-        /// </summary>
+        private void TickAttack(ref CharacterState s, CharacterDefinition def)
+        {
+            // Zero velocity — in-place combo
+            s.VX = 0f; s.VZ = 0f; s.VY = 0f;
+
+            float cos = MathF.Cos(s.FacingYaw);
+            float sin = MathF.Sin(s.FacingYaw);
+            float fwdX = sin, fwdZ = cos;
+
+            float hit1Tick = GetParam(def, "hit1_tick", 4f);
+            float hit2Tick = GetParam(def, "hit2_tick", 10f);
+            float hit3Tick = GetParam(def, "hit3_tick", 26f);
+
+            if (_phaseTicks == hit1Tick)
+            {
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX + fwdX * 1.2f, Y = s.PY + 0.9f, Z = s.PZ + fwdZ * 1.2f,
+                    Radius = 0.6f, Shape = HitboxShape.Sphere,
+                    Damage = GetParam(def, "hit1_damage", 6f),
+                    StunTicks = (ushort)GetParam(def, "hit1_stun", 16f),
+                    DurationTicks = 4, OwnerId = s.EntityId,
+                });
+            }
+            else if (_phaseTicks == hit2Tick)
+            {
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX + fwdX * 1.4f, Y = s.PY + 1.2f, Z = s.PZ + fwdZ * 1.4f,
+                    Radius = 0.65f, Shape = HitboxShape.Sphere,
+                    Damage = GetParam(def, "hit2_damage", 8f),
+                    StunTicks = (ushort)GetParam(def, "hit2_stun", 20f),
+                    DurationTicks = 4, OwnerId = s.EntityId,
+                });
+            }
+            else if (_phaseTicks == hit3Tick)
+            {
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX + fwdX * 1.6f, Y = s.PY + 1.0f, Z = s.PZ + fwdZ * 1.6f,
+                    Radius = 0.7f, Shape = HitboxShape.Sphere,
+                    Damage = GetParam(def, "hit3_damage", 16f),
+                    BaseKnockback = GetParam(def, "hit3_base", 16f),
+                    KnockbackGrowth = GetParam(def, "hit3_growth", 18f),
+                    KnockbackUpward = GetParam(def, "hit3_upward", 8f),
+                    StunTicks = (ushort)GetParam(def, "hit3_stun", 24f),
+                    DurationTicks = 4, OwnerId = s.EntityId,
+                });
+            }
+
+            float attackDuration = GetParam(def, "attack_duration", 36f);
+            if (_phaseTicks >= attackDuration)
+                EndAbility(ref s);
+        }
+
+        private void TickEnd(ref CharacterState s, CharacterDefinition def)
+        {
+            s.VX = 0f; s.VZ = 0f;
+
+            float endDuration = GetParam(def, "end_duration", 15f);
+            if (_phaseTicks >= endDuration)
+                EndAbility(ref s);
+        }
+
         public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
             CharacterDefinition attackerDef,
             ref float damage, ref float knockbackForce)
         {
-            if (_hasImpacted)
-                return;
+            if (_phase != Phase.Loop || _hitDuringLoop) return;
+            _hitDuringLoop = true;
 
-            bool isMarked = (target.StatusFlags & (1 << 2)) != 0;
-
-            if (isMarked)
-            {
-                target.StatusFlags = (byte)(target.StatusFlags & ~(1 << 2));
-                target.StatusRemainingTicks = 0;
-                float multiplier = GetParam(attackerDef, "mark_multiplier", 1.5f);
-                damage *= multiplier;
-            }
-
-            // Spawn AoE explosion at target position
-            float aoeRadius = GetParam(attackerDef, "impact_aoe_radius", 2f);
-            float aoeDuration = GetParam(attackerDef, "impact_aoe_duration", 8f);
-            float aoeDamage = GetParam(attackerDef, "impact_aoe_damage", 6f);
-            float aoeKbBase = GetParam(attackerDef, "impact_aoe_kb_base", 3.2f);
-            float aoeKbGrowth = GetParam(attackerDef, "impact_aoe_kb_growth", 4.8f);
-            float aoeUpward = GetParam(attackerDef, "impact_aoe_upward", 6f);
-            ushort aoeStun = (ushort)GetParam(attackerDef, "impact_aoe_stun", 10f);
-
-            Resolver.Spawn(new Hitbox
-            {
-                X = target.PX,
-                Y = target.PY + 0.5f,
-                Z = target.PZ,
-                Radius = aoeRadius,
-                Shape = HitboxShape.Sphere,
-                DurationTicks = (ushort)aoeDuration,
-                Damage = aoeDamage,
-                BaseKnockback = aoeKbBase,
-                KnockbackGrowth = aoeKbGrowth,
-                KnockbackUpward = aoeUpward,
-                StunTicks = aoeStun,
-                OwnerId = attacker.EntityId,
-            });
-
-            // Switch to impact animation (spell_r_attack), stop forward motion
+            // Transition to attack phase immediately
+            _phase = Phase.Attack;
+            _phaseTicks = 0;
             AnimIndex = 1;
             attacker.ComboStage = 1;
             attacker.VX = 0f;
             attacker.VZ = 0f;
             attacker.VY = 0f;
 
-            _hasImpacted = true;
-            _postImpactTicks = 10;
+            ushort attackDur = (ushort)GetParam(attackerDef, "attack_duration", 36f);
+            attacker.AnimLockTicks = attackDur;
+        }
+
+        private void TransitionToEnd(ref CharacterState s, CharacterDefinition def)
+        {
+            _phase = Phase.End;
+            _phaseTicks = 0;
+            AnimIndex = 2;
+            s.ComboStage = 2;
+            s.VX = 0f; s.VZ = 0f;
+
+            ushort endDur = (ushort)GetParam(def, "end_duration", 15f);
+            s.AnimLockTicks = endDur;
         }
     }
 }

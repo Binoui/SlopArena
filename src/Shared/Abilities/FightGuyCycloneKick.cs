@@ -3,20 +3,18 @@ using System;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
-    /// FightGuy's E — Cyclone Kick: forward engage with stun.
-    /// FightGuy spins forward with a powerful kick. High stun on hit sets up
-    /// combo follow-ups. Risky: windup frames with no hitbox before the kick.
-    /// Works both grounded and airborne.
+    /// FightGuy's E — Cyclone Kick: forward lunge with per-tick hitboxes.
+    /// FightGuy dashes forward at 17 m/s for 40 ticks (~11.3m) while spawning
+    /// body + 4 side hitboxes each tick from tick 6-34. Stuns enemies passed through,
+    /// no knockback — pure engage/disrupt tool.
     /// </summary>
     public class FightGuyCycloneKick : ServerAbility
     {
         private ushort _ticks;
-        private ushort _windupTicks;
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _ticks = 0;
-            _windupTicks = (ushort)GetParam(def, "windup_ticks", 8f);
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
@@ -24,11 +22,10 @@ namespace SlopArena.Shared.Abilities
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
 
-            // Forward lunge
-            float forwardSpeed = GetParam(def, "forward_speed", 14f);
+            float forwardSpeed = GetParam(def, "forward_speed", 17f);
             SetVelocityInFacing(ref s, forwardSpeed);
 
-            ushort duration = (ushort)GetParam(def, "duration_ticks", 35f);
+            ushort duration = (ushort)GetParam(def, "duration_ticks", 40f);
             s.AnimLockTicks = duration;
         }
 
@@ -37,25 +34,74 @@ namespace SlopArena.Shared.Abilities
             _ticks++;
 
             // Maintain forward velocity during lunge
-            float lungeDuration = GetParam(def, "lunge_duration", 10f);
-            if (_ticks <= lungeDuration)
-            {
-                float forwardSpeed = GetParam(def, "forward_speed", 14f);
-                SetVelocityInFacing(ref s, forwardSpeed);
-            }
+            float forwardSpeed = GetParam(def, "forward_speed", 17f);
+            SetVelocityInFacing(ref s, forwardSpeed);
 
-            // Spawn hitbox after windup
-            if (_ticks > _windupTicks)
+            // Spawn hitboxes during the active window
+            float windupTicks = GetParam(def, "windup_ticks", 6f);
+            float hitboxEndTick = GetParam(def, "hitbox_end_tick", 34f);
+            if (_ticks > windupTicks && _ticks <= hitboxEndTick)
             {
-                var stage = def.GetSlotAbility(Slot, false).Stages[0];
-                foreach (var evt in stage.HitboxEvents)
+                float cos = MathF.Cos(s.FacingYaw);
+                float sin = MathF.Sin(s.FacingYaw);
+
+                float bodyRadius = GetParam(def, "body_radius", 0.8f);
+                float sideRadius = GetParam(def, "side_radius", 0.4f);
+                float sideOff = GetParam(def, "side_offset", 0.8f);
+                float damage = GetParam(def, "damage", 7f);
+                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 48f);
+                float bodyY = s.PY + GetParam(def, "body_y", 0.8f);
+                float sideY = s.PY + GetParam(def, "side_y", 0.3f);
+
+                // Body hitbox — at character center
+                Resolver.Spawn(new Hitbox
                 {
-                    if (evt.TriggerTick == _ticks)
-                        SpawnHitbox(ref s, evt);
-                }
+                    X = s.PX, Y = bodyY, Z = s.PZ,
+                    Radius = bodyRadius,
+                    Shape = HitboxShape.Sphere,
+                    Damage = damage,
+                    StunTicks = stunTicks,
+                    DurationTicks = 2,
+                    OwnerId = s.EntityId,
+                });
+
+                // 4 side hitboxes: front, back, left, right — covers the spin arc
+                // Forward direction: (sin, cos), Right direction: (cos, -sin)
+                // Front
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX + (sin * sideOff), Y = sideY, Z = s.PZ + (cos * sideOff),
+                    Radius = sideRadius, Shape = HitboxShape.Sphere,
+                    Damage = damage, StunTicks = stunTicks,
+                    DurationTicks = 2, OwnerId = s.EntityId,
+                });
+                // Back
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX - (sin * sideOff), Y = sideY, Z = s.PZ - (cos * sideOff),
+                    Radius = sideRadius, Shape = HitboxShape.Sphere,
+                    Damage = damage, StunTicks = stunTicks,
+                    DurationTicks = 2, OwnerId = s.EntityId,
+                });
+                // Right
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX + (cos * sideOff), Y = sideY, Z = s.PZ - (sin * sideOff),
+                    Radius = sideRadius, Shape = HitboxShape.Sphere,
+                    Damage = damage, StunTicks = stunTicks,
+                    DurationTicks = 2, OwnerId = s.EntityId,
+                });
+                // Left
+                Resolver.Spawn(new Hitbox
+                {
+                    X = s.PX - (cos * sideOff), Y = sideY, Z = s.PZ + (sin * sideOff),
+                    Radius = sideRadius, Shape = HitboxShape.Sphere,
+                    Damage = damage, StunTicks = stunTicks,
+                    DurationTicks = 2, OwnerId = s.EntityId,
+                });
             }
 
-            ushort duration = (ushort)GetParam(def, "duration_ticks", 35f);
+            ushort duration = (ushort)GetParam(def, "duration_ticks", 40f);
             if (_ticks >= duration)
                 EndAbility(ref s);
         }

@@ -50,6 +50,8 @@ namespace SlopArena.Shared
         public string[]? SpecialEffectKeys;
         /// <summary>Animation name per combo stage.</summary>
         public string[]? AnimationNames;
+        /// <summary>Animation playback speed multiplier. 0 = auto-compute from frames/duration.</summary>
+        public float AnimSpeed = 0f;
         /// <summary>Named float parameters for server-side abilities (e.g., "backflip_damage").</summary>
         public Dictionary<string, float> Params = new();
 

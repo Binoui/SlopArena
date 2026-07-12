@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: dd3ee0c97aab8a7498c9292f3482f60b
+timeCreated: 1492248782
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Skybox Cubemap Extended/Demo/Prefabs/LowPoly - Fence
+    A.prefab
+  uploadId: 878720

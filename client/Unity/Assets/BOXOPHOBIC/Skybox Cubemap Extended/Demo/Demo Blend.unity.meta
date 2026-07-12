@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a66e5f1bb7e0e90469c3bcd8ae5c4b2d
+timeCreated: 1517938592
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Skybox Cubemap Extended/Demo/Demo Blend.unity
+  uploadId: 878720

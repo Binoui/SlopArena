@@ -184,73 +184,68 @@ public static partial class CharacterRegistry
                 Description = "Dash forward with a rapid spinning kick",
                 IconName = "e",
                 CooldownTicks = 120,
+                Behavior = AbilityBehavior.MeleeCombo,
+                AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 35, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 18, Radius = 0.7f, OffX = 0, OffY = 0.8f, OffZ = 1.8f, Damage = 7f, BaseKnockback = 8f, KnockbackGrowth = 5f, KnockbackUpward = 2f, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                    new() { DurationTicks = 40 },
                 },
                 AnimationNames = new[] { "spell_e" },
+                AnimSpeed = 2f,
                 SpecialEffectKeys = new[] { "FightGuyCycloneKick" },
                 Params = new()
                 {
-                    ["forward_speed"] = 14f,
-                    ["lunge_duration"] = 10f,
-                    ["windup_ticks"] = 8f,
-                    ["duration_ticks"] = 35f,
+                    ["forward_speed"] = 17f,
+                    ["windup_ticks"] = 6f,
+                    ["hitbox_end_tick"] = 34f,
+                    ["duration_ticks"] = 40f,
+                    ["body_radius"] = 0.8f,
+                    ["side_radius"] = 0.4f,
+                    ["side_offset"] = 0.8f,
+                    ["damage"] = 7f,
+                    ["stun_ticks"] = 48f,
+                    ["body_y"] = 0.8f,
+                    ["side_y"] = 0.3f,
                 },
             },
 
             R = new AbilitySpec
             {
                 Name = "Dragon's Kick",
-                Description = "Home in on a marked enemy with a flying kick that deals bonus damage",
+                Description = "Dash forward with a flying kick. On hit: unleash aerial combo. Whiff: recovery.",
                 IconName = "r",
                 CooldownTicks = 180,
+                Behavior = AbilityBehavior.MeleeCombo,
+                AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 120, ChainWindowTicks = 0,
+                    new() { DurationTicks = 60,
                             HitboxEvents = new HitboxEvent[]
                             {
-                                // Left foot sweet spot at tick 5 (bone-attached — follows foot animation)
-                                new() { TriggerTick = 5, DurationTicks = 114, Radius = 0.6f,
-                                    BoneName = "mixamorig:LeftFoot", BoneOffY = 0.1f,
-                                    Damage = 10f, BaseKnockback = 8f, KnockbackGrowth = 10f, KnockbackUpward = 4f,
-                                    StunTicks = 14, Interruptible = true },
-                                // Main kick hitbox at tick 10 (entity-relative, in front)
-                                new() { TriggerTick = 10, DurationTicks = 109, Radius = 0.7f,
-                                    OffX = 0, OffY = 0.9f, OffZ = 2.0f,
-                                    Damage = 14f, BaseKnockback = 12f, KnockbackGrowth = 14f, KnockbackUpward = 6f,
-                                    StunTicks = 18, Interruptible = true },
+                                // Forward-facing capsule: sweeps ahead during dash (loop hurtbox)
+                                new() { TriggerTick = 3, DurationTicks = 57, Radius = 0.6f,
+                                    OffX = 0, OffY = 0.5f, OffZ = 0.5f,
+                                    EndOffX = 0, EndOffY = 0.5f, EndOffZ = 1.5f,
+                                    Damage = 5f, BaseKnockback = 0f, KnockbackGrowth = 0f, KnockbackUpward = 0f,
+                                    StunTicks = 14, Shape = HitboxShape.Capsule },
                             },
-                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
-                    new() { DurationTicks = 20, ChainWindowTicks = 0,
-                            HitboxEvents = new HitboxEvent[]
-                            {
-                                new() { TriggerTick = 10, DurationTicks = 10, Radius = 0.7f,
-                                    OffX = 0, OffY = 0.9f, OffZ = 2.0f,
-                                    Damage = 14f, BaseKnockback = 12f, KnockbackGrowth = 14f, KnockbackUpward = 6f,
-                                    StunTicks = 18, Interruptible = true },
-                            },
-                            AttackRange = 5f, WarpRange = 0f, LungeForce = 3f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                    new() { DurationTicks = 88 },
+                    new() { DurationTicks = 15 },
                 },
                 AnimationNames = new[] { "spell_r_loop", "spell_r_attack", "spell_r_end" },
                 SpecialEffectKeys = new[] { "FightGuyDragonKick" },
                 Params = new()
                 {
-                    ["mark_multiplier"] = 1.5f,
                     ["forward_speed"] = 20f,
-                    ["homing_speed"] = 24f,
-                    ["homing_accel"] = 2f,
-                    ["max_flight_ticks"] = 120f,    // 2s
+                    ["max_flight_ticks"] = 60f,
                     ["min_ticks_before_cancel"] = 10f,
-                    ["impact_aoe_radius"] = 2f,
-                    ["impact_aoe_duration"] = 8f,
-                    ["impact_aoe_damage"] = 10f,
-                    ["impact_aoe_kb_base"] = 6f,
-                    ["impact_aoe_kb_growth"] = 7f,
-                    ["impact_aoe_upward"] = 8f,
-                    ["impact_aoe_stun"] = 12f,
+                    ["attack_duration"] = 88f,
+                    ["end_duration"] = 15f,
+                    ["hit1_tick"] = 4f, ["hit1_damage"] = 6f, ["hit1_stun"] = 16f,
+                    ["hit2_tick"] = 10f, ["hit2_damage"] = 8f, ["hit2_stun"] = 20f,
+                    ["hit3_tick"] = 26f, ["hit3_damage"] = 16f, ["hit3_stun"] = 24f,
+                    ["hit3_base"] = 16f, ["hit3_growth"] = 18f, ["hit3_upward"] = 8f,
                 },
             },
 

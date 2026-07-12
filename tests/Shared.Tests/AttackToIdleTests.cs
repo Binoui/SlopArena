@@ -295,7 +295,7 @@ public class AttackToIdleTests
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
-        // max_flight_ticks=180 + post_impact_ticks=10 + margin
+        // max_flight_ticks=60 + end_duration=15 + margin
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 200);
 
         Assert.Equal(ActionState.Idle, after.State);

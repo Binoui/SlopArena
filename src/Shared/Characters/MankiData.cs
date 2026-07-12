@@ -73,6 +73,7 @@ public static partial class CharacterRegistry
             // Only ClipOverrides needed for custom timelines
             ClipOverrides = new AnimationClipConfig[]
             {
+                new AnimationClipConfig { Name = "spell_q_loop", Extrapolation = ExtrapolationMode.Continuous },
             },
 
             // ═══ ABILITIES ═══

@@ -199,7 +199,7 @@ public class FightGuyAbilityTests
         state.FacingYaw = 0f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
         var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 3);
-        Assert.True(t1.VZ > 5f, $"Expected VZ>5 (forward lunge), got VZ={t1.VZ:F3}");
+        Assert.True(t1.VZ > 16f, $"Expected VZ>16 (forward lunge), got VZ={t1.VZ:F3}");
         Assert.True(t1.PZ > 0.1f, $"Expected forward position change, got PZ={t1.PZ:F3}");
     }
 
@@ -220,14 +220,45 @@ public class FightGuyAbilityTests
 
         // Press E and tick past hitbox trigger (tick 10, after windup)
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < 24; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
-
         var npcAfter = sim.GetState(100);
+
         Assert.True(npcAfter.DamagePercent > 0,
             $"NPC should take damage from Tornado Kick, got {npcAfter.DamagePercent}");
-        Assert.True(npcAfter.HitstunTicks >= 16,
-            $"Expected HitstunTicks >= 16 (stun), got {npcAfter.HitstunTicks}");
+        Assert.True(npcAfter.HitstunTicks >= 40,
+            $"Expected HitstunTicks >= 40 (stun), got {npcAfter.HitstunTicks}");
+    }
+
+    [Fact]
+    public void FightGuyCycloneKick_HitsMultipleEnemiesAlongPath()
+    {
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPY;
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+
+        // NPC1 close (z=2), NPC2 far (z=6)
+        var npc1 = TestHelpers.NpcState(0f, 2f);
+        npc1.PY = GroundPY;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc1);
+
+        var npc2 = TestHelpers.NpcState(0f, 6f);
+        npc2.PY = GroundPY;
+        sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
+
+        // Activate E and tick through full duration
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default }, { 101, default } });
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new() { { 1, default }, { 100, default }, { 101, default } });
+
+        var n1 = sim.GetState(100);
+        var n2 = sim.GetState(101);
+        Assert.True(n1.DamagePercent > 0, $"NPC1 should take damage, got {n1.DamagePercent}");
+        Assert.True(n1.HitstunTicks >= 20, $"NPC1 stun too short: {n1.HitstunTicks}");
+        Assert.True(n2.DamagePercent > 0, $"NPC2 should take damage, got {n2.DamagePercent}");
+        Assert.True(n2.HitstunTicks >= 20, $"NPC2 stun too short: {n2.HitstunTicks}");
     }
 
     // ── R (FightGuyDragonKick) ──
@@ -266,8 +297,8 @@ public class FightGuyAbilityTests
         state.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
 
-        // Player lunges forward at 20m/s. After 10 ticks (hitbox spawn): ~3.3m.
-        // Hitbox OffZ=2 → center at ~5.3m. Place NPC there.
+        // Forward capsule hitbox sweeps the player's path. At tick ~15, PZ=5.0,
+        // capsule covers z=5.5-6.5. NPC at z=5 is within capsule+radius range.
         var npc = TestHelpers.NpcState(0f, 5f);
         npc.PY = 5f; npc.IsGrounded = false;
         npc.DamagePercent = 0;
@@ -281,62 +312,8 @@ public class FightGuyAbilityTests
             $"NPC should have taken damage, got {sim.GetState(100).DamagePercent}");
     }
 
-    [Fact]
-    public void FightGuyDragonKick_MarkConsumption_ClearsMarkAndSpawnsAoe()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f; state.IsGrounded = false;
-        state.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-
-        // Marked NPC in front
-        var npc = TestHelpers.NpcState(0f, 5f);
-        npc.PY = 5f; npc.IsGrounded = false;
-        npc.DamagePercent = 0;
-        npc.StatusFlags = (1 << 2);         // Marked
-        npc.StatusRemainingTicks = 300;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
-        for (int i = 0; i < 15; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var npcAfter = sim.GetState(100);
-        Assert.True(npcAfter.DamagePercent > 0,
-            $"NPC should have taken damage from DragonKick, got {npcAfter.DamagePercent}");
-        Assert.True((npcAfter.StatusFlags & (1 << 2)) == 0, "Mark should be consumed");
-        Assert.True(npcAfter.StatusRemainingTicks == 0, "Mark remaining ticks should be 0");
-        // NOTE: AoE explosion is spawned by OnHitEntity but re-hits the same NPC next tick
-        // and is consumed (one-hit-per-hitbox). The mark clearing + damage are the key validations.
-    }
 
 
-    [Fact]
-    public void FightGuyDragonKick_HomingSteersTowardMarkedTarget()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f; state.IsGrounded = false;
-        state.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-
-        // Marked NPC at an offset (right + forward) so homing must steer
-        var npc = TestHelpers.NpcState(3f, 10f);
-        npc.PY = 5f; npc.IsGrounded = false;
-        npc.StatusFlags = (1 << 2);
-        npc.StatusRemainingTicks = 300;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
-        // Tick a few frames before hitbox trigger — homing path runs each tick
-        for (int i = 0; i < 5; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var after = sim.GetState(1);
-        Assert.True(after.VX > 1f,
-            $"Expected VX > 1 (steering right toward NPC at +3 X), got VX={after.VX:F3}");
-    }
 
     [Fact]
     public void FightGuyDragonKick_CancelBeforeMinTicks_DoesNotCancel()
@@ -368,12 +345,10 @@ public class FightGuyAbilityTests
         state.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
 
-        // Marked NPC in front
+        // NPC in lunge path — loop capsule hit triggers transition to attack phase
         var npc = TestHelpers.NpcState(0f, 5f);
         npc.PY = 5f; npc.IsGrounded = false;
         npc.DamagePercent = 0;
-        npc.StatusFlags = (1 << 2);
-        npc.StatusRemainingTicks = 300;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
@@ -396,20 +371,20 @@ public class FightGuyAbilityTests
         state.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
 
-        // No NPC — timeout after max_flight_ticks (120)
+        // No NPC — timeout after max_flight_ticks (60)
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
-        // Tick to just after timeout (120 flight + 5 into end anim = 125)
-        for (int i = 0; i < 125; i++)
+        // Tick to just after timeout (60 flight + 5 into end anim = 65)
+        for (int i = 0; i < 65; i++)
             sim.Tick(new() { { 1, default } });
 
         var mid = sim.GetState(1);
         Assert.Equal((byte)2, mid.AnimIndex); // spell_r_end
         Assert.Equal(ActionState.Attacking, mid.State);
-        Assert.True(mid.PZ > 30f,
-            $"Expected player to travel >30m during 2s flight, got PZ={mid.PZ:F1}");
+        Assert.True(mid.PZ > 15f,
+            $"Expected player to travel >15m during 1s flight, got PZ={mid.PZ:F1}");
 
-        // Tick past end anim (10 ticks) + margin
-        for (int i = 0; i < 15; i++)
+        // Tick past end anim (15 ticks) + margin
+        for (int i = 0; i < 20; i++)
             sim.Tick(new() { { 1, default } });
 
         var ended = sim.GetState(1);
@@ -417,34 +392,9 @@ public class FightGuyAbilityTests
         Assert.Equal((byte)0, ended.AttackSlot);
     }
 
-    [Fact]
-    public void FightGuyDragonKick_OnHit_TransitionsToAttackAnim()
-    {
-        // Hit an unmarked NPC — should still switch to spell_r_attack (AnimIndex=1)
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f; state.IsGrounded = false;
-        state.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-
-        // Place NPC in lunge path. Player lunges at 20m/s, hitbox spawns at tick 10
-        // (existing entity-relative kick). After 10 ticks: PZ ≈ 3.3m, hitbox OffZ=2
-        // → center at ~5.3m. Place NPC there.
-        var npc = TestHelpers.NpcState(0f, 5f);
-        npc.PY = 5f; npc.IsGrounded = false;
-        npc.DamagePercent = 0;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
-        for (int i = 0; i < 15; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var playerAfter = sim.GetState(1);
-        Assert.Equal((byte)1, playerAfter.AnimIndex); // spell_r_attack
-    }
 
     [Fact]
-    public void FightGuyDragonKick_LeftFootHitbox_DealsDamage()
+    public void FightGuyDragonKick_ForwardCapsule_DealsDamage()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -452,10 +402,9 @@ public class FightGuyAbilityTests
         state.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
 
-        // Player lunges at 20m/s. Left foot hitbox at tick 5, spawns at entity center
-        // (no baked data → OffX/Y/Z=0 fallback). After 5 ticks: ≈1.67m forward.
-        // Hitbox radius 0.6 + NPC capsule 0.3 = 0.9. Place within 0.9m.
-        var npc = TestHelpers.NpcState(0f, 2.2f);
+        // Player lunges at 20m/s. Forward capsule starts at OffZ=0.5, ends at EndOffZ=1.5.
+        // At trigger tick 3: PZ=1.0, capsule z=1.5-2.5, radius 0.6. Place NPC at z=1.5.
+        var npc = TestHelpers.NpcState(0f, 1.5f);
         npc.PY = 5f; npc.IsGrounded = false;
         npc.DamagePercent = 0;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
@@ -466,13 +415,80 @@ public class FightGuyAbilityTests
 
         var npcAfter = sim.GetState(100);
         Assert.True(npcAfter.DamagePercent > 0,
-            $"NPC should take damage from left foot hitbox at tick 5, got {npcAfter.DamagePercent}");
+            $"NPC should take damage from forward capsule, got {npcAfter.DamagePercent}");
 
         // On first hit, ability transitions to spell_r_attack and stops moving
         var playerAfter = sim.GetState(1);
         Assert.Equal((byte)1, playerAfter.AnimIndex);
         Assert.Equal(0f, playerAfter.VX);
         Assert.Equal(0f, playerAfter.VZ);
+    }
+
+    [Fact]
+    public void FightGuyDragonKick_AttackPhase_ReturnsToIdleAfterCombo()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f; state.IsGrounded = false;
+        state.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
+
+        // NPC close enough to trigger loop hit → attack phase
+        var npc = TestHelpers.NpcState(0f, 1.5f);
+        npc.PY = 5f; npc.IsGrounded = false;
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+
+        // Activate R — loop hits around tick 3, transitions to attack
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        // Loop (5) + hit1 (6) should connect on NPC at z=1.5
+        var mid = sim.GetState(100);
+        Assert.True(mid.DamagePercent >= 5,
+            $"NPC should take at least loop damage (5), got {mid.DamagePercent}");
+
+        // Now in attack phase — tick through full combo (88 ticks) + margin
+        for (int i = 0; i < 95; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var ended = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, ended.State);
+        Assert.Equal((byte)0, ended.AttackSlot);
+
+        // NPC should have accumulated damage from loop + attack hits
+        var npcEnd = sim.GetState(100);
+        Assert.True(npcEnd.DamagePercent > mid.DamagePercent,
+            $"NPC damage should increase during attack phase: {mid.DamagePercent} → {npcEnd.DamagePercent}");
+        Assert.True(npcEnd.DamagePercent >= 10,
+            $"NPC should take at least loop(5)+hit1(6)=11 damage total, got {npcEnd.DamagePercent}");
+    }
+
+    [Fact]
+    public void FightGuyDragonKick_HomingSteersTowardMarkedTarget()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f; state.IsGrounded = false;
+        state.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
+
+        // Marked NPC at an offset (right + forward) so homing must steer
+        var npc = TestHelpers.NpcState(3f, 10f);
+        npc.PY = 5f; npc.IsGrounded = false;
+        npc.StatusFlags = (1 << 2);
+        npc.StatusRemainingTicks = 300;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        // Tick a few frames — homing runs each tick, NPC at +3 X too far for capsule
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var after = sim.GetState(1);
+        Assert.True(after.VX > 1f,
+            $"Expected VX > 1 (steering right toward NPC at +3 X), got VX={after.VX:F3}");
     }
 
     // ── F (FightGuyTempest) ──

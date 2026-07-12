@@ -1,0 +1,12 @@
+{
+    "asset": "d54faf51bab2b8e82b7755deac1bfa58",
+    "fileName": "019f53d8-9783-72d6-886d-915e3b1d11a8.pose.json",
+    "prompt": "jump",
+    "negativePrompt": "",
+    "model": "unity-text-to-motion",
+    "modelName": "Text to Motion",
+    "customSeed": 455697067,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "isTrimmed": false
+}

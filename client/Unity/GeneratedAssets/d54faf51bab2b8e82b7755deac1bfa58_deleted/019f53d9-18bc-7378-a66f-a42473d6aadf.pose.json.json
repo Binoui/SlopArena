@@ -1,0 +1,12 @@
+{
+    "asset": "d54faf51bab2b8e82b7755deac1bfa58",
+    "fileName": "019f53d9-18bc-7378-a66f-a42473d6aadf.pose.json",
+    "prompt": "jump, action, game",
+    "negativePrompt": "tame",
+    "model": "unity-text-to-motion",
+    "modelName": "Text to Motion",
+    "customSeed": 890508426,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "isTrimmed": false
+}

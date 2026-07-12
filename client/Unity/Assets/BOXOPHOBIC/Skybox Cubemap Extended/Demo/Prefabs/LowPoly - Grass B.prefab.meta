@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: c23a5db78ca1a5b4f921e0109f33128c
+timeCreated: 1492255355
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 107400
+  packageName: FREE Skybox Extended Shader
+  packageVersion: 2.5.0
+  assetPath: Assets/BOXOPHOBIC/Skybox Cubemap Extended/Demo/Prefabs/LowPoly - Grass
+    B.prefab
+  uploadId: 878720
