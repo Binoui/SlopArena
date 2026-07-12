@@ -151,22 +151,22 @@ public static partial class CharacterRegistry
                 IconName = "q",
                 CooldownTicks = 120,
                 Behavior = AbilityBehavior.AimedProjectile,
+                AimMode = AimMode.CameraForward3D,
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, BaseKnockback = 3f, KnockbackGrowth = 4.5f, KnockbackUpward = 3f, StunTicks = 10, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 8f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                 },
-                AnimationNames = new[] { "spell_q" },
+            AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
                 SpecialEffectKeys = new[] { "FightGuyKiShot" },
                 Params = new()
                 {
                     ["charge_hold_ticks"] = 180f,    // 3s max aim
                     ["throw_duration"] = 60f,
                     ["throw_trigger_tick"] = 10f,
-                    ["launch_angle"] = 30f,
-                    ["gravity"] = 30f,
-                    ["max_range"] = 15f,
+                    ["projectile_speed"] = 25f,
+                    ["gravity"] = 1f,                // ki blast — minimal float
                     ["hitbox_radius"] = 0.5f,
                     ["damage"] = 6f,
                     ["knockback_base"] = 3f,
@@ -175,13 +175,6 @@ public static partial class CharacterRegistry
                     ["stun_ticks"] = 10f,
                     ["max_flight_ticks"] = 90f,
                     ["mark_duration_ticks"] = 300f,  // 5s
-                    ["explosion_radius"] = 2.5f,
-                    ["explosion_damage"] = 8f,
-                    ["explosion_kb_base"] = 2f,
-                    ["explosion_kb_growth"] = 3f,
-                    ["explosion_knockback_upward"] = 3f,
-                    ["explosion_stun_ticks"] = 8f,
-                    ["explosion_duration_ticks"] = 6f,
                 },
             },
 

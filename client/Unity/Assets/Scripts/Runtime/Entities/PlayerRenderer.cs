@@ -323,11 +323,11 @@ namespace SlopArena.Client.Entities
                     {
                         byte slot = (byte)(state.AttackSlot - 1);
                         var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
-                        if (spec?.Stages != null && state.ComboStage < spec.Stages.Length)
+                        if (spec?.AnimationNames != null && state.ComboStage < spec.AnimationNames.Length)
                         {
                             animName = spec.GetAnimationName(state.ComboStage);
-                            // Runtime speed modulation: match animation duration to server stage duration
-                            if (_bakedData != null)
+                            // Runtime speed modulation: only for data-driven abilities with matching stages
+                            if (_bakedData != null && spec.Stages != null && state.ComboStage < spec.Stages.Length)
                             {
                                 int bakedIdx = _bakedData.FindAnimIndex(animName);
                                 if (bakedIdx >= 0)

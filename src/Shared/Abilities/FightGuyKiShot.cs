@@ -4,21 +4,21 @@ namespace SlopArena.Shared.Abilities
 {
     /// <summary>
     /// FightGuy's Q — Ki Shot: aimed projectile that applies Marked status on hit.
-    /// Hold to aim (up to charge_hold_ticks), release fires a ki blast.
+    /// Hold to aim (TPS camera), release fires a fast ki blast in aim direction.
+    /// Minimal gravity — true ki-blast floating projectile.
     /// On entity hit: applies Marked status (StatusType.Marked = bit 2).
-    /// On ground impact: spawns AoE explosion.
     /// </summary>
     public sealed class FightGuyKiShot : ServerAbility
     {
         private bool _projectileSpawned;
-        private float _cachedAimDistance;
         private float _cachedAimYaw;
+        private float _cachedAimPitch;
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _projectileSpawned = false;
-            _cachedAimDistance = 0f;
             _cachedAimYaw = 0f;
+            _cachedAimPitch = 0f;
 
             s.State = ActionState.Attacking;
             s.AttackSlot = (byte)(Slot + 1);
@@ -44,8 +44,8 @@ namespace SlopArena.Shared.Abilities
 
                 if (s.AttackElapsedTicks > 8 && (!input.IsAiming || (maxHoldTicks > 0 && s.ChargeTicks >= maxHoldTicks)))
                 {
-                    _cachedAimDistance = s.AimTargetDistance;
                     _cachedAimYaw = s.AimYaw;
+                    _cachedAimPitch = s.AimPitch;
                     s.ComboStage = 1;
                     AnimIndex = 2;
                     s.AttackElapsedTicks = 0;
@@ -61,19 +61,14 @@ namespace SlopArena.Shared.Abilities
                 _projectileSpawned = true;
                 s.IsAiming = false;
 
-                float D = Math.Clamp(_cachedAimDistance, 0.5f, GetParam(def, "max_range", 15f));
-                float launchAngleDeg = GetParam(def, "launch_angle", 30f);
-                float g = GetParam(def, "gravity", 30f);
+                float speed = GetParam(def, "projectile_speed", 25f);
+                float pitch = _cachedAimPitch;
+                float cosPitch = MathF.Cos(pitch);
+                float vx = speed * cosPitch * MathF.Sin(_cachedAimYaw);
+                float vy = speed * MathF.Sin(pitch);
+                float vz = speed * cosPitch * MathF.Cos(_cachedAimYaw);
+
                 float launchOffsetY = GetParam(def, "launch_offset_y", 1.2f);
-                float dY = -def.CapsuleHeight * 0.5f - launchOffsetY;
-
-                float launchRad = launchAngleDeg * (MathF.PI / 180f);
-                CombatMath.ComputeProjectileLaunch(D, launchRad, g, dY,
-                    out float _, out float hSpeed, out float vSpeed);
-
-                float aimCos = MathF.Cos(_cachedAimYaw);
-                float aimSin = MathF.Sin(_cachedAimYaw);
-
                 float projRadius = GetParam(def, "hitbox_radius", 0.5f);
                 float projDamage = GetParam(def, "damage", 6f);
                 ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
@@ -84,20 +79,12 @@ namespace SlopArena.Shared.Abilities
                 ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 6f);
                 ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
 
-                float explosionKbBase = GetParam(def, "explosion_kb_base", 1.2f);
-                float explosionKbGrowth = GetParam(def, "explosion_kb_growth", 1.8f);
-                float explosionKbUpward = GetParam(def, "explosion_knockback_upward", 2f);
-                ushort explosionStun = (ushort)GetParam(def, "explosion_stun_ticks", 4f);
-                ushort explosionDuration = (ushort)GetParam(def, "explosion_duration_ticks", 6f);
-
                 Resolver.Spawn(new Hitbox
                 {
                     X = s.PX,
                     Y = s.PY + launchOffsetY,
                     Z = s.PZ,
-                    VX = hSpeed * aimSin,
-                    VY = vSpeed,
-                    VZ = hSpeed * aimCos,
+                    VX = vx, VY = vy, VZ = vz,
                     Radius = projRadius,
                     Shape = HitboxShape.Sphere,
                     EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
@@ -108,17 +95,7 @@ namespace SlopArena.Shared.Abilities
                     StunTicks = stunTicks,
                     DurationTicks = maxFlight,
                     OwnerId = s.EntityId,
-                    Gravity = g,
-                    Explosion = new ProjectileExplosion
-                    {
-                        Radius = GetParam(def, "explosion_radius", 2.5f),
-                        Damage = GetParam(def, "explosion_damage", 8f),
-                        BaseKnockback = explosionKbBase,
-                        KnockbackGrowth = explosionKbGrowth,
-                        KnockbackUpward = explosionKbUpward,
-                        StunTicks = explosionStun,
-                        DurationTicks = explosionDuration,
-                    },
+                    Gravity = GetParam(def, "gravity", 1f),
                 });
             }
 
