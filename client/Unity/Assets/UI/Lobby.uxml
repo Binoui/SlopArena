@@ -7,7 +7,7 @@
                 <ui:Label name="p1-label" text="P1" class="player-id" />
                 <ui:Label name="p1-status" text="Connected" class="player-status player-status--connected" />
             </ui:VisualElement>
-            <ui:VisualElement name="p2-row" class="player-row">
+            <ui:VisualElement name="p2-row" class="player-row unity-last-child">
                 <ui:Label name="p2-label" text="P2" class="player-id" />
                 <ui:Label name="p2-status" text="Waiting..." class="player-status player-status--waiting" />
             </ui:VisualElement>

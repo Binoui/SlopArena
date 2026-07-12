@@ -4,7 +4,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Pure C# ability specification — the single source of truth for an ability.
-    /// Instantiated directly in character data files (MankiData, BunnyData).
+    /// Instantiated directly in character data files (MankiData, FightGuyData).
     ///
     /// The server reads Stages/HitboxEvents/CooldownTicks from this.
     /// The client wraps this in an Ability subclass for input/indicators.

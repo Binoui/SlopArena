@@ -8,12 +8,12 @@ namespace SlopArena.Shared.Tests;
 /// after their attack duration expires.
 /// Covers: LmbCombo (ServerAbility), MankiAerosolFlame (RMB),
 /// MankiRoundBomb (Q), data-driven (AirLMB), MankiBazooka (R),
-/// MankiOverclock (F), and Bunny's extended abilities.
+/// MankiOverclock (F), and FightGuy's extended abilities.
 /// </summary>
 public class AttackToIdleTests
 {
     private static readonly CharacterDefinition MankiDef = TestHelpers.MankiDef;
-    private static readonly CharacterDefinition BunnyDef = TestHelpers.BunnyDef;
+    private static readonly CharacterDefinition FightGuyDef = TestHelpers.FightGuyDef;
     private static readonly float MankiGroundPy = TestHelpers.MankiGroundPY;
 
     // ════════════════════════════════════════════════
@@ -217,36 +217,36 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  BUNNY LMB — LmbCombo (StageChainAbility)
+    //  FIGHTGUY LMB — LmbCombo (StageChainAbility)
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void BunnyLMB_SingleStage_ReturnsToIdle()
+    public void FightGuyLMB_SingleStage_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(BunnyDef);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
         state.FacingYaw = 0;
-        TestHelpers.RegisterPlayer(sim, BunnyDef, state);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1),
-            BunnyDef.LMB!.Stages[0].DurationTicks + 10);
+            FightGuyDef.LMB!.Stages[0].DurationTicks + 10);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);
     }
 
     // ════════════════════════════════════════════════
-    //  BUNNY Q — BunnyWhirlingCarrot (hold → throw)
+    //  FIGHTGUY Q — FightGuyKiShot (hold → throw)
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void BunnyQ_HoldAndRelease_ReturnsToIdle()
+    public void FightGuyQ_HoldAndRelease_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(BunnyDef);
-        TestHelpers.RegisterPlayer(sim, BunnyDef, state);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 3, aiming: true) } });
 
@@ -264,18 +264,18 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  BUNNY E — BunnyTornadoKick
+    //  FIGHTGUY E — FightGuyCycloneKick
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void BunnyE_TornadoKick_ReturnsToIdle()
+    public void FightGuyE_CycloneKick_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(BunnyDef);
-        TestHelpers.RegisterPlayer(sim, BunnyDef, state);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
-        var spec = BunnyDef.E!;
+        var spec = FightGuyDef.E!;
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4),
             spec.Stages[^1].DurationTicks + 30);
 
@@ -284,16 +284,16 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  BUNNY R — BunnyDragonKick
+    //  FIGHTGUY R — FightGuyDragonKick
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void BunnyR_DragonKick_ReturnsToIdle()
+    public void FightGuyR_DragonKick_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(BunnyDef);
-        TestHelpers.RegisterPlayer(sim, BunnyDef, state);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         // max_flight_ticks=180 + post_impact_ticks=10 + margin
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 200);
@@ -303,16 +303,16 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  BUNNY F — BunnyJadeHare
+    //  FIGHTGUY F — FightGuyTempest
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void BunnyF_JadeHare_ReturnsToIdle()
+    public void FightGuyF_Tempest_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(BunnyDef);
-        TestHelpers.RegisterPlayer(sim, BunnyDef, state);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 120);
 

@@ -204,7 +204,7 @@
     border-color: #2e2e50;
 }
 
-.player-row:last-child {
+.player-row.unity-last-child {
     border-bottom-width: 0;
 }
 

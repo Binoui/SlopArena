@@ -18,7 +18,7 @@ public static class AbilityFactory
         return characterClass switch
         {
             CharacterClass.Manki => CreateMankiAbility(slot, airborne),
-            CharacterClass.Bunny => CreateBunnyAbility(slot, airborne),
+            CharacterClass.FightGuy => CreateFightGuyAbility(slot, airborne),
             _ => null,
         };
     }
@@ -35,15 +35,15 @@ public static class AbilityFactory
         _ => null, // No ServerAbility = data-driven fallback
     };
 
-    private static ServerAbility? CreateBunnyAbility(byte slot, bool airborne) => (slot, airborne) switch
+    private static ServerAbility? CreateFightGuyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
         (0, false) => new LmbCombo(),         // LMB — 3-hit combo
         (0, true) => new AirLmbCombo(),             // AirLMB — multi-hit air combo
         (1, _) => null,                             // RMB/AirRMB — data-driven
-        (2, _) => new BunnyWhirlingCarrot(),        // Q — aimed projectile
-        (3, _) => new BunnyTornadoKick(),           // E — forward engage + stun
-        (4, _) => new BunnyDragonKick(),            // R — conditional finisher
-        (5, _) => new BunnyJadeHare(),              // F — ultimate
+        (2, _) => new FightGuyKiShot(),        // Q — aimed projectile
+        (3, _) => new FightGuyCycloneKick(),           // E — forward engage + stun
+        (4, _) => new FightGuyDragonKick(),            // R — conditional finisher
+        (5, _) => new FightGuyTempest(),              // F — ultimate
         _ => null,
     };
 

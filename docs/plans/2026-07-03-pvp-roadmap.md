@@ -18,7 +18,7 @@
 | **Client VFX** | 🔶 Partial | Hit sparks exist. No flamethrower/aerosol/bomb explosion VFX |
 | **Client network** | 🔶 Partial | NetworkClient (UDP, receive thread, ConcurrentQueue). No prediction/rollback loop, no PvPMatch |
 | **Client UI flow** | ❌ Missing | No menus, no character select, no scene loading (empty build settings) |
-| **Client Bunny** | ❌ Missing | `bunny_skeleton.bin` exists, no animation config or renderer |
+| **Client FightGuy** | ❌ Missing | `fightguy_skeleton.bin` exists, no animation config or renderer |
 | **Server match** | ✅ Done | MatchInstance: ServerSimulation, input buffering, timeout, 3-stock, match lifecycle |
 | **Server orchestration** | ✅ Done | MultiMatchOrchestrator: port allocation, 15 concurrent matches |
 | **Server registration** | ✅ Done | GameServerRegistration: master server HTTP registration, 10s heartbeat, match results |
@@ -252,7 +252,7 @@ PvPMatch → owns NetworkSimulationBridge → wraps NetworkClient
 
 ### T4.2: Character Select scene
 
-**What:** `Scenes/CharacterSelect.unity` with Manki + Bunny portraits. Player picks, then match starts.
+**What:** `Scenes/CharacterSelect.unity` with Manki + FightGuy portraits. Player picks, then match starts.
 
 **Files:**
 - Create: `Scenes/CharacterSelect.unity`
@@ -270,42 +270,42 @@ PvPMatch → owns NetworkSimulationBridge → wraps NetworkClient
 - Modify: `TrainingMatch.cs` — use passed character class instead of hardcoded `CharacterClass.Manki`
 - Modify: `PvPMatch.cs` — same
 
-**Verify:** Pick Bunny in Character Select → Training starts with Bunny.
+**Verify:** Pick FightGuy in Character Select → Training starts with FightGuy.
 
 ---
 
-## Phase 5 — Bunny (low priority)
+## Phase 5 — FightGuy (low priority)
 
 **Deliverable:** Second character playable in both Training and PvP modes.
 
-### T5.1: Create Bunny `CharacterAnimationConfig`
+### T5.1: Create FightGuy `CharacterAnimationConfig`
 
-**What:** Create Bunny animation config ScriptableObject, assign clips from `bunny.glb` (embedded animations).
+**What:** Create FightGuy animation config ScriptableObject, assign clips from `bunny.glb` (embedded animations).
 
 **Files:**
-- Create: `Assets/Resources/Characters/BunnyAnimConfig.asset`
-- Modify: `BunnyData.cs` — set `ModelResourcePath = "Characters/Bunny"` (or wherever the prefab lives)
+- Create: `Assets/Resources/Characters/FightGuyAnimConfig.asset`
+- Modify: `FightGuyData.cs` — set `ModelResourcePath = "Characters/FightGuy"` (or wherever the prefab lives)
 
 **Reference:** Manki's config pattern — same clip names (`idle`, `run`, `jump`, `fall`, `hit_small`, etc.)
 
-**Verify:** Select Bunny → all animations play correctly.
+**Verify:** Select FightGuy → all animations play correctly.
 
-### T5.2: Wire Bunny abilities
+### T5.2: Wire FightGuy abilities
 
-**What:** Define Bunny's ability slots (LMB/RMB/Q/E/R/F) in `BunnyData.cs`. Implement any custom ability behaviors.
+**What:** Define FightGuy's ability slots (LMB/RMB/Q/E/R/F) in `FightGuyData.cs`. Implement any custom ability behaviors.
 
 **Reference:** `MankiData.cs` + `MankiLmbCombo.cs`, `MankiAerosolFlame.cs`, etc.
 
-**Verify:** Bunny's RMB/Q/E abilities work in training mode.
+**Verify:** FightGuy's RMB/Q/E abilities work in training mode.
 
-### T5.3: Bunny VFX
+### T5.3: FightGuy VFX
 
-**What:** Particle effects for Bunny's abilities (e.g., ice/spell VFX from existing assets in `AnimationPacks/`).
+**What:** Particle effects for FightGuy's abilities (e.g., ice/spell VFX from existing assets in `AnimationPacks/`).
 
 **Files:**
-- Modify: `SpellVFXManager.cs` — add Bunny ability routing
+- Modify: `SpellVFXManager.cs` — add FightGuy ability routing
 
-**Verify:** Bunny abilities produce VFX.
+**Verify:** FightGuy abilities produce VFX.
 
 ---
 
@@ -355,7 +355,7 @@ Phase 1 (PvP Bridge) ─── Phase 2 (Prediction) ─── Phase 6 (Hardening
        │                        │
 Phase 4 (UI Flow) ─────────────┤
        │                        │
-Phase 5 (Bunny) ───────────────┘
+Phase 5 (FightGuy) ───────────────┘
 ```
 
 Phases 1 → 2 → 6 are sequential (each builds on the last).
@@ -367,7 +367,7 @@ Phase 5 needs Phase 1 + 3, independent of 2/4/6.
 - **Phase 1-2:** Run server + two Unity editor instances. Verify PvP state sync in console/Gizmos.
 - **Phase 3:** Visual inspection + screen recording.
 - **Phase 4:** Click through the full flow. Verify scene transitions.
-- **Phase 5:** Select Bunny in training. Verify all abilities work.
+- **Phase 5:** Select FightGuy in training. Verify all abilities work.
 - **Phase 6:** Kill/restart server mid-match. Verify recovery.
 - **Continuous:** `dotnet test tests/Shared.Tests/` after every shared code change (215+ tests, ~3s).
 

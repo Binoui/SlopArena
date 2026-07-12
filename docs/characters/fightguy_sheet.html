@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FightGuy - SlopArena Character Sheet</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            background-color: #0b0c10;
+            color: #c5c6c7;
+            font-family: 'Rajdhani', sans-serif;
+            width: 1200px;
+            height: 1200px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 8px solid #1f2833;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 10% 10%, rgba(216, 67, 21, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(21, 101, 192, 0.08) 0%, transparent 40%),
+                linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 20px 20px, 20px 20px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Header Style */
+        .header {
+            background: linear-gradient(135deg, #1f2833 0%, #0b0c10 100%);
+            padding: 20px 30px;
+            border-bottom: 3px solid #66fcf1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+            position: relative;
+        }
+
+        .header-title-area {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-game {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 900;
+            color: #66fcf1;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 3px;
+            text-shadow: 0 0 10px rgba(102, 252, 241, 0.4);
+        }
+
+        .header-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 42px;
+            font-weight: 900;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            line-height: 1;
+        }
+
+        .header-tagline {
+            font-size: 16px;
+            color: #45f3ff;
+            font-weight: 500;
+            margin-top: 3px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status-badge {
+            font-family: 'Orbitron', sans-serif;
+            background-color: rgba(102, 252, 241, 0.1);
+            border: 1px solid #66fcf1;
+            color: #66fcf1;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.1);
+        }
+
+        /* Main Content Grid */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 460px 1fr;
+            z-index: 5;
+            position: relative;
+            background: rgba(11, 12, 16, 0.85);
+        }
+
+        /* Left Column: Visual, Palette, Concept */
+        .left-column {
+            border-right: 2px solid #1f2833;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            justify-content: flex-start;
+            position: relative;
+            gap: 15px;
+        }
+
+        .character-preview-card {
+            border: 2px solid #1f2833;
+            background: rgba(31, 40, 51, 0.4);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 380px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.6);
+        }
+
+        .character-image {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.8));
+            z-index: 2;
+        }
+
+        .preview-overlay-corners {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            pointer-events: none;
+        }
+        .preview-overlay-corners::before,
+        .preview-overlay-corners::after {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-color: #66fcf1;
+            border-style: solid;
+        }
+        .preview-overlay-corners::before {
+            top: 0; left: 0; border-width: 2px 0 0 2px;
+        }
+        .preview-overlay-corners::after {
+            bottom: 0; right: 0; border-width: 0 2px 2px 0;
+        }
+
+        /* Palette Swatches */
+        .palette-section {
+            background: rgba(31, 40, 51, 0.2);
+            border: 1px solid #1f2833;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #66fcf1;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            border-left: 3px solid #66fcf1;
+            padding-left: 8px;
+        }
+
+        .swatches-grid {
+            display: flex;
+            gap: 10px;
+        }
+
+        .swatch-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .color-block {
+            width: 100%;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid #1f2833;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 4px;
+        }
+
+        .color-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #ffffff;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .color-hex {
+            font-size: 9px;
+            color: #858687;
+            font-family: monospace;
+        }
+
+        /* Concept / Lore Section */
+        .concept-section {
+            background: rgba(31, 40, 51, 0.2);
+            border: 1px solid #1f2833;
+            border-radius: 6px;
+            padding: 14px;
+            flex: 1;
+        }
+
+        .concept-text {
+            font-size: 14px;
+            line-height: 1.45;
+            color: #c5c6c7;
+        }
+
+        /* Right Column: Kits & Core Archetype */
+        .right-column {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: calc(1200px - 140px); /* Fill space perfectly */
+        }
+
+        .archetype-banner {
+            background: linear-gradient(90deg, rgba(31, 40, 51, 0.6) 0%, rgba(11, 12, 16, 0.1) 100%);
+            border-left: 4px solid #66fcf1;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .archetype-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+
+        .archetype-desc {
+            font-size: 14px;
+            line-height: 1.35;
+            color: #c5c6c7;
+        }
+
+        /* Ability Kit Rows */
+        .abilities-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .ability-row {
+            background: rgba(31, 40, 51, 0.25);
+            border: 1px solid #1f2833;
+            border-radius: 6px;
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: 90px 180px 1fr;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .ability-row:hover {
+            border-color: #66fcf1;
+            background: rgba(31, 40, 51, 0.4);
+        }
+
+        .slot-keycap {
+            font-family: 'Orbitron', sans-serif;
+            background: #1f2833;
+            color: #66fcf1;
+            border: 1px solid #66fcf1;
+            width: 75px;
+            height: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 900;
+            font-size: 12px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.1);
+            text-transform: uppercase;
+        }
+
+        .ability-info {
+            display: flex;
+            flex-direction: column;
+            padding-right: 15px;
+        }
+
+        .ability-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            line-height: 1.2;
+        }
+
+        .ability-type {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
+        .type-melee { color: #ff5252; }
+        .type-projectile { color: #40c4ff; }
+        .type-mobility { color: #69f0ae; }
+        .type-charge { color: #ffd740; }
+        .type-ultimate { color: #e040fb; }
+        .type-artillery { color: #ff5252; }
+        .type-buff { color: #ffab40; }
+        .type-aoe { color: #b2ff59; }
+        .type-engage { color: #ff6e40; }
+        .type-finisher { color: #ea80fc; }
+
+        .ability-desc {
+            font-size: 14px;
+            line-height: 1.35;
+            color: #c5c6c7;
+        }
+
+        /* Footer Branding */
+        .footer {
+            background: #0b0c10;
+            border-top: 1px solid #1f2833;
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #858687;
+        }
+
+        .footer-branding {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            color: #66fcf1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-title-area">
+            <span class="header-game">SlopArena // Roster Registry</span>
+            <span class="header-name">FightGuy</span>
+            <span class="header-tagline">Martial Arts Champion</span>
+        </div>
+        <div class="status-badge">Alpha Core (Ready)</div>
+    </div>
+
+    <div class="main-container">
+        <div class="left-column">
+            <div class="character-preview-card">
+                <div class="preview-overlay-corners"></div>
+                <img class="character-image" src="images/fightguy_front.jpg" alt="FightGuy">
+            </div>
+
+            <div class="palette-section">
+                <h3 class="section-title">Visual Palette</h3>
+                <div class="swatches-grid">
+                    
+        <div class="swatch-item">
+            <div class="color-block" style="background-color: #FFFFFF;"></div>
+            <span class="color-label">fur</span>
+            <span class="color-hex">#FFFFFF</span>
+        </div>
+        
+        <div class="swatch-item">
+            <div class="color-block" style="background-color: #1A237E;"></div>
+            <span class="color-label">gi</span>
+            <span class="color-hex">#1A237E</span>
+        </div>
+        
+        <div class="swatch-item">
+            <div class="color-block" style="background-color: #EEEEEE;"></div>
+            <span class="color-label">belt</span>
+            <span class="color-hex">#EEEEEE</span>
+        </div>
+        
+        <div class="swatch-item">
+            <div class="color-block" style="background-color: #D50000;"></div>
+            <span class="color-label">headband</span>
+            <span class="color-hex">#D50000</span>
+        </div>
+        
+        <div class="swatch-item">
+            <div class="color-block" style="background-color: #FFAB91;"></div>
+            <span class="color-label">skin</span>
+            <span class="color-hex">#FFAB91</span>
+        </div>
+        
+                </div>
+            </div>
+
+            <div class="concept-section">
+                <h3 class="section-title">Concept & Theme</h3>
+                <p class="concept-text">A disciplined martial artist in traditional gi, channeling ki through precise strikes and kicks. A technical fighter who sets up targets with projectile marks, then executes with devastating pursuit techniques — fast, technical, and methodical.
+
+The character's theme is **martial arts mastery** with explosive ki effects. Think **Ryu × Lee Sin** — serious martial arts with ki-infused techniques.</p>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="archetype-banner">
+                <div class="archetype-title">Combat Archetype</div>
+                <p class="archetype-desc">High-Agility Melee Assassin / Dive Spec. Uses long-range carrot poke setups to apply marks, triggering high-damage execution finishers.</p>
+            </div>
+
+            <div class="abilities-section">
+                <h3 class="section-title" style="margin-bottom: 3px;">Activated Ability Kit</h3>
+                
+        <div class="ability-row">
+            <div class="slot-keycap">LMB</div>
+            <div class="ability-info">
+                <span class="ability-name">Rabbit Combo</span>
+                <span class="ability-type type-melee">melee</span>
+            </div>
+            <p class="ability-desc">3 hits: low -> medium -> high kick combo. High kick is a launcher.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">Air LMB</div>
+            <div class="ability-info">
+                <span class="ability-name">Rising Bun</span>
+                <span class="ability-type type-melee">melee</span>
+            </div>
+            <p class="ability-desc">Upward kick. Fast, high-priority vertical air-to-air launcher.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">RMB</div>
+            <div class="ability-info">
+                <span class="ability-name">Carrot Slam</span>
+                <span class="ability-type type-aoe">aoe</span>
+            </div>
+            <p class="ability-desc">Slam giant carrot on ground. Ground-pound AoE for field control.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">Air RMB</div>
+            <div class="ability-info">
+                <span class="ability-name">Helicopter</span>
+                <span class="ability-type type-melee">melee</span>
+            </div>
+            <p class="ability-desc">Spinning wheel kick in air. Extended air combo hit with downward spike knockback.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">Q</div>
+            <div class="ability-info">
+                <span class="ability-name">Whirling Carrot</span>
+                <span class="ability-type type-projectile">projectile</span>
+            </div>
+            <p class="ability-desc">Throw spinning carrot like a boomerang. Poke that marks target for R.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">E</div>
+            <div class="ability-info">
+                <span class="ability-name">Tornado Kick</span>
+                <span class="ability-type type-engage">engage</span>
+            </div>
+            <p class="ability-desc">Powerful spinning kick. Forward engage with stun on hit.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">R</div>
+            <div class="ability-info">
+                <span class="ability-name">Dragon's Kick</span>
+                <span class="ability-type type-finisher">finisher</span>
+            </div>
+            <p class="ability-desc">Powerful flying kick. Hard hit finisher, deals massive damage if target is marked.</p>
+        </div>
+        
+        <div class="ability-row">
+            <div class="slot-keycap">F</div>
+            <div class="ability-info">
+                <span class="ability-name">Tempest of the Hare</span>
+                <span class="ability-type type-ultimate">ultimate</span>
+            </div>
+            <p class="ability-desc">Cyclone spin pulling enemies in over 1.5s, finished by a devastating launcher kick.</p>
+        </div>
+        
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>System Version v1.1.0 (Density Optimized)</div>
+        <div>Rendered: 2026-07-03</div>
+        <div class="footer-branding">Oh My Pi // SlopArena</div>
+    </div>
+</body>
+</html>

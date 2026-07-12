@@ -256,7 +256,6 @@ GameObject:
   m_Component:
   - component: {fileID: 543287390}
   - component: {fileID: 543287389}
-  - component: {fileID: 543287388}
   - component: {fileID: 543287386}
   m_Layer: 0
   m_Name: AimCamera
@@ -281,29 +280,10 @@ MonoBehaviour:
   _pivot: {fileID: 1386413333}
   _pitchMin: -60
   _pitchMax: 60
-  _defaultPitchDeg: 10
+  _defaultPitchDeg: -5
   _shoulderOffsetX: 0.5
   _shoulderOffsetY: 0.3
   _pivotHeightOffset: 1
---- !u!114 &543287388
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 543287385}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b617507da6d07e749b7efdb34e1173e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  TrackerSettings:
-    BindingMode: 1
-    PositionDamping: {x: 1, y: 1, z: 1}
-    AngularDampingMode: 0
-    RotationDamping: {x: 1, y: 1, z: 1}
-    QuaternionDamping: 1
-  FollowOffset: {x: 0, y: 0, z: 0}
 --- !u!114 &543287389
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -494,7 +474,7 @@ MonoBehaviour:
       Enabled: 1
       Input:
         InputAction: {fileID: -5630151704836100654, guid: 1d6e640e716dc4ff6989b73d02023f2b, type: 3}
-        Gain: 20
+        Gain: 1.5
         LegacyInput: 
         LegacyGain: 1
         CancelDeltaTime: 0
@@ -504,10 +484,10 @@ MonoBehaviour:
         DecelTime: 0
     - Name: Look Orbit Y
       Owner: {fileID: 651353939}
-      Enabled: 0
+      Enabled: 1
       Input:
         InputAction: {fileID: -5630151704836100654, guid: 1d6e640e716dc4ff6989b73d02023f2b, type: 3}
-        Gain: 5
+        Gain: 0.5
         LegacyInput: 
         LegacyGain: 1
         CancelDeltaTime: 0
@@ -1194,6 +1174,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
+      propertyPath: _npcClass
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _arenaName
       value: Island_arena
       objectReference: {fileID: 0}
@@ -1373,6 +1357,10 @@ PrefabInstance:
     - target: {fileID: 2626569396940563197, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
       propertyPath: m_LocalRotation.z
       value: -0.015649773
+      objectReference: {fileID: 0}
+    - target: {fileID: 4646404746901770375, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4646404746901770375, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
       propertyPath: m_CullingMask.m_Bits

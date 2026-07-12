@@ -37,7 +37,7 @@
 - `src/Shared/AbilitySpec.cs` — add `Description` string field
 - `src/Shared/ArenaDefinition.cs` — add `PreviewColor` string field, fill in `BuildAll()`
 - `src/Shared/Characters/MankiData.cs` — fill `Description` on each `AbilitySpec`
-- `src/Shared/Characters/BunnyData.cs` — same
+- `src/Shared/Characters/FightGuyData.cs` — same
 - `client/Unity/Assets/Scripts/Runtime/Network/NetworkClient.cs` — add `Connect(string ip, int port)` public method
 - `client/Unity/Assets/Scripts/Runtime/World/MatchBase.cs` — remove `_playerClass`/`_arenaName` SerializeFields, read from `MatchConfig`
 - `client/Unity/Assets/Scripts/Runtime/World/PvPMatch.cs` — call `_networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort)` in `OnMatchStart`
@@ -52,7 +52,7 @@
 - Modify: `src/Shared/AbilitySpec.cs`
 - Modify: `src/Shared/ArenaDefinition.cs`
 - Modify: `src/Shared/Characters/MankiData.cs`
-- Modify: `src/Shared/Characters/BunnyData.cs`
+- Modify: `src/Shared/Characters/FightGuyData.cs`
 
 - [ ] **Create `MatchConfig.cs`**
 
@@ -117,7 +117,7 @@ new AbilitySpec {
 
 Fill all 4 of Manki's ability specs (Q/W/E/R). Use the existing `Name` field for reference.
 
-- [ ] **Fill `Description` in `BunnyData.cs`** — same pattern for Bunny's abilities.
+- [ ] **Fill `Description` in `FightGuyData.cs`** — same pattern for FightGuy's abilities.
 
 - [ ] **Build Shared to verify 0 errors:**
 ```bash
@@ -129,7 +129,7 @@ Expected: `Build succeeded. 0 Error(s)`
 - [ ] **Commit:**
 ```bash
 git add src/Shared/AbilitySpec.cs src/Shared/ArenaDefinition.cs \
-    src/Shared/Characters/MankiData.cs src/Shared/Characters/BunnyData.cs \
+    src/Shared/Characters/MankiData.cs src/Shared/Characters/FightGuyData.cs \
     client/Unity/Assets/Scripts/Runtime/UI/MatchConfig.cs
 git commit -m "feat: MatchConfig static class, AbilitySpec.Description, ArenaDefinition.PreviewColor"
 ```

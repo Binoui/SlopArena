@@ -214,31 +214,49 @@ public class SlopArenaBaker : EditorWindow
     public static void BakeAllCharacters()
     {
         float sampleRate = 60f;
-        string baseDir = "Assets/Art/Characters";
-        var configGuids = AssetDatabase.FindAssets("t:CharacterAnimationConfig", new[] { baseDir });
+
+        // Collect configs from both Art/Characters and Resources/AnimationConfigs
+        var configGuids = new List<string>(
+            AssetDatabase.FindAssets("t:CharacterAnimationConfig", new[] { "Assets/Art/Characters" }));
+        configGuids.AddRange(
+            AssetDatabase.FindAssets("t:CharacterAnimationConfig", new[] { "Assets/Resources/AnimationConfigs" }));
+
         int baked = 0;
+        var bakedNames = new HashSet<string>();
         foreach (var guid in configGuids)
         {
             string configPath = AssetDatabase.GUIDToAssetPath(guid);
             var config = AssetDatabase.LoadAssetAtPath<CharacterAnimationConfig>(configPath);
             if (config == null) continue;
 
-            // Find model FBX: config is at {name}/Animations/Animations_AnimConfig.asset
-            // or at {name}/{name}_AnimConfig.asset
             string configDir = Path.GetDirectoryName(configPath);
             string charDir = Path.GetDirectoryName(configDir);
+
+            // Derive character name from config directory structure
             string charName = Path.GetFileName(charDir);
             var model = AssetDatabase.LoadAssetAtPath<GameObject>($"{charDir}/{charName}.fbx");
             if (model == null)
             {
-                // Try config dir as char root: config was at {name}/{name}_AnimConfig.asset
+                // Try config dir as char root: config was at {name}/.../{name}_AnimConfig.asset
                 charName = Path.GetFileName(configDir);
                 model = AssetDatabase.LoadAssetAtPath<GameObject>($"{configDir}/{charName}.fbx");
+            }
+
+            // Fallback: derive charName from config asset filename (e.g. FightGuy_AnimConfig -> fightguy)
+            if (model == null && config.name.EndsWith("_AnimConfig"))
+            {
+                charName = config.name.Replace("_AnimConfig", "").ToLowerInvariant();
+                model = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Art/Characters/{charName}/{charName}.fbx");
             }
 
             if (model == null)
             {
                 Debug.LogWarning($"[BakeAll] No model FBX found for config {configPath}");
+                continue;
+            }
+            if (!bakedNames.Add(charName))
+            {
+                Debug.Log($"[BakeAll] Skipping {charName} (already baked)");
                 continue;
             }
 

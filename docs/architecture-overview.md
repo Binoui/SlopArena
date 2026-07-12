@@ -8,7 +8,7 @@
 ```
 SlopArena/
 ├── client/Unity/Assets/Scripts/Shared/  ← REAL files (Unity compiles these directly)
-│   ├── Characters/     ← MankiData, BunnyData (CharacterRegistry)
+│   ├── Characters/     ← MankiData, FightGuyData (CharacterRegistry)
 │   ├── Abilities/      ← AbilityFactory, ServerAbility implementations
 │   ├── Simulation.cs   ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs← Hitbox spawn/Tick: sphere-capsule collision math
@@ -51,7 +51,7 @@ SlopArena/
 │       ├── Editor/
 │       │   └── SlopArenaAnimatorGenerator.cs ← Generates AnimatorControllers
 │       └── Shared/         ← REAL FILES (source of truth for Shared code)
-│           ├── Characters/     ← MankiData, BunnyData
+│           ├── Characters/     ← MankiData, FightGuyData
 │           ├── Abilities/      ← AbilityFactory, ServerAbility impls
 │           └── ... (all Shared code)
 │
@@ -128,7 +128,7 @@ SlopArena/
 ## Changing Gameplay Data
 
 ### Tune a character's stats
-→ `Shared/Characters/MankiData.cs` or `BunnyData.cs`
+→ `Shared/Characters/MankiData.cs` or `FightGuyData.cs`
 - `Movement` struct: speed, jump, gravity, dash
 - `HurtboxBoneDefs[]`: bone-attached hurtbox spheres
 - `LMB/RMB/Q/E/R/F` abilities: `AbilitySpec` with `AbilityTypeId` and `Params`

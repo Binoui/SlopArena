@@ -8,7 +8,7 @@ public static class TestHelpers
 {
     public static CharacterDefinition MankiDef => CharacterRegistry.Get(CharacterClass.Manki);
 
-    public static CharacterDefinition BunnyDef => CharacterRegistry.Get(CharacterClass.Bunny);
+    public static CharacterDefinition FightGuyDef => CharacterRegistry.Get(CharacterClass.FightGuy);
 
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests

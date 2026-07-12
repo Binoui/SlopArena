@@ -6,7 +6,7 @@ namespace SlopArena.Client.UI
     {
         public static GameMode Mode = GameMode.Training;
         public static SlopArena.Shared.CharacterClass PlayerClass
-            = SlopArena.Shared.CharacterClass.Manki;
+            = SlopArena.Shared.CharacterClass.FightGuy;
         public static SlopArena.Shared.CharacterClass OpponentClass
             = SlopArena.Shared.CharacterClass.Manki;
         public static string ArenaName = "training";
@@ -17,7 +17,7 @@ namespace SlopArena.Client.UI
         public static void Reset()
         {
             Mode = GameMode.Training;
-            PlayerClass = SlopArena.Shared.CharacterClass.Manki;
+            PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
             OpponentClass = SlopArena.Shared.CharacterClass.Manki;
             ArenaName = "training";
             IsHost = true;
