@@ -39,7 +39,7 @@
 | [`characters/character-import-checklist.md`](characters/character-import-checklist.md) | Asset import checklist |
 | [`characters/character-kit-design-principles.md`](characters/character-kit-design-principles.md) | Design rules for abilities |
 | [`characters/manki.md`](characters/manki.md) | Manki — Mad Bomber Monkey |
-| [`characters/bunny.md`](characters/bunny.md) | Bunny — Kung-Fu Rabbit Assassin |
+| [`characters/fightguy.md`](characters/bunny.md) | FightGuy — Martial Arts Champion |
 
 ---
 

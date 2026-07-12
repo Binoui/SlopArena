@@ -134,6 +134,8 @@ namespace SlopArena.Shared
         /// human-readable
         /// </summary>
         public string DisplayName;
+        /// <summary>Hex color string for stage select card placeholder e.g. "#2a4a2a"</summary>
+        public string PreviewColor;
         /// <summary>
         /// res://assets/arenas/xxx.tscn
         /// </summary>
@@ -411,6 +413,7 @@ namespace SlopArena.Shared
                 {
                     Name = "pit",
                     DisplayName = "The Pit",
+                    PreviewColor = "#1a2e1a",
                     ScenePath = "res://assets/arenas/arena_pit.tscn",
                     KillHeight = -15f,  // Deep blast zone (80x80 large stage)
                     MinX = 0f, MaxX = 80f,
@@ -432,6 +435,7 @@ namespace SlopArena.Shared
                 {
                     Name = "cross",
                     DisplayName = "Crossroads",
+                    PreviewColor = "#1a2a3e",
                     ScenePath = "res://assets/arenas/arena_cross.tscn",
                     KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
                     MinX = 0f, MaxX = 60f,
@@ -453,6 +457,7 @@ namespace SlopArena.Shared
                 {
                     Name = "split",
                     DisplayName = "The Split",
+                    PreviewColor = "#2e1a1a",
                     ScenePath = "res://assets/arenas/arena_split.tscn",
                     KillHeight = -6f,   // Shallow blast zone (60x60 small competitive stage)
                     MinX = 0f, MaxX = 60f,
@@ -472,6 +477,7 @@ namespace SlopArena.Shared
                 {
                     Name = "training",
                     DisplayName = "Training Room",
+                    PreviewColor = "#1a1a1a",
                     KillHeight = -15f,
                     MinX = -25f, MaxX = 25f,
                     MinZ = -25f, MaxZ = 25f,
@@ -487,6 +493,7 @@ namespace SlopArena.Shared
                 {
                     Name = "sanctum",
                     DisplayName = "Sanctum",
+                    PreviewColor = "#2a1a2e",
                     ScenePath = "res://assets/arenas/arena_sanctum.tscn",
                     KillHeight = -20f,
                     MinX = 0f, MaxX = 200f,

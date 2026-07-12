@@ -51,7 +51,7 @@ Each ability/locomotion slot needs a separate FBX file with one animation clip.
 
 ### Place FBX files
 ```
-client/Unity/Assets/Art/Characters/<name>/bunny.fbx  (static mesh, importAnimation=0)
+client/Unity/Assets/Art/Characters/<name>/fightguy.fbx  (static mesh, importAnimation=0)
 client/Unity/Assets/Art/Characters/<name>/Animations/Idle.fbx
 client/Unity/Assets/Art/Characters/<name>/Animations/run.fbx
 ...
@@ -74,12 +74,13 @@ client/Unity/Assets/Art/Characters/<name>/Animations/run.fbx
 
 ## ☐ Phase 4 — Code Integration
 
-### BunnyData.cs (`src/Shared/Characters/`)
+### FightGuyData.cs (`src/Shared/Characters/`)
 - [ ] Create `Build<Name>()` method with:
   - [ ] `Class = CharacterClass.<Name>`
   - [ ] `DisplayName`
   - [ ] `MovementStats`
   - [ ] `CapsuleRadius`, `CapsuleHeight`
+  - [ ] `HipHeight` (abs of lowest bone Y at idle frame 0; see `GetMinBoneY()`)
   - [ ] `HurtboxCapsules` (fallback) and `HurtboxBoneDefs` (preferred)
   - [ ] `ModelResourcePath = "Characters/<Name>"` (matches prefab location)
   - [ ] `VisualScale = 1.0f` (Unity import scale, NOT Godot-era 0.022f)

@@ -200,7 +200,7 @@ Task 1.4 depends on 1.3 (deletes code TrainingMatch replaces).
 - Jump/dash input uses manual edge detection (not `wasPressedThisFrame`)
 - NPC spawns and stands idle
 - Bake skeleton tool ported to Unity editor
-- Hurtbox debug visualization via Gizmos
+    - Hurtbox debug visualization via Gizmos (server-authoritative, from `GetLastEntityData()`)
 
 **In flight / known issues:**
 - Jump input detection: `isPressed` edge tracking works, but jump may still fail if

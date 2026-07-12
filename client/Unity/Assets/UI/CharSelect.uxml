@@ -1,0 +1,61 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="SlopArena.uss" />
+    <ui:VisualElement name="root" class="screen">
+        <ui:Label name="title" text="SELECT CHARACTER" class="title" />
+
+        <!-- Panel 1: character grid -->
+        <ui:VisualElement name="char-grid" class="char-grid">
+            <!-- populated at runtime by CharSelectController -->
+        </ui:VisualElement>
+
+        <!-- Panel 2: preview -->
+        <ui:VisualElement name="preview-panel" class="preview-panel">
+            <!-- Left: Q and E abilities -->
+            <ui:VisualElement name="abilities-left" class="abilities-col">
+                <ui:VisualElement name="ability-q" class="ability-card">
+                    <ui:Label name="ability-q-key" text="Q" class="ability-key" />
+                    <ui:VisualElement class="ability-info">
+                        <ui:Label name="ability-q-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-q-desc" text="" class="ability-desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="ability-e" class="ability-card">
+                    <ui:Label name="ability-e-key" text="E" class="ability-key" />
+                    <ui:VisualElement class="ability-info">
+                        <ui:Label name="ability-e-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-e-desc" text="" class="ability-desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Center: name + 3D render texture -->
+            <ui:VisualElement name="model-col" class="model-col">
+                <ui:Label name="char-name" text="—" class="char-name" />
+                <ui:VisualElement name="model-viewport" class="model-viewport">
+                    <ui:VisualElement name="model-image" class="model-image" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Right: R and F abilities -->
+            <ui:VisualElement name="abilities-right" class="abilities-col">
+                <ui:VisualElement name="ability-r" class="ability-card">
+                    <ui:Label name="ability-r-key" text="R" class="ability-key" />
+                    <ui:VisualElement class="ability-info">
+                        <ui:Label name="ability-r-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-r-desc" text="" class="ability-desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="ability-f" class="ability-card">
+                    <ui:Label name="ability-f-key" text="F" class="ability-key" />
+                    <ui:VisualElement class="ability-info">
+                        <ui:Label name="ability-f-name" text="—" class="ability-name" />
+                        <ui:Label name="ability-f-desc" text="" class="ability-desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:Button name="btn-select" text="SELECT" class="btn-primary" />
+        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+    </ui:VisualElement>
+</ui:UXML>

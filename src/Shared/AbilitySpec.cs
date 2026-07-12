@@ -4,7 +4,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Pure C# ability specification — the single source of truth for an ability.
-    /// Instantiated directly in character data files (MankiData, BunnyData).
+    /// Instantiated directly in character data files (MankiData, FightGuyData).
     ///
     /// The server reads Stages/HitboxEvents/CooldownTicks from this.
     /// The client wraps this in an Ability subclass for input/indicators.
@@ -32,6 +32,7 @@ namespace SlopArena.Shared
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public AimMode AimMode = AimMode.None;
         public string Name = "";
+        public string Description = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>
         public string? IconName;
         /// <summary>
@@ -49,6 +50,8 @@ namespace SlopArena.Shared
         public string[]? SpecialEffectKeys;
         /// <summary>Animation name per combo stage.</summary>
         public string[]? AnimationNames;
+        /// <summary>Animation playback speed multiplier. 0 = auto-compute from frames/duration.</summary>
+        public float AnimSpeed = 0f;
         /// <summary>Named float parameters for server-side abilities (e.g., "backflip_damage").</summary>
         public Dictionary<string, float> Params = new();
 

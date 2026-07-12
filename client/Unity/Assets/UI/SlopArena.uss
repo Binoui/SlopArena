@@ -1,0 +1,434 @@
+/* ============================================================
+   SlopArena.uss — shared styles for all menu screens
+   MainMenu / Lobby / CharSelect / StageSelect
+   ============================================================ */
+
+/* ── Variables (repeat these values site-wide) ──────────────
+   bg-dark:       #0d0d1a
+   bg-panel:      #16162a
+   bg-card:       #1e1e36
+   accent:        #e05c2a   (orange)
+   accent-hover:  #f07040
+   text-primary:  #f0eee8
+   text-muted:    #7a7a99
+   border:        #2e2e50
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Screen root ─────────────────────────────────────────── */
+
+.screen {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #0d0d1a;
+    padding: 40px;
+}
+
+/* ── Typography ──────────────────────────────────────────── */
+
+.title {
+    font-size: 52px;
+    color: #f0eee8;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    letter-spacing: 6px;
+    margin-bottom: 40px;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #7a7a99;
+    -unity-text-align: middle-center;
+    margin-top: 12px;
+}
+
+/* ── Main menu list ──────────────────────────────────────── */
+
+.menu-list {
+    flex-direction: column;
+    align-items: center;
+    width: 320px;
+}
+
+.menu-item {
+    width: 100%;
+    height: 48px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    padding-left: 24px;
+    padding-right: 24px;
+    border-radius: 3px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+    color: #f0eee8;
+    font-size: 13px;
+    letter-spacing: 2px;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    transition-duration: 0.1s;
+    transition-property: background-color, border-color;
+}
+
+.menu-item:hover {
+    background-color: #2a2a46;
+    border-color: #e05c2a;
+}
+
+.menu-item--active {
+    border-color: #e05c2a;
+    color: #e05c2a;
+}
+
+/* Submenu items — slightly indented, smaller */
+.menu-item--sub {
+    width: 240px;
+    height: 40px;
+    font-size: 12px;
+    background-color: #13131f;
+    border-color: #2e2e50;
+    color: #aaaacc;
+}
+
+.menu-item--sub:hover {
+    background-color: #1e1e36;
+    border-color: #e05c2a;
+    color: #f0eee8;
+}
+
+.submenu {
+    flex-direction: column;
+    align-items: center;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top-width: 1px;
+    border-color: #2e2e50;
+    width: 100%;
+}
+
+.join-row {
+    flex-direction: row;
+    align-items: center;
+    width: 240px;
+    margin-top: 6px;
+}
+
+.join-row .menu-item--sub {
+    flex-grow: 1;
+    margin-right: 6px;
+}
+
+.ip-input {
+    width: 120px;
+    height: 40px;
+    background-color: #13131f;
+    border-width: 1px;
+    border-color: #2e2e50;
+    border-radius: 3px;
+    color: #f0eee8;
+    font-size: 12px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.ip-input:focus {
+    border-color: #e05c2a;
+}
+
+/* ── Shared action buttons ───────────────────────────────── */
+
+.btn-primary {
+    width: 240px;
+    height: 52px;
+    margin-top: 24px;
+    border-radius: 3px;
+    background-color: #e05c2a;
+    border-width: 0;
+    color: #f0eee8;
+    font-size: 14px;
+    letter-spacing: 3px;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    transition-duration: 0.1s;
+    transition-property: background-color;
+}
+
+.btn-primary:hover {
+    background-color: #f07040;
+}
+
+.btn-primary:disabled {
+    background-color: #2e2e50;
+    color: #4a4a66;
+}
+
+.btn-back {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    width: 100px;
+    height: 36px;
+    border-radius: 3px;
+    background-color: rgba(0,0,0,0);
+    border-width: 1px;
+    border-color: #2e2e50;
+    color: #7a7a99;
+    font-size: 12px;
+    -unity-text-align: middle-center;
+}
+
+.btn-back:hover {
+    border-color: #7a7a99;
+    color: #f0eee8;
+}
+
+/* ── Lobby ───────────────────────────────────────────────── */
+
+.player-list {
+    flex-direction: column;
+    width: 360px;
+    background-color: #16162a;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #2e2e50;
+    padding: 16px 24px;
+}
+
+.player-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    border-bottom-width: 1px;
+    border-color: #2e2e50;
+}
+
+.player-row.unity-last-child {
+    border-bottom-width: 0;
+}
+
+.player-id {
+    font-size: 18px;
+    color: #f0eee8;
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+}
+
+.player-status {
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    border-radius: 2px;
+}
+
+.player-status--connected {
+    color: #4cdd88;
+    background-color: rgba(76, 221, 136, 0.1);
+    border-width: 1px;
+    border-color: rgba(76, 221, 136, 0.3);
+}
+
+.player-status--waiting {
+    color: #7a7a99;
+    background-color: rgba(122, 122, 153, 0.1);
+    border-width: 1px;
+    border-color: #2e2e50;
+}
+
+/* ── CharSelect ──────────────────────────────────────────── */
+
+.char-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 20px;
+}
+
+/* Character portrait cards — populated at runtime */
+/* CharSelectController adds these classes to Button children */
+.char-card {
+    width: 96px;
+    height: 96px;
+    margin: 6px;
+    border-radius: 4px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+    -unity-text-align: middle-center;
+    color: #f0eee8;
+    font-size: 11px;
+    letter-spacing: 1px;
+    transition-duration: 0.1s;
+    transition-property: border-color, background-color;
+}
+
+.char-card:hover {
+    border-color: #e05c2a;
+    background-color: #2a2a46;
+}
+
+.char-card--selected {
+    border-color: #e05c2a;
+    border-width: 2px;
+    background-color: #2a2a46;
+}
+
+/* Preview panel — 3-column: abilities | model | abilities */
+.preview-panel {
+    flex-direction: row;
+    align-items: stretch;
+    width: 100%;
+    max-width: 820px;
+    height: 340px;
+    background-color: #16162a;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #2e2e50;
+    margin-bottom: 16px;
+    padding: 16px;
+}
+
+.model-col {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.char-name {
+    font-size: 20px;
+    color: #f0eee8;
+    -unity-font-style: bold;
+    letter-spacing: 4px;
+    -unity-text-align: middle-center;
+    margin-bottom: 12px;
+}
+
+.model-viewport {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 260px;
+    border-radius: 3px;
+    overflow: hidden;
+    background-color: #0d0d1a;
+    border-width: 1px;
+    border-color: #2e2e50;
+}
+
+.model-image {
+    flex-grow: 1;
+    width: 100%;
+    height: 100%;
+}
+
+/* Ability columns */
+.abilities-col {
+    flex-direction: column;
+    justify-content: center;
+    width: 200px;
+    padding: 0 8px;
+}
+
+.ability-card {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 10px 8px;
+    margin-bottom: 8px;
+    border-radius: 3px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+}
+
+.ability-key {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: #e05c2a;
+    background-color: #2a2a46;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: #e05c2a;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.ability-info {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.ability-name {
+    font-size: 12px;
+    color: #f0eee8;
+    -unity-font-style: bold;
+    margin-bottom: 2px;
+}
+
+.ability-desc {
+    font-size: 10px;
+    color: #7a7a99;
+    white-space: normal;
+}
+
+/* ── StageSelect ─────────────────────────────────────────── */
+
+.stage-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 20px;
+}
+
+/* Stage cards — populated at runtime by StageSelectController */
+.stage-card {
+    width: 180px;
+    height: 120px;
+    margin: 8px;
+    border-radius: 4px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 12px;
+    overflow: hidden;
+    transition-duration: 0.1s;
+    transition-property: border-color, background-color;
+}
+
+.stage-card:hover {
+    border-color: #e05c2a;
+    background-color: #2a2a46;
+}
+
+.stage-card--selected {
+    border-color: #e05c2a;
+    border-width: 2px;
+    background-color: #2a2a46;
+}
+
+.stage-card .stage-name {
+    font-size: 13px;
+    color: #f0eee8;
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+    -unity-text-align: middle-center;
+}
+
+.stage-swatch {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 32px;
+    opacity: 0.35;
+}

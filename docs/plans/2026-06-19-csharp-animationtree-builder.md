@@ -45,7 +45,7 @@ The builder must create `AnimationNodeTimeScale` nodes so these paths exist.
 | Shared/ | Add locomotion/hit-reaction anim name fields + `AnimationClipConfig` struct | `AbilitySpec.AnimationNames` — already exists |
 | Scripts/Animation/ | New `AnimationTreeBuilder.cs` | `StateMachine.cs`, all State files — zero changes |
 | Scripts/Entities/ | `PlayerController._Ready()` calls builder instead of loading .tscn sub-resources | `ApplyAnimationTimeScales()`, FSM init, everything else |
-| Data files | MankiData.cs, BunnyData.cs — add new string fields | `AbilitySpec.AnimationNames` — already populated |
+| Data files | MankiData.cs, FightGuyData.cs — add new string fields | `AbilitySpec.AnimationNames` — already populated |
 | .tscn files | Strip all `[sub_resource]` blocks + `tree_root` + `parameters/*/TimeScale/scale` | AnimationTree node, FSM tree, model — all preserved |
 
 ---
@@ -125,7 +125,7 @@ public float LandStartOffset = 0.49f;
 public AnimationClipConfig[]? ClipOverrides;
 ```
 
-Defaults cover all Mixamo characters (Manki). Bunny needs:
+Defaults cover all Mixamo characters (Manki). FightGuy needs:
 - `HitSmallAnim = "hit_small"` (not "small_hit") — verify from GLB
 - All other defaults likely match
 
@@ -361,18 +361,18 @@ Note: `HitSmallAnim = "small_hit"`, `HitMediumAnim = "medium_hit"`, `HitHardAnim
 
 ---
 
-#### Task 0.5: Set animation names in BunnyData.cs
-**Files:** Modify `Shared/Characters/BunnyData.cs` — inside `BuildBunny()`, after `AutoModelYOffset = true` line
+#### Task 0.5: Set animation names in FightGuyData.cs
+**Files:** Modify `Shared/Characters/FightGuyData.cs` — inside `BuildFightGuy()`, after `AutoModelYOffset = true` line
 
-Bunny GLB animation names need verification. For now, match the .tscn:
+FightGuy GLB animation names need verification. For now, match the .tscn:
 ```csharp
-            // Bunny GLB uses "hit_small" etc. (not "small_hit" like Manki)
+            // FightGuy GLB uses "hit_small" etc. (not "small_hit" like Manki)
             HitSmallAnim = "hit_small",
             HitMediumAnim = "hit_medium",
             HitHardAnim = "hit_hard",
 ```
 
-No ClipOverrides needed (Bunny has no Q charge loop, no custom timelines).
+No ClipOverrides needed (FightGuy has no Q charge loop, no custom timelines).
 
 **Verify:** `dotnet build` — passes.
 
@@ -853,7 +853,7 @@ Run the project in Godot Editor. Verify:
 - Manki Q round bomb (spell_q_loop → spell_q) works
 - Hit reactions (hit_small/hit_medium/hit_hard) play on damage
 - Landing animation plays after fall
-- Bunny has same behavior
+- FightGuy has same behavior
 - TimeScales are applied correctly (check debug prints from ApplyAnimationTimeScales)
 
 #### Task 4.2: NPC test
@@ -865,7 +865,7 @@ Run TrainingMatch. Verify NPC Manki animations work (NPC uses the same builder p
 
 - **`AnimationNodeBlendSpace1D.AddBlendPoint()` signature**: Takes `AnimationRootNode` + `float` position. `AnimationNodeAnimation` inherits from `AnimationRootNode`. No TimeScale wrapper inside BlendSpace (BlendSpace1D doesn't support it — this is expected and matches current .tscn).
 
-- **Duplicate animation names across abilities**: Bunny's RMB reuses `spell_lmb_1`. The `_allAttackAnimNames` HashSet handles deduplication — only one StateMachine state is created per unique animation name.
+- **Duplicate animation names across abilities**: FightGuy's RMB reuses `spell_lmb_1`. The `_allAttackAnimNames` HashSet handles deduplication — only one StateMachine state is created per unique animation name.
 
 - **State name vs clip name**: The builder uses `AnimationNames` from AbilitySpec as BOTH the StateMachine state name AND the animation clip name. This matches the current .tscn where `states/spell_lmb_1/node = SubResource("bt_melee")` with `animation = &"spell_lmb_1"`. The FSM calls `Travel("spell_lmb_1")` which matches the state name.
 
@@ -873,7 +873,7 @@ Run TrainingMatch. Verify NPC Manki animations work (NPC uses the same builder p
 
 - **Landing animation uses JumpAnim clip**: `AddLandingState` creates a new `AnimationNodeAnimation` with `Animation = charDef.JumpAnim` and custom timeline settings. It does NOT use `CreateWrappedState` because the landing config is different from the jump state. But the TimeScale parameter path is still `parameters/land/TimeScale/scale` (from the BlendTree wrapper), so `ApplyAnimationTimeScales` won't break — it tries to set TimeScale on landing but silently catches the "parameter doesn't exist" case since landing uses custom timeline, not DurationTicks.
 
-- **Bunny has no `spell_air_lmb` state in current .tscn**: Verify — the bunny.tscn transitions don't include `spell_air_lmb`. Check if BunnyData.cs has AirLMB.AnimationNames. If not, the builder won't create the state. If Bunny SHOULD have AirLMB, add it to BunnyData.cs.
+- **FightGuy has no `spell_air_lmb` state in current .tscn**: Verify — the bunny.tscn transitions don't include `spell_air_lmb`. Check if FightGuyData.cs has AirLMB.AnimationNames. If not, the builder won't create the state. If FightGuy SHOULD have AirLMB, add it to FightGuyData.cs.
 
 - **`xfade_01` vs `xfade_015` consolidation**: The current .tscn uses both 0.1s and 0.15s crossfade. The builder consolidates to 0.15s everywhere. This is a deliberate simplification — the existing `AnimationNodeStateMachineTransition` default is 0.15s.
 
@@ -888,5 +888,5 @@ Phase 0: feat: add animation catalog fields to CharacterDefinition + AnimationCl
 Phase 1: feat: add AnimationTreeBuilder — generates StateMachine from CharacterDefinition
 Phase 2: feat: wire AnimationTreeBuilder into PlayerController.Ready()
 Phase 3: chore: strip AnimationTree sub-resources from character .tscn files
-Phase 4: test: verify all animations play correctly for Manki + Bunny
+Phase 4: test: verify all animations play correctly for Manki + FightGuy
 ```

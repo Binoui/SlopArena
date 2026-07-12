@@ -16,7 +16,7 @@ namespace SlopArena.Client.Network
         [SerializeField] private string _serverIp = "127.0.0.1";
         [SerializeField] private int _serverPort = 9876;
 
-        private UdpClient? _udp;
+        private volatile UdpClient? _udp;
         private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876);
         private ulong _entityId = 1;
         private bool _connected;
@@ -70,6 +70,25 @@ namespace SlopArena.Client.Network
             _udp?.Close();
             _udp = null;
             _connected = false;
+        }
+
+        /// <summary>
+        /// Re-point the client at a new server address. Safe to call before first SendInput.
+        /// Closes the existing socket and opens a fresh one aimed at the new endpoint.
+        /// </summary>
+        public void Connect(string ip, int port)
+        {
+            _running = false;
+            _receiveThread?.Join(500);
+            _udp?.Close();
+            _udp = null;
+            _connected = false;
+
+            _serverIp = ip;
+            _serverPort = port;
+            _serverEp = new IPEndPoint(IPAddress.Parse(ip), port);
+            CreateSocket();
+            StartReceiveThread();
         }
 
         // ── Send / Receive ──
