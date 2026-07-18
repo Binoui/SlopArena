@@ -6,6 +6,7 @@ namespace SlopArena.Shared
 {
     public enum CharacterClass : byte
     {
+        None,
         Manki,
         FightGuy
     }
@@ -177,8 +178,9 @@ namespace SlopArena.Shared
         {
             return new CharacterDefinition[]
             {
-                BuildManki(),
-                BuildFightGuy(),
+                default,            // None (placeholder)
+                BuildManki(),       // Manki
+                BuildFightGuy(),    // FightGuy
             };
         }
     }

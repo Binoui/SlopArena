@@ -487,6 +487,24 @@ namespace SlopArena.Shared
                         new SpawnPoint { X = 10f, Y = 0f, Z = 0f, Yaw = MathF.PI },
                     }
                 },
+                // Colosseum: Flat DKO-style arena with pillars for cover
+                // Circular/octagonal floor ~22m diameter with pillar ring
+                new ArenaDefinition
+                {
+                    Name = "colosseum",
+                    DisplayName = "Colosseum",
+                    PreviewColor = "#3a2a1a",
+                    KillHeight = -10f,
+                    MinX = -15f, MaxX = 15f,
+                    MinZ = -15f, MaxZ = 15f,
+                    SpawnPoints = new[]
+                    {
+                        new SpawnPoint { X = -6f, Y = 0.5f, Z = 0f, Yaw = 0f },
+                        new SpawnPoint { X = 6f, Y = 0.5f, Z = 0f, Yaw = MathF.PI },
+                        new SpawnPoint { X = 0f, Y = 0.5f, Z = -6f, Yaw = MathF.PI / 2f },
+                        new SpawnPoint { X = 0f, Y = 0.5f, Z = 6f, Yaw = -MathF.PI / 2f },
+                    }
+                },
                 // Sanctum: Large multi-level arena
                 // Floor at Y=0, CentralPlatform at Y=5, Galleries at Y=8, CenterPiece at Y=6
                 new ArenaDefinition

@@ -22,8 +22,14 @@ namespace SlopArena.Client.World
         [Header("Entities (NPC)")]
         [SerializeField] private PlayerRenderer _npcRenderer;
 
+        [Header("Characters (Player)")]
+        [SerializeField] private CharacterClass _playerClassOverride;
+ 
         [Header("Characters (NPC)")]
         [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
+ 
+        [Header("Arena")]
+        [SerializeField] private string _arenaNameOverride = "colosseum";
 
         [Header("Debug")]
         [Header("Combat")]
@@ -40,23 +46,23 @@ namespace SlopArena.Client.World
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
-
         protected override void OnMatchStart()
         {
-            Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
+            string arenaName = string.IsNullOrEmpty(_arenaNameOverride) ? MatchConfig.ArenaName : _arenaNameOverride;
+            Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={arenaName}");
             // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
-            string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
+            string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", arenaName + ".arena"));
             ArenaDefinition arena;
             if (File.Exists(arenaPath))
             {
                 var loaded = ArenaBinaryFormat.LoadFromFile(arenaPath);
-                arena = loaded ?? ArenaRegistry.Get(MatchConfig.ArenaName);
+                arena = loaded ?? ArenaRegistry.Get(arenaName);
                 Debug.Log($"[TrainingMatch] Loaded arena from file: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
             }
             else
             {
-                arena = ArenaRegistry.Get(MatchConfig.ArenaName);
-                Debug.Log($"[TrainingMatch] Using hardcoded arena: {MatchConfig.ArenaName} — no file at {arenaPath}");
+                arena = ArenaRegistry.Get(arenaName);
+                Debug.Log($"[TrainingMatch] Using hardcoded arena: {arenaName} — no file at {arenaPath}");
             }
 
             // Wire sim debug logging to Unity console
@@ -66,13 +72,13 @@ namespace SlopArena.Client.World
             // Bridge (local)
             _bridge = new LocalSimulationBridge(arena);
             _combatFeedback.SetSimulation(_bridge.InternalSim);
-
-            var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
+            var playerClass = _playerClassOverride != CharacterClass.None ? _playerClassOverride : MatchConfig.PlayerClass;
+            var playerDef = CharacterRegistry.Get(playerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
-
+ 
             // Shared player renderer + HUD setup
             SetupPlayerRenderer(playerDef, playerBaked);
             SetupHUD(playerDef);

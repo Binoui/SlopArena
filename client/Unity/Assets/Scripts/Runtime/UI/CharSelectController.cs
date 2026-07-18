@@ -20,8 +20,16 @@ namespace SlopArena.Client.UI
         private readonly List<Button> _gridButtons = new();
         private GameObject _currentModel;
 
-        private static readonly CharacterClass[] Classes =
-            (CharacterClass[])System.Enum.GetValues(typeof(CharacterClass));
+        private static readonly CharacterClass[] Classes = GetPlayableClasses();
+ 
+        private static CharacterClass[] GetPlayableClasses()
+        {
+            var values = (CharacterClass[])System.Enum.GetValues(typeof(CharacterClass));
+            var playable = new System.Collections.Generic.List<CharacterClass>(values.Length);
+            foreach (var c in values)
+                if (c != CharacterClass.None) playable.Add(c);
+            return playable.ToArray();
+        }
         // Slot index → key label: Q=2, E=3, R=4, F=5 (matches GetSlotAbility)
         private static readonly string[] AbilitySlots =
             { "ability-q", "ability-e", "ability-r", "ability-f" };
