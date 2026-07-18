@@ -1,0 +1,67 @@
+<h2>Stage Select</h2>
+<p class="subtitle">Host picks, others see the result. 3 stages for the demo.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Stage Select Screen</div>
+  <div class="mockup-body" style="background:#0a0a14;padding:16px;font-family:sans-serif;display:flex;flex-direction:column;gap:12px">
+
+    <!-- stage cards -->
+    <div style="display:flex;gap:10px;justify-content:center">
+
+      <!-- selected -->
+      <div style="width:130px;display:flex;flex-direction:column;gap:0;border:2px solid #e94560;border-radius:8px;overflow:hidden;box-shadow:0 0 14px #e9456044">
+        <div style="height:80px;background:linear-gradient(160deg,#1a2a1a 0%,#0d1a0d 100%);display:flex;align-items:center;justify-content:center;position:relative">
+          <!-- rough stage silhouette: flat platform -->
+          <div style="width:90px;height:6px;background:#2a4a2a;border-radius:3px;position:absolute;bottom:24px"></div>
+          <div style="width:30px;height:6px;background:#2a4a2a;border-radius:3px;position:absolute;bottom:38px;left:18px"></div>
+          <div style="width:30px;height:6px;background:#2a4a2a;border-radius:3px;position:absolute;bottom:38px;right:18px"></div>
+          <div style="position:absolute;top:6px;right:6px;color:#e94560;font-size:7px;font-weight:bold;background:#e9456022;padding:2px 5px;border-radius:3px">SELECTED</div>
+        </div>
+        <div style="background:#0d0d1a;padding:7px 10px">
+          <div style="color:#fff;font-size:9px;font-weight:bold;letter-spacing:1px">THE PIT</div>
+          <div style="color:#555;font-size:7px;margin-top:2px">Large · Open</div>
+        </div>
+      </div>
+
+      <!-- unselected -->
+      <div style="width:130px;display:flex;flex-direction:column;gap:0;border:1px solid #1e1e3a;border-radius:8px;overflow:hidden;opacity:0.75">
+        <div style="height:80px;background:linear-gradient(160deg,#1a1a2a 0%,#0d0d1a 100%);display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:100px;height:6px;background:#2a2a4a;border-radius:3px;position:absolute;bottom:24px"></div>
+        </div>
+        <div style="background:#0d0d1a;padding:7px 10px">
+          <div style="color:#888;font-size:9px;font-weight:bold;letter-spacing:1px">TRAINING</div>
+          <div style="color:#555;font-size:7px;margin-top:2px">Medium · Flat</div>
+        </div>
+      </div>
+
+      <!-- unselected -->
+      <div style="width:130px;display:flex;flex-direction:column;gap:0;border:1px solid #1e1e3a;border-radius:8px;overflow:hidden;opacity:0.75">
+        <div style="height:80px;background:linear-gradient(160deg,#1a1a1a 0%,#0d0d0d 100%);display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="width:40px;height:6px;background:#3a3a3a;border-radius:3px;position:absolute;bottom:24px;left:16px"></div>
+          <div style="width:40px;height:6px;background:#3a3a3a;border-radius:3px;position:absolute;bottom:24px;right:16px"></div>
+          <div style="width:20px;height:18px;background:#3a3a3a;border-radius:3px 3px 0 0;position:absolute;bottom:30px;left:50%;transform:translateX(-50%)"></div>
+        </div>
+        <div style="background:#0d0d1a;padding:7px 10px">
+          <div style="color:#888;font-size:9px;font-weight:bold;letter-spacing:1px">ISLAND</div>
+          <div style="color:#555;font-size:7px;margin-top:2px">Small · Platforms</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- bottom: host confirm vs client waiting -->
+    <div style="display:flex;gap:10px">
+      <div style="flex:1;background:#0d0d1a;border:1px solid #1e1e3a;border-radius:8px;padding:10px;text-align:center">
+        <div style="color:#444;font-size:7px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Host view</div>
+        <div style="background:#e94560;color:#fff;font-size:9px;font-weight:bold;padding:6px 16px;border-radius:5px;display:inline-block;letter-spacing:1px">CONFIRM STAGE</div>
+      </div>
+      <div style="flex:1;background:#0d0d1a;border:1px solid #1e1e3a;border-radius:8px;padding:10px;text-align:center">
+        <div style="color:#444;font-size:7px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Client view</div>
+        <div style="color:#555;font-size:8px;font-style:italic;padding:6px 0">Waiting for host<span style="animation:blink 1s infinite">...</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p style="text-align:center;margin-top:14px" class="subtitle">Does this structure work for stage select?</p>

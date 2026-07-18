@@ -1,0 +1,152 @@
+<h2>Character Select — Top Grid + Bottom Preview</h2>
+<p class="subtitle">Does this proportions and layout feel right? Click to select.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a14;padding:14px;font-family:sans-serif">
+
+      <!-- TOP: character grid -->
+      <div style="display:flex;gap:7px;justify-content:center;margin-bottom:10px">
+        <!-- selected -->
+        <div style="width:68px;height:84px;background:#1a1a2e;border:2px solid #e94560;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5px;box-shadow:0 0 10px #e9456044;position:relative">
+          <div style="position:absolute;top:4px;left:4px;width:14px;height:14px;background:#e94560;border-radius:50%;display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:7px;font-weight:bold">P1</span>
+          </div>
+          <div style="width:38px;height:50px;background:#3a3a6e;border-radius:3px;margin-bottom:3px"></div>
+          <span style="color:#fff;font-size:8px;font-weight:bold;letter-spacing:1px">MANKI</span>
+        </div>
+        <div style="width:68px;height:84px;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5px">
+          <div style="width:38px;height:50px;background:#2a2a4e;border-radius:3px;margin-bottom:3px"></div>
+          <span style="color:#888;font-size:8px;letter-spacing:1px">BUNNY</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+      </div>
+
+      <!-- BOTTOM: preview panel -->
+      <div style="background:#0d0d1a;border:1px solid #1e1e3a;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:stretch">
+        <!-- 3D model viewport -->
+        <div style="width:90px;flex-shrink:0;background:#111827;border-radius:6px;border:1px solid #1e1e3a;display:flex;align-items:center;justify-content:center;min-height:90px;position:relative">
+          <div style="width:42px;height:70px;background:linear-gradient(180deg,#4a4a8e 0%,#2a2a6e 100%);border-radius:4px 4px 2px 2px;position:relative">
+            <!-- rough character silhouette -->
+            <div style="width:18px;height:18px;background:#5a5a9e;border-radius:50%;position:absolute;top:-10px;left:50%;transform:translateX(-50%)"></div>
+          </div>
+          <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center">
+            <span style="color:#333;font-size:7px">3D PREVIEW</span>
+          </div>
+        </div>
+        <!-- info panel -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <div style="color:#e94560;font-size:11px;font-weight:bold;letter-spacing:2px">MANKI</div>
+          <div style="color:#888;font-size:8px;margin-bottom:2px;font-style:italic">"Fast striker, close range"</div>
+          <!-- ability slots -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <div style="background:#1a1a2e;border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:4px">
+              <span style="color:#e94560;font-size:8px;font-weight:bold;background:#e9456022;padding:1px 4px;border-radius:3px">Q</span>
+              <span style="color:#aaa;font-size:8px">Grapple</span>
+            </div>
+            <div style="background:#1a1a2e;border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:4px">
+              <span style="color:#4ec9e9;font-size:8px;font-weight:bold;background:#4ec9e922;padding:1px 4px;border-radius:3px">E</span>
+              <span style="color:#aaa;font-size:8px">Aerosol</span>
+            </div>
+            <div style="background:#1a1a2e;border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:4px">
+              <span style="color:#a4e94e;font-size:8px;font-weight:bold;background:#a4e94e22;padding:1px 4px;border-radius:3px">R</span>
+              <span style="color:#aaa;font-size:8px">Bazooka</span>
+            </div>
+            <div style="background:#1a1a2e;border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:4px">
+              <span style="color:#e9c94e;font-size:8px;font-weight:bold;background:#e9c94e22;padding:1px 4px;border-radius:3px">F</span>
+              <span style="color:#aaa;font-size:8px">Combo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="card-body">
+      <h3>Compact — grid + slim preview</h3>
+      <p>Preview panel is a horizontal strip below the grid. 3D model small on the left, abilities on the right. Fits on screen without scrolling.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a14;padding:14px;font-family:sans-serif">
+
+      <!-- TOP: character grid -->
+      <div style="display:flex;gap:7px;justify-content:center;margin-bottom:10px">
+        <div style="width:68px;height:84px;background:#1a1a2e;border:2px solid #e94560;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5px;box-shadow:0 0 10px #e9456044;position:relative">
+          <div style="position:absolute;top:4px;left:4px;width:14px;height:14px;background:#e94560;border-radius:50%;display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:7px;font-weight:bold">P1</span>
+          </div>
+          <div style="width:38px;height:50px;background:#3a3a6e;border-radius:3px;margin-bottom:3px"></div>
+          <span style="color:#fff;font-size:8px;font-weight:bold;letter-spacing:1px">MANKI</span>
+        </div>
+        <div style="width:68px;height:84px;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5px">
+          <div style="width:38px;height:50px;background:#2a2a4e;border-radius:3px;margin-bottom:3px"></div>
+          <span style="color:#888;font-size:8px;letter-spacing:1px">BUNNY</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+        <div style="width:68px;height:84px;background:#111;border:1px dashed #222;border-radius:6px;display:flex;align-items:center;justify-content:center">
+          <span style="color:#333;font-size:18px">?</span>
+        </div>
+      </div>
+
+      <!-- BOTTOM: tall preview panel -->
+      <div style="background:#0d0d1a;border:1px solid #1e1e3a;border-radius:8px;padding:10px;display:flex;gap:12px;align-items:stretch">
+        <!-- tall 3D viewport -->
+        <div style="width:70px;flex-shrink:0;background:#111827;border-radius:6px;border:1px solid #1e1e3a;display:flex;align-items:center;justify-content:center;min-height:110px;position:relative">
+          <div style="width:42px;height:82px;background:linear-gradient(180deg,#4a4a8e 0%,#2a2a6e 100%);border-radius:4px 4px 2px 2px;position:relative">
+            <div style="width:18px;height:18px;background:#5a5a9e;border-radius:50%;position:absolute;top:-10px;left:50%;transform:translateX(-50%)"></div>
+          </div>
+          <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center">
+            <span style="color:#333;font-size:7px">3D PREVIEW</span>
+          </div>
+        </div>
+        <!-- right side: name + desc + abilities stacked -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <div>
+            <div style="color:#e94560;font-size:12px;font-weight:bold;letter-spacing:2px">MANKI</div>
+            <div style="color:#666;font-size:8px;font-style:italic">Fast striker · Close range</div>
+          </div>
+          <div style="color:#777;font-size:8px;line-height:1.5">Aggressive brawler with explosive close-range tools. Excels at edgeguarding.</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="color:#e94560;font-size:8px;font-weight:bold;background:#e9456022;padding:1px 5px;border-radius:3px;min-width:14px;text-align:center">Q</span>
+              <span style="color:#aaa;font-size:8px">Grapple — grab & throw</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="color:#4ec9e9;font-size:8px;font-weight:bold;background:#4ec9e922;padding:1px 5px;border-radius:3px;min-width:14px;text-align:center">E</span>
+              <span style="color:#aaa;font-size:8px">Aerosol — flame cone</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="color:#a4e94e;font-size:8px;font-weight:bold;background:#a4e94e22;padding:1px 5px;border-radius:3px;min-width:14px;text-align:center">R</span>
+              <span style="color:#aaa;font-size:8px">Bazooka — aim & fire</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="color:#e9c94e;font-size:8px;font-weight:bold;background:#e9c94e22;padding:1px 5px;border-radius:3px;min-width:14px;text-align:center">F</span>
+              <span style="color:#aaa;font-size:8px">Combo strike</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="card-body">
+      <h3>Tall — grid + full preview</h3>
+      <p>Taller bottom panel. 3D model gets more vertical space, abilities stack with one-line descriptions. Feels more like a character bio.</p>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,109 @@
+<h2>Character Select Layout</h2>
+<p class="subtitle">5 characters — pick the layout that feels right for the game's style</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;padding:16px">
+      <!-- Smash-style row -->
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px">
+        <div style="width:72px;height:90px;background:#1a1a2e;border:2px solid #e94560;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6px">
+          <div style="width:40px;height:52px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#fff;font-size:9px;font-weight:bold">MANKI</span>
+        </div>
+        <div style="width:72px;height:90px;background:#1a1a2e;border:2px solid #333;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6px">
+          <div style="width:40px;height:52px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#aaa;font-size:9px">BUNNY</span>
+        </div>
+        <div style="width:72px;height:90px;background:#1a1a2e;border:2px solid #333;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6px">
+          <div style="width:40px;height:52px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#aaa;font-size:9px">???</span>
+        </div>
+        <div style="width:72px;height:90px;background:#1a1a2e;border:2px solid #333;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6px">
+          <div style="width:40px;height:52px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#aaa;font-size:9px">???</span>
+        </div>
+        <div style="width:72px;height:90px;background:#1a1a2e;border:2px solid #333;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:6px">
+          <div style="width:40px;height:52px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#aaa;font-size:9px">???</span>
+        </div>
+      </div>
+      <!-- preview panel -->
+      <div style="background:#0d0d1a;border-radius:6px;padding:8px;display:flex;gap:8px;align-items:center">
+        <div style="width:48px;height:64px;background:#2a2a4e;border-radius:4px;flex-shrink:0"></div>
+        <div>
+          <div style="color:#e94560;font-size:10px;font-weight:bold;margin-bottom:3px">MANKI</div>
+          <div style="color:#888;font-size:8px;line-height:1.4">Q · W · E · R<br>abilities listed here</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Row + Preview Panel</h3>
+      <p>All 5 chars in a top row. Clicking one expands a panel below showing name, portrait, and ability slots. Classic Smash / DKO style.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;padding:16px">
+      <!-- Center spotlight -->
+      <div style="display:flex;align-items:center;gap:6px;justify-content:center">
+        <div style="width:44px;height:60px;background:#1a1a2e;border:1px solid #333;border-radius:4px;opacity:0.5"></div>
+        <div style="width:44px;height:60px;background:#1a1a2e;border:1px solid #333;border-radius:4px;opacity:0.7"></div>
+        <!-- center selected -->
+        <div style="width:80px;height:110px;background:#1a1a2e;border:2px solid #e94560;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:8px;box-shadow:0 0 16px #e9456066">
+          <div style="width:48px;height:68px;background:#2a2a4e;border-radius:4px;margin-bottom:4px"></div>
+          <span style="color:#fff;font-size:9px;font-weight:bold">MANKI</span>
+        </div>
+        <div style="width:44px;height:60px;background:#1a1a2e;border:1px solid #333;border-radius:4px;opacity:0.7"></div>
+        <div style="width:44px;height:60px;background:#1a1a2e;border:1px solid #333;border-radius:4px;opacity:0.5"></div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:4px;margin-top:8px">
+        <div style="width:6px;height:6px;background:#e94560;border-radius:50%"></div>
+        <div style="width:6px;height:6px;background:#333;border-radius:50%"></div>
+        <div style="width:6px;height:6px;background:#333;border-radius:50%"></div>
+        <div style="width:6px;height:6px;background:#333;border-radius:50%"></div>
+        <div style="width:6px;height:6px;background:#333;border-radius:50%"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Carousel / Spotlight</h3>
+      <p>Selected char is centered and large. Neighbors peek in from sides. Navigate with arrows or d-pad. Cinematic feel, good for controller.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;padding:16px">
+      <!-- Grid left + big preview right -->
+      <div style="display:flex;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0">
+          <div style="width:52px;height:64px;background:#1a1a2e;border:2px solid #e94560;border-radius:5px;display:flex;align-items:center;justify-content:center">
+            <div style="width:28px;height:40px;background:#2a2a4e;border-radius:3px"></div>
+          </div>
+          <div style="width:52px;height:64px;background:#1a1a2e;border:1px solid #333;border-radius:5px;display:flex;align-items:center;justify-content:center">
+            <div style="width:28px;height:40px;background:#2a2a4e;border-radius:3px"></div>
+          </div>
+          <div style="width:52px;height:64px;background:#1a1a2e;border:1px solid #333;border-radius:5px;display:flex;align-items:center;justify-content:center">
+            <div style="width:28px;height:40px;background:#2a2a4e;border-radius:3px"></div>
+          </div>
+          <div style="width:52px;height:64px;background:#1a1a2e;border:1px solid #333;border-radius:5px;display:flex;align-items:center;justify-content:center">
+            <div style="width:28px;height:40px;background:#2a2a4e;border-radius:3px"></div>
+          </div>
+          <div style="width:52px;height:64px;background:#1a1a2e;border:1px solid #333;border-radius:5px;display:flex;align-items:center;justify-content:center;grid-column:1/-1;width:100%">
+            <div style="width:28px;height:40px;background:#2a2a4e;border-radius:3px"></div>
+          </div>
+        </div>
+        <!-- big preview -->
+        <div style="flex:1;background:#0d0d1a;border-radius:6px;padding:8px;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="color:#e94560;font-size:10px;font-weight:bold">MANKI</div>
+          <div style="width:100%;height:50px;background:#2a2a4e;border-radius:4px"></div>
+          <div style="color:#888;font-size:8px">Q W E R abilities</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Grid + Big Preview</h3>
+      <p>2×2 grid of portraits on the left (5th centered below), large preview pane on the right with art, name, and ability summary. Scales to 8+ chars later.</p>
+    </div>
+  </div>
+
+</div>
