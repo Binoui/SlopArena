@@ -39,7 +39,6 @@ Desktop.ini
 .claude/
 .aider*
 .windsurf/
-.superpowers/
 
 # ==========================================
 # Large binary data (use Git LFS or generate at runtime)

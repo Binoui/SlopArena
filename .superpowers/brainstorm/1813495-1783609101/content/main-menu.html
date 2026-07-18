@@ -1,0 +1,67 @@
+<h2>Main Menu</h2>
+<p class="subtitle">SlopArena — pick a layout feel</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a14;padding:20px;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div style="color:#e94560;font-size:18px;font-weight:bold;letter-spacing:4px;text-shadow:0 0 20px #e9456066">SLOPARENA</div>
+      <div style="display:flex;flex-direction:column;gap:6px;width:160px">
+        <div style="background:#e94560;color:#fff;font-size:10px;font-weight:bold;letter-spacing:2px;padding:9px 0;text-align:center;border-radius:5px">TRAINING</div>
+        <div style="background:#1a1a2e;color:#aaa;font-size:10px;font-weight:bold;letter-spacing:2px;padding:9px 0;text-align:center;border-radius:5px;border:1px solid #2a2a4e">MULTIPLAYER</div>
+      </div>
+      <div style="color:#333;font-size:7px;letter-spacing:1px">v0.1 DEMO</div>
+    </div>
+    <div class="card-body">
+      <h3>Minimal vertical stack</h3>
+      <p>Logo top, two big buttons below. Multiplayer expands in-place to show Host / Join sub-buttons.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a14;padding:16px;font-family:sans-serif">
+      <div style="color:#e94560;font-size:16px;font-weight:bold;letter-spacing:4px;text-align:center;margin-bottom:14px;text-shadow:0 0 20px #e9456066">SLOPARENA</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <div style="flex:1;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:8px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="width:36px;height:36px;background:#e9456022;border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:18px">🥊</span>
+          </div>
+          <div style="color:#ccc;font-size:9px;font-weight:bold;letter-spacing:1px">TRAINING</div>
+          <div style="color:#555;font-size:7px;text-align:center">Solo practice</div>
+        </div>
+        <div style="flex:1;background:#1a1a2e;border:1px solid #e94560;border-radius:8px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 0 10px #e9456033">
+          <div style="width:36px;height:36px;background:#e9456022;border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:18px">🌐</span>
+          </div>
+          <div style="color:#e94560;font-size:9px;font-weight:bold;letter-spacing:1px">MULTIPLAYER</div>
+          <div style="color:#555;font-size:7px;text-align:center">Host or Join</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Mode cards side by side</h3>
+      <p>Two equal-weight mode cards. Clicking Multiplayer navigates to a Host / Join sub-screen.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a14;padding:16px;font-family:sans-serif;display:flex;flex-direction:column;gap:10px">
+      <div style="color:#e94560;font-size:16px;font-weight:bold;letter-spacing:4px;text-align:center;text-shadow:0 0 20px #e9456066">SLOPARENA</div>
+      <!-- main options -->
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="background:#1a1a2e;color:#aaa;font-size:9px;letter-spacing:2px;padding:8px 14px;border-radius:5px;border-left:3px solid #e94560">TRAINING MODE</div>
+        <div style="background:#1a1a2e;color:#aaa;font-size:9px;letter-spacing:2px;padding:8px 14px;border-radius:5px;border-left:3px solid #333">MULTIPLAYER ›</div>
+      </div>
+      <!-- multiplayer submenu indented -->
+      <div style="display:flex;flex-direction:column;gap:4px;padding-left:16px">
+        <div style="background:#131326;color:#666;font-size:8px;letter-spacing:2px;padding:6px 12px;border-radius:4px;border-left:2px solid #2a2a4e">HOST GAME</div>
+        <div style="background:#131326;color:#666;font-size:8px;letter-spacing:2px;padding:6px 12px;border-radius:4px;border-left:2px solid #2a2a4e">JOIN GAME</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Nested list with submenu</h3>
+      <p>Multiplayer expands in-place to reveal Host / Join indented below it. Keyboard/controller-friendly, classic menu feel.</p>
+    </div>
+  </div>
+
+</div>

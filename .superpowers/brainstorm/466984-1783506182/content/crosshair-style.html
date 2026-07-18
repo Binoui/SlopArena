@@ -1,0 +1,66 @@
+<h2>Aiming Crosshair Style</h2>
+<p class="subtitle">While holding R (Bazooka) or E (Grapple), a crosshair appears center-screen. Which style fits Manki's scrappy pyromaniac personality?</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;display:flex;align-items:center;justify-content:center;height:160px;position:relative;">
+      <!-- Classic dot + lines crosshair -->
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <line x1="40" y1="10" x2="40" y2="30" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="40" y1="50" x2="40" y2="70" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="10" y1="40" x2="30" y2="40" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="50" y1="40" x2="70" y2="40" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="40" cy="40" r="3" fill="#fff"/>
+      </svg>
+      <div style="position:absolute;bottom:8px;right:8px;font-size:10px;color:#555;font-family:monospace;">moves with mouse</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Classic Crosshair</h3>
+      <p>Simple cross + dot, always center-screen. Mouse flicks pitch up/down. Clean, readable.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;display:flex;align-items:center;justify-content:center;height:160px;position:relative;">
+      <!-- Reticle with angle bracket corners -->
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <!-- top-left corner -->
+        <polyline points="18,30 18,18 30,18" fill="none" stroke="#f90" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- top-right corner -->
+        <polyline points="50,18 62,18 62,30" fill="none" stroke="#f90" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- bottom-left corner -->
+        <polyline points="18,50 18,62 30,62" fill="none" stroke="#f90" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- bottom-right corner -->
+        <polyline points="62,50 62,62 50,62" fill="none" stroke="#f90" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="40" cy="40" r="2.5" fill="#f90"/>
+      </svg>
+      <div style="position:absolute;bottom:8px;right:8px;font-size:10px;color:#555;font-family:monospace;">moves with mouse</div>
+    </div>
+    <div class="card-body">
+      <h3>B — Orange Bracket Reticle</h3>
+      <p>Corner brackets + center dot, orange tint. More stylized, reads as "weapon sights." Mouse flicks pitch same way.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;display:flex;align-items:center;justify-content:center;height:160px;position:relative;">
+      <!-- Circle + dot, minimal -->
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="18" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="40" y1="10" x2="40" y2="26" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <line x1="40" y1="54" x2="40" y2="70" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="40" cy="40" r="3" fill="#fff"/>
+      </svg>
+      <div style="position:absolute;bottom:8px;right:8px;font-size:10px;color:#555;font-family:monospace;">moves with mouse</div>
+    </div>
+    <div class="card-body">
+      <h3>C — Circle + Dot</h3>
+      <p>Dashed circle with short tick marks and a center dot. Communicates a blast radius feel — natural for bazooka. Same control scheme.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;padding:16px;background:#1a1a1a;border-radius:8px;border-left:3px solid #444;">
+  <p class="label">Context</p>
+  <p style="margin:4px 0 0;font-size:13px;color:#aaa;">The crosshair stays fixed at screen center. Mouse Y-axis flicks it up/down <em>virtually</em> — the camera doesn't move, only your aim pitch changes. This lets you rocket-jump (aim down at feet) or shoot overhead without repositioning the camera.</p>
+</div>
