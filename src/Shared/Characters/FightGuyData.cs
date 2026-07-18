@@ -285,3 +285,4 @@ public static partial class CharacterRegistry
         };
     }
 }
+// __TEST_MARKER_FIGHTGUY_DATA_INCLUDED__
