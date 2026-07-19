@@ -90,6 +90,8 @@ namespace SlopArena.Shared.Abilities
                 float kbGrowth = GetParam(def, "knockback_growth", 6f);
                 float explosionKbBase = GetParam(def, "explosion_kb_base", 2.4f);
                 float explosionKbGrowth = GetParam(def, "explosion_kb_growth", 3.6f);
+                float kbAngle = GetParam(def, "kb_angle", 30f);
+                float explosionKbAngle = GetParam(def, "explosion_kb_angle", 30f);
 
                 Resolver.Spawn(new Hitbox
                 {
@@ -104,7 +106,7 @@ namespace SlopArena.Shared.Abilities
                     EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
                     Damage = projDamage,
                     BaseKnockback = kbBase, KnockbackGrowth = kbGrowth,
-                    KnockbackUpward = GetParam(def, "knockback_upward", 6f),
+                    KnockbackAngle = (sbyte)kbAngle,
                     StunTicks = (ushort)GetParam(def, "stun_ticks", 14f),
                     DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 90f),
                     OwnerId = s.EntityId,
@@ -113,8 +115,7 @@ namespace SlopArena.Shared.Abilities
                     {
                         Radius = GetParam(def, "explosion_radius", 3f),
                         Damage = GetParam(def, "explosion_damage", 25f),
-                        BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth,
-                        KnockbackUpward = GetParam(def, "explosion_knockback_upward", 12f),
+                        Knockback = new() { Profile = KnockbackProfile.Custom, Angle = (sbyte)explosionKbAngle, BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth },
                         StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
                         DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
                     },

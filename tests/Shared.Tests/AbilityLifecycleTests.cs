@@ -432,8 +432,8 @@ public class AbilityLifecycleTests
         // Normal hitbox params per MankiData
         Assert.Equal(8f, hb.Damage);
         Assert.Equal(0.8f, hb.Radius);
-        Assert.Equal(5.6f, hb.BaseKnockback);
-        Assert.Equal(8.4f, hb.KnockbackGrowth);
+        Assert.Equal(8f, hb.BaseKnockback);
+        Assert.Equal(5f, hb.KnockbackGrowth);
     }
 
     [Fact]
@@ -463,8 +463,8 @@ public class AbilityLifecycleTests
         // Charged hitbox params per MankiData
         Assert.Equal(14f, hb.Damage);
         Assert.Equal(1.0f, hb.Radius);
-        Assert.Equal(9.6f, hb.BaseKnockback);
-        Assert.Equal(14.4f, hb.KnockbackGrowth);
+        Assert.Equal(8f, hb.BaseKnockback);
+        Assert.Equal(5f, hb.KnockbackGrowth);
     }
 
     [Fact]

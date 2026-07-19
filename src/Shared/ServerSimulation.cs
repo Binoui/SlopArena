@@ -746,34 +746,34 @@ namespace SlopArena.Shared
 							EndY = wy + evt.EndOffY,
 							EndZ = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos)),
 							Damage = boneDamage,
-							BaseKnockback = evt.BaseKnockback, KnockbackGrowth = evt.KnockbackGrowth, KnockbackUpward = evt.KnockbackUpward,
+							BaseKnockback = evt.Knockback.Resolve().baseKB,
+							KnockbackGrowth = evt.Knockback.Resolve().growthKB,
+							KnockbackAngle = evt.Knockback.Resolve().angle,
 							StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
 						});
 
 						continue; // Skip ability.SpawnHitbox and default melee path for this evt
 					}
-
-					// Let the AbilitySpec decide: true = handled, false = use default melee
-					if (!ability.SpawnHitbox(evt, state, def, _spellResolver, id))
+					// ── Default melee/static hitbox ──
+					float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
+					float hy = state.PY + evt.OffY;
+					float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
+					float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
+					float hey = hy + evt.EndOffY;
+					float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
+					float damage = evt.Damage;
+					float radius = evt.Radius;
+					ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
+					var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
+					_spellResolver.Spawn(new Hitbox
 					{
-						// ── Default melee/static hitbox ──
-						float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
-						float hy = state.PY + evt.OffY;
-						float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
-						float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
-						float hey = hy + evt.EndOffY;
-						float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
-                        float damage = evt.Damage;
-                        float radius = evt.Radius;
-                        ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
-                        _spellResolver.Spawn(new Hitbox
-                        {
-                            X = hx, Y = hy, Z = hz, Radius = radius, Shape = evt.Shape,
-                            EndX = hex, EndY = hey, EndZ = hez, Damage = damage,
-                            BaseKnockback = evt.BaseKnockback, KnockbackGrowth = evt.KnockbackGrowth, KnockbackUpward = evt.KnockbackUpward,
-                            StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
-                        });
-					}
+					    X = hx, Y = hy, Z = hz, Radius = radius, Shape = evt.Shape,
+					    EndX = hex, EndY = hey, EndZ = hez, Damage = damage,
+					    BaseKnockback = kbBase,
+					    KnockbackGrowth = kbGrowth,
+					    KnockbackAngle = kbAngle,
+					    StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
+					});
 				}
 			}
 		}
@@ -812,7 +812,7 @@ namespace SlopArena.Shared
 				targetState.HitstunLevel = hit.StunTicks <= 30 ? (byte)0 :
 				    hit.StunTicks <= 50 ? (byte)1 : (byte)2;
 				Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
-				    hit.KnockbackY, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
+				    hit.KnockbackAngle, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
 				targetState.HitstunTicks = hit.StunTicks;
 
 				// Let the attacker's active ability apply hit effects (e.g., FightGuy R mark consumption)
@@ -843,15 +843,16 @@ namespace SlopArena.Shared
             // flags alongside projectile data and check at explosion time.
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
 			{
+				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();
 				_spellResolver.Spawn(new Hitbox
 				{
 					X = ex, Y = ey, Z = ez,
 					Radius = explosion.Radius, Shape = HitboxShape.Sphere,
 					EndX = ex, EndY = ey, EndZ = ez,
 					Damage = explosion.Damage,
-					BaseKnockback = explosion.BaseKnockback,
-					KnockbackGrowth = explosion.KnockbackGrowth,
-					KnockbackUpward = explosion.KnockbackUpward,
+					BaseKnockback = kbBase,
+					KnockbackGrowth = kbGrowth,
+					KnockbackAngle = kbAngle,
 					StunTicks = explosion.StunTicks,
 					DurationTicks = explosion.DurationTicks,
 					OwnerId = ownerId,

@@ -167,8 +167,7 @@ namespace SlopArena.Shared.Abilities
                 Shape = HitboxShape.Sphere,
                 EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
                 Damage = 0f,
-                BaseKnockback = 0f, KnockbackGrowth = 0f,
-                KnockbackUpward = 0f, StunTicks = 0,
+                BaseKnockback = 0f, KnockbackGrowth = 0f, KnockbackAngle = 0, StunTicks = 0,
                 DurationTicks = _maxFlightTicks,
                 OwnerId = s.EntityId,
                 Gravity = 2f,
@@ -176,8 +175,7 @@ namespace SlopArena.Shared.Abilities
                 {
                     Radius = 0.1f,
                     Damage = 0f,
-                    BaseKnockback = 0f, KnockbackGrowth = 0f,
-                    KnockbackUpward = 0f, StunTicks = 0,
+                    Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 0, BaseKnockback = 0, KnockbackGrowth = 0 }, StunTicks = 0,
                     DurationTicks = 1,
                 },
             });

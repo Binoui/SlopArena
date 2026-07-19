@@ -39,7 +39,8 @@ namespace SlopArena.Shared
             public ulong OwnerEntityId;
             public float Damage;
             public float DirX;
-            public float KnockbackY;
+            /// <summary>Launch angle in degrees (-90 to 90).</summary>
+            public sbyte KnockbackAngle;
             public float DirZ;
             public float BaseKnockback;
             public float KnockbackGrowth;
@@ -224,8 +225,7 @@ namespace SlopArena.Shared
                             TargetEntityId = entity.Id,
                             OwnerEntityId = hb.OwnerId,
                             Damage = hb.Damage,
-                            DirX = dirXNorm,
-                            KnockbackY = hb.KnockbackUpward,
+                            KnockbackAngle = hb.KnockbackAngle,
                             DirZ = dirZNorm,
                             BaseKnockback = hb.BaseKnockback,
                             KnockbackGrowth = hb.KnockbackGrowth,

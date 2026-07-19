@@ -22,9 +22,8 @@ namespace SlopArena.Shared
         /// <summary>Local offset from bone origin (applied after bone position is resolved).</summary>
         public float BoneOffX, BoneOffY, BoneOffZ;
         public float Damage;
-        public float BaseKnockback;
-        public float KnockbackGrowth;
-        public float KnockbackUpward;
+        /// <summary>Knockback profile + optional custom overrides. Resolved at spawn time.</summary>
+        public KnockbackData Knockback;
         public ushort StunTicks;
         /// <summary>If false: persists even if attacker is hit during startup.</summary>
         public bool Interruptible;
@@ -88,12 +87,8 @@ namespace SlopArena.Shared
         public float LaunchOffsetY;
         /// <summary>Damage on direct hit.</summary>
         public float Damage;
-        /// <summary>Minimum horizontal knockback (at 0% damage).</summary>
-        public float BaseKnockback;
-        /// <summary>Additional knockback per (damage% * 0.01).</summary>
-        public float KnockbackGrowth;
-        /// <summary>Vertical knockback (upward).</summary>
-        public float KnockbackUpward;
+        /// <summary>Knockback profile + optional custom overrides. Resolved at projectile spawn time.</summary>
+        public KnockbackData Knockback;
         /// <summary>Stun ticks on hit.</summary>
         public ushort StunTicks;
         /// <summary>Max lifetime of the projectile in ticks (600 = 10 seconds, more than enough).</summary>
@@ -113,13 +108,11 @@ namespace SlopArena.Shared
     {
         public float Radius;
         public float Damage;
-        public float BaseKnockback;
-        public float KnockbackGrowth;
-        public float KnockbackUpward;
+        /// <summary>Knockback profile + optional custom overrides. Resolved at explosion spawn time.</summary>
+        public KnockbackData Knockback;
         public ushort StunTicks;
         public ushort DurationTicks;
         /// <summary>If true, this explosion can hit its spawner (mine jump, etc.).</summary>
         public bool CanHitOwner;
     }
 }
-

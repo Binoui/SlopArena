@@ -73,9 +73,9 @@ namespace SlopArena.Shared.Abilities
                 float projDamage = GetParam(def, "damage", 6f);
                 ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
 
-                float kbBase = GetParam(def, "knockback_base", 1.2f);
-                float kbGrowth = GetParam(def, "knockback_growth", 1.8f);
-                float kbUpward = GetParam(def, "knockback_upward", 2f);
+                float kbBase = GetParam(def, "knockback_base", 3f);
+                float kbGrowth = GetParam(def, "knockback_growth", 4.5f);
+                float kbAngle = GetParam(def, "kb_angle", 30f);
                 ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 12f);
                 ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
 
@@ -91,7 +91,7 @@ namespace SlopArena.Shared.Abilities
                     Damage = projDamage,
                     BaseKnockback = kbBase,
                     KnockbackGrowth = kbGrowth,
-                    KnockbackUpward = kbUpward,
+                    KnockbackAngle = (sbyte)kbAngle,
                     StunTicks = stunTicks,
                     DurationTicks = maxFlight,
                     OwnerId = s.EntityId,
