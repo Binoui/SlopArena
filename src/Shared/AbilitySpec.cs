@@ -27,6 +27,17 @@ namespace SlopArena.Shared
         AreaDenial,          // Places persistent hazard (mine, flame wall).
     }
 
+    /// <summary>Describes a bone trail particle VFX for an ability stage.</summary>
+    public struct BoneTrailDef
+    {
+        /// <summary>Bone name in the skeleton (e.g. "mixamorig:RightHand").</summary>
+        public string BoneName;
+        /// <summary>Trail particle width in meters.</summary>
+        public float Width;
+        /// <summary>Trail color (RGBA).</summary>
+        public float R, G, B, A;
+    }
+
     public class AbilitySpec
     {
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
@@ -50,6 +61,8 @@ namespace SlopArena.Shared
         public string[]? SpecialEffectKeys;
         /// <summary>Animation name per combo stage.</summary>
         public string[]? AnimationNames;
+        /// <summary>Optional bone trail VFX. Enabled during this ability's active period.</summary>
+        public BoneTrailDef[]? BoneTrails;
         /// <summary>Animation playback speed multiplier. 0 = auto-compute from frames/duration.</summary>
         public float AnimSpeed = 0f;
         /// <summary>Named float parameters for server-side abilities (e.g., "backflip_damage").</summary>

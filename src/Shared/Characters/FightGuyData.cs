@@ -94,6 +94,7 @@ public static partial class CharacterRegistry
                             AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3", "spell_lmb_4" },
+                BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } },
                 Params = new() { ["lunge_duration"] = 6f, },
             },
 
@@ -118,6 +119,7 @@ public static partial class CharacterRegistry
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2" },
+                BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } },
             },
 
             RMB = new AbilitySpec
