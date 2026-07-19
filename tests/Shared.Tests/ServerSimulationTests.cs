@@ -283,7 +283,7 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 5f; // within WarpRange=10, outside AttackRange=5
+        npc.PZ = 3f; // within AttackRange=4 → direct attack, no warp
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
@@ -473,7 +473,29 @@ public class ServerSimulationTests
         // No warp — already within attack range
         Assert.Equal(0f, state.WarpSpeed);
     }
-    // ── Warp velocity fix: exponential convergence ──
+    // ── Warp velocity: constant SprintSpeed (replaced exponential 0.3) ──
+    // Manki CombatDef: SprintSpeed=12 m/s → 0.2m per tick at 60Hz
+    // Manki LMB stage 1: AttackRange=4, WarpRange=10
+
+    [Fact]
+    public void Warp_VelocityEqualsSprintSpeed_PerTick()
+    {
+        // 1 tick: velocity should be exactly SprintSpeed toward target
+        var sim = TestHelpers.MakeSim(MakeTestArena());
+        var def = TestHelpers.CombatDef;
+        var player = MakeIdleState(1);
+        var npc = MakeIdleState(100);
+        npc.PZ = 7f;
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, npc);
+
+        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
+        // VZ = SprintSpeed = 12 m/s toward target (+Z)
+        TestHelpers.AssertNear(12f, state.VZ, tolerance: 0.01f);
+        // PZ advanced by 12/60 = 0.2m
+        TestHelpers.AssertNear(0.2f, state.PZ, tolerance: 0.01f);
+        Assert.True(state.WarpSpeed > 0f); // still warping
+    }
 
     [Fact]
     public void Warp_MovesCharacterTowardTarget()
@@ -486,14 +508,14 @@ public class ServerSimulationTests
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
-        // 15 ticks: LMB activates ability, warp converges (~tick 2), ability continues
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 15);
+        // 16 ticks: close 3m at 0.2m/tick, ProcessWarp checks distSq before position update
+        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 16);
 
-        // Warp moved character significantly toward target (exponential: 30%/tick → ~3.57m)
-        Assert.True(state.PZ > 2.0f, $"Expected PZ > 2.0 (moved toward target), got {state.PZ:F4}");
+        // PZ = 16 * 0.2 = 3.0m (arrived at AttackRange, VZ cleared on arrival tick)
+        TestHelpers.AssertNear(3.0f, state.PZ, tolerance: 0.01f);
         // Warp completed — WarpSpeed should be 0
         Assert.Equal(0f, state.WarpSpeed);
-        // State remains Attacking (not killed by old Idle override)
+        // State remains Attacking
         Assert.Equal(ActionState.Attacking, state.State);
     }
 
@@ -504,12 +526,12 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 6f; // within WarpRange=10, outside AttackRange=4
+        npc.PZ = 6f; // need to close 2m → 10 ticks at 0.2m/tick
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
-        // 5 ticks: warp completes by ~tick 2, then 3 more ticks in ability
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 5);
+        // 12 ticks: warp completes ~tick 10, then ability continues
+        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 12);
 
         Assert.Equal(ActionState.Attacking, state.State);
         Assert.Equal(0f, state.WarpSpeed);
@@ -522,18 +544,19 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 7f; // within WarpRange=10, outside AttackRange=4
+        npc.PZ = 5.5f; // close 1.5m → ~8 ticks warp, lunge 10-tick window still open
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
-        // 6 ticks: warp completes by ~tick 2, lunge applies on tick 3+ (WarpSpeed==0, LungeForce=8)
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 6);
+        // 13 ticks: warp completes ~tick 8, lunge applies tick 9+ (LungeForce=4, 10 tick default duration)
+        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 13);
 
-        // Lunge velocity applied after warp completes
+        // Lunge velocity (4 m/s) after warp completed — should be > 0
         Assert.True(state.VZ > 1.0f, $"Expected VZ > 1.0 (lunge after warp), got {state.VZ:F4}");
         Assert.Equal(0f, state.WarpSpeed);
         Assert.Equal(ActionState.Attacking, state.State);
     }
+
     [Fact]
     public void Warp_NoVelocityPersistsAfterAbilityEnds()
     {

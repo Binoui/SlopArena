@@ -122,9 +122,8 @@ namespace SlopArena.Shared
         public bool IsAiming;
 
         /// <summary>
-        /// Warp speed as a fraction of remaining distance closed per tick.
-        /// e.g. 0.3 = 30% of remaining distance toward target each tick.
-        /// Velocity is computed as: V = dx * WarpSpeed / TickDt in ProcessWarp.
+        /// Warp active flag. > 0 = currently warping toward target.
+        /// Velocity is set to SprintSpeed (constant) in ProcessWarp.
         /// Set to 0 by ProcessWarp on arrival (within AttackRange).
         /// </summary>
         public float WarpTargetX;

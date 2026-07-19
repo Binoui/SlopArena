@@ -17,7 +17,8 @@ namespace SlopArena.Shared
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
 		private readonly SpellResolver _spellResolver = new();
 		private readonly Dictionary<ulong, (float x, float y, float z)> _respawnPositions = new();
-
+		// Track pending attack slots for warp-in-progress entities
+		private readonly Dictionary<ulong, byte> _pendingWarpAttacks = new();
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
 
@@ -351,6 +352,40 @@ namespace SlopArena.Shared
 					continue;
 				}
 
+				// ── Warp check: sprint to target if between WarpRange and AttackRange ──
+				if (state.State == ActionState.Idle && spec.Stages != null && spec.Stages.Length > 0)
+				{
+					var firstStage = spec.Stages[0];
+					if (firstStage.WarpRange > 0f)
+					{
+						ulong targetId = FindClosestEnemy(id, state.PX, state.PZ, firstStage.WarpRange, out _);
+						if (targetId > 0)
+						{
+							var target = _states[targetId];
+							float dx = target.PX - state.PX;
+							float dz = target.PZ - state.PZ;
+							float dist = MathF.Sqrt(dx * dx + dz * dz);
+
+							if (dist > firstStage.AttackRange && dist <= firstStage.WarpRange)
+							{
+								state.WarpTargetX = target.PX;
+								state.WarpTargetZ = target.PZ;
+								state.WarpAttackRange = firstStage.AttackRange;
+								state.WarpSpeed = 1f;
+								state.State = ActionState.Warping;
+								_pendingWarpAttacks[id] = input.ActiveSlot;
+
+								// Consume input (prevent SimulateTick from also starting attack)
+								var ci = input;
+								ci.ActiveSlot = 0;
+								inputs[id] = ci;
+								_states[id] = state;
+								continue;
+							}
+						}
+					}
+				}
+
                 // Reject F (Overclock) reactivation while buff already active
                 if (input.ActiveSlot == 6 && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
                     continue;
@@ -459,6 +494,40 @@ namespace SlopArena.Shared
 
 				state.TargetEntityId = targetId;
 				if (targetId == 0) { _states[id] = state; continue; }
+				// ── Warping: rotation tracking (no warp init — already set by PreTickAbilities) ──
+				if (state.State == ActionState.Warping)
+				{
+					if (_pendingWarpAttacks.TryGetValue(id, out byte pendingSlot))
+					{
+						var def = _defs[id];
+						bool airborne = !state.IsGrounded;
+						var spec = def.GetSlotAbility(pendingSlot - 1, airborne);
+						if (spec != null && spec.Stages != null && spec.Stages.Length > 0)
+						{
+							var stage = spec.Stages[0];
+							var target = _states[targetId];
+							float dx = target.PX - state.PX;
+							float dz = target.PZ - state.PZ;
+							float dist = MathF.Sqrt(dx * dx + dz * dz);
+
+							// ── Rotate toward target each tick ──
+							float rotRange = stage.WarpRange > 0f ? stage.WarpRange : stage.AttackRange;
+							if (stage.RotateTowardTarget && stage.TrackingStrength > 0f && dist <= rotRange)
+							{
+								if (dx * dx + dz * dz > 0.001f)
+								{
+									float targetYaw = MathF.Atan2(dx, dz);
+									float diff = targetYaw - state.FacingYaw;
+									while (diff > MathF.PI) diff -= 2f * MathF.PI;
+									while (diff < -MathF.PI) diff += 2f * MathF.PI;
+									state.FacingYaw += diff * stage.TrackingStrength * Simulation.TickDt;
+								}
+							}
+						}
+					}
+					_states[id] = state;
+					continue;
+				}
 
 				// ── Attacking-only behaviors (warp, rotation) ──
 				if (state.State != ActionState.Attacking || state.AttackSlot == 0)
@@ -467,42 +536,42 @@ namespace SlopArena.Shared
 					continue;
 				}
 
-				var def = _defs[id];
-				bool airborne = !state.IsGrounded;
-				var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-				if (spec == null) { _states[id] = state; continue; }
+				var attackDef = _defs[id];
+				bool attackAirborne = !state.IsGrounded;
+				var attackSpec = attackDef.GetSlotAbility(state.AttackSlot - 1, attackAirborne);
+				if (attackSpec == null) { _states[id] = state; continue; }
 
-				if (spec.Stages == null || spec.Stages.Length == 0) { _states[id] = state; continue; }
-				var stage = Simulation.ResolveStage(spec, state);
+				if (attackSpec.Stages == null || attackSpec.Stages.Length == 0) { _states[id] = state; continue; }
+				var attackStage = Simulation.ResolveStage(attackSpec, state);
 
 				// Only process warp/rotation if target lock is enabled for this stage
-				if (!stage.UseTargetLock) { _states[id] = state; continue; }
+				if (!attackStage.UseTargetLock) { _states[id] = state; continue; }
 
-				var target = _states[targetId];
-				float dx = target.PX - state.PX;
-				float dz = target.PZ - state.PZ;
-				float dist = MathF.Sqrt(dx * dx + dz * dz);
+				var attackTarget = _states[targetId];
+				float attackDx = attackTarget.PX - state.PX;
+				float attackDz = attackTarget.PZ - state.PZ;
+				float attackDist = MathF.Sqrt(attackDx * attackDx + attackDz * attackDz);
 
 				// ── Warp toward target if within WarpRange but outside AttackRange ──
-				if (stage.WarpRange > 0f && dist > stage.AttackRange && dist <= stage.WarpRange)
+				if (state.WarpSpeed <= 0f && attackStage.WarpRange > 0f && attackDist > attackStage.AttackRange && attackDist <= attackStage.WarpRange)
 				{
-					state.WarpTargetX = target.PX;
-					state.WarpTargetZ = target.PZ;
-					state.WarpAttackRange = stage.AttackRange;
-					state.WarpSpeed = 0.3f; // 30% of remaining distance per tick
+					state.WarpTargetX = attackTarget.PX;
+					state.WarpTargetZ = attackTarget.PZ;
+					state.WarpAttackRange = attackStage.AttackRange;
+					state.WarpSpeed = 1f;
 				}
 
 				// ── Rotate toward target each tick ──
-				float rotRange = stage.WarpRange > 0f ? stage.WarpRange : stage.AttackRange;
-				if (stage.RotateTowardTarget && stage.TrackingStrength > 0f && dist <= rotRange)
+				float attackRotRange = attackStage.WarpRange > 0f ? attackStage.WarpRange : attackStage.AttackRange;
+				if (attackStage.RotateTowardTarget && attackStage.TrackingStrength > 0f && attackDist <= attackRotRange)
 				{
-					if (dx * dx + dz * dz > 0.001f)
+					if (attackDx * attackDx + attackDz * attackDz > 0.001f)
 					{
-						float targetYaw = MathF.Atan2(dx, dz);
+						float targetYaw = MathF.Atan2(attackDx, attackDz);
 						float diff = targetYaw - state.FacingYaw;
 						while (diff > MathF.PI) diff -= 2f * MathF.PI;
 						while (diff < -MathF.PI) diff += 2f * MathF.PI;
-						state.FacingYaw += diff * stage.TrackingStrength * Simulation.TickDt;
+						state.FacingYaw += diff * attackStage.TrackingStrength * Simulation.TickDt;
 					}
 				}
 
@@ -734,9 +803,9 @@ namespace SlopArena.Shared
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
-				// Resolve hitstun animation tier from damage
-				targetState.HitstunLevel = finalDamage < 5f ? (byte)0 :
-				    finalDamage < 15f ? (byte)1 : (byte)2;
+				// Resolve hitstun animation tier from stun duration
+				targetState.HitstunLevel = hit.StunTicks <= 30 ? (byte)0 :
+				    hit.StunTicks <= 50 ? (byte)1 : (byte)2;
 				Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
 				    hit.KnockbackY, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
 				targetState.HitstunTicks = hit.StunTicks;
@@ -786,6 +855,61 @@ namespace SlopArena.Shared
 			}
 		}
 
+		private void ProcessWarpArrivals()
+		{
+			foreach (var id in _pendingWarpAttacks.Keys.ToList())
+			{
+				if (!_states.TryGetValue(id, out var state))
+				{
+					_pendingWarpAttacks.Remove(id);
+					continue;
+				}
+
+				// Clean up if entity left Warping state (interrupted by hitstun, etc.)
+				if (state.State != ActionState.Warping)
+				{
+					_pendingWarpAttacks.Remove(id);
+					continue;
+				}
+
+				// Warp still in progress
+				if (state.WarpSpeed > 0f)
+					continue;
+
+				// Warp completed — activate the pending attack
+				byte slot = _pendingWarpAttacks[id];
+				_pendingWarpAttacks.Remove(id);
+
+				var def = _defs[id];
+				bool airborne = !state.IsGrounded;
+				var spec = def.GetSlotAbility(slot - 1, airborne);
+				if (spec == null)
+				{
+					state.State = ActionState.Idle;
+					_states[id] = state;
+					continue;
+				}
+
+				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(slot - 1), airborne);
+				if (ability != null)
+				{
+					SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(slot - 1));
+					ActivateAbility(id, ability, (byte)(slot - 1), def);
+				}
+				else
+				{
+					// Data-driven attack: set state directly
+					state.State = ActionState.Attacking;
+					state.AttackSlot = slot;
+					state.AttackElapsedTicks = 0;
+					state.ComboStage = 0;
+					state.IsServerAbility = false;
+					state.StateTicks = 0;
+					_states[id] = state;
+				}
+			}
+		}
+
 		private void CheckVoidDeaths()
 		{
 			// ── Step 4: Void death check ──
@@ -816,6 +940,9 @@ namespace SlopArena.Shared
 			ProcessTargetLock(inputs);
 
 			SimulateMovement(inputs);
+
+			// ── Warp arrival: activate pending attacks ──
+			ProcessWarpArrivals();
 
 			var entityList = BuildHurtboxList();
 			SpawnHitboxEvents();

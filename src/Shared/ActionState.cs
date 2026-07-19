@@ -8,6 +8,7 @@ namespace SlopArena.Shared
         Sliding = 3,
         Attacking = 4,
         AirDodging = 5,
-        JumpSquat = 6
+        JumpSquat = 6,
+        Warping = 7
     }
 }

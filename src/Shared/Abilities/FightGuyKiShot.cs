@@ -76,7 +76,7 @@ namespace SlopArena.Shared.Abilities
                 float kbBase = GetParam(def, "knockback_base", 1.2f);
                 float kbGrowth = GetParam(def, "knockback_growth", 1.8f);
                 float kbUpward = GetParam(def, "knockback_upward", 2f);
-                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 6f);
+                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 12f);
                 ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
 
                 Resolver.Spawn(new Hitbox

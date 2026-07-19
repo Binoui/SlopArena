@@ -49,7 +49,7 @@ namespace SlopArena.Shared.Abilities
                 float sideRadius = GetParam(def, "side_radius", 0.4f);
                 float sideOff = GetParam(def, "side_offset", 0.8f);
                 float damage = GetParam(def, "damage", 7f);
-                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 48f);
+                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 96f);
                 float bodyY = s.PY + GetParam(def, "body_y", 0.8f);
                 float sideY = s.PY + GetParam(def, "side_y", 0.3f);
 
