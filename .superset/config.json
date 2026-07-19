@@ -1,0 +1,10 @@
+{
+  "setup": [
+    "dotnet restore",
+    "dotnet build src/Shared/ --nologo"
+  ],
+  "teardown": [],
+  "run": [
+    "dotnet run --project src/Server/SlopArena.Server.csproj"
+  ]
+}
