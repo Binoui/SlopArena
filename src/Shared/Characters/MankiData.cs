@@ -86,20 +86,25 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
+                    // Stage 1: right punch
                     new() { DurationTicks = 40, ChainWindowTicks = 12, LungeForce = 8f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, BaseKnockback = 15f, KnockbackGrowth = 2f, KnockbackUpward = 3f, StunTicks = 32, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
+                    // Stage 2: left punch
                     new() { DurationTicks = 35, ChainWindowTicks = 14, LungeForce = 2f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, BaseKnockback = 15f, KnockbackGrowth = 3f, KnockbackUpward = 5f, StunTicks = 40, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f },
+                            AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
+                    // Stage 3: big finisher
                     new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 10f,
                             HitboxEvents = new[] {
                                 new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1.5f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, BaseKnockback = 21f, KnockbackGrowth = 5f, KnockbackUpward = 10f, StunTicks = 44, Interruptible = true }
                             },
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.2f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
-                BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } },
                 Params = new()
                 {
                     ["lunge_duration"] = 10f,
@@ -113,15 +118,18 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
+                    // Stage 1: air kick
                     new() { DurationTicks = 16, ChainWindowTicks = 10,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 4f, BaseKnockback = 8f, KnockbackGrowth = 2f, KnockbackUpward = 5f, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f },
+                            AttackRange = 5f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
+                    // Stage 2: air kick 2
                     new() { DurationTicks = 18, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Radius = 0.8f, OffX = 0, OffY = 0.4f, OffZ = 1.2f, Damage = 6f, BaseKnockback = 12f, KnockbackGrowth = 3f, KnockbackUpward = 8f, StunTicks = 32, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                 },
                 AnimationNames = new[] { "spell_lmb_air", "spell_lmb_air" },
-                BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } },
             },
 
             RMB = new AbilitySpec

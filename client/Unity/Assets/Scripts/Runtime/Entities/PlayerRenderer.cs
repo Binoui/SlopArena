@@ -457,32 +457,39 @@ namespace SlopArena.Client.Entities
                 }
             }
 
-            _lastAnimState = state.State;
+            byte prevComboStage = _lastComboStage;
             _lastComboStage = state.ComboStage;
             _wasGrounded = state.IsGrounded;
 
             // ── Bone trail lifecycle ──
             bool isAttacking = state.State == ActionState.Attacking;
             bool slotChanged = isAttacking && _lastAttackSlot != state.AttackSlot;
-            if ((isAttacking && !_wasAttacking || slotChanged) && _charDef != null)
+            bool stageChanged = isAttacking && prevComboStage != state.ComboStage;
+            if ((isAttacking && !_wasAttacking || slotChanged || stageChanged) && _charDef != null)
             {
-                // Transitioning into attack (or slot changed) — re-evaluate trails
-                if (slotChanged)
+                // Transitioning into attack, slot change, or stage change — re-evaluate trails
+                if (slotChanged || stageChanged)
                     DisableAllTrails();
                 byte slot = (byte)(state.AttackSlot - 1);
                 var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
-                if (spec?.BoneTrails != null)
+                if (spec != null && spec.Stages != null && spec.Stages.Length > 0)
                 {
-                    foreach (var def in spec.BoneTrails)
+                    int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+                    var stage = spec.Stages[stageIdx];
+                    var trails = stage.BoneTrails ?? spec.BoneTrails;
+                    if (trails != null)
                     {
-                        var ps = GetOrCreateBoneTrail(def.BoneName, def);
-                        if (ps != null)
+                        foreach (var trailDef in trails)
                         {
-                            var main = ps.main;
-                            main.startColor = new Color(def.R, def.G, def.B, def.A);
-                            main.startSize = def.Width;
-                            var emission = ps.emission;
-                            emission.enabled = true;
+                            var ps = GetOrCreateBoneTrail(trailDef.BoneName, trailDef);
+                            if (ps != null)
+                            {
+                                var main = ps.main;
+                                main.startColor = new Color(trailDef.R, trailDef.G, trailDef.B, trailDef.A);
+                                main.startSize = trailDef.Width;
+                                var emission = ps.emission;
+                                emission.enabled = true;
+                            }
                         }
                     }
                 }
@@ -524,6 +531,17 @@ namespace SlopArena.Client.Entities
             var trail = UnityEngine.Object.Instantiate(_boneTrailPrefab, bone).GetComponent<ParticleSystem>();
             trail.transform.localPosition = Vector3.zero;
             trail.transform.localRotation = Quaternion.identity;
+
+            // World simulation space: particles freeze in world space as bone moves, tracing the arc
+            var main = trail.main;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+            // Start the system (playOnAwake=false on prefab → starts stopped)
+            trail.Play();
+            // Disable emission immediately — attack-start code re-enables it
+            var trailEmission = trail.emission;
+            trailEmission.enabled = false;
+
             _activeTrails[boneName] = trail;
             return trail;
         }
