@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Run a C# script in Unity via gamedev-mcp-server
-# Usage: scripts/mcp-exec.sh <code> [isMethodBody]
-#   isMethodBody defaults to false (full class mode)
-#   For body mode: scripts/mcp-exec.sh 'Debug.Log("hi");' true
+# Usage:
+#   scripts/mcp-exec.sh '<code>' [isMethodBody]    # raw SSE output
+#   scripts/mcp-exec.sh --json '<code>' [isMethodBody]  # parsed result
 # Auto-initializes session — no SID management needed.
+
+JSON_MODE=false
+[ "${1:-}" = "--json" ] && JSON_MODE=true && shift
 
 SID="${MCP_SID:-$SID}"
 
@@ -31,15 +34,37 @@ CODE="$1"
 BODY="${2:-false}"
 
 if [ -z "$CODE" ]; then
-    echo "Usage: $0 '<csharp_code>' [isMethodBody]" >&2
+    echo "Usage: $0 '[--json]' '<csharp_code>' [isMethodBody]" >&2
     exit 1
 fi
 
-curl -s http://localhost:26356/mcp \
+RESULT=$(curl -s http://localhost:26356/mcp \
   -H "Content-Type: application/json" \
   -H "Mcp-Session-Id: $SID" \
   -d "$(jq -n \
     --arg tool "script-execute" \
     --arg code "$CODE" \
     --argjson body "$BODY" \
-    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":$tool,"arguments":{"csharpCode":$code,"isMethodBody":$body}}}')"
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":$tool,"arguments":{"csharpCode":$code,"isMethodBody":$body}}}')")
+
+if $JSON_MODE; then
+  echo "$RESULT" | python3 -c "
+import json,sys
+for line in sys.stdin:
+    line = line.strip()
+    if line.startswith('data:'):
+        d = json.loads(line[5:])
+        for c in d.get('result',{}).get('content',[]):
+            try:
+                t = json.loads(c['text'])
+                v = t.get('result', {})
+                if isinstance(v, dict):
+                    print(v.get('value', json.dumps(v, indent=2)))
+                else:
+                    print(v)
+            except json.JSONDecodeError:
+                print(c['text'][:2000])
+"
+else
+  echo "$RESULT"
+fi
