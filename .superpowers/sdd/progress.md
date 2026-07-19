@@ -1,0 +1,5 @@
+Task 1: complete (inspect placeholder, review clean)
+Tasks 2-6: complete (all modules configured, material created, verification 18/18)
+Task 7: complete (prefab saved+renamed to HitSpark.prefab)
+Task 8: complete (wired HitSpark.prefab in Arena_Offline + Arena_PvP)
+Task 9: complete (play mode test, 0 errors, scene saved)
