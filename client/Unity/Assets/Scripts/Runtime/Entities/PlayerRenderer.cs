@@ -219,9 +219,9 @@ namespace SlopArena.Client.Entities
         {
             if (_boneTrailPrefab == null)
             {
-                _boneTrailPrefab = Resources.Load<GameObject>("Prefabs/VFX/BoneTrail");
+                _boneTrailPrefab = Resources.Load<GameObject>("VFX/BoneTrail");
                 if (_boneTrailPrefab == null)
-                    Debug.LogWarning("[PlayerRenderer] BoneTrail prefab not found at Resources/Prefabs/VFX/BoneTrail");
+                    Debug.LogWarning("[PlayerRenderer] BoneTrail prefab not found at Resources/VFX/BoneTrail");
             }
         }
 
