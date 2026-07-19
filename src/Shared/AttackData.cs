@@ -65,6 +65,8 @@ namespace SlopArena.Shared
         /// 0-1: rotation lerp toward target per frame (0.8 = strong tracking)
         /// </summary>
         public float TrackingStrength;
+        /// <summary>Optional bone trail VFX for this stage. If null, falls back to AbilitySpec.BoneTrails.</summary>
+        public BoneTrailDef[]? BoneTrails;
     }
 
     /// <summary>
