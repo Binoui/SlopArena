@@ -60,6 +60,10 @@ namespace SlopArena.Client.Entities
         [Header("Visual Offset")]
         [SerializeField] private float _modelYOffset;
 
+        [Header("Bone Trail VFX")]
+        [SerializeField] private GameObject _boneTrailPrefab;
+        private Dictionary<string, ParticleSystem> _activeTrails = new();
+
         /// <summary>
         /// Y offset to align the visual model's feet with the collision capsule bottom.
         /// Set from CharacterDefinition.ModelYOffset (≈ -0.52 for Manki).
@@ -185,6 +189,7 @@ namespace SlopArena.Client.Entities
         private int _deathFlashTicks;
         private const int DeathFlashDuration = 6;
         private bool _wasGrounded = true;
+        private bool _wasAttacking;
         private ClipExtrapolator? _activeExtrapolator;
         private ExtrapolationMode _currentExtrapolationMode;
         private AnimancerState? _currentAnimState;
@@ -210,6 +215,16 @@ namespace SlopArena.Client.Entities
             if (_animancer == null)
                 _animancer = GetComponent<AnimancerComponent>();
         }
+        private void Start()
+        {
+            if (_boneTrailPrefab == null)
+            {
+                _boneTrailPrefab = Resources.Load<GameObject>("Prefabs/VFX/BoneTrail");
+                if (_boneTrailPrefab == null)
+                    Debug.LogWarning("[PlayerRenderer] BoneTrail prefab not found at Resources/Prefabs/VFX/BoneTrail");
+            }
+        }
+
 
         // ── Public API ──
 
@@ -443,9 +458,42 @@ namespace SlopArena.Client.Entities
             }
 
             _lastAnimState = state.State;
-            _lastAttackSlot = state.AttackSlot;
             _lastComboStage = state.ComboStage;
             _wasGrounded = state.IsGrounded;
+
+            // ── Bone trail lifecycle ──
+            bool isAttacking = state.State == ActionState.Attacking;
+            bool slotChanged = isAttacking && _lastAttackSlot != state.AttackSlot;
+            if ((isAttacking && !_wasAttacking || slotChanged) && _charDef != null)
+            {
+                // Transitioning into attack (or slot changed) — re-evaluate trails
+                if (slotChanged)
+                    DisableAllTrails();
+                byte slot = (byte)(state.AttackSlot - 1);
+                var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
+                if (spec?.BoneTrails != null)
+                {
+                    foreach (var def in spec.BoneTrails)
+                    {
+                        var ps = GetOrCreateBoneTrail(def.BoneName, def);
+                        if (ps != null)
+                        {
+                            var main = ps.main;
+                            main.startColor = new Color(def.R, def.G, def.B, def.A);
+                            main.startSize = def.Width;
+                            var emission = ps.emission;
+                            emission.enabled = true;
+                        }
+                    }
+                }
+            }
+            else if (!isAttacking && _wasAttacking)
+            {
+                // Transitioning away from attack — disable all trails
+                DisableAllTrails();
+            }
+            _lastAttackSlot = state.AttackSlot;
+            _wasAttacking = isAttacking;
         }
 
         private void LateUpdate()
@@ -466,6 +514,29 @@ namespace SlopArena.Client.Entities
             }
         }
 
+        private ParticleSystem GetOrCreateBoneTrail(string boneName, BoneTrailDef def)
+        {
+            if (_activeTrails.TryGetValue(boneName, out var existing))
+                return existing;
+            var bone = FindBone(boneName);
+            if (_boneTrailPrefab == null) return null;
+            if (bone == null) return null;
+            var trail = UnityEngine.Object.Instantiate(_boneTrailPrefab, bone).GetComponent<ParticleSystem>();
+            trail.transform.localPosition = Vector3.zero;
+            trail.transform.localRotation = Quaternion.identity;
+            _activeTrails[boneName] = trail;
+            return trail;
+        }
+
+        private void DisableAllTrails()
+        {
+            foreach (var kvp in _activeTrails)
+            {
+                var emission = kvp.Value.emission;
+                emission.enabled = false;
+            }
+        }
+
 
         /// <summary>
         /// Reset animation state to defaults. Useful on respawn.
@@ -481,6 +552,17 @@ namespace SlopArena.Client.Entities
             _activeExtrapolator = null;
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;
+            _wasAttacking = false;
+            DisableAllTrails();
+            foreach (var kvp in _activeTrails)
+            {
+                var go = kvp.Value.gameObject;
+                if (Application.isPlaying)
+                    UnityEngine.Object.Destroy(go);
+                else
+                    UnityEngine.Object.DestroyImmediate(go);
+            }
+            _activeTrails.Clear();
         }
 
         /// <summary>
