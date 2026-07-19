@@ -28,7 +28,7 @@ public class SpellResolverTests
             Damage = 10,
             BaseKnockback = 25f,
             KnockbackGrowth = 25f,
-            KnockbackUpward = 20,
+            KnockbackAngle = 30,
             StunTicks = 10,
             DurationTicks = 10,
             OwnerId = ownerId,
@@ -156,8 +156,7 @@ public class SpellResolverTests
         hb.DurationTicks = 30;
         hb.Explosion = new ProjectileExplosion
         {
-            Radius = 3, Damage = 25, BaseKnockback = 40f, KnockbackGrowth = 40f,
-            KnockbackUpward = 30, StunTicks = 15, DurationTicks = 5,
+            Radius = 3, Damage = 25, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 40f, KnockbackGrowth = 40f }, StunTicks = 15, DurationTicks = 5,
         };
         resolver.Spawn(hb);
 
@@ -203,7 +202,7 @@ public class SpellResolverTests
         var resolver = new SpellResolver();
         var hb = MakeHitbox(0, -1, 0); // below ground
         hb.Gravity = 20f;
-        hb.Explosion = new ProjectileExplosion { Radius = 2, Damage = 15, BaseKnockback = 30f, KnockbackGrowth = 30f, KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5 };
+        hb.Explosion = new ProjectileExplosion { Radius = 2, Damage = 15, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 30f, KnockbackGrowth = 30f }, StunTicks = 10, DurationTicks = 5 };
         resolver.Spawn(hb);
 
         var arena = TestHelpers.TestArena();
@@ -222,8 +221,7 @@ public class SpellResolverTests
         hb.Gravity = 20f;
         hb.Explosion = new ProjectileExplosion
         {
-            Radius = 2, Damage = 15, BaseKnockback = 30f, KnockbackGrowth = 30f,
-            KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5,
+            Radius = 2, Damage = 15, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 30f, KnockbackGrowth = 30f }, StunTicks = 10, DurationTicks = 5,
         };
         resolver.Spawn(hb);
 
@@ -240,8 +238,7 @@ public class SpellResolverTests
         hb.Gravity = 0;                 // zero gravity = melee hitbox, not a projectile
         hb.Explosion = new ProjectileExplosion
         {
-            Radius = 2, Damage = 15, BaseKnockback = 30f, KnockbackGrowth = 30f,
-            KnockbackUpward = 20, StunTicks = 10, DurationTicks = 5,
+            Radius = 2, Damage = 15, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 30f, KnockbackGrowth = 30f }, StunTicks = 10, DurationTicks = 5,
         };
         resolver.Spawn(hb);
         var arena = TestHelpers.TestArena();

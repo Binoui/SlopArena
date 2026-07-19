@@ -900,22 +900,21 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
-        /// Apply knockback using BaseKnockback + KnockbackGrowth (Smash-style).
-        /// effectiveHorizontal = baseKB + growthKB * (DamagePercent * 0.01)
-        /// effectiveUpward = kbUpward * (1 + DamagePercent * 0.01)
-        /// Hitstun gates on stunTicks > 0 from the hitbox data, not a magic threshold.
-        /// StunTicks from the hitbox acts as a per-move max hitstun cap.
+        /// Apply knockback using a fixed launch angle + Smash-style magnitude scaling.
+        /// KnockbackUpward/KnockbackY replaced by angleDeg: -90 (straight down) to 90 (straight up).
+        /// Magnitude = baseKB + growthKB * (damage% * 0.01). Angle determines KVX/KVY/KVZ split.
         /// </summary>
         public static void ApplyKnockback(ref CharacterState s, float dirX, float dirZ,
-            float kbUpward, float baseKB, float growthKB, ushort stunTicks)
+            sbyte angleDeg, float baseKB, float growthKB, ushort stunTicks)
         {
-            float scaling = 1f + (s.DamagePercent * 0.01f);
-            float effectiveHorizontal = baseKB + growthKB * (s.DamagePercent * 0.01f);
-            float effectiveUpward = kbUpward * scaling;
+            float magnitude = baseKB + growthKB * (s.DamagePercent * 0.01f);
+            float rad = angleDeg * MathF.PI / 180f;
+            float cosA = MathF.Cos(rad);
+            float sinA = MathF.Sin(rad);
 
-            s.KVX = dirX * effectiveHorizontal;
-            s.KVY = effectiveUpward;
-            s.KVZ = dirZ * effectiveHorizontal;
+            s.KVX = dirX * magnitude * cosA;
+            s.KVY = magnitude * sinA;
+            s.KVZ = dirZ * magnitude * cosA;
 
             float kbMagnitude = MathF.Sqrt(
                 (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));

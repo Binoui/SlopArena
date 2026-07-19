@@ -174,7 +174,7 @@ namespace SlopArena.Shared.Abilities
                     Damage = GetParam(def, "hit3_damage", 16f),
                     BaseKnockback = GetParam(def, "hit3_base", 16f),
                     KnockbackGrowth = GetParam(def, "hit3_growth", 18f),
-                    KnockbackUpward = GetParam(def, "hit3_upward", 8f),
+                    KnockbackAngle = (sbyte)GetParam(def, "hit3_angle", 25f),
                     StunTicks = (ushort)GetParam(def, "hit3_stun", 24f),
                     DurationTicks = 4, OwnerId = s.EntityId,
                 });

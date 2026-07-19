@@ -39,7 +39,8 @@ namespace SlopArena.Shared
         public float Damage;
         public float BaseKnockback;
         public float KnockbackGrowth;
-        public float KnockbackUpward;
+        /// <summary>Launch angle in degrees (-90 to 90). Resolved from profile at spawn time.</summary>
+        public sbyte KnockbackAngle;
         public ushort StunTicks;
         public ulong OwnerId;
 

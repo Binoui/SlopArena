@@ -80,9 +80,9 @@ namespace SlopArena.Shared.Abilities
             if (spinElapsed == _spinDuration)
             {
                 float launcherDamage = GetParam(def, "launcher_damage", 8f);
-                float launcherKBBase = GetParam(def, "launcher_kb_base", 4.8f);
-                float launcherKBGrowth = GetParam(def, "launcher_kb_growth", 7.2f);
-                float launcherUp = GetParam(def, "launcher_knockback_up", 18f);
+                float launcherKBBase = GetParam(def, "launcher_kb_base", 10f);
+                float launcherKBGrowth = GetParam(def, "launcher_kb_growth", 10f);
+                float launcherAngle = GetParam(def, "launcher_kb_angle", 45f);
                 ushort launcherStun = (ushort)GetParam(def, "launcher_stun_ticks", 18f);
 
                 Resolver.Spawn(new Hitbox
@@ -94,7 +94,7 @@ namespace SlopArena.Shared.Abilities
                     Damage = launcherDamage,
                     BaseKnockback = launcherKBBase,
                     KnockbackGrowth = launcherKBGrowth,
-                    KnockbackUpward = launcherUp,
+                    KnockbackAngle = (sbyte)launcherAngle,
                     StunTicks = launcherStun,
                     OwnerId = s.EntityId,
                 });

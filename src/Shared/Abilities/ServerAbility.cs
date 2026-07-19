@@ -146,6 +146,9 @@ namespace SlopArena.Shared.Abilities
             float radius = evt.Radius;
             ApplyBuffBonuses(ref s, ref damage, ref radius);
 
+            // Resolve knockback profile to flat values
+            var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
+
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
@@ -157,9 +160,9 @@ namespace SlopArena.Shared.Abilities
                 Shape = evt.Shape,
                 EndX = wex, EndY = wey, EndZ = wez,
                 Damage = damage,
-                BaseKnockback = evt.BaseKnockback,
-                KnockbackGrowth = evt.KnockbackGrowth,
-                KnockbackUpward = evt.KnockbackUpward,
+                BaseKnockback = kbBase,
+                KnockbackGrowth = kbGrowth,
+                KnockbackAngle = kbAngle,
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,

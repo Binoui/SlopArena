@@ -74,20 +74,24 @@ public static partial class CharacterRegistry
                 {
                     // Stage 1: fast right foot low kick
                     new() { DurationTicks = 40, ChainWindowTicks = 10, LungeForce = 10f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.2f, OffZ = 1.0f, Damage = 4f, BaseKnockback = 2f, KnockbackGrowth = 1.5f, KnockbackUpward = 1f, StunTicks = 20, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.2f, OffZ = 1.0f,
+                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                     // Stage 2: right foot high kick
                     new() { DurationTicks = 32, ChainWindowTicks = 10, LungeForce = 10f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 1.0f, OffZ = 1.2f, Damage = 4f, BaseKnockback = 3f, KnockbackGrowth = 1.5f, KnockbackUpward = 3f, StunTicks = 24, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 1.0f, OffZ = 1.2f, 
+                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 24, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                     // Stage 3: double middle kick — left then right
                     new() { DurationTicks = 42, ChainWindowTicks = 10, LungeForce = 14f,
                             HitboxEvents = new HitboxEvent[]
                             {
-                                new() { TriggerTick = 8, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.6f, OffZ = 1.3f, Damage = 5f, BaseKnockback = 5f, KnockbackGrowth = 2f, KnockbackUpward = 3f, StunTicks = 16, Interruptible = true },
-                                new() { TriggerTick = 17, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.6f, OffZ = 1.3f, Damage = 7f, BaseKnockback = 8f, KnockbackGrowth = 3f, KnockbackUpward = 5f, StunTicks = 28, Interruptible = true },
+                                new() { TriggerTick = 8, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.6f, OffZ = 1.3f, 
+                                        Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true },
+                                new() { TriggerTick = 17, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.6f, OffZ = 1.3f, 
+                                        Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 28, Interruptible = true },
                             },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
                             BoneTrails = new[] {
@@ -95,9 +99,10 @@ public static partial class CharacterRegistry
                                 new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f },
                             } },
                     // Stage 4: jumping double kick finisher
-                    new() { DurationTicks = 56, ChainWindowTicks = 0, LungeForce = 14f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 8, Radius = 1.0f, OffX = 0, OffY = 0.7f, OffZ = 1.5f, Damage = 10f, BaseKnockback = 18f, KnockbackGrowth = 7f, KnockbackUpward = 14f, StunTicks = 36, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                    new() { DurationTicks = 56, ChainWindowTicks = 0, LungeForce = 18f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 8, Radius = 1.0f, OffX = 0, OffY = 0.7f, OffZ = 1.5f,
+                            Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 36, Interruptible = true } },
+                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
                             BoneTrails = new[] { 
                                 new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } ,
                                 new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
@@ -117,8 +122,8 @@ public static partial class CharacterRegistry
                     new() { DurationTicks = 28, ChainWindowTicks = 10, LungeForce = 3f,
                             HitboxEvents = new HitboxEvent[]
                             {
-                                new() { TriggerTick = 6, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 4f, BaseKnockback = 5f, KnockbackGrowth = 2f, KnockbackUpward = 4f, StunTicks = 20, Interruptible = true },
-                                new() { TriggerTick = 14, DurationTicks = 6, Radius = 0.8f, OffX = 0, OffY = 0.9f, OffZ = 1.2f, Damage = 6f, BaseKnockback = 8f, KnockbackGrowth = 3f, KnockbackUpward = 8f, StunTicks = 28, Interruptible = true },
+                                new() { TriggerTick = 6, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true },
+                                new() { TriggerTick = 14, DurationTicks = 6, Radius = 0.8f, OffX = 0, OffY = 0.9f, OffZ = 1.2f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 28, Interruptible = true },
                             },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { 
@@ -126,7 +131,7 @@ public static partial class CharacterRegistry
                                 new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                     // Stage 2: big downward punch spike
                     new() { DurationTicks = 34, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.5f, OffZ = 1.3f, Damage = 8f, BaseKnockback = 10f, KnockbackGrowth = 5f, KnockbackUpward = -8f, StunTicks = 32, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.5f, OffZ = 1.3f, Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 32, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
@@ -153,9 +158,9 @@ public static partial class CharacterRegistry
                     new() { DurationTicks = 35, ChainWindowTicks = 0,
                             HitboxEvents = new HitboxEvent[]
                             {
-                                new() { TriggerTick = 5, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.2f, OffZ = 0.8f, Damage = 6f, BaseKnockback = 5f, KnockbackGrowth = 4f, KnockbackUpward = 5f, StunTicks = 20, Interruptible = true },
-                                new() { TriggerTick = 10, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 6f, BaseKnockback = 5f, KnockbackGrowth = 4f, KnockbackUpward = 5f, StunTicks = 20, Interruptible = true },
-                                new() { TriggerTick = 15, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 1.6f, OffZ = 0.6f, Damage = 6f, BaseKnockback = 5f, KnockbackGrowth = 4f, KnockbackUpward = 5f, StunTicks = 20, Interruptible = true },
+                                new() { TriggerTick = 5, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.2f, OffZ = 0.8f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 8, KnockbackGrowth = 5 }, StunTicks = 20, Interruptible = true },
+                                new() { TriggerTick = 10, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 8, KnockbackGrowth = 5 }, StunTicks = 20, Interruptible = true },
+                                new() { TriggerTick = 15, DurationTicks = 4, Radius = 0.7f, OffX = 0, OffY = 1.6f, OffZ = 0.6f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 8, KnockbackGrowth = 5 }, StunTicks = 20, Interruptible = true },
                             },
                             LungeForce = 4f, AttackRange = 3f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } 
@@ -167,9 +172,9 @@ public static partial class CharacterRegistry
                     new() { DurationTicks = 35, ChainWindowTicks = 0,
                             HitboxEvents = new HitboxEvent[]
                             {
-                                new() { TriggerTick = 5, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 0.2f, OffZ = 0.8f, Damage = 14f, BaseKnockback = 12f, KnockbackGrowth = 8f, KnockbackUpward = 12f, StunTicks = 36, Interruptible = true },
-                                new() { TriggerTick = 10, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 14f, BaseKnockback = 12f, KnockbackGrowth = 8f, KnockbackUpward = 12f, StunTicks = 36, Interruptible = true },
-                                new() { TriggerTick = 15, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 1.6f, OffZ = 0.6f, Damage = 14f, BaseKnockback = 12f, KnockbackGrowth = 8f, KnockbackUpward = 12f, StunTicks = 36, Interruptible = true },
+                                new() { TriggerTick = 5, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 0.2f, OffZ = 0.8f, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 14, KnockbackGrowth = 8 }, StunTicks = 36, Interruptible = true },
+                                new() { TriggerTick = 10, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 14, KnockbackGrowth = 8 }, StunTicks = 36, Interruptible = true },
+                                new() { TriggerTick = 15, DurationTicks = 4, Radius = 0.9f, OffX = 0, OffY = 1.6f, OffZ = 0.6f, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 50, BaseKnockback = 14, KnockbackGrowth = 8 }, StunTicks = 36, Interruptible = true },
                             },
                             LungeForce = 5f, AttackRange = 3f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } 
@@ -186,7 +191,7 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 25, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.6f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 7f, BaseKnockback = 4f, KnockbackGrowth = 6f, KnockbackUpward = -8f, StunTicks = 28, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.6f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 28, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } 
                             },
@@ -205,7 +210,7 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, BaseKnockback = 3f, KnockbackGrowth = 4.5f, KnockbackUpward = 3f, StunTicks = 20, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 8f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                 },
             AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
@@ -221,7 +226,7 @@ public static partial class CharacterRegistry
                     ["damage"] = 6f,
                     ["knockback_base"] = 3f,
                     ["knockback_growth"] = 4.5f,
-                    ["knockback_upward"] = 3f,
+                    ["kb_angle"] = 30f,
                     ["stun_ticks"] = 20f,
                     ["max_flight_ticks"] = 90f,
                     ["mark_duration_ticks"] = 300f,  // 5s
@@ -276,7 +281,7 @@ public static partial class CharacterRegistry
                                 new() { TriggerTick = 3, DurationTicks = 57, Radius = 0.6f,
                                     OffX = 0, OffY = 0.5f, OffZ = 0.5f,
                                     EndOffX = 0, EndOffY = 0.5f, EndOffZ = 1.5f,
-                                    Damage = 5f, BaseKnockback = 0f, KnockbackGrowth = 0f, KnockbackUpward = 0f,
+                                    Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light },
                                     StunTicks = 28, Shape = HitboxShape.Capsule },
                             },
                             AttackRange = 5f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
@@ -295,7 +300,7 @@ public static partial class CharacterRegistry
                     ["hit1_tick"] = 4f, ["hit1_damage"] = 6f, ["hit1_stun"] = 32f,
                     ["hit2_tick"] = 10f, ["hit2_damage"] = 8f, ["hit2_stun"] = 40f,
                     ["hit3_tick"] = 26f, ["hit3_damage"] = 16f, ["hit3_stun"] = 48f,
-                    ["hit3_base"] = 16f, ["hit3_growth"] = 18f, ["hit3_upward"] = 8f,
+                    ["hit3_base"] = 16f, ["hit3_growth"] = 18f, ["hit3_angle"] = 25f,
                 },
             },
 
@@ -313,7 +318,7 @@ public static partial class CharacterRegistry
                             AttackRange = 0f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                     // Stage 2: sustained spinning kick AoE
                     new() { DurationTicks = 60, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 3.5f, OffX = 0, OffY = 0.5f, OffZ = 0f, Damage = 3f, BaseKnockback = 3f, KnockbackGrowth = 3f, KnockbackUpward = 2f, StunTicks = 6, Interruptible = false } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 3.5f, OffX = 0, OffY = 0.5f, OffZ = 0f, Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 6, Interruptible = false } },
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 AnimationNames = new[] { "spell_f" },
@@ -326,7 +331,7 @@ public static partial class CharacterRegistry
                     ["launcher_damage"] = 12f,
                     ["launcher_kb_base"] = 10f,
                     ["launcher_kb_growth"] = 10f,
-                    ["launcher_knockback_up"] = 20f,
+                    ["launcher_kb_angle"] = 45f,
                     ["launcher_stun_ticks"] = 40f,
                     ["windup_ticks"] = 12f,
                     ["spin_duration_ticks"] = 60f,
