@@ -156,11 +156,13 @@ namespace SlopArena.Shared
             if (s.State == ActionState.Hitstun)
             {
                 ProcessHitstun(ref s, input);
-                return;
+                // Fall through — position update + ground collision must run during hitstun.
+                // Without this, the target stands perfectly still for the entire stun duration
+                // (V=KV set but PX/PZ/PY never updated), then does a single-frame hop on expiry.
             }
 
             // 3. Knockback overrides everything (but dash invincibility still applies)
-            if (HasKnockback(s))
+            if (s.State != ActionState.Hitstun && HasKnockback(s))
             {
                 ProcessKnockback(ref s, arena, def);
                 return;
@@ -189,7 +191,8 @@ namespace SlopArena.Shared
             }
 
             // Ground friction during attacking (abilities handle velocity via LungeForce)
-            if (s.State == ActionState.Attacking && s.IsGrounded)
+            // Skip during warp — warp velocity should stay at SprintSpeed until arrival
+            if (s.State == ActionState.Attacking && s.IsGrounded && s.WarpSpeed <= 0f)
             {
                 float friction = stats.GroundFriction * TickDt;
                 s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
@@ -226,6 +229,7 @@ namespace SlopArena.Shared
                         s.AttackSlot = 0;
                         s.ComboStage = 0;
                         s.AttackElapsedTicks = 0;
+                        s.ChargeTicks = 0;
                     }
                 }
             }
@@ -299,7 +303,7 @@ namespace SlopArena.Shared
             }
 
             // 6. Input-driven actions (only when not locked by animation or in jump squat)
-            if (s.AnimLockTicks == 0 && s.State != ActionState.JumpSquat)
+            if (s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
@@ -361,8 +365,9 @@ namespace SlopArena.Shared
                 }
             }
 
-            // 8. Gravity
-            ApplyGravity(ref s, stats);
+            // 8. Gravity (skip during hitstun — ProcessHitstun handles KVY decay)
+            if (s.State != ActionState.Hitstun)
+                ApplyGravity(ref s, stats);
 
             // 9. Position update (Euler integration)
             s.PX += s.VX * TickDt;
@@ -819,10 +824,11 @@ namespace SlopArena.Shared
                 return true;
             }
 
-            // Set velocity toward target: exponential convergence
-            // V = dx * WarpSpeed / TickDt → closes WarpSpeed fraction of remaining distance per tick
-            s.VX = dx * s.WarpSpeed / TickDt;
-            s.VZ = dz * s.WarpSpeed / TickDt;
+            // Set velocity toward target: constant speed at SprintSpeed
+            // (auto-run feel — matched to character movement speed)
+            float dist = MathF.Sqrt(distSq);
+            s.VX = (dx / dist) * def.Movement.SprintSpeed;
+            s.VZ = (dz / dist) * def.Movement.SprintSpeed;
             s.FacingYaw = MathF.Atan2(dx, dz);
 
             // Position update and collision handled by main SimulateTick loop (steps 5-7)

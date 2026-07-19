@@ -188,6 +188,11 @@ namespace SlopArena.Client.Entities
         private ClipExtrapolator? _activeExtrapolator;
         private ExtrapolationMode _currentExtrapolationMode;
         private AnimancerState? _currentAnimState;
+        // ── Hitstun extrapolation tracking ──
+        private bool _inHitstunAnim;
+        private float _hitstunAnimStartTime;
+        private float _hitstunAnimLength;
+        private string _lastHitstunAnimName = "";
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
@@ -257,11 +262,6 @@ namespace SlopArena.Client.Entities
 
         // ── Animancer-driven animation ──
         //
-        // All states play AnimationClips directly via AnimancerComponent.Play().
-        // No AnimatorController, no triggers, no blend tree.
-        // Movement uses simple idle/run crossfade (no linear mixer needed for
-        // a platform fighter where speed is a threshold, not a smooth gradient).
-
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animancer == null || _charConfig == null)
@@ -278,26 +278,87 @@ namespace SlopArena.Client.Entities
                 || state.State == ActionState.Dashing
                 || state.State == ActionState.Hitstun;
 
+            // ── Hitstun animation (always, even during extrapolation guard) ──
+            // Separate from stateChanged gate to handle re-hits during guard period.
+            if (state.State == ActionState.Hitstun)
+            {
+                string hitName = state.HitstunLevel switch
+                {
+                    1 => "hit_medium",
+                    2 => "hit_hard",
+                    _ => "hit_small"
+                };
+                // Re-hit detection: restart animation when HitstunTicks resets upward
+                // (new hit) or on first entry into hitstun.
+                bool newHit = _lastAnimState != ActionState.Hitstun
+                    || state.HitstunTicks >= _lastState.HitstunTicks;
+                if (newHit)
+                {
+                    var clip = _charConfig.GetClipByName(hitName);
+                    if (clip != null)
+                    {
+                        _animancer.Play(clip, 0f);
+                        _lastHitstunAnimName = hitName;
+                        _inHitstunAnim = true;
+                        _hitstunAnimStartTime = Time.time;
+                        _hitstunAnimLength = clip.length;
+                    }
+                }
+                _lastAnimState = ActionState.Hitstun;
+                return;
+            }
+
+            // ── Hitstun extrapolation guard ──
+            // Let the hitstun clip finish naturally before transitioning to idle/run.
+            // Animancer non-looping clips hold last frame after finishing.
+            if (_inHitstunAnim)
+            {
+                float elapsed = Time.time - _hitstunAnimStartTime;
+                if (elapsed < _hitstunAnimLength)
+                {
+                    _lastAnimState = ActionState.Hitstun; // Keep trigger for next re-hit
+                    return;
+                }
+                _inHitstunAnim = false;
+            }
+
             // ── Non-combat: ground/air state machine ──
             if (!isCombat)
             {
-                if (state.State == ActionState.JumpSquat && _lastAnimState != ActionState.JumpSquat)
+                if (state.State == ActionState.JumpSquat)
                 {
-                    // JumpSquat entry — play jump
                     var clip = _charConfig.GetClipByName("jump");
                     if (clip != null)
                         _animancer.Play(clip, 0.05f);
                 }
                 else if (!state.IsGrounded)
                 {
-                    // Airborne (fall / post-jump) — play fall
-                    var clip = _charConfig.GetClipByName("fall");
-                    if (clip != null)
-                        _animancer.Play(clip, 0.1f);
+                    bool isAscending = state.VY > 0f;
+                    bool wasAscending = _lastState.VY > 0f;
+
+                    if (isAscending)
+                    {
+                        // Crossfade to jump on ascent start (initial jump or double jump)
+                        if (!wasAscending)
+                        {
+                            var clip = _charConfig.GetClipByName("jump");
+                            if (clip != null)
+                                _animancer.Play(clip, 0.05f);
+                        }
+                    }
+                    else
+                    {
+                        // Crossfade to fall on descent start
+                        if (wasAscending)
+                        {
+                            var clip = _charConfig.GetClipByName("fall");
+                            if (clip != null)
+                                _animancer.Play(clip, 0.1f);
+                        }
+                    }
                 }
                 else
                 {
-                    // Grounded — idle/run crossfade
                     var clip = hSpeed > _runSpeedThreshold
                         ? _charConfig.GetClipByName("run")
                         : _charConfig.GetClipByName("idle");
@@ -306,15 +367,7 @@ namespace SlopArena.Client.Entities
                 }
             }
 
-            // Double jump: upward impulse while airborne (overrides fall)
-            if (!state.IsGrounded && state.VY > 2f && _lastState.VY <= 0f && state.State != ActionState.JumpSquat)
-            {
-                var clip = _charConfig.GetClipByName("jump");
-                if (clip != null)
-                    _animancer.Play(clip, 0.05f);
-            }
-
-            // ── Combat state changes ──
+            // ── Combat state changes (excluding hitstun — handled above) ──
             bool stateChanged = state.State != _lastAnimState
                 || (state.State == ActionState.Attacking && (
                     state.AttackSlot != _lastAttackSlot || state.ComboStage != _lastComboStage));
@@ -323,7 +376,6 @@ namespace SlopArena.Client.Entities
             {
                 if (state.State == ActionState.Attacking)
                 {
-                    // Look up clip from character definition
                     string animName = "spell_lmb_1";
                     float animSpeed = 1f;
                     if (_charDef != null)
@@ -333,7 +385,6 @@ namespace SlopArena.Client.Entities
                         if (spec?.AnimationNames != null && state.ComboStage < spec.AnimationNames.Length)
                         {
                             animName = spec.GetAnimationName(state.ComboStage);
-                            // Runtime speed modulation: only for data-driven abilities with matching stages
                             if (_bakedData != null && spec.Stages != null && state.ComboStage < spec.Stages.Length)
                             {
                                 int bakedIdx = _bakedData.FindAnimIndex(animName);
@@ -345,7 +396,6 @@ namespace SlopArena.Client.Entities
                                         animSpeed = (float)frameCount / durationTicks;
                                 }
                             }
-                            // AnimSpeed override: server abilities set explicit playback speed
                             if (spec.AnimSpeed > 0f)
                                 animSpeed = spec.AnimSpeed;
                         }
@@ -358,7 +408,6 @@ namespace SlopArena.Client.Entities
                         animState.Speed = animSpeed;
                         _currentAnimState = animState;
                         _currentExtrapolationMode = ExtrapolationMode.None;
-                        // Check ClipOverrides (from CharacterDefinition) 
                         if (_charDef?.ClipOverrides != null)
                         {
                             foreach (var cfg in _charDef.ClipOverrides)
@@ -371,7 +420,6 @@ namespace SlopArena.Client.Entities
                                 }
                             }
                         }
-                        // Check AbilityClips (from CharacterAnimationConfig asset)
                         if (_currentExtrapolationMode == ExtrapolationMode.None && _charConfig?.AbilityClips != null)
                         {
                             foreach (var entry in _charConfig.AbilityClips)
@@ -389,18 +437,6 @@ namespace SlopArena.Client.Entities
                 else if (state.State == ActionState.Dashing)
                 {
                     var clip = _charConfig.GetClipByName("dash");
-                    if (clip != null)
-                        _animancer.Play(clip, 0f);
-                }
-                else if (state.State == ActionState.Hitstun)
-                {
-                    string hitName = state.HitstunLevel switch
-                    {
-                        1 => "hit_medium",
-                        2 => "hit_hard",
-                        _ => "hit_small"
-                    };
-                    var clip = _charConfig.GetClipByName(hitName);
                     if (clip != null)
                         _animancer.Play(clip, 0f);
                 }

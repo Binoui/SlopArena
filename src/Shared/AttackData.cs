@@ -53,7 +53,8 @@ namespace SlopArena.Shared
         public float AttackRange;
         public float WarpRange;
         /// <summary>
-        /// Warp speed now driven by character Movement.SprintSpeed (not per-stage)
+        /// Warp drives the entity toward target at SprintSpeed (constant velocity).
+        /// See Simulation.ProcessWarp for the implementation.
         /// </summary>
         public bool UseTargetLock;     // true = use soft lock system for this attack
         /// <summary>

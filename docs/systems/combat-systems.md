@@ -258,3 +258,15 @@ Deserialize is backward-compatible: checks `buf.Length >= 17` before reading off
 - **Target dies/respawns**: ProcessTargetLock clears/recomputes each tick, so a respawned entity is immediately re-targetable.
 - **Multiple targets at equal distance**: screen-center proximity breaks ties (client) / first-found wins (server fallback).
 - **Older clients**: Deserialize ignores missing TargetEntityId byte (checks length) — defaults to 0, server falls back to nearest scan.
+
+
+## 10. Combat VFX
+
+Hits produce a visual spark burst at the target's position via `CombatFeedback.cs`:
+
+| Component | File | Behavior |
+|-----------|------|----------|
+| CombatFeedback | `Combat/CombatFeedback.cs` | Reads `ServerSimulation.LastTickHits` each FixedUpdate, spawns `_hitSparkPrefab` at target position, dedup per entity per tick, auto-destroys after `_sparkLifetime` (1s) |
+| HitSpark.prefab | `Prefabs/VFX/HitSpark.prefab` | 35-particle burst, 90° cone, gold→orange→transparent gradient, additive material |
+
+Full particle system reference: [`vfx-particles.md`](vfx-particles.md)

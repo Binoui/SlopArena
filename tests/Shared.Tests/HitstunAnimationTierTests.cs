@@ -9,37 +9,38 @@ namespace SlopArena.Shared.Tests;
 /// ═══════════════════════════════════════════════════════════════════════
 ///
 /// Verifies the 3-tier hitstun animation system:
-///   - Damage < 5   → HitstunLevel = 0 (small / hit_light)
-///   - Damage 5-14  → HitstunLevel = 1 (medium / hit_medium)
-///   - Damage ≥ 15  → HitstunLevel = 2 (hard / hit_hard)
+///   - StunTicks ≤ 30  → HitstunLevel = 0 (small / hit_light)
+///   - StunTicks 31-50 → HitstunLevel = 1 (medium / hit_medium)
+///   - StunTicks ≥ 51  → HitstunLevel = 2 (hard / hit_hard)
 ///
-/// Tier is computed once at hit time in ServerSimulation.ResolveHits(),
-/// serialized through CharacterStatePacket at byte offset 43,
+/// Tier is computed once at hit time in ServerSimulation.ResolveHits()
+/// from hit.StunTicks, serialized through CharacterStatePacket at byte offset 43,
 /// and consumed by the client renderer for animator trigger selection.
 /// ═══════════════════════════════════════════════════════════════════════
+/// </summary>
 public class HitstunAnimationTierTests
 {
-    // Mirrors ServerSimulation.ResolveHits damage→level logic
-    private static byte ComputeHitstunLevel(float damage)
-        => damage < 5f ? (byte)0 : damage < 15f ? (byte)1 : (byte)2;
+    // Mirrors ServerSimulation.ResolveHits StunTicks→level logic
+    private static byte ComputeHitstunLevel(ushort stunTicks)
+        => stunTicks <= 30 ? (byte)0 : stunTicks <= 50 ? (byte)1 : (byte)2;
 
     // ═══════════════════════════════════════════════════════════════════
     // Tier boundary tests
     // ═══════════════════════════════════════════════════════════════════
 
     [Theory]
-    [InlineData(0f,    0)]
-    [InlineData(1f,    0)]
-    [InlineData(4.9f,  0)]
-    [InlineData(5f,    1)]
-    [InlineData(7f,    1)]
-    [InlineData(14.9f, 1)]
-    [InlineData(15f,   2)]
-    [InlineData(20f,   2)]
-    [InlineData(999f,  2)]
-    public void HitstunLevel_ComputedFromDamage_CorrectTier(float damage, byte expectedLevel)
+    [InlineData(0,   0)]
+    [InlineData(15,  0)]
+    [InlineData(30,  0)]
+    [InlineData(31,  1)]
+    [InlineData(40,  1)]
+    [InlineData(50,  1)]
+    [InlineData(51,  2)]
+    [InlineData(80,  2)]
+    [InlineData(200, 2)]
+    public void HitstunLevel_ComputedFromStunTicks_CorrectTier(ushort stunTicks, byte expectedLevel)
     {
-        byte level = ComputeHitstunLevel(damage);
+        byte level = ComputeHitstunLevel(stunTicks);
         Assert.Equal(expectedLevel, level);
     }
 
@@ -115,9 +116,9 @@ public class HitstunAnimationTierTests
     // ═══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void LMB_Stage1_SmallDamage_SetsHitstunLevel0()
+    public void LMB_Stage1_MediumStun_SetsHitstunLevel1()
     {
-        // Manki LMB stage 1: Damage = 4 → HitstunLevel = 0
+        // Manki LMB stage 1: StunTicks = 32 → HitstunLevel = 1 (medium)
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var def = TestHelpers.CombatDef;
@@ -139,7 +140,7 @@ public class HitstunAnimationTierTests
         var afterHit = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, afterHit.State);
         Assert.True(afterHit.DamagePercent > 0, "NPC should have taken damage");
-        Assert.Equal(0, (int)afterHit.HitstunLevel);
+        Assert.Equal(1, (int)afterHit.HitstunLevel);
     }
 
     [Fact]

@@ -20,6 +20,28 @@ Scripts in `scripts/mcp-*.sh`:
 | `mcp-init.sh` | Init session → sets `$SID` |
 | `mcp-call.sh` | Call any tool by name |
 | `mcp-exec.sh` | Shorthand for `script-execute` |
+
+## Quick Task Index
+
+| Want to... | Use this tool |
+|---|---|
+| Inspect a component's fields at runtime | `gameobject-find name:...` + `gameobject-component-get` |
+| Find an asset by type | `assets-find t:TypeName` (e.g. `t:ScriptableObject`, `t:Material`, `t:AnimationClip`) |
+| Find a GameObject in the scene | `gameobject-find` with `name` or `path` |
+| Spawn a prefab into the scene | `assets-prefab-instantiate` |
+| Modify a component field | `gameobject-component-modify` |
+| Read/modify Unity Input bindings | `inputsystem-get` / `inputsystem-binding-add` |
+| Read/modify animation clips | `animation-get-data` / `animation-modify` |
+| Create/modify an AnimatorController | `animator-create` / `animator-modify` |
+| Check/modify a Cinemachine camera | `cinemachine-camera-get` / `cinemachine-set-body` / `cinemachine-set-aim` |
+| List scene hierarchy | `scene-get-data includeRootGameObjects=true` |
+| Read Unity console errors | `console-get-logs logTypeFilter=Error maxEntries=20` |
+| Run EditMode/PlayMode tests | `tests-run` |
+| Take a GameObject screenshot | `screenshot-isolated` |
+| Create/modify a material | `assets-material-create` / `assets-get-data` + `assets-modify` |
+| Open a prefab for editing | `assets-prefab-open` + `assets-prefab-close` |
+| Refresh AssetDatabase | `assets-refresh` |
+
 ## Config
 
 ```json
@@ -54,8 +76,6 @@ Session expires when Unity restarts or the MCP server restarts.
 | Run arbitrary C# in Unity | `script-execute` (full mode) | `public static string Main()` returning `string` |
 | Run simple statements | `script-execute` (body mode) | `isMethodBody: true`, `void` method, `Debug.Log()` for output |
 | Read Unity console | `console-get-logs` | Filter by `logTypes: "Error"/"ScriptingLog"`, `maxEntries: N` |
-| Enter/exit play mode | `editor-application-set-state` | `{ "isPlaying": true/false }` |
-| Check editor state | `editor-application-get-state` | Returns `IsPlaying`, `IsCompiling`, `IsPaused` |
 | Find GameObjects | `gameobject-find` | By name. Returns empty string if no match |
 | Create GameObjects | `gameobject-create` | With `position`/`rotation`/`scale` |
 | Add components | `gameobject-component-add` | Needs `gameObjectRef` with `instanceID` or `name` |
@@ -68,9 +88,7 @@ Session expires when Unity restarts or the MCP server restarts.
 
 **Scripting & Debugging:**
 - `script-execute` — compile+run C# via Roslyn
-- `script-update-or-create` — write a .cs file through Unity API (triggers recompile)
-- `console-get-logs` / `console-clear-logs`
-- `editor-application-get-state` / `editor-application-set-state`
+- `console-get-logs` — read Unity console output
 - `tests-run` — run EditMode/PlayMode tests
 
 **Scene:**

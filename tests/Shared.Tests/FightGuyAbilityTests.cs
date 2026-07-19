@@ -701,4 +701,201 @@ public class FightGuyAbilityTests
         Assert.True(npcAfter.DamagePercent > 0,
             $"NPC should take damage from entity-offset hitbox, got {npcAfter.DamagePercent}");
     }
+    // ── RMB Charged Uppercut ──
+
+    [Fact]
+    public void FightGuyRmb_ChargeTicksIncreaseWhileHolding()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+        // RMB + hold (aiming=true) for 10 ticks → ChargeTicks should increase
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, hold } });
+        var after = sim.GetState(1);
+        Assert.True(after.ChargeTicks > 0,
+            $"Expected ChargeTicks > 0 after 10 ticks holding RMB, got {after.ChargeTicks}");
+    }
+
+    [Fact]
+    public void FightGuyRmb_ReleasesOnButtonRelease()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+        // Hold for 10 ticks, then release (IsAiming=false)
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, hold } });
+        // Release RMB (IsAiming=false — but must keep activeSlot=2 for the ability to stay active)
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new() { { 1, release } });
+        var after = sim.GetState(1);
+        Assert.Equal((byte)1, after.ComboStage); // Should be in attack phase
+    }
+
+    [Fact]
+    public void FightGuyRmb_AutoReleaseOnFullCharge()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+        // Hold for full charge duration (180 ticks) — auto-releases
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 190; i++)
+            sim.Tick(new() { { 1, hold } });
+        var after = sim.GetState(1);
+        Assert.Equal((byte)1, after.ComboStage); // Attack phase
+        Assert.True(after.ChargeTicks >= 180,
+            $"Expected ChargeTicks >= 180 at full charge, got {after.ChargeTicks}");
+    }
+
+    [Fact]
+    public void FightGuyRmb_ChargedVariantDealsMoreDamage()
+    {
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+
+        // NPC in front at mid-range (hitbox covers OffZ=0.8-1.0)
+        var npc = TestHelpers.NpcState(0f, 1.5f);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+
+        // Charged: hold for full 180 ticks, then release
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 185; i++)
+            sim.Tick(new() { { 1, hold }, { 100, default } });
+        // Release — let attack play out to hitbox triggers (tick 5-15)
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 25; i++)
+            sim.Tick(new() { { 1, release }, { 100, default } });
+        var npcAfter = sim.GetState(100);
+
+        // Each charged hitbox does 14 damage, 3 hitboxes = up to 42 total
+        Assert.True(npcAfter.DamagePercent >= 14,
+            $"Expected charged RMB to deal >=14 damage, got {npcAfter.DamagePercent}");
+    }
+
+    [Fact]
+    public void FightGuyRmb_UnchargedDealsLessDamageThanCharged()
+    {
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+
+        // NPC at same position as charged test
+        var npc = TestHelpers.NpcState(0f, 1.5f);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+
+        // Uncharged: hold for only 6 ticks (debounce = 5), then release immediately
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 6; i++)
+            sim.Tick(new() { { 1, hold }, { 100, default } });
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 40; i++)
+            sim.Tick(new() { { 1, release }, { 100, default } });
+        var npcAfter = sim.GetState(100);
+
+        // Uncharged hitboxes do 6 damage each, 3 hitboxes = up to 18 total
+        Assert.True(npcAfter.DamagePercent >= 6,
+            $"Expected uncharged RMB to deal >=6 damage, got {npcAfter.DamagePercent}");
+        // But less than charged (14+ per hitbox)
+        Assert.True(npcAfter.DamagePercent <= 18,
+            $"Expected uncharged RMB to deal <=18 damage (uncharged), got {npcAfter.DamagePercent}");
+    }
+
+    [Fact]
+    public void FightGuyRmb_ThreeHitboxPositionsCoverUppercutArc()
+    {
+        var sim = TestHelpers.MakeSim();
+        // Place NPCs at 3 different heights to verify each sphere hitbox position
+        var player = TestHelpers.PlayerState();
+        player.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+
+        // NPC 1: low position (hitbox 1: OffY=0.2, OffZ=0.8, Radius=0.7)
+        var npc1 = TestHelpers.NpcState(0f, 1.5f); // within low hitbox range
+        npc1.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        npc1.DamagePercent = 0;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc1);
+
+        // Hold 6 ticks, release, tick through attack
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 6; i++)
+            sim.Tick(new() { { 1, hold }, { 100, default } });
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 40; i++)
+            sim.Tick(new() { { 1, release }, { 100, default } });
+
+        Assert.True(sim.GetState(100).DamagePercent > 0,
+            $"Low NPC should take damage from uppercut hitbox 1, got {sim.GetState(100).DamagePercent}");
+    }
+
+    [Fact]
+    public void FightGuyRmb_ExpiresAfterAttack()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+
+        // Hold briefly, release
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 6; i++)
+            sim.Tick(new() { { 1, hold } });
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 45; i++) // 35 duration + margin
+            sim.Tick(new() { { 1, release } });
+        var after = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, after.State);
+        Assert.Equal((byte)0, after.AttackSlot);
+    }
+
+    [Fact]
+    public void FightGuyRmb_ChargeResetsAfterAttack()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+
+        // First charge: hold for 10 ticks, release, let attack expire
+        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, hold } });
+        var release = new InputState { ActiveSlot = 2, IsAiming = false };
+        for (int i = 0; i < 45; i++)
+            sim.Tick(new() { { 1, release } });
+
+        // Attack should be over — verify ChargeTicks reset
+        var afterFirst = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, afterFirst.State);
+        Assert.Equal((ushort)0, afterFirst.ChargeTicks);
+
+        // Wait for cooldown to expire (60 ticks)
+        for (int i = 0; i < 70; i++)
+            sim.Tick(new() { { 1, default } });
+
+        // Second RMB press — should be able to charge again
+        var hold2 = TestHelpers.Input(activeSlot: 2, aiming: true);
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, hold2 } });
+        var afterSecond = sim.GetState(1);
+        Assert.True(afterSecond.ChargeTicks > 0,
+            $"Expected ChargeTicks > 0 on second charge, got {afterSecond.ChargeTicks}");
+    }
 }

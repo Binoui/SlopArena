@@ -73,14 +73,14 @@ namespace SlopArena.Client.Combat
                 if (inputController.IsSlotKeyHeld(slotIdx))
                 {
                     var candidate = charDef.GetSlotAbility(slotIdx, !playerState.IsGrounded);
-                    if (candidate?.AimMode is AimMode.GroundCursor or AimMode.CameraForward3D)
+                    if (candidate != null && (candidate.AimMode is AimMode.GroundCursor or AimMode.CameraForward3D
+                        || candidate.Behavior == AbilityBehavior.ChargeAttack))
                     {
                         spec = candidate;
                         _aimingSlot = slotIdx;
                     }
                 }
             }
-
             // Already attacking with an aimed ability and key is still held
             if (spec == null && playerState.State == ActionState.Attacking && playerState.AttackSlot > 0)
             {
@@ -88,7 +88,8 @@ namespace SlopArena.Client.Combat
                 if (inputController.IsSlotKeyHeld(slotIdx))
                 {
                     var candidate = charDef.GetSlotAbility(slotIdx, !playerState.IsGrounded);
-                    if (candidate?.AimMode is AimMode.GroundCursor or AimMode.CameraForward3D)
+                    if (candidate != null && (candidate.AimMode is AimMode.GroundCursor or AimMode.CameraForward3D
+                        || candidate.Behavior == AbilityBehavior.ChargeAttack))
                     {
                         spec = candidate;
                         _aimingSlot = slotIdx;
@@ -129,9 +130,9 @@ namespace SlopArena.Client.Combat
                 _cameraMount?.SetMode(desired);
                 _activeMode = desired;
             }
-
             // ── 3. Collect aim data ──
             AimContext ctx = AimContext.None;
+            bool isCharging = spec != null && spec.Behavior == AbilityBehavior.ChargeAttack;
 
             if (aimMode == AimMode.GroundCursor && _aimIndicator != null)
             {
@@ -165,6 +166,11 @@ namespace SlopArena.Client.Combat
                         AimYawRad   = _lastAimYawRad,
                         AimPitchRad = _lastAimPitchRad,
                     };
+                }
+                else if (isCharging && _aimingSlot > 0 && inputController.IsSlotKeyHeld(_aimingSlot))
+                {
+                    // ChargeAttack: signal IsAiming=true while key held, no cursor/camera changes
+                    ctx = new AimContext { IsAiming = true };
                 }
                 else if (_lastAimingSlot > 0 && playerState.State == ActionState.Attacking && playerState.AttackSlot == (byte)(_lastAimingSlot + 1))
                 {

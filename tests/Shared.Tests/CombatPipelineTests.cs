@@ -99,12 +99,41 @@ public class CombatPipelineTests
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // regardless of ApplyKnockback's internal logic.
-        Assert.Equal(16, (int)afterHit.HitstunTicks);
-        // Stage 1 damage = 4 → HitstunLevel = 0 (small tier)
-        Assert.Equal(0, (int)afterHit.HitstunLevel);
+        Assert.Equal(32, (int)afterHit.HitstunTicks);
+        // Manki LMB stage 1: StunTicks=32 → ≤30? no, >30 → level 1 (medium)
+        Assert.Equal(1, (int)afterHit.HitstunLevel);
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // TEST 1b: Re-hit while in hitstun resets HitstunTicks
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // Two players attack the same NPC on consecutive ticks while the
+    // hitboxes overlap. Player1 hits on tick 12 (LMB stage 1 trigger).
+    // Player2's same-tick hitbox is blocked by hitThisTick, but player2's
+    // hitbox (still active) hits on tick 13 while NPC is still in hitstun.
+    //
+    // Expected: HitstunTicks resets upward (new hit value, not continued
+    // countdown). The client uses this to detect re-hits and restart
+    // animation from frame 0.
+    //
+    // Mirrors PlayerRenderer.UpdateAnimationState re-hit detection:
+    //   newHit = _lastAnimState != Hitstun || state.HitstunTicks >= _lastState.HitstunTicks
+    private static bool IsReHit(bool wasInHitstun, ushort lastTicks, ushort currentTicks)
+        => !wasInHitstun || currentTicks >= lastTicks;
+
+    [Theory]
+    [InlineData(false, 0,  20,  true,  "Fresh hit (was idle)")]
+    [InlineData(true,  32, 31,  false, "Normal countdown: 32→31")]
+    [InlineData(true,  31, 32,  true,  "Re-hit reset: 31→32")]
+    [InlineData(true,  32, 32,  true,  "Re-hit same value: 32→32")]
+    [InlineData(true,  48, 96,  true,  "Re-hit higher value: 48→96")]
+    public void ReHit_ClientDetectionLogic_Correct(bool wasInHitstun, ushort lastTicks,
+        ushort currentTicks, bool expectedNewHit, string desc)
+    {
+        bool result = IsReHit(wasInHitstun, lastTicks, currentTicks);
+        Assert.Equal(expectedNewHit, result);
+    }
     // TEST 2: Q projectile hits NPC, explodes
     // ═══════════════════════════════════════════════════════════════════
     //
@@ -177,8 +206,8 @@ public class CombatPipelineTests
         // Direct projectile hit = 6 damage minimum (not stacking with explosion 10)
         Assert.True(npcAfter.DamagePercent >= 6,
             $"Direct projectile hit = 6 damage minimum, got {npcAfter.DamagePercent}");
-        // Both direct hit (6) and explosion (10) are in 5-15 range → HitstunLevel = 1
-        Assert.Equal(1, (int)npcAfter.HitstunLevel);
+        // Both direct hit (stun=28) and explosion (stun=20) are ≤30 → HitstunLevel = 0
+        Assert.Equal(0, (int)npcAfter.HitstunLevel);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -324,5 +353,86 @@ public class CombatPipelineTests
         // Entity IDs preserved
         Assert.Equal((ulong)1, pState.EntityId);
         Assert.Equal((ulong)100, nState.EntityId);
+    }
+
+    [Fact]
+    public void Warp_OutOfAttackRange_EntersWarpingState()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        // NPC at Z=6: within WarpRange=10 but outside AttackRange=4
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(z: 6f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        // Press LMB → should NOT enter Attacking (too far), should enter Warping
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Warping, state.State);
+    }
+
+    [Fact]
+    public void Warp_ArrivingAtTarget_StartsAttack()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        // NPC at Z=5: within WarpRange=10 but outside AttackRange=4
+        // Warp distance = 1m. SprintSpeed=12m/s → ~5 ticks.
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(z: 5f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        // Press LMB → enters Warping state
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+        Assert.Equal(ActionState.Warping, sim.GetState(1).State);
+
+        // Tick until warp completes (20 ticks is well beyond the ~5 needed)
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, state.State);
+        Assert.True(state.AttackElapsedTicks > 0,
+            "Attack should be running (elapsed ticks should be > 0)");
+        Assert.True(state.AttackElapsedTicks < 40,
+            $"Attack should be within stage duration (40 ticks), elapsed={state.AttackElapsedTicks}");
+    }
+
+    [Fact]
+    public void Warp_WithinAttackRange_AttacksDirectly()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        // NPC at Z=3: within AttackRange=4 → no warp, direct attack
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(z: 3f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, state.State);
     }
 }

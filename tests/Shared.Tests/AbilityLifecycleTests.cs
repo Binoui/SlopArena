@@ -503,22 +503,20 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Hold with aiming for 125 ticks (past max_hold_ticks=120)
+        // Hold with aiming past ChargeHoldTicks (45) — auto-release fires charged attack
         var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
         var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
-        for (int i = 0; i < 125; i++)
+        for (int i = 0; i < 60; i++)
             sim.Tick(holdInputs);
 
-        // Should auto-release as charged — wait past charged triggerTick=10
-        var postHoldInput = TestHelpers.Input(activeSlot: 2, aiming: true);
-        var postInputs = new Dictionary<ulong, InputState> { { 1, postHoldInput } };
-        for (int i = 0; i < 13; i++)
-            sim.Tick(postInputs);
+        // Release RMB (stop sending ActiveSlot) — let charged attack play out
+        for (int i = 0; i < 15; i++)
+            sim.Tick(new() { { 1, default } });
 
         var hitboxes = sim.Resolver.GetActiveHitboxes();
         Assert.NotEmpty(hitboxes);
         var hb = hitboxes[0];
-        // Should be charged params (auto-release past max_hold_ticks = always charged)
+        // Should be charged params (auto-release past ChargeHoldTicks = always charged)
         Assert.Equal(14f, hb.Damage);
         Assert.Equal(1.0f, hb.Radius);
     }

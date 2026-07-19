@@ -1,8 +1,8 @@
 {
   "dependencies": {
     "com.ivanmurzak.unity.mcp": {
-      "version": "0.82.4",
-      "depth": 0,
+      "version": "0.84.3",
+      "depth": 1,
       "source": "registry",
       "dependencies": {
         "com.unity.test-framework": "1.1.33",
@@ -12,32 +12,52 @@
       "url": "https://package.openupm.com"
     },
     "com.ivanmurzak.unity.mcp.animation": {
-      "version": "1.2.22",
+      "version": "1.2.26",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.ivanmurzak.unity.mcp": "0.82.2",
+        "com.ivanmurzak.unity.mcp": "0.84.3",
         "com.unity.modules.animation": "1.0.0"
       },
       "url": "https://package.openupm.com"
     },
     "com.ivanmurzak.unity.mcp.cinemachine": {
-      "version": "1.0.7",
+      "version": "1.0.12",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.ivanmurzak.unity.mcp": "0.82.1",
+        "com.ivanmurzak.unity.mcp": "0.84.3",
         "com.unity.cinemachine": "3.1.6"
       },
       "url": "https://package.openupm.com"
     },
     "com.ivanmurzak.unity.mcp.inputsystem": {
-      "version": "1.0.8",
+      "version": "1.0.12",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.ivanmurzak.unity.mcp": "0.82.2",
+        "com.ivanmurzak.unity.mcp": "0.84.3",
         "com.unity.inputsystem": "1.7.0"
+      },
+      "url": "https://package.openupm.com"
+    },
+    "com.ivanmurzak.unity.mcp.particlesystem": {
+      "version": "1.2.26",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.ivanmurzak.unity.mcp": "0.84.3",
+        "com.unity.modules.particlesystem": "1.0.0"
+      },
+      "url": "https://package.openupm.com"
+    },
+    "com.ivanmurzak.unity.mcp.probuilder": {
+      "version": "1.2.26",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.ivanmurzak.unity.mcp": "0.84.3",
+        "com.unity.probuilder": "5.2.4"
       },
       "url": "https://package.openupm.com"
     },
@@ -305,6 +325,15 @@
       "dependencies": {
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
+      }
+    },
+    "com.unity.visualeffectgraph": {
+      "version": "17.0.4",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.shadergraph": "17.0.4",
+        "com.unity.render-pipelines.core": "17.0.4"
       }
     },
     "extensions.unity.playerprefsex": {
