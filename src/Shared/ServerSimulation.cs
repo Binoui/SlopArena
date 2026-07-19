@@ -21,7 +21,6 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, byte> _pendingWarpAttacks = new();
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
-
 		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
 
 		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
@@ -32,7 +31,7 @@ namespace SlopArena.Shared
 			if (baked != null) _bakedData[id] = baked;
 			_animFrames[id] = 0;
 			_prevAnimIndex[id] = -1;
-		}
+	}
 
 		public void SetRespawnPosition(ulong entityId, float x, float y, float z)
 		{
@@ -553,7 +552,13 @@ namespace SlopArena.Shared
 				float attackDist = MathF.Sqrt(attackDx * attackDx + attackDz * attackDz);
 
 				// ── Warp toward target if within WarpRange but outside AttackRange ──
-				if (state.WarpSpeed <= 0f && attackStage.WarpRange > 0f && attackDist > attackStage.AttackRange && attackDist <= attackStage.WarpRange)
+				// Only for initial engage: don't re-warp if a ServerAbility is active.
+				// Without this guard, hitting a target knocks it back > AttackRange but ≤
+				// WarpRange, and ProcessTargetLock re-triggers warp every tick ("follow").
+				if (!_activeAbilities.ContainsKey(id) && state.WarpSpeed <= 0f
+				    && attackStage.WarpRange > 0f
+				    && attackDist > attackStage.AttackRange
+				    && attackDist <= attackStage.WarpRange)
 				{
 					state.WarpTargetX = attackTarget.PX;
 					state.WarpTargetZ = attackTarget.PZ;
