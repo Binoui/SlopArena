@@ -33,7 +33,6 @@ namespace SlopArena.Shared.Abilities
             s.AnimLockTicks = stage.DurationTicks;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
-
             // Apply initial lunge velocity
             if (stage.LungeForce > 0f)
                 SetVelocityInFacing(ref s, stage.LungeForce);
@@ -53,6 +52,16 @@ namespace SlopArena.Shared.Abilities
             {
                 if (evt.TriggerTick == _stageTicks)
                     SpawnHitbox(ref s, evt);
+            }
+
+            // Clear residual lunge velocity once the lunge window expires.
+            // The lunge closes distance; hitbox OffX/Y/Z handles the rest.
+            // Abilities needing sustained movement (DragonKick, CycloneKick) manage their own
+            // velocity via ServerAbility.Tick rather than StageChainAbility lunge.
+            if (_stageTicks > _lungeDuration && stage.LungeForce > 0f && s.WarpSpeed <= 0f)
+            {
+                s.VX = 0f;
+                s.VZ = 0f;
             }
 
             // Buffer phase — any LMB press during the stage is buffered for chain.
@@ -105,7 +114,6 @@ namespace SlopArena.Shared.Abilities
                     s.ComboStage = _stage;
                     s.AnimLockTicks = stages[_stage].DurationTicks;
                     s.AttackElapsedTicks = 0;
-
                     // Apply lunge velocity for new stage (skip when warp is active)
                     if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
                         SetVelocityInFacing(ref s, stages[_stage].LungeForce);
@@ -126,5 +134,5 @@ namespace SlopArena.Shared.Abilities
             int idx = Math.Min(_stage, (byte)(stages.Length - 1));
             return stages[idx];
         }
-    }
+}
 }

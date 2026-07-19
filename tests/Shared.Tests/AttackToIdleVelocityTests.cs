@@ -53,10 +53,10 @@ public class AttackToIdleVelocityTests
             sim.Tick(new() { { 1, default } });
 
         var beforeLast = sim.GetState(1);
-        // Still Attacking, lunge velocity still present
+        // Still Attacking, past all hitbox triggers — lunge velocity should be cleared
         Assert.Equal(ActionState.Attacking, beforeLast.State);
-        float speed = System.MathF.Sqrt(beforeLast.VX * beforeLast.VX + beforeLast.VZ * beforeLast.VZ);
-        Assert.True(speed > 0f, "Expected non-zero velocity during attack");
+        Assert.Equal(0f, beforeLast.VX);
+        Assert.Equal(0f, beforeLast.VZ);
 
         // One more tick → EndAbility fires, state transitions to Idle
         sim.Tick(new() { { 1, default } });
@@ -256,10 +256,8 @@ public class AttackToIdleVelocityTests
         Assert.Equal(0f, after.VZ);
     }
 
-    // ── Velocity dead zone during attacking (regression guard) ──
-
     [Fact]
-    public void AttackState_DoesNotApplyDeadZone_ButFrictionDecays()
+    public void AttackState_ClearsVelocityAfterLungeWindow()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -277,12 +275,10 @@ public class AttackToIdleVelocityTests
         var mid = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, mid.State);
 
-        // Velocity should be decaying but still positive (Manki LMB1 = 40 ticks, lunge=10)
-        // At tick 20 (10 ticks after lunge ends): VZ ≈ 5.66 * 0.767^10 ≈ 0.39
-        // Should be > dead zone (0.015) but < initial lunge (5.66)
-        float speed = System.MathF.Sqrt(mid.VX * mid.VX + mid.VZ * mid.VZ);
-        Assert.True(speed > 0.01f, $"Expected decaying velocity > dead zone mid-attack, got {speed:F4}");
-        Assert.True(speed < 5f, $"Expected velocity below initial lunge, got {speed:F4}");
+        // Velocity should be zeroed after lunge window expires (StageChainAbility
+        // clears residual lunge on the first tick past _lungeDuration)
+        Assert.Equal(0f, mid.VX);
+        Assert.Equal(0f, mid.VZ);
     }
 
     // ── Helpers ──
