@@ -14,6 +14,14 @@ scripts/mcp-exec.sh 'Debug.Log("hi");' true   # body mode
 scripts/mcp-call.sh assets-refresh '{}'
 ```
 
+## Pre-flight check
+
+Before calling any MCP tool, verify the server is alive:
+```bash
+scripts/mcp-check.sh
+```
+If it returns DOWN, all subsequent MCP calls will silently fail. No need to proceed until Unity is running.
+
 Scripts in `scripts/mcp-*.sh`:
 | Script | Purpose |
 |--------|---------|
