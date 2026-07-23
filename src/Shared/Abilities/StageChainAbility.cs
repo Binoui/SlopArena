@@ -94,8 +94,9 @@ namespace SlopArena.Shared.Abilities
                 s.ComboStage = _stage;
                 s.AnimLockTicks = stages[_stage].DurationTicks;
                 s.AttackElapsedTicks = 0;
-
-                // Apply lunge velocity for new stage (skip when warp is active)
+                s.AirTimeTicks = 0;
+                if (!s.IsGrounded && s.VY < 0f)
+                    s.VY = 0f;
                 if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
                     SetVelocityInFacing(ref s, stages[_stage].LungeForce);
 
@@ -116,7 +117,12 @@ namespace SlopArena.Shared.Abilities
                     s.AttackElapsedTicks = 0;
                     // Apply lunge velocity for new stage (skip when warp is active)
                     if (s.WarpSpeed <= 0f && stages[_stage].LungeForce > 0f)
+                    {
                         SetVelocityInFacing(ref s, stages[_stage].LungeForce);
+                    }
+                    s.AirTimeTicks = 0;
+                    if (!s.IsGrounded && s.VY < 0f)
+                        s.VY = 0f;
                 }
                 else
                 {

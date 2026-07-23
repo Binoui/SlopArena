@@ -41,7 +41,7 @@ public static partial class CharacterRegistry
                 AirAcceleration = 14f,
                 JumpForce = 10f,
                 Gravity = 35f,
-                AirFloatGravity = 6f,
+                AirFloatGravity = 0f,
                 DashDurationTicks = 15,
                 DashCooldownTicks = 60,
                 GroundFriction = 14f,
@@ -49,6 +49,8 @@ public static partial class CharacterRegistry
                 MaxFallSpeed = 45f,
                 MaxJumps = 2,
                 JumpSquatTicks = 6,
+                FloatWindowTicks = 30,
+                FallRampDuration = 15,
             },
 
             HurtboxBoneDefs = new HurtboxBoneDef[]

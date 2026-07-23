@@ -30,6 +30,10 @@ namespace SlopArena.Shared
         public byte MaxJumps;
         /// <summary>Jump squat duration in ticks (1 tick = 1/60s). Character locks during this window before airborne.</summary>
         public ushort JumpSquatTicks;
+        /// <summary>Ticks of reduced gravity (AirFloatGravity) after AirTime resets. 0 = no float window.</summary>
+        public ushort FloatWindowTicks;
+        /// <summary>Ticks to ramp from AirFloatGravity to full Gravity after FloatWindow expires. 0 = instant transition.</summary>
+        public ushort FallRampDuration;
     }
 
     public class CharacterDefinition

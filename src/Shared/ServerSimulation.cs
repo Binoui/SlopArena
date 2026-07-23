@@ -73,6 +73,10 @@ namespace SlopArena.Shared
 			state.AnimIndex = ability.AnimIndex;
 			state.IsServerAbility = true;
 			state.AttackSlot = (byte)(slot + 1);
+            state.AirTimeTicks = 0;
+            // Aerial attacks: cancel downward velocity so FloatWindow starts from hover
+            if (!state.IsGrounded && state.VY < 0f)
+                state.VY = 0f;
 			_states[entityId] = state;
 			_activeAbilities[entityId] = ability;
 		}

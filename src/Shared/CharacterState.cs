@@ -31,6 +31,8 @@ namespace SlopArena.Shared
         public ushort DamagePercent;    // 0-999, Smash-style % (increases when hit, knockback scales with it)
         public byte JumpsLeft;
         public byte AirDodgesLeft;
+        /// <summary>Ticks since last actionable event (attack, dash, jump, hit, landing). Drives FallRamp gravity.</summary>
+        public ushort AirTimeTicks;
         public bool IsGrounded;
         public bool WasAirborneDuringKnockback;
         public byte Deaths;              // match death counter, server authority
@@ -106,6 +108,7 @@ namespace SlopArena.Shared
         /// accumulated DI input during hitstun
         /// </summary>
         public float DIX, DIY;
+
 
         /// <summary>
         /// ── Facing ──

@@ -7,11 +7,19 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class PhysicsTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
+    // Classic definition with FloatWindowTicks=0, FallRampDuration=0 for backward-compatible gravity tests
+    private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
     private static readonly float GroundPx = TestHelpers.MankiGroundPY;
     private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
 
+    private static CharacterDefinition CreateClassicDef()
+    {
+        var mov = TestHelpers.MankiDef.Movement;
+        mov.FloatWindowTicks = 0;
+        mov.FallRampDuration = 0;
+        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+    }
     // ── Jump ──
 
     [Fact]
@@ -299,5 +307,186 @@ public class PhysicsTests
         var after = sim.GetState(1);
         Assert.Equal(0, (int)after.HitstunTicks);
         Assert.Equal(ActionState.Idle, after.State);
+    }
+    // ── FallRamp (progressive gravity) ──
+    
+    // FallRampChar: Manki definition with FloatWindowTicks=10, FallRampDuration=20 for testing
+    private static readonly CharacterDefinition FallRampDef = CreateFallRampDef();
+    private static readonly float FallRampFloatPerTick = FallRampDef.Movement.AirFloatGravity * Simulation.TickDt;
+    private static readonly float FallRampFullPerTick = 35f * Simulation.TickDt;   // Gravity=35
+    
+    private static CharacterDefinition CreateFallRampDef()
+    {
+        var mov = TestHelpers.MankiDef.Movement;
+        mov.AirFloatGravity = 6f;
+        mov.FloatWindowTicks = 10;
+        mov.FallRampDuration = 20;
+        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+    }
+
+    [Fact]
+    public void FallRamp_AirTimeIncrementsEachTick()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 2f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 0;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+
+        // AirTime starts at 0 (default)
+        Assert.Equal(0, (int)sim.GetState(1).AirTimeTicks);
+
+        var t1 = TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(1, (int)t1.AirTimeTicks);
+
+        var t2 = TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(2, (int)t2.AirTimeTicks);
+    }
+
+    [Fact]
+    public void FallRamp_AirTimeResetsOnLanding()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 2f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 0;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+
+        // Fall for 30 ticks (accumulates AirTime)
+        for (int i = 0; i < 30; i++)
+            TestHelpers.TickDefault(sim, 1);
+
+        var before = sim.GetState(1);
+        Assert.True(before.IsGrounded, "Should have landed after 30 ticks");
+        Assert.Equal(0, (int)before.AirTimeTicks);
+    }
+    
+    [Fact]
+    public void FallRamp_FloatWindowUsesReducedGravity()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 2f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 0;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+        
+        // Tick 1: still in FloatWindow (FloatWindowTicks=10)
+        var t1 = TestHelpers.TickDefault(sim, 1);
+        float expectedVY = 0f - FallRampFloatPerTick;
+        TestHelpers.AssertNear(expectedVY, t1.VY, 0.001f);
+        
+        // Tick 2: still in FloatWindow
+        var t2 = TestHelpers.TickDefault(sim, 1);
+        expectedVY -= FallRampFloatPerTick;
+        TestHelpers.AssertNear(expectedVY, t2.VY, 0.001f);
+    }
+    
+    [Fact]
+    public void FallRamp_RampIncreasesGravityProgressively()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 3f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 0;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+        
+        // Run through tick 10 (end of FloatWindow, start of ramp)
+        for (int i = 0; i < 10; i++)
+            TestHelpers.TickDefault(sim, 1);
+        
+        
+        // Track VY deltas during ramp (ticks 11-30 = ramp phase)
+        float[] deltas = new float[FallRampDef.Movement.FallRampDuration];
+        for (int i = 0; i < deltas.Length; i++)
+        {
+            float beforeVy = sim.GetState(1).VY;
+            TestHelpers.TickDefault(sim, 1);
+            float afterVy = sim.GetState(1).VY;
+            deltas[i] = afterVy - beforeVy; // negative = falling faster
+        }
+        
+        // Each delta should be >= the previous (gravity increases monotonically)
+        for (int i = 1; i < deltas.Length; i++)
+        {
+            Assert.True(deltas[i] <= deltas[i - 1],
+                $"Ramp delta at step {i} ({deltas[i]:F6}) should be <= step {i - 1} ({deltas[i - 1]:F6})");
+        }
+        // First ramp tick should be close to AirFloatGravity
+        TestHelpers.AssertNear(-FallRampFloatPerTick, deltas[0], 0.05f);
+    }
+    
+    [Fact]
+    public void FallRamp_FullGravityAfterRamp()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 0;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+        
+        // Tick through FloatWindow (10) + Ramp (20) = 30 ticks
+        for (int i = 0; i < 10 + 20; i++)
+            TestHelpers.TickDefault(sim, 1);
+        
+        // Now past ramp: full gravity should apply
+        float vyBefore = sim.GetState(1).VY;
+        TestHelpers.TickDefault(sim, 1);
+        float vyDeltaFull = sim.GetState(1).VY - vyBefore;
+        
+        TestHelpers.AssertNear(-FallRampFullPerTick, vyDeltaFull, 0.01f);
+    }
+    
+    [Fact]
+    public void FallRamp_NoRampWhenGrounded()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 0f + FallRampDef.CapsuleHeight * 0.5f; // grounded
+        state.IsGrounded = true;
+        state.JumpsLeft = 2;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+        
+        // Grounded: AirTime should be 0, gravity should not apply (grounded has its own path)
+        TestHelpers.TickDefault(sim, 5);
+        var s = sim.GetState(1);
+        Assert.True(s.IsGrounded);
+        Assert.Equal(0, (int)s.AirTimeTicks);
+    }
+    
+    [Fact]
+    public void FallRamp_AirTimeResetsOnDoubleJump()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = 2f;
+        state.IsGrounded = false;
+        state.JumpsLeft = 2;
+        state.VY = 0f;
+        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
+        
+        // Fall for 15 ticks to accumulate AirTime
+        for (int i = 0; i < 15; i++)
+            TestHelpers.TickDefault(sim, 1);
+        Assert.True(sim.GetState(1).AirTimeTicks > 0, "Should have accumulated AirTime");
+        
+        // Double jump — AirTime set past FloatWindow+Ramp, then gravity increments by 1
+        // FallRampDef: FloatWindowTicks=10, FallRampDuration=20 → AirTime = 10+20+1 = 31
+        var afterJump = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
+        Assert.Equal(31, (int)afterJump.AirTimeTicks);
     }
 }
