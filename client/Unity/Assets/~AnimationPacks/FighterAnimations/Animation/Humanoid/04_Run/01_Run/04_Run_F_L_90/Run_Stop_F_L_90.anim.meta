@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 216e91ffab35fb147bb7f67f20e643e6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/01_Run/04_Run_F_L_90/Run_Stop_F_L_90.anim
+  uploadId: 612385

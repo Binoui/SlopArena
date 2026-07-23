@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b31b91a7d71ab9f48b804b679085c3c4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/02_Dodge_Air/Dodge_Air_B_L_45.anim
+  uploadId: 612385

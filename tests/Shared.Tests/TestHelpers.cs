@@ -272,4 +272,49 @@ public static class TestHelpers
             };
         }
     }
+
+    /// <summary>
+    /// Create a deep copy of a CharacterDefinition, optionally overriding Movement.
+    /// </summary>
+    public static CharacterDefinition CloneDef(CharacterDefinition src, MovementStats? movement = null)
+    {
+        var mov = movement ?? src.Movement;
+        return new CharacterDefinition
+        {
+            Class = src.Class,
+            DisplayName = src.DisplayName,
+            CapsuleRadius = src.CapsuleRadius,
+            CapsuleHeight = src.CapsuleHeight,
+            HurtboxRadius = src.HurtboxRadius,
+            HipHeight = src.HipHeight,
+            Movement = mov,
+            LMB = src.LMB,
+            RMB = src.RMB,
+            AirLMB = src.AirLMB,
+            AirRMB = src.AirRMB,
+            Q = src.Q,
+            E = src.E,
+            R = src.R,
+            F = src.F,
+            ClipOverrides = src.ClipOverrides,
+            HurtboxCapsules = src.HurtboxCapsules,
+            HurtboxBoneDefs = src.HurtboxBoneDefs,
+            BakedDataPath = src.BakedDataPath,
+            IdleAnim = src.IdleAnim,
+            RunAnim = src.RunAnim,
+            DashAnim = src.DashAnim,
+            JumpAnim = src.JumpAnim,
+            FallAnim = src.FallAnim,
+            HitSmallAnim = src.HitSmallAnim,
+            HitMediumAnim = src.HitMediumAnim,
+            HitHardAnim = src.HitHardAnim,
+            VisualScale = src.VisualScale,
+            ModelYOffset = src.ModelYOffset,
+            ModelSoleOffset = src.ModelSoleOffset,
+            AutoModelYOffset = src.AutoModelYOffset,
+            ModelResourcePath = src.ModelResourcePath,
+            LandStartOffset = src.LandStartOffset,
+            HurtboxBoneScale = src.HurtboxBoneScale,
+        };
+    }
     }

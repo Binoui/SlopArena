@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e78d97571e85de046b68c77b162a23fb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/07_Roll/02_Roll_to_Run/Roll_to_Run_L_90.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 701c7e08e7879834d8bfcab16f5d4d26
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/09_Turn/02_Turn_Combat/Turn_Combat_90_R.anim
+  uploadId: 612385

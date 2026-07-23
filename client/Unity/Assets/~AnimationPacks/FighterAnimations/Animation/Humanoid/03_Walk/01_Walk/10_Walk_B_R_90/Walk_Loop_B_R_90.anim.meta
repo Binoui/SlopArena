@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8b67e20dcb05fe4498172413650898b9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/01_Walk/10_Walk_B_R_90/Walk_Loop_B_R_90.anim
+  uploadId: 612385

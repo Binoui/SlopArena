@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2ff0edba8aaba324eaac529e816c5cf3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/03_Hit_Air_To_Floor/Hit_Heavy_Loop.anim
+  uploadId: 612385

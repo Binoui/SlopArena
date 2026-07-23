@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: e1b13da7b867f7149bbea3fa07db2c7e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Basic
+    Motions/AnimatorControllers/HumanM@Crouch01_Walk_ForwardRight.controller
+  uploadId: 912162

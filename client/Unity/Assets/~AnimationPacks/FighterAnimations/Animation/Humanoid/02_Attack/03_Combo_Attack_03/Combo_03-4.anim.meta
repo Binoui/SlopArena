@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 574f487ff085ffd468547956e605b654
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/03_Combo_Attack_03/Combo_03-4.anim
+  uploadId: 612385

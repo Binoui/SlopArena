@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: d6377e128a8d2fd40b0aeb8b229af54c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Female/1H/HumanF@Walk_ForwardLeft - 1H.overrideController
+  uploadId: 912162

@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@MagicAttackOmnidirectionals
+  m_Controller: {fileID: 9100000, guid: 9a7ac59f625f7bb4b8ad545a8da9dcf3, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: b98582042c1292a4e81193a2e417a4d2, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 6ce5c8cc7157f2542b78acd83e609475, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 6ffc4e72728346249875a6b8dfd85a01, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 9b550ae1c49cbc44cab8932a2fddfbed, type: 3}

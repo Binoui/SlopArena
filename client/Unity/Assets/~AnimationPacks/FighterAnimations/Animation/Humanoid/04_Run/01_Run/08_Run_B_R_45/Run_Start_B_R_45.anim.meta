@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 64c9c403607958b4a965c65921a3f22e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/01_Run/08_Run_B_R_45/Run_Start_B_R_45.anim
+  uploadId: 612385

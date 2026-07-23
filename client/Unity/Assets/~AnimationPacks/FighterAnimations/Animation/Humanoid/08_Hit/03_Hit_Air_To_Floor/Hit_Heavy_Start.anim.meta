@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0119eed0f5e12b348bf4c153551dd3c6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/03_Hit_Air_To_Floor/Hit_Heavy_Start.anim
+  uploadId: 612385

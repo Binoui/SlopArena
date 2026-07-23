@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 075a843c98121464d85c440bb7399b04
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Male/Polearm/HumanM@Run_Left - Polearm.controller
+  uploadId: 912162

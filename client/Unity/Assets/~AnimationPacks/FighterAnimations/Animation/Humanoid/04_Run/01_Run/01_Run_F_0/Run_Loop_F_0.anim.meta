@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4c84b6892c7ef814689f30593031dfe5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/01_Run/01_Run_F_0/Run_Loop_F_0.anim
+  uploadId: 612385

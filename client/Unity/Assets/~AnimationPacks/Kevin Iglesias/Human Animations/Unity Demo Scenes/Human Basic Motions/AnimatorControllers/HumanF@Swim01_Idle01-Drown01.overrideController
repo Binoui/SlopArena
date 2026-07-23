@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@Swim01_Idle01-Drown01
+  m_Controller: {fileID: 9100000, guid: d59d13ac3d3c20741b52f08c5141528d, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 3ff8c8d35c6853c46800c192caf46240, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 330d3547c6e6d9244948976c64109471, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: b437b75e0ff88e24ebb2b833d2aa4960, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 4f05699090d2f2b498394de5544eb647, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 8d9d33358a4c5324c885f7d8413538ae, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: f47990c404c3cdd43b03602a4c8e228f, type: 3}

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7cebd5605f7f3724cb7cade61f6137e5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/05_Knock_Down/Knock_Down_Get_Up.anim
+  uploadId: 612385

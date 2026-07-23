@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1339ad4545a08d249a2243d5f57c3a57
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/02_Walk_Combat/06_Walk_Combat_B_180/Walk_Combat_Start_B_180.anim
+  uploadId: 612385

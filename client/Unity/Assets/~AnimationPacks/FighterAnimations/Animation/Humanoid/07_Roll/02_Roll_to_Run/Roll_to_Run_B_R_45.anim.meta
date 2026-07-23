@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c5cefead30ce923469798e1b2e10a195
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/07_Roll/02_Roll_to_Run/Roll_to_Run_B_R_45.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eef26dbe80344b144a5ad974c50d9775
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/06_Charge_Attack/02_Charge_Air_Attack/Charge_Air_Attack_End.anim
+  uploadId: 612385

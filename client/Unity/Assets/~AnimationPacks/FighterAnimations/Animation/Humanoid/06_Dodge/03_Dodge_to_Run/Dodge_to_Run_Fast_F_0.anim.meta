@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1d7aab2fc6de90b4d9db3663307b5555
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/03_Dodge_to_Run/Dodge_to_Run_Fast_F_0.anim
+  uploadId: 612385

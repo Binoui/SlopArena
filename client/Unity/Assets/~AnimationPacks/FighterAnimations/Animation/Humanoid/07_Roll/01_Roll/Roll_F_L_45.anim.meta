@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4e172d3160272654481b0c845516a0ee
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/07_Roll/01_Roll/Roll_F_L_45.anim
+  uploadId: 612385

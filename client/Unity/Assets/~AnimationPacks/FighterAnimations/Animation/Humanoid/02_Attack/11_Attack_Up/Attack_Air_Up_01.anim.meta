@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ff821b73f6c782a42beec0cdf8395412
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/11_Attack_Up/Attack_Air_Up_01.anim
+  uploadId: 612385

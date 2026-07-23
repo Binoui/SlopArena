@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 45ed69233a340d2498faab6c3a026168
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/02_Run_Combat/10_Run_Combat_B_R_90/Run_Combat_Stop_B_R_90.anim
+  uploadId: 612385

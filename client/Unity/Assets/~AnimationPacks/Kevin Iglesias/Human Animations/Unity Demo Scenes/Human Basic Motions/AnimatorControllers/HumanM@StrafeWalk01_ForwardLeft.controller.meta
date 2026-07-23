@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c56a72c1787f9dd4cb6110eee02b69d4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Basic
+    Motions/AnimatorControllers/HumanM@StrafeWalk01_ForwardLeft.controller
+  uploadId: 912162

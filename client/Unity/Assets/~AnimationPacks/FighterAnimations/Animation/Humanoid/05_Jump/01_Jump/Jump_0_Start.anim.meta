@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f7c79f578edf7544f80b9cb1c330ff31
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/05_Jump/01_Jump/Jump_0_Start.anim
+  uploadId: 612385

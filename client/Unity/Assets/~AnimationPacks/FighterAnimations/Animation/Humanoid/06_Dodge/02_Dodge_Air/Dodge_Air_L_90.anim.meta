@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b34fce762ad01be4898bd64a42ed8b21
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/02_Dodge_Air/Dodge_Air_L_90.anim
+  uploadId: 612385

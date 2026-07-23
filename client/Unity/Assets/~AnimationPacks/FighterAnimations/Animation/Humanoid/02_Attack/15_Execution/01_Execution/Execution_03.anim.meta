@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 20230f80cd3084c4bb79920d4ceb93ae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/15_Execution/01_Execution/Execution_03.anim
+  uploadId: 612385

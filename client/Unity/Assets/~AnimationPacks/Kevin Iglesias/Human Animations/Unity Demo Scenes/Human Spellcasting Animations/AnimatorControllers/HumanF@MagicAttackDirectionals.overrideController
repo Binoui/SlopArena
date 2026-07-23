@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@MagicAttackDirectionals
+  m_Controller: {fileID: 9100000, guid: 6ddf9c32c99d3ec458960bdd7a480674, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: c817d2bc0a7ac96498d32fa36a62bd88, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 84ee600ac7a22a240869f0119230d93b, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 0ec27b2ee6dda6d459311de3c0df0adb, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 5e777c22f4914c24bb1ab4df99f3832e, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 8f2199c73306dcc439cb3d6c3a6b920b, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: afc0d7b05fc184d49a7e863d9eec0f9e, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 4636b4252770e1c48b55aa8cb353a94f, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 8f9e5a2457c372e448a542fbbec3aee0, type: 3}

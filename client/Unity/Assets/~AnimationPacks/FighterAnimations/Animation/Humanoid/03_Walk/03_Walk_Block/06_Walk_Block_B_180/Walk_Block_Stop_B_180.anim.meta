@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fcbd1085104205846ba308f5f2c8558a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/03_Walk_Block/06_Walk_Block_B_180/Walk_Block_Stop_B_180.anim
+  uploadId: 612385

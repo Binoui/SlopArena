@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: c0b301435e49d9d4f9f24a5f435ec15d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Female/2H/HumanF@RunStrafe01_BackwardLeft - 2H
+    Shoulder.overrideController
+  uploadId: 912162

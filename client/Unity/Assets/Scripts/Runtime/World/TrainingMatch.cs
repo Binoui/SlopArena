@@ -31,9 +31,9 @@ namespace SlopArena.Client.World
         [Header("Arena")]
         [SerializeField] private string _arenaNameOverride = "colosseum";
 
-        [Header("Debug")]
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
+        [SerializeField] private ProjectileVFXManager _projectileVFX;
         [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Attack;
 
         [Header("Hitboxes")]
@@ -72,6 +72,9 @@ namespace SlopArena.Client.World
             // Bridge (local)
             _bridge = new LocalSimulationBridge(arena);
             _combatFeedback.SetSimulation(_bridge.InternalSim);
+            if (_projectileVFX == null)
+                _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
+            _projectileVFX.SetSimulation(_bridge.InternalSim);
             var playerClass = _playerClassOverride != CharacterClass.None ? _playerClassOverride : MatchConfig.PlayerClass;
             var playerDef = CharacterRegistry.Get(playerClass);
             _playerDef = playerDef;
@@ -188,6 +191,7 @@ namespace SlopArena.Client.World
                 if (_npcRenderer != null)
                     _npcRenderer.OnDeath();
             }
+            _projectileVFX?.OnTick();
             _combatFeedback.OnTick();
             _hudManager?.Refresh();
 

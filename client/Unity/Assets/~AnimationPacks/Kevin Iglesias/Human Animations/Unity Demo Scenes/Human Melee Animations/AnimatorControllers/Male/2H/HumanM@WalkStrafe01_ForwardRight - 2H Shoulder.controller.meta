@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: baa6fe19c9efa444faeede3fa4b3380a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Male/2H/HumanM@WalkStrafe01_ForwardRight - 2H
+    Shoulder.controller
+  uploadId: 912162

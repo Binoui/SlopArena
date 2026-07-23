@@ -1,0 +1,13 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@CastingDodge01
+  m_Controller: {fileID: 9100000, guid: ab41562cf3b66094b9f5672df8ee3a87, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 37624f1f0ed78f84e989d25619f7daa6, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 6c3dc4fb168429245aef3264e45131a3, type: 3}

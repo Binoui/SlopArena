@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3e841088c948d3341ac73abab0d6b969
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/05_Knock_Down/Knock_Down_Strat.anim
+  uploadId: 612385

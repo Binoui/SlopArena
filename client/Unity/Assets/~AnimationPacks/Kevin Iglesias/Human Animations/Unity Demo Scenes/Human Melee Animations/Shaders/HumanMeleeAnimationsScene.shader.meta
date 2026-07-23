@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 7d525b5cde79af04391bdc19690dafce
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/Shaders/HumanMeleeAnimationsScene.shader
+  uploadId: 912162

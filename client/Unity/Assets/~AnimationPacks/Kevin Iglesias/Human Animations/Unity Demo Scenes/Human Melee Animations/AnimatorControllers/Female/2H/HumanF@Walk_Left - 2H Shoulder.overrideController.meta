@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 78b5f9dc56b7353429106cd82991a99f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Female/2H/HumanF@Walk_Left - 2H Shoulder.overrideController
+  uploadId: 912162

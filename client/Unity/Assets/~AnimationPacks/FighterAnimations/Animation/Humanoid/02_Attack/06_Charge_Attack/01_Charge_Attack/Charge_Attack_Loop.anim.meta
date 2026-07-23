@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 95ee88e9de4290747a6be20db832679d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/06_Charge_Attack/01_Charge_Attack/Charge_Attack_Loop.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2083c39553eef4142a5c049aae439ab7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/01_Walk/04_Walk_F_L_90/Walk_Start_F_L_90.anim
+  uploadId: 612385

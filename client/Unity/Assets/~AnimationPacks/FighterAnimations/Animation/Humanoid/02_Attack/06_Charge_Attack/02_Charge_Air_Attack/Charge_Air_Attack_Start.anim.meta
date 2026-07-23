@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: af6cfb2a38b79a54f913a45d1ad64ccb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/06_Charge_Attack/02_Charge_Air_Attack/Charge_Air_Attack_Start.anim
+  uploadId: 612385

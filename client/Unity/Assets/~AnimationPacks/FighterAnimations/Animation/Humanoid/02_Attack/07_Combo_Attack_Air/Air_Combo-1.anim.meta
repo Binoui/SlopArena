@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a4ddf5095b2002040bb7aa0bc18cbeaa
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/07_Combo_Attack_Air/Air_Combo-1.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b2cbdecb3e1d41c4585c4cefcf3fd876
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/01_Dodge/Dodge_F_0.anim
+  uploadId: 612385

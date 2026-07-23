@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7887a665a25c6df41bb77e0221152c5b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/09_Attack_Air_to_Floor_02/Attack_Air_to_Floor_02_Start.anim
+  uploadId: 612385

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 0970473be17a83a44a49426b9978ce14
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Soldier
+    Animations/AnimatorControllers/HumanF@SoldierAnimations.overrideController
+  uploadId: 912162

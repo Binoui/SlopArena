@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8e1d3480784c4bf44a09f4de67fbe92b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/01_Dodge/Dodge_F_R_45.anim
+  uploadId: 612385

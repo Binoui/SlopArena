@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 42bc1bb0d3701c04c826dd36f45f47db
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/12_Attack/Attack_01.anim
+  uploadId: 612385

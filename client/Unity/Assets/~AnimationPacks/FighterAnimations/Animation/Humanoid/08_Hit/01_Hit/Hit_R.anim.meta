@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0a21362ecb5d209449877a0df463f1f0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/01_Hit/Hit_R.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a3393fc5621651f438817158c12909aa
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/05_Jump/02_Double_Jump/Double_Jump_L_90.anim
+  uploadId: 612385

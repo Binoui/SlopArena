@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: db4327703ad1dc04a9df1465b0b81cae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/09_Turn/01_Turn/Turn_180_L.anim
+  uploadId: 612385

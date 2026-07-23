@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6b5b002f3a6a6384eaab3ce6f11f2954
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/02_Dodge_Air/Dodge_Air_F_0.anim
+  uploadId: 612385

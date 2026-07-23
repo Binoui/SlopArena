@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c2d4fe94a0199dc47a871a0476deedf9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/05_Knock_Down/Knock_Down_Death.anim
+  uploadId: 612385

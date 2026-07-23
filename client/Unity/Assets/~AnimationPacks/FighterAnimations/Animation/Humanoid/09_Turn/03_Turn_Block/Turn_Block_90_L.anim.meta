@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 73c840cf4196d5840824d88ba156fd9e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/09_Turn/03_Turn_Block/Turn_Block_90_L.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fa9ef59197d619847aeebf365d046ba1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/09_Turn/01_Turn/Turn_90_R.anim
+  uploadId: 612385

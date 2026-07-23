@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0750fdf83e8ada54d8fb52d6c5b365d7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/03_Walk_Block/08_Walk_Block_B_R_45/Walk_Block_Start_B_R_45.anim
+  uploadId: 612385

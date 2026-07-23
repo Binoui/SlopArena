@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 01dc7f251ae302b40ba7c93d9b675f38
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Spellcasting
+    Animations/AnimatorControllers/HumanM@CastingIdles.controller
+  uploadId: 912162

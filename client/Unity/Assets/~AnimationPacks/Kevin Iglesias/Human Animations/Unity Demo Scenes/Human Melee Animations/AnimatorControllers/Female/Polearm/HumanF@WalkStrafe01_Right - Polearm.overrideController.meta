@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c72eb2430a5ad224084866a11059d81b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee
+    Animations/AnimatorControllers/Female/Polearm/HumanF@WalkStrafe01_Right - Polearm.overrideController
+  uploadId: 912162

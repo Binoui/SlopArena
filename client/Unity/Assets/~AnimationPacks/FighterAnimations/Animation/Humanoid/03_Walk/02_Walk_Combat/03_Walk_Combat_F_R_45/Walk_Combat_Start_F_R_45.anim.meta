@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 442e95e7b0ab8684989db899e23515c7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/02_Walk_Combat/03_Walk_Combat_F_R_45/Walk_Combat_Start_F_R_45.anim
+  uploadId: 612385

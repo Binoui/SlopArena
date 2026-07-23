@@ -306,8 +306,8 @@ GameObject:
   m_Component:
   - component: {fileID: 543287390}
   - component: {fileID: 543287389}
-  - component: {fileID: 543287386}
   - component: {fileID: 543287391}
+  - component: {fileID: 543287386}
   m_Layer: 0
   m_Name: AimCamera
   m_TagString: Untagged

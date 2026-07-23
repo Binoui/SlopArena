@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@RunStrafe01_BackwardLeft - 2H Shoulder
+  m_Controller: {fileID: 9100000, guid: 8e53314805323524eb208e364951071e, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 5da90ac229036a74798d1b6af61b871f, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 855d2ef280d7b2143bae774a3fe45259, type: 3}
+  - m_OriginalClip: {fileID: -3093763982061039955, guid: 51bdc1cd12e2d1a489d0eefb275b3cb6, type: 3}
+    m_OverrideClip: {fileID: 2259105683091889024, guid: d4ea2ec9518f92442a0c1c2ab0dc9780, type: 3}

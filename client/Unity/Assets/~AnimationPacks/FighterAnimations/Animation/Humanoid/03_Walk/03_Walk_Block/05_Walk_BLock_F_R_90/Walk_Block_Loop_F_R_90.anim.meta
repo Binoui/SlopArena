@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0cb264cb75f891f4f9021238528c3df6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/03_Walk_Block/05_Walk_BLock_F_R_90/Walk_Block_Loop_F_R_90.anim
+  uploadId: 612385

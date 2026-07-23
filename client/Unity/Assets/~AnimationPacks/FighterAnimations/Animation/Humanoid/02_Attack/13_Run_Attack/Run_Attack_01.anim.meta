@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 009fab983ac783841a23663c43d2a263
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/13_Run_Attack/Run_Attack_01.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2b8bec726943a9444ba20058de4d8270
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/03_Dodge_to_Run/Dodge_to_Run_B_R_45.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a8576fcde47f41e46b21ca61deb81272
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/02_Walk_Combat/01_Walk_Combat_F_0/Walk_Combat_Loop_F_0.anim
+  uploadId: 612385

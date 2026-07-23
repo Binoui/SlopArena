@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b83ab4576b676fe4380e97e18ff5a1c3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/08_Hit/02_Hit_Air/Hit_Air_1.anim
+  uploadId: 612385

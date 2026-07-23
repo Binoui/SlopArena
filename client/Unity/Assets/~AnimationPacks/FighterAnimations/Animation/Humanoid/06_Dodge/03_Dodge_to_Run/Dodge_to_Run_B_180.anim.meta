@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3c4a97f6912a2ac468ff09b187b46977
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/03_Dodge_to_Run/Dodge_to_Run_B_180.anim
+  uploadId: 612385

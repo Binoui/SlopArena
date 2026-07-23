@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@Combat - Unarmed
+  m_Controller: {fileID: 9100000, guid: 731e0520bf75866429c0aa6cb65c68b2, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 6463639787467006684, guid: 3876ef5f6caf71c4d8076fb6b1a90568, type: 3}
+    m_OverrideClip: {fileID: 7657701363798907477, guid: f94195208572c8e4aa70f50906124b0c, type: 3}
+  - m_OriginalClip: {fileID: 289810395463647177, guid: ba993d98705e1734e8a30dfc04a48e5d, type: 3}
+    m_OverrideClip: {fileID: 4271740692525038149, guid: 510093613b4593b489c25041a83639de, type: 3}
+  - m_OriginalClip: {fileID: -4725277914571804601, guid: 8d02e449ac9268746afba23edc429e9e, type: 3}
+    m_OverrideClip: {fileID: 8774878385520573616, guid: 61209cf30d5ce8041bbda2c3cf1e2393, type: 3}
+  - m_OriginalClip: {fileID: 4033456048983509219, guid: 611e1980d126af2448d8a9393a523705, type: 3}
+    m_OverrideClip: {fileID: -5234666313219195119, guid: b1a908c9413983a4c9853fbed9ea96f0, type: 3}
+  - m_OriginalClip: {fileID: -3918593891544521419, guid: 36f8f8b0d0d62af4d9fda9582fe2d21d, type: 3}
+    m_OverrideClip: {fileID: 3996679833834505438, guid: bafea1919c5df9e4d8118d6ace71ea89, type: 3}
+  - m_OriginalClip: {fileID: -7307023477714413547, guid: ae5455a0411152e419a7e25f60415f24, type: 3}
+    m_OverrideClip: {fileID: -3706451288003040655, guid: 3ef2aa8a2f3a210448f7780b1fbacf5e, type: 3}
+  - m_OriginalClip: {fileID: 936647226563093748, guid: 235e406cef14178429ac3b733394b3aa, type: 3}
+    m_OverrideClip: {fileID: -3655637226551710014, guid: 0933865c9e268224ab6c53a70aac132b, type: 3}
+  - m_OriginalClip: {fileID: 3703251632547715004, guid: d91203751b0bd8448a0090d39fbc0a0a, type: 3}
+    m_OverrideClip: {fileID: -7997045704327392166, guid: e0148133d00ccf3438fbe12c3e13500e, type: 3}
+  - m_OriginalClip: {fileID: 992911294148604404, guid: dddab171c4921bd4aa92cfec58cc6a53, type: 3}
+    m_OverrideClip: {fileID: 5500362734208254724, guid: a45f1bfacdca305438ec31d8e161b199, type: 3}
+  - m_OriginalClip: {fileID: 562522358643541774, guid: d083b044e5e1c0d41a36222c0d79aff0, type: 3}
+    m_OverrideClip: {fileID: -581051413017546103, guid: 7c6eca6fe4a8ffb40849c2b553852304, type: 3}

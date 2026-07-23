@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@MagicAttackCalls
+  m_Controller: {fileID: 9100000, guid: 0cc5c156cd530a04ba03eae3239581c7, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 35f6feb4c51bae84c97cc9a8d0b991dd, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 11465aac7c22a75458afa08d7ee99e6a, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: f90105e773f2ab449a7d1ba4cc31609a, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 48db70c02145a5148b852330af2203af, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: cf627dcc0291c2049aa24bde8f83be7a, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: ad6f247026ec8384da7e0e9aeb825338, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 41584165dd3f2c142880966690408982, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 839d511accf77ed4586a8e9d728a14a8, type: 3}

@@ -144,6 +144,7 @@ namespace SlopArena.Shared
                     s.VY = stats.JumpForce;
                     s.IsGrounded = false;
                     s.State = ActionState.Idle;
+                    s.AirTimeTicks = (ushort)(stats.FloatWindowTicks + stats.FallRampDuration);
                 }
                 // During squat: preserve horizontal momentum, no acceleration
             }
@@ -266,9 +267,11 @@ namespace SlopArena.Shared
                 byte slot = s.BufferedSlot;
                 s.BufferedSlot = 0;
                 // Ability activation handled by ServerSimulation.Tick pre-sim phase
-                // Client prediction: mark state as Attacking to prevent movement
                 s.State = ActionState.Attacking;
                 s.AttackSlot = slot;
+                s.AirTimeTicks = 0;
+                if (!s.IsGrounded && s.VY < 0f)
+                    s.VY = 0f;
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
@@ -291,6 +294,7 @@ namespace SlopArena.Shared
                     s.VX = dirX * stats.WalkSpeed;
                     s.VZ = dirZ * stats.WalkSpeed;
                     s.JumpsLeft--;
+                    s.AirTimeTicks = (ushort)(stats.FloatWindowTicks + stats.FallRampDuration);
                 }
             }
 
@@ -328,8 +332,11 @@ namespace SlopArena.Shared
                     {
                         s.State = ActionState.Attacking;
                         s.AttackSlot = input.ActiveSlot;
-                        s.IsServerAbility = false; // Clear stale flag from previous ServerAbility
-                        s.StateTicks = 0;  // Prevent generic expiry from interrupting attack
+                        s.IsServerAbility = false;
+                        s.StateTicks = 0;
+                        s.AirTimeTicks = 0;
+                        if (!s.IsGrounded && s.VY < 0f)
+                            s.VY = 0f;
                     }
                 }
             }
@@ -388,6 +395,7 @@ namespace SlopArena.Shared
                     s.IsGrounded = true;
                     s.VY = 0f;
                     s.PY = groundY;
+                    s.AirTimeTicks = 0;
                 }
                 else
                 {
@@ -658,7 +666,6 @@ namespace SlopArena.Shared
                 s.VX = 0f;
                 s.VZ = 0f;
             }
-            UpdateFacing(ref s);
         }
 
         // ── AIR DODGE ──
@@ -770,7 +777,10 @@ namespace SlopArena.Shared
             }
             ApplyVelocityDeadZone(ref s);
 
-            UpdateFacing(ref s);
+            if (hasInput)
+            {
+                s.FacingYaw = MathF.Atan2(dirX, dirZ);
+            }
         }
 
         private static void ProcessAirMovement(
@@ -795,7 +805,11 @@ namespace SlopArena.Shared
             // Dash initiation is handled by PlayerController outside of Simulation
             // (works both ground and air, has cooldown, grants invincibility)
 
-            UpdateFacing(ref s);
+            bool hasAirInput = ((dirX * dirX) + (dirZ * dirZ)) > 0.0001f;
+            if (hasAirInput)
+            {
+                s.FacingYaw = MathF.Atan2(dirX, dirZ);
+            }
         }
 
         // ── ATTACK PROCESSING ──
@@ -886,6 +900,7 @@ namespace SlopArena.Shared
             s.VX = dirX * stats.DashSpeed;
             s.VZ = dirZ * stats.DashSpeed;
             s.VY = s.IsGrounded ? Math.Max(s.VY, 0f) : 0f;
+            s.AirTimeTicks = 0;
         }
 
         /// <summary>
@@ -925,7 +940,7 @@ namespace SlopArena.Shared
             if (stunTicks > 0 && kbMagnitude > 0.5f)
             {
                 ushort hitstunFromKB = (ushort)Math.Clamp(8 + (int)(kbMagnitude * 0.5f), 8, 60);
-                ushort hitstunFinal = Math.Min(hitstunFromKB, stunTicks); // cap at stage's StunTicks
+                ushort hitstunFinal = Math.Min(hitstunFromKB, stunTicks);
                 s.HitstunTicks = hitstunFinal;
                 s.State = ActionState.Hitstun;
             }
@@ -933,6 +948,9 @@ namespace SlopArena.Shared
             {
                 s.State = ActionState.Idle;
             }
+
+            // AirTime resets on any damage/hit, regardless of hitstun
+            s.AirTimeTicks = 0;
 
             s.DashDurationTicks = 0;
             s.StateTicks = 0;
@@ -975,32 +993,41 @@ namespace SlopArena.Shared
             s.VY = 0f;
             s.State = ActionState.Idle;
         }
-
         private static void ClearKnockback(ref CharacterState s)
         {
             s.KVX = s.KVY = s.KVZ = 0f;
         }
 
         // ── GRAVITY ──
-
+        
         private static void ApplyGravity(ref CharacterState s, MovementStats stats)
         {
             if (!s.IsGrounded)
             {
-                // Float system:
-                // - During attack animation (AnimLockTicks > 0): no gravity, maintain position
-                // - During dash: no gravity, maintains horizontal momentum
-                // - After float ends: gravity resumes naturally from current VY (starts slow)
-                if (s.AnimLockTicks > 0 || s.State == ActionState.Dashing || s.State == ActionState.Attacking || s.IsAiming)
+                // Increment AirTime each tick while airborne
+                if (s.AirTimeTicks < ushort.MaxValue)
+                    s.AirTimeTicks++;
+
+                float gravity;
+
+                if (s.AirTimeTicks < stats.FloatWindowTicks)
                 {
-                    float floatG = stats.AirFloatGravity > 0 ? stats.AirFloatGravity : 6f;
-                    if (s.VY > -3f)
-                        s.VY -= floatG * TickDt;
+                    // FloatWindow: zero or reduced gravity set per character
+                    gravity = stats.AirFloatGravity;
+                }
+                else if (s.AirTimeTicks < stats.FloatWindowTicks + stats.FallRampDuration)
+                {
+                    // FallRamp: lerp from float to full gravity
+                    float rampProgress = (s.AirTimeTicks - stats.FloatWindowTicks) / (float)stats.FallRampDuration;
+                    gravity = stats.AirFloatGravity + (stats.Gravity - stats.AirFloatGravity) * rampProgress;
                 }
                 else
                 {
-                    s.VY -= stats.Gravity * TickDt;
+                    // Full gravity (also reached when both FloatWindowTicks and FallRampDuration are 0)
+                    gravity = stats.Gravity;
                 }
+
+                s.VY -= gravity * TickDt;
 
                 // Hard cap on fall speed
                 if (s.VY < -stats.MaxFallSpeed)
@@ -1008,16 +1035,6 @@ namespace SlopArena.Shared
             }
         }
 
-        // ── FACING ──
-
-        private static void UpdateFacing(ref CharacterState s)
-        {
-            float hSpeedSq = (s.VX * s.VX) + (s.VZ * s.VZ);
-            if (hSpeedSq > 0.01f)
-            {
-                s.FacingYaw = MathF.Atan2(s.VX, s.VZ);
-            }
-        }
 
         // ── INPUT HELPERS ──
 

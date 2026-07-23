@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b09b029ea6865574dba89fb0315a9d66
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/05_Buff/Buff.anim
+  uploadId: 612385

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2ecfd4d606b969d429198c68bd581b03
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Spellcasting
+    Animations/AnimatorControllers/HumanF@MagicAttackOmnidirectionals.overrideController
+  uploadId: 912162

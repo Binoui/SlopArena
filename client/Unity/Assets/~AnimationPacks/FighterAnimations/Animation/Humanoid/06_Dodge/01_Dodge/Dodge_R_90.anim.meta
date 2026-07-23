@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a0fd964018c2c97439223c1c889f614d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/06_Dodge/01_Dodge/Dodge_R_90.anim
+  uploadId: 612385

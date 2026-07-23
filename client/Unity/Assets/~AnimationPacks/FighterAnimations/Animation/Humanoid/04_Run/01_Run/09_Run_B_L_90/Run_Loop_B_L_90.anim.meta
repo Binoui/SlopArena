@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fdecca2d9a06a954e83123fcd4fde336
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/01_Run/09_Run_B_L_90/Run_Loop_B_L_90.anim
+  uploadId: 612385

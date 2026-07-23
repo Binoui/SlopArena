@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7bcf98ae2896ebc4589f948db6591919
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/02_Attack/08_Attack_Air_to_Floor_01/Attack_Air_to_Floor_01_Loop.anim
+  uploadId: 612385

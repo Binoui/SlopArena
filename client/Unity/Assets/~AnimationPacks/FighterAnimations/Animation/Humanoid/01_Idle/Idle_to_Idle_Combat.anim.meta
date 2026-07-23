@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0865c0f129ba38242ac18309ee355350
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/01_Idle/Idle_to_Idle_Combat.anim
+  uploadId: 612385

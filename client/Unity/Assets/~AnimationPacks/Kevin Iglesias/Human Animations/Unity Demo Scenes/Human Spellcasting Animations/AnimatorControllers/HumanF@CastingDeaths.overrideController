@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@CastingDeaths
+  m_Controller: {fileID: 9100000, guid: 3219fb6bef5a8b34f997e60c34d23e4b, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: d906661c27a489a488c4495ad4350955, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 613a6f34cdcf9f74e813fe228a10a47c, type: 3}
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 894508bdca6de6649910262edd7d8097, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 5f69453783a07844c9ac2850588e63ec, type: 3}

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bf209285b8a9aab42ac9c37fcb786811
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/05_Jump/01_Jump/Jump_L_90.anim
+  uploadId: 612385

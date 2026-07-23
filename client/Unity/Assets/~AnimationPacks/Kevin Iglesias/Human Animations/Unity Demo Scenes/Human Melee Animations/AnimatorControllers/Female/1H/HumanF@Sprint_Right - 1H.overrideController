@@ -1,0 +1,13 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@Sprint_Right - 1H
+  m_Controller: {fileID: 9100000, guid: e0e703937e5a29d44ace1b6f6f4f4c64, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3094330708855449807, guid: 067a556d54da4e94b8c6cfc96e97d680, type: 3}
+    m_OverrideClip: {fileID: 3094330708855449807, guid: 31b250fe2fe55ed4c8daa545b042f886, type: 3}

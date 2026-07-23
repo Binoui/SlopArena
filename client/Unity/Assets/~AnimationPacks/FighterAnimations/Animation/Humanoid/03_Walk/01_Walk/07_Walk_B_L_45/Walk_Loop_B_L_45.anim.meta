@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3c92fd026b0e2554ab930cafad71616d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/01_Walk/07_Walk_B_L_45/Walk_Loop_B_L_45.anim
+  uploadId: 612385

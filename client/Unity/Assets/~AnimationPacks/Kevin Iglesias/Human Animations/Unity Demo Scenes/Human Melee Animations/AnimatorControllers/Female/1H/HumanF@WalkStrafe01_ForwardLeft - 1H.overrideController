@@ -1,0 +1,13 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HumanF@WalkStrafe01_ForwardLeft - 1H
+  m_Controller: {fileID: 9100000, guid: cb21565128d25f948ad758be264cfda9, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 3504916948563848526, guid: 2ae6ed1bb6fa4554793f3165bfd8259c, type: 3}
+    m_OverrideClip: {fileID: -5675168540241477735, guid: a829f957dee98864789ca61348b82f46, type: 3}

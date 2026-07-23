@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 37f53f787cf99424e862f0b5ab9c5789
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/03_Walk/02_Walk_Combat/09_Walk_Combat_B_L_90/Walk_Combat_Start_B_L_90.anim
+  uploadId: 612385

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5e20d08e541990b449e55bcbebf0b296
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 261194
+  packageName: Fighter Animation Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/FighterAnimations/Animation/Humanoid/04_Run/02_Run_Combat/11_Run_Fast_Combat/Run_Start_Fast_Combat_R.anim
+  uploadId: 612385

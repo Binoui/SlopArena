@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 1f27830309a019c4e819502b1635f2a9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 22100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162341
+  packageName: Human Mega Animations Pack
+  packageVersion: 2.0
+  assetPath: Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Spellcasting
+    Animations/AnimatorControllers/HumanF@IdlesBook_L.overrideController
+  uploadId: 912162
