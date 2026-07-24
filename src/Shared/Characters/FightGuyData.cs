@@ -280,7 +280,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new HitboxEvent[]
                             {
                                 // Forward-facing capsule: sweeps ahead during dash (loop hurtbox)
-                                new() { TriggerTick = 3, DurationTicks = 57, Radius = 0.6f,
+                                new() { TriggerTick = 6, DurationTicks = 57, Radius = 0.6f,
                                     OffX = 0, OffY = 0.5f, OffZ = 0.5f,
                                     EndOffX = 0, EndOffY = 0.5f, EndOffZ = 1.5f,
                                     Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light },

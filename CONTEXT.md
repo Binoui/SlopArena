@@ -23,3 +23,11 @@ _Avoid_: terminal velocity, max gravity
 **FallRampDuration**:
 The number of ticks over which gravity ramps from `AirFloatGravity` to `FallGravity`. Per-character tuning value.
 _Avoid_: ramp time, acceleration window
+
+**JumpArc**:
+The complete animation clip played during a single jump (ground or double). Plays through both ascent and baked descent. The character transitions to the Fall animation only when the JumpArc clip finishes while still airborne — not at the physics peak. Enables a clean, full jump animation without an abrupt mid-air switch.
+_Avoid_: jump animation, jump loop, air state
+
+**JumpArcActive**:
+A per-entity bool (client-side) tracking whether the JumpArc clip is currently playing. Cleared on landing, aerial attack, or hitstun.
+_Avoid_: isAscending, wasAscending, jump state

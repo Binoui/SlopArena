@@ -29,7 +29,8 @@ namespace SlopArena.Client.Animation
         [Header("Movement")]
         public AnimationClip Idle;
         public AnimationClip Run;
-        public AnimationClip Jump;
+        public AnimationClip JumpUp;
+        public AnimationClip JumpDown;
         public AnimationClip Fall;
 
         [Header("Combat")]
@@ -73,9 +74,10 @@ namespace SlopArena.Client.Animation
             {
                 case "idle":        return Idle;
                 case "run":         return Run;
-                case "jump":        return Jump;
+                case "jump_up":     return JumpUp;
+                case "jump_down":   return JumpDown;
+                case "jump":        return JumpUp ?? JumpDown; // backward compat
                 case "fall":        return Fall;
-                case "dash":        return Dash;
                 case "hit_small":
                 case "hit_light":   return HitSmall;
                 case "hit_medium":  return HitMedium;
