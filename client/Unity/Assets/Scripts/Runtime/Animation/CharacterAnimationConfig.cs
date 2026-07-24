@@ -77,6 +77,7 @@ namespace SlopArena.Client.Animation
                 case "jump_up":     return JumpUp;
                 case "jump_down":   return JumpDown;
                 case "jump":        return JumpUp ?? JumpDown; // backward compat
+                case "dash":        return Dash;
                 case "fall":        return Fall;
                 case "hit_small":
                 case "hit_light":   return HitSmall;

@@ -26,7 +26,7 @@ public static partial class CharacterRegistry
                 JumpForce = 12f,
                 Gravity = 36f,
                 AirFloatGravity = 0f,
-                DashDurationTicks = 8,
+                DashDurationTicks = 18,
                 DashCooldownTicks = 48,
                 GroundFriction = 16f,
                 AirFriction = 0.5f,
