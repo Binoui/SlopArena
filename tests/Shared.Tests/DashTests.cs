@@ -129,7 +129,6 @@ public class DashTests
                 // Dash successfully started — verify attack state was cleared
                 Assert.Equal((byte)0, s.AttackSlot);
                 Assert.Equal((ushort)0, s.AnimLockTicks);
-                Assert.False(s.IsServerAbility);
                 Assert.Equal((ushort)0, s.ComboStage);
                 Assert.Equal((ushort)0, s.AttackElapsedTicks);
                 return; // success

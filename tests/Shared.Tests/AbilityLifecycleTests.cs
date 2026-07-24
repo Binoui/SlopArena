@@ -5,9 +5,7 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Per-ability lifecycle tests.
-/// ServerAbility classes (MankiLmbCombo, MankiAerosolFlame, MankiRoundBomb)
-/// are partially implemented — tests for them check basic activation only.
-/// Data-driven path (no ServerAbility) is fully working.
+/// All abilities use ServerAbility subclasses — no data-driven path.
 /// </summary>
 public class AbilityLifecycleTests
 {
@@ -29,7 +27,7 @@ public class AbilityLifecycleTests
         Assert.Equal((byte)1, t0.AttackSlot);
     }
 
-    // ── AirLMB: data-driven, no ServerAbility ──
+    // ── AirLMB: ServerAbility (AirLmbCombo via StageChainAbility) ──
 
     [Fact]
     public void MankiAirLMB_DataDrivenDuration()
@@ -42,7 +40,7 @@ public class AbilityLifecycleTests
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Press LMB while airborne → data-driven attack via AirLMB spec
+        // Press LMB while airborne → AirLmbCombo
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
         Assert.Equal(ActionState.Attacking, t0.State);
 
@@ -356,7 +354,7 @@ public class AbilityLifecycleTests
 
 
     // ══════════════════════════════════════════════════════════════════
-    // ── AirRMB (slot 2, airborne): data-driven — basic lifecycle ──
+    // ── AirRMB (slot 2, airborne): ServerAbility (AirRmbAttack) — basic lifecycle ──
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]

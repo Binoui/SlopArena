@@ -71,7 +71,6 @@ namespace SlopArena.Shared
 			ability.Slot = slot;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
-			state.IsServerAbility = true;
 			state.AttackSlot = (byte)(slot + 1);
             state.AirTimeTicks = 0;
             // Aerial attacks: cancel downward velocity so FloatWindow starts from hover
@@ -139,8 +138,6 @@ namespace SlopArena.Shared
 				if (!_defs.TryGetValue(id, out var def)) continue;
 
 				// Interrupt: if state left Attacking (dash, idle, or other), deactivate without OnEnd.
-				// StartDash clears AttackSlot/AnimLockTicks/IsServerAbility, so the ability
-				// won't see stale attack fields — just remove it cleanly.
 				if (state.State != ActionState.Attacking)
 				{
 					ended.Add(id);
@@ -175,7 +172,7 @@ namespace SlopArena.Shared
 				{
 					// OnEnd already called by EndAbility, skip the duplicate.
 					// For interrupted abilities (dash/interrupt): OnEnd was NOT called — but
-					// StartDash already cleared AttackSlot/AnimLockTicks/IsServerAbility, so
+					// StartDash already cleared AttackSlot/AnimLockTicks, so
 					// the clean-up below (cooldown, buffered slot, AnimLockTicks) is still correct.
 					
 					// Apply cooldown
@@ -201,8 +198,6 @@ namespace SlopArena.Shared
 								$"[AbilityEnd] entity={id} cleared BufferedSlot — prevented data-driven re-trigger");
 					}
 
-					state.AnimLockTicks = 0; // Unlock input for next data-driven attack
-					state.IsServerAbility = false; // Allow data-driven attacks to work after ServerAbility ends
 					_states[id] = state; // Persist cooldown + buffered slot clear
 				}
 				_activeAbilities.Remove(id);
@@ -393,25 +388,11 @@ namespace SlopArena.Shared
                 if (input.ActiveSlot == 6 && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
                     continue;
 
-				// Server-side ability: try to create via slot mapping
+				// Create and activate server-side ability
 				if (_activeAbilities.ContainsKey(id)) continue;
 
 				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
-				if (ability == null)
-				{
-				    // Data-driven attack (no ServerAbility). When state is already Attacking,
-				    // consume the input to prevent SimulateTick from immediately re-triggering
-				    // the attack on the expiry tick (SimulateTick line 246).
-				    // Without this, the Idle state set by expiry is immediately overwritten
-				    // and the client never receives an Idle state packet.
-				    if (state.State == ActionState.Attacking)
-				    {
-				        var consumed = input;
-				        consumed.ActiveSlot = 0;
-				        inputs[id] = consumed;
-				    }
-				    continue;
-				}
+				if (ability == null) continue; // unsupported character or slot
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 				// Consume input so SimulateTick doesn't also try to start an attack
@@ -648,139 +629,6 @@ namespace SlopArena.Shared
 			return entityList;
 		}
 
-		private void SpawnHitboxEvents()
-		{
-			// ── Spawn hitbox events for attacking entities ──
-			foreach (var kvp in _states)
-			{
-				ulong id = kvp.Key;
-				var state = kvp.Value;
-				var def = _defs[id];
-				if (state.State != ActionState.Attacking || state.AttackSlot == 0 || state.IsServerAbility) continue;
-
-				bool airborne = !state.IsGrounded;
-				var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-				if (ability == null) continue;
-				var stage = Simulation.ResolveStage(ability, state);
-				if (stage.HitboxEvents == null) continue;
-
-				float cos = MathF.Cos(state.FacingYaw);
-				float sin = MathF.Sin(state.FacingYaw);
-				foreach (var evt in stage.HitboxEvents)
-				{
-					if (state.AttackElapsedTicks != evt.TriggerTick) continue;
-					// ── Bone-attached hitbox path ──
-					if (evt.BoneName != null)
-					{
-						if (!_bakedData.TryGetValue(id, out var baked) || def.HurtboxBoneDefs == null)
-						{
-							Simulation.OnDebugLog?.Invoke($"[SpawnHitboxEvents] Bone hitbox for '{evt.BoneName}' skipped — no baked data for entity {id}");
-							continue;
-						}
-
-						// Find bone def index by name
-						int bi = -1;
-						for (int i = 0; i < def.HurtboxBoneDefs.Length; i++)
-						{
-							if (def.HurtboxBoneDefs[i].BoneName == evt.BoneName) { bi = i; break; }
-						}
-						if (bi < 0)
-						{
-							Simulation.OnDebugLog?.Invoke($"[SpawnHitboxEvents] Bone '{evt.BoneName}' not found in HurtboxBoneDefs for entity {id}");
-							continue;
-						}
-
-						// Resolve animation name (same mapping as BuildHurtboxList — read-only, no frame advance)
-						string targetAnim;
-						if (state.State == ActionState.Dashing) targetAnim = "dash";
-						else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
-						{
-							bool airborneBone = !state.IsGrounded;
-							var boneAbility = def.GetSlotAbility(state.AttackSlot - 1, airborneBone);
-							int boneStageIdx = Math.Min(state.ComboStage, (byte)(boneAbility.Stages.Length - 1));
-							targetAnim = (boneStageIdx >= 0 && boneStageIdx < boneAbility.AnimationNames.Length) ? boneAbility.AnimationNames[boneStageIdx] : "melee";
-						}
-						else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
-						{
-						    1 => def.HitMediumAnim,
-						    2 => def.HitHardAnim,
-						    _ => def.HitSmallAnim,
-						};
-						else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
-						else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
-						else targetAnim = "idle";
-
-						int animIdx = baked.FindAnimIndex(targetAnim);
-						if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
-						if (animIdx < 0) continue;
-
-						// Compute baked frame from attack elapsed ticks (no anim frame side effects)
-						int fc = baked.Animations[animIdx].FrameCount;
-						int bakedFrame = 0;
-						if (state.State == ActionState.Attacking && state.AttackSlot > 0)
-						{
-							bool airborneBone2 = !state.IsGrounded;
-							var boneAbility2 = def.GetSlotAbility(state.AttackSlot - 1, airborneBone2);
-							int boneStageIdx2 = Math.Min(state.ComboStage, (byte)(boneAbility2.Stages.Length - 1));
-							if (boneStageIdx2 >= 0 && boneStageIdx2 < boneAbility2.Stages.Length)
-							{
-								int durationTicks = boneAbility2.Stages[boneStageIdx2].DurationTicks;
-								if (durationTicks > 0) bakedFrame = Math.Min(state.AttackElapsedTicks * fc / durationTicks, fc - 1);
-							}
-						}
-						if (bakedFrame >= fc) bakedFrame = fc - 1;
-
-						// Resolve bone position in world space
-						if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz)) continue;
-						float boneScale = def.HurtboxBoneScale;
-						bx *= boneScale; by *= boneScale; bz *= boneScale;
-						float wx = state.PX + ((bx * cos) + (bz * sin));
-						float wy = def.BoneYToWorldY(state.PY, by);
-						float wz = state.PZ + ((-bx * sin) + (bz * cos));
-						wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin); wy += evt.BoneOffY; wz += (-evt.BoneOffX * sin) + (evt.BoneOffZ * cos);
-
-						float boneDamage = evt.Damage;
-						float boneRadius = evt.Radius;
-						ServerAbility.ApplyBuffBonuses(ref state, ref boneDamage, ref boneRadius);
-
-						_spellResolver.Spawn(new Hitbox
-						{
-							X = wx, Y = wy, Z = wz, Radius = boneRadius, Shape = evt.Shape,
-							EndX = wx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin)),
-							EndY = wy + evt.EndOffY,
-							EndZ = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos)),
-							Damage = boneDamage,
-							BaseKnockback = evt.Knockback.Resolve().baseKB,
-							KnockbackGrowth = evt.Knockback.Resolve().growthKB,
-							KnockbackAngle = evt.Knockback.Resolve().angle,
-							StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
-						});
-
-						continue; // Skip ability.SpawnHitbox and default melee path for this evt
-					}
-					// ── Default melee/static hitbox ──
-					float hx = state.PX + ((evt.OffX * cos) + (evt.OffZ * sin));
-					float hy = state.PY + evt.OffY;
-					float hz = state.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
-					float hex = hx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
-					float hey = hy + evt.EndOffY;
-					float hez = hz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
-					float damage = evt.Damage;
-					float radius = evt.Radius;
-					ServerAbility.ApplyBuffBonuses(ref state, ref damage, ref radius);
-					var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
-					_spellResolver.Spawn(new Hitbox
-					{
-					    X = hx, Y = hy, Z = hz, Radius = radius, Shape = evt.Shape,
-					    EndX = hex, EndY = hey, EndZ = hez, Damage = damage,
-					    BaseKnockback = kbBase,
-					    KnockbackGrowth = kbGrowth,
-					    KnockbackAngle = kbAngle,
-					    StunTicks = evt.StunTicks, DurationTicks = evt.DurationTicks, OwnerId = id,
-					});
-				}
-			}
-		}
 
 		private void ResolveHits(List<SpellResolver.EntityData> entityList)
 		{
@@ -901,22 +749,14 @@ namespace SlopArena.Shared
 				}
 
 				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(slot - 1), airborne);
-				if (ability != null)
+				if (ability == null)
 				{
-					SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(slot - 1));
-					ActivateAbility(id, ability, (byte)(slot - 1), def);
-				}
-				else
-				{
-					// Data-driven attack: set state directly
-					state.State = ActionState.Attacking;
-					state.AttackSlot = slot;
-					state.AttackElapsedTicks = 0;
-					state.ComboStage = 0;
-					state.IsServerAbility = false;
-					state.StateTicks = 0;
+					state.State = ActionState.Idle;
 					_states[id] = state;
+					continue;
 				}
+				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(slot - 1));
+				ActivateAbility(id, ability, (byte)(slot - 1), def);
 			}
 		}
 
@@ -955,7 +795,6 @@ namespace SlopArena.Shared
 			ProcessWarpArrivals();
 
 			var entityList = BuildHurtboxList();
-			SpawnHitboxEvents();
 
 			ResolveHits(entityList);
 

@@ -66,8 +66,6 @@ namespace SlopArena.Shared
         public byte ComboStage;
         /// <summary>Animation index (into spec's AnimationNames[]) set by server ability. Synced to client.</summary>
         public byte AnimIndex;
-        /// <summary>True when a server-side ability class is active (skip old data-driven attack processing).</summary>
-        public bool IsServerAbility;
         /// <summary>
         /// chain window remaining
         /// </summary>
@@ -76,18 +74,6 @@ namespace SlopArena.Shared
         /// self-lock from attack (remaining)
         /// </summary>
         public ushort AnimLockTicks;
-        /// <summary>
-        /// buffered LMB chains (max 2, for spam)
-        /// </summary>
-        public byte BufferedChain;
-        /// <summary>
-        /// ticks holding RMB
-        /// </summary>
-        public ushort HeavyHoldTicks;
-        /// <summary>
-        /// true when hold threshold reached
-        /// </summary>
-        public bool HeavyCharged;
         /// <summary>
         /// aimed charge progress (0 = none, >0 = charging)
         /// </summary>

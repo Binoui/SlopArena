@@ -674,7 +674,7 @@ public class FightGuyAbilityTests
     [Fact]
     public void BoneHitbox_EntityOffsetHitboxStillWorks()
     {
-        // Uses FightGuyDef LMB (data-driven, entity-relative OffX/OffY/OffZ, BoneName=null default).
+        // Uses FightGuyDef LMB (entity-relative OffX/OffY/OffZ, BoneName=null default).
         // HitboxEvent with no BoneName → standard positioning path.
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();

@@ -5,7 +5,7 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Tests that velocity is correctly zeroed when transitioning from Attacking → Idle.
-/// Verifies both ServerAbility.EndAbility path (StageChainAbility) and data-driven expiry.
+/// All abilities use ServerAbility.EndAbility path (StageChainAbility, MankiAerosolFlame, etc.).
 /// Also tests dash state transitions for regressions.
 /// </summary>
 public class AttackToIdleVelocityTests

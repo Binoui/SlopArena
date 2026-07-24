@@ -278,7 +278,7 @@ public class PhysicsTests
         }
     }
 
-    // ── Data-driven attack expiry ──
+    // ── ServerAbility attack lifecycle (hitstun after hit) ──
 
 
     // ── Hitstun ──
