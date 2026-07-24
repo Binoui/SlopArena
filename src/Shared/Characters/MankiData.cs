@@ -91,7 +91,7 @@ public static partial class CharacterRegistry
                     // Stage 1: right punch
                     new() { DurationTicks = 40, ChainWindowTicks = 12, LungeForce = 8f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 32, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
+                            AttackRange = 4f, WarpRange = 6f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                     // Stage 2: left punch
                     new() { DurationTicks = 35, ChainWindowTicks = 14, LungeForce = 2f,
@@ -123,7 +123,7 @@ public static partial class CharacterRegistry
                     // Stage 1: air kick
                     new() { DurationTicks = 16, ChainWindowTicks = 10,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 5f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f,
+                            AttackRange = 5f, WarpRange = 7f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                     // Stage 2: air kick 2
                     new() { DurationTicks = 18, ChainWindowTicks = 0,
