@@ -278,6 +278,19 @@ namespace SlopArena.Client.Entities
 
         // ── Animancer-driven animation ──
         //
+        /// <summary>
+        /// Compute animation playback speed so that <c>frameCount</c> frames from
+        /// baked data play in exactly <c>durationTicks</c> ticks (at 60 Hz).
+        /// Returns 1f when baked data or the named animation is unavailable.
+        /// </summary>
+        private float GetAnimSpeedFromDuration(string animName, int durationTicks)
+        {
+            if (_bakedData == null || durationTicks <= 0) return 1f;
+            int bakedIdx = _bakedData.FindAnimIndex(animName);
+            if (bakedIdx < 0) return 1f;
+            int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
+            return (float)frameCount / durationTicks;
+        }
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animancer == null || _charConfig == null)
@@ -314,11 +327,13 @@ namespace SlopArena.Client.Entities
                     var clip = _charConfig.GetClipByName(hitName);
                     if (clip != null)
                     {
-                        _animancer.Play(clip, 0f);
+                        float hsAnimSpeed = GetAnimSpeedFromDuration(hitName, state.HitstunTicks);
+                        var hsState = _animancer.Play(clip, 0f);
+                        hsState.Speed = hsAnimSpeed;
                         _lastHitstunAnimName = hitName;
                         _inHitstunAnim = true;
                         _hitstunAnimStartTime = Time.time;
-                        _hitstunAnimLength = clip.length;
+                        _hitstunAnimLength = clip.length / hsAnimSpeed;
                     }
                 }
                 _lastAnimState = ActionState.Hitstun;
@@ -326,15 +341,18 @@ namespace SlopArena.Client.Entities
             }
 
             // ── Hitstun extrapolation guard ──
-            // Let the hitstun clip finish naturally before transitioning to idle/run.
-            // Animancer non-looping clips hold last frame after finishing.
+            // Let the hitstun clip finish naturally before transitioning — but
+            // release immediately if the server state has moved on (e.g. Dashing).
             if (_inHitstunAnim)
             {
-                float elapsed = Time.time - _hitstunAnimStartTime;
-                if (elapsed < _hitstunAnimLength)
+                if (state.State == ActionState.Hitstun)
                 {
-                    _lastAnimState = ActionState.Hitstun; // Keep trigger for next re-hit
-                    return;
+                    float elapsed = Time.time - _hitstunAnimStartTime;
+                    if (elapsed < _hitstunAnimLength)
+                    {
+                        _lastAnimState = ActionState.Hitstun; // Keep trigger for next re-hit
+                        return;
+                    }
                 }
                 _inHitstunAnim = false;
             }
@@ -479,8 +497,12 @@ namespace SlopArena.Client.Entities
                 else if (state.State == ActionState.Dashing)
                 {
                     var clip = _charConfig.GetClipByName("dash");
-                    if (clip != null)
-                        _animancer.Play(clip, 0f);
+                    if (clip != null && _charDef != null)
+                    {
+                        float dashAnimSpeed = GetAnimSpeedFromDuration("dash", _charDef.Movement.DashDurationTicks);
+                        var dashState = _animancer.Play(clip, 0f);
+                        dashState.Speed = dashAnimSpeed;
+                    }
                 }
             }
 
@@ -528,6 +550,7 @@ namespace SlopArena.Client.Entities
             }
             _lastAttackSlot = state.AttackSlot;
             _wasAttacking = isAttacking;
+            _lastAnimState = state.State;
         }
 
         private void LateUpdate()
