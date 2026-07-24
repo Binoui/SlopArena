@@ -256,7 +256,7 @@ public class ServerSimulationTests
     //
     // ProcessTargetLock() reads state.State/AttackSlot and input.TargetEntityId
     // to set state.TargetEntityId each tick. Tests use Manki LMB (stage 1:
-    // UseTargetLock=true, WarpRange=10, AttackRange=5, RotateTowardTarget=true).
+    // UseTargetLock=true, WarpRange=6, AttackRange=4, RotateTowardTarget=true).
 
     [Fact]
     public void TargetEntityId_ZeroWhenNoEnemyInRange()
@@ -360,7 +360,7 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 7f; // within WarpRange=10, outside AttackRange=5
+        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
@@ -431,8 +431,8 @@ public class ServerSimulationTests
         var player = MakeIdleState(1);
         player.FacingYaw = 0f; // facing +Z
         var npc = MakeIdleState(100);
-        npc.PX = 5f; // to the right (+X), at distance 5
-        npc.PZ = 0f; // within WarpRange=10, outside AttackRange=2
+        npc.PX = 2f; // slightly right of center, inside 120° facing cone
+        npc.PZ = 5f; // within WarpRange=10, outside AttackRange=2 (dist≈5.4, angle≈21.8°)
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
@@ -483,7 +483,7 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 7f;
+        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
@@ -502,19 +502,19 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 7f; // within WarpRange=10, outside AttackRange=4
+        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4 (1.5m warp)
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
-        // 16 ticks: close 3m at 0.2m/tick, ProcessWarp checks distSq before position update
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 16);
+        // 15 ticks: close 1.5m at 0.2m/tick, warp completes ~tick 8, lunge applies tick 9+
+        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 15);
 
-        // PZ = 16 * 0.2 = 3.0m (arrived at AttackRange, VZ cleared on arrival tick)
-        TestHelpers.AssertNear(3.0f, state.PZ, tolerance: 0.01f);
         // Warp completed — WarpSpeed should be 0
         Assert.Equal(0f, state.WarpSpeed);
-        // State remains Attacking
+        // State remains Attacking after warp
         Assert.Equal(ActionState.Attacking, state.State);
+        // Progressed past warp arrival (PZ≈1.6) with lunge
+        Assert.True(state.PZ > 1.6f, $"Expected PZ > 1.6 (warp arrival + lunge), got {state.PZ:F4}");
     }
 
     [Fact]
@@ -562,7 +562,7 @@ public class ServerSimulationTests
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 7f; // within WarpRange=10, outside AttackRange=4
+        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 

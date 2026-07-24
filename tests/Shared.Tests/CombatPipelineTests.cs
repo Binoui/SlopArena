@@ -363,12 +363,12 @@ public class CombatPipelineTests
         var def = TestHelpers.CombatDef;
         float gpy = TestHelpers.CombatGroundPY;
 
-        // NPC at Z=6: within WarpRange=10 but outside AttackRange=4
+        // NPC at Z=5.9: within WarpRange=6 but outside AttackRange=4
         var player = TestHelpers.PlayerState(z: 0f);
         player.PY = gpy;
+        var npc = TestHelpers.NpcState(z: 5.9f);
         sim.RegisterEntity(1, def, player);
 
-        var npc = TestHelpers.NpcState(z: 6f);
         npc.PY = gpy;
         sim.RegisterEntity(100, def, npc);
 
@@ -434,5 +434,80 @@ public class CombatPipelineTests
 
         var state = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, state.State);
+    }
+
+    [Fact]
+    public void Warp_BehindEnemy_AttacksDirectly()
+    {
+        // NPC behind player (negative Z): inside WarpRange but outside facing cone
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        player.FacingYaw = 0f; // facing +Z
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(z: -6f); // behind player
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        // Press LMB → should NOT warp (enemy behind), should attack directly
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(0f, state.WarpSpeed);
+        Assert.Equal(ActionState.Attacking, state.State);
+    }
+
+    [Fact]
+    public void Warp_EnemyInCone_EntersWarpingState()
+    {
+        // NPC at slight angle but within 120° cone: should warp
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        player.FacingYaw = 0f; // facing +Z
+        sim.RegisterEntity(1, def, player);
+
+        // NPC at PX=2, PZ=5: distance≈5.4, angle≈21.8° from facing → inside 60° half-cone
+        var npc = TestHelpers.NpcState(x: 2f, z: 5f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Warping, state.State);
+        Assert.True(state.WarpSpeed > 0f, "Expected warp to activate for enemy inside cone");
+    }
+    [Fact]
+    public void Warp_FacingEast_NpcAhead_EntersWarpingState()
+    {
+        // Player facing +X (FacingYaw=π/2), NPC directly ahead at +X within WarpRange
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        var player = TestHelpers.PlayerState(z: 0f);
+        player.PY = gpy;
+        player.FacingYaw = MathF.PI / 2f; // facing east (+X)
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(x: 5.9f, z: 0f); // directly ahead at +X, distance=5.9 (strictly < WarpRange=6)
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        var state = sim.GetState(1);
+        Assert.Equal(ActionState.Warping, state.State);
+        Assert.True(state.WarpSpeed > 0f, "Expected warp to activate for enemy ahead at non-zero facing");
     }
 }

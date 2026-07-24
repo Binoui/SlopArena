@@ -31,3 +31,15 @@ _Avoid_: jump animation, jump loop, air state
 **JumpArcActive**:
 A per-entity bool (client-side) tracking whether the JumpArc clip is currently playing. Cleared on landing, aerial attack, or hitstun.
 _Avoid_: isAscending, wasAscending, jump state
+
+**Warp**:
+The auto-dash during attack initiation that moves the entity toward the target at SprintSpeed. A separate phase before the attack's startup — the attack begins only after warp completes (distance closed to AttackRange). Not a fixed-duration animation; duration depends on distance and SprintSpeed.
+_Avoid_: lunge, auto-approach, gap closer
+
+**WarpRange**:
+The maximum distance at which warp will trigger. If the closest enemy within a forward-facing cone is between AttackRange and WarpRange, warp initiates. Per-attack tuning value.
+_Avoid_: warp distance, lunge range, approach range
+
+**WarpCone**:
+The forward-facing angle (centered on FacingYaw) within which warp can target an enemy. Currently 120° (60° left/right). Enemies outside the cone are ignored for warp, preventing warp to targets behind the character.
+_Avoid_: warp angle, field of view, targeting cone

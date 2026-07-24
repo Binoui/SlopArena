@@ -22,6 +22,7 @@ namespace SlopArena.Shared
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
 		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
+		private const float WarpConeHalfAngleRad = 120f * MathF.PI / 180f / 2f; // 60° half-cone = 120° total facing cone
 
 		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
 		{
@@ -363,9 +364,21 @@ namespace SlopArena.Shared
 							float dx = target.PX - state.PX;
 							float dz = target.PZ - state.PZ;
 							float dist = MathF.Sqrt(dx * dx + dz * dz);
-
 							if (dist > firstStage.AttackRange && dist <= firstStage.WarpRange)
 							{
+								// ── Facing cone check: only warp to enemies roughly in front ──
+								float angleToEnemy = MathF.Atan2(dx, dz);
+								float angleDiff = angleToEnemy - state.FacingYaw;
+								while (angleDiff > MathF.PI) angleDiff -= 2f * MathF.PI;
+								while (angleDiff < -MathF.PI) angleDiff += 2f * MathF.PI;
+								if (MathF.Abs(angleDiff) > WarpConeHalfAngleRad)
+								{
+									if (Simulation.OnDebugLog != null)
+										Simulation.OnDebugLog.Invoke(
+											$"[WarpCone] SKIP entity={id} target={targetId} angleDiff={angleDiff:F3} rad (outside {WarpConeHalfAngleRad:F3} half-cone)");
+									goto tryDirectAttack; // skip warp, fall through to normal attack activation
+								}
+
 								state.WarpTargetX = target.PX;
 								state.WarpTargetZ = target.PZ;
 								state.WarpAttackRange = firstStage.AttackRange;
@@ -383,6 +396,8 @@ namespace SlopArena.Shared
 						}
 					}
 				}
+
+				tryDirectAttack:
 
                 // Reject F (Overclock) reactivation while buff already active
                 if (input.ActiveSlot == 6 && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
