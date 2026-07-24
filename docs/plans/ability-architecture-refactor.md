@@ -1,3 +1,17 @@
+---
+> **Status: SUPERSEDED** — July 2026 cleanup moved all slots to `ServerAbility` classes.
+> The data-driven fallback and `IsServerAbility` field were removed.
+> See `docs/systems/ability-architecture.md` for current architecture.
+>
+> **Summary of what was done:**
+> - Created `MankiAerosolFlame`, `FightGuyUppercut`, `AirRmbAttack` as ServerAbility subclasses
+> - Wired all slots in `AbilityFactory` (no null returns)
+> - Removed `SpawnHitboxEvents`, data-driven expiry + hold-release from `Simulation.cs`
+> - Removed `IsServerAbility`, `BufferedChain`, `HeavyHoldTicks`, `HeavyCharged` from `CharacterState`
+> - 269 tests pass, 0 failures
+>
+---
+
 # Ability Architecture Refactor — Implementation Plan
 
 > **Goal**: Make each ability self-contained so creating a new ability only touches

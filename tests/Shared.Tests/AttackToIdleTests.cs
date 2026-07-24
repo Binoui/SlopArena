@@ -3,13 +3,11 @@ using SlopArena.Shared.Abilities;
 
 namespace SlopArena.Shared.Tests;
 
-/// <summary>
 /// Tests that every character's abilities properly transition back to idle
 /// after their attack duration expires.
-/// Covers: LmbCombo (ServerAbility), MankiAerosolFlame (RMB),
-/// MankiRoundBomb (Q), data-driven (AirLMB), MankiBazooka (R),
-/// MankiOverclock (F), and FightGuy's extended abilities.
-/// </summary>
+/// Covers all slots: LMB (LmbCombo), AirLMB (AirLmbCombo), RMB (MankiAerosolFlame/FightGuyUppercut),
+/// AirRMB (AirRmbAttack), Q (MankiRoundBomb/FightGuyKiShot), E (MankiGrapple/FightGuyCycloneKick),
+/// R (MankiBazooka/FightGuyDragonKick), F (MankiOverclock/FightGuyTempest).
 public class AttackToIdleTests
 {
     private static readonly CharacterDefinition MankiDef = TestHelpers.MankiDef;
@@ -52,7 +50,7 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI AIR LMB — data-driven (no ServerAbility)
+    //  MANKI AIR LMB — AirLmbCombo (StageChainAbility)
     // ════════════════════════════════════════════════
 
     [Fact]
@@ -112,7 +110,7 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI AIR RMB — data-driven (no ServerAbility)
+    //  MANKI AIR RMB — AirRmbAttack
     // ════════════════════════════════════════════════
 
     [Fact]
@@ -159,7 +157,7 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI E — data-driven explosive mine
+    //  MANKI E — MankiGrapple
     // ════════════════════════════════════════════════
 
     [Fact]

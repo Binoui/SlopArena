@@ -5,7 +5,7 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Tests for two bugs in the attack → idle transition:
-/// 1. Data-driven attacks re-trigger when button is held (PreTickAbilities doesn't consume input)
+/// 1. Held-input re-trigger (PreTickAbilities consumes input, but held buttons need guard)
 /// 2. AerosolFlame/Overclock use AttackElapsedTicks >= AnimLockTicks (halved duration)
 /// </summary>
 public class AttackIdleReTriggerTests
@@ -14,11 +14,10 @@ public class AttackIdleReTriggerTests
     private static readonly float GroundPy = TestHelpers.MankiGroundPY;
 
     // ══════════════════════════════════════════════════════════════
-    //  Bug 1: Data-driven held-input re-trigger
-    //  Manki E (slot 4), AirLMB (slot 1 airborne), AirRMB (slot 2 airborne)
-    //  have no ServerAbility — data-driven fallback.
-    //  When button is HELD, PreTickAbilities doesn't consume the input,
-    //  and SimulateTick re-triggers on the expiry tick.
+    //  Bug 1: Held-input re-trigger
+    //  All abilities are ServerAbility. PreTickAbilities activates them on
+    //  the first tick with ActiveSlot. When the button is HELD, the guard
+    //  `if (_activeAbilities.ContainsKey(id)) continue;` prevents re-trigger.
     // ══════════════════════════════════════════════════════════════
 
     [Fact]

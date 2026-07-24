@@ -2,7 +2,7 @@
 
 ## Overview
 
-All abilities use the **ServerAbility pattern**: polymorphic C# classes with data-driven parameters.
+**Every ability** uses the `ServerAbility` pattern: polymorphic C# classes with data-driven parameters. There is no data-driven fallback — all slots have a `ServerAbility` subclass.
 
 - **Logic:** `ServerAbility` subclasses (OnStart/Tick/OnEnd lifecycle)
 - **Data:** `AbilitySpec.Params` dictionary (tunable without recompiling)
@@ -28,17 +28,23 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 ┌─────────────────────────────────────────────────────┐
 │  AbilityFactory.CreateServer(characterClass, slot)   │
 │  ┌────────────────────────────────────────────────┐ │
-│  │ Manki + slot 0 => new MankiLmbCombo()          │ │
-│  │ Manki + slot 2 => new MankiRoundBomb()         │ │
-│  │ Manki + slot 1 => null (data-driven ChargeAtk)  │ │
+│  │ Manki:                                         │ │
+│  │  slot 0 ground → LmbCombo                      │ │
+│  │  slot 0 air   → AirLmbCombo                    │ │
+│  │  slot 1 ground → MankiAerosolFlame             │ │
+│  │  slot 1 air   → AirRmbAttack                   │ │
+│  │  slot 2       → MankiRoundBomb                 │ │
+│  │  slot 3       → MankiGrapple                   │ │
+│  │  slot 4       → MankiBazooka                   │ │
+│  │  slot 5       → MankiOverclock                 │ │
 │  └────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
-│  │ OnStart(ref state, def)  // called once; set AnimIndex via AnimIndex property   │
-│  │ Tick(ref state, input)   // called per tick; set AnimIndex on ability instance  │
-│  │ OnEnd(ref state)         // natural end only; no interrupt callback   │
-│  │ OnHitEntity(ref attacker, ref target, attackerDef, ref damage, ref kbForce) // called when hitbox connects   │
+│  OnStart(ref state, def)  // called once (AnimIndex via property)   │
+│  Tick(ref state, input)   // called per tick; set AnimIndex         │
+│  OnEnd(ref state)         // natural end only; no interrupt callback │
+│  OnHitEntity(...)         // hit-time effects (status, conditional) │
 └─────────────────────────────────────────────────────┘
                     ▼
 ┌─────────────────────────────────────────────────────┐
@@ -49,41 +55,84 @@ All abilities use the **ServerAbility pattern**: polymorphic C# classes with dat
 └─────────────────────────────────────────────────────┘
 ```
 
-## When to Use ServerAbility
+All abilities spawn their own hitboxes in `Tick()` via `SpawnHitbox(ref s, evt)` or `Resolver.Spawn()`. No data-driven `SpawnHitboxEvents` method.
 
-**Use ServerAbility when you need:**
-- Per-tick movement control (dash, lunge, warp)
-- Conditional logic (spawn hitbox only if X)
-- Dynamic behavior (tracking projectiles, mines)
-- Input-driven state (hold to charge)
+## Complete Slot Mapping
 
-**Examples:**
-  - **MankiLmbCombo**: Lunges forward for first 10 ticks of each stage
-  - **MankiRoundBomb**: Spawns projectile at specific tick, three-phase aim-hold pipeline
-  // Manki RMB is now data-driven ChargeAttack (see Hold-to-Charge section)
+| Slot | Manki | FightGuy | Shared |
+|------|-------|----------|--------|
+| LMB ground (0) | `LmbCombo` | `LmbCombo` | Shared via StageChainAbility |
+| LMB air (0) | `AirLmbCombo` | `AirLmbCombo` | Shared via StageChainAbility |
+| RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | Per-character |
+| RMB air (1) | `AirRmbAttack` | `AirRmbAttack` | Shared single-hit spike |
+| Q (2) | `MankiRoundBomb` | `FightGuyKiShot` | Per-character |
+| E (3) | `MankiGrapple` | `FightGuyCycloneKick` | Per-character |
+| R (4) | `MankiBazooka` | `FightGuyDragonKick` | Per-character |
+| F (5) | `MankiOverclock` | `FightGuyTempest` | Per-character |
 
-## Data-Driven Parameters
+## Key Patterns
 
-All tunable values live in `AbilitySpec.Params`:
+### StageChainAbility (LMB combos)
 
-```csharp
-Params = new()
-{
-    ["lunge_duration"] = 10f,
-    ["explosion_damage"] = 25f,
-    ["charge_threshold"] = 45f,
-}
+`StageChainAbility` is an abstract subclass of `ServerAbility` for multi-stage melee combos. Shared by `LmbCombo` and `AirLmbCombo` — stages come from the character's `AbilitySpec.Stages[]`.
+
+- Input buffered immediately on LMB press during any stage
+- Chain fires when the current stage expires (or at `ChainWindowTicks` before expiry)
+- Lunge velocity applied at stage start, cleared after `lunge_duration` ticks
+- Hitboxes spawned at each stage's `TriggerTick` via `SpawnHitbox()`
+
+### Hold-to-Charge Ability Pattern (RMB)
+
+RMB uses per-character ServerAbility subclasses (`MankiAerosolFlame`, `FightGuyUppercut`) with a two-phase lifecycle:
+
+```
+Phase 0: AnimIndex=0 (spell_rmb_charged/loop) → hold to charge
+Phase 1: AnimIndex=1 (spell_rmb_attack) → release, attack fires
 ```
 
-Read in ServerAbility:
-```csharp
-float duration = GetParam(def, "lunge_duration", 10f);
+**Phase 0 (Hold):**
+- Internal `_chargeTicks` accumulates while `input.IsAiming`
+- No lunge (Manki) or gentle lunge forward (FightGuy, from spec's `Stages[0].LungeForce`)
+
+**Release conditions (checked each tick):**
+- **Manual:** `!input.IsAiming` after 5-tick debounce
+- **Auto:** `_chargeTicks >= ChargeHoldTicks` or 5s failsafe (300 ticks)
+
+**Phase 1 (Attack):**
+- If `_chargeTicks >= ChargeHoldTicks` → uses `ChargedStages[0]` (bigger damage/radius)
+- Otherwise → uses `Stages[1]` (normal variant)
+- Lunge force from the chosen stage
+- Hitboxes spawned at `TriggerTick` via `SpawnHitbox()`
+
+| Variant | Charge Time | Stage Source |
+|---------|-------------|-------------|
+| Normal | < threshold | `Stages[1]` |
+| Charged | >= threshold | `ChargedStages[0]` |
+
+**Per-character params:**
+
+| Character | ChargeHoldTicks | Charge Anim | Lunge (charge) | Normal Damage | Charged Damage |
+|-----------|----------------|-------------|----------------|---------------|----------------|
+| Manki | 45 (0.75s) | `spell_rmb_charged` | 0 | 8 | 14 |
+| FightGuy | 180 (3s) | `spell_rmb_loop` | 2 m/s | 6×3 hits | 14×3 hits |
+
+**Client:** Both RMB abilities have `AimMode = AimMode.None` — camera follows freely during charge.
+
+### Hold-to-Aim Ability Pattern (Q)
+
+Manki RoundBomb and FightGuy KiShot use a three-phase aim pipeline:
+
+```
+spell_q_start (AnimIndex=0) → spell_q_loop (AnimIndex=1) → spell_q_end (AnimIndex=2)
 ```
 
-**Benefits:**
-- Designers tune without recompiling
-- Same ServerAbility class, different params per character
-- Easy A/B testing
+1. **OnStart**: Enter attacking, short 8-tick startup
+2. **Tick (hold phase)**: After 8 ticks, loop animation. Checks `input.IsAiming`:
+   - If true: stays in loop, accumulates `s.ChargeTicks` (via simulation's charge-ticks block in `SimulateTick`)
+   - If false: transitions to throw phase
+3. **Tick (throw phase)**: At trigger tick, spawns projectile via cached aim data. Calls `EndAbility` after throw duration.
+
+Aim data (`AimYaw`, `AimTargetDistance`, `AimPitch`) must be cached at transition time because `SimulateTick` overwrites them every tick.
 
 ## Creating a New Ability
 
@@ -94,12 +143,17 @@ public sealed class NewAbility : ServerAbility
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         s.State = ActionState.Attacking;
+        s.AttackSlot = (byte)(Slot + 1);
         s.AnimLockTicks = (ushort)GetParam(def, "duration", 30f);
+        AnimIndex = 0;
     }
     
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
     {
-        // Your logic here
+        // Spawn hitbox at trigger tick
+        if (s.AttackElapsedTicks == 10)
+            SpawnHitbox(ref s, new HitboxEvent { ... });
+
         if (s.AttackElapsedTicks >= s.AnimLockTicks)
             EndAbility(ref s);
     }
@@ -108,274 +162,112 @@ public sealed class NewAbility : ServerAbility
 
 2. **Register in AbilityFactory:**
 ```csharp
-// Add to the appropriate character's private method (e.g., CreateMankiAbility)
-private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
-{
-    (0, false) => new MankiLmbCombo(),
-    (1, false) => null,              // RMB — data-driven ChargeAttack
-    (2, _) => new MankiRoundBomb(),
-    (3, _) => new MankiGrapple(),    // E — Grapple Gun
-    (4, _) => new MankiBazooka(),   // R — FPS rocket launcher (no rise)
-    (5, _) => new MankiOverclock(),  // F
-    _ => null,
-};
+// Add to the appropriate character's CreateXAbility method
+(3, _) => new NewAbility(),  // slot 3 = E
 ```
 
-### Slot-Based Mapping
-
-Each ability is mapped by (CharacterClass, slot, airborne) tuple:
-- Slot 0 = LMB
-- Slot 1 = RMB
-- Slot 2 = Q
-- Slot 3 = E
-- Slot 4 = R
-- Slot 5 = F
-
-The `airborne` parameter allows different abilities for ground vs air (e.g., Manki LMB combo on ground, air combo via AirLmbCombo when airborne).
-
-**Example:**
-private static ServerAbility? CreateFightGuyAbility(byte slot, bool airborne) => (slot, airborne) switch
-{
-    (0, false) => new FightGuyLmbCombo(),
-    (0, true) => new AirLmbCombo(),   // AirLMB — multi-hit air combo
-    (1, _) => null,       // RMB — data-driven
-    (2, _) => new FightGuyKiShot(),   // Q
-    (3, _) => new FightGuyCycloneKick(),          // E
-    (4, _) => new FightGuyDragonKick(),        // R
-    (5, _) => new FightGuyTempest(),          // F
-    _ => null, // Data-driven fallback for slots without ServerAbility
-};
-
-3. **Add to CharacterDefinition:**
+3. **Add spec to CharacterDefinition:**
 ```csharp
 E = new AbilitySpec
 {
     Name = "New Ability",
     Params = new() { ["duration"] = 30f },
-    // ... rest of data
+    Stages = new[] { new AttackStage { DurationTicks = 30, ... } },
+    AnimationNames = new[] { "spell_e" },
 }
 ```
 
 ### AnimIndex — Set on Ability Instance (Not Struct Field)
 
-`AnimIndex` is a property on `ServerAbility` (the base class). This is the source
-of truth. Set it in `OnStart` and `Tick`:
+`AnimIndex` is a **property on `ServerAbility`** (the base class). Set it in `OnStart` and `Tick`:
 ```csharp
 AnimIndex = 2;  // sets the property on the ability instance
 ```
 
-`ActivateAbility` and `TickAbilities` sync this to `CharacterState.AnimIndex` via
-`state.AnimIndex = ability.AnimIndex`. Writing `s.AnimIndex` directly would be
-overwritten on the next sync.
-
-**Bug history:** Several abilities originally wrote `s.AnimIndex = X` (the struct field),
-which was silently overwritten by the sync. Fixed by changing all sites to `AnimIndex = X`.
-There is only one write path: the ability instance property.
+`ActivateAbility` and `TickAbilities` sync this to `CharacterState.AnimIndex` via `state.AnimIndex = ability.AnimIndex`. Writing `s.AnimIndex` directly is overwritten on the next sync.
 
 ### OnStart
 - Called once when ability activates
-- Set initial state (State, AnimLockTicks), and AnimIndex via `AnimIndex = X` (ability property, synced to struct)
-- Apply initial velocity if needed
-- Initialize private fields
- 
+- Set initial state, `AnimLockTicks`, and `AnimIndex = X` (property, synced to struct)
+- Apply initial velocity if needed. Do NOT set `AttackSlot` — `ActivateAbility` handles it.
+
 ### OnEnd
-- Called ONLY on natural completion (NOT interruption)
-- Override to apply lingering effects
-- Cooldown is applied automatically by ServerSimulation
+- Called only on natural completion (NOT interruption)
+- Override to apply lingering effects. Cooldown applied automatically.
 
 ### Interruption
-- Hitstun, death, or new ability activation → OnEnd NOT called
+- Hitstun, death, or new ability activation → `OnEnd` NOT called
 - Ability dropped from `_activeAbilities`
-- Velocity preserved (important for momentum-granting abilities)
-- **Known gap**: No `OnInterrupt` callback. Ability.Tick() runs during hitstun
-  until the ability's own EndAbility fires, which overwrites State=Idle.
-
-
-**Critical implementation detail:** `ActivateAbility` in `ServerSimulation.cs` sets
-`state.AttackSlot = (byte)(slot + 1)` after calling `OnStart`. Individual abilities
-`should NOT set AttackSlot in OnStart` — rely on ActivateAbility. (Bug: MankiLmbCombo
-and MankiAerosolFlame originally didn't set it, causing TickAbilities to immediately
-deactivate them via the `AttackSlot == 0` check. Fixed in `ActivateAbility`.)
+- Velocity preserved (momentum-granting abilities work correctly)
 
 ### OnHitEntity — Hit-Time Effects
 
-New in this branch: `OnHitEntity` is called when an ability's hitbox connects with a target.
-Override to apply status effects (Marked), conditional damage, or spawn secondary hitboxes (AoE).
+Called when this ability's hitbox connects with a target. Override for status effects, conditional damage, or secondary AoE:
 
-Example — FightGuyDragonKick:
 ```csharp
-public override void OnHitEntity(...)
+public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
+    CharacterDefinition attackerDef, ref float damage, ref float knockbackForce)
 {
     if ((target.StatusFlags & MARK_BIT) != 0)
     {
-        target.StatusFlags &= ~MARK_BIT;     // consume mark
-        target.StatusRemainingTicks = 0;
-        Resolver.Spawn(AoE hitbox);           // spawn secondary explosion
+        target.StatusFlags &= ~MARK_BIT;
+        Resolver.Spawn(AoE hitbox);
     }
 }
 ```
 
-### StatusFlags — Marked, Slowed, etc.
+### SpawnHitbox — Built-in Helper
 
-`CharacterState.StatusFlags` (byte bitfield) and `StatusRemainingTicks` (ushort)
-provide a generic status effect system. Currently used for FightGuy Q's Marked status (bit 2).
-Flag is auto-cleared when `StatusRemainingTicks` reaches 0.
+`SpawnHitbox(ref state, hitboxEvent)` in the base class handles:
+- Bone-attached hitbox positioning (when `HitboxEvent.BoneName` is set and `BakedData` is available)
+- Facing-relative world-space positioning (default)
+- Buff bonus application (Overclock adds +3 damage, +0.5 radius)
+- Knockback profile resolution
 
-### SimulationStates — Cross-Entity Inspection
+**Call this in Tick() at the right TriggerTick** rather than manually calling `Resolver.Spawn()`.
 
-`ServerAbility.SimulationStates` is set by `ServerSimulation` before each tick.
-Abilities can inspect other entities' state for homing (FightGuy R), area pull (FightGuy F), etc.
-Returns `Dictionary<ulong, CharacterState>` — do NOT mutate other entities' state directly.
+## Params — Tunable Values
 
+All tunable values live in `AbilitySpec.Params` and are read via `GetParam(def, key, fallback)`:
+
+```csharp
+Params = new()
+{
+    ["lunge_duration"] = 10f,
+    ["explosion_damage"] = 25f,
+    ["charge_threshold"] = 45f,
+}
+```
+
+Benefits: designers tune without recompiling, same class with different params per character.
 
 ## Best Practices
 
 1. **Keep logic in Tick(), data in Params**
-2. **Use `_stageTicks++` for tick counters** (not duration -= delta)
+2. **Use `_phaseticks++` or `_stageTicks++` for tick counters** (not duration -= delta)
 3. **Read params in OnStart** for performance
-4. **Spawn hitboxes relative to character** (OffX/OffY/OffZ are facing-rotated)
-5. **End explicitly** - call EndAbility() when done
-6. **Don't use engine types** in Shared/Abilities/
+4. **Spawn hitboxes via `SpawnHitbox()`** — handles facing rotation and buffs
+5. **End explicitly** — call `EndAbility(ref s)` when done
+6. **Don't use Unity/engine types** in `src/Shared/Abilities/`
+7. **Sync internal state to `s.ChargeTicks`** for test/debug visibility if your ability tracks charge
 
-## Warp Movement
-
-Warp movement (auto-dash toward target before attacking) is server-side in `Simulation.ProcessWarp()`:
-
-Warp parameters (`WarpTargetX`, `WarpTargetZ`, `WarpSpeed`) are set by `ProcessTargetLock()` when the target is within `WarpRange` but outside `AttackRange`. The ability `OnStart` does NOT set warp — it is set by the sim before abilities tick.
-
-```csharp
-// Not in OnStart — warp is set by ServerSimulation.ProcessTargetLock() each tick
-// s.WarpSpeed = 0.3f;   // done in ProcessTargetLock, not OnStart
-```
-
-The sim interpolates position each tick using exponential convergence:
-- Each tick closes `WarpSpeed` fraction of remaining distance: `V = dx * WarpSpeed / TickDt`
-- At `WarpSpeed = 0.3`, warp reaches attack range in ~3 ticks
-- Once warp completes (within `WarpAttackRange`), `WarpSpeed` is cleared and the ability's lunge phase auto-kicks in on the next tick
-
-## Hold-to-Aim Ability Pattern (Manki Q)
-
-Manki RoundBomb demonstrates the hold-to-aim pattern for `AimedProjectile` abilities:
-
-### Three-Phase Pipeline
-
-```
-spell_q_start (AnimIndex=0) → spell_q_loop (AnimIndex=1) → spell_q_end (AnimIndex=2)
-```
-
-1. **OnStart**: Sets `s.State = Attacking`, `s.ComboStage = 0`, `AnimIndex = 0`
-2. **Tick (hold phase)**: After 8 ticks, switches to `AnimIndex=1` (loop). Checks `input.IsAiming`:
-   - If `true`: stays in loop, accumulates ChargeTicks
-   - If `false`: transitions to throw phase
-3. **Tick (throw phase)**: At `throw_trigger_tick`, spawns projectile. At `throw_duration`, calls `EndAbility`
-
-### AimMode — Client-Side Camera Routing
-
-Each `AbilitySpec` carries an `AimMode` field (defined in `AbilitySpec.cs`):
-
-```csharp
-public enum AimMode : byte
-{
-    None,            // No aim input; camera free, cursor locked
-    GroundCursor,    // Cursor unlocked; raycast ground → AimYaw + AimDistance
-    CameraForward3D, // Cursor locked; camera yaw+pitch → AimYaw + AimPitch
-}
-```
-
-`TrainingMatch.OnMatchFixedUpdate` reads `spec.AimMode` and routes to `CameraMount.SetMode`:
-- `GroundCursor` → `CameraMode.FreeCursor` (cursor unlocks, `AimIndicator` drives ground ring)
-- `CameraForward3D` → `CameraMode.Frozen` (camera angle held, crosshair drawn, yaw+pitch read from camera)
-- `None` → `CameraMode.Normal` (camera free, cursor locked)
-
-**When adding a new aimed ability**, set `AimMode` on its `AbilitySpec` — no changes to `TrainingMatch` needed.
-
-### Aim Data Caching (server side)
-
-Critical detail: `s.AimTargetDistance` and `s.AimYaw` are overwritten every tick by `SimulateTick`.
-The projectile spawns 10 ticks after the release transition. Cache both values at transition time:
-
-```csharp
-_cachedAimDistance = s.AimTargetDistance;
-_cachedAimYaw = s.AimYaw;
-// Use _cachedAimDistance, _cachedAimYaw for spawn, not s.AimTargetDistance/s.AimYaw
-```
-
-### Cooldown
-
-`CharacterState` is a value type. After `SetCooldown(ref state, slot, ticks)`, persist with:
-```csharp
-_states[id] = state;
-```
-Client-side cooldown check in `Simulation.SimulateTick` mirrors the server check in `PreTickAbilities`.
-
-## Hold-to-Charge Ability Pattern (Manki RMB)
-
-Manki RMB is a data-driven `ChargeAttack` behavior. No `ServerAbility` class — the pipeline
-handles charging, release detection, and stage selection automatically.
-
-### Two-Phase Lifecycle
-
-```
-Phase 1: spell_rmb_charged (ComboStage=0) → charge hold
-Phase 2: spell_rmb_attack   (ComboStage=1) → release-to-attack
-```
-
-**Phase 1 — Charge hold** (ComboStage=0):
-- The data-driven pipeline detects `ChargeAttack` behavior and holds at ComboStage=0.
-- `ChargeTicks` accumulates each tick while `input.IsAiming` is true.
-- ChargeTicks is capped at `ChargeHoldTicks` (45 ticks = 0.75s).
-- The stage used for hitbox/expiry is `Stages[0]` (no `ChargedStages` during charge phase).
-
-**Release conditions** (in `Simulation.SimulateTick`):
-- **Manual release** (`!input.IsAiming && AttackElapsedTicks >= 5`): Player released RMB key,
-  fires as normal or charged depending on accumulated ChargeTicks.
-- **Auto-release** (`AttackElapsedTicks >= 10 || ChargeTicks >= ChargeHoldTicks`): Fallback
-  that prevents infinite charge. At ChargeHoldTicks the attack fires automatically.
-- On release: `ComboStage = 1`, `AttackElapsedTicks = 0`.
-
-**Phase 2 — Attack** (ComboStage=1):
-- Stage selection uses `ResolveStage()`:
-  - `ChargeTicks >= ChargeHoldTicks` → `ChargedStages[0]` (charged variant)
-  - Otherwise → `Stages[1]` (normal variant)
-- Same as standard data-driven attack: spawn hitbox at `triggerTick`, end when
-  `AttackElapsedTicks >= stage.DurationTicks`.
-
-### Key Differences from Hold-to-Aim (Manki Q)
-
-| Aspect | Hold-to-Aim (Q) | Hold-to-Charge (RMB) |
-|--------|-----------------|----------------------|
-| Input signal | `input.IsAiming` = release-to-throw | `input.IsAiming` = hold-to-charge |
-| Client indicator | Ground ring + arc via AimIndicator | No indicator (hidden behind `aimingSlot >= 2`) |
-| Camera lock | Locked during aiming | Not locked (camera follows player) |
-| Animation phases | 3 phases (start/loop/end) | 2 phases (charge/release) |
-| Variants | Always same projectile | Normal vs charged (damage, range, radius) |
-
-### Cooldown
-
-Cooldown (30 ticks) starts after the attack ends. Total commitment time =
-`hold_duration + attack_duration`, so RMB cannot re-fire during the active ability.
-
-### Client Integration (TrainingMatch)
-
-`TrainingMatch` reads `spec.AimMode` (not `spec.Behavior`) to determine camera/cursor state.
-RMB has `AimMode = AimMode.None`, so it never triggers cursor unlock or camera freeze — the
-camera follows freely during the charge hold, which is correct.
 ## Test Coverage
 
 All abilities have matching xUnit tests in `tests/Shared.Tests/`:
 
 | Test file | What it covers |
 |---|---|
-| `AbilityLifecycleTests.cs` | Activation, data-driven expiry, RMB charge-hold lifecycle (8 tests: normal/charged hitbox params, under-threshold hold, auto-release, cooldown, hold-release) |
+| `AbilityLifecycleTests.cs` | Activation + lifecycle for all slots (LMB, AirLMB, RMB charged/normal, AirRMB, Q, E, R, F) |
 | `AttackToIdleTests.cs` | State transitions back to idle after attacks |
-| `AnimatorGraphBuilderTests.cs` | Animation graph transition correctness |
-| `PhysicsTests.cs` | State transitions during attacks, hitstun knockback |
+| `AttackToIdleVelocityTests.cs` | Velocity zeroed on ability end |
+| `AttackIdleReTriggerTests.cs` | Held-input guard, ability timer vs struct timer |
+| `PhysicsTests.cs` | State transitions, hitstun knockback |
 | `CombatIntegrationTests.cs` | Two-entity stability during attacks |
 | `SpellResolverTests.cs` | Hitbox collision, CanHitOwner, explosions |
-| `ServerSimulationTests.cs` | Ability lifetime, self-hit prevention |
+| `ServerSimulationTests.cs` | Ability lifetime, cooldown, self-hit prevention |
 | `CombatMathTests.cs` | Knockback formulas, DI, projectile math |
-| `MankiExplosiveMineTests.cs` | Mine placement, detonation, auto-detonate, Overclock buff bonus |
-| `FightGuyAbilityTests.cs` | Bunny LMB/Q/E/R/F activation, hitbox, damage, mark, homing, launcher |
+| `MankiExplosiveMineTests.cs` | Mine placement, detonation, Overclock buff |
+| `FightGuyAbilityTests.cs` | All FightGuy slots: activation, hitbox, damage, mark, homing, launcher |
 
 **Run after every ability change:**
 ```bash

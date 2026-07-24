@@ -93,20 +93,9 @@ namespace SlopArena.Shared
         /// </summary>
         private const float LedgeGrabTolerance = 2.5f;
 
-        /// <summary>
-        /// Resolve the effective AttackStage for a data-driven ability.
-        /// For ChargeAttack with ChargedStages: uses ChargedStages[ComboStage-1] when
-        /// ChargeTicks >= ChargeHoldTicks and ComboStage >= 1 (attack phase).
-        /// Otherwise returns spec.Stages[Clamped(ComboStage)].
-        /// </summary>
+        /// Resolve the effective AttackStage from an AbilitySpec, clamping ComboStage.
         public static AttackStage ResolveStage(AbilitySpec spec, in CharacterState state)
         {
-            if (spec.Behavior == AbilityBehavior.ChargeAttack && spec.ChargedStages != null && spec.ChargedStages.Length > 0
-                && state.ComboStage >= 1 && state.ChargeTicks >= spec.ChargeHoldTicks)
-            {
-                int chargedIdx = Math.Min(state.ComboStage - 1, spec.ChargedStages.Length - 1);
-                return spec.ChargedStages[chargedIdx];
-            }
             int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
             return spec.Stages[stageIdx];
         }
@@ -200,65 +189,7 @@ namespace SlopArena.Shared
                 s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
             }
 
-            // Data-driven attack expiry (no ServerAbility — auto-end when stage duration elapses)
-            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && !s.IsServerAbility)
-            {
-                var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
-                if (spec != null)
-                {
-                    var stage = Simulation.ResolveStage(spec, s);
-                    if (s.AttackElapsedTicks >= stage.DurationTicks)
-                    {
-                        // Apply cooldown before clearing slot
-                        if (spec.CooldownTicks > 0)
-                        {
-                            switch (s.AttackSlot)
-                            {
-                                case 1: s.Cooldown0 = spec.CooldownTicks; break;
-                                case 2: s.Cooldown1 = spec.CooldownTicks; break;
-                                case 3: s.Cooldown2 = spec.CooldownTicks; break;
-                                case 4: s.Cooldown3 = spec.CooldownTicks; break;
-                                case 5: s.Cooldown4 = spec.CooldownTicks; break;
-                                case 6: s.Cooldown5 = spec.CooldownTicks; break;
-                            }
-                        }
-                        // Zero residual velocity from data-driven lunge/charge attacks
-                        // to prevent drift when transitioning to Idle.
-                        s.VX = 0f;
-                        s.VZ = 0f;
-                        s.State = ActionState.Idle;
-                        s.AttackSlot = 0;
-                        s.ComboStage = 0;
-                        s.AttackElapsedTicks = 0;
-                        s.ChargeTicks = 0;
-                    }
-                }
-            }
 
-            // 5.25 Hold-phase auto-release: advance ComboStage (data-driven abilities only)
-            // ServerAbility classes handle their own state via Tick.
-            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && s.ComboStage == 0 && !s.IsServerAbility)
-            {
-                var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
-                if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
-                {
-                    bool shouldRelease = false;
-
-                    // Manual release: button released before full charge (minimum 5 ticks to debounce)
-                    if (!input.IsAiming && s.AttackElapsedTicks >= 5)
-                        shouldRelease = true;
-
-                    // Auto-release: fully charged or safety net (5 second max hold)
-                    if ((spec.ChargeHoldTicks > 0 && s.ChargeTicks >= spec.ChargeHoldTicks) || s.AttackElapsedTicks >= 300)
-                        shouldRelease = true;
-
-                    if (shouldRelease)
-                    {
-                        s.ComboStage = 1;
-                        s.AttackElapsedTicks = 0; // Reset so hitbox TriggerTick is relative to attack start
-                    }
-                }
-            }
 
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
@@ -332,7 +263,6 @@ namespace SlopArena.Shared
                     {
                         s.State = ActionState.Attacking;
                         s.AttackSlot = input.ActiveSlot;
-                        s.IsServerAbility = false;
                         s.StateTicks = 0;
                         s.AirTimeTicks = 0;
                         if (!s.IsGrounded && s.VY < 0f)
@@ -360,24 +290,26 @@ namespace SlopArena.Shared
             {
                 ProcessNormalMovement(ref s, stats, input);
             }
-
-            // 7b. Charge ticks for hold/charge abilities
+            
+            // 7b. Charge ticks for aimed projectile abilities (Manki Q, FightGuy Q).
+            // ServerAbility subclasses read s.ChargeTicks to check max hold duration.
             if (s.State == ActionState.Attacking && s.AttackSlot > 0 && s.ChargeTicks < ushort.MaxValue)
             {
                 var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
-                if (spec != null && (spec.Behavior == AbilityBehavior.ChargeAttack || spec.Behavior == AbilityBehavior.AimedProjectile))
+                if (spec != null && spec.Behavior == AbilityBehavior.AimedProjectile)
                 {
                     if (input.IsAiming && s.ChargeTicks < spec.ChargeHoldTicks)
                         s.ChargeTicks++;
                 }
             }
-
+            
             // 8. Gravity (skip during hitstun — ProcessHitstun handles KVY decay)
             if (s.State != ActionState.Hitstun)
                 ApplyGravity(ref s, stats);
-
-            // 9. Position update (Euler integration)
+            
+            // 9. Position integration
             s.PX += s.VX * TickDt;
+
             s.PZ += s.VZ * TickDt;
             s.PY += s.VY * TickDt;
 
@@ -871,7 +803,6 @@ namespace SlopArena.Shared
                 s.AttackSlot = 0;
                 s.ComboStage = 0;
                 s.AttackElapsedTicks = 0;
-                s.IsServerAbility = false;
                 s.AnimLockTicks = 0;
             }
 

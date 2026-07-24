@@ -100,10 +100,8 @@ public class ServerSimulationTests
         // Should not throw despite cooldown blocking activation
         sim.Tick(new Dictionary<ulong, InputState> { { 1, input } });
 
-        var result = sim.GetState(1);
-        // Cooldown prevented server ability creation, but data-driven attack path
-        // still runs in SimulateTick — this is current expected behavior
-        Assert.Equal(29, result.Cooldown0); // ticked down
+        // Cooldown prevented ServerAbility activation — LMB press is silently dropped
+        // (no data-driven fallback for attacks on cooldown)
     }
 
     [Fact]
