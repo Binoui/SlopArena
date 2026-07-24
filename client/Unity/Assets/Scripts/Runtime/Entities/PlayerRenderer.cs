@@ -183,6 +183,7 @@ namespace SlopArena.Client.Entities
         // ── Tracking state for change detection ──
 
         private CharacterState _lastState;
+        private bool _jumpArcActive;
         private ActionState _lastAnimState;
         private byte _lastAttackSlot;
         private byte _lastComboStage;
@@ -305,6 +306,7 @@ namespace SlopArena.Client.Entities
                 };
                 // Re-hit detection: restart animation when HitstunTicks resets upward
                 // (new hit) or on first entry into hitstun.
+                _jumpArcActive = false;
                 bool newHit = _lastAnimState != ActionState.Hitstun
                     || state.HitstunTicks >= _lastState.HitstunTicks;
                 if (newHit)
@@ -342,38 +344,62 @@ namespace SlopArena.Client.Entities
             {
                 if (state.State == ActionState.JumpSquat)
                 {
-                    var clip = _charConfig.GetClipByName("jump");
+                    var clip = _charConfig.GetClipByName("jump_up");
                     if (clip != null)
+                    {
                         _animancer.Play(clip, 0.05f);
+                        _jumpArcActive = true;
+                    }
                 }
                 else if (!state.IsGrounded)
                 {
                     bool isAscending = state.VY > 0f;
                     bool wasAscending = _lastState.VY > 0f;
 
+                    // Detect double jump: JumpsLeft decreased this tick
+                    bool doubleJumped = state.JumpsLeft < _lastState.JumpsLeft;
+
                     if (isAscending)
                     {
-                        // Crossfade to jump on ascent start (initial jump or double jump)
+                        // New ascent: initial jump, or double jump from descent
                         if (!wasAscending)
                         {
-                            var clip = _charConfig.GetClipByName("jump");
-                            if (clip != null)
-                                _animancer.Play(clip, 0.05f);
+                            // Only play jump_up if it's a fresh jump (not recovery from attack hitstun)
+                            if (_jumpArcActive || doubleJumped)
+                            {
+                                var clip = _charConfig.GetClipByName("jump_up");
+                                if (clip != null)
+                                {
+                                    _animancer.Play(clip, 0.05f);
+                                    _jumpArcActive = true;
+                                }
+                            }
                         }
                     }
                     else
                     {
-                        // Crossfade to fall on descent start
-                        if (wasAscending)
+                        // Descending: slow crossfade from jump_up / attack pose → fall
+                        if (wasAscending && _jumpArcActive)
                         {
+                            // Fresh descent from a jump — slow transition to fall
                             var clip = _charConfig.GetClipByName("fall");
                             if (clip != null)
-                                _animancer.Play(clip, 0.1f);
+                                _animancer.Play(clip, 2f); // Very slow crossfade — blends jump_up into fall
+                            _jumpArcActive = false;
+                        }
+                        else if (!_jumpArcActive)
+                        {
+                            // Already descending (after attack, after jump_down expired, etc.)
+                            // Ensure fall is eventually playing
+                            var fallClip = _charConfig.GetClipByName("fall");
+                            if (fallClip != null && _animancer.States.Current?.Clip != fallClip)
+                                _animancer.Play(fallClip, 2f);
                         }
                     }
                 }
                 else
                 {
+                    _jumpArcActive = false;
                     var clip = hSpeed > _runSpeedThreshold
                         ? _charConfig.GetClipByName("run")
                         : _charConfig.GetClipByName("idle");
@@ -389,6 +415,7 @@ namespace SlopArena.Client.Entities
 
             if (isCombat && stateChanged)
             {
+                _jumpArcActive = false;
                 if (state.State == ActionState.Attacking)
                 {
                     string animName = "spell_lmb_1";
@@ -567,6 +594,8 @@ namespace SlopArena.Client.Entities
             _lastAnimState = default;
             _lastAttackSlot = 0;
             _lastComboStage = 0;
+            _jumpArcActive = false;
+
             _activeExtrapolator = null;
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;

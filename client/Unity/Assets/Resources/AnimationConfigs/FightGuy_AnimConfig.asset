@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Idle: {fileID: -203655887218126122, guid: 1c79c3f7ea06586d7a54165baa385b63, type: 3}
   Run: {fileID: 7400000, guid: 9497b614d4d8cbbc2b075339b0c00c6b, type: 2}
-  Jump: {fileID: 7400000, guid: c0e91d6138f429cfabe18ad13b1543bf, type: 2}
+  JumpUp: {fileID: 7400000, guid: c0e91d6138f429cfabe18ad13b1543bf, type: 2}
+  JumpDown: {fileID: 7400000, guid: 99fa5acf352abbaae8e564bc78fee164, type: 2}
   Fall: {fileID: -203655887218126122, guid: f5d91b50068e35631a0b4064627bee6f, type: 3}
   Dash: {fileID: 7400000, guid: 05261071379df35278f910e44d9c5b8d, type: 2}
   HitSmall: {fileID: -203655887218126122, guid: 0d47f09b34f2f647daeadc3ed46404cc, type: 3}
@@ -57,7 +58,7 @@ MonoBehaviour:
     Extrapolation: 0
   - Name: spell_r_loop
     Clip: {fileID: 7400000, guid: 77d4d58ee803888c7a35013b8f5a6102, type: 2}
-    Extrapolation: 0
+    Extrapolation: 1
   - Name: spell_r_attack
     Clip: {fileID: 7400000, guid: 69934ad2f98bf5210baa234ffa6d554d, type: 2}
     Extrapolation: 0
