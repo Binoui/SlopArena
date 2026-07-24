@@ -70,24 +70,32 @@ public class SlopArenaBaker : EditorWindow
             return;
         }
 
-        // Build clip list from CharacterAnimationConfig using server logical names
-        var ServerAnimNames = new[]
-        {
-            "idle", "run", "jump", "fall", "dash",
-            "small_hit", "medium_hit", "hard_hit", "melee",
-            "spell_lmb_1", "spell_lmb_2", "spell_lmb_3",
-            "spell_rmb", "spell_air_rmb",
-            "spell_q", "spell_q_start", "spell_q_loop", "spell_q_end",
-            "spell_e",
-            "spell_r_start", "spell_r_loop", "spell_r_attack", "spell_r_end",
-            "spell_f",
-        };
+        // Build clip list by enumerating all clips in the CharacterAnimationConfig
         var clips = new List<(string name, AnimationClip clip)>();
-        foreach (var animName in ServerAnimNames)
+
+        void AddClip(string name, AnimationClip? clip)
         {
-            var clip = animConfig.GetClipByName(animName);
-            if (clip != null)
-                clips.Add((animName, clip));
+            if (clip != null) clips.Add((name, clip));
+        }
+
+        // Standard clips (named fields on the config)
+        AddClip("idle", animConfig.Idle);
+        AddClip("run", animConfig.Run);
+        AddClip("jump_up", animConfig.JumpUp);
+        AddClip("jump_down", animConfig.JumpDown);
+        AddClip("jump", animConfig.JumpUp ?? animConfig.JumpDown);
+        AddClip("fall", animConfig.Fall);
+        AddClip("dash", animConfig.Dash);
+        AddClip("hit_small", animConfig.HitSmall);
+        AddClip("hit_medium", animConfig.HitMedium);
+        AddClip("hit_hard", animConfig.HitHard);
+        AddClip("death", animConfig.Death);
+
+        // Ability clips (character-specific, from the AbilityClips list)
+        foreach (var entry in animConfig.AbilityClips)
+        {
+            if (!string.IsNullOrEmpty(entry.Name) && entry.Clip != null)
+                clips.Add((entry.Name, entry.Clip));
         }
 
         if (clips.Count == 0)
