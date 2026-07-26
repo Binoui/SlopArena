@@ -302,7 +302,7 @@ public static partial class CharacterRegistry
                     ["hit1_tick"] = 4f, ["hit1_damage"] = 6f, ["hit1_stun"] = 32f,
                     ["hit2_tick"] = 10f, ["hit2_damage"] = 8f, ["hit2_stun"] = 40f,
                     ["hit3_tick"] = 26f, ["hit3_damage"] = 16f, ["hit3_stun"] = 48f,
-                    ["hit3_base"] = 16f, ["hit3_growth"] = 18f, ["hit3_angle"] = 25f,
+                    ["hit3_base"] = 16f, ["hit3_growth"] = 8f, ["hit3_angle"] = 25f,
                 },
             },
 

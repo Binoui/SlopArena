@@ -43,3 +43,7 @@ _Avoid_: warp distance, lunge range, approach range
 **WarpCone**:
 The forward-facing angle (centered on FacingYaw) within which warp can target an enemy. Currently 120° (60° left/right). Enemies outside the cone are ignored for warp, preventing warp to targets behind the character.
 _Avoid_: warp angle, field of view, targeting cone
+
+**Knockback**:
+The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses linear deceleration for a fast initial snap that heavily slows down approaching max range. Profile table maps archetypes (Light, Medium, Kill) to angle/base/growth values.
+_Avoid_: push force, hit reaction, knockback velocity

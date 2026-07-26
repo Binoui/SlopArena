@@ -32,10 +32,19 @@ namespace SlopArena.Shared
         /// </summary>
         private const float AirDrag = 0.2f;
         /// <summary>
-        /// 8.0/s at 60Hz
+        /// Linear drag applied to knockback velocity each tick (units/s²).
+        /// Fixed deceleration instead of exponential decay — creates fast initial launch
+        /// velocity with heavy slowdown as the target approaches max distance (Smash/DKO feel).
+        /// Tune this constant to adjust global knockback travel distance.
         /// </summary>
-        private const float KnockbackDecayPerTick = 0.02f;
-        private const float KnockbackMinGravity = 9.8f;
+        private const float KnockbackMinGravity = 2.0f;
+        /// <summary>
+        /// Linear drag applied to knockback velocity each tick (units/s²).
+        /// Fixed deceleration instead of exponential decay — creates fast initial launch
+        /// velocity with heavy slowdown as the target approaches max distance (Smash/DKO feel).
+        /// Tune this constant to adjust global knockback travel distance.
+        /// </summary>
+        private const float KnockbackDrag = 24f;
         private const byte MaxAirDodges = 1;
 
         /// <summary>
@@ -322,7 +331,34 @@ namespace SlopArena.Shared
             if (surfaceY > float.MinValue)
             {
                 groundY = surfaceY + capsuleHalf;
-                if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
+                if (s.State == ActionState.Hitstun)
+                {
+                    // During hitstun: skip snap while rising (KVY > 0) so launch works.
+                    // Re-snap when falling (KVY <= 0) — clear KVY to prevent next-tick gravity drill.
+                    // Force-snap if below surface to prevent map fall-through.
+                    bool atSurface = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
+                    if (atSurface && s.KVY <= 0f)
+                    {
+                        s.IsGrounded = true;
+                        s.VY = 0f;
+                        s.PY = groundY;
+                        s.AirTimeTicks = 0;
+                        s.KVY = 0f;
+                    }
+                    else if (s.PY < groundY - PlatformSnapTolerance)
+                    {
+                        s.IsGrounded = true;
+                        s.VY = 0f;
+                        s.KVY = 0f;
+                        s.PY = groundY;
+                        s.AirTimeTicks = 0;
+                    }
+                    else
+                    {
+                        s.IsGrounded = false;
+                    }
+                }
+                else if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
                 {
                     s.IsGrounded = true;
                     s.VY = 0f;
@@ -521,10 +557,12 @@ namespace SlopArena.Shared
 
         private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
         {
-            // Decay knockback
-            s.KVX -= s.KVX * KnockbackDecayPerTick;
-            s.KVY -= s.KVY * KnockbackDecayPerTick;
-            s.KVZ -= s.KVZ * KnockbackDecayPerTick;
+            // Linear drag: fixed deceleration per tick (not exponential decay)
+            // Fast initial launch → heavy slowdown approaching max range (Smash/DKO feel)
+            float drag = KnockbackDrag * TickDt;
+            s.KVX = s.KVX > 0 ? Math.Max(0, s.KVX - drag) : Math.Min(0, s.KVX + drag);
+            s.KVY = s.KVY > 0 ? Math.Max(0, s.KVY - drag) : Math.Min(0, s.KVY + drag);
+            s.KVZ = s.KVZ > 0 ? Math.Max(0, s.KVZ - drag) : Math.Min(0, s.KVZ + drag);
 
             // Apply to main velocity
             s.VX = s.KVX;
@@ -831,7 +869,7 @@ namespace SlopArena.Shared
             s.VX = dirX * stats.DashSpeed;
             s.VZ = dirZ * stats.DashSpeed;
             s.VY = s.IsGrounded ? Math.Max(s.VY, 0f) : 0f;
-            s.AirTimeTicks = 0;
+            s.AirTimeTicks = s.IsGrounded ? (ushort)0 : (ushort)Math.Max(s.AirTimeTicks, stats.FloatWindowTicks);
         }
 
         /// <summary>
@@ -862,6 +900,10 @@ namespace SlopArena.Shared
             s.KVY = magnitude * sinA;
             s.KVZ = dirZ * magnitude * cosA;
 
+            // Launch victim off the ground — prevents ground snap from eating vertical KB
+            // (was: IsGrounded stayed true, ground collision reset PY and VY=0 each tick)
+            if (s.KVY > 0f)
+                s.IsGrounded = false;
             float kbMagnitude = MathF.Sqrt(
                 (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
 
