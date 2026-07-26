@@ -6,7 +6,7 @@ namespace SlopArena.Shared;
 /// </summary>
 public enum KnockbackProfile : byte
 {
-    Light    = 0,  // 0°,  base=2,  growth=1.5  — combo glue, tiny push
+    Light    = 0,  // 15°, base=2,  growth=1.5  — combo glue, slight pop
     Medium   = 1,  // 15°, base=8,  growth=5    — knockdown, reset
     Launcher = 2,  // 25°, base=8,  growth=4    — pop-up, stays on screen
     Kill     = 3,  // 20°, base=18, growth=10   — blast zone send
@@ -41,7 +41,7 @@ public struct KnockbackData
     // ── Profile table — tune these for game-wide feel ──
     private static readonly (sbyte angle, float baseKB, float growthKB)[] ProfileTable = new (sbyte, float, float)[]
     {
-        ((sbyte)0,    2f,  1.5f),  // Light
+        ((sbyte)15,   2f,  1.5f),  // Light
         ((sbyte)15,   8f,  5f),    // Medium
         ((sbyte)25,   8f,  4f),    // Launcher
         ((sbyte)20,  18f, 10f),    // Kill

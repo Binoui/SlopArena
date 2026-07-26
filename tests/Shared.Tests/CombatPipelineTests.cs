@@ -510,4 +510,84 @@ public class CombatPipelineTests
         Assert.Equal(ActionState.Warping, state.State);
         Assert.True(state.WarpSpeed > 0f, "Expected warp to activate for enemy ahead at non-zero facing");
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // VERTICAL KNOCKBACK VERIFICATION
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void LightProfile_ApplyKnockback_HasVerticalComponent()
+    {
+        var state = TestHelpers.PlayerState();
+        state.DamagePercent = 50;
+
+        Simulation.ApplyKnockback(ref state, dirX: 1f, dirZ: 0f,
+            angleDeg: 5, baseKB: 2f, growthKB: 1.5f, stunTicks: 20);
+
+        Assert.True(state.KVY > 0f,
+            $"Light profile (5°) should produce vertical knockback, got KVY={state.KVY:F4}");
+    }
+
+    [Fact]
+    public void MediumProfile_ApplyKnockback_HasVerticalComponent()
+    {
+        var state = TestHelpers.PlayerState();
+        state.DamagePercent = 50;
+
+        Simulation.ApplyKnockback(ref state, dirX: 1f, dirZ: 0f,
+            angleDeg: 15, baseKB: 8f, growthKB: 5f, stunTicks: 20);
+
+        Assert.True(state.KVY > 0.5f,
+            $"Medium profile (15°) should produce noticeable vertical knockback, got KVY={state.KVY:F4}");
+    }
+
+    [Fact]
+    public void FightGuyLMB_FullPipeline_HasVerticalKnockback()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+
+        var def = TestHelpers.CombatDef;
+        float gpy = TestHelpers.CombatGroundPY;
+
+        var player = TestHelpers.PlayerState();
+        player.PY = gpy;
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(0f, 1.5f);
+        npc.PY = gpy;
+        sim.RegisterEntity(100, def, npc);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+
+        for (int i = 0; i < 11; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var afterHit = sim.GetState(100);
+
+        Assert.True(afterHit.DamagePercent > 0,
+            $"NPC should have taken damage from LMB hit, got {afterHit.DamagePercent}");
+
+        // After hit: must be airborne (was ground snap eating vertical KB)
+        Assert.False(afterHit.IsGrounded,
+            $"NPC should be airborne after knockback (ground snap bug), IsGrounded={afterHit.IsGrounded}");
+
+        // KVY must be non-zero (vertical knockback from angle=15°)
+        Assert.True(afterHit.KVY > 0f,
+            $"LMB hit should produce vertical knockback velocity, got KVY={afterHit.KVY:F4}");
+
+        // PY must be above ground (vertical knockback pushed them up)
+        Assert.True(afterHit.PY > gpy + 0.01f,
+            $"LMB hit should lift NPC off ground, PY={afterHit.PY:F4} ground={gpy:F4}");
+
+        // Run 2 more ticks — character should stay airborne (KVY still positive, no ground snap)
+        for (int i = 0; i < 2; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var afterAirborne = sim.GetState(100);
+        Assert.False(afterAirborne.IsGrounded,
+            $"NPC should stay airborne during hitstun rise, got IsGrounded={afterAirborne.IsGrounded}");
+    }
 }
