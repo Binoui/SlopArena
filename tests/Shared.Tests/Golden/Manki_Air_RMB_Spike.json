@@ -1,0 +1,29 @@
+{
+  "Scenario": "Manki Air RMB Spike",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 2,
+    "AirTimeTicks": 21
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.75,
+    "DamagePercent": 10,
+    "HitstunTicks": 27,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "DamagePercent": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

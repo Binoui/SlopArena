@@ -1,0 +1,31 @@
+{
+  "Scenario": "FightGuy Air LMB Combo",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "PZ": 0.35000005,
+    "AttackSlot": 1,
+    "AirTimeTicks": 13
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 1.5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 0.35000005,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 6.4749703,
+    "VZ": 0.055926863,
+    "DamagePercent": 8,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

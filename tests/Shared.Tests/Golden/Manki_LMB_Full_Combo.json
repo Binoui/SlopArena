@@ -1,0 +1,20 @@
+{
+  "Scenario": "Manki LMB Full Combo",
+  "TickCount": 200,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.75,
+    "PZ": 1.6611117,
+    "VZ": 10,
+    "ComboStage": 2,
+    "AttackSlot": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "PZ": 2.811112,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

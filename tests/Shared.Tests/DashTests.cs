@@ -63,14 +63,14 @@ public class DashTests
     [Fact]
     public void Dash_UsesCharacterDefDuration()
     {
-        // FightGuy has DashDurationTicks = 8 vs Manki's 15
+        // FightGuy has DashDurationTicks = 18 vs Manki's 15
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(dash: true, moveY: 1f), 1);
-        Assert.Equal((ushort)8, t0.DashDurationTicks);
+        Assert.Equal((ushort)18, t0.DashDurationTicks);
     }
 
     [Fact]
