@@ -1,0 +1,35 @@
+{
+  "Scenario": "FightGuy LMB Full Combo",
+  "TickCount": 250,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 0.8555556,
+    "AttackSlot": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.77998894,
+    "PZ": 1.6326537,
+    "VY": 0.39983392,
+    "VZ": 1.9898071,
+    "DamagePercent": 4,
+    "HitstunTicks": 16,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 3.764444,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 5.3181,
+    "DamagePercent": 19,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "Scenario": "FightGuy RMB Uncharged",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "PY": 0.85,
+    "PZ": 0.2555555,
+    "Cooldown1": 49,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 4.9298596,
+    "PZ": 4.33261,
+    "VY": 5.9213166,
+    "VZ": 1.3731819,
+    "DamagePercent": 12,
+    "AirTimeTicks": 17,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 0.2555555,
+    "Cooldown1": 20,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 7.2635875,
+    "PZ": 4.388022,
+    "VY": 0.6713164,
+    "DamagePercent": 12,
+    "AirTimeTicks": 46,
+    "JumpsLeft": 2
+  }
+}

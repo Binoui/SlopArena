@@ -1,0 +1,33 @@
+{
+  "Scenario": "Manki Air LMB Combo",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "PZ": 0.5500001,
+    "VZ": 3,
+    "ComboStage": 1,
+    "AttackSlot": 1,
+    "AirTimeTicks": 5
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 1.5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "PZ": 1.1999999,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 2.1925561,
+    "PZ": 7.7130475,
+    "VY": 0.49819905,
+    "DamagePercent": 6,
+    "AirTimeTicks": 35,
+    "JumpsLeft": 2
+  }
+}

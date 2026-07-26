@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Xunit;
-
 namespace SlopArena.Shared.Tests;
 
 public static class TestHelpers
@@ -316,5 +316,22 @@ public static class TestHelpers
             LandStartOffset = src.LandStartOffset,
             HurtboxBoneScale = src.HurtboxBoneScale,
         };
+    }
+
+    /// <summary>
+    /// Load baked skeleton data from disk, mirroring MatchInstance.LoadBakedData.
+    /// Resolves "res://data/..." from the test assembly to the repo root.
+    /// Returns null if file not found (callers fall back to capsule hurtboxes).
+    /// </summary>
+    public static BakedAnimationData? LoadBakedData(CharacterDefinition def)
+    {
+        if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
+        string relative = def.BakedDataPath.Replace("res://", "");
+        // Test runs from tests/Shared.Tests/bin/Debug/net8.0/
+        // Repo root is 5 dirs up from AppContext.BaseDirectory
+        string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string path = Path.Combine(repoRoot, relative);
+        if (!File.Exists(path)) return null;
+        return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
     }
     }
