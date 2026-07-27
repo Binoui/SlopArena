@@ -42,6 +42,17 @@ namespace SlopArena.Shared.Abilities
             ref float damage, ref float knockbackForce)
         {
         }
+
+        /// <summary>
+        /// Target-side hook: called in ResolveHits BEFORE damage/knockback is applied to the
+        /// defender, when the defender has this ability active. Return true to fully absorb the
+        /// incoming hit (no damage/knockback to the defender) — e.g. Kistu's Counter, which
+        /// riposte-launches the attacker. Default: no interception.
+        /// </summary>
+        public virtual bool TryCounter(ref CharacterState defender, ref CharacterState attacker, float incomingDamage)
+        {
+            return false;
+        }
         // ── Metadata (set by factory after construction) ──
 
         /// <summary>Which ability slot (0-5).</summary>

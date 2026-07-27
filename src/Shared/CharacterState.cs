@@ -78,6 +78,17 @@ namespace SlopArena.Shared
         /// aimed charge progress (0 = none, >0 = charging)
         /// </summary>
         public ushort ChargeTicks;
+        /// <summary>
+        /// ── Charge-stock pool (refundable ability charges, e.g. Kistu Rising Slash) ──
+        /// Number of charges currently spent/unavailable (0 = full pool). The pool max
+        /// and regen cadence come from the ability spec's "max_charges"/"charge_regen_ticks"
+        /// params. Refunded on hit by the ability's OnHitEntity. Server-sim only (not on the wire).
+        /// </summary>
+        public byte ChargeStockSpent;
+        /// <summary>Ticks until the next spent charge regenerates. 0 when nothing is regenerating.</summary>
+        public ushort ChargeStockRegenTicks;
+        /// <summary>Full regen period for one charge, cached from the ability spec at spend time.</summary>
+        public ushort ChargeStockRegenPeriod;
 
         /// <summary>
         /// ── Knockback ──
