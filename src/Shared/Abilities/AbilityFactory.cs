@@ -18,6 +18,7 @@ public static class AbilityFactory
         {
             CharacterClass.Manki => CreateMankiAbility(slot, airborne),
             CharacterClass.FightGuy => CreateFightGuyAbility(slot, airborne),
+            CharacterClass.Kistu => CreateKistuAbility(slot, airborne),
             _ => null,
         };
     }
@@ -45,6 +46,19 @@ public static class AbilityFactory
         (3, _) => new FightGuyCycloneKick(),   // E
         (4, _) => new FightGuyDragonKick(),    // R
         (5, _) => new FightGuyTempest(),       // F
+        _ => null,
+    };
+
+    private static ServerAbility? CreateKistuAbility(byte slot, bool airborne) => (slot, airborne) switch
+    {
+        (0, false) => new LmbCombo(),          // LMB ground — light slash combo
+        (0, true) => new AirLmbCombo(),        // AirLMB — air slash combo
+        (1, false) => new KistuChargeAttack(), // RMB — charged spin (kill move)
+        (1, true) => new AirRmbAttack(),       // AirRMB — falling slash spike
+        (2, _) => new KistuCounter(),          // Q — counter/parry
+        (3, _) => new KistuChargeAttack(),     // E — charged dash slash
+        (4, _) => new KistuRisingSlash(),      // R — rising slash (signature)
+        (5, _) => new KistuUltFlurry(),        // F — blade flurry ult
         _ => null,
     };
 
