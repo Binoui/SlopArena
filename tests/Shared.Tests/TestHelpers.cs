@@ -10,6 +10,8 @@ public static class TestHelpers
 
     public static CharacterDefinition FightGuyDef => CharacterRegistry.Get(CharacterClass.FightGuy);
 
+    public static CharacterDefinition KistuDef => CharacterRegistry.Get(CharacterClass.Kistu);
+
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests
     /// that need grounded must set PY = floorY + def.CapsuleHeight * 0.5f.

@@ -425,6 +425,19 @@ namespace SlopArena.Shared
             if (s.Cooldown4 > 0) s.Cooldown4--;
             if (s.Cooldown5 > 0) s.Cooldown5--;
 
+            // Charge-stock regen (refundable ability pools, e.g. Kistu Rising Slash).
+            // Only active when a charge is spent; recovers one charge per regen period.
+            if (s.ChargeStockSpent > 0)
+            {
+                if (s.ChargeStockRegenTicks > 0) s.ChargeStockRegenTicks--;
+                if (s.ChargeStockRegenTicks == 0)
+                {
+                    s.ChargeStockSpent--;
+                    if (s.ChargeStockSpent > 0)
+                        s.ChargeStockRegenTicks = s.ChargeStockRegenPeriod > 0 ? s.ChargeStockRegenPeriod : (ushort)180;
+                }
+            }
+
             // Buff timer
             if (s.BuffRemainingTicks > 0)
             {

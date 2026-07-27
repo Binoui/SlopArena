@@ -59,16 +59,16 @@ All abilities spawn their own hitboxes in `Tick()` via `SpawnHitbox(ref s, evt)`
 
 ## Complete Slot Mapping
 
-| Slot | Manki | FightGuy | Shared |
-|------|-------|----------|--------|
-| LMB ground (0) | `LmbCombo` | `LmbCombo` | Shared via StageChainAbility |
-| LMB air (0) | `AirLmbCombo` | `AirLmbCombo` | Shared via StageChainAbility |
-| RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | Per-character |
-| RMB air (1) | `AirRmbAttack` | `AirRmbAttack` | Shared single-hit spike |
-| Q (2) | `MankiRoundBomb` | `FightGuyKiShot` | Per-character |
-| E (3) | `MankiGrapple` | `FightGuyCycloneKick` | Per-character |
-| R (4) | `MankiBazooka` | `FightGuyDragonKick` | Per-character |
-| F (5) | `MankiOverclock` | `FightGuyTempest` | Per-character |
+| Slot | Manki | FightGuy | Kistu | Shared |
+|------|-------|----------|-------|--------|
+| LMB ground (0) | `LmbCombo` | `LmbCombo` | `LmbCombo` | Shared via StageChainAbility |
+| LMB air (0) | `AirLmbCombo` | `AirLmbCombo` | `AirLmbCombo` | Shared via StageChainAbility |
+| RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | `KistuChargeAttack` | Per-character |
+| RMB air (1) | `AirRmbAttack` | `AirRmbAttack` | `AirRmbAttack` | Shared single-hit spike |
+| Q (2) | `MankiRoundBomb` | `FightGuyKiShot` | `KistuCounter` | Per-character |
+| E (3) | `MankiGrapple` | `FightGuyCycloneKick` | `KistuChargeAttack` | Per-character |
+| R (4) | `MankiBazooka` | `FightGuyDragonKick` | `KistuRisingSlash` | Per-character |
+| F (5) | `MankiOverclock` | `FightGuyTempest` | `KistuUltFlurry` | Per-character |
 
 ## Key Patterns
 

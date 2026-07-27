@@ -406,10 +406,35 @@ namespace SlopArena.Shared
 				// Create and activate server-side ability
 				if (_activeAbilities.ContainsKey(id)) continue;
 
+				// ── Charge-stock gate: abilities that declare a "max_charges" param are
+				// limited by a refundable charge pool (Kistu Rising Slash) rather than a flat
+				// cooldown. Blocked when the pool is exhausted. ──
+				int maxCharges = (spec.Params != null && spec.Params.TryGetValue("max_charges", out var mc)) ? (int)mc : 0;
+				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
+				{
+					// Consume the input so SimulateTick doesn't start a data-driven attack.
+					var blockedInput = input;
+					blockedInput.ActiveSlot = 0;
+					inputs[id] = blockedInput;
+					continue;
+				}
+
 				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
 				if (ability == null) continue; // unsupported character or slot
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
+
+				// Spend a charge from the pool (refunded on hit by the ability's OnHitEntity).
+				if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))
+				{
+					afterState.ChargeStockSpent++;
+					ushort regenPeriod = (ushort)(spec.Params.TryGetValue("charge_regen_ticks", out var rg) ? rg : 180f);
+					afterState.ChargeStockRegenPeriod = regenPeriod;
+					if (afterState.ChargeStockRegenTicks == 0)
+						afterState.ChargeStockRegenTicks = regenPeriod;
+					_states[id] = afterState;
+				}
+
 				// Consume input so SimulateTick doesn't also try to start an attack
 				var consumedInput = input;
 				consumedInput.ActiveSlot = 0;
@@ -654,6 +679,21 @@ namespace SlopArena.Shared
 			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
+
+				// ── Counter interception (target-side): if the defender has an active
+				// ability that counters this hit, it absorbs the hit and applies its own
+				// riposte to the attacker. Skip normal damage/knockback for this hit. ──
+				if (hit.OwnerEntityId != hit.TargetEntityId
+				    && _activeAbilities.TryGetValue(hit.TargetEntityId, out var defenderAbility)
+				    && _states.TryGetValue(hit.OwnerEntityId, out var counterAttacker))
+				{
+					if (defenderAbility.TryCounter(ref targetState, ref counterAttacker, hit.Damage))
+					{
+						_states[hit.TargetEntityId] = targetState;
+						_states[hit.OwnerEntityId] = counterAttacker;
+						continue;
+					}
+				}
 
 				// Knockback direction: from attacker to target (not hitbox to target).
 				// The hitbox offset can place it past the target, inverting the direction.

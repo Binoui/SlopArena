@@ -8,7 +8,8 @@ namespace SlopArena.Shared
     {
         None,
         Manki,
-        FightGuy
+        FightGuy,
+        Kistu
     }
 
     [Serializable]
@@ -185,6 +186,7 @@ namespace SlopArena.Shared
                 default,            // None (placeholder)
                 BuildManki(),       // Manki
                 BuildFightGuy(),    // FightGuy
+                BuildKistu(),       // Kistu
             };
         }
     }
