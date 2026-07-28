@@ -41,7 +41,21 @@ namespace SlopArena.Shared
         public HitboxEvent[] HitboxEvents;
         /// <summary>Forward burst at attack start (applied once).</summary>
         public float LungeForce;
-        /// <summary>Per-tick velocity during this stage (world space). Set VY for jump arcs.</summary>
+        /// <summary>
+        /// Per-tick velocity during this stage (world space). Set VY for jump arcs / slams.
+        /// Honoured by <c>AirRmbAttack</c> ONLY (Nilus' Collapse is the sole declarer in the
+        /// game). Every other class that reads <c>AbilitySpec.Stages</c> ignores these three
+        /// fields entirely — <c>StageChainAbility</c> (and its <c>LmbCombo</c> /
+        /// <c>AirLmbCombo</c> subclasses), <c>ChargeAttackAbility</c> (and its
+        /// <c>LungeChargeAttack</c> subclass, which drives Nilus' own RMB),
+        /// <c>KistuRisingSlash</c>, <c>KistuUltFlurry</c>, <c>FightGuyUppercut</c>,
+        /// <c>NilusNetherGrasp</c> and <c>NilusRiftwalk</c>. Declaring <c>Move*</c> on a stage
+        /// driven by any of those is a SILENT no-op that no test will notice, so wire it in
+        /// the consumer first.
+        /// Non-zero components are written each tick; a zero component is left alone so a
+        /// MoveY-only stage keeps its LungeForce horizontal velocity. <c>AirRmbAttack</c>
+        /// additionally refuses a downward write while grounded — see the note there.
+        /// </summary>
         public float MoveX, MoveY, MoveZ;
         /// <summary>
         /// 0 = final stage / no chain. Non-zero = frames to buffer next input.
@@ -114,5 +128,11 @@ namespace SlopArena.Shared
         public ushort DurationTicks;
         /// <summary>If true, this explosion can hit its spawner (mine jump, etc.).</summary>
         public bool CanHitOwner;
+        /// <summary>
+        /// Propagated to Hitbox.RehitIntervalTicks.
+        /// 0 = normal one-hit explosion. &gt; 0 = the explosion becomes a lingering zone that
+        /// pulses every N ticks and survives contact until its DurationTicks expires.
+        /// </summary>
+        public ushort RehitIntervalTicks;
     }
 }

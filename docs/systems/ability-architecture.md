@@ -63,10 +63,10 @@ All abilities spawn their own hitboxes in `Tick()` via `SpawnHitbox(ref s, evt)`
 |------|-------|----------|-------|--------|
 | LMB ground (0) | `LmbCombo` | `LmbCombo` | `LmbCombo` | Shared via StageChainAbility |
 | LMB air (0) | `AirLmbCombo` | `AirLmbCombo` | `AirLmbCombo` | Shared via StageChainAbility |
-| RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | `KistuChargeAttack` | Per-character |
+| RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | `LungeChargeAttack` | Per-character |
 | RMB air (1) | `AirRmbAttack` | `AirRmbAttack` | `AirRmbAttack` | Shared single-hit spike |
 | Q (2) | `MankiRoundBomb` | `FightGuyKiShot` | `KistuCounter` | Per-character |
-| E (3) | `MankiGrapple` | `FightGuyCycloneKick` | `KistuChargeAttack` | Per-character |
+| E (3) | `MankiGrapple` | `FightGuyCycloneKick` | `LungeChargeAttack` | Per-character |
 | R (4) | `MankiBazooka` | `FightGuyDragonKick` | `KistuRisingSlash` | Per-character |
 | F (5) | `MankiOverclock` | `FightGuyTempest` | `KistuUltFlurry` | Per-character |
 

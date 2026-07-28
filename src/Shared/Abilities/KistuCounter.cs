@@ -17,8 +17,8 @@ namespace SlopArena.Shared.Abilities;
 public sealed class KistuCounter : ServerAbility
 {
     private ushort _ticks;
+    private ushort _duration;
     private bool _countered;
-
     private ushort _windowStart;
     private ushort _windowEnd;
     private float _riposteDamage;
@@ -40,10 +40,10 @@ public sealed class KistuCounter : ServerAbility
         // Stationary parry — no residual movement.
         SetVelocity(ref s, 0f, s.IsGrounded ? 0f : s.VY, 0f);
 
-        s.AnimLockTicks = (ushort)GetParam(def, "duration", 40f);
-
         _windowStart = (ushort)GetParam(def, "window_start", 4f);
         _windowEnd = (ushort)GetParam(def, "window_end", 18f);
+        _duration = (ushort)GetParam(def, "duration", 40f);
+        s.AnimLockTicks = _duration;
         _riposteDamage = GetParam(def, "riposte_damage", 12f);
         _riposteBase = GetParam(def, "riposte_base", 12f);
         _riposteGrowth = GetParam(def, "riposte_growth", 6f);
@@ -57,7 +57,7 @@ public sealed class KistuCounter : ServerAbility
         // Riposte animation once countered, else parry stance.
         AnimIndex = _countered ? (byte)1 : (byte)0;
 
-        if (_ticks >= s.AnimLockTicks)
+        if (_ticks >= _duration)
             EndAbility(ref s);
     }
 

@@ -79,8 +79,10 @@ namespace SlopArena.Shared
         /// <summary>
         /// Tolerance for snapping to platform surfaces (units).
         /// Characters must be within this window above the surface to snap.
+        /// Public because abilities that write position directly must agree with ground
+        /// resolution on what counts as a traversable step (see NilusRiftwalk).
         /// </summary>
-        private const float PlatformSnapTolerance = 0.5f;
+        public const float PlatformSnapTolerance = 0.5f;
         /// <summary>
         /// How far above the surface the character can be and still land.
         /// Must be small enough that a jump (VY ≈ 10) immediately breaks it in 1-2 frames.
@@ -215,7 +217,7 @@ namespace SlopArena.Shared
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
-            if (input.Jump && s.JumpsLeft > 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat)
+            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat)
             {
                 if (s.IsGrounded)
                 {
@@ -240,7 +242,8 @@ namespace SlopArena.Shared
 
             else if (input.Jump)
             {
-                string reason = s.HitstunTicks > 0 ? "hitstun" :
+                string reason = s.AnimLockTicks > 0 ? "anim_lock" :
+                    s.HitstunTicks > 0 ? "hitstun" :
                     s.State == ActionState.JumpSquat ? "already_squatting" :
                     s.JumpsLeft <= 0 ? "no_jumps" : "unknown";
                 OnDebugLog?.Invoke($"[JumpBlocked] input.Jump=true but blocked by {reason}");

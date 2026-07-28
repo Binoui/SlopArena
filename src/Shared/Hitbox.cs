@@ -59,5 +59,26 @@ namespace SlopArena.Shared
 
         /// <summary>If true, this hitbox can hit the entity that spawned it.</summary>
         public bool CanHitOwner;
+
+        /// <summary>
+        /// 0 = one-hit-then-die (default melee/projectile behaviour).
+        /// &gt; 0 = lingering zone: tests collisions only when AgeTicks % RehitIntervalTicks == 0,
+        /// hits every overlapping entity on that pulse, and survives until DurationTicks expires.
+        /// The expiry path is unchanged, so a zone carrying an Explosion still queues it once
+        /// when the zone times out — leave Explosion null if the zone should not burst on death.
+        /// </summary>
+        public ushort RehitIntervalTicks;
+
+        /// <summary>
+        /// If true this hitbox never scans bodies: no HitResult, no damage, no knockback, and
+        /// crucially no <c>Active = false</c> on contact, so it keeps travelling and still
+        /// reaches <see cref="SpellResolver.CheckGroundCollision"/>. For a projectile whose
+        /// payload is its <see cref="Explosion"/> rather than its impact (Nilus' Q seed), the
+        /// default one-hit behaviour would otherwise strand the explosion at the pre-move
+        /// mid-air position and hand the clipped entity a free ability-cancel via
+        /// <c>ApplyKnockback</c>'s zero-magnitude else branch.
+        /// Aging, expiry, explosion queueing and ground collision are all unaffected.
+        /// </summary>
+        public bool IgnoresEntities;
     }
 }

@@ -1,0 +1,36 @@
+{
+  "Scenario": "Nilus Air LMB Combo",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 4.825,
+    "PZ": 0.8166667,
+    "ComboStage": 1,
+    "AttackSlot": 1,
+    "AirTimeTicks": 10
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 4.8879952,
+    "PZ": 2.124755,
+    "VY": 3.416184,
+    "VZ": 7.54048,
+    "DamagePercent": 8,
+    "HitstunTicks": 23,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "PZ": 0.8166667,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 2.6578774,
+    "PZ": 6.725613,
+    "VY": -18.350483,
+    "DamagePercent": 8,
+    "AirTimeTicks": 73,
+    "JumpsLeft": 2
+  }
+}

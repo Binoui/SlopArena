@@ -83,6 +83,15 @@ namespace SlopArena.Shared.Abilities
         public BakedAnimationData? BakedData { get; set; }
         /// <summary>Character definition for the ability owner. Set by ServerSimulation.</summary>
         public CharacterDefinition? CharacterDef { get; set; }
+        /// <summary>
+        /// The arena being played, for terrain-aware displacement: an ability that
+        /// writes position directly (blinks, teleports, warps) can sample
+        /// <see cref="ArenaHeightmap.Sample"/> to resolve a destination that does not
+        /// end inside geometry. Set by ServerSimulation before activation.
+        /// MAY be null — harnesses that drive abilities without a simulation never set
+        /// it, so every consumer must have a no-arena fallback.
+        /// </summary>
+        public ArenaDefinition? Arena { get; set; }
 
         // ── Helpers (call from Tick) ──
 

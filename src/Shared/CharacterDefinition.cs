@@ -9,7 +9,8 @@ namespace SlopArena.Shared
         None,
         Manki,
         FightGuy,
-        Kistu
+        Kistu,
+        Nilus
     }
 
     [Serializable]
@@ -187,6 +188,7 @@ namespace SlopArena.Shared
                 BuildManki(),       // Manki
                 BuildFightGuy(),    // FightGuy
                 BuildKistu(),       // Kistu
+                BuildNilus(),       // Nilus
             };
         }
     }

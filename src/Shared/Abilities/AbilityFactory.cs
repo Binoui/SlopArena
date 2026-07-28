@@ -19,6 +19,7 @@ public static class AbilityFactory
             CharacterClass.Manki => CreateMankiAbility(slot, airborne),
             CharacterClass.FightGuy => CreateFightGuyAbility(slot, airborne),
             CharacterClass.Kistu => CreateKistuAbility(slot, airborne),
+            CharacterClass.Nilus => CreateNilusAbility(slot, airborne),
             _ => null,
         };
     }
@@ -53,12 +54,25 @@ public static class AbilityFactory
     {
         (0, false) => new LmbCombo(),          // LMB ground — light slash combo
         (0, true) => new AirLmbCombo(),        // AirLMB — air slash combo
-        (1, false) => new KistuChargeAttack(), // RMB — charged spin (kill move)
+        (1, false) => new LungeChargeAttack(), // RMB — charged spin (kill move)
         (1, true) => new AirRmbAttack(),       // AirRMB — falling slash spike
         (2, _) => new KistuCounter(),          // Q — counter/parry
-        (3, _) => new KistuChargeAttack(),     // E — charged dash slash
+        (3, _) => new LungeChargeAttack(),     // E — charged dash slash
         (4, _) => new KistuRisingSlash(),      // R — rising slash (signature)
         (5, _) => new KistuUltFlurry(),        // F — blade flurry ult
+        _ => null,
+    };
+
+    private static ServerAbility? CreateNilusAbility(byte slot, bool airborne) => (slot, airborne) switch
+    {
+        (0, false) => new LmbCombo(),          // LMB — rift claws
+        (0, true) => new AirLmbCombo(),        // AirLMB — void rake
+        (1, false) => new LungeChargeAttack(), // RMB — entropy lance (tap/charged)
+        (1, true) => new AirRmbAttack(),       // AirRMB — collapse
+        (2, _) => new NilusVoidRift(),         // Q — void rift
+        (3, _) => new NilusRiftwalk(),         // E — riftwalk
+        (4, _) => new NilusNetherGrasp(),      // R — nether grasp
+        (5, _) => new NilusEventHorizon(),     // F — event horizon
         _ => null,
     };
 

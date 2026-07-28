@@ -19,6 +19,7 @@ namespace SlopArena.Shared.Abilities;
 public sealed class KistuRisingSlash : ServerAbility
 {
     private ushort _ticks;
+    private ushort _duration;
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
@@ -35,7 +36,8 @@ public sealed class KistuRisingSlash : ServerAbility
         s.IsGrounded = false; // launch off the ground so the rise isn't clamped
 
         var spec = def.GetSlotAbility(Slot, airborne: false);
-        s.AnimLockTicks = spec?.Stages is { Length: > 0 } ? spec.Stages[0].DurationTicks : (ushort)24;
+        _duration = spec?.Stages is { Length: > 0 } ? spec.Stages[0].DurationTicks : (ushort)24;
+        s.AnimLockTicks = _duration;
     }
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
@@ -74,7 +76,7 @@ public sealed class KistuRisingSlash : ServerAbility
             }
         }
 
-        if (_ticks >= s.AnimLockTicks)
+        if (_ticks >= _duration)
             EndAbility(ref s);
     }
 

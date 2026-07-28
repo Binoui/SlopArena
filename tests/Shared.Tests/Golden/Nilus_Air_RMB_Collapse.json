@@ -1,0 +1,33 @@
+{
+  "Scenario": "Nilus Air RMB Collapse",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 3.024998,
+    "VY": -14,
+    "AttackSlot": 2,
+    "AirTimeTicks": 13
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 2.9109898,
+    "PZ": 1.230677,
+    "VY": -8.9347925,
+    "VZ": 8.768124,
+    "DamagePercent": 10,
+    "HitstunTicks": 25,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 5.2170196,
+    "DamagePercent": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

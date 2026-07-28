@@ -125,4 +125,9 @@ public abstract class KitScenarioTests
     /// Ground-level PY for FightGuy with floor at 0.
     /// </summary>
     protected static float FightGuyGpy => TestHelpers.GroundPY(TestHelpers.FightGuyDef);
+
+    /// <summary>
+    /// Ground-level PY for Nilus with floor at 0.
+    /// </summary>
+    protected static float NilusGpy => TestHelpers.GroundPY(TestHelpers.NilusDef);
 }
