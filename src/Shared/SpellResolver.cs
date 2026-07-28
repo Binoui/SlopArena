@@ -185,56 +185,74 @@ namespace SlopArena.Shared
                 if (hb.Gravity > 0f)
                     hb.VY -= hb.Gravity * Simulation.TickDt;
 
-                // Check collision against each entity
-                foreach (var entity in entities)
+                // Zone hitboxes pulse on an interval and survive contact; everything
+                // else keeps the legacy one-hit-then-die behaviour.
+                // Pulse count is NOT a damage guarantee: hitThisTick is shared across
+                // every hitbox in the tick and hitboxes are walked newest-to-oldest, so a
+                // pulse whose target was already claimed by another hitbox is simply lost.
+                // A one-hit hitbox stays active and retries next tick; a zone cannot retry
+                // until its next pulse, a full RehitIntervalTicks later.
+                bool isZone = hb.RehitIntervalTicks > 0;
+                // IgnoresEntities opts out of the body scan entirely; it still ages, expires
+                // and queues its explosion below. See Hitbox.IgnoresEntities.
+                bool pulse = !hb.IgnoresEntities
+                    && (!isZone || (hb.AgeTicks % hb.RehitIntervalTicks == 0));
+
+                if (pulse)
                 {
-                    if (!entity.Active) continue;
-                    if (!hb.CanHitOwner && entity.Id == hb.OwnerId) continue;
-                    if (hitThisTick.Contains(entity.Id)) continue;
-
-                    bool hit = false;
-                    float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
-
-                    if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
+                    // Check collision against each entity
+                    foreach (var entity in entities)
                     {
-                        hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz);
-                    }
-                    else
-                    {
-                        // Sphere-sphere (original)
-                        dx = entity.PosX - hb.X;
-                        dy = entity.PosY - hb.Y;
-                        dz = entity.PosZ - hb.Z;
-                        float distSq = (dx * dx) + (dy * dy) + (dz * dz);
-                        float combinedRadius = hb.Radius + entity.Radius;
-                        if (distSq <= combinedRadius * combinedRadius)
+                        if (!entity.Active) continue;
+                        if (!hb.CanHitOwner && entity.Id == hb.OwnerId) continue;
+                        if (hitThisTick.Contains(entity.Id)) continue;
+
+                        bool hit = false;
+                        float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
+
+                        if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
                         {
-                            dist = MathF.Sqrt(distSq);
-                            hit = true;
+                            hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz);
                         }
-                    }
-
-                    if (hit)
-                    {
-                        // Calculate knockback direction (normalized, no force multiplier)
-                        float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
-                        float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
-
-                        results.Add(new HitResult
+                        else
                         {
-                            TargetEntityId = entity.Id,
-                            OwnerEntityId = hb.OwnerId,
-                            Damage = hb.Damage,
-                            KnockbackAngle = hb.KnockbackAngle,
-                            DirZ = dirZNorm,
-                            BaseKnockback = hb.BaseKnockback,
-                            KnockbackGrowth = hb.KnockbackGrowth,
-                            StunTicks = hb.StunTicks,
-                        });
+                            // Sphere-sphere (original)
+                            dx = entity.PosX - hb.X;
+                            dy = entity.PosY - hb.Y;
+                            dz = entity.PosZ - hb.Z;
+                            float distSq = (dx * dx) + (dy * dy) + (dz * dz);
+                            float combinedRadius = hb.Radius + entity.Radius;
+                            if (distSq <= combinedRadius * combinedRadius)
+                            {
+                                dist = MathF.Sqrt(distSq);
+                                hit = true;
+                            }
+                        }
 
-                        hitThisTick.Add(entity.Id);
-                        hb.Active = false; // one-hit per hitbox
-                        break;
+                        if (hit)
+                        {
+                            // Calculate knockback direction (normalized, no force multiplier)
+                            float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
+                            float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
+
+                            results.Add(new HitResult
+                            {
+                                TargetEntityId = entity.Id,
+                                OwnerEntityId = hb.OwnerId,
+                                Damage = hb.Damage,
+                                KnockbackAngle = hb.KnockbackAngle,
+                                DirZ = dirZNorm,
+                                BaseKnockback = hb.BaseKnockback,
+                                KnockbackGrowth = hb.KnockbackGrowth,
+                                StunTicks = hb.StunTicks,
+                            });
+
+                            hitThisTick.Add(entity.Id);
+                            if (isZone)
+                                continue;   // zone survives and keeps scanning other entities
+                            hb.Active = false; // one-hit per hitbox
+                            break;
+                        }
                     }
                 }
 

@@ -142,7 +142,21 @@ namespace SlopArena.Client.Entities
                 string path = $"AnimationConfigs/{def.Class}_AnimConfig";
                 _charConfig = Resources.Load<CharacterAnimationConfig>(path);
                 if (_charConfig == null)
-                    Debug.LogError($"[PlayerRenderer] AnimConfig not found at Resources/{path}");
+                {
+                    // Placeholder characters borrow another class's prefab (e.g. Nilus and Kistu
+                    // both ship ModelResourcePath = "Characters/FightGuy"). The model IS that
+                    // class's model, so its clips are the right ones to borrow — without this
+                    // the applier early-returns on a null config and the character T-poses.
+                    string modelClass = def.ModelResourcePath.Substring(
+                        def.ModelResourcePath.LastIndexOf('/') + 1);
+                    string fallbackPath = $"AnimationConfigs/{modelClass}_AnimConfig";
+                    if (modelClass.Length > 0 && fallbackPath != path)
+                        _charConfig = Resources.Load<CharacterAnimationConfig>(fallbackPath);
+                    if (_charConfig != null)
+                        Debug.Log($"[PlayerRenderer] {def.Class} has no AnimConfig — borrowing {modelClass} clips from Resources/{fallbackPath} (placeholder art)");
+                    else
+                        Debug.LogError($"[PlayerRenderer] AnimConfig not found at Resources/{path} (model fallback Resources/{fallbackPath} missing too)");
+                }
             }
         }
 
@@ -468,7 +482,10 @@ namespace SlopArena.Client.Entities
                         animState.Speed = animSpeed;
                         _currentAnimState = animState;
                         _currentExtrapolationMode = ExtrapolationMode.None;
-                        if (_charDef?.ClipOverrides != null)
+                        // Extrapolation is driven entirely by baked skeleton frames. Characters
+                        // with no BakedDataPath (placeholders: Nilus, Kistu) have none, and
+                        // FromBakedData dereferences its argument — so gate on it here.
+                        if (_bakedData != null && _charDef?.ClipOverrides != null)
                         {
                             foreach (var cfg in _charDef.ClipOverrides)
                             {
@@ -480,7 +497,8 @@ namespace SlopArena.Client.Entities
                                 }
                             }
                         }
-                        if (_currentExtrapolationMode == ExtrapolationMode.None && _charConfig?.AbilityClips != null)
+                        if (_bakedData != null && _currentExtrapolationMode == ExtrapolationMode.None
+                            && _charConfig?.AbilityClips != null)
                         {
                             foreach (var entry in _charConfig.AbilityClips)
                             {

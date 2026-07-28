@@ -1,0 +1,20 @@
+{
+  "Scenario": "Nilus RMB Uncharged",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.825,
+    "PZ": 0.065625004,
+    "VZ": 1.6875,
+    "ComboStage": 1,
+    "AttackSlot": 2,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "PZ": 0.1499732,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

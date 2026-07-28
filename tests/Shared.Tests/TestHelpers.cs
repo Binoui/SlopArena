@@ -12,6 +12,8 @@ public static class TestHelpers
 
     public static CharacterDefinition KistuDef => CharacterRegistry.Get(CharacterClass.Kistu);
 
+    public static CharacterDefinition NilusDef => CharacterRegistry.Get(CharacterClass.Nilus);
+
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests
     /// that need grounded must set PY = floorY + def.CapsuleHeight * 0.5f.
@@ -217,9 +219,15 @@ public static class TestHelpers
     }
 
     /// <summary>
-    /// Convenience: ground-level PY for CombatDef (height 1.3m).
+    /// Spawn PY for <see cref="CombatDef"/> with the floor at 0.
+    ///
+    /// This is 0.65, NOT the settled ground PY. CombatDef clones MankiDef, whose CapsuleHeight
+    /// is 1.5 m, so ground resolution snaps a dummy spawned here to PY = 0.75 on its first tick
+    /// — which is what every golden's NpcFinal.PY records. 0.65 is inside
+    /// PlatformSnapTolerance, so the snap is silent and the spawn value is harmless; it is kept
+    /// because changing it would rewrite every golden for no behavioural gain.
     /// </summary>
-    public static float CombatGroundPY => 0f + 1.3f * 0.5f; // 0.65
+    public static float CombatGroundPY => 0.65f;
 
     /// <summary>
     /// A CharacterDefinition with Manki's specs, HurtboxBoneDefs set (for BoneName lookup),

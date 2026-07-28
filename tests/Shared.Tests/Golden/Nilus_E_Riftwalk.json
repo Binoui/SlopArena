@@ -1,0 +1,18 @@
+{
+  "Scenario": "Nilus E Riftwalk",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.825,
+    "PZ": 6,
+    "AttackSlot": 4,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "PZ": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

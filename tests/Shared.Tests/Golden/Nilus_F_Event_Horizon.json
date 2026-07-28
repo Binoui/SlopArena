@@ -1,0 +1,34 @@
+{
+  "Scenario": "Nilus F Event Horizon",
+  "TickCount": 200,
+  "PlayerSnap": {
+    "PY": 0.825,
+    "Cooldown5": 540,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.75,
+    "PZ": 4.0304537,
+    "VZ": -0.29523668,
+    "DamagePercent": 36,
+    "HitstunTicks": 40,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "Cooldown5": 472,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 13.688405,
+    "PZ": 18.754215,
+    "VY": 11.033883,
+    "VZ": 6.93986,
+    "DamagePercent": 36,
+    "AirTimeTicks": 29,
+    "JumpsLeft": 2
+  }
+}

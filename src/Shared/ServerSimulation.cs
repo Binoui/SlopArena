@@ -69,6 +69,7 @@ namespace SlopArena.Shared
 			ability.SimulationStates = _states;
 			ability.BakedData = _bakedData.TryGetValue(entityId, out var b) ? b : null;
 			ability.CharacterDef = def;
+			ability.Arena = _arena;
 			ability.Slot = slot;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
@@ -742,12 +743,14 @@ namespace SlopArena.Shared
             _spellResolver.CheckGroundCollision(_arena);
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
-            // NOTE: Explosion damage/radius from projectiles (bazooka/roundbomb ground impact)
-            // does NOT get Overclock buff bonuses. Explosions are secondary effects detached
-            // from the owner's state — the ProjectileExplosion config is baked at spawn time.
-            // Direct projectile hits DO get the bonus (applied in MankiBazooka/MankiRoundBomb
-            // before Resolver.Spawn). If explosion buffs are desired, propagate owner buff
-            // flags alongside projectile data and check at explosion time.
+            // NOTE: The ProjectileExplosion config is baked at spawn time, so nothing here
+            // applies Overclock buff bonuses — explosions are secondary effects detached
+            // from the owner's state by the time they resolve. An ability MAY therefore bake
+            // buffed values into the config itself before Resolver.Spawn: NilusVoidRift does
+            // exactly that (its explosion IS the payload rift), while MankiBazooka and
+            // MankiRoundBomb buff only the direct projectile hit and leave their ground-impact
+            // explosions unbuffed. Buffing an explosion any later would need the owner's buff
+            // flags propagated alongside the projectile and checked at explosion time.
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
 			{
 				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();
@@ -764,6 +767,7 @@ namespace SlopArena.Shared
 					DurationTicks = explosion.DurationTicks,
 					OwnerId = ownerId,
 					CanHitOwner = explosion.CanHitOwner,
+					RehitIntervalTicks = explosion.RehitIntervalTicks,
 				});
 			}
 		}

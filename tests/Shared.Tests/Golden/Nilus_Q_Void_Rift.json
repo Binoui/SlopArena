@@ -1,0 +1,33 @@
+{
+  "Scenario": "Nilus Q Void Rift",
+  "TickCount": 340,
+  "PlayerSnap": {
+    "PY": 0.825,
+    "ChargeTicks": 10,
+    "Cooldown2": 539,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.75,
+    "PZ": 4.575168,
+    "DamagePercent": 9,
+    "HitstunTicks": 6,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.825,
+    "ChargeTicks": 10,
+    "Cooldown2": 311,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 6.4090223,
+    "DamagePercent": 24,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}
