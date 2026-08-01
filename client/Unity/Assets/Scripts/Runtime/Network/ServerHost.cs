@@ -131,7 +131,7 @@ namespace SlopArena.Client.Network
 
             _configPath = Path.Combine(Path.GetTempPath(), $"sloparena-host-{_assignedPort}.json");
             File.WriteAllText(_configPath, config.ToJson());
-            Debug.Log($"[ServerHost] Wrote config to {_configPath} (port {_assignedPort})");
+            UnityEngine.Debug.Log($"[ServerHost] Wrote config to {_configPath} (port {_assignedPort})");
 
             var psi = new ProcessStartInfo
             {
@@ -172,7 +172,7 @@ namespace SlopArena.Client.Network
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
 
-            Debug.Log($"[ServerHost] Spawned server PID {_process.Id} on port {_assignedPort}.");
+            UnityEngine.Debug.Log($"[ServerHost] Spawned server PID {_process.Id} on port {_assignedPort}.");
         }
 
         /// <summary>
@@ -187,12 +187,12 @@ namespace SlopArena.Client.Network
             try
             {
                 if (!_process.HasExited)
-                    _process.Kill(entireProcessTree: true);
+                    _process.Kill();
                 _process.WaitForExit(2000);
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[ServerHost] Stop error: {ex.Message}");
+                UnityEngine.Debug.LogWarning($"[ServerHost] Stop error: {ex.Message}");
             }
 
             DetachProcess();
