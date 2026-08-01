@@ -207,5 +207,99 @@ namespace SlopArena.Tests
             });
             Assert.True(await client.AuthenticateGuestAsync());
         }
+
+        // ── GetServersAsync ──
+
+        private const string ServerListJson =
+            "[{\"id\":\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"," +
+            "\"name\":\"Test EU Server\"," +
+            "\"ipAddress\":\"127.0.0.1\"," +
+            "\"port\":9876," +
+            "\"region\":\"eu-west\"," +
+            "\"currentMatches\":2," +
+            "\"maxConcurrentMatches\":15," +
+            "\"isOfficial\":true}," +
+            "{\"id\":\"b2c3d4e5-f6a7-8901-bcde-f12345678901\"," +
+            "\"name\":\"Community US\"," +
+            "\"ipAddress\":\"10.0.0.5\"," +
+            "\"port\":9877," +
+            "\"region\":\"us-east\"," +
+            "\"currentMatches\":0," +
+            "\"maxConcurrentMatches\":8," +
+            "\"isOfficial\":false}]";
+
+        [Fact]
+        public async Task GetServers_ReturnsServerListAfterAuth()
+        {
+            string? capturedAuthHeader = null;
+            using var client = MakeClient(req =>
+            {
+                if (req.RequestUri!.ToString().Contains("auth/guest"))
+                    return GuestAuthResponse();
+
+                Assert.Equal("http://test/servers", req.RequestUri!.ToString());
+                Assert.Equal(HttpMethod.Get, req.Method);
+                capturedAuthHeader = req.Headers.Authorization?.ToString();
+                return JsonOk(ServerListJson);
+            });
+
+            await client.AuthenticateGuestAsync();
+            var servers = await client.GetServersAsync();
+
+            Assert.NotNull(servers);
+            Assert.Equal(2, servers!.Count);
+            Assert.Equal($"Bearer {SampleToken}", capturedAuthHeader);
+
+            var s0 = servers[0];
+            Assert.Equal("a1b2c3d4-e5f6-7890-abcd-ef1234567890", s0.Id.ToString());
+            Assert.Equal("Test EU Server", s0.Name);
+            Assert.Equal("127.0.0.1", s0.IpAddress);
+            Assert.Equal(9876, s0.Port);
+            Assert.Equal("eu-west", s0.Region);
+            Assert.Equal(2, s0.CurrentMatches);
+            Assert.Equal(15, s0.MaxConcurrentMatches);
+            Assert.True(s0.IsOfficial);
+
+            var s1 = servers[1];
+            Assert.Equal("b2c3d4e5-f6a7-8901-bcde-f12345678901", s1.Id.ToString());
+            Assert.False(s1.IsOfficial);
+            Assert.Equal("us-east", s1.Region);
+        }
+
+        [Fact]
+        public async Task GetServers_ReturnsNullBeforeAuth()
+        {
+            using var client = MakeClient(_ => JsonOk("[]"));
+            var servers = await client.GetServersAsync();
+            Assert.Null(servers);
+        }
+
+        [Fact]
+        public async Task GetServers_ReturnsEmptyListWhenNoServers()
+        {
+            using var client = MakeClient(req =>
+                req.RequestUri!.ToString().Contains("auth/guest")
+                    ? GuestAuthResponse()
+                    : JsonOk("[]"));
+
+            await client.AuthenticateGuestAsync();
+            var servers = await client.GetServersAsync();
+
+            Assert.NotNull(servers);
+            Assert.Empty(servers!);
+        }
+
+        [Fact]
+        public async Task GetServers_ReturnsNullOnServerError()
+        {
+            using var client = MakeClient(req =>
+                req.RequestUri!.ToString().Contains("auth/guest")
+                    ? GuestAuthResponse()
+                    : new HttpResponseMessage(HttpStatusCode.InternalServerError));
+
+            await client.AuthenticateGuestAsync();
+            var servers = await client.GetServersAsync();
+            Assert.Null(servers);
+        }
     }
 }

@@ -20,6 +20,7 @@ namespace SlopArena.Client.UI
             var btnHost        = root.Q<Button>("btn-host");
             var btnJoin        = root.Q<Button>("btn-join");
             var ipField        = root.Q<TextField>("ip-field");
+            var btnServerBrowser = root.Q<Button>("btn-serverbrowser");
 
             btnTraining.clicked += () =>
             {
@@ -40,6 +41,11 @@ namespace SlopArena.Client.UI
                 MatchConfig.IsHost   = true;
                 MatchConfig.ServerIP = "127.0.0.1";
                 SceneManager.LoadScene("Lobby");
+            };
+
+            btnServerBrowser.clicked += () =>
+            {
+                SceneManager.LoadScene("ServerBrowser");
             };
 
             btnJoin.clicked += () =>

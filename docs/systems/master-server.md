@@ -63,8 +63,9 @@ The game server (`src/Server`) points at the master server via `ServerConfig.Mas
 | POST | `/servers/register` | none (issues token) | `{ "serverId": "<guid>", "apiToken": "<guid>" }` |
 | POST | `/servers/{serverId}/heartbeat` | Bearer `apiToken` | `{ "status": "ok" }` |
 | POST | `/match/result` | Bearer `apiToken` | `{ "status": "recorded", "mmrChange": <int> }` (match row must already exist, else 404) |
+| GET | `/servers` | Bearer JWT | `[ { id, name, ipAddress, port, region, currentMatches, maxConcurrentMatches, isOfficial } ]` — heartbeat-fresh (< 15s), non-full servers |
 
-**Not yet implemented** (later roadmap tickets): `GET /servers` browser list (Phase 1.2), `LobbyHub` SignalR hub (Phase 2.1).
+**Not yet implemented** (later roadmap tickets): `LobbyHub` SignalR hub (Phase 2.1).
 
 ### Smoke test
 

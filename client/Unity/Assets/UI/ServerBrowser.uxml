@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="SlopArena.uss" />
+    <ui:VisualElement name="root" class="screen">
+        <ui:Label name="title" text="SERVER BROWSER" class="title" />
+        <ui:VisualElement name="server-list" class="server-list" />
+        <ui:Label name="lbl-status" text="Loading..." class="subtitle" />
+        <ui:Button name="btn-refresh" text="REFRESH" class="btn-primary" />
+        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+    </ui:VisualElement>
+</ui:UXML>
