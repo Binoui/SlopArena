@@ -188,3 +188,6 @@ client/Unity/Packages/com.kybernetik.animancer/
 client/Unity/Assets/BOXOPHOBIC/
 
 .worktrees/
+
+# Superpowers brainstorm session state
+.superpowers/
