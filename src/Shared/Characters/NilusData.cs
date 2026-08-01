@@ -52,8 +52,8 @@ public static partial class CharacterRegistry
                 FallRampDuration = 12,
             },
 
-            // No baked skeleton yet → capsule hurtbox fallback (placeholder).
-            HurtboxBoneDefs = null,
+            // Baked skeleton → shared mixamorig bone hurtboxes.
+            HurtboxBoneDefs = MixamorigBoneDefs,
             HurtboxCapsules = new HurtboxCapsule[]
             {
                 new(0f, 0.2f, 0f, 0f, 0.9f, 0f, 0.3f),
@@ -68,8 +68,8 @@ public static partial class CharacterRegistry
             ModelSoleOffset = 0f,
             AutoModelYOffset = true,
             ModelYOffset = 0f,
-            ModelResourcePath = "Characters/FightGuy", // placeholder stand-in prefab
-            BakedDataPath = "",                        // empty → capsule hurtboxes
+            ModelResourcePath = "Characters/Nilus", // Updated to actual prefab path
+            BakedDataPath = "res://data/nilus_skeleton.bin",
 
             // ═══ ABILITIES ═══
 

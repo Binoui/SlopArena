@@ -166,6 +166,23 @@ namespace SlopArena.Shared
     /// </summary>
     public static partial class CharacterRegistry
     {
+        /// <summary>
+        /// Standard 7-bone hurtbox defs shared by every character (all use the Mixamo
+        /// humanoid rig). Order MUST match the bake order in SlopArenaBaker
+        /// (Head, Spine2, Hips, RightHand, LeftHand, RightFoot, LeftFoot) —
+        /// GetBonePosition indexes by position in the baked array, not by name.
+        /// </summary>
+        private static readonly HurtboxBoneDef[] MixamorigBoneDefs = new HurtboxBoneDef[]
+        {
+            new("mixamorig:Head", 0, 0, 0, 0.25f),
+            new("mixamorig:Spine2", 0, 0, 0, 0.3f),
+            new("mixamorig:Hips", 0, 0, 0, 0.3f),
+            new("mixamorig:RightHand", 0, 0, 0, 0.14f),
+            new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
+            new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
+            new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
+        };
+
         private static CharacterDefinition[]? _definitions;
 
         public static CharacterDefinition[] All

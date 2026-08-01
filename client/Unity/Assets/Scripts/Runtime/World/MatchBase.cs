@@ -8,6 +8,7 @@ using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
 using SlopArena.Client.Input;
 using SlopArena.Client.Entities;
+using SlopArena.Client.Animation;
 using SlopArena.Client.Simulation;
 
 namespace SlopArena.Client.World
@@ -19,6 +20,11 @@ namespace SlopArena.Client.World
 
         [Header("Entities")]
         [SerializeField] protected PlayerRenderer _playerRenderer;
+
+        [Header("Player Character Assets (drag-drop — fallback to Resources.Load if empty)")]
+        [SerializeField] private GameObject _playerModelPrefab;
+        [SerializeField] private CharacterAnimationConfig _playerAnimConfig;
+        [SerializeField] private WeaponAttachConfig _playerWeaponConfig;
 
         [Header("Input")]
         [SerializeField] protected InputController _inputController;
@@ -51,9 +57,17 @@ namespace SlopArena.Client.World
             _playerRenderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
             _playerRenderer.SetBakedData(baked);
             _playerRenderer.SetCharacterDefinition(def);
-            _playerRenderer.LoadModel(def);
+
+            // Use drag-dropped assets, fall back to Resources.Load by convention
+            if (_playerAnimConfig != null)
+                _playerRenderer.SetAnimationConfig(_playerAnimConfig);
+            _playerRenderer.LoadModel(def, _playerModelPrefab);
+
+            var weaponConfig = _playerWeaponConfig != null
+                ? _playerWeaponConfig
+                : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
             _playerRenderer.GetComponent<WeaponAttach>()
-                ?.Init(_playerRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}"));
+                ?.Init(_playerRenderer, weaponConfig);
         }
 
         protected void SetupCamera()

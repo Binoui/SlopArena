@@ -36,16 +36,7 @@ public static partial class CharacterRegistry
                 FloatWindowTicks = 35,
                 FallRampDuration = 10,
             },
-            HurtboxBoneDefs = new HurtboxBoneDef[]
-            {
-                new("mixamorig:Head", 0, 0, 0, 0.25f),
-                new("mixamorig:Spine2", 0, 0, 0, 0.3f),
-                new("mixamorig:Hips", 0, 0, 0, 0.3f),
-                new("mixamorig:RightHand", 0, 0, 0, 0.14f),
-                new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
-                new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
-                new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
-            },
+            HurtboxBoneDefs = MixamorigBoneDefs,
 
             HurtboxCapsules = new HurtboxCapsule[]
             {
