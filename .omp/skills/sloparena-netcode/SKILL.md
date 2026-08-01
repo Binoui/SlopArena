@@ -15,73 +15,191 @@ triggers:
 
 ## Architecture Overview
 
+SlopArena has **three server-like things** (see CONTEXT.md "Disambiguation: server"):
+- **Master server** — separate repo (`SlopArena-MasterServer`), ASP.NET Core + SignalR + PostgreSQL. Handles matchmaking, lobby, char-select, results. Never runs simulation.
+- **Game server** — this repo's `src/Server/`, .NET console. Registers with master, receives match-start commands, runs 2-4 player matches over UDP.
+- **ServerSimulation** — `src/Shared/`, pure C# tick loop. Runs identically on client (prediction) and game server (authority).
+
 ```
-Godot Client (renderer + prediction)    ServerApp (.NET console, authority)
-       │                                          │
-       │  UDP localhost:9876                      │
-       │                                          │
-       ├─ Send(entityId + tick + InputState) ────►│
-       │                                          ├─ ServerSimulation.Tick()
-       │◄─────────────────────────────────────────├─ Send(entityId + tick + CharacterState)
-       │                                          │
-       └─ Compare predicted vs server             │
-          └─ mismatch → rollback                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                        MASTER SERVER (separate repo)                  │
+│           ASP.NET Core + SignalR + PostgreSQL                         │
+│                                                                       │
+│  Server Browser │ Lobby Hub │ Char Select │ Match Start │ Results    │
+│       │              │            │            │            │         │
+└───────┼──────────────┼────────────┼────────────┼────────────┼────────┘
+        │ /servers      │ SignalR    │            │ POST       │
+        │               │ pushes     │            │ /match/start│
+        ▼               ▼            ▼            ▼            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    GAME SERVER (src/Server, .NET console)              │
+│                                                                       │
+│  ┌─────────────────────┐    ┌──────────────────────────────────────┐ │
+│  │ MatchControlServer  │    │ MultiMatchOrchestrator                │ │
+│  │ TCP :base_port      │───►│ port allocation: base → base+max-1   │ │
+│  │ POST /match/start   │    │ tracks active MatchInstances          │ │
+│  └─────────────────────┘    └───────────┬──────────────────────────┘ │
+│                                         │ spawns                      │
+│                    ┌────────────────────┼────────────────────┐       │
+│                    ▼                    ▼                     ▼       │
+│              ┌──────────┐        ┌──────────┐          ┌──────────┐  │
+│              │ Match #1 │        │ Match #2 │   ...    │ Match #N │  │
+│              │ UDP      │        │ UDP      │          │ UDP      │  │
+│              │ :base+0  │        │ :base+1  │          │ :base+N  │  │
+│              │ thread   │        │ thread   │          │ thread   │  │
+│              └────┬─────┘        └────┬─────┘          └────┬─────┘  │
+└───────────────────┼───────────────────┼──────────────────────┼──────┘
+                    │ UDP               │ UDP                  │ UDP
+                    ▼                   ▼                      ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         UNITY CLIENTS                                 │
+│                                                                       │
+│  ┌──────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
+│  │ Input    │  │ LocalSim     │  │ NetworkClient│  │ LobbyClient   │  │
+│  │ (WASD)   │─►│ (predict)    │─►│ (UDP)       │  │ (SignalR)     │  │
+│  └──────────┘  └──────┬───────┘  └──────┬──────┘  └───────┬───────┘  │
+│                       │                 │                 │          │
+│                 ┌─────▼─────┐    ┌──────▼──────┐          │          │
+│                 │  RENDER   │◄───┤ State Buffer │          │          │
+│                 │ (Unity)   │    │ [t-29..t]   │          │          │
+│                 └──────────┘    │ 30-frame ring│          │          │
+│                                 │ rollback if  │          │          │
+│                                 │ 3D dist >0.5m│          │          │
+│                                 └─────────────┘           │          │
+│                                                           │          │
+│                 Lobby/meta via SignalR ◄──────────────────┘          │
+│                 Match sim via UDP ◄──────────────────────────────────┤
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+## Server Architecture (src/Server)
+
+The game server is a .NET console process that runs multiple concurrent matches. See `CONTEXT.md` for the canonical vocabulary (GameServer, MatchControlServer, MultiMatchOrchestrator, MatchInstance, Roster, PortAllocation).
+
+### Match start flow (master → game server)
+
+1. Master server sends `POST /match/start` with a JSON body (`MatchStartRequest`: matchId, arenaName, players[]).
+2. `MatchControlServer.TryStartMatch()` parses it via `MatchStartRequestCodec.TryParse()` (pure, unit-tested).
+3. `MultiMatchOrchestrator.AssignMatch()` finds the next free UDP port and creates a `MatchInstance` with the roster.
+4. `MatchControlServer` replies `{"port": N}` to the master server.
+5. Master server broadcasts `MatchStarted` via SignalR — clients connect to the game server IP at port N.
+
+### MatchInstance lifecycle
+
+- **Construction:** roster-driven — one `PlayerSlot` per `MatchPlayer(SteamId, CharacterClass, EntityId)`. Spawns entities via `_sim.RegisterEntity()` with the correct character class (no more hardcoded Manki).
+- **Waiting:** UDP socket bound, waiting for all rostered players to send their first packet (matched by entityId).
+- **Countdown:** 180 ticks (3s) once all players connected.
+- **Playing:** 60Hz tick loop — `ReceiveInputs()` → `_sim.Tick(inputs)` → `SendState()`. Death tracking: first to 3 deaths loses.
+- **Ended:** 180-tick post-match display, then `_running = false` → port freed via `_onMatchEnd` callback.
+- **Timeout:** 5s silence from any player → match stops.
+
+### Port allocation
+
+TCP control plane listens on `config.Port` (the registered base port). UDP matches bind `config.Port + offset` (0..max-1). One match per port. TCP and UDP coexist on the same port number because they're different protocols.
+
+### Registration + heartbeat
+
+`GameServerRegistration` registers with the master server at startup (`POST /servers/register` → gets `serverId` + `apiToken`), then heartbeats every 10s with current match count. On match end, reports the result (`POST /match/result`) for MMR updates.
 
 ## Data Flow (one frame)
 
-### Client _PhysicsProcess (60Hz):
+### Client FixedUpdate (60Hz):
 1. BuildInputState()
 2. Assign `_sendTick++`
 3. Store input in `_inputBuffer[tick % RollbackFrames]`
 4. `localSim.Tick(input)` → predict state
 5. Store predicted in `_stateBuffer[tick % RollbackFrames]`
 6. `Net.SendInput(input, tick)` → UDP
-7. `Player.ApplyServerState(predicted)` → render
+7. `PlayerRenderer.ApplyServerState(predicted)` → render
 
-### Client _Process:
+### Client Update:
 8. `Net.ReceiveStates()` → server states with ticks
 9. Compare `_stateBuffer[serverTick]` vs server state
 10. If mismatch: rollback (re-simulate from safe state)
 
-### ServerApp Tick:
-1. Receive all client inputs (buffer)
-2. `sim.Tick(inputs)` → ServerSimulation
-3. Broadcast `CharacterState[]` to all clients
+### MatchInstance Tick (60Hz, per match, own thread):
+1. `ReceiveInputs()` — drain UDP socket, match by entityId, queue inputs per PlayerSlot
+2. Check timeout (5s silence → match stops)
+3. `_sim.Tick(inputs)` → ServerSimulation (movement + hit detection + hurtboxes + void death)
+4. Check deaths (first to MaxDeaths=3 loses → MatchState.Ended)
+5. `SendState()` — broadcast all entity states to all connected clients
 
 ## Packet Format
 
-### Client → Server (26 bytes)
+### Client → Server (31 bytes)
 ```
-[0..7]  entityId (ulong)
-[8..11] tick (uint) 
-[12..25] InputState (14 bytes: MoveX, MoveY, flags byte, ActiveSlot byte, FacingYaw short, AimYaw short)
+[0..7]   entityId (ulong)
+[8..11]  tick (uint)
+[12..30] InputState (19 bytes)
 ```
 
-- InputState.Size = 14 (2 x float + 1 flags + 1 ActiveSlot + 2 FacingYaw + 2 AimYaw)
+**InputState layout (19 bytes):**
+| Offset | Type    | Field           | Notes                              |
+|--------|---------|-----------------|------------------------------------|
+| 0-3    | float   | MoveX           | Horizontal analog input            |
+| 4-7    | float   | MoveY           | Vertical analog input              |
+| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:Dash, 6:Crouch, 7:IsAiming |
+| 9      | byte    | ActiveSlot      | 0=none, 1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F |
+| 10-11  | short   | FacingYaw       | Degrees × 100 (movement-facing)    |
+| 12-13  | short   | AimYaw          | Degrees × 100 (combat-facing, reserved) |
+| 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
+| 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
+| 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
+
+- `InputState.Size = 19` (MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2) + AimPitch(2) + AimDistance(2) + TargetEntityId(1))
 - FacingYaw = movement-facing (set by Atan2 in sim, sent for completeness). NOT used by sim.
 - AimYaw = combat-facing (sent by client camera). NOT used by sim. Reserved.
-### Server → Client (52 bytes per entity)
- 
+- AimPitch = camera vertical aim. Serialized in CharacterStatePacket back to client for ghost rendering.
+
+### Server → Client (60 bytes per entity)
 ```
-[0..7]  entityId (ulong)
-[8..11] tick (uint) — echoed from client
-[12..51] CharacterStatePacket (40 bytes: TickNumber, PX, PY, PZ, VX, VY, VZ, State, IsGrounded, StateTicks, AttackSlot, ComboStage, FacingYaw, MatchState, AnimIndex)
+[0..7]   entityId (ulong)
+[8..11]  tick (uint) — echoed from client
+[12..59] CharacterStatePacket (48 bytes)
 ```
- 
-- `CharacterStatePacket.Size` = 40 bytes (TickNumber=4, 3 pos + 3 vel = 24, State=1, IsGrounded=1, StateTicks=2, AttackSlot=1, ComboStage=1, FacingYaw=4, MatchState=1, AnimIndex=1 = 40)
-- **CRITICAL: AttackSlot, ComboStage, FacingYaw, and MatchState must be in the packet.** Without AttackSlot, server ghost stays in idle pose. Without FacingYaw, ghost faces +Z. Without MatchState, clients can't show countdown/game-over UI. Add in FromState(), ToState(), Serialize(), Deserialize() — all 4 methods.
-- **MatchState field** (1 byte at packet offset 38) carries the server-authoritative match lifecycle: Waiting, Countdown, Playing, Ended. Set by the server before serialization, read by the client for UI updates. AnimIndex is at packet offset 39.
+
+**CharacterStatePacket layout (48 bytes):**
+| Offset | Type    | Field               | Notes                              |
+|--------|---------|---------------------|------------------------------------|
+| 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
+| 4-7    | float   | PositionX           | World X                            |
+| 8-11   | float   | PositionY           | World Y (up)                       |
+| 12-15  | float   | PositionZ           | World Z (forward)                  |
+| 16-19  | float   | VelocityX           | World velocity X                   |
+| 20-23  | float   | VelocityY           | World velocity Y                   |
+| 24-27  | float   | VelocityZ           | World velocity Z                   |
+| 28     | byte    | CurrentActionState  | Idle/Dashing/Attacking/Hitstun     |
+| 29     | byte    | IsGrounded          | 0 or 1                             |
+| 30-31  | ushort  | StateDurationFrames | Remaining ticks in current state   |
+| 32     | byte    | AttackSlot          | 0=none, 1-6=LMB/RMB/Q/E/R/F      |
+| 33     | byte    | ComboStage          | 0-3 combo chain stage              |
+| 34-37  | float   | FacingYaw           | Server-authoritative facing (radians) |
+| 38     | byte    | MatchState          | Match lifecycle (Waiting/Countdown/Playing/Ended) |
+| 39     | byte    | AnimIndex           | Animation index into ability's AnimationNames[] |
+| 40-41  | ushort  | BuffRemainingTicks  | Buff timer (0 = no active buff)    |
+| 42     | byte    | BuffActiveFlags     | BuffType bitfield                   |
+| 43     | byte    | HitstunLevel        | 0=small, 1=medium, 2=hard          |
+| 44-47  | float   | AimPitch            | Server-authoritative aim pitch (radians) |
+
+- `CharacterStatePacket.Size = 48` — verify against the `Size` constant in `Shared/CharacterStatePacket.cs`
+- **CRITICAL: AttackSlot, ComboStage, FacingYaw, MatchState, and AnimIndex must be in the packet.** Without AttackSlot, server ghost stays in idle pose. Without FacingYaw, ghost faces +Z. Without MatchState, clients can't show countdown/game-over UI. Add in FromState(), ToState(), Serialize(), Deserialize() — all 4 methods.
+- **MatchState field** (byte at offset 38) carries the server-authoritative match lifecycle. Set by MatchInstance.SendState() before serialization, read by the client for UI updates.
+- **Size evolution:** 32 → 34 → 38 → 39 → 40 → 48 bytes. When adding a field, update `Size` constant + all 4 serialization methods.
 
 ## Key Classes
 
-- **ServerSimulation** (Shared/): Pure C# game loop. 60Hz tick. Same code on client and server.
+- **ServerSimulation** (`Shared/ServerSimulation.cs`): Pure C# game loop. 60Hz tick. Same code on client and server.
   - `GetState(id)` returns a copy of the CharacterState for an entity.
   - `SetState(id, state)` replaces the state for an entity (used for warp data sync in training mode).
-- **MatchManager** (Scripts/World/): Orchestrates local sim + network client + rollback.
-- **NetworkClient** (Scripts/Network/): UDP send/receive with tick tracking.
-- **PlayerController.ApplyServerState()**: Simple struct copy + MoveAndSlide (no hacks).
-- **ServerApp** (ServerApp/): Standalone console .NET server process.
+- **MatchInstance** (`src/Server/MatchInstance.cs`): One running match — 2-4 rostered players, one dedicated UDP port, one thread. Roster-driven (master server sends character classes + entity IDs). Manages countdown/fight/results lifecycle.
+- **MultiMatchOrchestrator** (`src/Server/MultiMatchOrchestrator.cs`): Port allocation + match lifecycle inside the game server. Owns the match collection.
+- **MatchControlServer** (`src/Server/MatchControlServer.cs`): HTTP control plane. `POST /match/start` from master server → assigns port → replies.
+- **GameServerRegistration** (`src/Server/GameServerRegistration.cs`): Registers with master server, heartbeats every 10s, reports match results.
+- **MatchBase** (`client/Unity/.../World/MatchBase.cs`): Abstract MonoBehaviour — arena load, renderer pool, camera, HUD, sim tick loop, ApplyServerState calls.
+- **TrainingMatch** / **PvPMatch** (`client/Unity/.../World/`): Concrete MatchBase subclasses. Training = local sim + NPC AI. PvP = network client as sim source.
+- **NetworkClient** (`client/Unity/.../Network/NetworkClient.cs`): UDP send/receive with tick tracking.
+- **LobbyClient** (`client/Unity/.../Network/LobbyClient.cs`): SignalR client for lobby/meta (server browser, lobby room, char select, match started).
+- **PlayerRenderer.ApplyServerState()**: Simple struct copy (no hacks).
 
 ## Important: Input-Driven Simulation (Attack System)
 
@@ -254,10 +372,10 @@ if (simState == ActionState.Attacking && !_fsm.IsInState("attack"))
 Le serveur lit le tick de chaque client depuis le buffer d'input AVANT de vider le buffer, et écrit ce tick dans les paquets de réponse. Le client utilise ce tick pour retrouver l'état prédit correspondant dans son ring buffer.
 
 ```
-ServerApp Program.cs:
-  var clientTicks = inputBuffer.ToDictionary(kvp.Key → kvp.Value.tick);
-  sim.Tick(inputs); inputBuffer.Clear();
-  foreach client: packet.tick = clientTicks[entityId]
+MatchInstance.SendState():
+  // _serverTick is the latest client tick seen across all slots
+  foreach slot: packet.tick = _serverTick
+  foreach client: send all entity packets
 ```
 
 ## Rollback Threshold Tuning
@@ -299,10 +417,11 @@ The `ChainTo()` method calls `AnimPlayback.Travel(animName)` — this Travels fr
 ## Debug Logging Strategy
 
 When debugging netcode/tick/attack issues, logs must be visible:
-- **Client-side (Godot)**: Use `GD.Print()` — visible in Godot Editor output panel
-- **Sim-side (Shared/)**: Use `System.Console.WriteLine()` — goes to stdout (NOT visible in Godot panel)
-- **MatchManager**: After `_localSim.Tick()`, read state and GD.Print any field of interest (BufferedSlot, AttackSlot, ComboStage, AnimLockTicks)
-- **Rollback**: Add `GD.Print($"[Rollback] Tick {t}: dy={dy:F3}m")` to see rollback frequency
+- **Client-side (Unity)**: Use `Debug.Log()` — visible in Unity Console
+- **Sim-side (Shared/)**: Use `System.Console.WriteLine()` — goes to stdout (NOT visible in Unity Console)
+- **Game server (src/Server)**: Use `Console.WriteLine()` — visible in the server process terminal
+- **MatchBase**: After `_localSim.Tick()`, read state and `Debug.Log` any field of interest (BufferedSlot, AttackSlot, ComboStage, AnimLockTicks)
+- **Rollback**: Add `Debug.Log($"[Rollback] Tick {t}: dy={dy:F3}m")` to see rollback frequency
 - **Threshold**: A rollback every frame means the threshold is too tight — increase until rollbacks are infrequent
 
 ## Workstyle
@@ -359,10 +478,9 @@ var p1State = _sim.GetState(P1EntityId);
 - Connection timeout (5s silence → match stopped)
 - Entity IDs: `P1EntityId = 1`, `P2EntityId = 2`
 
-`ServerApp/Program.cs` is now a prototype stub superseded by `Server/MatchInstance`.
 
-### 1. Godot parent/child _PhysicsProcess order
-MatchManager (parent) ticks BEFORE PlayerController (child). The sim handles inputs, so client code should REACT to sim state, not start actions.
+### 1. Unity FixedUpdate execution order
+MatchBase (parent) ticks BEFORE PlayerRenderer (child). The sim handles inputs, so client code should REACT to sim state, not start actions.
 
 ### 2. No preservation hacks in ApplyServerState
 If the sim doesn't process an action, FIX THE SIM, don't add hacks to preserve timers.
@@ -382,11 +500,10 @@ Must serialize `IsGrounded` or the client FSM stays in "air" forever.
 When updating `docs/netcode-architecture.md`, do NOT just rephrase — the real packet sizes, field names, and struct layouts are in the source code. Always:
 1. Read the existing doc first
 2. Read the actual struct definitions (InputState.cs, CharacterStatePacket.cs, CharacterState.cs)
-3. Read the serialization code (InputState.Write, CharacterStatePacket.Serialize)
-4. Read the packet send/receive code (NetworkClient.cs, ServerApp/Program.cs)
+4. Read the packet send/receive code (NetworkClient.cs, MatchInstance.cs)
 5. Cross-reference comment sizes vs actual `Size` constants
-   - `InputState.Size` = 14 (MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2)), send packet = 8+4+14 = 26B
-   - `CharacterStatePacket.Size` = 40, receive packet = 8+4+40 = 52B per entity
+   - `InputState.Size` = 19 (MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2) + AimPitch(2) + AimDistance(2) + TargetEntityId(1)), send packet = 8+4+19 = 31B
+   - `CharacterStatePacket.Size` = 48, receive packet = 8+4+48 = 60B per entity
 6. Fix any stale comments found during cross-referencing — they mislead future readers
 
 ### 6. Attack system is part of the netcode now
@@ -513,13 +630,12 @@ The server now manages a full match lifecycle with `MatchState` enum (Shared/Mat
 
 **Post-match:** after Ended state, `_postMatchTicks` counts down for 180 ticks (3s), then `_running = false` — server frees the port.
 
-### 14. Opponent PlayerController rendering (ADDED June 2026)
+### 14. Opponent PlayerRenderer rendering (ADDED June 2026)
 
-For PvP, the client spawns an `Opponent` PlayerController (entity ID 2) alongside the local `Player` (entity ID 1):
-- Opponent uses `SetNPC(true)` — no local input processing, FSM driven by server state
-- Opponent is added to "enemies" group for TargetLockSystem
-- Opponent state is applied from `_localSim.GetState(OpponentEntityId)` in `_PhysicsProcess` (predicted)
-- Opponent state is also applied from `serverStates[OpponentEntityId]` in `_Process` (server-authoritative)
+For PvP, the client spawns an opponent `PlayerRenderer` (entity ID 2) alongside the local player (entity ID 1):
+- Opponent has no local input processing — FSM driven by server state
+- Opponent state is applied from `_localSim.GetState(OpponentEntityId)` in `FixedUpdate` (predicted)
+- Opponent state is also applied from `serverStates[OpponentEntityId]` in `Update` (server-authoritative)
 - Opponent is preserved during rollback: snapshot state before sim replacement, re-register in new sim
 - Target ring and `SetTarget()` support entity ID 2 alongside NPC IDs (100-104)
 
@@ -528,12 +644,11 @@ For PvP, the client spawns an `Opponent` PlayerController (entity ID 2) alongsid
 The server and client MUST use the same wire format. The client (NetworkClient) expects `entityId(8) + tick(4) + payload`. If the server sends raw payload without the envelope, packets are silently rejected (too small). Always verify both send AND receive paths when changing packet formats.
 
 **Verified format (June 2026):**
-- Client → Server: `entityId(8) + tick(4) + InputState(14)` = 26 bytes
-- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(40)` = 52 bytes per entity
+- Client → Server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes
+- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(48)` = 60 bytes per entity
+### 16. Unity meta files (NOTE)
 
-### 16. Godot regenerates deleted .tscn files (PITFALL)
-
-Godot automatically regenerates empty `.tscn` files when the editor is opened, even if they were deleted. `rabbit.tscn` in `assets/characters/bunny/` is a known case — it's a 3-line empty scene with no references. If you delete it, Godot will recreate it. Either leave it or add it to `.gitignore`. Do NOT keep re-deleting it — it's harmless and Godot will just bring it back.
+Unity `.meta` files are generated for every asset and must be committed. Unlike the old Godot `.tscn` regeneration issue (no longer applies — project migrated to Unity), Unity will not recreate deleted assets. If you delete a `.meta` without deleting the asset, Unity logs a warning and regenerates the meta with a new GUID, breaking references.
 
 ### 12. Connection timeout — dead players must not hold matches forever (ADDED June 2026)
 
@@ -561,21 +676,21 @@ if ((now - _lastP1Packet).TotalSeconds > TimeoutSeconds ||
     continue;
 }
 ```
+### 8. Server build — src/Server is NOT in the Unity solution
 
-### 8. ServerApp is a separate project — NOT in solution
-
-ServerApp/ is a standalone .NET project NOT in SlopArena.sln. `dotnet build` skips it silently. Changes to ServerApp/Program.cs are compiled ONLY when you explicitly run:
+`src/Server/` is a standalone .NET project (`SlopArena.Server.csproj`), NOT part of the Unity project. It compiles separately:
 
 ```bash
-dotnet build ServerApp/
+dotnet build src/Server/
 ```
 
-Always rebuild BOTH:
+The server references `src/Shared/` (the same shared DLL that Unity imports). After changing Shared code, rebuild both:
 ```bash
-cd ServerApp && dotnet build && cd .. && dotnet build
+dotnet build src/Shared/   # rebuilds DLL, auto-copies to Unity Plugins
+dotnet build src/Server/   # rebuilds server binary
 ```
 
-**Without this:** the server runs the OLD DLL with hardcoded CharacterClass.Manki. Client predicts FightGuy stats but server uses Manki stats overshoot desync.
+**Without this:** the server runs the OLD DLL. Client predicts new stats but server uses old ones → desync.
 
 ## Hurtbox Y Alignment — Bake-Time Normalization + Server Formula
 
@@ -640,14 +755,22 @@ Requires `public Node3D? PlayerModel => _playerModel;` on PlayerController.
 
 ## References
 
-- `docs/netcode-architecture.md` — full design doc
-- `references/server-audit-june2026.md` — two-server problem, integration fixes, dead code audit
-- `references/attack-system-debugging-June2026.md` — attack pipeline debugging
-- `references/facing-yaw-sync.md` — facing direction sync details
-- `ServerApp/Program.cs` — prototype server (now superseded by Server/MatchInstance)
-- `Scripts/Network/NetworkClient.cs` — client UDP send/receive
-- `Scripts/World/MatchManager.cs` — client orchestration + rollback
-- `Shared/ServerSimulation.cs` — core simulation (tick, hitbox spawning)
-- `Shared/InputState.cs` — 14-byte input struct
-- `Shared/CharacterState.cs` — full per-tick state
-- `Shared/CharacterStatePacket.cs` — 40-byte serialized subset (includes AnimIndex at offset 39, MatchState at offset 38)
+- `docs/systems/netcode-architecture.md` — full design doc (human-facing)
+- `docs/systems/master-server.md` — master server (separate repo) endpoints, deployment, schema
+- `docs/adr/0008-lobby-room-match-flow.md` — match flow decision (lobby → char select → fight → results)
+- `CONTEXT.md` — canonical domain vocabulary (GameServer, MatchControlServer, MatchInstance, Roster, etc.)
+- `src/Server/MatchInstance.cs` — one match instance (roster-driven, 60Hz UDP sim, own thread)
+- `src/Server/MultiMatchOrchestrator.cs` — port allocation + match lifecycle
+- `src/Server/MatchControlServer.cs` — HTTP control plane (POST /match/start)
+- `src/Server/GameServerRegistration.cs` — master server registration + heartbeat
+- `src/Server/Program.cs` — game server entry point
+- `client/Unity/Assets/Scripts/Runtime/Network/NetworkClient.cs` — client UDP send/receive
+- `client/Unity/Assets/Scripts/Runtime/Network/LobbyClient.cs` — SignalR lobby/meta client
+- `client/Unity/Assets/Scripts/Runtime/World/MatchBase.cs` — abstract match MonoBehaviour (shared wiring)
+- `client/Unity/Assets/Scripts/Runtime/World/PvPMatch.cs` — online PvP match (network sim source)
+- `src/Shared/ServerSimulation.cs` — core simulation (tick, hitbox spawning)
+- `src/Shared/InputState.cs` — 19-byte input struct
+- `src/Shared/CharacterState.cs` — full per-tick state
+- `src/Shared/CharacterStatePacket.cs` — 48-byte serialized subset
+- `src/Shared/MatchStartRequest.cs` — master→game-server match-start command + codec
+- `src/Shared/LobbyPayloadCodec.cs` — SignalR lobby payload parser (pure, unit-tested)

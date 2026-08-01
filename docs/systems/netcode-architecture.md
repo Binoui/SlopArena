@@ -11,60 +11,55 @@ Même archi que Rivals 2, GGST, SF6.
 ## 2. Components
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      UNITY CLIENT                          │
-│                                                              │
-│  ┌──────────┐   ┌──────────────┐   ┌─────────────────────┐  │
-│  │  Input    │   │  Local Sim   │   │  Network             │  │
-│  │ (WASD)   │──►│  (predict)   │──►│  Client              │  │
-│  │ LMB,RMB  │   │              │   │  (UDP)               │  │
-│  │ slot keys│   │              │   │                      │  │
-│  └──────────┘   └──────┬───────┘   └──────────┬───────────┘  │
-│                        │                      │              │
-│                        ▼                      │              │
-│                  ┌──────────┐                 │              │
-│                  │  RENDER  │◄───────┐       │              │
-│                  │ (Unity)  │        │       │              │
-│                  └──────────┘        │       │              │
-│                                       │       │              │
-│          ┌────────────────────┐       │       │              │
-│          │ State Buffer       │───────┘       │              │
-│          │ [t-9 .. t]        │  rollback      │              │
-│          │ (10-frame ring)   │  si mismatch   │              │
-│          └────────────────────┘               │              │
-│          ┌────────────────────┐               │              │
-│          │ Input Buffer       │               │              │
-│          │ [t-9 .. t]        │  (pour         │              │
-│          │ (10-frame ring)   │   re-sim)      │              │
-│          └────────────────────┘               │              │
-│                                                │              │
-│                               UDP localhost:9876              │
-└────────────────────────────────────────────────┼──────────────┘
-                                                 │
-                                                 ▼
-┌────────────────────────────────────────────────┼──────────────┐
-│               SERVERAPP (.NET CONSOLE)          │              │
-│                                                │              │
-│                  ┌──────────────┐              │              │
-│                  │  UDP Server  │◄─────────────┘              │
-│                  │  :9876       │                             │
-│                  └──────┬───────┘                             │
-│                         │                                     │
-│                         ▼                                     │
-│                  ┌──────────────┐                             │
-│                  │  Simulate    │                             │
-│                  │  Tick(inputs)│  AUTHORITY                  │
-│                  └──────┬───────┘                             │
-│                         │                                     │
-│                         ▼                                     │
-│                  ┌──────────────┐                             │
-│                  │  Broadcast   │                             │
-│                  │  State[]     │─────────────────────────────│
-│                  │  (echoes     │                             │
-│                  │   client     │                             │
-│                  │   tick)      │                             │
-│                  └──────────────┘                             │
-└───────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        MASTER SERVER (separate repo)                  │
+│           ASP.NET Core + SignalR + PostgreSQL                         │
+│                                                                       │
+│  Server Browser │ Lobby Hub │ Char Select │ Match Start │ Results    │
+│       │              │            │            │            │         │
+└───────┼──────────────┼────────────┼────────────┼────────────┼────────┘
+        │ /servers      │ SignalR    │            │ POST       │
+        │               │ pushes     │            │ /match/start│
+        ▼               ▼            ▼            ▼            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    GAME SERVER (src/Server, .NET console)              │
+│                                                                       │
+│  ┌─────────────────────┐    ┌──────────────────────────────────────┐ │
+│  │ MatchControlServer  │    │ MultiMatchOrchestrator                │ │
+│  │ TCP :base_port      │───►│ port allocation: base → base+max-1   │ │
+│  │ POST /match/start   │    │ tracks active MatchInstances          │ │
+│  └─────────────────────┘    └───────────┬──────────────────────────┘ │
+│                                         │ spawns                      │
+│                    ┌────────────────────┼────────────────────┐       │
+│                    ▼                    ▼                     ▼       │
+│              ┌──────────┐        ┌──────────┐          ┌──────────┐  │
+│              │ Match #1 │        │ Match #2 │   ...    │ Match #N │  │
+│              │ UDP      │        │ UDP      │          │ UDP      │  │
+│              │ :base+0  │        │ :base+1  │          │ :base+N  │  │
+│              │ thread   │        │ thread   │          │ thread   │  │
+│              └────┬─────┘        └────┬─────┘          └────┬─────┘  │
+└───────────────────┼───────────────────┼──────────────────────┼──────┘
+                    │ UDP               │ UDP                  │ UDP
+                    ▼                   ▼                      ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         UNITY CLIENTS                                 │
+│                                                                       │
+│  ┌──────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
+│  │ Input    │  │ LocalSim     │  │ NetworkClient│  │ LobbyClient   │  │
+│  │ (WASD)   │─►│ (predict)    │─►│ (UDP)       │  │ (SignalR)     │  │
+│  └──────────┘  └──────┬───────┘  └──────┬──────┘  └───────┬───────┘  │
+│                       │                 │                 │          │
+│                 ┌─────▼─────┐    ┌──────▼──────┐          │          │
+│                 │  RENDER   │◄───┤ State Buffer │          │          │
+│                 │ (Unity)   │    │ [t-29..t]   │          │          │
+│                 └──────────┘    │ 30-frame ring│          │          │
+│                                 │ rollback if  │          │          │
+│                                 │ 3D dist >0.5m│          │          │
+│                                 └─────────────┘           │          │
+│                                                           │          │
+│                 Lobby/meta via SignalR ◄──────────────────┘          │
+│                 Match sim via UDP ◄──────────────────────────────────┤
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -84,7 +79,7 @@ _PhysicsProcess():
   2. Increment _sendTick
      → _sendTick++ (monotonically increasing per frame)
 
-  3. Store input in 10-frame ring buffer
+  3. Store input in 30-frame ring buffer
      → _inputBuffer[_sendTick % RollbackFrames] = input
 
   4. LocalSimulation.Tick(input)
@@ -96,44 +91,49 @@ _PhysicsProcess():
 
   6. Send input + tick to server (UDP, non-bloquant)
      → Net.SendInput(input, _sendTick)
-     → Packet: entityId(8) + tick(4) + InputState(10) = 22B
+     → Packet: entityId(8) + tick(4) + InputState(19) = 31B
 
   7. Render predicted state
-     → Player.ApplyServerState(predicted)
-     → Player._PhysicsProcess réagit aux changements d'ActionState
+     → PlayerRenderer.ApplyServerState(predicted)
+     → FixedUpdate réagit aux changements d'ActionState
        (FSM transitions: Idle → Dashing, Idle → Attacking, etc.)
 ```
 
-### 3b. Client _Process — Reconcile with Server
+### 3b. Client Update — Reconcile with Server
 
 ```
-_Process(delta):
+Update(delta):
 
   1. Receive server states (non-bloquant)
      → Net.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(43) = 55B
+     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60B
 
   2. For player's server state:
      a. Find predicted state for same tick
         → int idx = serverTick % RollbackFrames
         → CharacterState predicted = _stateBuffer[idx]
 
-     b. Compare server vs predicted
+     b. Compare server vs predicted (3D distance)
+        → float dx = predicted.PX - serverState.PX
         → float dy = predicted.PY - serverState.PY
-        → If MathF.Abs(dy) > 0.01f:
+        → float dz = predicted.PZ - serverState.PZ
+        → float distSq = dx*dx + dy*dy + dz*dz
+        → If distSq > 0.25f (0.5m threshold):
             → ROLLBACK triggered
 
      c. Rollback procedure:
-        i.   Reset local sim to server's confirmed state
+        i.   Snapshot NPC states before replacing sim
+        ii.  Reset local sim to server's confirmed state
              → new ServerSimulation(arena)
              → RegisterEntity with serverState as initial state
-        ii.  Re-simulate from serverTick+1 to currentTick
+        iii. Re-register NPCs (prefer server-confirmed, fallback to snapshot)
+        iv.  Re-simulate from serverTick+1 to currentTick
              → for tick t = serverTick+1 .. _sendTick:
                  pastInput = _inputBuffer[t % RollbackFrames]
                  _localSim.Tick({ playerEntityId, pastInput })
-        iii. Apply corrected state
-             → Player.ApplyServerState(corrected)
+        v.   Apply corrected state
+             → PlayerRenderer.ApplyServerState(corrected)
              → Update _stateBuffer[currentTick % RollbackFrames]
 
   3. For NPC server states:
@@ -142,38 +142,31 @@ _Process(delta):
   4. Update visuals (target ring follow, UI)
 ```
 
-### 3c. Server Tick Loop (60Hz)
+### 3c. MatchInstance Tick Loop (60Hz, per match, own thread)
 
 ```
 Tick():
 
-  1. Receive all clients' inputs (from background UDP thread)
-     → Dictionary<ulong, (uint tick, InputState input)>
+  1. ReceiveInputs() — drain UDP socket, match by entityId
+     → Queue inputs per PlayerSlot
 
-  2. Save per-client tick numbers BEFORE clearing buffer
-     → clientTicks = inputBuffer.ToDictionary(kvp.Value.tick)
+  2. Check timeout (5s silence → match stops)
 
-  3. For each entity:
-     ServerSimulation.Tick(ref state, input)
+  3. Flush input queues (take last valid packet per slot)
+     → _serverTick = max(_serverTick, latestClientTick)
+
+  4. ServerSimulation.Tick(inputs)
      → SimulateTick: mouvement, gravité, sol, combat, tout
+     → Spawn hitboxes from attack events (HitboxEvent.TriggerTick)
+     → SpellResolver.Tick: hitbox vs hurtbox collision, damage, knockback, hitstun
 
-  4. Spawn hitboxes from attack events
-     → For each entity in Attacking state with AttackSlot > 0:
-       → Resolve ability from slot (1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F)
-       → Check current combo stage's HitboxEvents
-       → If AttackElapsedTicks == evt.TriggerTick:
-           → SpellResolver.Spawn(new Hitbox{ ... })
-           → Hitbox position = entity pos + offset rotated by FacingYaw
+  5. Check deaths (first to MaxDeaths=3 loses → MatchState.Ended)
 
-  5. SpellResolver.Tick(entityList)
-     → Hitbox vs hurtbox collision detection
-     → Apply damage, knockback, hitstun
-
-  6. Broadcast to all clients
+  6. SendState() — broadcast to all connected clients
      → For each client:
-       → For each entity:
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(43) = 55B
-         → tick = client's own tick number (echoed back)
+       → For each entity (all rostered players):
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(48) = 60B
+         → tick = _serverTick (echoed back)
        → Client filters by entityId
 ```
 
@@ -184,76 +177,62 @@ Tick():
 ### 4a. Client → Server
 
 ```
-Send packet: entityId(8) + tick(4) + InputState(10) = 22 bytes
+Send packet: entityId(8) + tick(4) + InputState(19) = 31 bytes
 
 [0..7]   entityId        (ulong)
 [8..11]  tick            (uint)       ← local client frame counter
-[12..15] MoveX           (float)
-[16..19] MoveY           (float)
-[20]     flags           (byte)
-                           bit 0: Up
-                           bit 1: Down
-                           bit 2: Left
-                           bit 3: Right
-                           bit 4: Jump
-                           bit 5: Dash
-                           bit 6: Crouch
-                           bit 7: Attack
-[21]     ActiveSlot      (byte)       ← 0=none, 1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F
-Total: 22 bytes
+[12..30] InputState (19 bytes)
 ```
 
-**InputState layout (17 bytes):**
+**InputState layout (19 bytes):**
 | Offset | Type    | Field           | Notes                              |
 |--------|---------|-----------------|------------------------------------|
-| 0      | float   | MoveX           | Horizontal analog input            |
-| 4      | float   | MoveY           | Vertical analog input              |
-| 8      | byte    | flags           | 8 boolean buttons (bitfield)       |
-| 9      | byte    | ActiveSlot      | 1-6 for ability slots              |
-| 10-11  | short   | FacingYaw       | Degrees × 100                      |
-| 12-13  | short   | AimYaw          | Aim yaw (overrides FacingYaw)      |
-| 14-15  | ushort  | AimDistance     | Aim distance in cm (0-6500 = 0-65m)|
-| 16     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
+| 0-3    | float   | MoveX           | Horizontal analog input            |
+| 4-7    | float   | MoveY           | Vertical analog input              |
+| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:Dash, 6:Crouch, 7:IsAiming |
+| 9      | byte    | ActiveSlot      | 0=none, 1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F |
+| 10-11  | short   | FacingYaw       | Degrees × 100 (movement-facing)    |
+| 12-13  | short   | AimYaw          | Degrees × 100 (combat-facing, reserved) |
+| 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
+| 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
+| 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
+
+Total: 31 bytes (8 + 4 + 19)
 
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(43) = 55 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
-[12..15] TickNumber        (uint)       ← also echoes client tick (in packet body)
-[16..19] PositionX         (float)
-[20..23] PositionY         (float)
-[24..27] PositionZ         (float)
-[28..31] VelocityX         (float)
-[32..35] VelocityY         (float)
-[36..39] VelocityZ         (float)
-[40]     CurrentActionState (byte)      ← Idle, Dashing, Hitstun, etc.
-[41]     IsGrounded        (byte)       ← 0 or 1
-[42..43] StateDurationFrames (ushort)   ← remaining ticks in state
-Total: 55 bytes per entity
+[12..59] CharacterStatePacket (48 bytes)
 ```
 
-**CharacterStatePacket layout (43 bytes):**
+**CharacterStatePacket layout (48 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
-| 0      | uint    | TickNumber          | Echoed client tick (for matching) |
-| 4      | float   | PositionX           | World X                            |
-| 8      | float   | PositionY           | World Y                            |
-| 12     | float   | PositionZ           | World Z                            |
-| 16     | float   | VelocityX           | World velocity X                   |
-| 20     | float   | VelocityY           | World velocity Y                   |
-| 24     | float   | VelocityZ           | World velocity Z                   |
+| 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
+| 4-7    | float   | PositionX           | World X                            |
+| 8-11   | float   | PositionY           | World Y (up)                       |
+| 12-15  | float   | PositionZ           | World Z (forward)                  |
+| 16-19  | float   | VelocityX           | World velocity X                   |
+| 20-23  | float   | VelocityY           | World velocity Y                   |
+| 24-27  | float   | VelocityZ           | World velocity Z                   |
 | 28     | byte    | CurrentActionState  | Idle/Dashing/Attacking/Hitstun     |
 | 29     | byte    | IsGrounded          | 0 or 1                             |
-| 30-31  | ushort  | StateDurationFrames | Remaining ticks in current state  |
+| 30-31  | ushort  | StateDurationFrames | Remaining ticks in current state   |
 | 32     | byte    | AttackSlot          | 0=none, 1-6=LMB/RMB/Q/E/R/F      |
-| 33     | byte    | ComboStage          | 0-3 combo chain stage             |
-| 34-37  | float   | FacingYaw           | Server-authoritative facing yaw   |
-| 38     | byte    | MatchState          | Match lifecycle                     |
-| 39-40  | ushort  | BuffRemainingTicks  | Overclock timer                      |
-| 41     | byte    | BuffActiveFlags     | BuffType bitfield                   |
+| 33     | byte    | ComboStage          | 0-3 combo chain stage              |
+| 34-37  | float   | FacingYaw           | Server-authoritative facing (radians) |
+| 38     | byte    | MatchState          | Match lifecycle (Waiting/Countdown/Playing/Ended) |
+| 39     | byte    | AnimIndex           | Animation index into ability's AnimationNames[] |
+| 40-41  | ushort  | BuffRemainingTicks  | Buff timer (0 = no active buff)    |
+| 42     | byte    | BuffActiveFlags     | BuffType bitfield                   |
+| 43     | byte    | HitstunLevel        | 0=small, 1=medium, 2=hard          |
+| 44-47  | float   | AimPitch            | Server-authoritative aim pitch (radians) |
+
+Total: 60 bytes per entity (8 + 4 + 48)
 
 **Le serveur envoie TOUS les états à chaque client.** Le client ignore ceux qui ne le concernent pas. Pas de overhead de routing.
 
@@ -263,7 +242,7 @@ Total: 55 bytes per entity
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (144 bytes in memory, 43 serialized) is the full per-tick state of one entity:
+`CharacterState` (144 bytes in memory, 48 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|

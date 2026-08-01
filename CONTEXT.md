@@ -90,3 +90,38 @@ _Avoid_: listen server, client-hosted, peer-to-peer host
 **MatchFlow**:
 The lifecycle of a PvP match: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room. The master server (SignalR) manages lobby/char-select/results; the game server (UDP) manages countdown/fight only.
 _Avoid_: game flow, match lifecycle, session flow
+
+## Game Server (src/Server)
+
+**GameServer**:
+The dedicated .NET console process that runs match simulations. Registers with the master server, receives match-start commands, and runs 2-4 player matches on dedicated UDP ports. Lives in `src/Server/`. This is what the master server's ServerBrowser lists; clients connect to it by IP+port for the fight.
+_Avoid_: server (ambiguous — see disambiguation below), ServerApp (old name), match server
+
+**MatchControlServer**:
+The HTTP control plane on the GameServer. Listens on TCP at the registered base port and exposes `POST /match/start` for the master server. Parses the roster, asks the orchestrator for a port, and replies with it. UDP matches bind base+offset, so TCP control and UDP simulation coexist on the same port number. This is the seam that keeps the GameServer stateless between matches (ADR-0008).
+_Avoid_: control endpoint, match API, HTTP server
+
+**MultiMatchOrchestrator**:
+The component inside the GameServer that manages port allocation and match lifecycle across concurrent matches. Assigns each new match to the next free UDP port, tracks active MatchInstances, and reclaims ports on match end. The single owner of the match collection — nothing else spins up or tears down a match directly.
+_Avoid_: match manager (collides with client-side MatchManager), server manager, match pool
+
+**MatchInstance**:
+One running match — 2-4 rostered players, one dedicated UDP port, one thread, full 60Hz ServerSimulation. Spawned by the orchestrator on match start with the roster's character classes + entity IDs; disposed on match end (winner detected or all opponents gone). Countdown starts once every rostered player has connected.
+_Avoid_: match (too generic), game session, server instance
+
+**Roster**:
+The ordered player list the master server sends at match start. Each entry pairs a player's SteamId with their locked-in CharacterClass and an assigned EntityId (1..N by lobby join order). Drives entity spawning on the GameServer — replaces the old hardcoded-Manki path.
+_Avoid_: player list, team, lineup
+
+**PortAllocation**:
+The scheme where each match binds a dedicated UDP port from `base_port` to `base_port + max_concurrent_matches - 1`. One match per port. The TCP MatchControlServer listens on base_port itself; UDP matches use base+offset, so the two never collide on the same number.
+_Avoid_: port pool, port map, port range (too vague)
+
+## Disambiguation: "server"
+
+The word "server" is overloaded in SlopArena. Three distinct things share it:
+- **Master server** — the separate-repo ASP.NET Core app (SignalR/REST, PostgreSQL) that handles matchmaking, lobby, char-select, and results. Repo: `SlopArena-MasterServer`. Never runs simulation.
+- **Game server** (GameServer above) — the .NET console process in this repo (`src/Server/`) that runs match simulation over UDP. Registers with the master server; receives match-start commands via MatchControlServer.
+- **ServerSimulation** — the pure C# tick loop in `src/Shared/` (`Simulation.cs`, `CombatMath.cs`). Runs identically on client (prediction) and GameServer (authority). Not a process — a class.
+
+When any of these is meant, use the full term. Bare "server" is ambiguous and should be challenged.

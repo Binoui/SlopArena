@@ -222,7 +222,7 @@ namespace SlopArena.Server
 					var remoteEP = new IPEndPoint(IPAddress.Any, 0);
 					byte[] data = _udpServer.Receive(ref remoteEP);
 
-					// Client packet format: entityId(8) + tick(4) + InputState(10) = 22 bytes
+					// Client packet format: entityId(8) + tick(4) + InputState(19) = 31 bytes
 					if (data.Length < 8 + 4 + InputState.Size) continue;
 
 					ulong entityId = BitConverter.ToUInt64(data, 0);

@@ -19,29 +19,39 @@ SlopArena is a 3D platform fighter (Smash/DKO-style) with a server-authoritative
 
 ### Architecture
 
+Three server-like things (see `CONTEXT.md` "Disambiguation: server"):
+- **Master server** — separate repo (`SlopArena-MasterServer`), ASP.NET Core + SignalR + PostgreSQL. Matchmaking, lobby, char-select, results. Never runs simulation. See `docs/systems/master-server.md`.
+- **Game server** — this repo's `src/Server/`, .NET console. Registers with master, receives match-start commands via HTTP, runs 2-4 player matches over UDP. See `docs/systems/netcode-architecture.md`.
+- **ServerSimulation** — `src/Shared/`, pure C# tick loop. Runs identically on client (prediction) and game server (authority).
+
 ```
-Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
-       │                                          │
-       │  UDP localhost:9876                      │
-       │                                          │
-       ├─ InputState (22 bytes, 60Hz) ───────────►│
-       │                                          ├─ ServerSimulation.Tick()
-       │◄─────────────────────────────────────────├─ CharacterState (44 bytes per entity)
+Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
+  Lobby / Char Select / Results         MatchControlServer (TCP :base_port)
+         │                                    │ POST /match/start
+         │ POST /match/start                  ▼
+         └────────────────────►  MultiMatchOrchestrator (port allocation)
+                                      │ spawns MatchInstance (one per match)
+                                      │
+  Unity Client ◄──── UDP ─────── MatchInstance (60Hz sim, dedicated port)
+  Unity Client ◄──── SignalR ──── Master Server (lobby/meta)
 ```
 
 - `Shared/` is pure C# with zero Unity dependencies. No `UnityEngine.*` imports.
 - All tick durations use `ushort` (max 65535 ticks = ~18 minutes).
 - Packet serialization uses `System.Buffers.Binary.BinaryPrimitives` (little-endian).
-- ClientInputPacket = 22 bytes, CharacterStatePacket = 44 bytes per entity.
+- Client → Server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes, 60Hz.
+- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(48)` = 60 bytes per entity.
+- Match flow: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room (ADR-0008). Master server (SignalR) manages lobby/char-select/results; game server (UDP) manages countdown/fight only.
 
 ## Key Conventions
 
 ### Project Structure
 - `src/Shared/` — canonical shared code (netstandard2.1). Real .cs files, single source of truth.
+- `src/Server/` — game server (.NET console). Multi-match orchestrator, match instances, master server registration. Standalone project — build with `dotnet build src/Server/`.
 - `client/Unity/Assets/Plugins/SlopArena.Shared/` — compiled DLL, auto-copied via post-build.
 - `dotnet build src/Shared/` → rebuilds DLL and copies to Unity Plugins.
-- `client/Unity/Assets/Scripts/Runtime/` — Unity MonoBehaviour scripts (Input, Renderer, Camera, UI).
-- `tests/Shared.Tests/` — xUnit tests for simulation.
+- `client/Unity/Assets/Scripts/Runtime/` — Unity MonoBehaviour scripts (Input, Renderer, Camera, UI, Network, World).
+- `tests/Shared.Tests/` — xUnit tests for simulation + codecs (LobbyPayloadCodec, MatchStartRequestCodec).
 
 ### Unity Conventions
 - Use `MonoBehaviour.Update/FixedUpdate`, not Godot `_Process`/`_PhysicsProcess`.
@@ -85,9 +95,12 @@ Unity Client (renderer + prediction)    ServerApp (.NET console, authority)
 
 ### Docs worth reading before system-level work
 - `docs/architecture-overview.md` — directory map, data flow, pitfall list
-- `docs/systems/netcode-architecture.md` — UDP protocol, rollback, packet layout
+- `docs/systems/netcode-architecture.md` — UDP protocol, rollback, packet layout, match-control topology
+- `docs/systems/master-server.md` — master server (separate repo) endpoints, deployment, DB schema
 - `docs/systems/combat-systems.md` — universal combat mechanics
 - `docs/systems/hitbox-system.md` — hit detection, hurtboxes, collision math
 - `docs/systems/animation-system.md` — Animancer clip playback, extrapolation, speed modulation
+- `docs/adr/0008-lobby-room-match-flow.md` — match flow decision (lobby → char select → fight → results)
+- `CONTEXT.md` — canonical domain vocabulary (GameServer, MatchControlServer, MatchInstance, Roster, etc.)
 - `docs/contributing/conventions.md` — art direction, naming, pipeline
 - `docs/plans/` — active refactor plans (ability refactor, AnimationTree builder, online PvP roadmap)
