@@ -125,13 +125,24 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 
 # Third-party animation/model packs (non-redistributable)
 client/Unity/Assets/~AnimationPacks/
+client/Unity/Assets/~AnimationPacks.meta
 client/Unity/Assets/AnimationPacks/
+client/Unity/Assets/AnimationPacks.meta
 
 # Character art (models, textures, materials — non-redistributable)
 client/Unity/Assets/Art/
+client/Unity/Assets/Art.meta
 
 # Root-level prototype assets
 /assets/
+
+# Unity directories without tracked content
+client/Unity/Assets/Editor.meta
+client/Unity/Assets/Samples.meta
+client/Unity/Assets/Plugins/SlopArena.Shared.meta
+client/Unity/Assets/Plugins/SlopArena.Shared/
+client/Unity/Assets/Scenes/Arena_Offline/Materials.meta
+client/Unity/Assets/Resources/Icons/
 
 # Unity Plugins — third-party DLLs (NuGet, Animancer, etc.)
 client/Unity/Assets/Plugins/**/*.dll
