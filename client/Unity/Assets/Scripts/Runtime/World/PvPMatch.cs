@@ -27,6 +27,7 @@ namespace SlopArena.Client.World
         private const ulong OpponentEntityId = 2;
 
         private uint _tick;
+        private MatchState _lastMatchState = MatchState.Waiting;
         private NetworkSimulationBridge _bridge = null!;
         protected override ISimulationBridge Bridge => _bridge;
 
@@ -132,6 +133,14 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             if (_opponentRenderer != null)
                 _opponentRenderer.ApplyServerState(_bridge.GetState(OpponentEntityId));
+
+            // Surface server match state transitions (countdown → fight → results)
+            var matchState = _bridge.GetState(PlayerEntityId).MatchState;
+            if (matchState != _lastMatchState)
+            {
+                Debug.Log($"[PvP] MatchState transition: {_lastMatchState} → {matchState}");
+                _lastMatchState = matchState;
+            }
 
             _tick++;
             if (_tick % 120 == 1)

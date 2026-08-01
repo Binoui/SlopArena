@@ -117,6 +117,7 @@ namespace SlopArena.Shared
             buffer[33] = ComboStage;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(34, 4), BitConverter.SingleToInt32Bits(FacingYaw));
             buffer[38] = (byte)MatchState;
+            buffer[39] = AnimIndex;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
             buffer[42] = BuffActiveFlags;
             buffer[43] = HitstunLevel;
@@ -143,6 +144,7 @@ namespace SlopArena.Shared
             packet.ComboStage = buffer[33];
             packet.FacingYaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(34, 4)));
             packet.MatchState = (MatchState)buffer[38];
+            packet.AnimIndex = buffer[39];
             packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
             packet.BuffActiveFlags = buffer[42];
             packet.HitstunLevel = buffer[43];

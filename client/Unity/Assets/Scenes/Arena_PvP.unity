@@ -967,7 +967,7 @@ MonoBehaviour:
   _playerRenderer: {fileID: 1553613842}
   _inputController: {fileID: 1663229515}
   _cameraMount: {fileID: 651353934}
-  _aimHandler: {fileID: 0}
+  _aimHandler: {fileID: 5000000012}
   _hudManager: {fileID: 1212363336}
   _crosshairTexture: {fileID: 0}
   _crosshairSize: 32
@@ -1262,6 +1262,54 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8571f1a8d3d462332bcba632f3d6d50d, type: 3}
+--- !u!1 &5000000010
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5000000011}
+  - component: {fileID: 5000000012}
+  m_Layer: 0
+  m_Name: AimHandler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5000000011
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5000000010}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5000000012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5000000010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63b8137297f463faf92245044b326311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _aimIndicator: {fileID: 2988542345828366012}
+  _cameraMount: {fileID: 651353934}
+  _aimCameraMount: {fileID: 0}
+  _aimSensitivity: 0.15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1273,3 +1321,4 @@ SceneRoots:
   - {fileID: 2988542345828366009}
   - {fileID: 8956583311211441222}
   - {fileID: 5000000002}
+  - {fileID: 5000000011}
