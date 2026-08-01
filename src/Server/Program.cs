@@ -26,6 +26,12 @@ namespace SlopArena.Server
             var registration = new GameServerRegistration(config, orchestrator);
             var cts = new CancellationTokenSource();
 
+            // HTTP control endpoint for master server match-start commands
+            // (issue #35). Listens on the registered base TCP port; UDP matches
+            // bind port+offset, so the two coexist on the same number.
+            using var control = new MatchControlServer(orchestrator, config.Port, defaultArena: "split");
+            control.Start();
+
             // Handle Ctrl+C for graceful shutdown
             Console.CancelKeyPress += (sender, e) =>
             {
@@ -64,8 +70,10 @@ namespace SlopArena.Server
                 try { await Task.Delay(-1, cts.Token); } catch (TaskCanceledException) { }
             }
 
+            control.Stop();
             orchestrator.Shutdown();
             Console.WriteLine("Server stopped.");
+
         }
     }
 }

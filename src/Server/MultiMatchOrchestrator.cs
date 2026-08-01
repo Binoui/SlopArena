@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text.Json;
+using SlopArena.Shared;
 
 namespace SlopArena.Server
 {
@@ -8,7 +10,7 @@ namespace SlopArena.Server
     /// Manages port allocation, match lifecycle, and provides status.
     ///
     /// Port allocation: base_port → base_port + max_matches - 1
-    /// Each port handles one 1v1 match with 2 players.
+    /// Each port handles one match (2-4 players).
     /// </summary>
     public class MultiMatchOrchestrator
     {
@@ -21,21 +23,22 @@ namespace SlopArena.Server
         }
 
         /// <summary>
-        /// Assign a new match to the next available port.
-        /// Returns the port assigned, or -1 if no slots available.
+        /// Assign a new match to the next available port with a roster of
+        /// players + character classes (issue #35). Returns the assigned UDP
+        /// port, or -1 if no slots are available.
         /// </summary>
-        public int AssignMatch(string matchId, string arenaName)
+        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster)
         {
             for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
             {
                 int port = _config.Port + offset;
                 if (!_activeMatches.ContainsKey(port))
                 {
-                    var match = new MatchInstance(port, matchId, arenaName, OnMatchEnd);
+                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd);
                     if (_activeMatches.TryAdd(port, match))
                     {
                         match.Start();
-                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches})");
+                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
                         return port;
                     }
                 }
@@ -44,6 +47,16 @@ namespace SlopArena.Server
             Console.WriteLine($"[Orchestrator] No ports available for match {matchId} (max {_config.MaxConcurrentMatches})");
             return -1;
         }
+
+        /// <summary>
+        /// Assign a match with two Manki players (legacy/training path).
+        /// </summary>
+        public int AssignMatch(string matchId, string arenaName)
+            => AssignMatch(matchId, arenaName, new[]
+            {
+                new MatchPlayer(0, CharacterClass.Manki, 1),
+                new MatchPlayer(0, CharacterClass.Manki, 2),
+            });
 
         /// <summary>
         /// Called by MatchInstance when a match ends (thread callback).

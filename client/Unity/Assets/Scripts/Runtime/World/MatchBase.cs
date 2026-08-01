@@ -35,7 +35,9 @@ namespace SlopArena.Client.World
         [SerializeField] private Texture2D _crosshairTexture;
         [SerializeField] private float _crosshairSize = 32f;
 
-        protected const ulong PlayerEntityId = 1;
+        // Read from MatchConfig so PvP can use the master-assigned entity ID
+        // (issue #35); training leaves it at the default 1.
+        protected static ulong PlayerEntityId => MatchConfig.LocalEntityId;
 
         protected bool _showCrosshair;
         protected CharacterDefinition _playerDef = null!;

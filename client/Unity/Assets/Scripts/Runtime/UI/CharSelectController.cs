@@ -206,7 +206,43 @@ namespace SlopArena.Client.UI
 
         private async void OnMatchStarted(MatchStartedConfig config)
         {
-            Debug.Log($"[CharSelect] Match started: {config.Players.Count} players.");
+            Debug.Log($"[CharSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
+
+            // Find the local player in the roster (by SteamId) and an opponent
+            // (first other player). The master server assigned entity IDs 1..N
+            // by join order (issue #35); the game server spawns each with the
+            // roster's character class, so both clients render the right chars.
+            var players = config.Players;
+            LobbyPlayerInfo? local = null;
+            LobbyPlayerInfo? opponent = null;
+            foreach (var p in players)
+            {
+                if (p.SteamId == ClientSession.SteamId)
+                    local = p;
+                else if (opponent == null)
+                    opponent = p;
+            }
+
+            if (local == null)
+            {
+                _lblPvPStatus.text = "Match started but you are not in the roster. Returning to server browser.";
+                Debug.LogError("[CharSelect] Local player missing from MatchStarted roster.");
+                SceneManager.LoadScene("ServerBrowser");
+                return;
+            }
+
+            // Stash the match config the PvP scene reads on start.
+            MatchConfig.Mode = GameMode.PvP;
+            MatchConfig.ArenaName = string.IsNullOrEmpty(config.ArenaName) ? "split" : config.ArenaName;
+            MatchConfig.ServerPort = config.MatchPort > 0 ? config.MatchPort : MatchConfig.ServerPort;
+            // ServerIP is already set (host: localhost, joiner: server browser IP).
+            MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, _selected);
+            MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
+            if (opponent != null)
+            {
+                MatchConfig.OpponentClass = ParseClass(opponent.CharacterSelection, CharacterClass.Manki);
+                MatchConfig.OpponentEntityId = (ulong)(opponent.EntityId > 0 ? opponent.EntityId : 2);
+            }
 
             // Tear down the lobby connection — the match is now handed off to
             // the game server (UDP). Leaving the SignalR lobby connected would
@@ -223,11 +259,19 @@ namespace SlopArena.Client.UI
             ClientSession.ActiveLobby = null;
             ClientSession.LobbyRoster = null;
 
-            // Stash the local player's class for the match
-            MatchConfig.PlayerClass = _selected;
-            MatchConfig.Mode = GameMode.PvP;
-            // TODO: connect to game server (ticket #35). For now, go to StageSelect.
-            SceneManager.LoadScene("StageSelect");
+            // Go straight to the PvP arena — the master server already picked
+            // the arena and assigned the port, so StageSelect is skipped for
+            // online matches (issue #35).
+            SceneManager.LoadScene("Arena_PvP");
+        }
+
+        private static CharacterClass ParseClass(string? name, CharacterClass fallback)
+        {
+            if (string.IsNullOrEmpty(name))
+                return fallback;
+            return System.Enum.TryParse<CharacterClass>(name, ignoreCase: true, out var c) && c != CharacterClass.None
+                ? c
+                : fallback;
         }
 
         private void OnPvPError(string message)
