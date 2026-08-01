@@ -110,7 +110,6 @@ client/Unity/[Mm]emoryCapturer/
 client/Unity/.vs/
 client/Unity/*.csproj
 client/Unity/*.uid
-client/Unity/*.meta
 client/Unity/*.sln
 client/Unity/*.user
 client/Unity/Assets/Shared/*.pdb
@@ -124,14 +123,47 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 /UserSettings/
 /Temp/
 
-client/Unity/Assets/AnimationPacks
-client/Unity/Assets/AnimationPacks/*
-# Unity Plugins — ignore build artifacts but preserve .meta import settings
+# Third-party animation/model packs (non-redistributable)
+client/Unity/Assets/~AnimationPacks/
+client/Unity/Assets/AnimationPacks/
+
+# Character art (models, textures, materials — non-redistributable)
+client/Unity/Assets/Art/
+
+# Root-level prototype assets
+/assets/
+
+# Unity Plugins — third-party DLLs (NuGet, Animancer, etc.)
 client/Unity/Assets/Plugins/**/*.dll
 client/Unity/Assets/Plugins/**/*.pdb
 client/Unity/Assets/Plugins/**/*.deps.json
 client/Unity/Assets/Plugins/**/*.runtimeconfig.json
 client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
+
+# Binary asset types — non-redistributable art/animation data
+*.fbx
+*.FBX
+*.anim
+*.png
+*.tga
+*.jpg
+*.jpeg
+*.mat
+*.mask
+*.exr
+*.hdr
+*.zip
+*.unitypackage
+*.pdf
+*.glb
+*.gltf
+*.controller
+*.overrideController
+*.renderTexture
+*.terrainlayer
+*.vfx
+*.vfxgraph
+*.shadervariants
 
 # Auto-generated prefabs from symlinked asset packs (regenerate on clone)
 client/Unity/Assets/Prefabs/Arena_*.prefab
@@ -151,11 +183,8 @@ client/Unity/mono_crash.mem.*
 # Duplicate runtime data (source of truth in /data/)
 client/Unity/data/
 
-
-# Paid asset — do not commit
+# Paid assets — do not commit
 client/Unity/Packages/com.kybernetik.animancer/
-.worktrees/
-
-# Boxophobic Unity asset (external/paid, should not be tracked)
 client/Unity/Assets/BOXOPHOBIC/
-client/Unity/~AnimationPacks/
+
+.worktrees/
