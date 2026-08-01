@@ -39,10 +39,19 @@ public static class LobbyPayloadCodec
             selection = string.IsNullOrEmpty(sel.GetString()) ? null : sel.GetString();
         }
 
+        // lockedIn is optional (older master servers may not send it); default false.
+        bool lockedIn = false;
+        if (element.TryGetProperty("lockedIn", out var li) &&
+            (li.ValueKind == JsonValueKind.False || li.ValueKind == JsonValueKind.True))
+        {
+            lockedIn = li.GetBoolean();
+        }
+
         return new LobbyPlayerInfo(
             steam.GetInt64(),
             name.GetString()!,
             selection,
+            lockedIn,
             host.GetBoolean());
     }
 
@@ -83,5 +92,15 @@ public static class LobbyPayloadCodec
     {
         var snap = TryParseSnapshot(element);
         return snap is null ? null : new MatchStartingConfig(snap.ServerId, snap.Players);
+    }
+
+    /// <summary>
+    /// Parse a <c>MatchStartedConfig</c>-shaped element: same shape as a
+    /// snapshot (<c>{ serverId, players[] }</c>).
+    /// </summary>
+    public static MatchStartedConfig? TryParseMatchStarted(JsonElement element)
+    {
+        var snap = TryParseSnapshot(element);
+        return snap is null ? null : new MatchStartedConfig(snap.ServerId, snap.Players);
     }
 }

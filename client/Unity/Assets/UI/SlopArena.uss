@@ -531,21 +531,6 @@
     letter-spacing: 1px;
 }
 
-.slot-portrait {
-    width: 40px;
-    height: 40px;
-    margin-left: 8px;
-    margin-right: 12px;
-    border-radius: 4px;
-    background-color: #1e1e36;
-    border-width: 1px;
-    border-color: #2e2e50;
-    -unity-text-align: middle-center;
-    color: #4a4a66;
-    font-size: 10px;
-    letter-spacing: 1px;
-}
-
 .slot-name {
     flex-grow: 1;
     color: #f0eee8;
@@ -614,4 +599,110 @@
 .btn-secondary:hover {
     border-color: #e05c2a;
     background-color: #2a2a46;
+}
+
+/* ── CharSelect PvP (issue #34) ──────────────────────────── */
+.pvp-panel {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 480px;
+    margin-top: 8px;
+    display: none; /* shown by CharSelectController in PvP mode */
+}
+
+.roster-panel {
+    flex-direction: column;
+    width: 100%;
+    background-color: #16162a;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #2e2e50;
+    padding: 8px 12px;
+}
+
+.roster-row {
+    flex-direction: row;
+    align-items: center;
+    height: 36px;
+    padding: 0 8px;
+    border-bottom-width: 1px;
+    border-color: #2e2e50;
+}
+
+.roster-row.unity-last-child {
+    border-bottom-width: 0;
+}
+
+.roster-host {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #e05c2a;
+    border-width: 1px;
+    border-color: #e05c2a;
+    border-radius: 2px;
+    padding: 1px 4px;
+    margin-right: 8px;
+}
+
+.roster-name {
+    flex-grow: 1;
+    color: #f0eee8;
+    font-size: 13px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
+
+.roster-char {
+    color: #4a4a66;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-right: 12px;
+    min-width: 80px;
+    -unity-text-align: middle-left;
+}
+
+.roster-char--picked {
+    color: #f0eee8;
+    -unity-font-style: bold;
+}
+
+.roster-lock {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 2px;
+}
+
+.roster-lock--picking {
+    color: #7a7a99;
+    background-color: rgba(122, 122, 153, 0.1);
+    border-width: 1px;
+    border-color: #2e2e50;
+}
+
+.roster-lock--locked {
+    color: #4cdd88;
+    background-color: rgba(76, 221, 136, 0.1);
+    border-width: 1px;
+    border-color: rgba(76, 221, 136, 0.3);
+}
+
+.pvp-status {
+    font-size: 12px;
+    color: #7a7a99;
+    -unity-text-align: middle-center;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.pvp-buttons {
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.pvp-btn {
+    margin: 0 8px;
 }
