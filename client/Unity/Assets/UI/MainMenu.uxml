@@ -2,6 +2,7 @@
     <ui:Style src="SlopArena.uss" />
     <ui:VisualElement name="root" class="screen">
         <ui:Label name="title" text="SLOPARENA" class="title" />
+        <ui:Label name="lbl-host-status" text="" class="subtitle" style="display: none;" />
         <ui:VisualElement name="menu" class="menu-list">
             <ui:Button name="btn-training" text="TRAINING MODE" class="menu-item menu-item--active" />
             <ui:Button name="btn-multiplayer" text="MULTIPLAYER ›" class="menu-item" />
