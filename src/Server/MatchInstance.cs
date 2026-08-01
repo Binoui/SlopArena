@@ -339,8 +339,8 @@ namespace SlopArena.Server
 			if (_udpServer == null) return;
 
 			// Packet format (matching NetworkClient expectations):
-			//   entityId(8) + tick(4) + CharacterStatePacket(39)
-			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size; // 51 bytes
+			//   entityId(8) + tick(4) + CharacterStatePacket(48)
+			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size; // 60 bytes
 
 			var p1Packet = CharacterStatePacket.FromState(_sim.GetState(P1EntityId), _serverTick);
 			p1Packet.MatchState = _matchState;

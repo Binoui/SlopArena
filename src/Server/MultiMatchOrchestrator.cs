@@ -109,7 +109,7 @@ namespace SlopArena.Server
     {
         public string ServerName { get; set; } = "SlopArena Server";
         public string Region { get; set; } = "EU";
-        public int Port { get; set; } = 7777;
+        public int Port { get; set; } = 9876;
         public int MaxConcurrentMatches { get; set; } = 15;
         public string MasterServerUrl { get; set; } = "http://localhost:5000";
         public bool IsOfficial { get; set; } = false;
