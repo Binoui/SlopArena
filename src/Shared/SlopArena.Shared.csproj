@@ -10,9 +10,16 @@
     <PackageId>SlopArena.Shared</PackageId>
     <Version>0.1.0</Version>
     <Authors>Binoui</Authors>
-    <Description>Shared data types for SlopArena — pure C#, no dependencies</Description>
+    <Description>Shared data types for SlopArena — pure C#, no Unity dependencies</Description>
     <RepositoryUrl>https://github.com/Binoui/SlopArena</RepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- System.Text.Json is a first-party BCL lib already present as a Unity
+         NuGet plugin (see client/Unity/Assets/Plugins/NuGet/.nuget-installed.json).
+         Used only by the lobby payload codec; keeps Shared Unity-free. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
   
   <Target Name="CopyToUnity" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)"

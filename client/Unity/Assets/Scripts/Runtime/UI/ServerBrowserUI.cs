@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using SlopArena.Shared;
+using SlopArena.Client;
 
 namespace SlopArena.Client.UI
 {
@@ -31,6 +32,7 @@ namespace SlopArena.Client.UI
             btnBack.clicked += () => SceneManager.LoadScene("MainMenu");
 
             _masterClient = new MasterServerClient(_masterServerUrl);
+            ClientSession.MasterServerUrl = _masterServerUrl;
             RefreshServers();
         }
 
@@ -105,9 +107,15 @@ namespace SlopArena.Client.UI
             MatchConfig.ServerIP = server.IpAddress;
             MatchConfig.ServerPort = server.Port;
 
+            // Carry the guest auth + selected server to the SignalR lobby room.
+            ClientSession.AuthToken          = _masterClient.Token;
+            ClientSession.SteamId            = _masterClient.SteamId ?? 0;
+            ClientSession.SelectedServerId   = server.Id;
+            ClientSession.SelectedServerName = server.Name;
+
             Debug.Log($"[ServerBrowser] Joining server: {server.Name} ({server.IpAddress}:{server.Port})");
 
-            SceneManager.LoadScene("Lobby");
+            SceneManager.LoadScene("LobbyRoom");
         }
 
         private void OnDisable()
