@@ -51,27 +51,41 @@ namespace SlopArena.Client.UI
             _btnStart.clicked += OnStartClicked;
             _btnStart.style.display = DisplayStyle.None; // shown once we learn we're host
 
-            RenderPlayers();
+        RenderPlayers();
 
-            if (string.IsNullOrEmpty(ClientSession.AuthToken))
-            {
-                _lblStatus.text = "Not authenticated. Returning to server browser.";
-                SceneManager.LoadScene("ServerBrowser");
-                return;
-            }
+        if (string.IsNullOrEmpty(ClientSession.AuthToken))
+        {
+            _lblStatus.text = "Not authenticated. Returning to server browser.";
+            SceneManager.LoadScene("ServerBrowser");
+            return;
+        }
 
-            _lobby.Connected    += OnConnected;
-            _lobby.PlayerJoined += OnPlayerJoined;
-            _lobby.PlayerLeft   += OnPlayerLeft;
-            _lobby.LobbyUpdated += OnLobbyUpdated;
-            _lobby.MatchStarting += OnMatchStarting;
-            _lobby.Error        += OnError;
-            _lobby.Disconnected += OnDisconnected;
+        // Create or reuse the lobby connection so it survives the scene
+        // transition to CharSelect (issue #34).
+        _lobby = ClientSession.ActiveLobby ??= new LobbyClient(
+            ClientSession.MasterServerUrl, ClientSession.AuthToken);
 
+        _lobby.Connected    += OnConnected;
+        _lobby.PlayerJoined += OnPlayerJoined;
+        _lobby.PlayerLeft   += OnPlayerLeft;
+        _lobby.LobbyUpdated += OnLobbyUpdated;
+        _lobby.MatchStarting += OnMatchStarting;
+        _lobby.Error        += OnError;
+        _lobby.Disconnected += OnDisconnected;
+
+        if (_lobby.IsConnected)
+        {
+            // Already connected (e.g. returning from CharSelect) — just re-join.
+            _lblStatus.text = "Connected.";
+            _ = _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+        }
+        else
+        {
             _lblStatus.text = "Connecting to lobby...";
             ConnectAndJoin();
         }
 
+        }
         private async void ConnectAndJoin()
         {
             bool ok = await _lobby.ConnectAsync();
@@ -117,7 +131,10 @@ namespace SlopArena.Client.UI
         private void OnMatchStarting(MatchStartingConfig config)
         {
             Debug.Log($"[LobbyRoom] Match starting on server {config.ServerId} with {config.Players.Count} players.");
-            // Stash the roster for char-select / match start (later tickets).
+            // Stash the roster so CharSelectController has the player list
+            // immediately on scene load, before the first LobbyUpdated push
+            // arrives (issue #34).
+            ClientSession.LobbyRoster = new LobbySnapshot(config.ServerId, config.Players);
             MatchConfig.Mode = GameMode.PvP;
             SceneManager.LoadScene("CharSelect");
         }
@@ -179,41 +196,24 @@ namespace SlopArena.Client.UI
             var slotIndex = new Label($"P{index + 1}") { name = "slot-index" };
             slotIndex.AddToClassList("slot-index");
 
-            var portrait = new VisualElement { name = "slot-portrait" };
-            portrait.AddToClassList("slot-portrait");
+        var name = new Label { name = "slot-name" };
+        name.AddToClassList("slot-name");
 
-            var name = new Label { name = "slot-name" };
-            name.AddToClassList("slot-name");
+        if (index < players.Count)
+        {
+            var p = players[index];
+            name.text = p.Name;
 
-            if (index < players.Count)
+            if (p.IsHost)
             {
-                var p = players[index];
-                name.text = p.Name;
-
-                // Portrait reflects a picked character; char-select lands in a
-                // later ticket, so CharacterSelection is null until then.
-                if (!string.IsNullOrEmpty(p.CharacterSelection))
-                {
-                    var portraitLabel = new Label(p.CharacterSelection);
-                    portrait.Add(portraitLabel);
-                }
-
-                if (p.IsHost)
-                {
-                    var badge = new Label("HOST") { name = "host-badge" };
-                    badge.AddToClassList("host-badge");
-                    slot.Add(badge);
-                }
+                var badge = new Label("HOST") { name = "host-badge" };
+                badge.AddToClassList("host-badge");
+                slot.Add(badge);
             }
-            else
-            {
-                name.text = "Empty";
-                name.AddToClassList("slot-name--empty");
-            }
+        }
 
-            slot.Add(slotIndex);
-            slot.Add(portrait);
-            slot.Add(name);
+        slot.Add(slotIndex);
+        slot.Add(name);
             return slot;
         }
 
@@ -224,15 +224,20 @@ namespace SlopArena.Client.UI
                 try { await _lobby.LeaveLobbyAsync(); } catch { /* best effort */ }
                 await _lobby.DisconnectAsync();
             }
+            ClientSession.ActiveLobby = null;
             SceneManager.LoadScene("ServerBrowser");
         }
 
-        private async void OnDisable()
+        private void OnDisable()
         {
             _btnStart.clicked -= OnStartClicked;
             _btnLeave.clicked -= Leave;
             if (_lobby != null)
             {
+                // Unsubscribe our handlers but keep the connection alive —
+                // the lobby connection persists across the LobbyRoom → CharSelect
+                // transition via ClientSession.ActiveLobby (issue #34). The
+                // connection is only torn down on Leave (back to ServerBrowser).
                 _lobby.Connected    -= OnConnected;
                 _lobby.PlayerJoined -= OnPlayerJoined;
                 _lobby.PlayerLeft   -= OnPlayerLeft;
@@ -240,7 +245,6 @@ namespace SlopArena.Client.UI
                 _lobby.MatchStarting -= OnMatchStarting;
                 _lobby.Error        -= OnError;
                 _lobby.Disconnected -= OnDisconnected;
-                await _lobby.DisconnectAsync();
             }
         }
     }

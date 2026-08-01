@@ -46,6 +46,10 @@ namespace SlopArena.Client.Network
         public event Action<LobbySnapshot>? LobbyUpdated;
         /// <summary>The host started the match; clients should go to char-select.</summary>
         public event Action<MatchStartingConfig>? MatchStarting;
+        /// <summary>A player locked in / changed their character (issue #34).</summary>
+        public event Action<LobbyPlayerInfo>? CharacterSelected;
+        /// <summary>The host started the actual match; clients should connect to the game server (issue #34).</summary>
+        public event Action<MatchStartedConfig>? MatchStarted;
         /// <summary>The hub connection opened (or reopened after a retry).</summary>
         public event Action? Connected;
         /// <summary>The hub connection closed. Arg is null on a clean close.</summary>
@@ -144,6 +148,18 @@ namespace SlopArena.Client.Network
                 if (cfg is null) return;
                 _pending.Enqueue(() => MatchStarting?.Invoke(cfg));
             });
+            _conn.On<JsonElement>("CharacterSelected", element =>
+            {
+                var player = LobbyPayloadCodec.TryParsePlayer(element);
+                if (player is null) return;
+                _pending.Enqueue(() => CharacterSelected?.Invoke(player));
+            });
+            _conn.On<JsonElement>("MatchStarted", element =>
+            {
+                var cfg = LobbyPayloadCodec.TryParseMatchStarted(element);
+                if (cfg is null) return;
+                _pending.Enqueue(() => MatchStarted?.Invoke(cfg));
+            });
         }
 
         /// <summary>Join the lobby for the given game server.</summary>
@@ -163,6 +179,14 @@ namespace SlopArena.Client.Network
         /// <summary>Host-only: start the match for this lobby.</summary>
         public Task HostStartAsync() =>
             InvokeSafe("HostStart");
+
+        /// <summary>Lock in a character selection (issue #34). Can be called again to change pick.</summary>
+        public Task SelectCharacterAsync(string characterClass) =>
+            InvokeSafe("SelectCharacter", characterClass);
+
+        /// <summary>Host-only: start the actual match from char select (issue #34). Requires all locked in.</summary>
+        public Task StartMatchAsync() =>
+            InvokeSafe("StartMatch");
 
         private async Task InvokeSafe(string method, params object[] args)
         {
