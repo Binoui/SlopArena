@@ -59,6 +59,10 @@ namespace SlopArena.Client.UI
                 SceneManager.LoadScene("ServerBrowser");
                 return;
             }
+            // Construct the lobby client now that ClientSession carries the
+            // guest JWT (set by the Server Browser or the host flow #39).
+            // Without this the field is null and every Pump()/ConnectAsync() NREs.
+            _lobby = new LobbyClient(ClientSession.MasterServerUrl, ClientSession.AuthToken!);
 
             _lobby.Connected    += OnConnected;
             _lobby.PlayerJoined += OnPlayerJoined;
