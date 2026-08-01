@@ -24,7 +24,7 @@ namespace SlopArena.Client.World
         [Header("Network")]
         [SerializeField] private NetworkClient _networkClient;
 
-        private const ulong OpponentEntityId = 2;
+        private static ulong OpponentEntityId => MatchConfig.OpponentEntityId;
 
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;

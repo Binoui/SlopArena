@@ -47,12 +47,22 @@ public static class LobbyPayloadCodec
             lockedIn = li.GetBoolean();
         }
 
+        // entityId is optional (only sent on the MatchStarted push, issue #35);
+        // default 0 when absent (lobby/char-select snapshots).
+        int entityId = 0;
+        if (element.TryGetProperty("entityId", out var eid) &&
+            eid.ValueKind == JsonValueKind.Number)
+        {
+            entityId = eid.GetInt32();
+        }
+
         return new LobbyPlayerInfo(
             steam.GetInt64(),
             name.GetString()!,
             selection,
             lockedIn,
-            host.GetBoolean());
+            host.GetBoolean(),
+            entityId);
     }
 
     /// <summary>
@@ -95,12 +105,31 @@ public static class LobbyPayloadCodec
     }
 
     /// <summary>
-    /// Parse a <c>MatchStartedConfig</c>-shaped element: same shape as a
-    /// snapshot (<c>{ serverId, players[] }</c>).
+    /// Parse a <c>MatchStartedConfig</c>-shaped element: a snapshot
+    /// (<c>{ serverId, players[] }</c>) plus the match-start fields
+    /// <c>matchPort</c> (int) and <c>arenaName</c> (string) added by issue #35.
+    /// Both are optional (default 0 / "") so older pushes still parse.
     /// </summary>
     public static MatchStartedConfig? TryParseMatchStarted(JsonElement element)
     {
         var snap = TryParseSnapshot(element);
-        return snap is null ? null : new MatchStartedConfig(snap.ServerId, snap.Players);
+        if (snap is null) return null;
+
+        int matchPort = 0;
+        if (element.TryGetProperty("matchPort", out var mp) &&
+            mp.ValueKind == JsonValueKind.Number)
+        {
+            matchPort = mp.GetInt32();
+        }
+
+        string arenaName = string.Empty;
+        if (element.TryGetProperty("arenaName", out var an) &&
+            an.ValueKind == JsonValueKind.String)
+        {
+            var s = an.GetString();
+            if (!string.IsNullOrEmpty(s)) arenaName = s;
+        }
+
+        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName);
     }
 }

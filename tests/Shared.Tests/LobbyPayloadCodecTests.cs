@@ -175,4 +175,68 @@ public class LobbyPayloadCodecTests
     {
         Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse("""{"players":[]}""")));
     }
+    // ── Player.entityId (issue #35) ──
+
+    [Fact]
+    public void TryParsePlayer_WithEntityId_ReturnsEntityId()
+    {
+        var el = Parse("""{"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true,"entityId":3}""");
+
+        var p = LobbyPayloadCodec.TryParsePlayer(el);
+
+        Assert.NotNull(p);
+        Assert.Equal(3, p!.EntityId);
+    }
+
+    [Fact]
+    public void TryParsePlayer_MissingEntityId_DefaultsZero()
+    {
+        var el = Parse("""{"steamId":1,"name":"A","isHost":true}""");
+
+        var p = LobbyPayloadCodec.TryParsePlayer(el);
+
+        Assert.NotNull(p);
+        Assert.Equal(0, p!.EntityId);
+    }
+
+    // ── MatchStarted matchPort + arenaName (issue #35) ──
+
+    [Fact]
+    public void TryParseMatchStarted_ParsesMatchPortAndArena()
+    {
+        var json = """
+        {"serverId":"22222222-2222-2222-2222-222222222222","matchPort":9877,"arenaName":"split","players":[
+            {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true,"entityId":1},
+            {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false,"entityId":2}
+        ]}
+        """;
+
+        var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
+
+        Assert.NotNull(cfg);
+        Assert.Equal(9877, cfg!.MatchPort);
+        Assert.Equal("split", cfg.ArenaName);
+        Assert.Equal(1, cfg.Players[0].EntityId);
+        Assert.Equal(2, cfg.Players[1].EntityId);
+        Assert.Equal("Manki", cfg.Players[0].CharacterSelection);
+        Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
+    }
+
+    [Fact]
+    public void TryParseMatchStarted_OmittedMatchPortAndArena_Defaults()
+    {
+        // Older master servers (pre-#35) sent neither field; must still parse.
+        var json = """
+        {"serverId":"22222222-2222-2222-2222-222222222222","players":[
+            {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true},
+            {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false}
+        ]}
+        """;
+
+        var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
+
+        Assert.NotNull(cfg);
+        Assert.Equal(0, cfg!.MatchPort);
+        Assert.Equal(string.Empty, cfg.ArenaName);
+    }
 }

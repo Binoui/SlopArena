@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -6,35 +7,29 @@ using SlopArena.Shared;
 namespace SlopArena.Server
 {
 	/// <summary>
-	/// One match instance — 2 players, 60Hz UDP simulation on a dedicated port.
+	/// One match instance — 2-4 players, 60Hz UDP simulation on a dedicated port.
 	/// Runs on its own thread. Uses ServerSimulation for full hit detection,
 	/// hurtbox tracking, and void death.
+	///
+	/// Roster-driven (issue #35): the master server sends the locked-in character
+	/// classes + entity IDs via <c>POST /match/start</c>; this instance spawns one
+	/// entity per player with the correct <see cref="CharacterClass"/> instead of
+	/// hardcoded Manki. Countdown starts once every rostered player has connected.
 	/// </summary>
 	public class MatchInstance
 	{
-		private const ulong P1EntityId = 1;
-		private const ulong P2EntityId = 2;
-
 		private readonly int _port;
 		private readonly string _matchId;
 		private readonly string _arenaName;
+		private readonly List<PlayerSlot> _slots;
 
 		private UdpClient? _udpServer;
-		private IPEndPoint? _player1EndPoint;
-		private IPEndPoint? _player2EndPoint;
 		private bool _running = true;
 
 		private ArenaDefinition _arena;
 		private ServerSimulation _sim = null!;
-
-		// Input buffering (per player, keyed by tick)
-		private readonly List<(uint tick, InputState input)> _p1Queue = new();
-		private readonly List<(uint tick, InputState input)> _p2Queue = new();
 		private uint _serverTick;
 
-		// Connection timeout
-		private DateTime _lastP1Packet = DateTime.UtcNow;
-		private DateTime _lastP2Packet = DateTime.UtcNow;
 		private const double TimeoutSeconds = 5.0;
 
 		// Match lifecycle
@@ -49,13 +44,25 @@ namespace SlopArena.Server
 		private Thread? _thread;
 		private readonly Action<int> _onMatchEnd;
 
-		public MatchInstance(int port, string matchId, string arenaName, Action<int> onMatchEnd)
+		/// <param name="roster">Ordered players (index 0 = host). Each carries an entity ID (1..N) and a character class.</param>
+		public MatchInstance(int port, string matchId, string arenaName,
+			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd)
 		{
 			_port = port;
 			_matchId = matchId;
 			_arenaName = arenaName;
 			_onMatchEnd = onMatchEnd;
+
+			_slots = new List<PlayerSlot>(roster.Count);
+			foreach (var p in roster)
+				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass));
 		}
+
+		/// <summary>True while the match loop is active.</summary>
+		public bool IsRunning => _running;
+
+		/// <summary>Number of rostered players.</summary>
+		public int PlayerCount => _slots.Count;
 
 		public void Start()
 		{
@@ -69,30 +76,27 @@ namespace SlopArena.Server
 			try { _udpServer?.Close(); } catch { }
 		}
 
-		public bool IsRunning => _running;
-
 		private void Run()
 		{
-			Console.WriteLine($"[Match:{_matchId}] Starting on port {_port}");
+			Console.WriteLine($"[Match:{_matchId}] Starting on port {_port} ({_slots.Count} players)");
 
 			_arena = ArenaRegistry.Get(_arenaName);
-			var p1Def = CharacterRegistry.Get(CharacterClass.Manki);
-			var p2Def = CharacterRegistry.Get(CharacterClass.Manki);
 
-			// Load baked skeleton data
-			var p1Baked = LoadBakedData(p1Def);
-			var p2Baked = LoadBakedData(p2Def);
-
-			// Create simulation and register both entities
 			_sim = new ServerSimulation(_arena);
-			_sim.RegisterEntity(P1EntityId, p1Def, CreateInitialState(p1Def, 0), p1Baked);
-			_sim.RegisterEntity(P2EntityId, p2Def, CreateInitialState(p2Def, 1), p2Baked);
+			for (int i = 0; i < _slots.Count; i++)
+			{
+				var slot = _slots[i];
+				var def = CharacterRegistry.Get(slot.CharacterClass);
+				var baked = LoadBakedData(def);
+				_sim.RegisterEntity(slot.EntityId, def, CreateInitialState(def, i), baked);
+				Console.WriteLine($"[Match:{_matchId}] Slot {i}: entity {slot.EntityId} = {slot.CharacterClass}");
+			}
 
 			try
 			{
 				_udpServer = new UdpClient(_port);
 				_udpServer.Client.Blocking = false;
-				Console.WriteLine($"[Match:{_matchId}] Listening on UDP {_port}, waiting for 2 players...");
+				Console.WriteLine($"[Match:{_matchId}] Listening on UDP {_port}, waiting for {_slots.Count} players...");
 			}
 			catch (Exception ex)
 			{
@@ -111,16 +115,25 @@ namespace SlopArena.Server
 				if (currentTime >= nextTickTime)
 				{
 					ReceiveInputs();
-					if (_player1EndPoint != null && _player2EndPoint != null)
+					if (AllConnected())
 					{
-						// Check for disconnected players
+						// Check for disconnected players.
 						var now = DateTime.UtcNow;
-						bool p1Timeout = (now - _lastP1Packet).TotalSeconds > TimeoutSeconds;
-						bool p2Timeout = (now - _lastP2Packet).TotalSeconds > TimeoutSeconds;
-
-						if (p1Timeout || p2Timeout)
+						bool anyTimeout = false;
+						string timedOut = "";
+						foreach (var slot in _slots)
 						{
-							Console.WriteLine($"[Match:{_matchId}] Player {(p1Timeout ? "1" : "2")} timed out — stopping match.");
+							if (slot.EndPoint != null && (now - slot.LastPacket).TotalSeconds > TimeoutSeconds)
+							{
+								anyTimeout = true;
+								timedOut = slot.EntityId.ToString();
+								break;
+							}
+						}
+
+						if (anyTimeout)
+						{
+							Console.WriteLine($"[Match:{_matchId}] Player (entity {timedOut}) timed out — stopping match.");
 							_running = false;
 							continue;
 						}
@@ -147,21 +160,31 @@ namespace SlopArena.Server
 			_onMatchEnd(_port);
 		}
 
+		private bool AllConnected()
+		{
+			foreach (var slot in _slots)
+				if (slot.EndPoint == null) return false;
+			return true;
+		}
+
 		private static BakedAnimationData? LoadBakedData(CharacterDefinition def)
 		{
+			// Reuse the existing BakedDataPath + LoadFromBin path (same as the
+			// pre-refactor server). Falls back to null (no baked skeleton) when
+			// the file is absent or unreadable.
 			if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
 
 			try
 			{
 				string sysPath = def.BakedDataPath.Replace("res://", "");
-				var binData = System.IO.File.ReadAllBytes(sysPath);
+				var binData = File.ReadAllBytes(sysPath);
 				var baked = BakedAnimationData.LoadFromBin(binData);
-				Console.WriteLine($"[Server] Loaded baked data: {sysPath} ({binData.Length} bytes, {baked.Animations.Length} anims)");
+				Console.WriteLine($"[Match] Loaded baked data: {sysPath} ({binData.Length} bytes, {baked.Animations.Length} anims)");
 				return baked;
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[Server] Failed to load baked data: {ex.Message} — using fallback capsules");
+				Console.WriteLine($"[Match] Failed to load baked data: {ex.Message} — using fallback");
 				return null;
 			}
 		}
@@ -205,50 +228,41 @@ namespace SlopArena.Server
 					ulong entityId = BitConverter.ToUInt64(data, 0);
 					uint clientTick = BitConverter.ToUInt32(data, 8);
 
-					// Map entity ID to player slot
-					bool isP1 = entityId == P1EntityId;
-					bool isP2 = entityId == P2EntityId;
+					var slot = FindSlot(entityId);
+					if (slot == null) continue; // not a rostered player
 
-					// New player connecting — register their endpoint
-					if (!isP1 && !isP2)
-						continue;
+					// New player connecting — register their endpoint.
+					if (slot.EndPoint == null)
+					{
+						slot.EndPoint = remoteEP;
+						slot.LastPacket = DateTime.UtcNow;
+						Console.WriteLine($"[Match:{_matchId}] Player (entity {entityId}) connected: {remoteEP}");
 
-					if (isP1 && _player1EndPoint == null)
-					{
-						_player1EndPoint = remoteEP;
-						_lastP1Packet = DateTime.UtcNow;
-						Console.WriteLine($"[Match:{_matchId}] Player 1 (entity {entityId}) connected: {remoteEP}");
-						continue;
-					}
-					if (isP2 && _player2EndPoint == null)
-					{
-						_player2EndPoint = remoteEP;
-						_lastP2Packet = DateTime.UtcNow;
-						_matchState = MatchState.Countdown;
-						_countdownTicks = CountdownDuration;
-						Console.WriteLine($"[Match:{_matchId}] Player 2 (entity {entityId}) connected: {remoteEP} — countdown started!");
+						// Start the countdown once the last player connects.
+						if (AllConnected() && _matchState == MatchState.Waiting)
+						{
+							_matchState = MatchState.Countdown;
+							_countdownTicks = CountdownDuration;
+							Console.WriteLine($"[Match:{_matchId}] All {_slots.Count} players connected — countdown started!");
+						}
 						continue;
 					}
 
-					// Update last packet time for timeout detection
-					if (isP1) _lastP1Packet = DateTime.UtcNow;
-					if (isP2) _lastP2Packet = DateTime.UtcNow;
+					slot.LastPacket = DateTime.UtcNow;
 
 					if (clientTick <= _serverTick) continue;
 
-					// Parse input and wrap in a minimal packet for the queue
 					var inputState = InputState.Deserialize(data.AsSpan(12));
-					var queue = isP1 ? _p1Queue : _p2Queue;
 
 					// Prevent duplicates
 					bool exists = false;
-					for (int i = 0; i < queue.Count; i++)
+					for (int i = 0; i < slot.Queue.Count; i++)
 					{
-						if (queue[i].tick == clientTick)
+						if (slot.Queue[i].tick == clientTick)
 						{ exists = true; break; }
 					}
 					if (!exists)
-						queue.Add((clientTick, inputState));
+						slot.Queue.Add((clientTick, inputState));
 				}
 				catch (SocketException ex)
 				{
@@ -262,6 +276,13 @@ namespace SlopArena.Server
 					break;
 				}
 			}
+		}
+
+		private PlayerSlot? FindSlot(ulong entityId)
+		{
+			foreach (var s in _slots)
+				if (s.EntityId == entityId) return s;
+			return null;
 		}
 
 		private void Tick()
@@ -289,21 +310,15 @@ namespace SlopArena.Server
 				return;
 			}
 
-			var p1Input = FlushQueue(_p1Queue, out _);
-			var p2Input = FlushQueue(_p2Queue, out _);
-
 			var inputs = new Dictionary<ulong, InputState>();
-
-			if (p1Input.HasValue)
+			foreach (var slot in _slots)
 			{
-				_serverTick = Math.Max(_serverTick, p1Input.Value.tick);
-				inputs[P1EntityId] = p1Input.Value.input;
-			}
-
-			if (p2Input.HasValue)
-			{
-				_serverTick = Math.Max(_serverTick, p2Input.Value.tick);
-				inputs[P2EntityId] = p2Input.Value.input;
+				var input = FlushQueue(slot.Queue, out _);
+				if (input.HasValue)
+				{
+					_serverTick = Math.Max(_serverTick, input.Value.tick);
+					inputs[slot.EntityId] = input.Value.input;
+				}
 			}
 
 			// Run authoritative simulation (movement + hit detection + hurtboxes + void death)
@@ -311,23 +326,33 @@ namespace SlopArena.Server
 			{
 				_sim.Tick(inputs);
 
-				// Check for match end (first to MaxDeaths loses)
-				var p1State = _sim.GetState(P1EntityId);
-				var p2State = _sim.GetState(P2EntityId);
-
-				if (p1State.Deaths >= MaxDeaths)
+				// Check for match end (first to MaxDeaths loses).
+				ulong? winner = null;
+				ulong? loser = null;
+			foreach (var slot in _slots)
 				{
-					_matchState = MatchState.Ended;
-					_winnerEntityId = P2EntityId;
-					_postMatchTicks = PostMatchDuration;
-					Console.WriteLine($"[Match:{_matchId}] Player 1 eliminated! Player 2 wins! ({p1State.Deaths}-{p2State.Deaths})");
+					var st = _sim.GetState(slot.EntityId);
+					if (st.Deaths >= MaxDeaths)
+					{
+						loser = slot.EntityId;
+						break;
+					}
 				}
-				else if (p2State.Deaths >= MaxDeaths)
+				if (loser.HasValue)
 				{
+					// Winner = the first other player still under the death limit.
+					foreach (var slot in _slots)
+					{
+						if (slot.EntityId != loser.Value)
+						{
+							var st = _sim.GetState(slot.EntityId);
+							if (st.Deaths < MaxDeaths) { winner = slot.EntityId; break; }
+						}
+					}
 					_matchState = MatchState.Ended;
-					_winnerEntityId = P1EntityId;
+					_winnerEntityId = winner ?? 0;
 					_postMatchTicks = PostMatchDuration;
-					Console.WriteLine($"[Match:{_matchId}] Player 2 eliminated! Player 1 wins! ({p1State.Deaths}-{p2State.Deaths})");
+					Console.WriteLine($"[Match:{_matchId}] Entity {loser.Value} eliminated! Winner: {_winnerEntityId}");
 				}
 
 				SendState();
@@ -340,35 +365,29 @@ namespace SlopArena.Server
 
 			// Packet format (matching NetworkClient expectations):
 			//   entityId(8) + tick(4) + CharacterStatePacket(48)
-			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size; // 60 bytes
+			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size;
 
-			var p1Packet = CharacterStatePacket.FromState(_sim.GetState(P1EntityId), _serverTick);
-			p1Packet.MatchState = _matchState;
-			var p2Packet = CharacterStatePacket.FromState(_sim.GetState(P2EntityId), _serverTick);
-			p2Packet.MatchState = _matchState;
+			// Build a packet per entity once, then send each to every connected client.
+			var packets = new List<(ulong entityId, byte[] buffer)>(_slots.Count);
+			foreach (var slot in _slots)
+			{
+				var statePacket = CharacterStatePacket.FromState(_sim.GetState(slot.EntityId), _serverTick);
+				statePacket.MatchState = _matchState;
 
-			Span<byte> p1Buf = stackalloc byte[envelopeSize];
-			BitConverter.TryWriteBytes(p1Buf.Slice(0, 8), P1EntityId);
-			BitConverter.TryWriteBytes(p1Buf.Slice(8, 4), _serverTick);
-			p1Packet.Serialize(p1Buf.Slice(12));
-
-			Span<byte> p2Buf = stackalloc byte[envelopeSize];
-			BitConverter.TryWriteBytes(p2Buf.Slice(0, 8), P2EntityId);
-			BitConverter.TryWriteBytes(p2Buf.Slice(8, 4), _serverTick);
-			p2Packet.Serialize(p2Buf.Slice(12));
+				var buf = new byte[envelopeSize];
+				BitConverter.TryWriteBytes(buf.AsSpan(0, 8), slot.EntityId);
+				BitConverter.TryWriteBytes(buf.AsSpan(8, 4), _serverTick);
+				statePacket.Serialize(buf.AsSpan(12));
+				packets.Add((slot.EntityId, buf));
+			}
 
 			try
 			{
-				// Send both states to both players (T1.6)
-				if (_player1EndPoint != null)
+				foreach (var slot in _slots)
 				{
-					_udpServer.Send(p1Buf.ToArray(), envelopeSize, _player1EndPoint);
-					_udpServer.Send(p2Buf.ToArray(), envelopeSize, _player1EndPoint);
-				}
-				if (_player2EndPoint != null)
-				{
-					_udpServer.Send(p1Buf.ToArray(), envelopeSize, _player2EndPoint);
-					_udpServer.Send(p2Buf.ToArray(), envelopeSize, _player2EndPoint);
+					if (slot.EndPoint == null) continue;
+					foreach (var pkt in packets)
+						_udpServer.Send(pkt.buffer, envelopeSize, slot.EndPoint);
 				}
 			}
 			catch (Exception ex)
@@ -392,5 +411,23 @@ namespace SlopArena.Server
 			return last;
 		}
 
+		/// <summary>
+		/// Per-player state held outside the simulation: the client's UDP endpoint,
+		/// its input queue, and the last-seen packet time for timeout detection.
+		/// </summary>
+		private sealed class PlayerSlot
+		{
+			public ulong EntityId { get; }
+			public CharacterClass CharacterClass { get; }
+			public IPEndPoint? EndPoint { get; set; }
+			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
+			public List<(uint tick, InputState input)> Queue { get; } = new();
+
+			public PlayerSlot(ulong entityId, CharacterClass characterClass)
+			{
+				EntityId = entityId;
+				CharacterClass = characterClass;
+			}
+		}
 	}
 }
