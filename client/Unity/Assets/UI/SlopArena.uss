@@ -494,3 +494,124 @@
 .server-join:hover {
     background-color: #f07040;
 }
+
+/* ── Lobby Room (SignalR, issue #33) ─────────────────────── */
+
+.lobby-room {
+    width: 520px;
+}
+
+.lobby-room #lbl-server {
+    margin-bottom: 20px;
+}
+
+.player-list.lobby-list {
+    width: 100%;
+    padding: 8px 12px;
+}
+
+.player-slot {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    padding: 0 12px;
+    border-bottom-width: 1px;
+    border-color: #2e2e50;
+}
+
+.player-slot.unity-last-child {
+    border-bottom-width: 0;
+}
+
+.slot-index {
+    width: 36px;
+    color: #7a7a99;
+    font-size: 13px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
+
+.slot-portrait {
+    width: 40px;
+    height: 40px;
+    margin-left: 8px;
+    margin-right: 12px;
+    border-radius: 4px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+    -unity-text-align: middle-center;
+    color: #4a4a66;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+
+.slot-name {
+    flex-grow: 1;
+    color: #f0eee8;
+    font-size: 15px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
+
+.slot-name--empty {
+    color: #4a4a66;
+    -unity-font-style: normal;
+}
+
+.host-badge {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #e05c2a;
+    border-width: 1px;
+    border-color: #e05c2a;
+    border-radius: 2px;
+    padding: 2px 6px;
+    margin-left: 8px;
+}
+
+.chat-placeholder {
+    width: 100%;
+    height: 120px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    background-color: #13131f;
+    border-width: 1px;
+    border-color: #2e2e50;
+    -unity-text-align: middle-center;
+    justify-content: center;
+}
+
+.lobby-buttons {
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.lobby-buttons .btn-primary,
+.lobby-buttons .btn-secondary {
+    margin: 0 8px;
+}
+
+.btn-secondary {
+    width: 240px;
+    height: 52px;
+    border-radius: 3px;
+    background-color: #1e1e36;
+    border-width: 1px;
+    border-color: #2e2e50;
+    color: #f0eee8;
+    font-size: 14px;
+    letter-spacing: 3px;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    transition-duration: 0.1s;
+    transition-property: border-color, background-color;
+}
+
+.btn-secondary:hover {
+    border-color: #e05c2a;
+    background-color: #2a2a46;
+}

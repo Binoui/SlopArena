@@ -1,0 +1,17 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="SlopArena.uss" />
+    <ui:VisualElement name="root" class="screen lobby-room">
+        <ui:Label name="title" text="LOBBY ROOM" class="title" />
+        <ui:Label name="lbl-server" text="" class="subtitle" />
+        <ui:VisualElement name="player-list" class="player-list lobby-list" />
+        <ui:VisualElement name="chat-placeholder" class="chat-placeholder">
+            <ui:Label text="Chat coming soon" class="subtitle" />
+        </ui:VisualElement>
+        <ui:VisualElement name="button-row" class="lobby-buttons">
+            <ui:Button name="btn-leave" text="LEAVE" class="btn-secondary" />
+            <ui:Button name="btn-start" text="START" class="btn-primary" />
+        </ui:VisualElement>
+        <ui:Label name="lbl-status" text="Connecting..." class="subtitle" />
+        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+    </ui:VisualElement>
+</ui:UXML>

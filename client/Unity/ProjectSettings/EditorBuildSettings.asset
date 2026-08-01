@@ -23,6 +23,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Arena_PvP.unity
     guid: 9e50f62b09564aadb793e9ec9345e6c6
+  - enabled: 1
+    path: Assets/Scenes/ServerBrowser.unity
+    guid: dfcf9f623a9648d79858c1ace3f1f31a
+  - enabled: 1
+    path: Assets/Scenes/LobbyRoom.unity
+    guid: 84d2952d59214d19b4032edd770b2ad9
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
   m_UseUCBPForAssetBundles: 0
