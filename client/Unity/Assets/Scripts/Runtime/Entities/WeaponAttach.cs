@@ -51,14 +51,13 @@ namespace SlopArena.Client.Entities
             {
                 _bones[i] = FindBone(_entries[i].BoneName);
 
-                var prefab = Resources.Load<GameObject>(_entries[i].PrefabResourcePath);
-                if (prefab == null)
+                if (_entries[i].Prefab == null)
                 {
-                    Debug.LogWarning($"[WeaponAttach] Prefab not found at Resources/{_entries[i].PrefabResourcePath}");
+                    Debug.LogWarning($"[WeaponAttach] Prefab is null for entry {i} ({_entries[i].BoneName})");
                     continue;
                 }
 
-                _instances[i] = Instantiate(prefab);
+                _instances[i] = Instantiate(_entries[i].Prefab);
                 _instances[i].SetActive(false);
             }
         }

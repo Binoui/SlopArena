@@ -15,8 +15,8 @@ namespace SlopArena.Client.Entities
         [Tooltip("Exact bone name from the SkinnedMeshRenderer (e.g. mixamorig:RightHand).")]
         public string BoneName;
 
-        [Tooltip("Resources-relative path to the weapon prefab (e.g. Weapons/manki_bazooka).")]
-        public string PrefabResourcePath;
+        [Tooltip("Weapon prefab. Drag from Project view.")]
+        public GameObject Prefab;
 
         [Tooltip("Local rotation offset applied on top of the bone's rotation.")]
         public Vector3 RotationOffset;

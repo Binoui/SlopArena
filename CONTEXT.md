@@ -64,3 +64,29 @@ _Avoid_: i-frames, dodge window, invuln
 **FloatWindowReset**:
 The restoration of FloatWindow gravity by setting AirTime to 0 mid-air. Triggered by: aerial attack, taking damage, or landing. This is the core aerial recovery mechanic — chaining attacks resets the float window, letting the character stay floaty and continue aerial combos. Without a reset, the character progresses through FallRamp into full gravity.
 _Avoid_: air reset, float restore, hover refresh
+
+## PvP / Multiplayer
+
+**ServerBrowser**:
+A listing of active game servers maintained by the master server. Players browse the list (name, region, player count) and join one directly. No matchmaking queue — the player chooses which server to connect to. Like Counter-Strike community servers.
+_Avoid_: matchmaking, queue, server list (too generic)
+
+**LobbyRoom**:
+A pre-match waiting state managed by the master server via SignalR. Players who have joined a game server wait in the lobby room, see the player list, and the host presses Start to begin character select. Not the game server's concern — the game server only receives "start match" commands.
+_Avoid_: waiting room, pre-game, staging
+
+**GuestAuth**:
+Anonymous authentication via `POST /auth/guest` on the master server. Returns a JWT + temporary SteamId (Guid). No Steam SDK, no credentials. Placeholder for future Steam authentication — the JWT issuance and all downstream code stays unchanged when Steam auth lands.
+_Avoid_: dev login, anonymous auth, temp account
+
+**StockMode**:
+The win condition for PvP matches. Each player starts with N stocks (default 3). Getting KO'd (void death or blast zone) costs one stock. A player with 0 stocks is eliminated. Last player with stocks remaining wins. Scales naturally from 2 to 4+ players.
+_Avoid_: lives mode, stock battle, elimination mode
+
+**HostAndPlay**:
+The embedded host model where a player starts the game server from the Unity client (subprocess), registers it with the master server, and plays on the same machine (connecting to localhost). Placeholder for future dedicated servers — the server binary and registration flow are identical.
+_Avoid_: listen server, client-hosted, peer-to-peer host
+
+**MatchFlow**:
+The lifecycle of a PvP match: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room. The master server (SignalR) manages lobby/char-select/results; the game server (UDP) manages countdown/fight only.
+_Avoid_: game flow, match lifecycle, session flow

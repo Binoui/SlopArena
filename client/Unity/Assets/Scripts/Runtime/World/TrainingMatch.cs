@@ -296,10 +296,7 @@ namespace SlopArena.Client.World
                 }
                 else
                 {
-                    var end = new Vector3(ed.EndX, ed.EndY, ed.EndZ);
-                    Gizmos.DrawWireSphere(center, ed.Radius);
-                    Gizmos.DrawWireSphere(end, ed.Radius);
-                    Gizmos.DrawLine(center, end);
+                    DrawWireCapsule(center, new Vector3(ed.EndX, ed.EndY, ed.EndZ), ed.Radius, Gizmos.DrawLine);
                 }
             }
         }
@@ -317,10 +314,7 @@ namespace SlopArena.Client.World
                 }
                 else
                 {
-                    var end = new Vector3(hb.EndX, hb.EndY, hb.EndZ);
-                    Gizmos.DrawWireSphere(center, hb.Radius);
-                    Gizmos.DrawWireSphere(end, hb.Radius);
-                    Gizmos.DrawLine(center, end);
+                    DrawWireCapsule(center, new Vector3(hb.EndX, hb.EndY, hb.EndZ), hb.Radius, Gizmos.DrawLine);
                 }
             }
         }
@@ -338,10 +332,7 @@ namespace SlopArena.Client.World
                 }
                 else
                 {
-                    var end = new Vector3(hb.EndX, hb.EndY, hb.EndZ);
-                    DebugDrawWireSphere(center, hb.Radius, color);
-                    DebugDrawWireSphere(end, hb.Radius, color);
-                    Debug.DrawLine(center, end, color);
+                    DrawWireCapsule(center, new Vector3(hb.EndX, hb.EndY, hb.EndZ), hb.Radius, (p0, p1) => Debug.DrawLine(p0, p1, color));
                 }
             }
         }
@@ -364,10 +355,95 @@ namespace SlopArena.Client.World
                 }
                 else
                 {
-                    var end = new Vector3(ed.EndX, ed.EndY, ed.EndZ);
-                    DebugDrawWireSphere(center, ed.Radius, color);
-                    DebugDrawWireSphere(end, ed.Radius, color);
-                    Debug.DrawLine(center, end, color);
+                    DrawWireCapsule(center, new Vector3(ed.EndX, ed.EndY, ed.EndZ), ed.Radius, (p0, p1) => Debug.DrawLine(p0, p1, color));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws the true wireframe of a capsule — segment (a→b) swept with radius:
+        /// cap circles at both ends, 4 longitudinal cylinder lines, and dome arcs for
+        /// the rounded caps. Matches the swept-sphere volume the collision tests use
+        /// (SpellResolver.CapsuleCollision), unlike a naive 2-spheres + line.
+        /// </summary>
+        private static void DrawWireCapsule(Vector3 a, Vector3 b, float radius, Action<Vector3, Vector3> drawLine)
+        {
+            Vector3 axis = b - a;
+            float len = axis.magnitude;
+            if (len < 1e-4f)
+            {
+                // Degenerate (start ≈ end): single cross-section circle. Defensive only —
+                // callers route equal endpoints to the sphere branch.
+                const int seg = 16;
+                Vector3 prev = default;
+                for (int i = 0; i <= seg; i++)
+                {
+                    float angle = i * (Mathf.PI * 2f / seg);
+                    Vector3 p = a + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                    if (i > 0) drawLine(prev, p);
+                    prev = p;
+                }
+                return;
+            }
+
+            Vector3 dir = axis / len;
+            Vector3 u = Vector3.Cross(dir, Vector3.up);
+            if (u.sqrMagnitude < 1e-6f)
+                u = Vector3.Cross(dir, Vector3.right);
+            u.Normalize();
+            Vector3 v = Vector3.Cross(dir, u);
+
+            const int segments = 16;
+            const int planes = 4;
+
+            // ── Cap circles (cylinder cross-section) at both endpoints ──
+            Vector3 prevA = default, prevB = default;
+            for (int i = 0; i <= segments; i++)
+            {
+                float angle = i * (Mathf.PI * 2f / segments);
+                Vector3 radial = (u * Mathf.Cos(angle) + v * Mathf.Sin(angle)) * radius;
+                Vector3 pa = a + radial;
+                Vector3 pb = b + radial;
+                if (i > 0)
+                {
+                    drawLine(prevA, pa);
+                    drawLine(prevB, pb);
+                }
+                prevA = pa;
+                prevB = pb;
+            }
+
+            // ── Longitudinal lines: the cylinder silhouette ──
+            for (int p = 0; p < planes; p++)
+            {
+                float angle = p * (Mathf.PI * 2f / planes);
+                Vector3 radial = (u * Mathf.Cos(angle) + v * Mathf.Sin(angle)) * radius;
+                drawLine(a + radial, b + radial);
+            }
+
+            // ── Dome arcs: semicircle from one cap-circle point to the opposite one,
+            // through the pole (a − dir·r / b + dir·r) — the rounded cap surface ──
+            for (int p = 0; p < planes; p++)
+            {
+                float angle = p * (Mathf.PI * 2f / planes);
+                Vector3 radial = (u * Mathf.Cos(angle) + v * Mathf.Sin(angle)) * radius;
+
+                Vector3 prev = a + radial;
+                for (int i = 1; i <= 8; i++)
+                {
+                    float t = i / 8f * Mathf.PI;
+                    Vector3 point = a + radial * Mathf.Cos(t) - dir * radius * Mathf.Sin(t);
+                    drawLine(prev, point);
+                    prev = point;
+                }
+
+                prev = b + radial;
+                for (int i = 1; i <= 8; i++)
+                {
+                    float t = i / 8f * Mathf.PI;
+                    Vector3 point = b + radial * Mathf.Cos(t) + dir * radius * Mathf.Sin(t);
+                    drawLine(prev, point);
+                    prev = point;
                 }
             }
         }

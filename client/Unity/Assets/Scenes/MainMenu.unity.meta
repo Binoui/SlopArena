@@ -1,10 +1,5 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:client/Unity/Assets/Art/Characters/fightguy/Animations.meta
-guid: 98d994e905a77684aacec11fe9c90b77
-folderAsset: yes
-========
 guid: 4fe0e4adea82d9abba67ad4c41368259
->>>>>>>> 5f983d3 (feat: create MainMenu scene and remove legacy animation controllers folder):client/Unity/Assets/Scenes/MainMenu.unity.meta
 DefaultImporter:
   externalObjects: {}
   userData: 

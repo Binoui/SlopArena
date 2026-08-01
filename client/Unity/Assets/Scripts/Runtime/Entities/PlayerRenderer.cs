@@ -77,6 +77,9 @@ namespace SlopArena.Client.Entities
         private GameObject _modelInstance;
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
+
+        /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
+        public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
         private StatusBillboard _billboard;
 
         /// <summary>
@@ -103,9 +106,11 @@ namespace SlopArena.Client.Entities
         /// Destroys any existing model child and instantiates the new one.
         /// Must be called before ApplyServerState.
         /// </summary>
-        public void LoadModel(CharacterDefinition def)
+        /// <param name="def">Character definition with ModelResourcePath as fallback.</param>
+        /// <param name="prefabOverride">If non-null, use this prefab instead of Resources.Load.</param>
+        public void LoadModel(CharacterDefinition def, GameObject prefabOverride = null)
         {
-            if (string.IsNullOrEmpty(def.ModelResourcePath)) return;
+            if (prefabOverride == null && string.IsNullOrEmpty(def.ModelResourcePath)) return;
 
             // Destroy existing model children
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -117,10 +122,15 @@ namespace SlopArena.Client.Entities
                     DestroyImmediate(child);
             }
 
-            var prefab = Resources.Load<GameObject>(def.ModelResourcePath);
+            // Use Unity's null-aware operator (!=): a broken/missing reference is
+            // "fake-null" (C#-non-null but Unity-null), and `??` would NOT fall
+            // through to Resources.Load for it — silently skipping the model.
+            var prefab = prefabOverride != null
+                ? prefabOverride
+                : Resources.Load<GameObject>(def.ModelResourcePath);
             if (prefab == null)
             {
-                Debug.LogError($"[PlayerRenderer] Model not found at Resources/{def.ModelResourcePath}");
+                Debug.LogError($"[PlayerRenderer] Model not found — override null and Resources/{def.ModelResourcePath} missing");
                 return;
             }
 

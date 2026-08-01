@@ -42,8 +42,8 @@ public static partial class CharacterRegistry
                 FallRampDuration = 10,
             },
 
-            // No baked skeleton yet → capsule hurtbox fallback (placeholder, copied from FightGuy).
-            HurtboxBoneDefs = null,
+            // Baked skeleton → shared mixamorig bone hurtboxes.
+            HurtboxBoneDefs = MixamorigBoneDefs,
             HurtboxCapsules = new HurtboxCapsule[]
             {
                 new(0f, 0.2f, 0f, 0f, 0.9f, 0f, 0.3f),
@@ -58,8 +58,8 @@ public static partial class CharacterRegistry
             ModelSoleOffset = 0f,
             AutoModelYOffset = true,
             ModelYOffset = 0f,
-            ModelResourcePath = "Characters/FightGuy", // placeholder stand-in prefab
-            BakedDataPath = "",                        // empty → capsule hurtboxes
+            ModelResourcePath = "Characters/Kistu", // Updated to actual prefab path
+            BakedDataPath = "res://data/kistu_skeleton.bin",
 
             // ═══ ABILITIES ═══
 
@@ -76,22 +76,22 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.8f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                            AttackRange = 4f, WarpRange = 3f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     new() { DurationTicks = 28, ChainWindowTicks = 10, LungeForce = 6f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.9f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                            AttackRange = 4f, WarpRange = 6f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     new() { DurationTicks = 30, ChainWindowTicks = 10, LungeForce = 8f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.6f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.6f, EndOffZ = 2.0f,
                                     Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                            AttackRange = 4f, WarpRange = 6f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     new() { DurationTicks = 42, ChainWindowTicks = 0, LungeForce = 10f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.8f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 2.0f,
                                     Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Launcher }, StunTicks = 30, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                            AttackRange = 4f, WarpRange = 6f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3", "spell_lmb_4" },
                 Params = new() { ["lunge_duration"] = 6f },
@@ -115,13 +115,8 @@ public static partial class CharacterRegistry
                                     OffX = 0, OffY = 0.9f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.9f, EndOffZ = 1.6f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
-                    new() { DurationTicks = 30, ChainWindowTicks = 0, LungeForce = 4f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.5f,
-                                    OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.7f,
-                                    Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Launcher }, StunTicks = 26, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2", "spell_lmb_air_3" },
+                AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2" },
             },
 
             // RMB — Charged Spin: tap = horizontal poke, hold = charged kill (big horizontal launch)
@@ -259,8 +254,8 @@ public static partial class CharacterRegistry
                 {
                     ["max_charges"] = 2f,
                     ["charge_regen_ticks"] = 240f, // 4s to recover one charge
-                    ["rise_speed"] = 16f,
-                    ["rise_ticks"] = 18f,
+                    ["rise_speed"] = 8f,
+                    ["rise_ticks"] = 8f,
                     ["homing_range"] = 7f,
                     ["homing_speed"] = 10f,
                 },
