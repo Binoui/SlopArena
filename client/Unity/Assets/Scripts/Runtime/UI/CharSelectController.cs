@@ -3,10 +3,20 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using SlopArena.Shared;
-using SlopArena.Client.UI;
+using SlopArena.Client.Network;
 
 namespace SlopArena.Client.UI
 {
+    /// <summary>
+    /// Character select screen (issue #34). Two modes:
+    /// <list type="bullet">
+    /// <item><b>Training</b> — single-player: pick a character, click SELECT,
+    /// go to StageSelect. Unchanged from the original flow.</item>
+    /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
+    /// lock in, and the host starts the match when everyone is locked in (min 2).
+    /// Uses the shared <see cref="ClientSession.ActiveLobby"/> connection.</item>
+    /// </list>
+    /// </summary>
     public class CharSelectController : MonoBehaviour
     {
         [SerializeField] private UIDocument _uiDocument;
@@ -20,8 +30,17 @@ namespace SlopArena.Client.UI
         private readonly List<Button> _gridButtons = new();
         private GameObject _currentModel;
 
+        // PvP state
+        private LobbyClient _lobby;
+        private VisualElement _rosterPanel;
+        private Button _btnLockIn;
+        private Button _btnStartMatch;
+        private Label _lblPvPStatus;
+        private bool _lockedIn;
+        private LobbySnapshot _snapshot;
+
         private static readonly CharacterClass[] Classes = GetPlayableClasses();
- 
+
         private static CharacterClass[] GetPlayableClasses()
         {
             var values = (CharacterClass[])System.Enum.GetValues(typeof(CharacterClass));
@@ -30,6 +49,7 @@ namespace SlopArena.Client.UI
                 if (c != CharacterClass.None) playable.Add(c);
             return playable.ToArray();
         }
+
         // Slot index → key label: Q=2, E=3, R=4, F=5 (matches GetSlotAbility)
         private static readonly string[] AbilitySlots =
             { "ability-q", "ability-e", "ability-r", "ability-f" };
@@ -55,6 +75,27 @@ namespace SlopArena.Client.UI
                 _gridButtons.Add(btn);
             }
 
+            // Wire preview camera render texture to model-image element
+            if (_previewRenderTexture != null)
+            {
+                var modelImage = root.Q<VisualElement>("model-image");
+                modelImage.style.backgroundImage = Background.FromRenderTexture(_previewRenderTexture);
+            }
+
+            SelectCharacter(_selected, root);
+
+            if (MatchConfig.Mode == GameMode.PvP)
+                InitPvP(root);
+            else
+                InitTraining(root);
+        }
+
+        // ── Training (single-player, unchanged) ──
+
+        private void InitTraining(VisualElement root)
+        {
+            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.None;
+
             root.Q<Button>("btn-select").clicked += () =>
             {
                 MatchConfig.PlayerClass = _selected;
@@ -66,16 +107,213 @@ namespace SlopArena.Client.UI
                 string prev = MatchConfig.Mode == GameMode.Training ? "MainMenu" : "Lobby";
                 SceneManager.LoadScene(prev);
             };
+        }
 
-            // Wire preview camera render texture to model-image element
-            if (_previewRenderTexture != null)
+        // ── PvP (multiplayer, issue #34) ──
+
+        private void InitPvP(VisualElement root)
+        {
+            // Hide single-player SELECT button; show the PvP panel.
+            root.Q<Button>("btn-select").style.display = DisplayStyle.None;
+            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
+
+            // Seed the roster from the stashed snapshot so the host check and
+            // roster render work before the first LobbyUpdated push arrives.
+            _snapshot = ClientSession.LobbyRoster;
+
+            _rosterPanel   = root.Q<VisualElement>("roster-panel");
+            _btnLockIn     = root.Q<Button>("btn-lockin");
+            _btnStartMatch = root.Q<Button>("btn-start-match");
+            _lblPvPStatus  = root.Q<Label>("lbl-pvp-status");
+
+            _btnLockIn.text = "LOCK IN";
+            // Host-only: show Start Match button (enabled when all locked in, min 2)
+            bool isHost = IsLocalHost();
+            if (isHost)
             {
-                var modelImage = root.Q<VisualElement>("model-image");
-                modelImage.style.backgroundImage = Background.FromRenderTexture(_previewRenderTexture);
+                _btnStartMatch.style.display = DisplayStyle.Flex;
+                _btnStartMatch.SetEnabled(false);
+                _btnStartMatch.clicked += OnStartMatchClicked;
+            }
+            else
+            {
+                _btnStartMatch.style.display = DisplayStyle.None;
             }
 
-            SelectCharacter(_selected, root);
+            _btnLockIn.clicked += OnLockInClicked;
+
+            root.Q<Button>("btn-back").clicked += OnPvPBackClicked;
+
+            // Reuse the persistent lobby connection
+            _lobby = ClientSession.ActiveLobby;
+            if (_lobby == null)
+            {
+                _lblPvPStatus.text = "No lobby connection. Returning to server browser.";
+                SceneManager.LoadScene("ServerBrowser");
+                return;
+            }
+
+            _lobby.LobbyUpdated    += OnLobbyUpdated;
+            _lobby.CharacterSelected += OnCharacterSelected;
+            _lobby.MatchStarted     += OnMatchStarted;
+            _lobby.Error            += OnPvPError;
+
+            _lblPvPStatus.text = "Select your character...";
+            RenderRoster();
+            UpdateStartMatchButton();
         }
+
+        private bool IsLocalHost()
+        {
+            var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
+            foreach (var p in players)
+            {
+                if (p.SteamId == ClientSession.SteamId && p.IsHost)
+                    return true;
+            }
+            return false;
+        }
+
+        private void OnLockInClicked()
+        {
+            if (_lockedIn) return;
+            _btnLockIn.SetEnabled(false);
+            _btnLockIn.text = "LOCKED";
+            _ = _lobby.SelectCharacterAsync(_selected.ToString());
+        }
+
+        private void OnStartMatchClicked()
+        {
+            _btnStartMatch.SetEnabled(false);
+            _lblPvPStatus.text = "Starting match...";
+            _ = _lobby.StartMatchAsync();
+        }
+
+        private void OnLobbyUpdated(LobbySnapshot snapshot)
+        {
+            _snapshot = snapshot;
+            RenderRoster();
+            UpdateStartMatchButton();
+        }
+
+        private void OnCharacterSelected(LobbyPlayerInfo player)
+        {
+            // The LobbyUpdated that follows carries the same info; just re-render.
+            RenderRoster();
+            UpdateStartMatchButton();
+        }
+
+        private async void OnMatchStarted(MatchStartedConfig config)
+        {
+            Debug.Log($"[CharSelect] Match started: {config.Players.Count} players.");
+
+            // Tear down the lobby connection — the match is now handed off to
+            // the game server (UDP). Leaving the SignalR lobby connected would
+            // keep server-side lobby membership alive past match start.
+            if (_lobby != null)
+            {
+                _lobby.LobbyUpdated    -= OnLobbyUpdated;
+                _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.MatchStarted     -= OnMatchStarted;
+                _lobby.Error            -= OnPvPError;
+                try { await _lobby.LeaveLobbyAsync(); } catch { /* best effort */ }
+                await _lobby.DisconnectAsync();
+            }
+            ClientSession.ActiveLobby = null;
+            ClientSession.LobbyRoster = null;
+
+            // Stash the local player's class for the match
+            MatchConfig.PlayerClass = _selected;
+            MatchConfig.Mode = GameMode.PvP;
+            // TODO: connect to game server (ticket #35). For now, go to StageSelect.
+            SceneManager.LoadScene("StageSelect");
+        }
+
+        private void OnPvPError(string message)
+        {
+            _lblPvPStatus.text = message;
+            // Re-enable lock-in on error (e.g. rejected selection)
+            _btnLockIn.SetEnabled(!_lockedIn);
+        }
+
+        private void OnPvPBackClicked()
+        {
+            if (_lobby != null)
+            {
+                _lobby.LobbyUpdated    -= OnLobbyUpdated;
+                _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.MatchStarted     -= OnMatchStarted;
+                _lobby.Error            -= OnPvPError;
+            }
+            // Return to lobby room (connection still alive)
+            SceneManager.LoadScene("LobbyRoom");
+        }
+
+        private void RenderRoster()
+        {
+            if (_rosterPanel == null) return;
+            _rosterPanel.Clear();
+
+            var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
+
+            foreach (var p in players)
+            {
+                var row = new VisualElement();
+                row.AddToClassList("roster-row");
+
+                var name = new Label(p.Name) { name = "roster-name" };
+                name.AddToClassList("roster-name");
+
+                if (p.IsHost)
+                {
+                    var badge = new Label("HOST") { name = "roster-host" };
+                    badge.AddToClassList("roster-host");
+                    row.Add(badge);
+                }
+
+                row.Add(name);
+
+                var charLabel = new Label(p.CharacterSelection ?? "—") { name = "roster-char" };
+                charLabel.AddToClassList("roster-char");
+                if (!string.IsNullOrEmpty(p.CharacterSelection))
+                    charLabel.AddToClassList("roster-char--picked");
+
+                row.Add(charLabel);
+
+                var lockBadge = new Label(p.LockedIn ? "LOCKED" : "PICKING")
+                    { name = "roster-lock" };
+                lockBadge.AddToClassList("roster-lock");
+                lockBadge.AddToClassList(p.LockedIn ? "roster-lock--locked" : "roster-lock--picking");
+                row.Add(lockBadge);
+
+                _rosterPanel.Add(row);
+            }
+        }
+
+        private void UpdateStartMatchButton()
+        {
+            if (_btnStartMatch == null || _btnStartMatch.style.display == DisplayStyle.None)
+                return;
+
+            var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
+            bool canStart = players.Count >= 2 && players.All(p => p.LockedIn);
+            _btnStartMatch.SetEnabled(canStart);
+
+            if (!canStart)
+            {
+                int locked = 0;
+                foreach (var p in players) if (p.LockedIn) locked++;
+                _lblPvPStatus.text = players.Count < 2
+                    ? "Waiting for players..."
+                    : $"Waiting for locks ({locked}/{players.Count})...";
+            }
+            else
+            {
+                _lblPvPStatus.text = "All players locked in. Host can start.";
+            }
+        }
+
+        // ── Shared ──
 
         private void SelectCharacter(CharacterClass cls, VisualElement root)
         {
@@ -132,9 +370,23 @@ namespace SlopArena.Client.UI
                     t.gameObject.layer = layer;
         }
 
+        private void Update()
+        {
+            // Marshal hub events onto the main thread (PvP mode only).
+            _lobby?.Pump();
+        }
+
         private void OnDisable()
         {
             if (_currentModel != null) Destroy(_currentModel);
+
+            if (_lobby != null)
+            {
+                _lobby.LobbyUpdated    -= OnLobbyUpdated;
+                _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.MatchStarted     -= OnMatchStarted;
+                _lobby.Error            -= OnPvPError;
+            }
         }
     }
 }

@@ -20,7 +20,7 @@ public class LobbyPayloadCodecTests
     [Fact]
     public void TryParsePlayer_HostWithNullSelection_ReturnsPlayer()
     {
-        var el = Parse("""{"steamId":12345,"name":"Guest-12345","characterSelection":null,"isHost":true}""");
+        var el = Parse("""{"steamId":12345,"name":"Guest-12345","characterSelection":null,"lockedIn":false,"isHost":true}""");
 
         var p = LobbyPayloadCodec.TryParsePlayer(el);
 
@@ -28,19 +28,21 @@ public class LobbyPayloadCodecTests
         Assert.Equal(12345, p!.SteamId);
         Assert.Equal("Guest-12345", p.Name);
         Assert.Null(p.CharacterSelection);
+        Assert.False(p.LockedIn);
         Assert.True(p.IsHost);
     }
 
-    [Fact]
+[Fact]
     public void TryParsePlayer_NonHostWithSelection_ReturnsPlayer()
     {
-        var el = Parse("""{"steamId":99,"name":"Guest-99","characterSelection":"Manki","isHost":false}""");
+        var el = Parse("""{"steamId":99,"name":"Guest-99","characterSelection":"Manki","lockedIn":true,"isHost":false}""");
 
         var p = LobbyPayloadCodec.TryParsePlayer(el);
 
         Assert.NotNull(p);
         Assert.Equal(99, p!.SteamId);
         Assert.Equal("Manki", p.CharacterSelection);
+        Assert.True(p.LockedIn);
         Assert.False(p.IsHost);
     }
 
@@ -53,6 +55,7 @@ public class LobbyPayloadCodecTests
 
         Assert.NotNull(p);
         Assert.Null(p!.CharacterSelection);
+        Assert.False(p.LockedIn);
         Assert.True(p.IsHost);
     }
 
@@ -74,8 +77,8 @@ public class LobbyPayloadCodecTests
     {
         var json = """
         {"serverId":"33333333-3333-3333-3333-333333333333","players":[
-            {"steamId":1,"name":"Host","characterSelection":null,"isHost":true},
-            {"steamId":2,"name":"Guest","characterSelection":null,"isHost":false}
+            {"steamId":1,"name":"Host","characterSelection":null,"lockedIn":false,"isHost":true},
+            {"steamId":2,"name":"Guest","characterSelection":null,"lockedIn":true,"isHost":false}
         ]}
         """;
 
@@ -86,8 +89,10 @@ public class LobbyPayloadCodecTests
         Assert.Equal(2, snap.Players.Count);
         Assert.Equal("Host", snap.Players[0].Name);
         Assert.True(snap.Players[0].IsHost);
+        Assert.False(snap.Players[0].LockedIn);
         Assert.Equal("Guest", snap.Players[1].Name);
         Assert.False(snap.Players[1].IsHost);
+        Assert.True(snap.Players[1].LockedIn);
     }
 
     [Fact]
@@ -119,13 +124,13 @@ public class LobbyPayloadCodecTests
 
     // ── MatchStarting (same shape as snapshot) ──
 
-    [Fact]
+[Fact]
     public void TryParseMatchStarting_TwoPlayers_ReturnsConfig()
     {
         var json = """
         {"serverId":"11111111-1111-1111-1111-111111111111","players":[
-            {"steamId":7,"name":"A","characterSelection":null,"isHost":true},
-            {"steamId":8,"name":"B","characterSelection":"FightGuy","isHost":false}
+            {"steamId":7,"name":"A","characterSelection":null,"lockedIn":false,"isHost":true},
+            {"steamId":8,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false}
         ]}
         """;
 
@@ -135,11 +140,39 @@ public class LobbyPayloadCodecTests
         Assert.Equal(new System.Guid("11111111-1111-1111-1111-111111111111"), cfg!.ServerId);
         Assert.Equal(2, cfg.Players.Count);
         Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
+        Assert.True(cfg.Players[1].LockedIn);
     }
 
     [Fact]
     public void TryParseMatchStarting_Malformed_ReturnsNull()
     {
         Assert.Null(LobbyPayloadCodec.TryParseMatchStarting(Parse("""{"players":[]}""")));
+    }
+    // ── MatchStarted (same shape as snapshot, issue #34) ──
+
+    [Fact]
+    public void TryParseMatchStarted_TwoPlayers_ReturnsConfig()
+    {
+        var json = """
+        {"serverId":"22222222-2222-2222-2222-222222222222","players":[
+            {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true},
+            {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false}
+        ]}
+        """;
+
+        var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
+
+        Assert.NotNull(cfg);
+        Assert.Equal(new System.Guid("22222222-2222-2222-2222-222222222222"), cfg!.ServerId);
+        Assert.Equal(2, cfg.Players.Count);
+        Assert.True(cfg.Players.All(p => p.LockedIn));
+        Assert.Equal("Manki", cfg.Players[0].CharacterSelection);
+        Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
+    }
+
+    [Fact]
+    public void TryParseMatchStarted_Malformed_ReturnsNull()
+    {
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse("""{"players":[]}""")));
     }
 }

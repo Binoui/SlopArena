@@ -17,4 +17,5 @@ public sealed record LobbyPlayerInfo(
     long SteamId,
     string Name,
     string? CharacterSelection,
+    bool LockedIn,
     bool IsHost);

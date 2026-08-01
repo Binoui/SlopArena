@@ -30,6 +30,21 @@ namespace SlopArena.Client
         /// <summary>Display name of the selected game server (for the lobby title).</summary>
         public static string SelectedServerName = string.Empty;
 
+        /// <summary>
+        /// The live SignalR lobby connection, kept alive across scene transitions
+        /// (LobbyRoom → CharSelect, issue #34). Created by LobbyRoomUI on first
+        /// connect, reused by CharSelectController, disposed on leave/return to
+        /// server browser.
+        /// </summary>
+        public static Network.LobbyClient? ActiveLobby;
+
+        /// <summary>
+        /// Roster snapshot stashed by LobbyRoomUI.OnMatchStarting so
+        /// CharSelectController has the player list immediately on scene load,
+        /// before the first LobbyUpdated push arrives (issue #34).
+        /// </summary>
+        public static Shared.LobbySnapshot? LobbyRoster;
+
         public static void Reset()
         {
             MasterServerUrl = "http://localhost:5000";
@@ -38,6 +53,8 @@ namespace SlopArena.Client
             Username = null;
             SelectedServerId = Guid.Empty;
             SelectedServerName = string.Empty;
+            ActiveLobby = null;
+            LobbyRoster = null;
         }
     }
 }
