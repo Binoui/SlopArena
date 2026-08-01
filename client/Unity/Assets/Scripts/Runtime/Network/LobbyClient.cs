@@ -90,7 +90,7 @@ namespace SlopArena.Client.Network
                 _pending.Enqueue(() => Disconnected?.Invoke(ex));
                 return Task.CompletedTask;
             };
-            _conn.Reconnected += _ =>
+            _conn.Reconnected += _connectionId =>
             {
                 // Re-add ourselves to the lobby group after a reconnect; the
                 // new connection id is not in the old group. Fire-and-forget —

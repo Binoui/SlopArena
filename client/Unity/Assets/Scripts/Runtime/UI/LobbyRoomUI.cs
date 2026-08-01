@@ -69,7 +69,7 @@ namespace SlopArena.Client.UI
             _lobby.Disconnected += OnDisconnected;
 
             _lblStatus.text = "Connecting to lobby...";
-            _ = ConnectAndJoin();
+            ConnectAndJoin();
         }
 
         private async void ConnectAndJoin()
