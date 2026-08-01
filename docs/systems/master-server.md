@@ -11,7 +11,7 @@ The master server is the matchmaking/meta API for online PvP. It runs **separate
 
 - ASP.NET Core 8 Web API (minimal API in `Program.cs`)
 - PostgreSQL via EF Core 8 + Npgsql
-- Bearer-token auth: `/servers/register` issues a plain `apiToken` GUID; heartbeat + match-result authenticate by timing-safe comparison of that raw GUID against the stored `GameServers.ApiToken`. JWT packages are referenced but **not wired yet** (no `AddAuthentication` in `Program.cs`) — guest JWT auth lands in roadmap Phase 1.1.
+- Bearer-token auth: `/servers/register` issues a plain `apiToken` GUID; heartbeat + match-result authenticate by timing-safe comparison of that raw GUID against the stored `GameServers.ApiToken`. Guest JWT auth is wired via `AddAuthentication().AddJwtBearer()` — `POST /auth/guest` issues a JWT containing the SteamId claim; `GET /auth/me` validates it. Two auth schemes coexist: raw GUID bearer for game servers, JWT bearer for clients.
 - SignalR registered, **no hubs yet** — lobby hub lands in a later ticket (roadmap Phase 2)
 
 ---
@@ -58,11 +58,13 @@ The game server (`src/Server`) points at the master server via `ServerConfig.Mas
 | Method | Path | Auth | Returns |
 |---|---|---|---|
 | GET | `/health` | none | `{ "status": "ok", "version": "0.1.0" }` |
+| POST | `/auth/guest` | none (issues JWT) | `{ "token": "<jwt>", "steamId": <long> }` |
+| GET | `/auth/me` | Bearer JWT | `{ "steamId": <long>, "username": "<string>", "mmr": <int> }` |
 | POST | `/servers/register` | none (issues token) | `{ "serverId": "<guid>", "apiToken": "<guid>" }` |
 | POST | `/servers/{serverId}/heartbeat` | Bearer `apiToken` | `{ "status": "ok" }` |
 | POST | `/match/result` | Bearer `apiToken` | `{ "status": "recorded", "mmrChange": <int> }` (match row must already exist, else 404) |
 
-**Not yet implemented** (later roadmap tickets): `POST /auth/guest` (Phase 1.1), `GET /servers` browser list (Phase 1.2), `LobbyHub` SignalR hub (Phase 2.1).
+**Not yet implemented** (later roadmap tickets): `GET /servers` browser list (Phase 1.2), `LobbyHub` SignalR hub (Phase 2.1).
 
 ### Smoke test
 
@@ -76,6 +78,19 @@ curl -s -X POST http://localhost:5000/servers/register \
   -H "Content-Type: application/json" \
   -d '{"name":"fake-eu-1","ipAddress":"127.0.0.1","port":9876,"region":"eu-west","isOfficial":false,"maxConcurrentMatches":15,"customRulesJson":null}'
 # → {"serverId":"...","apiToken":"..."}
+
+# Guest auth — get a JWT + temporary SteamId
+curl -s -X POST http://localhost:5000/auth/guest
+# → {"token":"<jwt>","steamId":12345678}
+
+# Use the JWT to hit an authed endpoint
+curl -s http://localhost:5000/auth/me \
+  -H "Authorization: Bearer <jwt>"
+# → {"steamId":12345678,"username":"Guest-12345","mmr":1000}
+
+# Without the JWT → 401
+curl -s http://localhost:5000/auth/me
+# → 401 Unauthorized
 ```
 
 ---
@@ -90,5 +105,4 @@ curl -s -X POST http://localhost:5000/servers/register \
 
 ## Notes
 
-- The master server is the **source of truth for matchmaking/meta only**. Match simulation stays server-authoritative on the game server over UDP — never replicate gameplay state to the master server.
-- The `Jwt__Secret` in `.env` is a placeholder for the future guest-auth flow (Phase 1.1) — not used by the current bearer-token auth. Dev-only; regenerate with `openssl rand -base64 64` for any non-local deployment.
+- The `Jwt__Secret` in `.env` signs guest JWTs (HMAC-SHA256). Dev-only; regenerate with `openssl rand -base64 64` for any non-local deployment.
