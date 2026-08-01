@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -128,6 +129,80 @@ namespace SlopArena.Shared
             }
         }
 
+        /// <summary>
+        /// Fetch the server browser list: GET /servers (requires prior auth).
+        /// Returns null if not authenticated, network error, or non-2xx response.
+        /// Returns an empty list if the server is up but has no servers to list.
+        /// </summary>
+        public async Task<List<ServerInfo>?> GetServersAsync(CancellationToken ct = default)
+        {
+            if (!IsAuthenticated)
+                return null;
+
+            try
+            {
+                using var response = await _http.GetAsync("servers", ct);
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var json = await response.Content.ReadAsStringAsync();
+                return ParseServerList(json);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Parse a JSON array of flat server objects into ServerInfo list.
+        /// Objects are flat (no nesting), so regex block extraction is safe.
+        /// </summary>
+        private static List<ServerInfo> ParseServerList(string json)
+        {
+            var result = new List<ServerInfo>();
+
+            // Match each {...} block (objects are flat — no nested braces)
+            var blockMatches = Regex.Matches(json, @"\{[^{}]*\}");
+
+            foreach (Match block in blockMatches)
+            {
+                var obj = block.Value;
+
+                var idStr = ExtractStringField(obj, "id");
+                var name = ExtractStringField(obj, "name");
+                var ipAddress = ExtractStringField(obj, "ipAddress");
+                var port = ExtractNumberField(obj, "port");
+                var region = ExtractStringField(obj, "region");
+                var currentMatches = ExtractNumberField(obj, "currentMatches");
+                var maxConcurrentMatches = ExtractNumberField(obj, "maxConcurrentMatches");
+                var isOfficial = ExtractBoolField(obj, "isOfficial");
+
+                if (idStr == null || name == null || ipAddress == null ||
+                    port == null || region == null || currentMatches == null ||
+                    maxConcurrentMatches == null || isOfficial == null)
+                    continue;
+
+                result.Add(new ServerInfo
+                {
+                    Id = Guid.Parse(idStr),
+                    Name = name,
+                    IpAddress = ipAddress,
+                    Port = (int)port.Value,
+                    Region = region,
+                    CurrentMatches = (int)currentMatches.Value,
+                    MaxConcurrentMatches = (int)maxConcurrentMatches.Value,
+                    IsOfficial = isOfficial.Value
+                });
+            }
+
+            return result;
+        }
+
         // ── Lightweight JSON field extraction (avoids System.Text.Json dependency) ──
         // Safe for controlled API responses: JWT tokens are base64url (no quotes),
         // guest usernames are alphanumeric+dashes, numbers are non-negative integers.
@@ -142,6 +217,14 @@ namespace SlopArena.Shared
         {
             var match = Regex.Match(json, $"\"{fieldName}\"\\s*:\\s*(\\d+)");
             return match.Success ? long.Parse(match.Groups[1].Value) : null;
+        }
+
+        private static bool? ExtractBoolField(string json, string fieldName)
+        {
+            var match = Regex.Match(json, $"\"{fieldName}\"\\s*:\\s*(true|false)");
+            if (!match.Success)
+                return null;
+            return match.Groups[1].Value == "true";
         }
 
         public void Dispose()
