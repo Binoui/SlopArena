@@ -95,6 +95,20 @@ _Avoid_: hosted server, our server, dedicated (ambiguous with server binary)
 The lifecycle of a PvP match: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room. The master server (SignalR) manages lobby/char-select/results; the game server (UDP) manages countdown/fight only.
 _Avoid_: game flow, match lifecycle, session flow
 
+## Prediction & Rollback
+
+**ConfirmedTick**:
+The highest match tick for which the client holds server-authoritative states for every entity. The base state every re-simulation starts from; it advances as state packets arrive, one tick at a time.
+_Avoid_: ack tick, sync tick, last confirmed
+
+**RollbackWindow**:
+The span of ticks between ConfirmedTick and the currently rendered tick. Re-simulation replays this span whenever the confirmed base advances or a mismatch is corrected.
+_Avoid_: rewind window, prediction buffer, lag window
+
+**InputRelay**:
+The server broadcasting each entity's consumed InputState — or an explicit no-input marker when the server had nothing to consume for it that tick (empty queue → drop → `default(InputState)`) — alongside its state packet, so every client can replay opponents' exact inputs *and omissions* during re-simulation. Makes all-entity prediction exact rather than guessed.
+_Avoid_: input forwarding, input piggyback, input echo
+
 ## Game Server (src/Server)
 
 **GameServer**:
