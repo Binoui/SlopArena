@@ -84,8 +84,12 @@ The win condition for PvP matches. Each player starts with N stocks (default 3).
 _Avoid_: lives mode, stock battle, elimination mode
 
 **HostAndPlay**:
-The embedded host model where a player starts the game server from the Unity client (subprocess), registers it with the master server, and plays on the same machine (connecting to localhost). Placeholder for future dedicated servers — the server binary and registration flow are identical.
+The embedded host model where a player starts the game server from the Unity client (subprocess), registers it with the master server, and plays on the same machine (connecting to localhost). The demo targets this at technical players only: the host machine must be reachable from outside (port forwarding or LAN), which non-technical players won't do. The server binary and registration flow are identical to a dedicated server.
 _Avoid_: listen server, client-hosted, peer-to-peer host
+
+**OfficialServer**:
+An operator-run, always-on GameServer instance listed in the ServerBrowser (the demo runs these on the home mini PC). Players join it but never host it; it is the default online path for non-technical users because it removes per-player NAT/port-forwarding. The opposite of a HostAndPlay server. `isOfficial` in the registration payload flags the server, though nothing currently filters on it.
+_Avoid_: hosted server, our server, dedicated (ambiguous with server binary)
 
 **MatchFlow**:
 The lifecycle of a PvP match: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room. The master server (SignalR) manages lobby/char-select/results; the game server (UDP) manages countdown/fight only.
