@@ -45,7 +45,7 @@ namespace SlopArena.Server
         {
             try
             {
-                var ip = GetPublicIpAddress();
+                var ip = _config.PublicIp ?? GetPublicIpAddress();
                 var payload = new
                 {
                     name = _config.ServerName,

@@ -39,6 +39,15 @@ public class HostedServerConfigTests
     }
 
     [Fact]
+    public void ToJson_WithPublicIp_EmitsCamelCasePublicIp()
+    {
+        var cfg = new HostedServerConfig { PublicIp = "slop.barakaslurp.fr" };
+        var json = cfg.ToJson();
+
+        Assert.Contains("\"publicIp\": \"slop.barakaslurp.fr\"", json);
+    }
+
+    [Fact]
     public void ToJson_Defaults_AreDemoSafe()
     {
         var cfg = new HostedServerConfig { ArenaDataDir = "/x" };

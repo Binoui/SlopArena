@@ -128,6 +128,12 @@ namespace SlopArena.Server
         public int Port { get; set; } = 9876;
         public int MaxConcurrentMatches { get; set; } = 15;
         public string MasterServerUrl { get; set; } = "http://localhost:5000";
+        /// <summary>
+        /// Public IP or DNS name advertised to the master server (clients connect
+        /// here over UDP). Null → auto-detect LAN IP (correct only for directly
+        /// routable machines). Set behind NAT (e.g. "slop.barakaslurp.fr").
+        /// </summary>
+        public string? PublicIp { get; set; }
         public bool IsOfficial { get; set; } = false;
         /// <summary>Directory containing .arena files. Relative to the server working directory.</summary>
         public string ArenaDataDir { get; set; } = "data/arenas";
