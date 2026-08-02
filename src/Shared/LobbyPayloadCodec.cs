@@ -130,6 +130,19 @@ public static class LobbyPayloadCodec
             if (!string.IsNullOrEmpty(s)) arenaName = s;
         }
 
-        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName);
+        // maxStocks is optional (absent → default 3, matching MatchStartRequest and
+        // the game server's StockMatchRule). Present-but-malformed also falls back
+        // to the default, mirroring how matchPort/arenaName treat bad input — a
+        // malformed optional field must never abort the whole match-start push.
+        int maxStocks = MatchDefaults.DefaultMaxStocks;
+        if (element.TryGetProperty("maxStocks", out var ms) &&
+            ms.ValueKind == JsonValueKind.Number &&
+            ms.TryGetInt32(out int parsed) &&
+            parsed >= 1 && parsed <= 99)
+        {
+            maxStocks = parsed;
+        }
+
+        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks);
     }
 }

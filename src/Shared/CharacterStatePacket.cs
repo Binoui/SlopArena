@@ -45,8 +45,12 @@ namespace SlopArena.Shared
         public float AimPitch;
         /// <summary>Match death counter (stock counter: stocks = maxStocks - Deaths). Issue #37.</summary>
         public byte Deaths;
-        /// <summary>49 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1;
+        /// <summary>Smash-style damage percent 0-999, sent so the client HUD can show every player's %. Issue #38.</summary>
+        public ushort DamagePercent;
+        /// <summary>Per-slot cooldown ticks (0-5), sent so the local player's HUD cooldown fills work in PvP. Issue #38.</summary>
+        public ushort Cooldown0, Cooldown1, Cooldown2, Cooldown3, Cooldown4, Cooldown5;
+        /// <summary>63 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1 + 2 + 2 + 2 + 2 + 2 + 2 + 2;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -73,6 +77,13 @@ namespace SlopArena.Shared
                 HitstunLevel = s.HitstunLevel,
                 AimPitch = s.AimPitch,
                 Deaths = s.Deaths,
+                DamagePercent = s.DamagePercent,
+                Cooldown0 = s.Cooldown0,
+                Cooldown1 = s.Cooldown1,
+                Cooldown2 = s.Cooldown2,
+                Cooldown3 = s.Cooldown3,
+                Cooldown4 = s.Cooldown4,
+                Cooldown5 = s.Cooldown5,
             };
         }
 
@@ -99,6 +110,13 @@ namespace SlopArena.Shared
                 HitstunLevel = HitstunLevel,
                 AimPitch = AimPitch,
                 Deaths = Deaths,
+                DamagePercent = DamagePercent,
+                Cooldown0 = Cooldown0,
+                Cooldown1 = Cooldown1,
+                Cooldown2 = Cooldown2,
+                Cooldown3 = Cooldown3,
+                Cooldown4 = Cooldown4,
+                Cooldown5 = Cooldown5,
             };
         }
 
@@ -127,6 +145,13 @@ namespace SlopArena.Shared
             buffer[43] = HitstunLevel;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(44, 4), BitConverter.SingleToInt32Bits(AimPitch));
             buffer[48] = Deaths;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(49, 2), DamagePercent);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(51, 2), Cooldown0);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(53, 2), Cooldown1);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(55, 2), Cooldown2);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(57, 2), Cooldown3);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(59, 2), Cooldown4);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(61, 2), Cooldown5);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -155,6 +180,13 @@ namespace SlopArena.Shared
             packet.HitstunLevel = buffer[43];
             packet.AimPitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(44, 4)));
             packet.Deaths = buffer[48];
+            packet.DamagePercent = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(49, 2));
+            packet.Cooldown0 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(51, 2));
+            packet.Cooldown1 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(53, 2));
+            packet.Cooldown2 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(55, 2));
+            packet.Cooldown3 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(57, 2));
+            packet.Cooldown4 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(59, 2));
+            packet.Cooldown5 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(61, 2));
             return packet;
         }
     }

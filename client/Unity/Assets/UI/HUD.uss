@@ -1,9 +1,75 @@
-.damage-percent {
-    font-size: 48px;
+.hud-root {
+    flex-grow: 1;
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 40px;
+}
+
+.player-panels {
+    flex-direction: row;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.player-panel {
+    min-width: 140px;
+    margin: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.35);
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+}
+
+/* Local player's panel is highlighted (issue #38) */
+.player-panel.local {
+    border-color: #ffd700;
+    background-color: rgba(40, 35, 0, 0.55);
+}
+
+/* Eliminated (0 stocks) — dimmed spectator */
+.player-panel.eliminated {
+    opacity: 0.45;
+}
+
+.player-name {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.85);
+    -unity-font-style: bold;
+}
+
+.player-panel.local .player-name {
+    color: #ffd700;
+}
+
+.player-damage {
+    font-size: 40px;
     color: white;
     -unity-font-style: bold;
-    text-align: center;
-    margin-bottom: 20px;
+}
+
+.stock-row {
+    flex-direction: row;
+    margin-top: 6px;
+}
+
+.stock-icon {
+    width: 14px;
+    height: 14px;
+    margin: 2px;
+    border-radius: 7px;
+    background-color: white;
+}
+
+.stock-icon.lost {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.stock-count {
+    font-size: 18px;
+    color: white;
+    -unity-font-style: bold;
 }
 
 .slot-row {

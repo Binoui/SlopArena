@@ -47,7 +47,7 @@ namespace SlopArena.Server
 		/// <param name="roster">Ordered players (index 0 = host). Each carries an entity ID (1..N) and a character class.</param>
 		/// <param name="maxStocks">Stocks per player (default 3, issue #37).</param>
 		public MatchInstance(int port, string matchId, string arenaName,
-			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = 3)
+			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = MatchDefaults.DefaultMaxStocks)
 		{
 			_port = port;
 			_matchId = matchId;
@@ -362,7 +362,7 @@ namespace SlopArena.Server
 			if (_udpServer == null) return;
 
 			// Packet format (matching NetworkClient expectations):
-			//   entityId(8) + tick(4) + CharacterStatePacket(49)
+			//   entityId(8) + tick(4) + CharacterStatePacket(63)
 			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size;
 
 			// Build a packet per entity once, then send each to every connected client.

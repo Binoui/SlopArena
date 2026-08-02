@@ -24,7 +24,7 @@ public sealed record MatchPlayer(long SteamId, CharacterClass CharacterClass, in
 /// <param name="ArenaName">Arena the game server should load for this match.</param>
 /// <param name="Players">Ordered roster (index 0 = host) the game server spawns.</param>
 /// <param name="MaxStocks">Stocks per player (default 3, issue #37).</param>
-public sealed record MatchStartRequest(string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players, int MaxStocks = 3);
+public sealed record MatchStartRequest(string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players, int MaxStocks = MatchDefaults.DefaultMaxStocks);
 
 /// <summary>
 /// Parses the <c>POST /match/start</c> JSON body (<see cref="MatchStartRequest"/>).
