@@ -4,16 +4,16 @@
 
 **Goal:** Ship a downloadable Windows `.exe` that non-technical friends can run to play training mode solo or join online games, backed by a self-hosted master server + dedicated game servers on the home mini PC.
 
-**Architecture:** Three layers — the Windows Unity player (built locally, self-contained game server binary bundled for host-and-play), the master server + PostgreSQL (ASP.NET Core 8 on the Debian 12 mini PC, TLS-terminated by Caddy at `sloparena.barakaslurp.fr`), and 1-2 dedicated game server instances (`src/Server`, systemd-managed) that players join directly over UDP. Host-and-play stays supported for technical players who port-forward; non-technical players only join the operator's OfficialServers.
+**Architecture:** Three layers — the Windows Unity player (built locally, self-contained game server binary bundled for host-and-play), the master server + PostgreSQL (ASP.NET Core 8 on the Debian 12 mini PC, TLS-terminated by Cloudflare Tunnel at `sloparena.barakaslurp.fr`), and 1-2 dedicated game server instances (`src/Server`, docker-compose-managed) that players join directly over UDP. Host-and-play stays supported for technical players who port-forward; non-technical players only join the operator's OfficialServers. All services run as docker containers (host network) — the mini PC hosts no .NET install; binaries are published on the dev machine and rsync'd.
 
-**Tech Stack:** Unity 6000.0.78f1 (Windows player build), .NET 8 (game server, master server), PostgreSQL 15 (Debian bookworm), Caddy (auto-HTTPS reverse proxy), systemd (service management), GitHub Actions (CI test gate), GitHub Releases (distribution).
+**Tech Stack:** Unity 6000.0.78f1 (Windows player build), .NET 8 (game server, master server — dev machines only, containers use `mcr.microsoft.com/dotnet/aspnet:8.0`), PostgreSQL 15 (container), Cloudflare Tunnel (TLS + ingress), docker compose (service management), GitHub Actions (CI test gate), GitHub Releases (distribution).
 
 ## Global Constraints
 
 - **Audience:** friends-first demo (not public release). Non-technical users must only ever click: download → unzip → run → Training or Join. No port forwarding, no config, no .NET install.
 - **Hosting model (grill Q1):** hybrid — dedicated servers are the default online path; host-and-play is supported for technical players. "Host" is NOT a player verb in user docs.
-- **Mini PC (grill Q2):** Debian 12 bookworm, kernel 6.12.74+deb12, 16GB DDR4. **Runs the user's home automation** — all deployment steps must be additive and non-destructive; services get `Restart=on-failure` and resource caps; never touch existing postgres configs/data, only add a role + database.
-- **Domain (grill Q3):** `barakaslurp.fr` owned; release builds point at `https://sloparena.barakaslurp.fr` (subdomain to be created). Plain HTTP is NOT acceptable for the master server — Caddy terminates TLS.
+- **Mini PC (grill Q2):** Debian 12 bookworm, kernel 6.12.74+deb12, 16GB DDR4. **Runs the user's home automation** — all deployment steps must be additive and non-destructive; containers get `restart: unless-stopped` and resource caps (`mem_limit: 512m`, `cpus: 0.5`); never touch existing postgres configs/data — the app database is its own `postgres:15` container with a named volume.
+- **Domain (grill Q3):** `barakaslurp.fr` owned; release builds point at `https://sloparena.barakaslurp.fr` (subdomain to be created). Plain HTTP is NOT acceptable for the master server — Cloudflare Tunnel terminates TLS at the edge (no Caddy, no inbound 443 needed).
 - **Roster (grill Q5):** all characters legal in online matches. `custom_rules` is omitted from official `server.json` (note: `AllowedCharacters` is currently decorative server-side — no enforcement exists; do not build enforcement in this plan).
 - **Signing (grill Q6):** none — friends-only. SmartScreen click-through documented in the player guide.
 - **Distribution (grill Q7):** GitHub Releases zip. itch.io is post-demo.
@@ -33,7 +33,7 @@
 
 **Files:** none (router/DNS).
 
-- [ ] **Step 1: Compare public IP vs router WAN IP**
+- [x] **Step 1: Compare public IP vs router WAN IP**
 
 ```bash
 curl -4 ifconfig.me
@@ -41,31 +41,36 @@ curl -4 ifconfig.me
 
 Log into the router admin panel and read the WAN IP. If they differ → **CGNAT. STOP.** Fall back to a VPS (Hetzner CX22, ~4€/mo) and redeploy Phases 1-4 there — document the alternative in `docs/systems/production-hosting.md` as a note.
 
-- [ ] **Step 2: Port-forward the demo range on the router**
+- [x] **Step 2: Port-forward the game range on the router**
 
-Forward to the mini PC's LAN IP:
-- TCP `443` and `80` (Caddy TLS + redirect)
+Forward to the mini PC's LAN IP (only the game-server range — TLS/HTTPS goes through Cloudflare Tunnel, which is outbound-only):
 - TCP `7777` and UDP `7777-7791` (game server instance 1: MatchControlServer TCP + 15 match ports)
+
+Note: the Bbox router only allows forwards in 1024-8191, so the old TCP 80/443 plan (Caddy) would not work here anyway — Cloudflare Tunnel sidesteps it entirely.
 
 Verify from OUTSIDE the LAN (phone on 4G, not Wi-Fi):
 
 ```bash
-# TCP 443 (after Phase 2, expect JSON health response)
-curl -sk https://<public-ip>/health
 # TCP 7777 (expect connection refusal or hang, NOT timeout — timeout = blocked)
 nc -vz <public-ip> 7777
 ```
 
-- [ ] **Step 3: Create DNS record**
+- [x] **Step 3: Create the tunnel hostname (replaces DNS record)**
 
-A record `sloparena.barakaslurp.fr` → public IP, TTL 300 (fast rollback if the IP changes).
+No A record at the registrar — Cloudflare Tunnel provisions DNS automatically. In the Cloudflare dashboard (Zero Trust → Networks → Tunnels → the existing alfred tunnel → Public Hostname → Add):
 
-```bash
-dig +short sloparena.barakaslurp.fr
-# expected: <public-ip>
+```
+Subdomain: sloparena
+Domain:    barakaslurp.fr
+Service:   HTTP → localhost:5000
 ```
 
-Note in `docs/systems/production-hosting.md`: home IPs change; on change, update the A record (manual). DDNS is explicitly out of scope for the demo.
+Save; Cloudflare creates the CNAME. Verify:
+
+```bash
+curl -s https://sloparena.barakaslurp.fr/health
+# {"status":"ok","version":"0.1.0"}  ← after Phase 2
+```
 
 - [ ] **Step 4: Commit**
 
@@ -75,79 +80,74 @@ No repo change; record results in `docs/systems/production-hosting.md` (created 
 
 ## Phase 1 — Mini PC base services
 
-### Task 1.1: Install .NET 8 (SDK + runtime)
+### Task 1.1: Postgres 15 container + compose stack dir
 
-**Files:** none (apt).
+**Files:** alfred: `/root/homelab/sloparena/{docker-compose.yml,.env}` (compose file versioned on the box — it is deliberately NOT in this repo; game repo stays game-only. Template is maintained directly on alfred; `.env` copied from `.env.example` with a generated password).
 
-- [ ] **Step 1: Add the Microsoft apt repo (bookworm)**
+No .NET on the host; no apt postgres — the box's home-automation packages stay untouched. Postgres runs as an official `postgres:15` container with a named volume; role + database come from env (`POSTGRES_USER/PASSWORD/DB`). The master and game-server services are in the same compose file (created now, started when their binaries land in Phases 2/4).
+
+- [x] **Step 1: Create the stack dir + secrets**
 
 ```bash
-sudo apt install -y apt-transport-https ca-certificates curl gnupg
-curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
-echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg arch=amd64] https://packages.microsoft.com/repos/dotnet/ bookworm main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
-sudo apt update
-sudo apt install -y aspnetcore-runtime-8.0 dotnet-sdk-8.0
+sudo mkdir -p /root/homelab/sloparena
+# scp from dev machine: docker-compose.yml + .env.example (from alfred's own copy — see note above)
+# .env: SLOPARENA_DB_PASSWORD="$(openssl rand -base64 18)"   (chmod 600)
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Start postgres only**
 
 ```bash
-dotnet --version   # expected: 8.0.x
+cd /root/homelab/sloparena
+docker compose up -d postgres
 ```
 
-### Task 1.2: Install PostgreSQL 15 + create the app database
-
-**Files:** none (apt/psql). Must be additive — the machine may already run postgres for home automation.
-
-- [ ] **Step 1: Install and enable**
+- [x] **Step 3: Verify**
 
 ```bash
-sudo apt install -y postgresql
-sudo systemctl enable --now postgresql
+# verified: sloparena-postgres Up; SELECT 1 → 1 (host-reachable via SSH tunnel on 15432)
 ```
 
-- [ ] **Step 2: Create role + database (idempotent, non-destructive)**
-
 ```bash
-sudo -u postgres psql -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='sloparena') THEN CREATE ROLE sloparena LOGIN PASSWORD '<generate: openssl rand -base64 18>'; END IF; END \$\$;"
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='sloparena'" | grep -q 1 || sudo -u postgres createdb -O sloparena sloparena
-```
-
-- [ ] **Step 3: Verify**
-
-```bash
-PGPASSWORD='<generated>' psql -h localhost -U sloparena -d sloparena -c "SELECT 1;"   # → 1
+docker compose ps            # sloparena-postgres Up
+PGPASSWORD='<generated>' psql -h 127.0.0.1 -U sloparena -d sloparena -c "SELECT 1;"   # → 1
 ```
 
 ---
 
 ## Phase 2 — Master server deploy
 
-### Task 2.1: Publish and configure
+### Task 2.1: Publish from the dev machine + rsync + migrate
 
 **Files:**
-- Clone: `/srv/sloparena/master/` (mini PC)
-- Create: `/srv/sloparena/master/appsettings.Production.json` (chmod 600)
+- Dev machine: `/home/binoui/Documents/projects/SlopArena-MasterServer` (publish source)
+- Mini PC: `/srv/sloparena/master/publish/` (binaries **and** `appsettings.Production.json` inside it — the compose file bind-mounts the whole dir read-only and cannot overlay a single file onto it; a file mount fails at runtime with `create mountpoint ... read-only file system`)
 
-- [ ] **Step 1: Clone + install EF tool**
+No build on the mini PC — the master repo is published locally and rsync'd, same pattern as the game server. Postgres is already up (Phase 1) and reachable at `127.0.0.1:5432` on the host.
+
+- [x] **Step 1: Publish + rsync (dev machine)**
 
 ```bash
-sudo mkdir -p /srv/sloparena && sudo chown "$USER" /srv/sloparena
-git clone https://github.com/Binoui/SlopArena-MasterServer /srv/sloparena/master
-cd /srv/sloparena/master
-dotnet tool install --global dotnet-ef --version 8.0.0
-export PATH="$PATH:$HOME/.dotnet/tools"
-dotnet publish -c Release -o /srv/sloparena/master/publish
+cd ~/Documents/projects/SlopArena-MasterServer
+dotnet publish -c Release -o /tmp/minipc-master   # /tmp, NOT build/ — see the ⚠ warning below (test-project bin/obj leak)
+dotnet tool install --global dotnet-ef --version 8.0.0   # once; for migrations
+ssh alfred 'sudo mkdir -p /srv/sloparena/master && sudo chown alfred:alfred /srv/sloparena/master'
+rsync -avz build/minipc-master/ alfred:/srv/sloparena/master/publish/
+# ⚠ never add --delete to this rsync: it would wipe the config written in Step 2.
+#    --delete-excluded is EVEN WORSE — it deletes files excluded from transfer
+#    (this actually happened 2026-08-02: config was destroyed and had to be
+#    rebuilt; JWT secret was regenerated). Also publish master to /tmp, not
+#    build/minipc-master: the MasterServer.Tests subfolder leaks its bin/obj
+#    into the output (content globs) and grows recursively on re-publish → MSB3030.
 ```
 
-- [ ] **Step 2: Write production config**
+- [x] **Step 2: Write production config (mini PC) — INSIDE publish/**
 
-`/srv/sloparena/master/appsettings.Production.json`:
+`/srv/sloparena/master/publish/appsettings.Production.json` (content on the box — never commit secrets):
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=sloparena;Username=sloparena;Password=<generated>"
+    "DefaultConnection": "Host=localhost;Port=5432;Database=sloparena;Username=sloparena;Password=<from Phase 1 .env>"
   },
   "Jwt": {
     "Secret": "<openssl rand -base64 64>"
@@ -157,106 +157,80 @@ dotnet publish -c Release -o /srv/sloparena/master/publish
 ```
 
 ```bash
-chmod 600 /srv/sloparena/master/appsettings.Production.json
+sudo chmod 600 /srv/sloparena/master/publish/appsettings.Production.json
 ```
 
-- [ ] **Step 3: Apply migrations (one-time)**
+- [x] **Step 3: Apply migrations (one-time, from dev machine)**
+
+The containerized postgres publishes only on `127.0.0.1` — reach it through an SSH tunnel. Use a non-conflicting local port (this dev machine runs its own postgres on 5432):
 
 ```bash
-cd /srv/sloparena/master
-ASPNETCORE_ENVIRONMENT=Production dotnet ef database update
+ssh -f -N -L 15432:127.0.0.1:5432 alfred   # local 15432 → alfred's container postgres
+# dev machine:
+cd ~/Documents/projects/SlopArena-MasterServer
+export ConnectionStrings__DefaultConnection='Host=localhost;Port=15432;Database=sloparena;Username=sloparena;Password=<from Phase 1 .env>'
+dotnet ef database update
 # expected: "Done."
-sudo -u postgres psql -d sloparena -c "\dt"   # GameServers, Users, Matches
+# verify (through the same tunnel):
+PGPASSWORD='<password>' psql -h localhost -p 15432 -U sloparena -d sloparena -c "\dt"   # GameServers, Users, Matches
 ```
 
-### Task 2.2: systemd service
+(Note: the master container's own `appsettings.Production.json` keeps `Host=localhost;Port=5432` — that points at the host's 5432, which is the container's published port on alfred. The 15432 only exists on the dev machine for the migration tunnel.)
 
-**Files:** Create `/etc/systemd/system/sloparena-master.service`.
+### Task 2.2: docker compose service
 
-- [ ] **Step 1: Write the unit** (resource-capped — home automation box):
+**Files:** `/root/homelab/sloparena/docker-compose.yml` on the mini PC (versioned on the box, not in this repo).
 
-```ini
-[Unit]
-Description=SlopArena Master Server
-After=network-online.target postgresql.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=sloparena
-Group=sloparena
-WorkingDirectory=/srv/sloparena/master/publish
-Environment=ASPNETCORE_ENVIRONMENT=Production
-ExecStart=/usr/bin/dotnet /srv/sloparena/master/publish/MasterServer.dll
-Restart=on-failure
-RestartSec=5
-MemoryMax=512M
-CPUQuota=50%
-NoNewPrivileges=true
-
-[Install]
-WantedBy=multi-user.target
-```
+- [x] **Step 1: Deploy the compose file**
 
 ```bash
-sudo useradd --system --home /srv/sloparena/master --shell /usr/sbin/nologin sloparena 2>/dev/null || true
-sudo chown -R sloparena:sloparena /srv/sloparena/master
-sudo systemctl daemon-reload && sudo systemctl enable --now sloparena-master
+# dev machine
+rsync -avz docker-compose.yml alfred:/root/homelab/sloparena/   # from wherever the template is kept (currently only on alfred)
+ssh alfred 'cd /root/homelab/sloparena && docker compose up -d master'
 ```
 
-- [ ] **Step 2: Verify locally**
+The `master` service runs `mcr.microsoft.com/dotnet/aspnet:8.0` with `network_mode: host` (cloudflared is also host-networked → reaches `127.0.0.1:5000`), bind-mounts `/srv/sloparena/master/publish` read-only, resource-capped (`mem_limit: 512m`, `cpus: 0.5`) — same caps as the original systemd unit, minus `NoNewPrivileges`/user sandboxing (root inside container; host exposure is host-network).
+
+- [x] **Step 2: Verify locally**
 
 ```bash
 curl -s http://127.0.0.1:5000/health   # {"status":"ok","version":"0.1.0"}
+docker compose logs master | tail
 ```
 
-### Task 2.3: Caddy reverse proxy (TLS)
+### Task 2.3: Cloudflare Tunnel hostname (replaces Caddy)
 
-**Files:** Create `/etc/caddy/Caddyfile` (append block).
+**Files:** Cloudflare Zero Trust dashboard (no install — the alfred tunnel already runs as a container).
 
-- [ ] **Step 1: Install Caddy (official repo)**
-
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-- [ ] **Step 2: Caddyfile block**
+- [x] **Step 1: Add the public hostname** (Zero Trust → Networks → Tunnels → alfred's tunnel → Public Hostname → Add):
 
 ```
-sloparena.barakaslurp.fr {
-	reverse_proxy 127.0.0.1:5000
-}
+Subdomain: sloparena
+Domain:    barakaslurp.fr
+Service:   HTTP → localhost:5000
 ```
 
-```bash
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
-
-- [ ] **Step 3: Verify from outside (phone 4G)**
+- [x] **Step 2: Verify from outside (phone 4G)**
 
 ```bash
 curl -s https://sloparena.barakaslurp.fr/health
-# {"status":"ok","version":"0.1.0"}  ← proves DNS + NAT + Caddy + TLS + master all work
+# {"status":"ok","version":"0.1.0"}  ← proves tunnel + TLS + NAT-less reachability + master all work
 ```
 
 ### Task 2.4: Backups (demo-scale)
 
-**Files:** `/etc/cron.d/sloparena-backup`.
+**Files:** `/etc/cron.d/sloparena-backup` on the mini PC. Same weekly pg_dump; the container's volume holds the data, the dump goes to the host FS.
 
-- [ ] **Step 1: Weekly pg_dump**
+- [x] **Step 1: Weekly pg_dump**
 
 ```
-30 4 * * 1 root mkdir -p /var/backups/sloparena && pg_dump -U sloparena -h localhost sloparena | gzip > /var/backups/sloparena/sloparena-$(date +\%F).sql.gz && find /var/backups/sloparena -name '*.sql.gz' -mtime +90 -delete
+30 4 * * 1 root mkdir -p /var/backups/sloparena && docker exec sloparena-postgres pg_dump -U sloparena sloparena | gzip > /var/backups/sloparena/sloparena-$(date +\%F).sql.gz && find /var/backups/sloparena -name '*.sql.gz' -mtime +90 -delete
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 ```bash
-sudo run-parts --test /etc/cron.d 2>/dev/null; sudo ls -la /var/backups/sloparena 2>/dev/null || echo "run once manually: sudo bash -c 'pg_dump ... | gzip > /var/backups/sloparena/manual-test.sql.gz'"
+sudo ls -la /var/backups/sloparena 2>/dev/null || echo "run once manually: sudo bash -c 'docker exec sloparena-postgres pg_dump -U sloparena sloparena | gzip > /var/backups/sloparena/manual-test.sql.gz'"
 ```
 
 ---
@@ -267,7 +241,7 @@ sudo run-parts --test /etc/cron.d 2>/dev/null; sudo ls -la /var/backups/sloparen
 
 **Files:** Create `docs/adr/0009-demo-hosting-model.md`.
 
-- [ ] **Step 1: Write the ADR** (amends ADR-0005's "LAN/localhost sufficient" posture):
+- [x] **Step 1: Write the ADR** (amends ADR-0005's "LAN/localhost sufficient" posture):
 
 ```markdown
 # ADR-0009: Demo Hosting Model — OfficialServers + Technical Host-and-Play
@@ -304,10 +278,7 @@ Two-tier hosting for the demo:
 - Future migration to VPS hosting is infra-only (ADR-0005 consequence unchanged).
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add docs/adr/0009-demo-hosting-model.md CONTEXT.md
+- [x] **Step 2: Commit**
 git commit -m "docs: add ADR-0009 demo hosting model + glossary terms"
 ```
 
@@ -324,7 +295,7 @@ git commit -m "docs: add ADR-0009 demo hosting model + glossary terms"
 - Consumes: `ServerConfig` (PascalCase props, case-insensitive JSON binding), `HostedServerConfig` (camelCase emission).
 - Produces: `ServerConfig.PublicIp` (nullable string, JSON key `publicIp`), `HostedServerConfig.PublicIp` (nullable string), used by Task 4.1's `server.json` and by `ServerHost` (Task 3.3).
 
-- [ ] **Step 1: Add `PublicIp` to ServerConfig**
+- [x] **Step 1: Add `PublicIp` to ServerConfig**
 
 In `src/Server/MultiMatchOrchestrator.cs`:
 
@@ -338,7 +309,7 @@ public string MasterServerUrl { get; set; } = "http://localhost:5000";
 public string? PublicIp { get; set; }
 ```
 
-- [ ] **Step 2: Use it in registration**
+- [x] **Step 2: Use it in registration**
 
 In `src/Server/GameServerRegistration.cs:48`, change:
 
@@ -352,7 +323,7 @@ to:
 var ip = _config.PublicIp ?? GetPublicIpAddress();
 ```
 
-- [ ] **Step 3: Rewrite `src/Server/server.json` in camelCase + publicIp**
+- [x] **Step 3: Rewrite `src/Server/server.json` in camelCase + publicIp**
 
 The current snake_case keys do NOT bind (`PropertyNameCaseInsensitive` handles case only, not underscores — `master_server_url`, `custom_rules` etc. silently fell back to defaults). New canonical dev file:
 
@@ -370,7 +341,7 @@ The current snake_case keys do NOT bind (`PropertyNameCaseInsensitive` handles c
 
 (`publicIp` omitted → LAN auto-detect; keep dev behavior unchanged.)
 
-- [ ] **Step 4: Add `PublicIp` to HostedServerConfig + test**
+- [x] **Step 4: Add `PublicIp` to HostedServerConfig + test**
 
 In `src/Shared/HostedServerConfig.cs`:
 
@@ -395,7 +366,7 @@ public void ToJson_WithPublicIp_EmitsCamelCasePublicIp()
 }
 ```
 
-- [ ] **Step 5: Build + test**
+- [x] **Step 5: Build + test**
 
 ```bash
 dotnet build src/Shared/ --nologo
@@ -403,7 +374,7 @@ dotnet test tests/Shared.Tests/ --nologo   # all pass, incl. new test
 dotnet build src/Server/ --nologo
 ```
 
-- [ ] **Step 6: Smoke — server honors publicIp**
+- [x] **Step 6: Smoke — server honors publicIp**
 
 ```bash
 cd src/Server && dotnet run --no-build -- '{"serverName":"smoke","port":7777,"maxConcurrentMatches":1,"masterServerUrl":"http://localhost:5000","publicIp":"1.2.3.4"}' 2>/dev/null || true
@@ -411,7 +382,7 @@ cd src/Server && dotnet run --no-build -- '{"serverName":"smoke","port":7777,"ma
 #   [Registration] ... ipAddress 1.2.3.4  ← proves override wins
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/Shared/HostedServerConfig.cs src/Server/MultiMatchOrchestrator.cs src/Server/GameServerRegistration.cs src/Server/server.json tests/Shared.Tests/HostedServerConfigTests.cs
@@ -427,7 +398,7 @@ git commit -m "fix(server): honor publicIp override in server.json (issue #52)"
 - Consumes: `HostedServerConfig.PublicIp` (Task 3.2), bundled binary at `StreamingAssets/Server/SlopArena.Server[.exe]` (produced by Task 5.3).
 - Produces: editor behavior unchanged; built players spawn the self-contained binary with the config path as `args[0]` (matches `Program.cs:12`).
 
-- [ ] **Step 1: Rewrite the launch branch in `StartHosting`**
+- [x] **Step 1: Rewrite the launch branch in `StartHosting`**
 
 Replace the `_assignedPort = FindFreeUdpPort();` … `Process.Start(psi);` block's path resolution:
 
@@ -500,14 +471,14 @@ else
 
 (`ResolveRepoRoot` stays as-is; it is only consulted in the editor fallback branch now.)
 
-- [ ] **Step 2: Editor regression check**
+- [x] **Step 2: Editor regression check**
 
 Run the game from the Editor (`Arena_PvP` scene → Host flow). Expected: falls back to `dotnet run` (no `StreamingAssets/Server` yet), server registers, host plays on localhost.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
-git add client/Unity/Assets/Scripts/Runtime/Network/ServerHost.cs
+ git add client/Unity/Assets/Scripts/Runtime/Network/ServerHost.cs
 git commit -m "fix(client): spawn bundled server binary in release builds (issue #52)"
 ```
 
@@ -519,18 +490,18 @@ git commit -m "fix(client): spawn bundled server binary in release builds (issue
 - `client/Unity/Assets/Scripts/Runtime/UI/ServerBrowserUI.cs:17`
 - `client/Unity/Assets/Scripts/Runtime/Network/ServerHost.cs:41`
 
-- [ ] **Step 1: Check for scene inspector overrides first**
+- [x] **Step 1: Check for scene inspector overrides first**
 
 `grep -rn "localhost:5000" client/Unity/Assets/Scenes/ --include="*.unity"` — if scene serialized values exist, update them too (scene values win over code defaults).
 
-- [ ] **Step 2: Change all defaults to `https://sloparena.barakaslurp.fr`**
+- [x] **Step 2: Change all defaults to `https://sloparena.barakaslurp.fr`**
 
 Dev machines keep working by overriding in the scene inspector; the code default becomes the release URL.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
-git add client/Unity/Assets/Scripts/Runtime
+ git add client/Unity/Assets/Scripts/Runtime
 git commit -m "fix(client): point release defaults at production master server"
 ```
 
@@ -544,24 +515,25 @@ git commit -m "fix(client): point release defaults at production master server"
 
 **Files:** `/srv/sloparena/server/{SlopArena.Server, server.json, arenas/*.arena}` (mini PC).
 
-- [ ] **Step 1: Publish linux-x64 (framework-dependent) + rsync**
+- [x] **Step 1: Publish linux-x64 (framework-dependent) + rsync**
 
 ```bash
 # dev machine
 dotnet publish src/Server/SlopArena.Server.csproj -c Release -r linux-x64 --self-contained false -o build/minipc
-rsync -avz build/minipc/ mini-pc:/srv/sloparena/server/
+ssh alfred 'sudo mkdir -p /srv/sloparena/server && sudo chown alfred:alfred /srv/sloparena/server'
+rsync -avz build/minipc/ alfred:/srv/sloparena/server/   # build-release.sh deletes server.json from publish output — never clobber the live one
 mkdir -p /tmp/arenas && cp data/arenas/*.arena /tmp/arenas/
-rsync -avz /tmp/arenas/ mini-pc:/srv/sloparena/server/arenas/
+rsync -avz /tmp/arenas/ alfred:/srv/sloparena/server/arenas/
 ```
 
-- [ ] **Step 2: Write `/srv/sloparena/server/server.json`** (camelCase — Task 3.2):
+- [x] **Step 2: Write `/srv/sloparena/server/server.json`** (camelCase — Task 3.2):
 
 ```json
 {
   "serverName": "SlopArena EU #1",
   "region": "EU",
   "port": 7777,
-  "maxConcurrentMatches": 15,
+  "maxConcurrentMatches": 4,
   "masterServerUrl": "https://sloparena.barakaslurp.fr",
   "isOfficial": true,
   "arenaDataDir": "/srv/sloparena/server/arenas",
@@ -569,47 +541,29 @@ rsync -avz /tmp/arenas/ mini-pc:/srv/sloparena/server/arenas/
 }
 ```
 
-### Task 4.2: systemd service
+> Deployed value is `maxConcurrentMatches: 4` (Bbox forwards only cover UDP 7777-7780; 15 would need 7777-7791).
 
-**Files:** Create `/etc/systemd/system/sloparena-server-1.service`.
+### Task 4.2: docker compose service
 
-- [ ] **Step 1: Unit**
+**Files:** `server-1` service in `/root/homelab/sloparena/docker-compose.yml` (deployed in Task 2.2).
 
-```ini
-[Unit]
-Description=SlopArena Game Server #1
-After=network-online.target sloparena-master.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=sloparena
-Group=sloparena
-WorkingDirectory=/srv/sloparena/server
-ExecStart=/usr/bin/dotnet /srv/sloparena/server/SlopArena.Server.dll /srv/sloparena/server/server.json
-Restart=on-failure
-RestartSec=5
-MemoryMax=512M
-CPUQuota=50%
-
-[Install]
-WantedBy=multi-user.target
-```
+- [x] **Step 1: Start the service**
 
 ```bash
-sudo chown -R sloparena:sloparena /srv/sloparena/server
-sudo systemctl daemon-reload && sudo systemctl enable --now sloparena-server-1
+ssh alfred 'cd /root/homelab/sloparena && docker compose up -d server-1'
 ```
 
-- [ ] **Step 2: Verify registration**
+The `server-1` service runs `mcr.microsoft.com/dotnet/aspnet:8.0` with `network_mode: host` — TCP 7777 + UDP 7777-7791 bind directly on the host (no docker port publishing, no iptables for the UDP range), same resource caps as the old unit (`mem_limit: 512m`, `cpus: 0.5`), config + arenas bind-mounted read-only.
+
+- [x] **Step 2: Verify registration**
 
 ```bash
-sudo journalctl -u sloparena-server-1 -n 50 --no-pager   # registration + heartbeat lines
-sudo -u postgres psql -d sloparena -c "SELECT name, \"ipAddress\", port, \"isOfficial\" FROM \"GameServers\";"
+ssh alfred 'cd /root/homelab/sloparena && docker compose logs server-1 | tail -30'   # registration + heartbeat lines
+docker exec sloparena-postgres psql -U sloparena -d sloparena -c "SELECT name, \"ipAddress\", port, \"isOfficial\" FROM \"GameServers\";"
 # ipAddress = sloparena.barakaslurp.fr, isOfficial = true
 ```
 
-- [ ] **Step 3: Optional second instance** (only after Phase 7 playtest shows demand): clone the unit with `port: 7877`, `serverName: "SlopArena EU #2"`, UDP forward `7877-7891`. Not required for the friends demo.
+- [ ] **Step 3: Optional second instance** (only after Phase 7 playtest shows demand): add a `server-2` service in the compose file with `port: 7877`, `serverName: "SlopArena EU #2"`, UDP forward `7877-7891`. Not required for the friends demo.
 
 ---
 
@@ -759,6 +713,16 @@ scripts/build-release.sh 0.2.0-demo.1
 # DONE: build/release/SlopArena-0.2.0-demo.1.zip
 ```
 
+- [ ] **Step 1b: Master server refresh (separate repo, manual)** — the master repo publishes independently and is NOT part of `build-release.sh`:
+
+```bash
+cd ~/Documents/projects/SlopArena-MasterServer
+dotnet publish -c Release -o /tmp/minipc-master   # /tmp, NOT build/ — test-project bin/obj leaks + recurses (see Task 2.1 warning)
+rsync -avz --exclude 'appsettings.Production.json' /tmp/minipc-master/ alfred:/srv/sloparena/master/publish/   # no --delete — would wipe appsettings.Production.json
+ssh alfred 'cd /root/homelab/sloparena && docker compose up -d --force-recreate master'
+# only needed when master code changed; the master API is versioned, so the game client is not coupled to its release cadence
+```
+
 - [ ] **Step 2: Publish**
 
 ```bash
@@ -777,7 +741,7 @@ gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
 
 **Files:** Create `docs/release/PLAY_GUIDE.md` (shipped as `README.txt` in the zip).
 
-- [ ] **Step 1: Write the guide** — full text:
+- [x] **Step 1: Write the guide** — full text:
 
 ```markdown
 # SlopArena — how to play
@@ -807,10 +771,10 @@ gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
      if the servers are up.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
-git add docs/release/PLAY_GUIDE.md docs/release/HOST_GUIDE.md docs/release/RELEASE_NOTES.template.md
+ git add docs/release/PLAY_GUIDE.md docs/release/HOST_GUIDE.md docs/release/RELEASE_NOTES.template.md
 git commit -m "docs: add player guide, host guide, release notes template"
 ```
 
@@ -818,7 +782,7 @@ git commit -m "docs: add player guide, host guide, release notes template"
 
 **Files:** Create `docs/release/HOST_GUIDE.md` (shipped as `HOSTING.txt`).
 
-- [ ] **Step 1: Write it**
+- [x] **Step 1: Write it**
 
 ```markdown
 # SlopArena — hosting your own game
@@ -842,17 +806,18 @@ The game server is bundled inside the game — no .NET or extra installs needed.
 **Files:**
 - Create `docs/systems/production-hosting.md`
 - Create `docs/systems/release-pipeline.md`
+- Create `docs/systems/troubleshooting.md` (added post-plan, 2026-08-02, after the first live playtest: UFW drops, stale registration, rsync config wipes, Unity build failures — every failure mode hit during deploy)
 
-- [ ] **Step 1: production-hosting.md** — the mini-PC runbook: condensed Phases 0-4 (CGNAT check, apt repos, postgres role/db, master systemd, Caddy, game server systemd, backups, DNS-IP-change procedure, VPS fallback note, "machine runs home automation — be additive" warning).
+- [x] **Step 1: production-hosting.md** — the mini-PC runbook: condensed Phases 0-4 (CGNAT check, port forwards, postgres container + `.env` secret, master publish+rsync, docker compose services, Cloudflare Tunnel hostname, backups, DNS-IP-change procedure, VPS fallback note, "machine runs home automation — be additive" warning).
 
-- [ ] **Step 2: release-pipeline.md** — how to cut a release: version scheme (`v<major>.<minor>.<patch>-demo.<n>`), `scripts/build-release.sh`, `gh release create`, CI status, what each artifact is (`build/release/*.zip`, `build/minipc/`).
+- [x] **Step 2: release-pipeline.md** — how to cut a release: version scheme (`v<major>.<minor>.<patch>-demo.<n>`), `scripts/build-release.sh`, `gh release create`, CI status, what each artifact is (`build/release/*.zip`, `build/minipc/`).
 
-- [ ] **Step 3: Record Phase 0 results** in `production-hosting.md` (CGNAT verdict, public IP, DNS record, forwarded ports) — closes Task 0.4's stub.
+- [x] **Step 3: Record Phase 0 results** in `production-hosting.md` (CGNAT verdict, public IP, DNS record, forwarded ports) — closes Task 0.4's stub.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
-git add docs/systems/production-hosting.md docs/systems/release-pipeline.md
+ git add docs/systems/production-hosting.md docs/systems/release-pipeline.md
 git commit -m "docs: add production hosting runbook and release pipeline"
 ```
 
@@ -862,7 +827,8 @@ git commit -m "docs: add production hosting runbook and release pipeline"
 
 ### Task 7.1: Remote playtest
 
-- [ ] **Step 1: Run the full pipeline once** (Tasks 5.3-5.5) → zip distributed to 2 friends.
+- [x] **Step 1: Run the full pipeline once** (Tasks 5.3-5.5) → zip distributed to 2 friends.
+  (Build + zip verified 2026-08-02: `build/release/SlopArena-0.2.0-demo.1.zip`, 90MB. Not yet published to GitHub / distributed — `gh release create` awaits operator go.)
 - [ ] **Step 2: Scripted playtest checklist** (operator):
 
 | Check | Pass |
@@ -884,6 +850,8 @@ git commit -m "docs: add production hosting runbook and release pipeline"
 
 - [ ] **Step 1: Fresh Windows VM/laptop** (no Unity, no .NET, no repo). Install from the zip only.
 - [ ] **Step 2: Verify no dev dependencies leak** — `localhost:5000` must appear NOWHERE (grep the zip's scripts; watch the client log while joining; check the host flow spawns the bundled exe, not `dotnet`).
+
+  Verified at build time (2026-08-02): full-text + binary scan of the zip → 0 hits for `localhost:5000` and `127.0.0.1:5000`; `server.json` removed from the bundled server publish output (`build-release.sh` rm); `ServerHost` `useBundled` path spawns `StreamingAssets/Server/SlopArena.Server.exe` on WindowsPlayer (statically confirmed, file present in zip). Remaining: runtime confirmation on a clean machine.
 
 ---
 

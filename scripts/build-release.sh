@@ -18,9 +18,17 @@ dotnet test "$ROOT/tests/Shared.Tests/" --nologo
 
 echo "== Self-contained Windows server (embedded host-and-play) =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 --self-contained true -o "$SA/Server"
+# The csproj copies server.json (dev defaults, localhost:5000) into publish
+# output; both release flows (bundled host-and-play, dedicated compose) pass an
+# explicit config path as arg[0], so the shipped file is dead weight AND leaks
+# localhost:5000 into the zip (Task 7.2: must appear NOWHERE). Drop it.
+rm -f "$SA/Server/server.json"
 
 echo "== linux-x64 server for the mini PC =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x64 --self-contained false -o "$ROOT/build/minipc"
+# Same rationale: rsync'ing this onto alfred must not clobber the live
+# server.json (real masterServerUrl + publicIp).
+rm -f "$ROOT/build/minipc/server.json"
 
 echo "== Stage arenas =="
 mkdir -p "$SA/arenas"
