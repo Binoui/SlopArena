@@ -22,7 +22,7 @@ namespace SlopArena.Client.Network
         private bool _connected;
         private Thread? _receiveThread;
         private volatile bool _running;
-        private readonly ConcurrentQueue<(ulong entityId, uint tick, CharacterState state)> _receivedQueue = new();
+        private readonly ConcurrentQueue<ServerEntityPacket> _receivedQueue = new();
 
         public ulong EntityId { get => _entityId; set => _entityId = value; }
         public bool IsServerConnected => _connected;
@@ -116,13 +116,18 @@ namespace SlopArena.Client.Network
             }
         }
 
+        /// <summary>
+        /// Drain the receive queue into the latest server-authoritative states.
+        /// The input-relay section (issue #80) is deliberately dropped here —
+        /// the rollback bridge drains it via its own accessor when re-sim lands.
+        /// </summary>
         public Dictionary<ulong, CharacterState> ReceiveStates()
         {
             var result = new Dictionary<ulong, CharacterState>();
             while (_receivedQueue.TryDequeue(out var entry))
             {
-                result[entry.entityId] = entry.state;
-                LastServerTick = entry.tick;
+                result[entry.EntityId] = entry.State.ToState();
+                LastServerTick = entry.Tick;
             }
             return result;
         }
@@ -140,13 +145,9 @@ namespace SlopArena.Client.Network
 
                     var ep = new IPEndPoint(IPAddress.Any, 0);
                     byte[] buf = _udp.Receive(ref ep);
-                    int minSize = 8 + 4 + CharacterStatePacket.Size;
-                    if (buf.Length < minSize) continue;
+                    if (buf.Length < ServerEntityPacket.BaseSize) continue;
 
-                    ulong eid = ReadUInt64LE(buf, 0);
-                    uint tick = ReadUInt32LE(buf, 8);
-                    var packet = CharacterStatePacket.Deserialize(buf.AsSpan(12));
-                    _receivedQueue.Enqueue((eid, tick, packet.ToState()));
+                    _receivedQueue.Enqueue(ServerEntityPacket.Deserialize(buf));
                 }
                 catch
                 {
@@ -182,12 +183,5 @@ namespace SlopArena.Client.Network
             buf[off] = (byte)val; buf[off+1] = (byte)(val>>8);
             buf[off+2] = (byte)(val>>16); buf[off+3] = (byte)(val>>24);
         }
-
-        private static ulong ReadUInt64LE(byte[] buf, int off) =>
-            buf[off] | (ulong)buf[off+1]<<8 | (ulong)buf[off+2]<<16 | (ulong)buf[off+3]<<24
-            | (ulong)buf[off+4]<<32 | (ulong)buf[off+5]<<40 | (ulong)buf[off+6]<<48 | (ulong)buf[off+7]<<56;
-
-        private static uint ReadUInt32LE(byte[] buf, int off) =>
-            (uint)(buf[off] | buf[off+1]<<8 | buf[off+2]<<16 | buf[off+3]<<24);
     }
 }
