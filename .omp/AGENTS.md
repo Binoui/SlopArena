@@ -86,6 +86,10 @@ Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
 - Mixamo FBX scale: cm (0.01 factor). Blender 5.1 uses layered actions API.
 
 
+### Git
+- Commit convention: Conventional Commits, one squash commit per branch — `<type>(<scope>): <imperative summary> (issue #N)`. Full rules in `docs/contributing/conventions.md` § Git & Commits.
+- Squash + PR flow lives in `.omp/skills/sloparena-finish-branch`.
+
 ### Debugging Protocol
 1. State the problem (1-2 sentences)
 2. Describe the fix (2-3 sentences): what, which files, why

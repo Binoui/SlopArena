@@ -15,6 +15,15 @@ triggers:
 
 Deterministic flow, no menu. Run from the repo root or let `git rev-parse --show-toplevel` find it.
 
+## 0. Subject
+
+Decide `<subject>` before touching git:
+
+- A user-supplied subject wins.
+- Otherwise derive one conventional subject for the whole branch, per the commit convention in `docs/contributing/conventions.md` (§ Git & Commits): `<type>(<scope>): <imperative summary>` + ` (issue #N)` when the branch resolves a GitHub issue.
+- Pick the type/scope from the actual change (`feat(match)` for gameplay, `fix(client)` for repairs, else `refactor`/`docs`/`test`/`chore` + the subsystem scope). Match the existing log style, e.g. `feat(match): roster-driven match start with character classes (issue #35)`.
+- If the branch is empty (no code changes), say so and stop.
+
 ## 1. Branch guard
 
 ```bash
@@ -34,21 +43,49 @@ Failures → stop, report them, do NOT commit.
 ## 3. Squash
 
 ```bash
-git reset --soft "$(git merge-base HEAD main)" && git commit -m "<subject>"
+git add -A   # required: reset --soft does NOT stage untracked files — they'd be dropped from the commit
+git reset --soft "$(git merge-base HEAD main)"
+git diff --cached --quiet && { echo "nothing to squash — clean tree"; exit 1; }
+git commit -m "<subject>"
 ```
 
-`<subject>` = the last commit's subject (or the user-supplied arg). Clean tree / nothing staged → report and stop.
+- **Always `git add -A` first.** `git reset --soft` only stages the diff merge-base..HEAD; brand-new files in the working tree would otherwise be silently omitted from the commit.
+- **Fresh branch (HEAD == merge-base, no commits)?** The reset is a no-op — that's fine: `git add -A` already staged the whole working tree and the commit is created normally. This is NOT the "clean tree" case.
+- "Clean tree / nothing staged" means the tree was already clean after the reset — print "nothing to squash — clean tree" and stop.
 
 ## 4. Push + PR
 
 ```bash
-git push -u origin HEAD
-gh pr create --title "<subject>" --body "<body>"
+if git ls-remote --heads origin "$(git branch --show-current)" | grep -q .; then
+  git push --force-with-lease -u origin HEAD   # branch was pushed before — rewritten history needs force
+else
+  git push -u origin HEAD
+fi
 ```
 
-`<body>` = `git log main..HEAD --format='- %s'` + diffstat (`git diff --stat main...HEAD`).
+Open the PR with a real description — summary, changes, verification, and a **fenced** diffstat:
 
-If `gh` is unavailable → print the push output and the repo URL (`https://github.com/Binoui/SlopArena`) instead, and stop there.
+````bash
+gh pr create --title "<subject>" --body "$(cat <<'EOF'
+<1-3 sentences: what the branch does and why>
+
+## Changes
+- bullet per logical change (start from `git log main..HEAD --format='- %s'` and expand)
+
+## Verification
+- what was run and the result: test count, build, manual/e2e checks
+
+## Diffstat
+```text
+<git diff --stat main...HEAD>
+```
+EOF
+)"
+````
+
+- The diffstat MUST be inside a ```text fence — an unfenced diffstat renders with broken alignment in GitHub Markdown.
+- Server-authoritative changes: note which Shared files changed (per `docs/contributing/conventions.md` § Git & Commits).
+- If `gh` is unavailable → print the push output and the repo URL (`https://github.com/Binoui/SlopArena`) instead, and stop there.
 
 ## 5. Report
 
