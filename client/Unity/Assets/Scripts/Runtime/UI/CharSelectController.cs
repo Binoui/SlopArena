@@ -204,7 +204,7 @@ namespace SlopArena.Client.UI
             UpdateStartMatchButton();
         }
 
-        private async void OnMatchStarted(MatchStartedConfig config)
+        private void OnMatchStarted(MatchStartedConfig config)
         {
             Debug.Log($"[CharSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
 
@@ -251,20 +251,19 @@ namespace SlopArena.Client.UI
                     ParseClass(p.CharacterSelection, CharacterClass.Manki)));
             }
 
-            // Tear down the lobby connection — the match is now handed off to
-            // the game server (UDP). Leaving the SignalR lobby connected would
-            // keep server-side lobby membership alive past match start.
+            // Keep the lobby connection alive through the match (issue #40): the
+            // results screen + lobby return rely on it. Just unsubscribe the
+            // event handlers so nothing fires while in Arena_PvP.
             if (_lobby != null)
             {
                 _lobby.LobbyUpdated    -= OnLobbyUpdated;
                 _lobby.CharacterSelected -= OnCharacterSelected;
                 _lobby.MatchStarted     -= OnMatchStarted;
                 _lobby.Error            -= OnPvPError;
-                try { await _lobby.LeaveLobbyAsync(); } catch { /* best effort */ }
-                await _lobby.DisconnectAsync();
             }
-            ClientSession.ActiveLobby = null;
-            ClientSession.LobbyRoster = null;
+
+            // Stash the roster so the results screen can render names/classes.
+            ClientSession.MatchRoster = config.Players;
 
             // Go straight to the PvP arena — the master server already picked
             // the arena and assigned the port, so StageSelect is skipped for

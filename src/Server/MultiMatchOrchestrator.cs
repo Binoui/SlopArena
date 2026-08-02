@@ -22,6 +22,9 @@ namespace SlopArena.Server
             _config = config;
         }
 
+        /// <summary>Optional callback invoked with (match guid, winner steam id) when a match ends (issue #40).</summary>
+        public Action<Guid, long>? ReportMatchResult { get; set; }
+
         /// <summary>
         /// Assign a new match to the next available port with a roster of
         /// players + character classes (issue #35). Returns the assigned UDP
@@ -34,7 +37,7 @@ namespace SlopArena.Server
                 int port = _config.Port + offset;
                 if (!_activeMatches.ContainsKey(port))
                 {
-                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd, maxStocks);
+                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd, maxStocks, ReportMatchResult);
                     if (_activeMatches.TryAdd(port, match))
                     {
                         match.Start();

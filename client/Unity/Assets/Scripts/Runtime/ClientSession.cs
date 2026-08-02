@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 
 namespace SlopArena.Client
 {
@@ -45,6 +46,30 @@ namespace SlopArena.Client
         /// </summary>
         public static Shared.LobbySnapshot? LobbyRoster;
 
+        /// <summary>Roster stashed at match start (entityId → name/class) for the results screen (issue #40).</summary>
+        public static IReadOnlyList<Shared.LobbyPlayerInfo>? MatchRoster;
+
+        /// <summary>Final standings, set by PvPMatch when the match ends; consumed by ResultsUI.</summary>
+        public static MatchResultsData? CurrentMatchResults;
+
+        /// <summary>One player's final standing line on the results screen.</summary>
+        public sealed class ResultEntry
+        {
+            public ulong EntityId;
+            public string Name = "";
+            public string ClassName = "";
+            public int StocksRemaining;
+            public int DamagePercent;
+            public bool IsWinner;
+        }
+
+        /// <summary>Final standings snapshot for the results screen.</summary>
+        public sealed class MatchResultsData
+        {
+            public bool SharedVictory;
+            public List<ResultEntry> Entries = new();
+        }
+
         public static void Reset()
         {
             MasterServerUrl = "http://localhost:5000";
@@ -55,6 +80,8 @@ namespace SlopArena.Client
             SelectedServerName = string.Empty;
             ActiveLobby = null;
             LobbyRoster = null;
+            MatchRoster = null;
+            CurrentMatchResults = null;
         }
     }
 }

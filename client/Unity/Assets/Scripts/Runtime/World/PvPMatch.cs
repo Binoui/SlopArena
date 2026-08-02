@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
@@ -197,6 +198,11 @@ namespace SlopArena.Client.World
             {
                 Debug.Log($"[PvP] MatchState transition: {_lastMatchState} → {matchState}");
                 _lastMatchState = matchState;
+
+                if (matchState == MatchState.Ended)
+                {
+                    BuildAndShowResults();
+                }
             }
 
             _tick++;
@@ -206,6 +212,83 @@ namespace SlopArena.Client.World
                 Debug.Log($"[PvP] tick={_tick} connected={_networkClient.IsServerConnected} " +
                           $"pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) serverTick={_networkClient.LastServerTick}");
             }
+        }
+
+        /// <summary>
+        /// Build the final standings from the last server states and schedule the
+        /// return to the results screen (issue #40). Runs once on the Ended transition.
+        /// </summary>
+        private void BuildAndShowResults()
+        {
+            var states = new Dictionary<ulong, CharacterState>
+            {
+                { PlayerEntityId, _bridge.GetState(PlayerEntityId) }
+            };
+            foreach (var id in _opponentRenderers.Keys)
+                states[id] = _bridge.GetState(id);
+
+            // Winner via the shared rule — same decision the game server made.
+            var outcome = new StockMatchRule((byte)MatchConfig.MaxStocks).Evaluate(states);
+
+            var data = new ClientSession.MatchResultsData
+            {
+                SharedVictory = outcome.IsSharedVictory,
+            };
+
+            if (ClientSession.MatchRoster != null)
+            {
+                foreach (var roster in ClientSession.MatchRoster)
+                {
+                    if (roster.EntityId <= 0) continue;
+                    var id = (ulong)roster.EntityId;
+                    if (!states.TryGetValue(id, out var st)) continue;
+
+                    var className = roster.CharacterSelection;
+                    if (string.IsNullOrEmpty(className))
+                    {
+                        className = id == PlayerEntityId
+                            ? MatchConfig.PlayerClass.ToString()
+                            : OpponentClass(id);
+                    }
+
+                    data.Entries.Add(new ClientSession.ResultEntry
+                    {
+                        EntityId = id,
+                        Name = string.IsNullOrEmpty(roster.Name) ? $"P{id}" : roster.Name,
+                        ClassName = className,
+                        StocksRemaining = MatchConfig.MaxStocks - st.Deaths,
+                        DamagePercent = st.DamagePercent,
+                        IsWinner = !outcome.IsSharedVictory && id == outcome.WinnerEntityId,
+                    });
+                }
+            }
+
+            // Rank: most stocks first, then least damage (tie-break).
+            data.Entries.Sort((a, b) =>
+            {
+                int byStocks = b.StocksRemaining.CompareTo(a.StocksRemaining);
+                return byStocks != 0 ? byStocks : a.DamagePercent.CompareTo(b.DamagePercent);
+            });
+
+            ClientSession.CurrentMatchResults = data;
+            Debug.Log($"[PvP] Match ended — {data.Entries.Count} entries, shared={outcome.IsSharedVictory}");
+
+            // 2s beat so the KO moment renders; the server keeps broadcasting the
+            // Ended state for its 3s post-match window, then we cut to Results.
+            StartCoroutine(ReturnToLobbyAfterDelay());
+        }
+
+        private string OpponentClass(ulong entityId)
+        {
+            foreach (var opp in MatchConfig.Opponents)
+                if (opp.EntityId == entityId) return opp.Class.ToString();
+            return $"P{entityId}";
+        }
+
+        private System.Collections.IEnumerator ReturnToLobbyAfterDelay()
+        {
+            yield return new WaitForSeconds(2f);
+            SceneManager.LoadScene("Results");
         }
     }
 }

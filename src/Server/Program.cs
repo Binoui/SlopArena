@@ -26,6 +26,11 @@ namespace SlopArena.Server
             var registration = new GameServerRegistration(config, orchestrator);
             var cts = new CancellationTokenSource();
 
+            // Report finished-match results (winner steam id) to the master server (issue #40).
+            // Fire-and-forget: ReportMatchResultAsync swallows errors; shared victory reports 0.
+            orchestrator.ReportMatchResult = (matchId, winner) =>
+                _ = registration.ReportMatchResultAsync(matchId, winner);
+
             // HTTP control endpoint for master server match-start commands
             // (issue #35). Listens on the registered base TCP port; UDP matches
             // bind port+offset, so the two coexist on the same number.

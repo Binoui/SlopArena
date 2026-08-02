@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="SlopArena.uss" />
+    <ui:VisualElement name="root" class="screen">
+        <ui:Label name="title" text="RESULTS" class="title" />
+        <ui:Label name="lbl-winner" text="" class="subtitle" />
+        <ui:VisualElement name="standings-list" class="player-list lobby-list" />
+        <ui:Label name="lbl-countdown" text="" class="subtitle" />
+    </ui:VisualElement>
+</ui:UXML>
