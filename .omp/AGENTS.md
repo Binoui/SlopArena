@@ -40,7 +40,7 @@ Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
 - All tick durations use `ushort` (max 65535 ticks = ~18 minutes).
 - Packet serialization uses `System.Buffers.Binary.BinaryPrimitives` (little-endian).
 - Client → Server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes, 60Hz.
-- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(63)` = 75 bytes per entity.
+- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19)` = up to 95 bytes per entity (input relay, issue #80).
 - Match flow: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room (ADR-0008). Master server (SignalR) manages lobby/char-select/results; game server (UDP) manages countdown/fight only.
 
 ## Key Conventions
@@ -97,7 +97,7 @@ Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
   - `dotnet build src/Shared/ --nologo` after any Shared change (auto-copies the DLL to Unity Plugins).
   - `dotnet test tests/Shared.Tests/` — filtered during development, full suite at the end.
   - `dotnet build src/Server/` when server code changed.
-- Optional stronger gate: `"$UNITY_EDITOR" -batchmode -quit -projectPath <worktree>/client/Unity` once per worktree — catches Unity-script compile errors. First run builds a fresh `Library/` (slow, multi-GB); afterwards fast. `$UNITY_EDITOR` = Unity 6000.0.78f1 install path.
+- Optional stronger gate: `"$UNITY_EDITOR" -batchmode -quit -projectPath <worktree>/client/Unity` once per worktree — catches Unity-script compile errors. First run builds a fresh `Library/` (slow, multi-GB); afterwards fast. `$UNITY_EDITOR` = Unity 6000.0.78f1 install path. **Gitignored local packages don't travel to worktrees** (`Packages/com.kybernetik.animancer` is paid and never committed): run `scripts/setup-worktree-unity-packages.sh` first or the gate fails on Animancer type errors.
 - **Handoff:** if the slice touches Unity-facing code (`client/Unity/Assets/Scripts/`, prefabs, animation, input), write a short "Test in Unity" checklist (what to playtest, what to look for) to `TESTING-UNITY.md` at the repo root (gitignored — never committed). `sloparena-finish-branch` picks it up into the PR body.
 
 ### Debugging Protocol

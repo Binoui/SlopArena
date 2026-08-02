@@ -26,7 +26,9 @@ Verified against `src/Shared/` and `src/Server/MatchInstance.cs`:
 - `InputState.Size = 19` (`src/Shared/InputState.cs`)
 - **Client → server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes** (`MatchInstance.ReceiveInputs` comment)
 - `CharacterStatePacket.Size = 63` (`src/Shared/CharacterStatePacket.cs`)
-- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(63)` = 75 bytes** (`MatchInstance.SendState` comment)
+- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19)` = up to 95 bytes** — 76B no-input marker / 95B with relayed input (`ServerEntityPacket`, issue #80)
+
+Input relay (issue #80): the server appends the exact `InputState` it consumed for that entity that tick, or the explicit no-input marker when its queue was empty / the entity is eliminated or disconnected. `hasInput = 0` → client omits the entity from re-sim inputs (server's `default(InputState)` path). Clients decode via `ServerEntityPacket.Deserialize` (`NetworkClient.ReceiveLoop`); the relayed inputs are consumed by the rollback bridge.
 
 InputState layout (19 bytes): MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2) + AimPitch(2) + AimDistance(2) + TargetEntityId(1).
 

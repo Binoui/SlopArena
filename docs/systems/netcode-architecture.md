@@ -134,8 +134,10 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(63) = 75B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19) = up to 95B
          → tick = _serverTick (echoed back)
+         → hasInput/InputState = the input the server consumed for that entity
+           that tick, or the no-input marker (issue #80 — input relay)
        → Client filters by entityId
 ```
 
@@ -171,12 +173,16 @@ Total: 31 bytes (8 + 4 + 19)
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) = 75 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19) = up to 95 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
 [12..74] CharacterStatePacket (63 bytes)
+[75]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
+[76..94] InputState        (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
 ```
+
+**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 76 bytes, a relayed packet 95 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
 
 **CharacterStatePacket layout (63 bytes):**
 | Offset | Type    | Field               | Notes                              |
@@ -204,7 +210,7 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) = 75
 | 49-50  | ushort  | DamagePercent       | Smash-style damage %, HUD display (issue #38) |
 | 51-62  | ushort×6| Cooldown0..5        | Per-slot cooldown ticks, local HUD fills (issue #38) |
 
-Total: 75 bytes per entity (8 + 4 + 63)
+Total: 75 bytes base (8 + 4 + 63), up to 95 with the relay section (76 no-input marker / 95 relayed — issue #80)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

@@ -30,6 +30,16 @@ namespace SlopArena.Server
 		private ServerSimulation _sim = null!;
 		private uint _serverTick;
 
+		/// <summary>
+		/// The inputs the server actually consumed for the last sim tick, keyed by
+		/// entity. Sent back to clients as the input-relay section of each state
+		/// broadcast (issue #80, ADR-0010): membership in this dict is the relay
+		/// signal, so empty queues, eliminated entities, and disconnected players
+		/// all broadcast the explicit no-input marker. Null until the first
+		/// playing tick (countdown broadcasts relay nothing).
+		/// </summary>
+		private Dictionary<ulong, InputState>? _lastTickInputs;
+
 		private const double TimeoutSeconds = 5.0;
 
 		// Match lifecycle
@@ -347,6 +357,7 @@ namespace SlopArena.Server
 			}
 
 			// Run authoritative simulation (movement + hit detection + hurtboxes + void death)
+			_lastTickInputs = inputs;
 			if (inputs.Count > 0)
 			{
 				_sim.Tick(inputs);
@@ -386,20 +397,35 @@ namespace SlopArena.Server
 
 			// Packet format (matching NetworkClient expectations):
 			//   entityId(8) + tick(4) + CharacterStatePacket(63)
-			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size;
+			//   + hasInput(1) + InputState(19) when this entity's input was consumed
+			//   this tick — the input relay for client rollback prediction (issue #80).
+			// Max 95 bytes per entity; the flag is always present (76B no-input marker).
 
 			// Build a packet per entity once, then send each to every connected client.
-			var packets = new List<(ulong entityId, byte[] buffer)>(_slots.Count);
+			var packets = new List<(byte[] buffer, int length)>(_slots.Count);
 			foreach (var slot in _slots)
 			{
 				var statePacket = CharacterStatePacket.FromState(_sim.GetState(slot.EntityId), _serverTick);
 				statePacket.MatchState = _matchState;
 
-				var buf = new byte[envelopeSize];
-				BitConverter.TryWriteBytes(buf.AsSpan(0, 8), slot.EntityId);
-				BitConverter.TryWriteBytes(buf.AsSpan(8, 4), _serverTick);
-				statePacket.Serialize(buf.AsSpan(12));
-				packets.Add((slot.EntityId, buf));
+				// Relay the exact input the sim consumed this tick — membership in the
+				// consumed dict — or the explicit no-input marker. Entities excluded
+				// from the sim inputs (empty queue, eliminated, disconnected) must relay
+				// nothing so clients reproduce the server's default(InputState) path.
+				InputState consumed = default;
+				bool hasInput = _lastTickInputs != null && _lastTickInputs.TryGetValue(slot.EntityId, out consumed);
+				var packet = new ServerEntityPacket
+				{
+					EntityId = slot.EntityId,
+					Tick = _serverTick,
+					State = statePacket,
+					HasInput = hasInput,
+					Input = consumed,
+				};
+
+				var buf = new byte[ServerEntityPacket.MaxSize];
+				packet.Serialize(buf);
+				packets.Add((buf, packet.WireSize));
 			}
 
 			try
@@ -408,7 +434,7 @@ namespace SlopArena.Server
 				{
 					if (slot.EndPoint == null || slot.Disconnected) continue;
 					foreach (var pkt in packets)
-						_udpServer.Send(pkt.buffer, envelopeSize, slot.EndPoint);
+						_udpServer.Send(pkt.buffer, pkt.length, slot.EndPoint);
 				}
 			}
 			catch (Exception ex)
