@@ -43,21 +43,25 @@ namespace SlopArena.Server
 
 		private Thread? _thread;
 		private readonly Action<int> _onMatchEnd;
+		private readonly Action<Guid, long>? _onMatchResult;
 
 		/// <param name="roster">Ordered players (index 0 = host). Each carries an entity ID (1..N) and a character class.</param>
 		/// <param name="maxStocks">Stocks per player (default 3, issue #37).</param>
+		/// <param name="onMatchResult">Optional callback invoked once when the match ends (match guid, winner steam id).</param>
 		public MatchInstance(int port, string matchId, string arenaName,
-			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = MatchDefaults.DefaultMaxStocks)
+			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = MatchDefaults.DefaultMaxStocks,
+			Action<Guid, long>? onMatchResult = null)
 		{
 			_port = port;
 			_matchId = matchId;
 			_arenaName = arenaName;
 			_onMatchEnd = onMatchEnd;
+			_onMatchResult = onMatchResult;
 			_rule = new StockMatchRule(maxStocks);
 
 			_slots = new List<PlayerSlot>(roster.Count);
 			foreach (var p in roster)
-				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass));
+				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass, p.SteamId));
 		}
 
 		/// <summary>True while the match loop is active.</summary>
@@ -351,6 +355,18 @@ namespace SlopArena.Server
 					Console.WriteLine(outcome.IsSharedVictory
 						? $"[Match:{_matchId}] Shared victory — all players eliminated simultaneously."
 						: $"[Match:{_matchId}] Winner: {_winnerEntityId}");
+
+					// Report the result to the master server (issue #40). Fire-and-forget:
+					// ReportMatchResultAsync swallows errors. Shared victory (_winnerEntityId == 0)
+					// reports winnerSteamId = 0, which the master stores as NULL. Runs exactly once
+					// because subsequent ticks take the Ended branch above.
+					if (_onMatchResult != null && Guid.TryParse(_matchId, out var matchGuid))
+					{
+						long winnerSteamId = 0;
+						var winnerSlot = FindSlot(_winnerEntityId);
+						if (winnerSlot != null) winnerSteamId = winnerSlot.SteamId;
+						_onMatchResult(matchGuid, winnerSteamId); // fire-and-forget; ReportMatchResultAsync swallows errors
+					}
 				}
 
 				SendState();
@@ -417,15 +433,17 @@ namespace SlopArena.Server
 		{
 			public ulong EntityId { get; }
 			public CharacterClass CharacterClass { get; }
+			public long SteamId { get; }
 			public IPEndPoint? EndPoint { get; set; }
 			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
 			public bool Disconnected { get; set; }
 			public List<(uint tick, InputState input)> Queue { get; } = new();
 
-			public PlayerSlot(ulong entityId, CharacterClass characterClass)
+			public PlayerSlot(ulong entityId, CharacterClass characterClass, long steamId)
 			{
 				EntityId = entityId;
 				CharacterClass = characterClass;
+				SteamId = steamId;
 			}
 		}
 	}

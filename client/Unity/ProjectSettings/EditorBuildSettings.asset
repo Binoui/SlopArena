@@ -29,6 +29,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/LobbyRoom.unity
     guid: 84d2952d59214d19b4032edd770b2ad9
+  - enabled: 1
+    path: Assets/Scenes/Results.unity
+    guid: a1b2c3d4e5f60718293a4b5c6d7e8f9a
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
   m_UseUCBPForAssetBundles: 0
