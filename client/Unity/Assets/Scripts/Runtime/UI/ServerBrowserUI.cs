@@ -14,7 +14,7 @@ namespace SlopArena.Client.UI
     public class ServerBrowserUI : MonoBehaviour
     {
         [SerializeField] private UIDocument _uiDocument;
-        [SerializeField] private string _masterServerUrl = "http://localhost:5000";
+        [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
 
         private MasterServerClient _masterClient;
         private VisualElement _serverList;

@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _uiDocument: {fileID: 1100000002}
-  _masterServerUrl: http://localhost:5000
+  _masterServerUrl: https://sloparena.barakaslurp.fr
 --- !u!114 &1100000002
 MonoBehaviour:
   m_ObjectHideFlags: 0

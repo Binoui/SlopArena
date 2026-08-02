@@ -13,8 +13,8 @@ namespace SlopArena.Client
     /// </summary>
     public static class ClientSession
     {
-        /// <summary>Master server base URL (e.g. http://localhost:5000).</summary>
-        public static string MasterServerUrl = "http://localhost:5000";
+        /// <summary>Master server base URL (release default; dev overrides via scene inspector).</summary>
+        public static string MasterServerUrl = "https://sloparena.barakaslurp.fr";
 
         /// <summary>Guest JWT bearer token; null until guest auth succeeds.</summary>
         public static string? AuthToken;
@@ -72,7 +72,7 @@ namespace SlopArena.Client
 
         public static void Reset()
         {
-            MasterServerUrl = "http://localhost:5000";
+            MasterServerUrl = "https://sloparena.barakaslurp.fr";
             AuthToken = null;
             SteamId = 0;
             Username = null;
