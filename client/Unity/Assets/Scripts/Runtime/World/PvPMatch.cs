@@ -39,21 +39,23 @@ namespace SlopArena.Client.World
         protected override void OnMatchStart()
         {
             Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
-            // Arena
-            string arenaPath = Path.GetFullPath(Path.Combine(
-                Application.dataPath, "..", "..", "..", "data", "arenas", MatchConfig.ArenaName + ".arena"));
-            ArenaDefinition arena;
-            if (File.Exists(arenaPath))
+            // Baked arena is required (issue #77): hardcoded ArenaRegistry arenas carry
+            // no collision data, so a missing .arena file used to make players fall
+            // through the floor. The client only renders; the server is authoritative.
+            string? arenaPath = BakedContentPaths.ResolveArena(MatchConfig.ArenaName);
+            if (arenaPath == null)
             {
-                var loaded = ArenaBinaryFormat.LoadFromFile(arenaPath);
-                arena = loaded ?? ArenaRegistry.Get(MatchConfig.ArenaName);
-                Debug.Log($"[PvPMatch] Loaded arena: {arenaPath}");
+                Debug.LogError($"[PvPMatch] Baked arena '{MatchConfig.ArenaName}' not found (looked in StreamingAssets/arenas and repo data/arenas). " +
+                               "Bake the arena or run scripts/build-release.sh. Aborting match start.");
+                return;
             }
-            else
+            var arenaOpt = ArenaBinaryFormat.LoadFromFile(arenaPath);
+            if (arenaOpt is not ArenaDefinition arena)
             {
-                arena = ArenaRegistry.Get(MatchConfig.ArenaName);
-                Debug.Log($"[PvPMatch] Using hardcoded arena: {MatchConfig.ArenaName}");
+                Debug.LogError($"[PvPMatch] Failed to parse baked arena: {arenaPath}");
+                return;
             }
+            Debug.Log($"[PvPMatch] Loaded arena: {arenaPath}");
 
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
 
@@ -125,6 +127,7 @@ namespace SlopArena.Client.World
 
         private void Update()
         {
+            if (IsPaused) return; // pause menu owns Esc + skips polling (issue #77)
             _inputController.Poll();
         }
 

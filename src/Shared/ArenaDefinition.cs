@@ -382,12 +382,18 @@ namespace SlopArena.Shared
             EnsureInitialized();
         }
 
-        public static ArenaDefinition Get(string name)
+        /// <summary>
+        /// Look up an arena by name. Returns null when the name is unknown —
+        /// callers must NOT silently substitute another arena (issue #77: the
+        /// old fallback to _hardcoded[0] made e.g. "island" silently become
+        /// "pit", and hardcoded arenas carry no baked collision data).
+        /// </summary>
+        public static ArenaDefinition? Get(string name)
         {
             EnsureInitialized();
             foreach (var a in _hardcoded)
                 if (a.Name == name) return a;
-            return _hardcoded[0];
+            return null;
         }
 
         private static void EnsureInitialized()

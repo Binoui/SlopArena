@@ -632,9 +632,15 @@ dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 
 echo "== linux-x64 server for the mini PC =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x64 --self-contained false -o "$ROOT/build/minipc"
 
-echo "== Stage arenas =="
-mkdir -p "$SA/arenas"
+echo "== Stage baked data (arenas + skeleton bins) =="
+mkdir -p "$SA/arenas" "$SA/data" "$SA/Server/data"
 cp "$ROOT"/data/arenas/*.arena "$SA/arenas/"
+# Skeleton bins: the client reads them from StreamingAssets/data (BakedContentPaths),
+# the bundled server from its CWD-relative data/ (MatchInstance.LoadBakedData runs with
+# WorkingDirectory = the server binary dir). Issue #77: without this, bone-attached
+# hitboxes degrade to capsules in the shipped exe.
+cp "$ROOT"/data/*.bin "$SA/data/"
+cp "$ROOT"/data/*.bin "$SA/Server/data/"
 
 echo "== Version stamp =="
 sed -i "s/^bundleVersion: .*/bundleVersion: $VERSION/" "$PROJ/ProjectSettings/ProjectSettings.asset"
@@ -647,7 +653,7 @@ echo "== Restore committed bundleVersion =="
 git -C "$ROOT" checkout -- client/Unity/ProjectSettings/ProjectSettings.asset
 
 echo "== Unstage build-only artifacts =="
-rm -rf "$SA/Server" "$SA/arenas"
+rm -rf "$SA/Server" "$SA/arenas" "$SA/data"
 
 echo "== Ship docs + zip =="
 cp "$ROOT/docs/release/PLAY_GUIDE.md" "$REL/README.txt"

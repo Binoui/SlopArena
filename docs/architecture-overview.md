@@ -61,7 +61,11 @@ SlopArena/
 │   └── Shared.Tests/      ← xUnit tests (ServerSimulation, SpellResolver, etc.)
 │
 ├── docs/                 ← All documentation
-├── data/                 ← Baked binary data (.arena, _skeleton.bin)
+├── data/                 ← Baked binary data (.arena, _skeleton.bin). Versioned source;
+│                           staged into client/Unity/Assets/StreamingAssets/ by
+│                           scripts/build-release.sh for player builds. Clients resolve
+│                           via BakedContentPaths (StreamingAssets first, repo data/
+│                           fallback for the Editor) — issue #77
 └── tools/                ← Python scripts, build tools
 ```
 

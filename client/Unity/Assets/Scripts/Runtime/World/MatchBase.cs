@@ -43,11 +43,20 @@ namespace SlopArena.Client.World
         protected bool _showCrosshair;
         protected CharacterDefinition _playerDef = null!;
         protected UnityEngine.Camera _mainCamera;
+        protected MatchPauseMenu _pauseMenu;
+
+        /// <summary>True while the in-match pause menu is open (issue #77).</summary>
+        protected bool IsPaused => _pauseMenu != null && _pauseMenu.IsPaused;
 
         protected abstract void OnMatchStart();
         protected abstract void OnMatchFixedUpdate();
 
-        private void Start() => OnMatchStart();
+        private void Start()
+        {
+            _pauseMenu = gameObject.AddComponent<MatchPauseMenu>();
+            _pauseMenu.Init(_cameraMount, _inputController);
+            OnMatchStart();
+        }
         private void FixedUpdate() => OnMatchFixedUpdate();
 
         // ── Shared setup helpers ────────────────────────────────────────────
@@ -154,6 +163,7 @@ namespace SlopArena.Client.World
 
         protected virtual void OnGUI()
         {
+            if (IsPaused) return; // crosshair hidden behind the pause panel
             if (!_showCrosshair) return;
             float cx = Screen.width * 0.5f;
             float cy = Screen.height * 0.5f;
@@ -176,21 +186,11 @@ namespace SlopArena.Client.World
 
         // ── Static utilities ────────────────────────────────────────────────
 
-        protected static ArenaDefinition LoadArenaFromFile(string path)
-        {
-            if (File.Exists(path))
-            {
-                var result = ArenaBinaryFormat.LoadFromFile(path);
-                if (result.HasValue) return result.Value;
-            }
-            return ArenaRegistry.Get("training");
-        }
-
         protected static BakedAnimationData? LoadBakedData(CharacterDefinition def)
         {
             if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-            string path = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", def.BakedDataPath.Replace("res://", "")));
-            if (!File.Exists(path)) return null;
+            string? path = BakedContentPaths.ResolveBaked(def.BakedDataPath);
+            if (path == null) return null;
             try
             {
                 return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
