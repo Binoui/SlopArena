@@ -25,8 +25,8 @@ Verified against `src/Shared/` and `src/Server/MatchInstance.cs`:
 
 - `InputState.Size = 19` (`src/Shared/InputState.cs`)
 - **Client → server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes** (`MatchInstance.ReceiveInputs` comment)
-- `CharacterStatePacket.Size = 49` (`src/Shared/CharacterStatePacket.cs`)
-- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(49)` = 61 bytes** (`MatchInstance.SendState` comment)
+- `CharacterStatePacket.Size = 63` (`src/Shared/CharacterStatePacket.cs`)
+- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(63)` = 75 bytes** (`MatchInstance.SendState` comment)
 
 InputState layout (19 bytes): MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2) + AimPitch(2) + AimDistance(2) + TargetEntityId(1).
 
@@ -42,7 +42,7 @@ InputState layout (19 bytes): MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + F
 | 16-17  | ushort | AimDistance    | cm (0-6500 = 0-65m)                    |
 | 18     | byte   | TargetEntityId | Client-selected target (0 = none)      |
 
-CharacterStatePacket layout (49 bytes): TickNumber(4) + Position(12) + Velocity(12) + CurrentActionState(1) + IsGrounded(1) + StateDurationFrames(2) + AttackSlot(1) + ComboStage(1) + AnimIndex(1) + FacingYaw(4) + MatchState(1) + BuffRemainingTicks(2) + BuffActiveFlags(1) + HitstunLevel(1) + AimPitch(4) + Deaths(1).
+CharacterStatePacket layout (63 bytes): TickNumber(4) + Position(12) + Velocity(12) + CurrentActionState(1) + IsGrounded(1) + StateDurationFrames(2) + AttackSlot(1) + ComboStage(1) + AnimIndex(1) + FacingYaw(4) + MatchState(1) + BuffRemainingTicks(2) + BuffActiveFlags(1) + HitstunLevel(1) + AimPitch(4) + Deaths(1) + DamagePercent(2) + Cooldown0..5(12).
 
 The server sends ALL entity states to every client; each client filters by entityId. The tick field echoes the client's tick (informational in Phase 1). When adding a packet field, update the `Size` constant AND all four serialization methods (`FromState`/`ToState`/`Serialize`/`Deserialize`).
 

@@ -36,6 +36,10 @@ namespace SlopArena.Client.UI
         /// <summary>All non-local players, in master-server roster order.</summary>
         public static List<OpponentInfo> Opponents = new();
 
+        /// <summary>Stocks per player (ADR-0007, issue #38). Must match the game
+        /// server's rule; the master server push carries it when present, else 3.</summary>
+        public static int MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;
+
         public static void Reset()
         {
             Mode = GameMode.Training;
@@ -46,6 +50,7 @@ namespace SlopArena.Client.UI
             ServerPort = 9876;
             LocalEntityId = 1;
             Opponents.Clear();
+            MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;
         }
     }
 }

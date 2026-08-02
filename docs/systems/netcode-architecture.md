@@ -94,7 +94,7 @@ PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
   1. Receive server states (non-blocking)
      → NetworkClient.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(49) = 61B
+     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) = 75B
 
   2. Store into the bridge
      → NetworkSimulationBridge._latestStates[kv.Key] = kv.Value
@@ -134,7 +134,7 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(49) = 61B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(63) = 75B
          → tick = _serverTick (echoed back)
        → Client filters by entityId
 ```
@@ -171,14 +171,14 @@ Total: 31 bytes (8 + 4 + 19)
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(49) = 61 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) = 75 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
-[12..60] CharacterStatePacket (49 bytes)
+[12..74] CharacterStatePacket (63 bytes)
 ```
 
-**CharacterStatePacket layout (49 bytes):**
+**CharacterStatePacket layout (63 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
@@ -201,8 +201,10 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(49) = 61
 | 43     | byte    | HitstunLevel        | 0=small, 1=medium, 2=hard          |
 | 44-47  | float   | AimPitch            | Server-authoritative aim pitch (radians) |
 | 48     | byte    | Deaths              | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
+| 49-50  | ushort  | DamagePercent       | Smash-style damage %, HUD display (issue #38) |
+| 51-62  | ushort×6| Cooldown0..5        | Per-slot cooldown ticks, local HUD fills (issue #38) |
 
-Total: 61 bytes per entity (8 + 4 + 49)
+Total: 75 bytes per entity (8 + 4 + 63)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -212,7 +214,7 @@ Total: 61 bytes per entity (8 + 4 + 49)
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (144 bytes in memory, 49 serialized) is the full per-tick state of one entity:
+`CharacterState` (144 bytes in memory, 63 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|

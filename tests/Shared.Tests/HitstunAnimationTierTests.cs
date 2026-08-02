@@ -107,8 +107,8 @@ public class HitstunAnimationTierTests
     [Fact]
     public void CharacterStatePacket_Size_IncludesHitstunLevel()
     {
-        // Size should be 49 for the current packet layout (Deaths added, issue #37)
-        Assert.Equal(49, CharacterStatePacket.Size);
+        // Size should be 63 for the current packet layout (Deaths #37, damage + cooldowns #38)
+        Assert.Equal(63, CharacterStatePacket.Size);
     }
 
     // ═══════════════════════════════════════════════════════════════════

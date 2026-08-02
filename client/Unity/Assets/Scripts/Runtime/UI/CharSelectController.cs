@@ -235,6 +235,9 @@ namespace SlopArena.Client.UI
             // ServerIP is already set (host: localhost, joiner: server browser IP).
             MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, _selected);
             MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
+            // Codec guarantees [1,99] (default 3); assign directly so a stale value
+            // from a previous match can never leak through (issue #38).
+            MatchConfig.MaxStocks = config.MaxStocks;
             // Every non-local rostered player is an opponent (issue #36).
             // entityId <= 0 means the master never assigned it, so the game
             // server never spawned the entity — skip it.

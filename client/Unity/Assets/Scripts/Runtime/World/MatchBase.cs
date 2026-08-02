@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -85,7 +86,20 @@ namespace SlopArena.Client.World
 
         protected void SetupHUD(CharacterDefinition def)
         {
-            _hudManager?.Initialize(() => Bridge.GetState(PlayerEntityId));
+            // One panel per player (local + opponents), sorted by entity ID so
+            // panels read P1..PN left to right regardless of who is local (issue #38).
+            var players = new List<HUDManager.HudPlayer>(MatchConfig.Opponents.Count + 1)
+            {
+                new(PlayerEntityId, $"P{PlayerEntityId}", isLocal: true)
+            };
+            foreach (var opp in MatchConfig.Opponents)
+                players.Add(new HUDManager.HudPlayer(opp.EntityId, $"P{opp.EntityId}", isLocal: false));
+            players.Sort((a, b) => a.EntityId.CompareTo(b.EntityId));
+
+            // Stocks only in PvP (the game server's StockMatchRule); training has
+            // no win condition, so stock display is hidden (maxStocks <= 0).
+            int maxStocks = MatchConfig.Mode == GameMode.PvP ? MatchConfig.MaxStocks : 0;
+            _hudManager?.Initialize(Bridge.GetState, players, maxStocks);
             _hudManager?.SetCharacterDefinition(def);
             for (int slot = 0; slot < 6; slot++)
             {

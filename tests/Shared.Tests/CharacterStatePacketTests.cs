@@ -29,6 +29,13 @@ public class CharacterStatePacketTests
             HitstunLevel = 2,
             AimPitch = -0.5f,
             Deaths = 2,
+            DamagePercent = 87,
+            Cooldown0 = 1,
+            Cooldown1 = 12,
+            Cooldown2 = 33,
+            Cooldown3 = 44,
+            Cooldown4 = 55,
+            Cooldown5 = 66,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -59,14 +66,22 @@ public class CharacterStatePacketTests
         Assert.Equal(original.HitstunLevel, restored.HitstunLevel);
         Assert.Equal(original.AimPitch, restored.AimPitch);
         Assert.Equal(original.Deaths, restored.Deaths);
+        Assert.Equal(original.DamagePercent, restored.DamagePercent);
+        Assert.Equal(original.Cooldown0, restored.Cooldown0);
+        Assert.Equal(original.Cooldown1, restored.Cooldown1);
+        Assert.Equal(original.Cooldown2, restored.Cooldown2);
+        Assert.Equal(original.Cooldown3, restored.Cooldown3);
+        Assert.Equal(original.Cooldown4, restored.Cooldown4);
+        Assert.Equal(original.Cooldown5, restored.Cooldown5);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // AimPitch (float at offset 44) ends at byte 47, Deaths at byte 48 → 49 bytes.
+        // AimPitch (float at offset 44) ends at byte 47, Deaths at 48, then
+        // DamagePercent (49-50) and six cooldowns (51-62) → 63 bytes.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(49, CharacterStatePacket.Size);
+        Assert.Equal(63, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f });

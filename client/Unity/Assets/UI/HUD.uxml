@@ -1,10 +1,10 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
     <ui:Style src="HUD.uss" />
-    <ui:VisualElement style="flex-grow: 1; justify-content: flex-end; padding-bottom: 40px;">
-        <!-- Damage % -->
-        <ui:Label name="damage-percent" text="0%" class="damage-percent" />
+    <ui:VisualElement name="hud-root" class="hud-root">
+        <!-- Player panels — one per player, built at runtime by HUDManager (issue #38) -->
+        <ui:VisualElement name="player-panels" class="player-panels" />
 
-        <!-- Slot row -->
+        <!-- Slot row (local player only) -->
         <ui:VisualElement name="slot-row" class="slot-row">
             <ui:VisualElement name="slot-0" class="slot-icon">
                 <ui:VisualElement name="slot-0-cooldown" class="slot-cooldown" />
