@@ -27,6 +27,9 @@ namespace SlopArena.Client.World
         private readonly Dictionary<ulong, PlayerRenderer> _opponentRenderers = new();
         private PlayerRenderer[] _opponentArray = System.Array.Empty<PlayerRenderer>();
 
+        /// <summary>Last server Deaths counter per entity — drives the death/respawn flash (issue #37).</summary>
+        private readonly Dictionary<ulong, byte> _lastDeaths = new();
+
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;
         private NetworkSimulationBridge _bridge = null!;
@@ -108,6 +111,12 @@ namespace SlopArena.Client.World
             // Player spawns at its own roster spawn point (entityId 1..N ↔ spawnPoints[0..N-1]).
             _playerRenderer.transform.position = SpawnPosition(arena, PlayerEntityId);
 
+            // Track initial Deaths so the first state apply doesn't trigger a false flash.
+            _lastDeaths.Clear();
+            _lastDeaths[PlayerEntityId] = 0;
+            foreach (var id in _opponentRenderers.Keys)
+                _lastDeaths[id] = 0;
+
             // Shared camera + aim setup
             SetupCamera();
             SetupAimHandler(playerDef);
@@ -163,6 +172,24 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             foreach (var kv in _opponentRenderers)
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
+
+            // Respawn/death feedback: flash + animation reset when the server Deaths
+            // counter increments (issue #37, mirrors TrainingMatch NPC handling).
+            byte playerDeaths = _bridge.GetState(PlayerEntityId).Deaths;
+            if (playerDeaths != _lastDeaths[PlayerEntityId])
+            {
+                _lastDeaths[PlayerEntityId] = playerDeaths;
+                _playerRenderer.OnDeath();
+            }
+            foreach (var kv in _opponentRenderers)
+            {
+                byte d = _bridge.GetState(kv.Key).Deaths;
+                if (d != _lastDeaths[kv.Key])
+                {
+                    _lastDeaths[kv.Key] = d;
+                    kv.Value.OnDeath();
+                }
+            }
 
             // Surface server match state transitions (countdown → fight → results)
             var matchState = _bridge.GetState(PlayerEntityId).MatchState;

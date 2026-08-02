@@ -16,12 +16,21 @@ namespace SlopArena.Shared
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
 		private readonly SpellResolver _spellResolver = new();
-		private readonly Dictionary<ulong, (float x, float y, float z)> _respawnPositions = new();
+		private readonly Dictionary<ulong, (float x, float y, float z, float yaw)> _respawnPositions = new();
 		// Track pending attack slots for warp-in-progress entities
 		private readonly Dictionary<ulong, byte> _pendingWarpAttacks = new();
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
-		public ServerSimulation(ArenaDefinition arena) => _arena = arena;
+		private readonly IMatchRule _rule;
+		/// <summary>Ticks of invincibility granted on respawn (60 = 1s at 60Hz). Issue #37.</summary>
+		public ushort RespawnInvincibilityTicks { get; set; } = 60;
+
+		/// <param name="rule">Win-condition rule (elimination + match end). Defaults to stock mode, 3 stocks.</param>
+		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null)
+		{
+			_arena = arena;
+			_rule = rule ?? new StockMatchRule(3);
+		}
 		private const float WarpConeHalfAngleRad = 120f * MathF.PI / 180f / 2f; // 60° half-cone = 120° total facing cone
 
 		public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
@@ -34,9 +43,9 @@ namespace SlopArena.Shared
 			_prevAnimIndex[id] = -1;
 	}
 
-		public void SetRespawnPosition(ulong entityId, float x, float y, float z)
+		public void SetRespawnPosition(ulong entityId, float x, float y, float z, float yaw = 0f)
 		{
-			_respawnPositions[entityId] = (x, y, z);
+			_respawnPositions[entityId] = (x, y, z, yaw);
 		}
 
 		public void RemoveEntity(ulong id)
@@ -452,6 +461,8 @@ namespace SlopArena.Shared
 			foreach (var id in simIds)
 			{
 				if (!_states.TryGetValue(id, out var state)) continue;
+				// Eliminated (0 stocks / rule) — frozen spectator, no physics (issue #37).
+				if (_rule.IsEliminated(state)) continue;
 				var def = _defs[id];
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				Simulation.SimulateTick(ref state, def, input, _arena);
@@ -620,6 +631,9 @@ namespace SlopArena.Shared
 				var state = kvp.Value;
 				var def = _defs[id];
 
+				// Eliminated (0 stocks / rule) — untargetable spectator (issue #37).
+				if (_rule.IsEliminated(state)) continue;
+
 				if (ResolveBoneAnimFrame(id, state, def, out var baked, out var targetAnim, out var bakedFrame))
 				{
 
@@ -680,6 +694,10 @@ namespace SlopArena.Shared
 			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
+
+				// Invincible (respawn grace, dash) — the hit is fully ignored (issue #37).
+				if (targetState.InvincibilityTicks > 0) continue;
+
 
 				// ── Counter interception (target-side): if the defender has an active
 				// ability that counters this hit, it absorbs the hit and applies its own
@@ -829,16 +847,47 @@ namespace SlopArena.Shared
 			{
 				var d = _defs[id];
 				var oldState = _states[id];
-				var (rpx, rpy, rpz) = _respawnPositions.TryGetValue(id, out var rp) ? rp :
-					(_arena.SpawnPoints[0].X, _arena.SpawnPoints[0].Y, _arena.SpawnPoints[0].Z);
-				_states[id] = new CharacterState
+				byte newDeaths = oldState.Deaths < byte.MaxValue ? (byte)(oldState.Deaths + 1) : oldState.Deaths;
+
+				// Respawn point: per-entity override when set (MatchInstance/TrainingMatch
+				// distribute spawn points), else deterministic by entity index so players
+				// never all stack on SpawnPoints[0] (issue #37).
+				float rpx, rpy, rpz, rpyaw;
+				if (_respawnPositions.TryGetValue(id, out var rp))
+				{
+					rpx = rp.x; rpy = rp.y; rpz = rp.z; rpyaw = rp.yaw;
+				}
+				else
+				{
+					int idx = (int)((id - 1) % (ulong)Math.Max(1, _arena.SpawnPoints.Length));
+					var sp = _arena.SpawnPoints[idx];
+					rpx = sp.X; rpy = sp.Y; rpz = sp.Z; rpyaw = sp.Yaw;
+				}
+
+				var respawned = new CharacterState
 				{
 					PX = rpx, PY = rpy, PZ = rpz,
-					FacingYaw = _arena.SpawnPoints[0].Yaw,
-                    EntityId = id,
+					FacingYaw = rpyaw,
+					EntityId = id,
+					State = ActionState.Idle,
+					IsGrounded = true,
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
-					Deaths = (byte)(oldState.Deaths + 1), DamagePercent = 0,
+					Deaths = newDeaths, DamagePercent = 0,
 				};
+
+				if (_rule.IsEliminated(respawned))
+				{
+					// Lost (0 stocks / rule) — spectator: frozen at its spawn point,
+					// excluded from hurtboxes and physics (see BuildHurtboxList/
+					// SimulateMovement), no input (see MatchInstance). Issue #37.
+					respawned.InvincibilityTicks = 0;
+				}
+				else
+				{
+					// Still has stocks — respawn with brief invincibility (Smash convention).
+					respawned.InvincibilityTicks = RespawnInvincibilityTicks;
+				}
+				_states[id] = respawned;
 			}
 		}
 

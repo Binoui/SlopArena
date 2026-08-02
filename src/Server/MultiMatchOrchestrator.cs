@@ -27,14 +27,14 @@ namespace SlopArena.Server
         /// players + character classes (issue #35). Returns the assigned UDP
         /// port, or -1 if no slots are available.
         /// </summary>
-        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster)
+        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks = 3)
         {
             for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
             {
                 int port = _config.Port + offset;
                 if (!_activeMatches.ContainsKey(port))
                 {
-                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd);
+                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd, maxStocks);
                     if (_activeMatches.TryAdd(port, match))
                     {
                         match.Start();

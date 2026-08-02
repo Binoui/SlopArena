@@ -25,8 +25,8 @@ Verified against `src/Shared/` and `src/Server/MatchInstance.cs`:
 
 - `InputState.Size = 19` (`src/Shared/InputState.cs`)
 - **Client → server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes** (`MatchInstance.ReceiveInputs` comment)
-- `CharacterStatePacket.Size = 48` (`src/Shared/CharacterStatePacket.cs`)
-- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(48)` = 60 bytes** (`MatchInstance.SendState` comment)
+- `CharacterStatePacket.Size = 49` (`src/Shared/CharacterStatePacket.cs`)
+- **Server → client, per entity: `entityId(8) + tick(4) + CharacterStatePacket(49)` = 61 bytes** (`MatchInstance.SendState` comment)
 
 InputState layout (19 bytes): MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + FacingYaw(2) + AimYaw(2) + AimPitch(2) + AimDistance(2) + TargetEntityId(1).
 
@@ -42,7 +42,7 @@ InputState layout (19 bytes): MoveX(4) + MoveY(4) + flags(1) + ActiveSlot(1) + F
 | 16-17  | ushort | AimDistance    | cm (0-6500 = 0-65m)                    |
 | 18     | byte   | TargetEntityId | Client-selected target (0 = none)      |
 
-CharacterStatePacket layout (48 bytes): TickNumber(4) + Position(12) + Velocity(12) + CurrentActionState(1) + IsGrounded(1) + StateDurationFrames(2) + AttackSlot(1) + ComboStage(1) + AnimIndex(1) + FacingYaw(4) + MatchState(1) + BuffRemainingTicks(2) + BuffActiveFlags(1) + HitstunLevel(1) + AimPitch(4).
+CharacterStatePacket layout (49 bytes): TickNumber(4) + Position(12) + Velocity(12) + CurrentActionState(1) + IsGrounded(1) + StateDurationFrames(2) + AttackSlot(1) + ComboStage(1) + AnimIndex(1) + FacingYaw(4) + MatchState(1) + BuffRemainingTicks(2) + BuffActiveFlags(1) + HitstunLevel(1) + AimPitch(4) + Deaths(1).
 
 The server sends ALL entity states to every client; each client filters by entityId. The tick field echoes the client's tick (informational in Phase 1). When adding a packet field, update the `Size` constant AND all four serialization methods (`FromState`/`ToState`/`Serialize`/`Deserialize`).
 
@@ -66,7 +66,7 @@ NPC states render directly from server state — always authoritative, no predic
 2. Timeout check — 5s silence from any connected player → match stops, port freed.
 3. Flush input queues — take the last valid packet per slot (`InputBufferWindow=6` in sim handles buffering); `_serverTick = max(_serverTick, latestClientTick)`.
 4. `ServerSimulation.Tick(inputs)` — movement, gravity, ground, combat, hitbox spawn (`HitboxEvent.TriggerTick`), `SpellResolver` collision — everything.
-5. Death check — first to `MaxDeaths=3` loses → `MatchState.Ended`.
+5. Death check — the match rule (issue #37): `StockMatchRule` = KO costs a stock, respawn with brief invincibility; 0 stocks → eliminated (frozen spectator, untargetable); last standing wins, tie → shared victory. `NoWinMatchRule` (training) = no elimination, no match end. `rule.Evaluate` → `MatchState.Ended`.
 6. `SendState()` — broadcast every entity's packet to all connected clients.
 
 Multi-match: `MultiMatchOrchestrator` allocates ports `base → base+max-1`, one `MatchInstance` per port. `MatchControlServer` handles `POST /match/start` from the master. `GameServerRegistration` registers at startup, heartbeats every 10s, reports results for MMR.

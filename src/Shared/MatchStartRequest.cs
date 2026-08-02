@@ -23,7 +23,8 @@ public sealed record MatchPlayer(long SteamId, CharacterClass CharacterClass, in
 /// <param name="MatchId">Opaque match identifier (for logging + orchestrator bookkeeping).</param>
 /// <param name="ArenaName">Arena the game server should load for this match.</param>
 /// <param name="Players">Ordered roster (index 0 = host) the game server spawns.</param>
-public sealed record MatchStartRequest(string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players);
+/// <param name="MaxStocks">Stocks per player (default 3, issue #37).</param>
+public sealed record MatchStartRequest(string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players, int MaxStocks = 3);
 
 /// <summary>
 /// Parses the <c>POST /match/start</c> JSON body (<see cref="MatchStartRequest"/>).
@@ -98,6 +99,20 @@ public static class MatchStartRequestCodec
         if (list.Count is < 2 or > 4)
             return null;
 
-        return new MatchStartRequest(matchId, arenaName, list);
+        // maxStocks is optional (absent → default 3, issue #37). Present but
+        // non-numeric (incl. fractional/out-of-int-range) or out of the [1,99]
+        // byte range is malformed — never throw, per the codec's null contract.
+        int maxStocks = 3;
+        if (element.TryGetProperty("maxStocks", out var ms))
+        {
+            // Number-kind check first: TryGetInt32 throws on non-numeric kinds
+            // (e.g. a string), and returns false for fractional/overflow values.
+            if (ms.ValueKind != JsonValueKind.Number
+                || !ms.TryGetInt32(out maxStocks)
+                || maxStocks < 1 || maxStocks > 99)
+                return null;
+        }
+
+        return new MatchStartRequest(matchId, arenaName, list, maxStocks);
     }
 }

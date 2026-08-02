@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using SlopArena.Shared;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
@@ -69,8 +70,9 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
 
-            // Bridge (local)
-            _bridge = new LocalSimulationBridge(arena);
+            // Bridge (local). NoWinMatchRule: training never eliminates or ends —
+            // the only way out is the Esc exit below (issue #37 follow-up).
+            _bridge = new LocalSimulationBridge(arena, NoWinMatchRule.Instance);
             _combatFeedback.SetSimulation(_bridge.InternalSim);
             if (_projectileVFX == null)
                 _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
@@ -126,8 +128,9 @@ namespace SlopArena.Client.World
                 _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
             _npcLastDeaths = 0;
 
-            // Set NPC respawn position
-            _bridge.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ);
+            // Set NPC respawn position (yaw preserves the old SpawnPoints[0] facing)
+            _bridge.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ,
+                arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0].Yaw : 0f);
 
             // Shared camera + aim setup
             SetupCamera();
@@ -137,6 +140,15 @@ namespace SlopArena.Client.World
         private void Update()
         {
             _inputController.Poll();
+
+            // Training has no win condition — Esc is the only way out (issue #37 follow-up).
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                Debug.Log("[Training] Esc pressed — returning to main menu.");
+                UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+                return;
+            }
+
             if (_showHitboxes && _bridge != null)
             {
                 DrawHitboxDebug();

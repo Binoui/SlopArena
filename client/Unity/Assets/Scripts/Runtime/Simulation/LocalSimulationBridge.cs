@@ -8,10 +8,10 @@ namespace SlopArena.Client.Simulation
         private readonly ServerSimulation _server;
         private readonly ArenaDefinition _arena;
 
-        public LocalSimulationBridge(ArenaDefinition arena)
+        public LocalSimulationBridge(ArenaDefinition arena, IMatchRule? rule = null)
         {
             _arena = arena;
-            _server = new ServerSimulation(arena);
+            _server = new ServerSimulation(arena, rule);
         }
 
         public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
@@ -24,7 +24,7 @@ namespace SlopArena.Client.Simulation
         public Dictionary<ulong, CharacterState> GetAllStates() => _server.GetAllStates();
         public SpellResolver? Resolver => _server.Resolver;
         public ServerSimulation InternalSim => _server;
-        public void SetRespawnPosition(ulong id, float x, float y, float z)
-            => _server.SetRespawnPosition(id, x, y, z);
+        public void SetRespawnPosition(ulong id, float x, float y, float z, float yaw = 0f)
+            => _server.SetRespawnPosition(id, x, y, z, yaw);
     }
 }

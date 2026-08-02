@@ -36,7 +36,7 @@ namespace SlopArena.Server
 		private MatchState _matchState = MatchState.Waiting;
 		private ushort _countdownTicks;
 		private const ushort CountdownDuration = 180; // 3 seconds at 60Hz
-		private const byte MaxDeaths = 3;
+		private readonly IMatchRule _rule;
 		private ulong _winnerEntityId;
 		private ushort _postMatchTicks;
 		private const ushort PostMatchDuration = 180; // 3 seconds before cleanup
@@ -45,13 +45,15 @@ namespace SlopArena.Server
 		private readonly Action<int> _onMatchEnd;
 
 		/// <param name="roster">Ordered players (index 0 = host). Each carries an entity ID (1..N) and a character class.</param>
+		/// <param name="maxStocks">Stocks per player (default 3, issue #37).</param>
 		public MatchInstance(int port, string matchId, string arenaName,
-			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd)
+			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = 3)
 		{
 			_port = port;
 			_matchId = matchId;
 			_arenaName = arenaName;
 			_onMatchEnd = onMatchEnd;
+			_rule = new StockMatchRule(maxStocks);
 
 			_slots = new List<PlayerSlot>(roster.Count);
 			foreach (var p in roster)
@@ -82,13 +84,16 @@ namespace SlopArena.Server
 
 			_arena = ArenaRegistry.Get(_arenaName);
 
-			_sim = new ServerSimulation(_arena);
+			_sim = new ServerSimulation(_arena, _rule);
 			for (int i = 0; i < _slots.Count; i++)
 			{
 				var slot = _slots[i];
 				var def = CharacterRegistry.Get(slot.CharacterClass);
 				var baked = LoadBakedData(def);
 				_sim.RegisterEntity(slot.EntityId, def, CreateInitialState(def, i), baked);
+				// Respawn at the same distributed spawn point as initial spawn (issue #37).
+				var respawnSpawn = PickSpawn(i);
+				_sim.SetRespawnPosition(slot.EntityId, respawnSpawn.X, respawnSpawn.Y, respawnSpawn.Z, respawnSpawn.Yaw);
 				Console.WriteLine($"[Match:{_matchId}] Slot {i}: entity {slot.EntityId} = {slot.CharacterClass}");
 			}
 
@@ -184,9 +189,7 @@ namespace SlopArena.Server
 
 		private CharacterState CreateInitialState(CharacterDefinition def, int spawnIndex)
 		{
-			var spawn = _arena.SpawnPoints.Length > spawnIndex
-				? _arena.SpawnPoints[spawnIndex]
-				: new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = 0f };
+			var spawn = PickSpawn(spawnIndex);
 
 			return new CharacterState
 			{
@@ -200,6 +203,15 @@ namespace SlopArena.Server
 				AirDodgesLeft = 1,
 				DamagePercent = 0,
 			};
+		}
+
+		/// <summary>Distributed spawn: spawn point by slot index, falling back to a
+		/// hardcoded default when the arena has fewer points than players.</summary>
+		private SpawnPoint PickSpawn(int spawnIndex)
+		{
+			if (_arena.SpawnPoints.Length > spawnIndex)
+				return _arena.SpawnPoints[spawnIndex];
+			return new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = 0f };
 		}
 
 		private void ReceiveInputs()
@@ -318,7 +330,7 @@ namespace SlopArena.Server
 				{
 					_serverTick = Math.Max(_serverTick, input.Value.tick);
 					if (slot.Disconnected) continue;
-					if (MatchRules.IsEliminated(_sim.GetState(slot.EntityId), MaxDeaths)) continue;
+					if (_rule.IsEliminated(_sim.GetState(slot.EntityId))) continue;
 					inputs[slot.EntityId] = input.Value.input;
 				}
 			}
@@ -328,14 +340,17 @@ namespace SlopArena.Server
 			{
 				_sim.Tick(inputs);
 
-				// Check for match end: last player standing wins (ADR-0007, issue #36).
-				ulong? winner = MatchRules.FindWinner(_sim.GetAllStates(), MaxDeaths);
-				if (winner.HasValue)
+				// Check for match end: the rule decides (stock: last player standing wins;
+				// simultaneous last-stock trade → shared victory). ADR-0007, issue #36/#37.
+				var outcome = _rule.Evaluate(_sim.GetAllStates());
+				if (outcome.IsEnded)
 				{
 					_matchState = MatchState.Ended;
-					_winnerEntityId = winner.Value;
+					_winnerEntityId = outcome.WinnerEntityId;
 					_postMatchTicks = PostMatchDuration;
-					Console.WriteLine($"[Match:{_matchId}] Winner: {_winnerEntityId}");
+					Console.WriteLine(outcome.IsSharedVictory
+						? $"[Match:{_matchId}] Shared victory — all players eliminated simultaneously."
+						: $"[Match:{_matchId}] Winner: {_winnerEntityId}");
 				}
 
 				SendState();
@@ -347,7 +362,7 @@ namespace SlopArena.Server
 			if (_udpServer == null) return;
 
 			// Packet format (matching NetworkClient expectations):
-			//   entityId(8) + tick(4) + CharacterStatePacket(48)
+			//   entityId(8) + tick(4) + CharacterStatePacket(49)
 			const int envelopeSize = 8 + 4 + CharacterStatePacket.Size;
 
 			// Build a packet per entity once, then send each to every connected client.
