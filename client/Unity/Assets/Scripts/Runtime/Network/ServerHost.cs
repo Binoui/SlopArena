@@ -38,7 +38,7 @@ namespace SlopArena.Client.Network
         [SerializeField] private string _arenaDataDir = "data/arenas";
 
         [Header("Master Server")]
-        [SerializeField] private string _masterServerUrl = "http://localhost:5000";
+        [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
 
         private Process? _process;
         private string? _configPath;

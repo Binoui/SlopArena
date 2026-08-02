@@ -11,7 +11,7 @@ namespace SlopArena.Client.UI
     public class MainMenuController : MonoBehaviour
     {
         [SerializeField] private UIDocument _uiDocument;
-        [SerializeField] private string _masterServerUrl = "http://localhost:5000";
+        [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
 
         private Label _lblHostStatus;
         private bool _hosting;   // guards against double-click during the async start

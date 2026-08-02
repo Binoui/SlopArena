@@ -4,7 +4,7 @@
 
 **Goal:** Ship a downloadable Windows `.exe` that non-technical friends can run to play training mode solo or join online games, backed by a self-hosted master server + dedicated game servers on the home mini PC.
 
-**Architecture:** Three layers — the Windows Unity player (built locally, self-contained game server binary bundled for host-and-play), the master server + PostgreSQL (ASP.NET Core 8 on the Debian 12 mini PC, TLS-terminated by Caddy at `slop.barakaslurp.fr`), and 1-2 dedicated game server instances (`src/Server`, systemd-managed) that players join directly over UDP. Host-and-play stays supported for technical players who port-forward; non-technical players only join the operator's OfficialServers.
+**Architecture:** Three layers — the Windows Unity player (built locally, self-contained game server binary bundled for host-and-play), the master server + PostgreSQL (ASP.NET Core 8 on the Debian 12 mini PC, TLS-terminated by Caddy at `sloparena.barakaslurp.fr`), and 1-2 dedicated game server instances (`src/Server`, systemd-managed) that players join directly over UDP. Host-and-play stays supported for technical players who port-forward; non-technical players only join the operator's OfficialServers.
 
 **Tech Stack:** Unity 6000.0.78f1 (Windows player build), .NET 8 (game server, master server), PostgreSQL 15 (Debian bookworm), Caddy (auto-HTTPS reverse proxy), systemd (service management), GitHub Actions (CI test gate), GitHub Releases (distribution).
 
@@ -13,7 +13,7 @@
 - **Audience:** friends-first demo (not public release). Non-technical users must only ever click: download → unzip → run → Training or Join. No port forwarding, no config, no .NET install.
 - **Hosting model (grill Q1):** hybrid — dedicated servers are the default online path; host-and-play is supported for technical players. "Host" is NOT a player verb in user docs.
 - **Mini PC (grill Q2):** Debian 12 bookworm, kernel 6.12.74+deb12, 16GB DDR4. **Runs the user's home automation** — all deployment steps must be additive and non-destructive; services get `Restart=on-failure` and resource caps; never touch existing postgres configs/data, only add a role + database.
-- **Domain (grill Q3):** `barakaslurp.fr` owned; release builds point at `https://slop.barakaslurp.fr` (subdomain to be created). Plain HTTP is NOT acceptable for the master server — Caddy terminates TLS.
+- **Domain (grill Q3):** `barakaslurp.fr` owned; release builds point at `https://sloparena.barakaslurp.fr` (subdomain to be created). Plain HTTP is NOT acceptable for the master server — Caddy terminates TLS.
 - **Roster (grill Q5):** all characters legal in online matches. `custom_rules` is omitted from official `server.json` (note: `AllowedCharacters` is currently decorative server-side — no enforcement exists; do not build enforcement in this plan).
 - **Signing (grill Q6):** none — friends-only. SmartScreen click-through documented in the player guide.
 - **Distribution (grill Q7):** GitHub Releases zip. itch.io is post-demo.
@@ -58,10 +58,10 @@ nc -vz <public-ip> 7777
 
 - [ ] **Step 3: Create DNS record**
 
-A record `slop.barakaslurp.fr` → public IP, TTL 300 (fast rollback if the IP changes).
+A record `sloparena.barakaslurp.fr` → public IP, TTL 300 (fast rollback if the IP changes).
 
 ```bash
-dig +short slop.barakaslurp.fr
+dig +short sloparena.barakaslurp.fr
 # expected: <public-ip>
 ```
 
@@ -226,7 +226,7 @@ sudo apt update && sudo apt install caddy
 - [ ] **Step 2: Caddyfile block**
 
 ```
-slop.barakaslurp.fr {
+sloparena.barakaslurp.fr {
 	reverse_proxy 127.0.0.1:5000
 }
 ```
@@ -239,7 +239,7 @@ sudo systemctl reload caddy
 - [ ] **Step 3: Verify from outside (phone 4G)**
 
 ```bash
-curl -s https://slop.barakaslurp.fr/health
+curl -s https://sloparena.barakaslurp.fr/health
 # {"status":"ok","version":"0.1.0"}  ← proves DNS + NAT + Caddy + TLS + master all work
 ```
 
@@ -300,7 +300,7 @@ Two-tier hosting for the demo:
   is documented separately for technical users.
 - The game server must accept a `publicIp` override (domain allowed) in
   `server.json`; `ServerHost` must launch a bundled binary in release builds.
-- The master server URL in release builds points at `https://slop.barakaslurp.fr`.
+- The master server URL in release builds points at `https://sloparena.barakaslurp.fr`.
 - Future migration to VPS hosting is infra-only (ADR-0005 consequence unchanged).
 ```
 
@@ -333,7 +333,7 @@ public string MasterServerUrl { get; set; } = "http://localhost:5000";
 /// <summary>
 /// Public IP or DNS name advertised to the master server (clients connect
 /// here over UDP). Null → auto-detect LAN IP (correct only for directly
-/// routable machines). Set behind NAT (e.g. "slop.barakaslurp.fr").
+/// routable machines). Set behind NAT (e.g. "sloparena.barakaslurp.fr").
 /// </summary>
 public string? PublicIp { get; set; }
 ```
@@ -388,10 +388,10 @@ In `tests/Shared.Tests/HostedServerConfigTests.cs`, add:
 [Fact]
 public void ToJson_WithPublicIp_EmitsCamelCasePublicIp()
 {
-    var cfg = new HostedServerConfig { PublicIp = "slop.barakaslurp.fr" };
+    var cfg = new HostedServerConfig { PublicIp = "sloparena.barakaslurp.fr" };
     var json = cfg.ToJson();
 
-    Assert.Contains("\"publicIp\": \"slop.barakaslurp.fr\"", json);
+    Assert.Contains("\"publicIp\": \"sloparena.barakaslurp.fr\"", json);
 }
 ```
 
@@ -513,7 +513,7 @@ git commit -m "fix(client): spawn bundled server binary in release builds (issue
 
 ### Task 3.4: Consolidate master server URL for release builds
 
-**Files:** Modify 4 defaults → `https://slop.barakaslurp.fr`:
+**Files:** Modify 4 defaults → `https://sloparena.barakaslurp.fr`:
 - `client/Unity/Assets/Scripts/Runtime/ClientSession.cs:17,75`
 - `client/Unity/Assets/Scripts/Runtime/UI/MainMenuController.cs:14`
 - `client/Unity/Assets/Scripts/Runtime/UI/ServerBrowserUI.cs:17`
@@ -523,7 +523,7 @@ git commit -m "fix(client): spawn bundled server binary in release builds (issue
 
 `grep -rn "localhost:5000" client/Unity/Assets/Scenes/ --include="*.unity"` — if scene serialized values exist, update them too (scene values win over code defaults).
 
-- [ ] **Step 2: Change all defaults to `https://slop.barakaslurp.fr`**
+- [ ] **Step 2: Change all defaults to `https://sloparena.barakaslurp.fr`**
 
 Dev machines keep working by overriding in the scene inspector; the code default becomes the release URL.
 
@@ -562,10 +562,10 @@ rsync -avz /tmp/arenas/ mini-pc:/srv/sloparena/server/arenas/
   "region": "EU",
   "port": 7777,
   "maxConcurrentMatches": 15,
-  "masterServerUrl": "https://slop.barakaslurp.fr",
+  "masterServerUrl": "https://sloparena.barakaslurp.fr",
   "isOfficial": true,
   "arenaDataDir": "/srv/sloparena/server/arenas",
-  "publicIp": "slop.barakaslurp.fr"
+  "publicIp": "sloparena.barakaslurp.fr"
 }
 ```
 
@@ -606,7 +606,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now sloparena-server-1
 ```bash
 sudo journalctl -u sloparena-server-1 -n 50 --no-pager   # registration + heartbeat lines
 sudo -u postgres psql -d sloparena -c "SELECT name, \"ipAddress\", port, \"isOfficial\" FROM \"GameServers\";"
-# ipAddress = slop.barakaslurp.fr, isOfficial = true
+# ipAddress = sloparena.barakaslurp.fr, isOfficial = true
 ```
 
 - [ ] **Step 3: Optional second instance** (only after Phase 7 playtest shows demand): clone the unit with `port: 7877`, `serverName: "SlopArena EU #2"`, UDP forward `7877-7891`. Not required for the friends demo.
