@@ -20,7 +20,7 @@ Fresh install of the plugin on Unity 6000.0.78f1:
 3. **NuGet DLLs in `Assets/Plugins/NuGet/`** — the plugin's Runtime code compiles against ReflectorNet/McpPlugin DLLs. If that folder is empty (only `.nuget-installed.json` left), compile fails with CS0246 (`Logs`, `SerializedMember`, `Reflector` not found). The DLLs are restored from `Library/NuGetCache/*.nupkg` (nupkgs are cached there — no network needed): extract per `Editor/DependencyResolver/NuGetConfig.cs` declared versions (0.86.3 → McpPlugin 7.5.2, ReflectorNet 5.4.0) from the **`lib/netstandard2.1`** folder ONLY.
    - NEVER extract net8.0/net9.0 builds → Unity errors CS1705 (`System.Runtime 8.0.0.0` vs 4.1.2.0).
    - Wrong versions → CS0115/CS0508 (`no suitable method found to override`).
-4. After compile goes green the plugin auto-spawns the bridge and connects. Verify: `scripts/mcp-check.sh`, then `tools/list` (~78 tools), then one `console-get-logs` call.
+4. After compile goes green the plugin auto-spawns the bridge and connects. Verify: `scripts/mcp-check.sh`, then `tools/list` (75 tools: core + 5 extensions), then one `console-get-logs` call.
 
 **Repo hygiene:** `Assets/Plugins/NuGet/*.dll` is force-tracked (gitignore negation) because the plugin cannot auto-restore while compilation is broken. When the plugin bumps its NuGet versions (see `NuGetConfig.cs`), the resolver replaces the DLLs on disk — commit the refreshed set + `.dll.meta` files so fresh clones stay green.
 
@@ -71,7 +71,7 @@ Scripts in `scripts/mcp-*.sh`:
 | Read/modify Unity Input bindings | `inputsystem-get` / `inputsystem-binding-add` |
 | Read/modify animation clips | `animation-get-data` / `animation-modify` |
 | Create/modify an AnimatorController | `animator-create` / `animator-modify` |
-| Check/modify a Cinemachine camera | `cinemachine-camera-get` / `cinemachine-set-body` / `cinemachine-set-aim` |
+| Control NavMesh agents / bake | `navigation-list` / `navigation-agent-add` / `navigation-set-bake-settings` |
 | List scene hierarchy | `scene-get-data includeRootGameObjects=true` |
 | Read Unity console errors | `console-get-logs logTypeFilter=Error maxEntries=20` |
 | Run EditMode/PlayMode tests | `tests-run` |
@@ -143,8 +143,11 @@ Session expires when Unity restarts or the MCP server restarts.
 - `assets-refresh` (asset reimport only)
 
 **Extensions installed** (more MCP tools):
-- AI InputSystem (`inputsystem-get`, `inputsystem-binding-add`, etc.)
-- AI Cinemachine (`cinemachine-camera-get`, `cinemachine-set-aim`, etc.)
+- AI InputSystem (`inputsystem-*`) v1.0.16
+- AI Navigation (`navigation-*`) v1.0.16
+- AI ProBuilder (`probuilder-*`) v1.2.30
+- AI Animation (`animation-*`, `animator-*`) v1.2.30
+- AI ParticleSystem (`particle-system-*`) v1.2.30
 
 ## Namespace Collisions (SlopArena Project)
 
@@ -203,7 +206,13 @@ code: Debug.Log("my value=" + someVariable);
 
 ## Extensions
 
+Installed via the AI Game Developer window → Extensions (OpenUPM, scope `com.ivanmurzak`). Core plugin works without them; each adds its tool prefix.
+
 | Extension | Tools prefix | When to use |
 |-----------|-------------|-------------|
 | AI InputSystem | `inputsystem-*` | Inspect/modify Input Action assets and bindings |
-| AI Cinemachine | `cinemachine-*` | Camera orbit control, virtual camera config |
+| AI Navigation | `navigation-*` | NavMesh agents, links, modifiers, surfaces, baking |
+| AI ProBuilder | `probuilder-*` | Shape creation, face/material editing, mesh info |
+| AI Animation | `animation-*`, `animator-*` | Clip data, AnimatorController create/modify |
+| AI ParticleSystem | `particle-system-*` | Inspect/modify particle systems |
+| AI Cinemachine | `cinemachine-*` | NOT installed — add via the Extensions manager if needed |

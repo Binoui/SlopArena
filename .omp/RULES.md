@@ -6,4 +6,4 @@
 - Never install anything without asking.
 - Server-side simulation is the source of truth for everything — no client-side hacks for gameplay mechanics.
 - NEVER use the `unity-mcp/Unity_*` tools (IvanMurzak package AI tools). Only use the custom `gamedev-mcp-server` at `localhost:26356/mcp` via its scripts or direct SSE calls.
-- MCP: `gamedev-mcp-server` at `localhost:26356/mcp` (78 tools). Use the task index in `.omp/skills/unity-mcp-gamedev/SKILL.md` to pick the right tool — don't default to `script-execute` for everything.
+- MCP: `gamedev-mcp-server` (official IvanMurzak GameDev-MCP-Server 9.x + Unity-MCP plugin 0.86.3 + 5 extensions) at `localhost:26356/mcp` (75 tools). Use the task index in `.omp/skills/unity-mcp-gamedev/SKILL.md` to pick the right tool — don't default to `script-execute` for everything.

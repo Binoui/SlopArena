@@ -4,7 +4,8 @@
       "name": "package.openupm.com",
       "url": "https://package.openupm.com",
       "scopes": [
-        "extensions.unity"
+        "extensions.unity",
+        "com.ivanmurzak"
       ]
     }
   ],
@@ -25,6 +26,11 @@
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.particlesystem": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.uielements": "1.0.0"
+    "com.unity.modules.uielements": "1.0.0",
+    "com.ivanmurzak.unity.mcp.probuilder": "1.2.30",
+    "com.ivanmurzak.unity.mcp.animation": "1.2.30",
+    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.16",
+    "com.ivanmurzak.unity.mcp.navigation": "1.0.16",
+    "com.ivanmurzak.unity.mcp.particlesystem": "1.2.30"
   }
 }
