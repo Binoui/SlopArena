@@ -1,0 +1,126 @@
+# Troubleshooting — SlopArena Online (master + game server + client)
+
+Operational debugging guide for the self-hosted setup on `alfred`. Companion
+to `docs/systems/production-hosting.md` (runbook — the what/where/how) — this
+doc is the "it's broken, where do I look" playbook. Every entry below was hit
+for real (2026-08-02, first deploy + playtest).
+
+## 0. Where the logs live
+
+| Component | Where | What to look for |
+|---|---|---|
+| Client (Windows exe / Steam Proton) | `%USERPROFILE%\AppData\LocalLow\SlopArena\SlopArena\Player.log` — under Proton: `<steamapps>/compatdata/<appid>/pfx/drive_c/users/steamuser/AppData/LocalLow/SlopArena/SlopArena/Player.log` | `[ServerBrowser]`, `[LobbyClient]`, `Exception`, `Error` |
+| Client (Unity Editor, Linux) | `~/.config/unity3d/Editor.log` (or the Editor console) | same markers |
+| Game server | `ssh alfred 'docker compose -f /root/homelab/sloparena/docker-compose.yml logs server-1'` | `[Registration]`, `[Heartbeat]`, `[MatchControl]`, `[MatchInstance]` |
+| Master server | same, `... logs master` | `Game server registered/re-registered`, `Rate limit exceeded`, `error` |
+| Postgres | `ssh alfred 'docker exec sloparena-postgres psql -U sloparena -d sloparena -c "..."'` | `GameServers` rows, heartbeat freshness |
+
+## 1. The diagnostic ladder (fastest → deepest)
+
+```bash
+# 1. Is the tunnel up? (client can reach the master API)
+curl -s https://sloparena.barakaslurp.fr/health          # expect {"status":"ok",...}
+
+# 2. Are all containers up?
+ssh alfred 'cd /root/homelab/sloparena && docker compose ps'
+
+# 3. Is the game server registered AND heartbeating (fresh = seconds old)?
+ssh alfred 'docker exec sloparena-postgres psql -U sloparena -d sloparena -c \
+  "SELECT \"Name\", \"IpAddress\", \"Port\", \"IsOfficial\", NOW() - \"LastHeartbeat\" AS age FROM \"GameServers\";"'
+# age > 30s → heartbeat dead → server crashed or unreachable
+
+# 4. Is UDP actually reachable? (firewall/forward issues hide here)
+timeout 8 bash -c 'echo > /dev/tcp/<alfred-lan-ip>/7777' && echo "TCP OK"     # 0=OK, 124=DROP
+timeout 8 bash -c 'echo > /dev/tcp/<public-ip>/7777' && echo "public OK" # hairpin through Bbox
+
+# 5. Client log tail — the actual player experience
+tail -40 ~/.local/share/Steam/steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/AppData/LocalLow/SlopArena/SlopArena/Player.log
+```
+
+## 2. Failure catalog
+
+### 2.1 "I hit Join and it just hangs" — UFW dropping game ports
+
+**Symptom:** client log shows `[ServerBrowser] Joining server: SlopArena EU #1 (sloparena.barakaslurp.fr:7777)` then nothing; TCP probe to `<alfred-lan-ip>:7777` times out (exit 124); loopback works.
+
+**Cause:** alfred's UFW has `INPUT policy DROP` and game ports weren't allowed. Bbox forward ≠ host firewall — both must be open.
+
+**Fix:**
+```bash
+ssh alfred 'sudo ufw allow 7777/tcp && sudo ufw allow 7777:7791/udp'
+sudo ufw status | grep 7777   # confirm
+```
+**Verify:** re-run the TCP/UDP probes (section 1 step 4) — both must pass.
+
+### 2.2 Registration fails `400 Invalid IP address: <domain>` (master side)
+
+**Symptom:** server logs `[Registration] Failed: BadRequest — {"error":"Invalid IP address: ..."}`.
+
+**Cause:** master's `IsValidIpAddress` historically required an IPv4 literal; official servers register with a DNS hostname (`sloparena.barakaslurp.fr`). Fixed in master `Program.cs` (`Uri.CheckHostName is IPv4 or Dns`). If you still see it, the deployed master is stale — redeploy per runbook.
+
+**Note:** the game server registers ONCE at startup and never retries. After any master redeploy: `docker compose restart server-1`.
+
+### 2.3 False 429s in the master test suite
+
+**Symptom:** `LobbyHubAuthIntegrationTests...Returns200` fails with 429 when running the full suite, passes alone.
+
+**Cause:** `RateLimitTracker` was a static class — all parallel test factories shared one counter. Now a DI singleton (per app instance). If it regresses, check `Program.cs` registers `RateLimitTracker` and the middleware resolves it via `context.RequestServices`.
+
+### 2.4 rsync wiped the master config
+
+**Symptom:** master container starts, then dies / loses DB connection after a deploy; `appsettings.Production.json` missing.
+
+**Cause:** `rsync --delete` or `--delete-excluded` on the master publish dir deletes the config that lives inside `publish/`. **Never use `--delete*` on the master rsync.** Use `--exclude 'appsettings.Production.json'` with plain `rsync -avz`. If the config is gone: rebuild it (real DB password from `/root/homelab/sloparena/.env`, fresh JWT secret via `openssl rand -base64 48`), chmod 600. Old JWTs die — acceptable, clients re-auth.
+
+### 2.5 `MSB3030` / exploding publish output (master repo)
+
+**Symptom:** `dotnet publish` fails with `MSB3030: Could not copy ... MasterServer.Tests/bin/Debug/...` recursing deeper each run.
+
+**Cause:** publishing into `build/minipc-master` inside the repo — the `MasterServer.Tests` subfolder (excluded from Compile but not content globs) leaks its `bin/obj` into the output and copies itself on each publish.
+
+**Fix:** publish to `/tmp/minipc-master` (or add `<Content Remove="MasterServer.Tests\**" />` to the csproj). Always `/tmp` for master publishes.
+
+### 2.6 Unity player build fails `build target was unsupported` / `UnityEditor.Handles` CS0234
+
+**Symptom:** `build-release.sh` aborts at the Unity step.
+
+**Causes (both hit):**
+1. Missing **Windows Build Support (Mono)** module on Linux editors: `ls Editor/Data/PlaybackEngines/` lacks `WindowsStandaloneSupport`. Fix: `/opt/unityhub/unityhub-bin -- --headless install-modules --version 6000.0.78f1 -m windows-mono`.
+2. Editor-only API in runtime scripts: `UnityEditor.Handles` in `OnDrawGizmos` (fixed with `#if UNITY_EDITOR`). Grep for `UnityEditor\.` in `Assets/Scripts/Runtime/` before release builds.
+
+**Note:** `dotnet build` does NOT compile Unity scripts — always validate with a Unity batchmode import (`-batchmode -quit -nographics`) or the player build itself.
+
+### 2.7 Version stamp / PipelineAsset drift after a failed build
+
+`build-release.sh` stamps `bundleVersion` before the Unity build and reverts it after. If Unity fails, the tree is left dirty: `ProjectSettings.asset` stamped + `StreamingAssets/` staged + PipelineAsset/URP settings re-serialized. Clean with:
+```bash
+git checkout -- client/Unity/ProjectSettings/ProjectSettings.asset \
+  client/Unity/Assets/Settings client/Unity/Assets/UniversalRenderPipelineGlobalSettings.asset
+rm -rf client/Unity/Assets/StreamingAssets/Server client/Unity/Assets/StreamingAssets/arenas \
+  client/Unity/Assets/StreamingAssets.meta client/Unity/Assets/packages-merged-link*
+```
+
+### 2.8 `localhost:5000` leak in the release zip
+
+**Symptom/check:** Task 7.2 requires `localhost:5000` NOWHERE in the shipped zip.
+
+**Cause:** the server csproj copies `server.json` (dev defaults) into publish output → shipped in `StreamingAssets/Server/`. `build-release.sh` now deletes it from both publish outputs. If it regresses: unzip, `grep -rl "localhost:5000" .`.
+
+### 2.9 Dev machine DNS is broken (known)
+
+The dev machine's DNS resolver is misconfigured (systemd-resolved/NetworkManager). Use `dig @1.1.1.1` and `curl --resolve HOST:443:188.114.97.2` when verifying the tunnel. Not a server fault.
+
+## 3. Arena notes
+
+`data/arenas/` contains 7 files; 4 are small stubs (cross/pit/sanctum/split, <500B) that fail `[ArenaRegistry] Failed to load` — expected, not a deploy bug. Playable: `training`, `colosseum`, `Island_arena`.
+
+## 4. Rebuild-the-zip quick path
+
+```bash
+cd ~/Documents/projects/SlopArena
+# editor must be CLOSED (Unity refuses a second instance on one project)
+./scripts/build-release.sh 0.2.0-demo.1
+# verify: unzip -l build/release/SlopArena-0.2.0-demo.1.zip | grep -c server.json   # 0
+#         unzip + grep -rl "localhost:5000" .                                      # nothing
+# publish: gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip --title ... --notes ...
+```

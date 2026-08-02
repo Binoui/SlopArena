@@ -14,6 +14,7 @@ namespace SlopArena.Client.UI
         [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
 
         private Label _lblHostStatus;
+        private TextField _hostIpField;   // host-and-play public IP/domain (ADR-0009)
         private bool _hosting;   // guards against double-click during the async start
 
         private void OnEnable()
@@ -27,6 +28,8 @@ namespace SlopArena.Client.UI
             var btnHost          = root.Q<Button>("btn-host");
             var btnJoin          = root.Q<Button>("btn-join");
             var ipField          = root.Q<TextField>("ip-field");
+            var hostIpField      = root.Q<TextField>("host-ip-field");
+            _hostIpField        = hostIpField;
             var btnServerBrowser = root.Q<Button>("btn-serverbrowser");
             _lblHostStatus       = root.Q<Label>("lbl-host-status");
 
@@ -126,7 +129,8 @@ namespace SlopArena.Client.UI
             host.Crashed            += onCrashed;
 
             // Spawn the server subprocess now that listeners are wired.
-            host.StartHosting(GenerateServerName());
+            string hostIp = _hostIpField.value.Trim();
+            host.StartHosting(GenerateServerName(), string.IsNullOrEmpty(hostIp) ? null : hostIp);
 
             // Wait for registration, crash, or a 15s timeout. Pump() runs in
             // ServerHost.Update, so events fire on the main thread.

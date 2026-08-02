@@ -97,7 +97,9 @@ namespace SlopArena.Client.Network
         /// main thread. Safe to call once per host session.
         /// </summary>
         /// <param name="serverName">Browser display name for this server.</param>
-        public void StartHosting(string serverName)
+        /// <param name="publicIp">Optional public IP/domain advertised to the master server
+        /// (host behind NAT, see ADR-0009). Null/empty → server auto-detects its LAN IP.</param>
+        public void StartHosting(string serverName, string? publicIp = null)
         {
             if (IsRunning)
             {
@@ -134,7 +136,11 @@ namespace SlopArena.Client.Network
                 MaxConcurrentMatches = 1,
                 MasterServerUrl = _masterServerUrl,
                 IsOfficial = false,
-                ArenaDataDir = arenaDir
+                ArenaDataDir = arenaDir,
+                // Host-entered public IP/domain (ADR-0009 host-and-play tier);
+                // null → server auto-detects LAN IP (correct only for directly
+                // reachable hosts).
+                PublicIp = string.IsNullOrWhiteSpace(publicIp) ? null : publicIp
             };
 
             _configPath = Path.Combine(Path.GetTempPath(), $"sloparena-host-{_assignedPort}.json");
