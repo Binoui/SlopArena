@@ -51,20 +51,23 @@ namespace SlopArena.Client.World
         {
             string arenaName = string.IsNullOrEmpty(_arenaNameOverride) ? MatchConfig.ArenaName : _arenaNameOverride;
             Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={arenaName}");
-            // Load arena from baked file if it exists, otherwise fall back to hardcoded registry
-            string arenaPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "data", "arenas", arenaName + ".arena"));
-            ArenaDefinition arena;
-            if (File.Exists(arenaPath))
+            // Baked arena is required (issue #77): hardcoded ArenaRegistry arenas carry
+            // no collision data, so a missing .arena file used to make players fall
+            // through the floor (Simulation grounded at KillHeight + 1).
+            string? arenaPath = BakedContentPaths.ResolveArena(arenaName);
+            if (arenaPath == null)
             {
-                var loaded = ArenaBinaryFormat.LoadFromFile(arenaPath);
-                arena = loaded ?? ArenaRegistry.Get(arenaName);
-                Debug.Log($"[TrainingMatch] Loaded arena from file: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
+                Debug.LogError($"[TrainingMatch] Baked arena '{arenaName}' not found (looked in StreamingAssets/arenas and repo data/arenas). " +
+                               "Bake the arena or run scripts/build-release.sh. Aborting match start.");
+                return;
             }
-            else
+            var arenaOpt = ArenaBinaryFormat.LoadFromFile(arenaPath);
+            if (arenaOpt is not ArenaDefinition arena)
             {
-                arena = ArenaRegistry.Get(arenaName);
-                Debug.Log($"[TrainingMatch] Using hardcoded arena: {arenaName} — no file at {arenaPath}");
+                Debug.LogError($"[TrainingMatch] Failed to parse baked arena: {arenaPath}");
+                return;
             }
+            Debug.Log($"[TrainingMatch] Loaded arena: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
 
             // Wire sim debug logging to Unity console
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
@@ -139,15 +142,11 @@ namespace SlopArena.Client.World
 
         private void Update()
         {
-            _inputController.Poll();
+            // While paused the MatchPauseMenu owns Esc and input polling is skipped so
+            // no buffered presses leak into the first frame after resume (issue #77).
+            if (IsPaused) return;
 
-            // Training has no win condition — Esc is the only way out (issue #37 follow-up).
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                Debug.Log("[Training] Esc pressed — returning to main menu.");
-                UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
-                return;
-            }
+            _inputController.Poll();
 
             if (_showHitboxes && _bridge != null)
             {

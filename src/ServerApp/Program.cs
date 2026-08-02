@@ -38,7 +38,13 @@ class Program
         ArenaRegistry.LoadFromDirectory(arenaDir);
         var loaded = ArenaRegistry.All;
         Console.Error.WriteLine($"[Server] Available arenas: {string.Join(", ", loaded.Select(a => a.Name))}");
-        var arena = ArenaRegistry.Get(arenaName);
+        var arenaOpt = ArenaRegistry.Get(arenaName);
+        if (!arenaOpt.HasValue)
+        {
+            Console.Error.WriteLine($"[Server] Unknown arena '{arenaName}' — exiting.");
+            return;
+        }
+        var arena = arenaOpt.Value;
         Console.Error.WriteLine($"[Server] Got arena: {arena.Name} ({arena.CollisionTriangles?.Length ?? 0} tris)");
         JitterCollisionWorld jitter = new JitterCollisionWorld(arena);
         var sim = new ServerSimulation(arena);

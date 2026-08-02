@@ -86,7 +86,14 @@ namespace SlopArena.Server
 		{
 			Console.WriteLine($"[Match:{_matchId}] Starting on port {_port} ({_slots.Count} players)");
 
-			_arena = ArenaRegistry.Get(_arenaName);
+			var arenaOpt = ArenaRegistry.Get(_arenaName);
+			if (!arenaOpt.HasValue)
+			{
+				Console.WriteLine($"[Match:{_matchId}] Unknown arena '{_arenaName}' — aborting match.");
+				_onMatchEnd(_port);
+				return;
+			}
+			_arena = arenaOpt.Value;
 
 			_sim = new ServerSimulation(_arena, _rule);
 			for (int i = 0; i < _slots.Count; i++)

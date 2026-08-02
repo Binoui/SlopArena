@@ -135,6 +135,18 @@ namespace SlopArena.Client.Input
         /// Returns and clears the pending slot press byte.
         /// Call after BuildInputState() to pass the value, then consume here.
         /// </summary>
+        /// <summary>
+        /// Discard buffered jump/dash/slot presses without consuming them. Called
+        /// when pausing so stale presses don't fire on the first frame after
+        /// resume (issue #77).
+        /// </summary>
+        public void ClearPendingFrameState()
+        {
+            _pendingJump = false;
+            _pendingDash = false;
+            _pendingSlotPress = 0;
+        }
+
         public byte ConsumePendingSlotPress()
         {
             byte slot = _pendingSlotPress;
