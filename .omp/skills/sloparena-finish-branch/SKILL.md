@@ -76,6 +76,7 @@ Closes #<ISSUE_N>.   <- when the branch resolves an issue; REQUIRED or GitHub le
 
 ## Verification
 - what was run and the result: test count, build, manual/e2e checks
+- **Test in Unity:** <splice TESTING-UNITY.md content here — see below>
 
 ## Diffstat
 ```text
@@ -86,6 +87,7 @@ EOF
 ````
 
 - The diffstat MUST be inside a ```text fence — an unfenced diffstat renders with broken alignment in GitHub Markdown.
+- **Test-in-Unity checklist:** if `TESTING-UNITY.md` exists at the repo root (gitignored, written by worktree implement agents — never committed), read it and replace the `<splice TESTING-UNITY.md content here — see below>` placeholder in the body with its content. If it doesn't exist but the branch touches Unity-facing paths (`client/Unity/Assets/`), write a short checklist from the diff instead. If no Unity-facing code changed, drop the placeholder line entirely.
 - Issue branches: the PR body MUST carry `Closes #N.` on its own line (or `Fixes`/`Resolves`) — GitHub auto-close keywords are parsed from the body/commit message, never the title.
 - Server-authoritative changes: note which Shared files changed (per `docs/contributing/conventions.md` § Git & Commits).
 - If `gh` is unavailable → print the push output and the repo URL (`https://github.com/Binoui/SlopArena`) instead, and stop there.

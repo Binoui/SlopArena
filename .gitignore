@@ -205,3 +205,6 @@ client/Unity/Assets/BOXOPHOBIC/
 
 # Superpowers brainstorm session state
 .superpowers/
+
+# Handoff playtest checklist (worktree agents → PR body, never committed)
+TESTING-UNITY.md

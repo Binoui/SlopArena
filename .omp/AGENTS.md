@@ -90,6 +90,16 @@ Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
 - Commit convention: Conventional Commits, one squash commit per branch — `<type>(<scope>): <imperative summary> (issue #N)`. Full rules in `docs/contributing/conventions.md` § Git & Commits.
 - Squash + PR flow lives in `.omp/skills/sloparena-finish-branch`.
 
+### Agent Verification Protocol (worktree agents)
+- **Scope note:** `### Debugging Protocol` below (explain → wait for "vas y" → implement) governs the interactive main session. Worktree agents are AFK: they STOP for approval only on architecture-level changes (design doc + go-ahead); everything else proceeds after the in-session plan.
+- **Unity is main-repo-only.** The Unity Editor and the MCP bridge (`:26356`) serve the main checkout — worktree agents must NOT run `scripts/mcp-*.sh`; they'd hit the main repo's Editor and see none of their own changes.
+- Headless verification, mandatory before finishing a slice:
+  - `dotnet build src/Shared/ --nologo` after any Shared change (auto-copies the DLL to Unity Plugins).
+  - `dotnet test tests/Shared.Tests/` — filtered during development, full suite at the end.
+  - `dotnet build src/Server/` when server code changed.
+- Optional stronger gate: `"$UNITY_EDITOR" -batchmode -quit -projectPath <worktree>/client/Unity` once per worktree — catches Unity-script compile errors. First run builds a fresh `Library/` (slow, multi-GB); afterwards fast. `$UNITY_EDITOR` = Unity 6000.0.78f1 install path.
+- **Handoff:** if the slice touches Unity-facing code (`client/Unity/Assets/Scripts/`, prefabs, animation, input), write a short "Test in Unity" checklist (what to playtest, what to look for) to `TESTING-UNITY.md` at the repo root (gitignored — never committed). `sloparena-finish-branch` picks it up into the PR body.
+
 ### Debugging Protocol
 1. State the problem (1-2 sentences)
 2. Describe the fix (2-3 sentences): what, which files, why
