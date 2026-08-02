@@ -41,6 +41,38 @@ public class MatchStartRequestCodecTests
     }
 
     [Fact]
+    public void TryParse_MaxStocks_Omitted_DefaultsToThree()
+    {
+        // maxStocks is optional — absent means the stock-mode default of 3 (issue #37).
+        var req = MatchStartRequestCodec.TryParse(Parse(TwoPlayerBody));
+        Assert.NotNull(req);
+        Assert.Equal(3, req!.MaxStocks);
+    }
+
+    [Fact]
+    public void TryParse_MaxStocks_Override_IsPreserved()
+    {
+        var req = MatchStartRequestCodec.TryParse(Parse("""
+        {"matchId":"m","maxStocks":5,"players":[
+            {"steamId":1,"characterClass":"Manki","entityId":1},
+            {"steamId":2,"characterClass":"FightGuy","entityId":2}
+        ]}
+        """));
+        Assert.NotNull(req);
+        Assert.Equal(5, req!.MaxStocks);
+    }
+
+    [Theory]
+    [InlineData("""{"matchId":"m","maxStocks":0,"players":[{"steamId":1,"characterClass":"Manki","entityId":1},{"steamId":2,"characterClass":"FightGuy","entityId":2}]}""")] // 0 out of range
+    [InlineData("""{"matchId":"m","maxStocks":100,"players":[{"steamId":1,"characterClass":"Manki","entityId":1},{"steamId":2,"characterClass":"FightGuy","entityId":2}]}""")] // > 99
+    [InlineData("""{"matchId":"m","maxStocks":3.5,"players":[{"steamId":1,"characterClass":"Manki","entityId":1},{"steamId":2,"characterClass":"FightGuy","entityId":2}]}""")] // fractional — must not throw
+    [InlineData("""{"matchId":"m","maxStocks":"3","players":[{"steamId":1,"characterClass":"Manki","entityId":1},{"steamId":2,"characterClass":"FightGuy","entityId":2}]}""")] // not a number
+    public void TryParse_BadMaxStocks_ReturnsNull(string json)
+    {
+        Assert.Null(MatchStartRequestCodec.TryParse(Parse(json)));
+    }
+
+    [Fact]
     public void TryParse_DynamicEntityIds_PreservesOrder()
     {
         // Join order maps to entity IDs 1..N — the host is not always entity 1

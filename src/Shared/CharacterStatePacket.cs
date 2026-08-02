@@ -43,8 +43,10 @@ namespace SlopArena.Shared
         public byte HitstunLevel;
         /// <summary>Aim pitch in radians, from server authority.</summary>
         public float AimPitch;
-        /// <summary>48 bytes</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4;
+        /// <summary>Match death counter (stock counter: stocks = maxStocks - Deaths). Issue #37.</summary>
+        public byte Deaths;
+        /// <summary>49 bytes</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -70,6 +72,7 @@ namespace SlopArena.Shared
                 BuffActiveFlags = s.BuffActiveFlags,
                 HitstunLevel = s.HitstunLevel,
                 AimPitch = s.AimPitch,
+                Deaths = s.Deaths,
             };
         }
 
@@ -95,6 +98,7 @@ namespace SlopArena.Shared
                 BuffActiveFlags = BuffActiveFlags,
                 HitstunLevel = HitstunLevel,
                 AimPitch = AimPitch,
+                Deaths = Deaths,
             };
         }
 
@@ -122,6 +126,7 @@ namespace SlopArena.Shared
             buffer[42] = BuffActiveFlags;
             buffer[43] = HitstunLevel;
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(44, 4), BitConverter.SingleToInt32Bits(AimPitch));
+            buffer[48] = Deaths;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -149,6 +154,7 @@ namespace SlopArena.Shared
             packet.BuffActiveFlags = buffer[42];
             packet.HitstunLevel = buffer[43];
             packet.AimPitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(44, 4)));
+            packet.Deaths = buffer[48];
             return packet;
         }
     }

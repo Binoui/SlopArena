@@ -29,6 +29,11 @@ public class ServerSimulationTests
             CapsuleRadius = 0.3f,
             CapsuleHeight = 1.5f,
             HurtboxRadius = 0.4f,
+            // Full-body capsule so entities appear in the hurtbox list — lets the
+            // elimination tests assert untargetability meaningfully.
+            HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
+            HurtboxBoneDefs = null,
+            BakedDataPath = "",
         };
     }
 
@@ -79,6 +84,146 @@ public class ServerSimulationTests
         Assert.Equal(arena.SpawnPoints[0].Z, result.PZ);
         Assert.Equal(1, result.Deaths);
         Assert.Equal(0u, result.DamagePercent);
+    }
+
+    [Fact]
+    public void Tick_BelowKillHeight_RespawnsAtAssignedPosition_WithInvincibility()
+    {
+        // Respawn honors the per-entity respawn position (MatchInstance distributes
+        // spawn points) and grants brief invincibility (issue #37).
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena);
+        var state = MakeIdleState(1);
+        state.PY = -30f; // below KillHeight (-20)
+        sim.RegisterEntity(1, MakeTestDef(), state);
+        sim.SetRespawnPosition(1, 12f, 3f, -7f);
+
+        sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
+
+        var result = sim.GetState(1);
+        Assert.Equal(12f, result.PX);
+        Assert.Equal(3f, result.PY);
+        Assert.Equal(-7f, result.PZ);
+        Assert.Equal(1, result.Deaths);
+        Assert.Equal(0u, result.DamagePercent);
+        Assert.Equal((ushort)60, result.InvincibilityTicks); // 1s at 60Hz
+    }
+
+    [Fact]
+    public void Tick_NoRespawnPosition_FallsBackDistributedByEntityIndex()
+    {
+        // Two spawn points: entity 2 dies → respawns at SpawnPoints[1], not
+        // everyone stacking on SpawnPoints[0] (issue #37).
+        var arena = MakeTestArena();
+        arena.SpawnPoints = new[]
+        {
+            new SpawnPoint { X = 0, Y = 0, Z = 0, Yaw = 0 },
+            new SpawnPoint { X = 10, Y = 0, Z = 10, Yaw = 1.5f },
+        };
+        var sim = new ServerSimulation(arena);
+        var state = MakeIdleState(2);
+        state.PY = -30f;
+        sim.RegisterEntity(2, MakeTestDef(), state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { { 2, default } });
+
+        var result = sim.GetState(2);
+        Assert.Equal(10f, result.PX);
+        Assert.Equal(10f, result.PZ);
+        Assert.Equal(1.5f, result.FacingYaw);
+    }
+
+    [Fact]
+    public void Tick_DeathAtMaxDeaths_EliminatesAndFreezes()
+    {
+        // Losing the last stock eliminates the player: no respawn, frozen at the
+        // spawn point, excluded from hurtboxes (untargetable) — issue #37.
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena, new StockMatchRule(3));
+        var state = MakeIdleState(1);
+        state.Deaths = 2; // on last stock
+        state.PY = -30f;
+        sim.RegisterEntity(1, MakeTestDef(), state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
+
+        var afterDeath = sim.GetState(1);
+        Assert.Equal(3, afterDeath.Deaths); // eliminated
+        Assert.Equal(0u, afterDeath.DamagePercent);
+        Assert.Equal(0, afterDeath.InvincibilityTicks); // no grace for spectators
+
+        // Frozen: repeated ticks must not move it or change deaths.
+        var frozenPos = (afterDeath.PX, afterDeath.PY, afterDeath.PZ);
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
+        var later = sim.GetState(1);
+        Assert.Equal(frozenPos, (later.PX, later.PY, later.PZ));
+        Assert.Equal(3, later.Deaths);
+
+        // Untargetable: not present in the last hurtbox list.
+        bool inHurtboxes = false;
+        foreach (var e in sim.GetLastEntityData())
+            if (e.Id == 1) inHurtboxes = true;
+        Assert.False(inHurtboxes);
+    }
+
+    [Fact]
+    public void Tick_NoWinRule_RespawnsForever_NeverEliminates()
+    {
+        // Training mode (NoWinMatchRule): deaths keep counting and the entity
+        // keeps respawning — no freeze at any stock threshold (issue #37 follow-up).
+        var arena = MakeTestArena();
+        var sim = new ServerSimulation(arena, NoWinMatchRule.Instance);
+        var state = MakeIdleState(1);
+        state.PY = -30f;
+        sim.RegisterEntity(1, MakeTestDef(), state);
+
+        // Kill the entity 6 times — past the stock-mode threshold of 3.
+        for (int i = 0; i < 6; i++)
+        {
+            var s = sim.GetState(1);
+            s.PY = -30f;
+            sim.SetState(1, s);
+            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
+        }
+
+        var result = sim.GetState(1);
+        Assert.Equal(6, result.Deaths); // kept counting, never eliminated
+        Assert.Equal(0u, result.DamagePercent);
+
+        // Still a hurtbox target — untargetability only applies to eliminated entities.
+        bool inHurtboxes = false;
+        foreach (var e in sim.GetLastEntityData())
+            if (e.Id == 1) inHurtboxes = true;
+        Assert.True(inHurtboxes);
+    }
+
+    [Fact]
+    public void Tick_InvincibleTarget_TakesNoDamage()
+    {
+        // Respawn (and dash) invincibility blocks incoming hits entirely (issue #37).
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.CombatDef;
+
+        var player = TestHelpers.PlayerState();
+        player.PY = TestHelpers.CombatGroundPY;
+        sim.RegisterEntity(1, def, player);
+
+        var npc = TestHelpers.NpcState(0f, 2.2f);
+        npc.PY = TestHelpers.CombatGroundPY;
+        npc.InvincibilityTicks = 60;
+        sim.RegisterEntity(100, def, npc);
+
+        // Manki LMB stage 1 hitbox triggers ~tick 12 (see HitstunAnimationTierTests).
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+        for (int i = 0; i < 15; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var after = sim.GetState(100);
+        Assert.Equal(0u, after.DamagePercent); // hit fully ignored
+        Assert.Equal(0, after.HitstunTicks);
+        Assert.NotEqual(ActionState.Hitstun, after.State);
     }
 
     [Fact]

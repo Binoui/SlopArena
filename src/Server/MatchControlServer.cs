@@ -98,7 +98,7 @@ namespace SlopArena.Server
                 return (0, "Invalid match-start body (need matchId, arenaName, and 2-4 players with a known characterClass + entityId).");
 
             var arena = string.IsNullOrEmpty(req.ArenaName) ? _defaultArena : req.ArenaName;
-            int port = _orchestrator.AssignMatch(req.MatchId, arena, req.Players);
+            int port = _orchestrator.AssignMatch(req.MatchId, arena, req.Players, (byte)req.MaxStocks);
             if (port < 0)
                 return (0, "No match slots available on this game server.");
 

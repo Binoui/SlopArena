@@ -28,6 +28,7 @@ public class CharacterStatePacketTests
             BuffActiveFlags = 0b_0011,
             HitstunLevel = 2,
             AimPitch = -0.5f,
+            Deaths = 2,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -57,14 +58,15 @@ public class CharacterStatePacketTests
         Assert.Equal(original.BuffActiveFlags, restored.BuffActiveFlags);
         Assert.Equal(original.HitstunLevel, restored.HitstunLevel);
         Assert.Equal(original.AimPitch, restored.AimPitch);
+        Assert.Equal(original.Deaths, restored.Deaths);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // AimPitch (float at offset 44) ends at byte 47 → the wire layout is exactly 48 bytes.
+        // AimPitch (float at offset 44) ends at byte 47, Deaths at byte 48 → 49 bytes.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(48, CharacterStatePacket.Size);
+        Assert.Equal(49, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f });

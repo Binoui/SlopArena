@@ -23,7 +23,7 @@ SlopArena/
 │   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs     ← hitbox collision math
 │   ├── CharacterState.cs    ← per-tick entity state
-│   ├── CharacterStatePacket.cs ← UDP packet (48 bytes, +12B envelope)
+│   ├── CharacterStatePacket.cs ← UDP packet (49 bytes, +13B envelope)
 │   ├── ClientInputPacket.cs ← legacy — the wire uses InputState; kept for compat
 │   ├── InputState.cs        ← normalized input (MoveX/Y, flags, ActiveSlot), 19 bytes
 │   ├── AttackData.cs        ← HitboxEvent, AttackStage, AbilityData structs

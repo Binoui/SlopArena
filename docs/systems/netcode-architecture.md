@@ -94,7 +94,7 @@ PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
   1. Receive server states (non-blocking)
      → NetworkClient.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60B
+     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(49) = 61B
 
   2. Store into the bridge
      → NetworkSimulationBridge._latestStates[kv.Key] = kv.Value
@@ -125,12 +125,16 @@ Tick():
      → Spawn hitboxes from attack events (HitboxEvent.TriggerTick)
      → SpellResolver.Tick: hitbox vs hurtbox collision, damage, knockback, hitstun
 
-  5. Check deaths (first to MaxDeaths=3 loses → MatchState.Ended)
+  5. Check deaths (first to maxStocks=3 deaths loses → MatchState.Ended)
+     → ServerSimulation.CheckVoidDeaths: KO costs a stock, respawn with brief
+       invincibility; 0 stocks → eliminated (frozen spectator, untargetable)
+     → StockMatchRule.Evaluate: last player standing wins; simultaneous
+       last-stock trade → most stocks wins, equal deaths → shared victory (issue #37)
 
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(48) = 60B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(49) = 61B
          → tick = _serverTick (echoed back)
        → Client filters by entityId
 ```
@@ -167,14 +171,14 @@ Total: 31 bytes (8 + 4 + 19)
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(49) = 61 bytes
 
 [0..7]   entityId          (ulong)
 [8..11]  tick              (uint)       ← echoes client's tick number
-[12..59] CharacterStatePacket (48 bytes)
+[12..60] CharacterStatePacket (49 bytes)
 ```
 
-**CharacterStatePacket layout (48 bytes):**
+**CharacterStatePacket layout (49 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
@@ -196,8 +200,9 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60
 | 42     | byte    | BuffActiveFlags     | BuffType bitfield                   |
 | 43     | byte    | HitstunLevel        | 0=small, 1=medium, 2=hard          |
 | 44-47  | float   | AimPitch            | Server-authoritative aim pitch (radians) |
+| 48     | byte    | Deaths              | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
 
-Total: 60 bytes per entity (8 + 4 + 48)
+Total: 61 bytes per entity (8 + 4 + 49)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -207,7 +212,7 @@ Total: 60 bytes per entity (8 + 4 + 48)
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (144 bytes in memory, 48 serialized) is the full per-tick state of one entity:
+`CharacterState` (144 bytes in memory, 49 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|
@@ -385,7 +390,7 @@ Deferred to PvP roadmap v2 Phase 7. The client currently renders raw server stat
 - [x] Server handles dash via InputState.Dash
 - [x] Server handles attack via InputState.ActiveSlot
 - [x] Server handles jump via InputState.Jump
-- [x] Full packet serialization (48-byte CharacterStatePacket)
+- [x] Full packet serialization (49-byte CharacterStatePacket)
 - [x] ActiveSlot pipeline (slot press → ability resolution → hitbox spawn)
 - [x] HitboxEvent → SpellResolver.Spawn flow
 
