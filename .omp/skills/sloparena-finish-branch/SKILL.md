@@ -21,6 +21,7 @@ Decide `<subject>` before touching git:
 
 - A user-supplied subject wins.
 - Otherwise derive one conventional subject for the whole branch, per the commit convention in `docs/contributing/conventions.md` (§ Git & Commits): `<type>(<scope>): <imperative summary>` + ` (issue #N)` when the branch resolves a GitHub issue.
+- Branch resolves a GitHub issue? Capture the number (`ISSUE_N`): user-supplied, from session `issue://` links, or `gh issue list --state open`. It goes in the subject AND in the PR body as `Closes #N` (Step 4) — a title ref alone does NOT auto-close the issue (GitHub reads closing keywords from the PR body / commit message only).
 - Pick the type/scope from the actual change (`feat(match)` for gameplay, `fix(client)` for repairs, else `refactor`/`docs`/`test`/`chore` + the subsystem scope). Match the existing log style, e.g. `feat(match): roster-driven match start with character classes (issue #35)`.
 - If the branch is empty (no code changes), say so and stop.
 
@@ -68,6 +69,7 @@ Open the PR with a real description — summary, changes, verification, and a **
 ````bash
 gh pr create --title "<subject>" --body "$(cat <<'EOF'
 <1-3 sentences: what the branch does and why>
+Closes #<ISSUE_N>.   <- when the branch resolves an issue; REQUIRED or GitHub leaves it open (title refs don't count)
 
 ## Changes
 - bullet per logical change (start from `git log main..HEAD --format='- %s'` and expand)
@@ -84,6 +86,7 @@ EOF
 ````
 
 - The diffstat MUST be inside a ```text fence — an unfenced diffstat renders with broken alignment in GitHub Markdown.
+- Issue branches: the PR body MUST carry `Closes #N.` on its own line (or `Fixes`/`Resolves`) — GitHub auto-close keywords are parsed from the body/commit message, never the title.
 - Server-authoritative changes: note which Shared files changed (per `docs/contributing/conventions.md` § Git & Commits).
 - If `gh` is unavailable → print the push output and the repo URL (`https://github.com/Binoui/SlopArena`) instead, and stop there.
 

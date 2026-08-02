@@ -273,7 +273,7 @@ See `docs/characters/manki.md` for details.
 - **type**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
 - **scope**: the subsystem touched — `match`, `client`, `server`, `shared`, `netcode`, `arena`, `docs`, `mcp`, …
 - **summary**: imperative, lowercase, ≤ 72 chars. What the change does, not how.
-- **issue ref**: append ` (issue #N)` when the work resolves a GitHub issue.
+- **issue ref**: append ` (issue #N)` when the work resolves a GitHub issue. The PR body must also carry `Closes #N` — GitHub auto-close keywords are parsed from the body/commit message, never the title (see `.omp/skills/sloparena-finish-branch`).
 
 ### Examples (from the repo log)
 
