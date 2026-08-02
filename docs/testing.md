@@ -39,7 +39,7 @@ dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
  | `FightGuyAbilityTests.cs` | 38 | FightGuy LMB/Q/E/R/F activation, hitbox collision, mark system, homing, launcher |
  | `FightGuyKitRegressionTests.cs` | 5 | Golden kit regression for FightGuy |
  | `HitstunAnimationTierTests.cs` | 7 | 3-tier hitstun animation (damage → HitstunLevel, clip tiers) |
- | `HostedServerConfigTests.cs` | 3 | HostedServerConfig server.json builder (ADR-0005) |
+ | `HostedServerConfigTests.cs` | 4 | HostedServerConfig server.json builder (ADR-0005) |
  | `KistuAbilityTests.cs` | 13 | Kistu kit: RMB charge, E dash, R launcher + charge-stock, Q counter |
  | `LedgeSnapTests.cs` | 6 | Ledge snap auto-grab near stage edge |
  | `LobbyPayloadCodecTests.cs` | 16 | SignalR lobby JSON payload mapping (issue #33) |

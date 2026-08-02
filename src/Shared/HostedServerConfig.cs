@@ -33,6 +33,12 @@ public sealed record HostedServerConfig
     /// <summary>Master server base URL (e.g. http://localhost:5000).</summary>
     public string MasterServerUrl { get; init; } = "http://localhost:5000";
 
+    /// <summary>
+    /// Public IP/domain for the browser list when the host machine is behind NAT.
+    /// Null → the server advertises its LAN IP (LAN-only hosting).
+    /// </summary>
+    public string? PublicIp { get; init; }
+
     /// <summary>Hosted servers are never official.</summary>
     public bool IsOfficial { get; init; } = false;
 
