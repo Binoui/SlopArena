@@ -26,11 +26,11 @@ namespace SlopArena.Server
         public Guid ServerId => _serverId;
         public bool IsRegistered => _registered;
 
-        public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator)
+        public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator, HttpMessageHandler? handler = null)
         {
             _config = config;
             _orchestrator = orchestrator;
-            _http = new HttpClient
+            _http = new HttpClient(handler ?? new HttpClientHandler())
             {
                 BaseAddress = new Uri(config.MasterServerUrl.TrimEnd('/') + "/"),
                 Timeout = TimeSpan.FromSeconds(5)
@@ -129,6 +129,45 @@ namespace SlopArena.Server
             }
 
             Console.WriteLine("[Heartbeat] Loop stopped.");
+
+            // Issue #49: deregister on graceful shutdown so the row disappears
+            // from the server browser immediately instead of lingering for the
+            // 15s heartbeat TTL window. Best-effort: ct is already cancelled at
+            // this point, so use a fresh token — the HttpClient's 5s timeout
+            // bounds the wait, and failure never throws (TTL remains the fallback).
+            await DeregisterAsync(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Deregister this game server with the master server (issue #49): removes
+        /// the GameServers row so the server stops appearing in GET /servers
+        /// immediately. Best-effort — never throws; if the master server is
+        /// unreachable, the heartbeat TTL still clears the row.
+        /// </summary>
+        public async Task DeregisterAsync(CancellationToken ct = default)
+        {
+            if (!_registered) return;
+
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Delete, $"servers/{_serverId}");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiToken);
+
+                var response = await _http.SendAsync(request, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    _registered = false;
+                    Console.WriteLine($"[Registration] Deregistered (ID: {_serverId}) — removed from server browser.");
+                }
+                else
+                {
+                    Console.WriteLine($"[Registration] Deregister failed: {response.StatusCode} (heartbeat TTL will clear the row).");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Registration] Deregister error (heartbeat TTL will clear the row): {ex.Message}");
+            }
         }
 
         private async Task SendHeartbeatAsync(CancellationToken ct)
