@@ -219,6 +219,13 @@ namespace SlopArena.Client.UI
 
         private async void Leave()
         {
+            // The host owns the embedded server subprocess (ADR-0005): backing
+            // out of the lobby must stop it, or the orphaned server keeps
+            // running and stays registered (issue #48). Non-hosts never touch
+            // it — MatchConfig.IsHost is the authoritative flag, not the roster.
+            if (MatchConfig.IsHost)
+                ServerHost.Instance?.Stop();
+
             if (_lobby != null)
             {
                 try { await _lobby.LeaveLobbyAsync(); } catch { /* best effort */ }
