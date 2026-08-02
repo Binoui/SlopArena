@@ -95,7 +95,7 @@ namespace SlopArena.Server
             }
 
             if (req is null)
-                return (0, "Invalid match-start body (need matchId, arenaName, and >=2 players with a known characterClass + entityId).");
+                return (0, "Invalid match-start body (need matchId, arenaName, and 2-4 players with a known characterClass + entityId).");
 
             var arena = string.IsNullOrEmpty(req.ArenaName) ? _defaultArena : req.ArenaName;
             int port = _orchestrator.AssignMatch(req.MatchId, arena, req.Players);

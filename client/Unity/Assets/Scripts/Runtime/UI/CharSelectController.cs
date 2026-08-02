@@ -208,19 +208,16 @@ namespace SlopArena.Client.UI
         {
             Debug.Log($"[CharSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
 
-            // Find the local player in the roster (by SteamId) and an opponent
-            // (first other player). The master server assigned entity IDs 1..N
-            // by join order (issue #35); the game server spawns each with the
-            // roster's character class, so both clients render the right chars.
+            // Find the local player in the roster (by SteamId). The master
+            // server assigned entity IDs 1..N by join order (issue #35); the
+            // game server spawns each with the roster's character class, so
+            // every client renders the right chars (issue #36).
             var players = config.Players;
             LobbyPlayerInfo? local = null;
-            LobbyPlayerInfo? opponent = null;
             foreach (var p in players)
             {
                 if (p.SteamId == ClientSession.SteamId)
                     local = p;
-                else if (opponent == null)
-                    opponent = p;
             }
 
             if (local == null)
@@ -238,10 +235,17 @@ namespace SlopArena.Client.UI
             // ServerIP is already set (host: localhost, joiner: server browser IP).
             MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, _selected);
             MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
-            if (opponent != null)
+            // Every non-local rostered player is an opponent (issue #36).
+            // entityId <= 0 means the master never assigned it, so the game
+            // server never spawned the entity — skip it.
+            MatchConfig.Opponents.Clear();
+            foreach (var p in players)
             {
-                MatchConfig.OpponentClass = ParseClass(opponent.CharacterSelection, CharacterClass.Manki);
-                MatchConfig.OpponentEntityId = (ulong)(opponent.EntityId > 0 ? opponent.EntityId : 2);
+                if (p.SteamId == ClientSession.SteamId) continue;
+                if (p.EntityId <= 0) continue;
+                MatchConfig.Opponents.Add(new MatchConfig.OpponentInfo(
+                    (ulong)p.EntityId,
+                    ParseClass(p.CharacterSelection, CharacterClass.Manki)));
             }
 
             // Tear down the lobby connection — the match is now handed off to

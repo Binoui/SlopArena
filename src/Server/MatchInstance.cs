@@ -117,25 +117,18 @@ namespace SlopArena.Server
 					ReceiveInputs();
 					if (AllConnected())
 					{
-						// Check for disconnected players.
+						// Check for disconnected players: mark the slot, clear its
+						// stale queue, and let the entity go idle (issue #36).
 						var now = DateTime.UtcNow;
-						bool anyTimeout = false;
-						string timedOut = "";
 						foreach (var slot in _slots)
 						{
-							if (slot.EndPoint != null && (now - slot.LastPacket).TotalSeconds > TimeoutSeconds)
+							if (slot.EndPoint == null || slot.Disconnected) continue;
+							if ((now - slot.LastPacket).TotalSeconds > TimeoutSeconds)
 							{
-								anyTimeout = true;
-								timedOut = slot.EntityId.ToString();
-								break;
+								slot.Disconnected = true;
+								slot.Queue.Clear();
+								Console.WriteLine($"[Match:{_matchId}] Player (entity {slot.EntityId}) disconnected — entity goes idle.");
 							}
-						}
-
-						if (anyTimeout)
-						{
-							Console.WriteLine($"[Match:{_matchId}] Player (entity {timedOut}) timed out — stopping match.");
-							_running = false;
-							continue;
 						}
 
 						Tick();
@@ -231,6 +224,13 @@ namespace SlopArena.Server
 					var slot = FindSlot(entityId);
 					if (slot == null) continue; // not a rostered player
 
+					// A previously disconnected player reconnecting resumes control.
+					if (slot.Disconnected)
+					{
+						slot.Disconnected = false;
+						Console.WriteLine($"[Match:{_matchId}] Player (entity {entityId}) reconnected.");
+					}
+
 					// New player connecting — register their endpoint.
 					if (slot.EndPoint == null)
 					{
@@ -317,6 +317,8 @@ namespace SlopArena.Server
 				if (input.HasValue)
 				{
 					_serverTick = Math.Max(_serverTick, input.Value.tick);
+					if (slot.Disconnected) continue;
+					if (MatchRules.IsEliminated(_sim.GetState(slot.EntityId), MaxDeaths)) continue;
 					inputs[slot.EntityId] = input.Value.input;
 				}
 			}
@@ -326,33 +328,14 @@ namespace SlopArena.Server
 			{
 				_sim.Tick(inputs);
 
-				// Check for match end (first to MaxDeaths loses).
-				ulong? winner = null;
-				ulong? loser = null;
-			foreach (var slot in _slots)
+				// Check for match end: last player standing wins (ADR-0007, issue #36).
+				ulong? winner = MatchRules.FindWinner(_sim.GetAllStates(), MaxDeaths);
+				if (winner.HasValue)
 				{
-					var st = _sim.GetState(slot.EntityId);
-					if (st.Deaths >= MaxDeaths)
-					{
-						loser = slot.EntityId;
-						break;
-					}
-				}
-				if (loser.HasValue)
-				{
-					// Winner = the first other player still under the death limit.
-					foreach (var slot in _slots)
-					{
-						if (slot.EntityId != loser.Value)
-						{
-							var st = _sim.GetState(slot.EntityId);
-							if (st.Deaths < MaxDeaths) { winner = slot.EntityId; break; }
-						}
-					}
 					_matchState = MatchState.Ended;
-					_winnerEntityId = winner ?? 0;
+					_winnerEntityId = winner.Value;
 					_postMatchTicks = PostMatchDuration;
-					Console.WriteLine($"[Match:{_matchId}] Entity {loser.Value} eliminated! Winner: {_winnerEntityId}");
+					Console.WriteLine($"[Match:{_matchId}] Winner: {_winnerEntityId}");
 				}
 
 				SendState();
@@ -385,7 +368,7 @@ namespace SlopArena.Server
 			{
 				foreach (var slot in _slots)
 				{
-					if (slot.EndPoint == null) continue;
+					if (slot.EndPoint == null || slot.Disconnected) continue;
 					foreach (var pkt in packets)
 						_udpServer.Send(pkt.buffer, envelopeSize, slot.EndPoint);
 				}
@@ -421,6 +404,7 @@ namespace SlopArena.Server
 			public CharacterClass CharacterClass { get; }
 			public IPEndPoint? EndPoint { get; set; }
 			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
+			public bool Disconnected { get; set; }
 			public List<(uint tick, InputState input)> Queue { get; } = new();
 
 			public PlayerSlot(ulong entityId, CharacterClass characterClass)

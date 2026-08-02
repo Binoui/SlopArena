@@ -24,7 +24,8 @@ namespace SlopArena.Client.World
         [Header("Network")]
         [SerializeField] private NetworkClient _networkClient;
 
-        private static ulong OpponentEntityId => MatchConfig.OpponentEntityId;
+        private readonly Dictionary<ulong, PlayerRenderer> _opponentRenderers = new();
+        private PlayerRenderer[] _opponentArray = System.Array.Empty<PlayerRenderer>();
 
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;
@@ -61,31 +62,51 @@ namespace SlopArena.Client.World
             var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
             _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
-            var opponentDef = CharacterRegistry.Get(MatchConfig.OpponentClass);
-            var opponentBaked = LoadBakedData(opponentDef);
 
             // Shared player renderer + HUD setup
             SetupPlayerRenderer(playerDef, playerBaked);
             SetupHUD(playerDef);
 
-            // Opponent renderer
-            if (_opponentRenderer != null)
+            // Opponent renderers — one per MatchConfig.Opponents entry. The scene's
+            // _opponentRenderer is the first opponent + the clone template for the rest.
+            _opponentRenderers.Clear();
+            for (int i = 0; i < MatchConfig.Opponents.Count; i++)
             {
-                _opponentRenderer.ModelYOffset = opponentDef.ModelYOffset;
-                _opponentRenderer.CapsuleRadius = opponentDef.CapsuleRadius;
-                _opponentRenderer.CapsuleHeight = opponentDef.CapsuleHeight;
-                _opponentRenderer.HurtboxBoneDefs = opponentDef.HurtboxBoneDefs;
-                _opponentRenderer.SetBakedData(opponentBaked);
-                _opponentRenderer.SetCharacterDefinition(opponentDef);
-                _opponentRenderer.LoadModel(opponentDef);
-            }
+                var opp = MatchConfig.Opponents[i];
 
-            // Position renderers at spawn points
-            var spawnPoints = arena.SpawnPoints;
-            if (spawnPoints.Length > 0)
-                _playerRenderer.transform.position = new Vector3(spawnPoints[0].X, spawnPoints[0].Y, spawnPoints[0].Z);
-            if (_opponentRenderer != null && spawnPoints.Length > 1)
-                _opponentRenderer.transform.position = new Vector3(spawnPoints[1].X, spawnPoints[1].Y, spawnPoints[1].Z);
+                PlayerRenderer renderer;
+                if (i == 0 && _opponentRenderer != null)
+                {
+                    renderer = _opponentRenderer;
+                }
+                else if (_opponentRenderer != null)
+                {
+                    var clone = Instantiate(_opponentRenderer.gameObject);
+                    clone.name = $"Opponent_{opp.EntityId}";
+                    renderer = clone.GetComponent<PlayerRenderer>();
+                }
+                else
+                {
+                    Debug.LogWarning($"[PvPMatch] No opponent template in scene — skipping opponent {opp.EntityId}.");
+                    continue;
+                }
+
+                var def = CharacterRegistry.Get(opp.Class);
+                var baked = LoadBakedData(def);
+                renderer.ModelYOffset = def.ModelYOffset;
+                renderer.CapsuleRadius = def.CapsuleRadius;
+                renderer.CapsuleHeight = def.CapsuleHeight;
+                renderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
+                renderer.SetBakedData(baked);
+                renderer.SetCharacterDefinition(def);
+                renderer.LoadModel(def);
+                renderer.transform.position = SpawnPosition(arena, opp.EntityId);
+                _opponentRenderers[opp.EntityId] = renderer;
+            }
+            _opponentArray = new List<PlayerRenderer>(_opponentRenderers.Values).ToArray();
+
+            // Player spawns at its own roster spawn point (entityId 1..N ↔ spawnPoints[0..N-1]).
+            _playerRenderer.transform.position = SpawnPosition(arena, PlayerEntityId);
 
             // Shared camera + aim setup
             SetupCamera();
@@ -95,6 +116,15 @@ namespace SlopArena.Client.World
         private void Update()
         {
             _inputController.Poll();
+        }
+
+        private static Vector3 SpawnPosition(ArenaDefinition arena, ulong entityId)
+        {
+            int idx = (int)entityId - 1;
+            if (idx < 0 || arena.SpawnPoints == null || idx >= arena.SpawnPoints.Length)
+                return new Vector3(40f, 0.5f, 40f);
+            var s = arena.SpawnPoints[idx];
+            return new Vector3(s.X, s.Y, s.Z);
         }
 
         protected override void OnMatchFixedUpdate()
@@ -110,7 +140,7 @@ namespace SlopArena.Client.World
             _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
 
             byte targetEntityId = PickScreenTarget(
-                _opponentRenderer != null ? new[] { _opponentRenderer } : Array.Empty<PlayerRenderer>(),
+                _opponentArray,
                 _mainCamera ??= _cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
 
             var (input, _, _) = _inputController.BuildInputState(
@@ -131,8 +161,8 @@ namespace SlopArena.Client.World
 
             // Apply server states to renderers
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
-            if (_opponentRenderer != null)
-                _opponentRenderer.ApplyServerState(_bridge.GetState(OpponentEntityId));
+            foreach (var kv in _opponentRenderers)
+                kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
 
             // Surface server match state transitions (countdown → fight → results)
             var matchState = _bridge.GetState(PlayerEntityId).MatchState;
