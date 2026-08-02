@@ -1,5 +1,4 @@
-> ⚠️ **DEPRECATED** — Contents are stale. The doc was written after Phase 1 and never updated.
-> See `docs/plans/2026-07-03-pvp-roadmap.md` for the current, audited roadmap.
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Unity migration plan; executed. Historical record.
 
 # Unity Client Architecture Plan
 

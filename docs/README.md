@@ -17,7 +17,7 @@
 
 | Doc | Covers |
 |-----|--------|
-| [`systems/animation-system.md`](systems/animation-system.md) | Unity Animator state machine, trigger-driven transitions |
+| [`systems/animation-system.md`](systems/animation-system.md) | Animancer clip playback, server-timed transitions |
 | [`systems/combat-systems.md`](systems/combat-systems.md) | Universal combat mechanics |
 | [`systems/hitbox-system.md`](systems/hitbox-system.md) | Hitbox/hurtbox architecture |
 | [`systems/attack-hitbox-system.md`](systems/attack-hitbox-system.md) | Attack hitbox data pipeline |
@@ -67,4 +67,4 @@
 
 | Doc | Covers |
 |-----|--------|
-| [`plans/2026-06-14-online-pvp-roadmap.md`](plans/2026-06-14-online-pvp-roadmap.md) | Online PvP implementation plan |
+| [`plans/2026-08-01-pvp-roadmap-v2.md`](plans/2026-08-01-pvp-roadmap-v2.md) | Online PvP implementation plan (current) |

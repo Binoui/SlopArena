@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Predates Unity migration (says 'run in Godot editor'). Historical; see `docs/testing.md` for current verification.
+
 # Smoke Test Checklist - ServerAbility Refactor
 
 **Date:** 2026-06-22

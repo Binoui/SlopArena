@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot-era plan; the codebase is Unity. See `docs/architecture-overview.md`.
+
 # Code Refactoring Plan — SlopArena Scripts/
 
 > Goal: split overgrown files into focused, single-responsibility classes.

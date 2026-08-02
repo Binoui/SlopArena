@@ -16,23 +16,45 @@ dotnet test tests/Shared.Tests/ --nologo --filter "PhysicsTests"
 dotnet test tests/Shared.Tests/ --nologo --filter "AbilityLifecycle"
 dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
 
-# Run all tests: 151 across 11 test suites
+# Run all tests: 390 across 33 test suites
 
 ## Test Suites
 
  | File | Tests | What it covers |
  |------|-------|----------------|
- | `ServerSimulationTests.cs` | 8 | Entity registration, void death, Q lifecycle, self-hit |
- | `SpellResolverTests.cs` | 12 | Sphere/capsule collision, explosion, gravity, CanHitOwner |
- | `CombatMathTests.cs` | 12 | Knockback formulas, angle math, DI calculations |
- | `PhysicsTests.cs` | 10 | Jump chain, dash, landing, walk/sprint/friction, hitstun, data-driven attack expiry |
- | `AbilityLifecycleTests.cs` | 28 | Per-ability activation + lifecycle (LMB combo, Q bomb, RMB charge, R divebomb, F overclock, AirRMB, mine), buff bonuses |
- | `CombatPipelineTests.cs` | 4 | **Full-pipeline combat** — LMB→NPC damage, Q projectile→NPC hit, Overclock damage boost, mutual trade |
+ | `AbilityLifecycleTests.cs` | 31 | Per-ability lifecycle — all abilities use ServerAbility subclasses |
+ | `AirDashAnalysisTests.cs` | 2 | Aerial dash hover bug: FloatWindow restart during air dash |
+ | `AttackIdleReTriggerTests.cs` | 5 | Attack → idle bugs: held-input re-trigger, halved AnimLockTicks |
+ | `AttackToIdleTests.cs` | 15 | Attacking → Idle transitions for every Manki/FightGuy ability |
+ | `AttackToIdleVelocityTests.cs` | 10 | Velocity zeroed on Attacking → Idle (ServerAbility.EndAbility) |
+ | `BakedAnimationDataTests.cs` | 8 | .bin format loader (matches SlopArenaBaker output) |
+ | `CharacterStatePacketTests.cs` | 3 | Packet round-trip serialization, size, AnimIndex |
+ | `ClipExtrapolationTests.cs` | 9 | Extrapolation modes (None/Hold/Continuous), velocity projection |
  | `CombatIntegrationTests.cs` | 2 | Two-entity tick stability |
- | `EdgeCaseTests.cs` | 2 | Cooldown countdown, entity isolation |
- | `AnimatorGraphBuilderTests.cs` | 15 | FSM transition structure, Manki combo chains, dedup |
- | `MankiExplosiveMineTests.cs` | 11 | Mine placement, detonation, auto-detonate, Overclock bonus, owner isolation |
- | `FightGuyAbilityTests.cs` | 25 | FightGuy LMB/Q/E/R/F activation, hitbox collision, damage, mark system, homing, launcher |
+ | `CombatMathTests.cs` | 21 | Circle/cone intersection, knockback direction, projectile launch |
+ | `CombatPipelineTests.cs` | 14 | **Full-pipeline combat** — LMB/Q hit NPCs, warp states, knockback profiles |
+ | `DashTests.cs` | 12 | Dash transitions, cooldown, cancel, velocity dead-zone |
+ | `EdgeCaseTests.cs` | 2 | Input buffering, cooldown countdown, entity isolation |
+ | `FacingDirectionTests.cs` | 2 | Facing yaw stability through hitstun |
+ | `FightGuyAbilityTests.cs` | 38 | FightGuy LMB/Q/E/R/F activation, hitbox collision, mark system, homing, launcher |
+ | `FightGuyKitRegressionTests.cs` | 5 | Golden kit regression for FightGuy |
+ | `HitstunAnimationTierTests.cs` | 7 | 3-tier hitstun animation (damage → HitstunLevel, clip tiers) |
+ | `HostedServerConfigTests.cs` | 3 | HostedServerConfig server.json builder (ADR-0005) |
+ | `KistuAbilityTests.cs` | 13 | Kistu kit: RMB charge, E dash, R launcher + charge-stock, Q counter |
+ | `LedgeSnapTests.cs` | 6 | Ledge snap auto-grab near stage edge |
+ | `LobbyPayloadCodecTests.cs` | 16 | SignalR lobby JSON payload mapping (issue #33) |
+ | `MankiKitRegressionTests.cs` | 7 | Golden kit regression for Manki (LMB, RMB, AirRMB, Overclock, Q) |
+ | `MankiKitTests.cs` | 6 | Bazooka rocket-jump, grapple tether, AirLMB, AirRMB |
+ | `MankiLmbTests.cs` | 16 | Manki LMB combo: 3-hit chain, lunge, bone hitboxes, input buffering |
+ | `MasterServerClientTests.cs` | 13 | MasterServerClient with canned HTTP responses |
+ | `MatchStartRequestCodecTests.cs` | 9 | Match-start request: char classes + dynamic entity IDs (ADR-0008) |
+ | `NilusAbilityTests.cs` | 36 | Nilus kit: registration + Q/E/R/F data-driven slots |
+ | `NilusKitRegressionTests.cs` | 9 | Golden kit regression for Nilus (full-state EntitySnapshot diff) |
+ | `PhysicsTests.cs` | 20 | State machine transitions and movement physics |
+ | `RehitZoneTests.cs` | 9 | Hitbox.RehitIntervalTicks lingering zones |
+ | `ServerLogParserTests.cs` | 5 | ServerLogParser master-server registration detection (ADR-0005) |
+ | `ServerSimulationTests.cs` | 24 | Sim core: respawn, cooldowns, soft-lock targeting, rotation |
+ | `SpellResolverTests.cs` | 12 | Sphere/capsule collision, owner skip, ground explosions, gravity |
  
  > **Ground-truth tests** (`CombatPipelineTests`) are the most important for understanding how combat
  > works end to end. They exercise the full pipeline: Input → ServerAbility → Hitbox → Collision →
@@ -79,9 +101,6 @@ wrong state = caught on the assertion; wrong side effect = silent regression.
 ```bash
 # Must pass with 0 errors
 dotnet build --nologo
-
-# Lint check
-make lint
 ```
 
 If `dotnet build` fails with errors in `Shared/`, check that you didn't import an engine type — Shared/ is pure C#.
@@ -109,7 +128,7 @@ Test the real server-authoritative multiplayer:
 
 **Terminal 1 — Server:**
 ```bash
-dotnet run --project Server/SlopArena.Server.csproj
+dotnet run --project src/Server/
 ```
 Output: `[Match:...] Listening on UDP 9876, waiting for 2 players...`
 
@@ -134,7 +153,7 @@ Build the Unity client (`File → Build Settings → Build`) and run two instanc
 
 ```bash
 # Build and run
-dotnet run --project Server/SlopArena.Server.csproj
+dotnet run --project src/Server/
 
 # Default port: 9876, arena: pit, both players: Manki
 # Future CLI args: --port 8765 --arena split --class FightGuy
@@ -165,17 +184,5 @@ python tools/read_skeleton_bin.py data/manki_skeleton.bin
 | Character invisible in sandbox | Model not loaded | Check `bakedDataPath` in CharacterDefinition |
 | Attacks don't connect | Hitbox offset wrong or TriggerTick > DurationTicks | Check `HitboxEvent` values, check console for `[HITBOX]` log |
 | Opponent doesn't move in PvP | Server not running or wrong entity ID | Check server console, verify `OpponentEntityId = 2` |
-| Rollback spam in console | Prediction threshold too tight or server desync | Check `distSq > 0.25f` threshold in MatchManager |
-| Spell VFX invisible | `StatusSpells.AddToScene` commented out | Check `Scripts/Spells/StatusSpells.cs:177` |
+| Spell VFX invisible | ProjectileVFXManager not registered | Check `TrainingMatch` wires `ProjectileVFXManager` — see `docs/systems/spell-vfx.md` |
 
----
-
-## Profiling / Debug
-
-```bash
-# Count GD.Print() calls (should stay under 15 files)
-grep -r "GD.Print" Scripts/ --include="*.cs" -l | wc -l
-
-# Find long methods (>150 lines)
-find Scripts -name "*.cs" -exec awk '/public|private|protected/ && /\(/ {s=NR} /^    \}/ {if(NR-s>150) print FILENAME":"s" ("NR-s" lines)"}' {} \;
-```

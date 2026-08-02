@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot-era AnimationTree plan; never shipped. Animation is Animancer-driven — see `docs/systems/animation-system.md`.
+
 # C# AnimationTree Builder — Implementation Plan
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.

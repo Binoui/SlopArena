@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot-era ability refactor plan; superseded by the `ServerAbility` pattern. See `docs/systems/ability-architecture.md`.
+
 ---
 > **Status: SUPERSEDED** — July 2026 cleanup moved all slots to `ServerAbility` classes.
 > The data-driven fallback and `IsServerAbility` field were removed.

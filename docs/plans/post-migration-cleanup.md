@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot cleanup plan; executed (Godot files are gone). Historical record.
+
 # Repo Cleanup — After Unity Port
 
 When the Unity client reaches feature parity and Godot is no longer used,

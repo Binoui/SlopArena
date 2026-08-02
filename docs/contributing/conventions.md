@@ -65,7 +65,7 @@ Unity             → import FBX, rename clips, generate Animator, create prefab
 - All FBX files share the same Mixamo skeleton
 - Place in `Assets/Art/Characters/<name>/Animations/`
 - Imported clips must be renamed from `mixamo.com` to the FBX filename
-- The `SlopArenaAnimatorGenerator` scans the folder and assigns clips automatically
+- Clip assignments are configured per character via `CharacterAnimationConfig` ScriptableObjects (see `docs/systems/animation-system.md`)
 
 ### Mixamo + Blender (rigging)
 
@@ -170,16 +170,15 @@ Each character defines their own ability animation names in `CharacterDefinition
 assets/
   characters/
     manki/
-      manki.glb           → master file (model + all anims embedded)
-      manki.glb.import    → Godot import config
+      manki.glb           → master file (model + all anims embedded), imported via the Unity FBX/GLB importer (no .import sidecar)
     weapons/
       sword_2handed_color.gltf
 ```
 
 animations/
-  run.res           → extracted per-animation .res files (Godot format)
-  idle.res
-  jump.res
+  run.fbx           → per-animation FBX with clips renamed to clip names in Unity
+  idle.fbx
+  jump.fbx
   ...
 
 animation_source/
@@ -242,10 +241,10 @@ The fire dancer is fun because of how he moves, not what he wears. Exaggerated k
 - **Movement style** (Narodin = acrobatic, floaty)
 
 ### Fix in engine, not in the asset
-- Weapons → BoneAttachment3D in Godot
-- Fire / particles → Godot VFX
-- Capes / cloth → Godot cloth simulation
-- Flames / glows → Godot shaders or particles
+- Weapons → attach to a bone transform (child of the weapon bone) in Unity
+- Fire / particles → ParticleSystem / VFX Graph
+- Capes / cloth → SkinnedMeshRenderer + Cloth component
+- Flames / glows → Shader Graph or ParticleSystem
 
 The 3D model should be as clean and simple as possible.
 

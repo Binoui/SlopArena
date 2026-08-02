@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot-era sim-loop plan; shipped as `LocalSimulationBridge`/`NetworkSimulationBridge` — see `docs/systems/netcode-architecture.md`.
+
 # Phase 1 Subplan — Match Loop + Local Sim
 
 > **Deliverable:** Manki moves + jumps + faces camera direction in a clean sim loop. No server process. Dummy NPC stands idle. No VFX, no UI, no network.

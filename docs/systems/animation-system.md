@@ -1,7 +1,7 @@
 # Unity Animation System
 
 > Animancer-driven clip playback. Server timing dictates when clips start and end.
-> No AnimatorController, no trigger parameters, no transition tables.
+> No animator controller, no trigger parameters, no transition tables.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ crossfade. The state machine is pure C# in `UpdateAnimationState()`:
 - **Dashing:** play dash clip (0s crossfade)
 - **Hitstun:** play `hit_small`/`hit_medium`/`hit_hard` by HitstunLevel
 
-No blend tree, no Animator parameters, no AnyState transitions.
+No blend tree, no animator parameters, no any-state transitions.
 
 ## Clip lookup
 

@@ -2,9 +2,9 @@
 
 ## 1. Philosophy
 
-**Server-authoritative with client-side prediction.** Le serveur est l'autorité absolue sur le state du jeu. Le client simule localement pour éviter la latence, et se corrige quand le serveur répond.
+**Server-authoritative.** The server is the absolute authority over game state. The client renders the latest server state directly — there is no local simulation, prediction, or rollback in Phase 1 (see §6).
 
-Même archi que Rivals 2, GGST, SF6.
+Same architecture as Rivals 2, GGST, SF6.
 
 ---
 
@@ -45,20 +45,20 @@ Même archi que Rivals 2, GGST, SF6.
 │                         UNITY CLIENTS                                 │
 │                                                                       │
 │  ┌──────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
-│  │ Input    │  │ LocalSim     │  │ NetworkClient│  │ LobbyClient   │  │
-│  │ (WASD)   │─►│ (predict)    │─►│ (UDP)       │  │ (SignalR)     │  │
-│  └──────────┘  └──────┬───────┘  └──────┬──────┘  └───────┬───────┘  │
-│                       │                 │                 │          │
-│                 ┌─────▼─────┐    ┌──────▼──────┐          │          │
-│                 │  RENDER   │◄───┤ State Buffer │          │          │
-│                 │ (Unity)   │    │ [t-29..t]   │          │          │
-│                 └──────────┘    │ 30-frame ring│          │          │
-│                                 │ rollback if  │          │          │
-│                                 │ 3D dist >0.5m│          │          │
-│                                 └─────────────┘           │          │
-│                                                           │          │
-│                 Lobby/meta via SignalR ◄──────────────────┘          │
-│                 Match sim via UDP ◄──────────────────────────────────┤
+│  │ Input    │  │ ISimulation  │  │ NetworkClient│  │ LobbyClient   │  │
+│  │ (WASD)   │─►│ Bridge       │─►│ (UDP)       │  │ (SignalR)     │  │
+│  └──────────┘  └──────────────┘  └──────┬──────┘  └───────┬───────┘  │
+│                                         │ ▲                │          │
+│                                   ┌─────▼─┴─────┐          │          │
+│                                   │  RENDER     │          │          │
+│                                   │ (Unity)     │          │          │
+│                                   │ latest      │          │          │
+│                                   │ server state│          │          │
+│                                   │ (1-tick lag)│          │          │
+│                                   └─────────────┘          │          │
+│                                                             │          │
+│                 Lobby/meta via SignalR ◄────────────────────┘          │
+│                 Match sim via UDP ◄───────────────────────────────────┤
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,78 +66,43 @@ Même archi que Rivals 2, GGST, SF6.
 
 ## 3. Data Flow
 
-### 3a. Client _PhysicsProcess (60Hz) — Predict + Send
+### 3a. Client FixedUpdate (60Hz) — Send
 
 ```
-_PhysicsProcess():
+PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
 
-  1. Player.GetCurrentInput()
+  1. InputController.Poll() — read Unity InputSystem
      → BuildInputState()
-       → lit clavier/souris + _pendingSlotPress
-       → InputState { MoveX, MoveY, flags, ActiveSlot }
+       → keyboard/mouse + ActiveSlot
+       → InputState { MoveX, MoveY, flags, ActiveSlot, FacingYaw, AimYaw, AimPitch, AimDistance, TargetEntityId }
 
-  2. Increment _sendTick
-     → _sendTick++ (monotonically increasing per frame)
+  2. NetworkSimulationBridge.Tick(inputs)
+     → _tick++ (monotonically increasing per frame)
+     → NetworkClient.SendInput(input, _tick)
+       → Packet: entityId(8) + tick(4) + InputState(19) = 31B
 
-  3. Store input in 30-frame ring buffer
-     → _inputBuffer[_sendTick % RollbackFrames] = input
-
-  4. LocalSimulation.Tick(input)
-     → ServerSimulation.Tick() — même code que le serveur
-     → prédit la position/vitesse/action du tick suivant
-
-  5. Store predicted state in ring buffer
-     → _stateBuffer[_sendTick % RollbackFrames] = predicted
-
-  6. Send input + tick to server (UDP, non-bloquant)
-     → Net.SendInput(input, _sendTick)
-     → Packet: entityId(8) + tick(4) + InputState(19) = 31B
-
-  7. Render predicted state
-     → PlayerRenderer.ApplyServerState(predicted)
-     → FixedUpdate réagit aux changements d'ActionState
-       (FSM transitions: Idle → Dashing, Idle → Attacking, etc.)
+  3. No local simulation, no prediction ring buffer
+     → render the latest server state via PlayerRenderer.ApplyServerState()
+       → one-tick display latency is intentional (Phase 1)
 ```
 
-### 3b. Client Update — Reconcile with Server
+### 3b. Client FixedUpdate — Render
 
 ```
-Update(delta):
+PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
 
-  1. Receive server states (non-bloquant)
-     → Net.ReceiveStates()
+  1. Receive server states (non-blocking)
+     → NetworkClient.ReceiveStates()
      → Returns: Dictionary<entityId, (tick, CharacterState)>
      → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60B
 
-  2. For player's server state:
-     a. Find predicted state for same tick
-        → int idx = serverTick % RollbackFrames
-        → CharacterState predicted = _stateBuffer[idx]
+  2. Store into the bridge
+     → NetworkSimulationBridge._latestStates[kv.Key] = kv.Value
 
-     b. Compare server vs predicted (3D distance)
-        → float dx = predicted.PX - serverState.PX
-        → float dy = predicted.PY - serverState.PY
-        → float dz = predicted.PZ - serverState.PZ
-        → float distSq = dx*dx + dy*dy + dz*dz
-        → If distSq > 0.25f (0.5m threshold):
-            → ROLLBACK triggered
-
-     c. Rollback procedure:
-        i.   Snapshot NPC states before replacing sim
-        ii.  Reset local sim to server's confirmed state
-             → new ServerSimulation(arena)
-             → RegisterEntity with serverState as initial state
-        iii. Re-register NPCs (prefer server-confirmed, fallback to snapshot)
-        iv.  Re-simulate from serverTick+1 to currentTick
-             → for tick t = serverTick+1 .. _sendTick:
-                 pastInput = _inputBuffer[t % RollbackFrames]
-                 _localSim.Tick({ playerEntityId, pastInput })
-        v.   Apply corrected state
-             → PlayerRenderer.ApplyServerState(corrected)
-             → Update _stateBuffer[currentTick % RollbackFrames]
-
-  3. For NPC server states:
-     → Apply server state directly (always authoritative, no prediction for now)
+  3. Render latest server state
+     → PlayerRenderer.ApplyServerState(state)
+     → NPC states are rendered directly from server state
+       (no prediction — always authoritative)
 
   4. Update visuals (target ring follow, UI)
 ```
@@ -156,7 +121,7 @@ Tick():
      → _serverTick = max(_serverTick, latestClientTick)
 
   4. ServerSimulation.Tick(inputs)
-     → SimulateTick: mouvement, gravité, sol, combat, tout
+     → SimulateTick: movement, gravity, ground, combat — everything
      → Spawn hitboxes from attack events (HitboxEvent.TriggerTick)
      → SpellResolver.Tick: hitbox vs hurtbox collision, damage, knockback, hitstun
 
@@ -234,9 +199,9 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(48) = 60
 
 Total: 60 bytes per entity (8 + 4 + 48)
 
-**Le serveur envoie TOUS les états à chaque client.** Le client ignore ceux qui ne le concernent pas. Pas de overhead de routing.
+**The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
-**Tick echo:** Le serveur lit le tick de chaque client depuis le buffer d'input et l'écrit dans le(s) paquet(s) de réponse. Le client utilise ce tick pour retrouver l'état prédit correspondant dans son ring buffer.
+**Tick echo:** The server reads each client's tick from the input queue and writes it into the response packet(s). The echoed tick is informational for Phase 1 — the client has no prediction ring buffer to match against (see §6).
 
 ---
 
@@ -280,77 +245,15 @@ Position, velocity, action state, grounded flag, state duration, attack slot, co
 
 ---
 
-## 6. Rollback System
+## 6. Prediction & Rollback — Not Implemented
 
-### 6a. Ring Buffers
+The client does **NOT** predict locally or roll back. `NetworkSimulationBridge`'s doc comment states:
 
-MatchManager maintains two 10-frame ring buffers:
+> No local simulation — one-tick display latency is intentional (Phase 1).
 
-```csharp
-private const int RollbackFrames = 10;
-private readonly InputState[] _inputBuffer = new InputState[RollbackFrames];
-private readonly CharacterState[] _stateBuffer = new CharacterState[RollbackFrames];
-```
+Input is sent each tick; the renderer displays the latest server-authoritative state. There are no input/state ring buffers, no server-vs-predicted mismatch comparison, and no re-simulation anywhere in `client/`.
 
-- `_inputBuffer[t % 10]` — every input sent to the server
-- `_stateBuffer[t % 10]` — every predicted state from local sim
-- 10 frames = ~167ms of buffer, enough to cover network jitter on localhost and realistic LAN latency
-
-### 6b. Rollback Trigger
-
-When a server state arrives for the player:
-
-```csharp
-int idx = (int)(serverTick % RollbackFrames);
-var predicted = _stateBuffer[idx];
-float dy = predicted.PY - serverState.PY;
-if (MathF.Abs(dy) > 0.01f)
-{
-    // ROLLBACK
-}
-```
-
-Threshold is 0.01m (1cm) on Y axis — if the vertical position differs by more than a centimeter, the prediction was wrong. The comparison currently checks only PY; this can be extended to a full vector comparison or per-field checks.
-
-### 6c. Rollback Procedure
-
-1. **Reset** — Create a fresh `ServerSimulation`, register the server's confirmed `CharacterState` as the initial state.
-2. **Re-simulate** — For each tick from `serverTick + 1` to `currentTick`, feed the corresponding input from `_inputBuffer` into `_localSim.Tick()`.
-3. **Apply** — Read the corrected state, update `_stateBuffer[currentTick % RollbackFrames]`, and call `Player.ApplyServerState(corrected)`.
-
-```csharp
-// Reset local sim to the server's confirmed state
-var safeState = serverState;
-_localSim = new ServerSimulation(_arenaDef);
-_localSim.RegisterEntity(_playerEntityId, _charDef, safeState);
-
-// Re-simulate from serverTick+1 to currentTick
-uint currentTick = _sendTick;
-for (uint t = serverTick + 1; t <= currentTick; t++)
-{
-    var pastInput = _inputBuffer[t % RollbackFrames];
-    _localSim.Tick(new Dictionary<ulong, InputState> { { _playerEntityId, pastInput } });
-}
-
-// Apply corrected state
-var corrected = _localSim.GetState(_playerEntityId);
-_stateBuffer[currentTick % RollbackFrames] = corrected;
-Player.ApplyServerState(corrected);
-```
-
-### 6d. Sur localhost = zéro rollback
-
-Quand le serveur tourne sur localhost :
-
-```
-Client envoie input → serveur reçoit immédiatement → tick → renvoie state
-                                                      ↓
-                                              Le temps d'arrivée est
-                                              < 1 frame (<1ms UDP local)
-                                              → toujours synchrone
-```
-
-Donc la prédiction locale matche TOUJOURS le serveur. L'archi rollback est là pour le jour où le serveur est distant.
+Prediction and rollback are deferred to **Phase 7 of `docs/plans/2026-08-01-pvp-roadmap-v2.md`** (the roadmap marks it ❌ Absent at line 58). On localhost the round-trip is under one tick, so raw state display is effectively synchronous; the roadmap defers client-side prediction until the server runs remotely.
 
 ---
 
@@ -360,18 +263,15 @@ Donc la prédiction locale matche TOUJOURS le serveur. L'archi rollback est là 
 
 ```
 1. Player presses LMB (slot 1)
-2. PlayerController._UnhandledInput(Key MouseButton.Left)
-   → _pendingSlotPress = 1 (stored, consumed next frame)
+   → InputController.Poll() reads Unity InputSystem (keyboard/mouse)
 
-3. Next _PhysicsProcess:
-   Player.BuildInputState()
-   → new InputState { Attack = true, ActiveSlot = 1, ... }
+2. BuildInputState() sets ActiveSlot = 1 on the InputState
 
-4. MatchManager._PhysicsProcess:
-   → _localSim.Tick(inputs) — local prediction
-   → ServerSimulation sees ActiveSlot=1, Attack=true
+3. InputState sent via the bridge
+   → NetworkSimulationBridge.Tick(inputs) → NetworkClient.SendInput(input, _tick)
+   → ServerSimulation edge-detects the slot press (prevAttack / state.AttackSlot)
 
-5. ServerSimulation.Tick → Simulation.SimulateTick()
+4. ServerSimulation.Tick → Simulation.SimulateTick()
    → Edge-detect Attack flag (prevAttack[entity] vs current)
    → On rising edge: resolve ability from slot
      → slot 1 = def.LMB → ability definition
@@ -381,7 +281,7 @@ Donc la prédiction locale matche TOUJOURS le serveur. L'archi rollback est là 
      → state.AttackElapsedTicks++
      → Check stage timings, chain windows, anim locks
 
-6. Hitbox spawning (post-simulation):
+5. Hitbox spawning (post-simulation):
    → In ServerSimulation.Tick(), after SimulateTick:
      → If state.State == Attacking && state.AttackSlot > 0:
        → Look up ability stage: slot → def.LMB → Stages[ComboStage]
@@ -424,87 +324,86 @@ Hitboxes are spawned at the precise trigger tick (e.g. frame 6 of an attack) and
 
 ---
 
-## 8. Client FSM Transitions
+## 8. Client Animation State
 
-The client's `Player._PhysicsProcess` does NOT independently drive gameplay state — it only reacts to what the simulation outputs:
+The client does NOT independently drive gameplay state — it only reacts to what the simulation outputs:
 
 ```
-Player._PhysicsProcess(delta):
+PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
 
-  1. First: ApplyServerState(state) was already called by MatchManager
+  1. First: ApplyServerState(state) was already called by the bridge
      → state.State, state.StateTicks, position, velocity are set
 
-  2. FSM transitions (AnimationPlayer):
-     → Detect ActionState changes from sim output
-     → idle → dashing:  start dash animation
-     → idle → attacking: start melee animation
-     → attacking → idle: reset combo state
-     → grounded → airborne: jump animation
-     → hitstun → recover: recovery animation
+  2. PlayerRenderer drives Animancer clip playback from the sim state
+     → ActionState changes map to clips (idle/run/jump/fall/dash/hitstun/attack)
+     → Clip speed modulated from server timing (GetAnimSpeedFromDuration)
+     → Clips are played via _animancer.Play()
 
   3. No input-driven state changes on client!
-     → All state transitions are driven by ApplyServerState
-     → Even on localhost, the sim is the authority
+     → All state transitions are driven by the server state
+     → Even in training mode, the local sim is the authority
 ```
 
-This ensures that even during rollback, the visual state is always driven by the corrected simulation output, not by stale local input processing.
+This ensures the visual state is always driven by the simulation output, not by stale local input processing.
 
 ---
 
-## 9. Mode Debug (F3)
+## 9. Debug Mode (F3)
 
-Les hurtboxes et hitboxes sont calculées côté serveur. Pour l'affichage F3, deux approches :
+Hurtboxes and hitboxes are computed server-side. For the F3 display, two approaches:
 
-### 9a. Simple (maintenant)
-Le mode debug réactive une simulation locale *en parallèle* juste pour le debug visuel. La vraie simulation reste sur le serveur.
+### 9a. Simple (now)
+Debug mode runs a local simulation *in parallel* purely for visual debugging. The real simulation stays on the server.
 
-### 9b. Propre (quand le protocole sera mature)
-Le client envoie un flag `RequestDebug` (1 bit dans InputState.flags). Le serveur, s'il voit le flag, envoie en plus :
+### 9b. Clean (once the protocol matures)
+The client sends a `RequestDebug` flag (1 bit in InputState.flags). The server, if it sees the flag, additionally sends:
 ```
 [0..7]   magic = 0x44454255  ("DEBU")
 [8..11]  count (uint)
 [...]    For each: position_start, position_end, radius, is_hitbox
 ```
 
-Packet séparé du state normal, le client l'ignore si pas en debug.
+Separate packet from the normal state; the client ignores it unless in debug mode.
 
 ---
 
 ## 10. Implementation Status
 
-### Phase 1 — Local prediction ✅
-- [x] MatchManager._PhysicsProcess: garder le NetworkClient pour l'envoi/réception
-- [x] Ajouter une `ServerSimulation` locale dans MatchManager
-- [x] Chaque frame: `localSim.Tick(input)` pour prédire
-- [x] Appliquer l'état prédit à PlayerController
-- [x] Quand le state serveur arrive: comparer, corriger si besoin
-- [x] Buffer d'inputs (10-frame ring, _inputBuffer[])
-- [x] Buffer de states prédits (10-frame ring, _stateBuffer[])
-- [x] Tick monotonic counter (_sendTick)
-- [x] Server echo du client tick dans la réponse
+### Phase 1 — Local prediction ❌ Not implemented
+Deferred to PvP roadmap v2 Phase 7. The client currently renders raw server state (see §6).
+- [ ] PvPMatch.FixedUpdate: keep the NetworkClient for send/receive
+- [ ] Add a local `ServerSimulation` to the match
+- [ ] Each frame: `localSim.Tick(input)` to predict
+- [ ] Apply the predicted state to PlayerRenderer
+- [ ] When the server state arrives: compare, correct if needed
+- [ ] Input buffer (10-frame ring, `_inputBuffer[]`)
+- [ ] Predicted-state buffer (10-frame ring, `_stateBuffer[]`)
+- [ ] Monotonic tick counter (`_sendTick`)
+- [ ] Server echoes the client tick in the response
 
-### Phase 2 — Combat côté serveur ✅
-- [x] Serveur gère dash via InputState.Dash
-- [x] Serveur gère attack via InputState.Attack + ActiveSlot
-- [x] Serveur gère jump via InputState.Jump
-- [x] Packet enrichi avec serialisation complète
+### Phase 2 — Server-side combat ✅
+- [x] Server handles dash via InputState.Dash
+- [x] Server handles attack via InputState.ActiveSlot
+- [x] Server handles jump via InputState.Jump
+- [x] Full packet serialization (48-byte CharacterStatePacket)
 - [x] ActiveSlot pipeline (slot press → ability resolution → hitbox spawn)
 - [x] HitboxEvent → SpellResolver.Spawn flow
 
-### Phase 3 — Rollback (quand le serveur sera distant) ✅
-- [x] Client: buffer des inputs envoyés (10 dernières frames)
-- [x] Client: buffer des states prédits (10 dernières frames)
-- [x] Quand le state serveur arrive: mismatch > 0.01m → résimuler depuis le dernier état sûr
-- [ ] Tests: delay simulé sur UDP pour stresser le rollback
+### Phase 3 — Rollback ❌ Not implemented
+Deferred to PvP roadmap v2 Phase 7.
+- [ ] Client: buffer of sent inputs (last 10 frames)
+- [ ] Client: buffer of predicted states (last 10 frames)
+- [ ] When the server state arrives: mismatch > threshold → re-simulate from the last confirmed state
+- [ ] Tests: simulated UDP delay to stress rollback
 
-### Phase 4 — Bots (threads séparés)
-- [ ] Chaque bot = thread dans ServerApp qui génère InputState
-- [ ] Thread lit les states du jeu, décide d'une action, génère input
-- [ ] Envoi via une queue thread-safe
-- [ ] Scale: 1 thread par bot (typiquement 4-8 max)
+### Phase 4 — Bots (separate threads)
+- [ ] Each bot = a thread in ServerApp generating InputState
+- [ ] Thread reads the game states, decides an action, generates input
+- [ ] Send via a thread-safe queue
+- [ ] Scale: 1 thread per bot (typically 4-8 max)
 
-### Phase 5 — Déploiement serveur distant
-- [ ] ServerApp build avec `dotnet publish -c Release`
-- [ ] Déployé sur un VPS
-- [ ] UDP hole-punching ou relay pour NAT traversal
-- [ ] Monitoring (latence, packet loss, jitter)
+### Phase 5 — Remote server deployment
+- [ ] ServerApp build with `dotnet publish -c Release`
+- [ ] Deployed on a VPS
+- [ ] UDP hole-punching or relay for NAT traversal
+- [ ] Monitoring (latency, packet loss, jitter)

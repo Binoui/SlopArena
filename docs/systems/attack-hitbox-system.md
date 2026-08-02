@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Superseded by `docs/systems/hitbox-system.md` (states no startup/self-lock; current model has `AnimLockTicks` + stages).
+
 # Attack & Hitbox System
 
 ## 1. Philosophy

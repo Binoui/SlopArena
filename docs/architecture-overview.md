@@ -7,44 +7,37 @@
 
 ```
 SlopArena/
-├── client/Unity/Assets/Scripts/Shared/  ← REAL files (Unity compiles these directly)
-│   ├── Characters/     ← MankiData, FightGuyData (CharacterRegistry)
-│   ├── Abilities/      ← AbilityFactory, ServerAbility implementations
-│   ├── Simulation.cs   ← SimulateTick(): one tick of movement + combat
-│   ├── SpellResolver.cs← Hitbox spawn/Tick: sphere-capsule collision math
-│   ├── CharacterState.cs← Per-tick entity state (pos, vel, cooldowns, deaths)
-│   ├── CharacterDefinition.cs ← Data-driven characters: stats, abilities, hitboxes
-│   ├── AttackData.cs   ← HitboxEvent, AttackStage, AbilityData structs
-│   ├── CombatMath.cs   ← Knockback, facing, damage scaling
-│   ├── ServerSimulation.cs ← Wraps Simulation + SpellResolver for server tick
-│   ├── CharacterStatePacket.cs ← UDP packet (39 bytes), FromState/Serialize
-│   ├── ClientInputPacket.cs ← Client->server input (14 bytes)
-│   ├── InputState.cs   ← Normalized input (MoveX/Y, flags, ActiveSlot)
-│   ├── BakedAnimationData.cs← Offline-baked bone positions per frame
-│   ├── ServerSkeleton.cs← FBX/GLB JSON parser for skeleton data
-│   ├── ArenaDefinition.cs← Arena data (platforms, spawns, kill height)
-│   └── MovementProfiles.cs← (deleted — dead code)
+├── client/Unity/Assets/Scripts/  ← Shared is NOT under Assets/Scripts; see src/Shared + Plugins/SlopArena.Shared DLL
 │
-├── src/Shared/          ← SYMLINKS → client/Unity/Assets/Scripts/Shared/ (shared code root)
+├── src/Shared/          ← canonical Shared code (netstandard2.1), built to client/Unity/Assets/Plugins/SlopArena.Shared/
 │   ├── Abilities/           ← ServerAbility implementations
 │   │   ├── ServerAbility.cs     ← Base class: OnStart/Tick/OnEnd lifecycle
 │   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
-│   │   ├── MankiLmbCombo.cs     ← Manki LMB: 3-hit combo with lunge
+│   │   ├── LmbCombo.cs          ← Manki LMB: 3-hit combo with lunge (StageChainAbility)
 │   │   ├── MankiRoundBomb.cs    ← Manki Q: hold-to-aim parabolic bomb
 │   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
 │   │   ├── MankiBazooka.cs      ← Manki R: rise-aim-fire bazooka
-│   │   └── MankiOverclock.cs    ← Manki F: self-buff 8s
-│   ├── Simulation.cs        ← shared logic
+│   │   ├── MankiOverclock.cs    ← Manki F: self-buff 8s
+│   │   └── Kistu*/Nilus*/FightGuy* ← per-character ability implementations
+│   ├── Characters/          ← MankiData, FightGuyData, KistuData, NilusData (per-character definitions)
+│   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs     ← hitbox collision math
-│   ├── CharacterState.cs    ← entity state
-│   └── ... (all files are symlinks to client/Unity/Assets/Scripts/Shared/)
+│   ├── CharacterState.cs    ← per-tick entity state
+│   ├── CharacterStatePacket.cs ← UDP packet (48 bytes, +12B envelope)
+│   ├── ClientInputPacket.cs ← legacy — the wire uses InputState; kept for compat
+│   ├── InputState.cs        ← normalized input (MoveX/Y, flags, ActiveSlot), 19 bytes
+│   ├── AttackData.cs        ← HitboxEvent, AttackStage, AbilityData structs
+│   ├── CombatMath.cs        ← knockback, facing, damage scaling
+│   ├── BakedAnimationData.cs← offline-baked bone positions per frame
+│   ├── ArenaDefinition.cs   ← arena data (platforms, spawns, kill height)
+│   └── ... (lobby/codec DTOs: LobbyPayloadCodec, MasterServerClient, HostedServerConfig, ServerLogParser)
 │
 ├── client/Unity/         ← Unity game client
 │   └── Assets/Scripts/
 │       ├── Runtime/
 │       │   ├── Entities/       ← PlayerRenderer, StatusBillboard, WeaponAttach
-│       │   ├── World/          ← MatchBase, TrainingMatch, PvPMatch (match orchestration)
-│       │   ├── Simulation/     ← LocalSimulationBridge, NetworkSimulationBridge, ISimulationBridge
+│       │   ├── World/          ← GameManager, MatchBase, TrainingMatch, PvPMatch (match orchestration)
+│       │   ├── Simulation/     ← ISimulationBridge, LocalSimulationBridge, NetworkSimulationBridge
 │       │   ├── Network/        ← NetworkClient (UDP, Connect/SendInput/ReceiveStates)
 │       │   ├── UI/             ← MatchConfig, MainMenuController, LobbyController, CharSelectController, StageSelectController, HUDManager
 │       │   ├── Input/          ← InputController (Unity Input → InputState)
@@ -52,14 +45,15 @@ SlopArena/
 │       │   ├── Combat/         ← CombatFeedback, AimHandler, AimIndicator
 │       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
 │       ├── Editor/
-│       │   └── SlopArenaAnimatorGenerator.cs ← Generates AnimatorControllers
-│       └── Shared/         ← REAL FILES (source of truth for Shared code)
-│           ├── Characters/     ← MankiData, FightGuyData
-│           ├── Abilities/      ← AbilityFactory, ServerAbility impls
-│           └── ... (all Shared code)
+│       │   ├── SlopArenaBaker.cs        ← skeleton bake (bone positions per anim frame → .bin)
+│       │   ├── SlopArenaArenaBaker.cs   ← arena bake
+│       │   ├── SlopArenaSceneSetup.cs   ← scene setup
+│       │   ├── PopulateAbilityClips.cs  ← populate ability clip slots
+│       │   ├── SetupArenaLighting.cs    ← arena lighting
+│       │   └── SetupArenaSkybox.cs      ← arena skybox
 │
 ├── src/
-│   ├── Shared/            ← SYMLINKS to client/Unity/Assets/Scripts/Shared/
+│   ├── Shared/            ← canonical Shared code (netstandard2.1)
 │   ├── Server/            ← Headless .NET server (MatchInstance, UDP loop)
 │   └── ServerApp/         ← Prototype test server
 │
@@ -88,7 +82,7 @@ SlopArena/
 │                                                                  │
 │  InputController.Poll() → InputState                            │
 │  PlayerRenderer.ApplyServerState(state)                         │
-│       └── UpdateAnimationState() → Animator transitions         │
+│       └── UpdateAnimationState() → _animancer.Play(clip)        │
 └──────────────────────────────────────────────────────────────────┘
 
 ---
@@ -140,7 +134,7 @@ SlopArena/
 
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
-→ Quick version: add `CharacterClass` enum value → write `BuildXxx()` in `CharacterDefinition.cs` → register in `BuildRegistry()` → add `AbilitySpec.Description` for each ability slot → create `CharacterAnimationConfig` ScriptableObject.
+→ Quick version: add `CharacterClass` enum value → create `src/Shared/Characters/<Name>Data.cs` → register in `BuildRegistry()` → add `AbilitySpec.Description` for each ability slot → create `CharacterAnimationConfig` ScriptableObject.
 
 ---
 
@@ -163,7 +157,7 @@ dotnet run --project src/Server/
 
 | Doc | Covers |
 |-----|--------|
-| `docs/systems/animation-system.md` | Unity Animator: 1-layer trigger-driven, generator tool, pitfalls |
+| `docs/systems/animation-system.md` | Animancer clip playback, server-timed transitions, extrapolation |
 | `docs/systems/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
 | `docs/systems/ability-architecture.md` | ServerAbility pattern, lifecycle, creating new abilities |
 | `docs/systems/combat-systems.md` | Universal combat mechanics |

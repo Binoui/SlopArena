@@ -155,7 +155,7 @@ const float HitstunScaling = 0.5f;       // KB → frames conversion (line 475)
 ## Visual Feedback
 
 **During Hitstun:**
-- White flash on victim (PlayerController.cs line 528-543)
+- White flash on victim (PlayerRenderer.cs)
 - Victim frozen in place
 - **Duration indicator:** Flash brightness = remaining hitstun
 
@@ -220,11 +220,11 @@ A: No. DI only affects knockback trajectory, not damage.
 
 Hitstun has 3 animation tiers based on the damage of the attack that hits, providing visual feedback proportional to impact strength:
 
-| Tier | Damage Range | `HitstunLevel` | Anim Clip       | Trigger          |
-|------|-------------|----------------|-----------------|------------------|
-| Light  | < 5        | 0              | `hit_light`     | `HitstunSmall`   |
-| Medium | 5–14       | 1              | `hit_medium`    | `HitstunMedium`  |
-| Hard   | ≥ 15       | 2              | `hit_hard`      | `HitstunHard`    |
+| Tier | Damage Range | `HitstunLevel` | Anim Clip              |
+|------|-------------|----------------|------------------------|
+| Light  | < 5        | 0              | `hit_light` (HitSmall) |
+| Medium | 5–14       | 1              | `hit_medium` (HitMedium) |
+| Hard   | ≥ 15       | 2              | `hit_hard` (HitHard)   |
 
 ### How It Works
 
@@ -234,9 +234,8 @@ Hitstun has 3 animation tiers based on the damage of the attack that hits, provi
                                finalDamage < 15f ? (byte)1 : (byte)2;
    ```
 2. **Set once:** The level is set at hit time, not re-derived from `DamagePercent`. This prevents flicker if another hit lands during hitstun.
-3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 44). The client receives it every tick during hitstun.
-4. **Client renderer:** `PlayerRenderer` maps `HitstunLevel` to the corresponding animator trigger:
-   - Level 0 → `HitstunSmall`, Level 1 → `HitstunMedium`, Level 2 → `HitstunHard`
+3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 48). The client receives it every tick during hitstun.
+4. **Client renderer:** `PlayerRenderer` maps `HitstunLevel` to a clip name (0→`hit_light`/HitSmall, 1→`hit_medium`/HitMedium, 2→`hit_hard`/HitHard) resolved through `CharacterAnimationConfig`, played via `_animancer.Play(clip)` with `Speed = GetAnimSpeedFromDuration(name, HitstunTicks)`
 5. **Server bone resolution:** Both bone-animation spots in `ServerSimulation` use the same switch to pick the clip name for hurtbox alignment.
 
 ### CharacterDefinition Defaults
@@ -249,15 +248,6 @@ public string HitHardAnim = "hit_hard";
 
 These map to the actual FBX clip names. Per-character overrides go in `CharacterDefinition.ClipOverrides`.
 
-### Animator Layer
-
-The animator controller has 3 independent AnyState transitions, one per tier. All are `AutoExit = true`.
-```
-AnyState ──HitstunSmall──→ HitstunSmallState (hit_light)  AutoExit
-AnyState ──HitstunMedium─→ HitstunMediumState (hit_medium) AutoExit
-AnyState ──HitstunHard───→ HitstunHardState (hit_hard)     AutoExit
-```
-
 ### Configuration Assets
 
 `CharacterAnimationConfig` ScriptableObject exposes:
@@ -265,10 +255,7 @@ AnyState ──HitstunHard───→ HitstunHardState (hit_hard)     AutoExit
 - `HitMedium` — clip for medium hits (5–14 damage)
 - `HitHard` — clip for hard hits (≥ 15 damage)
 
-The animator generator (`SlopArenaAnimatorGenerator.AssignClip`) maps these names:
-- `hit_light`, `hit_small` → `HitSmall` (aliases)
-- `hit_medium` → `HitMedium`
-- `hit_hard`, `hit_large` → `HitHard` (backward alias for `hit_large`)
+The `CharacterAnimationConfig` ScriptableObject exposes `HitSmall`/`HitMedium`/`HitHard` clip slots; aliases (`hit_light`↔`hit_small`, `hit_hard`↔`hit_large`) are resolved in `PlayerRenderer`'s hitstun clip lookup.
 
 ### Testing
 
@@ -281,7 +268,6 @@ See `tests/Shared.Tests/HitstunAnimationTierTests.cs` for:
 - **CharacterState.cs:** Line 47-48 (HitstunTicks, DIX, DIY), Line 102 (HitstunLevel)
 - **ActionState.cs:** Line 7 (Hitstun enum)
 - **Simulation.cs:** Line 61-67 (ProcessHitstun call), Line 141-176 (ProcessHitstun function), Line 462-495 (ApplyKnockback with hitstun)
-- **CharacterStatePacket.cs:** Offset 43 (HitstunLevel), Size 44
-- **PlayerController.cs:** Line 526-547 (Visual white flash)
-- **PlayerRenderer.cs:** Lines 288-297 (HitstunLevel switch → trigger)
+- **CharacterStatePacket.cs:** Offset 43 (HitstunLevel), Size 48
+- **PlayerRenderer.cs:** (hitstun clip play + speed)
 - **HitstunAnimationTierTests.cs:** Full unit + integration coverage

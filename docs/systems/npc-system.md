@@ -108,7 +108,7 @@ Player AND NPCs use the **same** system:
 // On knockout (void/out-of-bounds) - same for player and NPCs
 character.TriggerRespawn(); // Triggers 20s respawn at center
 
-// In Main.cs _Process:
+// In TrainingMatch.Update():
 if (_arenaManager.IsBelowKillHeight(character.GlobalPosition))
 {
     character.TriggerRespawn(); // 20s delay, respawn at center in air
@@ -172,7 +172,7 @@ private void ExecuteAttack()
 ### How It Works
 
 1. **InputController** supports two modes:
-   - Human: reads from Godot Input
+   - Human: reads from Unity InputSystem via InputController
    - AI: uses injected InputState
    
 2. **BotController** builds InputState each frame:
@@ -256,15 +256,15 @@ private void SpawnBots()
 ### Check NPCs
 
 ```csharp
-// In _Process or _PhysicsProcess
-GD.Print($"NPC Count: {_npcs.Count(n => n != null)}");
-GD.Print($"Alive NPCs: {_npcs.Count(n => n?.IsNpcAlive() ?? false)}");
+// In Update or FixedUpdate
+Debug.Log($"NPC Count: {_npcs.Count(n => n != null)}");
+Debug.Log($"Alive NPCs: {_npcs.Count(n => n?.IsNpcAlive() ?? false)}");
 
 foreach (var npc in _npcs)
 {
     if (npc != null)
     {
-        GD.Print($"{npc.Name}: Dmg={npc.GetDamagePercent()}%, Pos={npc.GlobalPosition}, Alive={npc.IsNpcAlive()}");
+        Debug.Log($"{npc.Name}: Dmg={npc.GetDamagePercent()}%, Pos={npc.GlobalPosition}, Alive={npc.IsNpcAlive()}");
     }
 }
 ```
@@ -276,15 +276,15 @@ NPCs have red emission when NPC mode is enabled (see PlayerController:1092).
 ### Console Commands
 
 ```csharp
-// Add in Main.cs _UnhandledInput:
-if (key.Keycode == Key.F1)
+// Add in TrainingMatch.Update():
+if (Keyboard.current.f1Key.wasPressedThisFrame)
 {
-    GD.Print("=== NPC STATUS ===");
+    Debug.Log("=== NPC STATUS ===");
     for (int i = 0; i < _npcs.Length; i++)
     {
         if (_npcs[i] != null)
         {
-            GD.Print($"NPC {i}: Dmg={_npcs[i].GetDamagePercent()}%, Alive={_npcs[i].IsNpcAlive()}");
+            Debug.Log($"NPC {i}: Dmg={_npcs[i].GetDamagePercent()}%, Alive={_npcs[i].IsNpcAlive()}");
         }
     }
 }

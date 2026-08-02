@@ -12,7 +12,7 @@ Surface the state of all feature branches at a glance and optionally draft a PR.
 
 Run:
 ```bash
-cd ~/Projects/SlopArena
+cd "$(git rev-parse --show-toplevel)"
 while IFS= read -r b; do
   ahead=$(git rev-list --count main.."$b" 2>/dev/null)
   behind=$(git rev-list --count "$b"..main 2>/dev/null)
@@ -37,7 +37,7 @@ Format a squash-merge PR body using these sections:
 - **Testing**: which `dotnet test` filter was run and result; if Unity changes, what was tested in-editor
 - **Checklist**:
   - [ ] `dotnet build src/Shared/ --nologo` — 0 errors
-  - [ ] `Shared/` has zero `UnityEngine.*` or `Godot.*` imports
+  - [ ] `Shared/` has zero `UnityEngine.*` imports (pure C#, netstandard2.1)
   - [ ] All durations use `ushort` ticks, no `float` seconds in Shared
   - [ ] Allman braces in C# (`{` on its own line)
 

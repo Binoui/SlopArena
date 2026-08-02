@@ -19,17 +19,17 @@ Run the simulation test suite. Always rebuild Shared first so Unity and tests st
 
 1. Rebuild Shared:
    ```bash
-   dotnet build ~/Projects/SlopArena/src/Shared/ --nologo -v q
+   cd "$(git rev-parse --show-toplevel)" && dotnet build src/Shared/ --nologo -v q
    ```
    Expected last line: `Build succeeded.`
 
 2. Run tests (with optional filter):
    ```bash
    # No filter:
-   dotnet test ~/Projects/SlopArena/tests/Shared.Tests/ --nologo -v q 2>&1
+   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo -v q 2>&1
 
    # With filter (replace FILTER with the argument the user passed):
-   dotnet test ~/Projects/SlopArena/tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" -v q 2>&1
+   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" -v q 2>&1
    ```
    Expected: `Passed: N` (where N is the number of tests run)
 
@@ -41,10 +41,10 @@ Run the simulation test suite. Always rebuild Shared first so Unity and tests st
 
    ```bash
    # Full suite (no filter was used):
-   dotnet test ~/Projects/SlopArena/tests/Shared.Tests/ --nologo 2>&1
+   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo 2>&1
 
    # Filtered run:
-   dotnet test ~/Projects/SlopArena/tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" 2>&1
+   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" 2>&1
    ```
    Then analyse the assertion and the relevant source file before reporting back.
 

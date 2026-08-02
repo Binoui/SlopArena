@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Godot-era FSM plan; superseded by Animancer. See `docs/systems/animation-system.md`.
+
 # JumpState / FallState Split — Summary
 
 ## Problem

@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED / SUPERSEDED** — Contents are stale. Superseded. Its `Scripts/Combat/TargetLockSystem.cs` does not exist; warp/soft-lock lives in `ServerSimulation.ProcessTargetLock` + `Simulation.ProcessWarp` with `AttackRange`/`WarpRange` on `AttackStage` (`src/Shared/AttackData.cs`). See `docs/systems/combat-systems.md` and `docs/systems/hitbox-system.md`.
+
 # Range-Based Combat System
 
 Complete implementation of Range-based combat (Range-Based) inspired combat mechanics for SlopArena.
