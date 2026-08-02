@@ -257,3 +257,36 @@ The 3D model should be as clean and simple as possible.
 | 1 | Manki | Agile rushdown / fire monkey | In-game prototype |
 
 See `docs/characters/manki.md` for details.
+
+---
+
+## 9. Git & Commits
+
+**One squash commit per branch.** Feature branches are squashed at finish time (see `.omp/skills/sloparena-finish-branch`); the message is written once, at the end, and must describe the whole branch.
+
+### Format — Conventional Commits
+
+```
+<type>(<scope>): <imperative summary> (issue #N)
+```
+
+- **type**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+- **scope**: the subsystem touched — `match`, `client`, `server`, `shared`, `netcode`, `arena`, `docs`, `mcp`, …
+- **summary**: imperative, lowercase, ≤ 72 chars. What the change does, not how.
+- **issue ref**: append ` (issue #N)` when the work resolves a GitHub issue.
+
+### Examples (from the repo log)
+
+```
+feat(match): roster-driven match start with character classes (issue #35)
+fix(client): repair Unity-MCP stack
+docs: sync skills and docs to Unity codebase
+chore(mcp): add Unity-MCP extensions, update docs
+```
+
+### Rules
+
+- One type + one scope per commit; pick the dominant one when mixed.
+- Server-authoritative changes note the Shared files touched in the PR body (not the subject).
+- Never commit generated artifacts (`artifacts/`, Unity Plugins DLLs — gitignored).
+
