@@ -32,7 +32,7 @@ namespace SlopArena.Client.Network
         [Header("Subprocess")]
         [Tooltip("Path to the dotnet executable. 'dotnet' relies on PATH.")]
         [SerializeField] private string _dotnetPath = "dotnet";
-        [Tooltip("Repo-relative path to the game-server .csproj (run via 'dotnet run').")]
+        [Tooltip("Repo-relative path to the game-server .csproj (run via 'dotnet run'). Editor-only fallback; built players spawn the bundled binary.")]
         [SerializeField] private string _serverProjectPath = "src/Server/SlopArena.Server.csproj";
         [Tooltip("Repo-relative path to the .arena files directory. Absolute if set.")]
         [SerializeField] private string _arenaDataDir = "data/arenas";
@@ -90,7 +90,9 @@ namespace SlopArena.Client.Network
 
         /// <summary>
         /// Start the embedded game server. Picks a free UDP port, writes a temp
-        /// <c>server.json</c>, and spawns <c>dotnet run</c> on the server project.
+        /// <c>server.json</c>, and spawns the game server — the self-contained
+        /// binary bundled at <c>StreamingAssets/Server</c> in built players, or
+        /// <c>dotnet run</c> on the repo project in the Editor.
         /// Fires <see cref="Registered"/> or <see cref="RegistrationFailed"/> on the
         /// main thread. Safe to call once per host session.
         /// </summary>
@@ -103,13 +105,19 @@ namespace SlopArena.Client.Network
                 return;
             }
 
-            string repoRoot = ResolveRepoRoot();
-            string projectPath = Path.IsPathRooted(_serverProjectPath)
-                ? _serverProjectPath
-                : Path.GetFullPath(Path.Combine(repoRoot, _serverProjectPath));
-            string arenaDir = Path.IsPathRooted(_arenaDataDir)
-                ? _arenaDataDir
-                : Path.GetFullPath(Path.Combine(repoRoot, _arenaDataDir));
+            // Built players: prefer the self-contained server binary bundled at
+            // StreamingAssets/Server (no repo, SDK, or .NET install needed).
+            // Editor: falls back to `dotnet run` on the repo project.
+            string bundledServerDir = Path.Combine(Application.streamingAssetsPath, "Server");
+            string bundledExe = Path.Combine(bundledServerDir,
+                Application.platform == RuntimePlatform.WindowsPlayer ? "SlopArena.Server.exe" : "SlopArena.Server");
+            bool useBundled = File.Exists(bundledExe);
+
+            string arenaDir = useBundled
+                ? Path.Combine(Application.streamingAssetsPath, "arenas")
+                : Path.IsPathRooted(_arenaDataDir)
+                    ? _arenaDataDir
+                    : Path.GetFullPath(Path.Combine(ResolveRepoRoot(), _arenaDataDir));
 
             if (!Directory.Exists(arenaDir))
             {
@@ -133,18 +141,41 @@ namespace SlopArena.Client.Network
             File.WriteAllText(_configPath, config.ToJson());
             UnityEngine.Debug.Log($"[ServerHost] Wrote config to {_configPath} (port {_assignedPort})");
 
-            var psi = new ProcessStartInfo
+            ProcessStartInfo psi;
+            if (useBundled)
             {
-                FileName = _dotnetPath,
-                // dotnet run --project <csproj> -- <configPath>
-                // '--' separates dotnet-run args from app args.
-                ArgumentList = { "run", "--project", projectPath, "--", _configPath },
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = repoRoot
-            };
+                psi = new ProcessStartInfo
+                {
+                    FileName = bundledExe,
+                    // Config path as args[0] (server Program.Main contract).
+                    // WorkingDirectory = binary dir (issue #60 requirement).
+                    ArgumentList = { _configPath },
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(bundledExe)!
+                };
+            }
+            else
+            {
+                string repoRoot = ResolveRepoRoot();
+                string projectPath = Path.IsPathRooted(_serverProjectPath)
+                    ? _serverProjectPath
+                    : Path.GetFullPath(Path.Combine(repoRoot, _serverProjectPath));
+                psi = new ProcessStartInfo
+                {
+                    FileName = _dotnetPath,
+                    // dotnet run --project <csproj> -- <configPath>
+                    // '--' separates dotnet-run args from app args.
+                    ArgumentList = { "run", "--project", projectPath, "--", _configPath },
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = repoRoot
+                };
+            }
 
             try
             {
