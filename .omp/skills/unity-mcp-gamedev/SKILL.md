@@ -1,8 +1,38 @@
 # Unity-MCP (gamedev-mcp-server)
 
-Server: `gamedev-mcp-server` at `http://localhost:26356/mcp`. Configured in `.omp/mcp.json`.
+Official IvanMurzak stack: **Unity-MCP plugin** (`com.ivanmurzak.unity.mcp`, v0.86.3) + **GameDev-MCP-Server** bridge (9.x) at `http://localhost:26356/mcp`. The plugin spawns the bridge (port 26356 = deterministic per-project) and connects over SignalR. Client config lives in `.omp/mcp.json`.
 
-> **Warning:** The `com.ivanmurzak.unity.mcp` package in Unity exposes separate AI tools (`Unity_*`, `Unity_Camera_*`, `Unity_AssetGeneration_*`, etc.) — these are NEVER used. Only the tools documented in this skill file from the custom `gamedev-mcp-server`.
+> **Warning:** The `Unity_*` / `unity_*` tools (`Unity_Camera_*`, `Unity_GetConsoleLogs`, `Unity_RunCommand`, …) come from **Unity's built-in MCP** (`com.unity.ai.assistant`, relay on :9002) — these are NEVER used. Only the tools documented in this skill file, served by the IvanMurzak bridge on :26356.
+
+## Setup / Reinstall (verified 2026-08-02)
+
+Fresh install of the plugin on Unity 6000.0.78f1:
+
+1. **manifest.json** dependency (git URL — the package is NOT at the repo root):
+   ```json
+   "com.ivanmurzak.unity.mcp": "https://github.com/IvanMurzak/Unity-MCP.git?path=/Unity-MCP-Plugin/Packages/com.ivanmurzak.unity.mcp"
+   ```
+   No version pin — `#0.84.3` etc. breaks against the NuGet DLLs the resolver installs.
+2. **scopedRegistries** in the SAME manifest — the plugin depends on `extensions.unity.playerprefsex` (OpenUPM), and Unity does NOT pick up the registry declared inside the package:
+   ```json
+   "scopedRegistries": [{"name": "package.openupm.com", "url": "https://package.openupm.com", "scopes": ["extensions.unity"]}]
+   ```
+3. **NuGet DLLs in `Assets/Plugins/NuGet/`** — the plugin's Runtime code compiles against ReflectorNet/McpPlugin DLLs. If that folder is empty (only `.nuget-installed.json` left), compile fails with CS0246 (`Logs`, `SerializedMember`, `Reflector` not found). The DLLs are restored from `Library/NuGetCache/*.nupkg` (nupkgs are cached there — no network needed): extract per `Editor/DependencyResolver/NuGetConfig.cs` declared versions (0.86.3 → McpPlugin 7.5.2, ReflectorNet 5.4.0) from the **`lib/netstandard2.1`** folder ONLY.
+   - NEVER extract net8.0/net9.0 builds → Unity errors CS1705 (`System.Runtime 8.0.0.0` vs 4.1.2.0).
+   - Wrong versions → CS0115/CS0508 (`no suitable method found to override`).
+4. After compile goes green the plugin auto-spawns the bridge and connects. Verify: `scripts/mcp-check.sh`, then `tools/list` (~78 tools), then one `console-get-logs` call.
+
+**Repo hygiene:** `Assets/Plugins/NuGet/*.dll` is force-tracked (gitignore negation) because the plugin cannot auto-restore while compilation is broken. When the plugin bumps its NuGet versions (see `NuGetConfig.cs`), the resolver replaces the DLLs on disk — commit the refreshed set + `.dll.meta` files so fresh clones stay green.
+
+## Known failure: boot race
+
+On editor restart, the plugin's SignalR handshake runs ~30s BEFORE the bridge finishes booting → `HubConnection failed: negotiation` → plugin drops into disconnected state and does NOT auto-reconnect. Bridge log then shows `Available connections:` (empty) and every call fails after 10 retries.
+
+**Recovery:** in Unity, **AI Game Developer** window → Stop → Start (re-runs the negotiation). A fresh bridge spawn alone does NOT re-trigger the plugin.
+
+## Known failure: project compile errors block everything
+
+Unity refuses to run ANY editor code while any script error exists. If the project itself has compile errors (e.g. CS0150 `A constant value is expected` — non-const values in switch-expression arms), the plugin never loads and the bridge never spawns, even though the plugin install is fine. Fix the project errors first.
 
 
 ## Quick Reference (session start)
@@ -51,6 +81,8 @@ Scripts in `scripts/mcp-*.sh`:
 | Refresh AssetDatabase | `assets-refresh` |
 
 ## Config
+
+The bridge runs `client-transport=streamableHttp`; the `"type": "sse"` client config below works against it (initialize/tools/call round-trip verified). Scripts in `scripts/mcp-*.sh` use the same session pattern.
 
 ```json
 {

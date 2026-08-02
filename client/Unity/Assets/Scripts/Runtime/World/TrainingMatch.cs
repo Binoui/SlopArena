@@ -285,7 +285,7 @@ namespace SlopArena.Client.World
                 // Color by entity: player=green, NPC=red, others=blue
                 Gizmos.color = ed.Id switch
                 {
-                    PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
+                    var id when id == PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
                     NpcEntityId    => new Color(1f, 0.3f, 0.3f, 0.5f),
                     _              => new Color(0.3f, 0.3f, 1f, 0.5f),
                 };
@@ -344,7 +344,7 @@ namespace SlopArena.Client.World
             {
                 Color color = ed.Id switch
                 {
-                    PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
+                    var id when id == PlayerEntityId => new Color(0f, 1f, 0.3f, 0.5f),
                     NpcEntityId    => new Color(1f, 0.3f, 0.3f, 0.5f),
                     _              => new Color(0.3f, 0.3f, 1f, 0.5f),
                 };

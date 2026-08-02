@@ -146,6 +146,9 @@ client/Unity/Assets/Resources/Icons/
 
 # Unity Plugins — third-party DLLs (NuGet, Animancer, etc.)
 client/Unity/Assets/Plugins/**/*.dll
+# NuGet DLLs for the Unity-MCP plugin are REQUIRED at compile time (no auto-restore
+# possible while compilation is broken) — track them explicitly.
+!client/Unity/Assets/Plugins/NuGet/*.dll
 client/Unity/Assets/Plugins/**/*.pdb
 client/Unity/Assets/Plugins/**/*.deps.json
 client/Unity/Assets/Plugins/**/*.runtimeconfig.json
