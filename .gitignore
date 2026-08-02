@@ -208,3 +208,6 @@ client/Unity/Assets/BOXOPHOBIC/
 
 # Handoff playtest checklist (worktree agents → PR body, never committed)
 TESTING-UNITY.md
+
+# Staged by scripts/build-release.sh (bundled server + arenas for player build)
+/client/Unity/Assets/StreamingAssets/

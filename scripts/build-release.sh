@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Build a Windows demo release: SlopArena-<version>.zip in build/release/.
+# Usage: scripts/build-release.sh <version>   e.g. scripts/build-release.sh 0.2.0-demo.1
+set -euo pipefail
+
+VERSION="${1:?usage: build-release.sh <version>}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+UNITY="${UNITY_EDITOR:-/home/binoui/Unity/Hub/Editor/6000.0.78f1/Editor/Unity}"
+PROJ="$ROOT/client/Unity"
+REL="$ROOT/build/release/SlopArena-$VERSION"
+SA="$PROJ/Assets/StreamingAssets"
+
+echo "== Shared build =="
+dotnet build "$ROOT/src/Shared/" --nologo
+
+echo "== Tests =="
+dotnet test "$ROOT/tests/Shared.Tests/" --nologo
+
+echo "== Self-contained Windows server (embedded host-and-play) =="
+dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 --self-contained true -o "$SA/Server"
+
+echo "== linux-x64 server for the mini PC =="
+dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x64 --self-contained false -o "$ROOT/build/minipc"
+
+echo "== Stage arenas =="
+mkdir -p "$SA/arenas"
+cp "$ROOT"/data/arenas/*.arena "$SA/arenas/"
+
+echo "== Version stamp =="
+# The stamp is reverted below with a hard checkout of the committed file; refuse
+# to run if ProjectSettings.asset has uncommitted edits (they would be lost).
+git -C "$ROOT" diff --quiet -- client/Unity/ProjectSettings/ProjectSettings.asset \
+  || { echo "error: ProjectSettings.asset has uncommitted changes -- commit or stash them first (the version stamp is reverted via git checkout)" >&2; exit 1; }
+sed -i "s/^  bundleVersion: .*/  bundleVersion: $VERSION/" "$PROJ/ProjectSettings/ProjectSettings.asset"
+
+echo "== Unity Windows player build =="
+mkdir -p "$REL"
+"$UNITY" -batchmode -quit -projectPath "$PROJ" -buildWindows64Player "$REL/SlopArena.exe"
+
+echo "== Restore committed bundleVersion =="
+git -C "$ROOT" checkout -- client/Unity/ProjectSettings/ProjectSettings.asset
+
+echo "== Unstage build-only artifacts =="
+rm -rf "$SA/Server" "$SA/arenas"
+
+echo "== Ship docs + zip =="
+cp "$ROOT/docs/release/PLAY_GUIDE.md" "$REL/README.txt"
+cp "$ROOT/docs/release/HOST_GUIDE.md" "$REL/HOSTING.txt"
+(cd "$REL/.." && zip -r "SlopArena-$VERSION.zip" "SlopArena-$VERSION")
+echo "DONE: build/release/SlopArena-$VERSION.zip"
