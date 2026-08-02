@@ -153,4 +153,19 @@ public class MatchStartRequestCodecTests
     {
         Assert.Null(MatchStartRequestCodec.TryParse(Parse(json)));
     }
+
+    [Fact]
+    public void TryParse_FivePlayers_Rejects()
+    {
+        var body = """
+        {"matchId":"m","arenaName":"split","players":[
+            {"steamId":1,"characterClass":"Manki","entityId":1},
+            {"steamId":2,"characterClass":"Kistu","entityId":2},
+            {"steamId":3,"characterClass":"Nilus","entityId":3},
+            {"steamId":4,"characterClass":"FightGuy","entityId":4},
+            {"steamId":5,"characterClass":"Manki","entityId":5}
+        ]}
+        """;
+        Assert.Null(MatchStartRequestCodec.TryParse(Parse(body)));
+    }
 }

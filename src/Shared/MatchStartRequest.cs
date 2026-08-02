@@ -95,7 +95,7 @@ public static class MatchStartRequestCodec
             list.Add(new MatchPlayer(steam.GetInt64(), characterClass, entityId));
         }
 
-        if (list.Count < 2)
+        if (list.Count is < 2 or > 4)
             return null;
 
         return new MatchStartRequest(matchId, arenaName, list);
