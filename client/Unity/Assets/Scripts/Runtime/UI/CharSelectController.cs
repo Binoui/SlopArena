@@ -296,6 +296,13 @@ namespace SlopArena.Client.UI
                 _lobby.MatchStarted     -= OnMatchStarted;
                 _lobby.Error            -= OnPvPError;
             }
+            // The host owns the embedded server subprocess (ADR-0005): backing
+            // out of char-select must stop it, or the orphaned server keeps
+            // running and stays registered (issue #48). Non-hosts never touch
+            // it — MatchConfig.IsHost is the authoritative flag, not the roster.
+            if (MatchConfig.IsHost)
+                ServerHost.Instance?.Stop();
+
             // Return to lobby room (connection still alive)
             SceneManager.LoadScene("LobbyRoom");
         }
