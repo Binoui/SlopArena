@@ -1,0 +1,41 @@
+{
+  "Scenario": "Kistu RMB Uncharged",
+  "TickCount": 50,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 0.12906632,
+    "VZ": 0.18400684,
+    "ComboStage": 1,
+    "AttackSlot": 2,
+    "ChargeTicks": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.8553707,
+    "PZ": 1.9056888,
+    "VY": 2.07408,
+    "VZ": 8.113776,
+    "DamagePercent": 8,
+    "HitstunTicks": 19,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 0.13748746,
+    "Cooldown1": 45,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 1.8148186,
+    "PZ": 6.0478806,
+    "VY": 1.4407473,
+    "VZ": 3.5710232,
+    "DamagePercent": 8,
+    "AirTimeTicks": 18,
+    "JumpsLeft": 2
+  }
+}

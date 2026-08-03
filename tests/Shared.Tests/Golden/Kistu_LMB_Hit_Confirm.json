@@ -1,0 +1,35 @@
+{
+  "Scenario": "Kistu LMB Hit Confirm",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 0.5133333,
+    "AttackSlot": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.7857737,
+    "PZ": 1.6646101,
+    "VY": 0.3626183,
+    "VZ": 1.9753183,
+    "DamagePercent": 3,
+    "HitstunTicks": 11,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 0.5133333,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 2.116805,
+    "DamagePercent": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

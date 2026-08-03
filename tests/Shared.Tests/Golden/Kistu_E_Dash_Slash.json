@@ -1,0 +1,41 @@
+{
+  "Scenario": "Kistu E Dash Slash",
+  "TickCount": 50,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 0.7878919,
+    "VZ": 0.8096302,
+    "ComboStage": 1,
+    "AttackSlot": 4,
+    "ChargeTicks": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.88765764,
+    "PZ": 1.7344792,
+    "VY": 2.014865,
+    "VZ": 8.017184,
+    "DamagePercent": 6,
+    "HitstunTicks": 16,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 0.82474047,
+    "Cooldown3": 71,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 1.8185511,
+    "PZ": 5.522566,
+    "VY": 1.4815321,
+    "VZ": 2.9925656,
+    "DamagePercent": 6,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  }
+}

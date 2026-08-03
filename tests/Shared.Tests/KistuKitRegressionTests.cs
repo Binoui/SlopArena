@@ -1,0 +1,192 @@
+using Xunit;
+
+namespace SlopArena.Shared.Tests;
+
+public class KistuKitRegressionTests : KitScenarioTests
+{
+    private static readonly CharacterDefinition Def = TestHelpers.KistuDef;
+    private static float Gpy => TestHelpers.GroundPY(Def);
+
+    /// <summary>
+    /// Build a hold-to-charge input sequence: press+aim on tick 0, keep aiming every
+    /// tick through <paramref name="holdTicks"/>. Needed to reach RMB/E's charged
+    /// path (ChargeAttackAbility requires IsAiming=true on every tick to accumulate
+    /// charge — an unset tick defaults to not-aiming and releases via debounce).
+    /// Unused here (every scenario below uses the tap/uncharged path, matching the
+    /// convention every other kit's golden file follows — charged-vs-uncharged is
+    /// covered by hand-written unit tests in KistuAbilityTests.cs instead), kept for
+    /// the next person who needs a genuine charged-path golden.
+    /// </summary>
+    private static InputSequence HoldAim(byte activeSlot, int holdTicks)
+    {
+        var seq = new InputSequence().Set(0, new InputState { ActiveSlot = activeSlot, IsAiming = true });
+        for (int t = 1; t <= holdTicks; t++)
+            seq.Set(t, new InputState { IsAiming = true });
+        return seq;
+    }
+
+    [Fact]
+    public void LMB_FullCombo_ChainsThroughAllStages()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu LMB Full Combo",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence()
+                .Press(0, 1).Press(22, 1).Press(45, 1).Press(70, 1),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 84,   // stage 4 launcher hitbox active (trigger=10, dur=6)
+            TotalTicks = 130,
+        });
+    }
+
+    [Fact]
+    public void LMB_Stage1_HitsNpcFor3Damage()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu LMB Hit Confirm",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 1),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 10,   // stage 1 hitbox active (trigger=6, dur=5)
+            TotalTicks = 80,
+        });
+    }
+
+    [Fact]
+    public void AirLMB_Combo_ChainsBothHits()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu Air LMB Combo",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
+            Inputs = new InputSequence().Press(0, 1).Press(18, 1),
+            Assert = _ => { },
+            SnapshotTick = 27,   // stage 2 hitbox active (chained at ~18, trigger=5, dur=5)
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void RMB_UnchargedPoke_HitsNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu RMB Uncharged",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence()
+                .Set(0, new InputState { ActiveSlot = 2, IsAiming = true })
+                .Set(10, default),  // release after debounce → tap poke, not the charged spin
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 13,   // tap-poke hitbox active (release ~tick4, trigger=6, dur=5)
+            TotalTicks = 50,
+        });
+    }
+
+    [Fact]
+    public void AirRMB_FallingSlash_SpikesNpcDownward()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu Air RMB Falling Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PX = 0, PZ = 0, PY = 1.5f, IsGrounded = false, JumpsLeft = 0 },
+            Inputs = new InputSequence().Press(0, 2),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.0f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 12,   // hitbox active (trigger=6, dur=14)
+            TotalTicks = 60,
+        });
+    }
+
+    [Fact]
+    public void E_DashSlash_TapHitsNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu E Dash Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence()
+                .Set(0, new InputState { ActiveSlot = 4, IsAiming = true })
+                .Set(10, default),  // release after debounce → short reposition dash, not full gap-close
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 14,   // dash-slash hitbox active (release ~tick4, trigger=6, dur=6)
+            TotalTicks = 50,
+        });
+    }
+
+    [Fact]
+    public void R_RisingSlash_LaunchesGroundedNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu R Rising Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 5),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.0f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 9,    // sphere hitbox active (trigger=5, dur=8)
+            TotalTicks = 40,
+        });
+    }
+
+    [Fact]
+    public void F_BladeFlurry_EarlyHitsConnectAgainstStationaryTarget()
+    {
+        // NOTE for the next balance pass: against a stationary target, only the first 3 of
+        // 5 flurry hits land (DamagePercent settles at 9, not the theoretical 24). Kistu's
+        // own forward drift (Params.forward_speed=7, KistuUltFlurry.cs) outpaces the target's
+        // Light-knockback drift and carries her past the target before the trigger=44 finisher
+        // fires — confirmed at two different starting distances (0.8 and 1.5), closer was worse.
+        // Unlike LMB/AirLMB/AirRMB, F's stage sets no UseTargetLock/WarpRange to re-close the
+        // gap per hit. This is real current behavior (numbers are explicitly first-pass
+        // placeholders per KistuData.cs), pinned as-is rather than papered over — if F ever
+        // gets tracking added so the finisher reliably connects, this golden should change
+        // (DamagePercent 9 -> 24, a real launch on NpcFinal) and that diff is the point.
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu F Blade Flurry",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 6),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 46,   // past all trigger windows (8,16,24,32,44) — settled post-flurry state
+            TotalTicks = 90,
+        });
+    }
+}

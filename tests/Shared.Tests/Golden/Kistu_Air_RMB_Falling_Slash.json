@@ -1,0 +1,32 @@
+{
+  "Scenario": "Kistu Air RMB Falling Slash",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 1.5,
+    "AttackSlot": 2,
+    "AirTimeTicks": 13
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.75,
+    "PZ": 2.0196478,
+    "VZ": 8.73984,
+    "DamagePercent": 9,
+    "HitstunTicks": 21,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 5.410479,
+    "DamagePercent": 9,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

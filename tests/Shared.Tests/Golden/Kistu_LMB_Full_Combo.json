@@ -1,0 +1,38 @@
+{
+  "Scenario": "Kistu LMB Full Combo",
+  "TickCount": 130,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 2.5666668,
+    "ComboStage": 3,
+    "AttackSlot": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 0.9878726,
+    "PZ": 4.0492826,
+    "VY": 3.5180888,
+    "VZ": 7.830499,
+    "DamagePercent": 16,
+    "HitstunTicks": 26,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 2.5666668,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 3.1569958,
+    "PZ": 9.0356865,
+    "VY": 2.651423,
+    "VZ": 2.817941,
+    "DamagePercent": 16,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  }
+}

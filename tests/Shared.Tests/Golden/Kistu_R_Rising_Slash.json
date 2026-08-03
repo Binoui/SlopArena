@@ -1,0 +1,38 @@
+{
+  "Scenario": "Kistu R Rising Slash",
+  "TickCount": 40,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2.05,
+    "PZ": 1.1666666,
+    "AttackSlot": 5,
+    "AirTimeTicks": 10,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "State": 2,
+    "PY": 1.3407822,
+    "PZ": 1.1273459,
+    "VY": 7.0227184,
+    "VZ": 1.5281507,
+    "DamagePercent": 7,
+    "HitstunTicks": 25,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 2.0149999,
+    "PZ": 1.4999999,
+    "VY": -0.90000004,
+    "AirTimeTicks": 40,
+    "JumpsLeft": 2
+  },
+  "NpcFinal": {
+    "PY": 4.6021423,
+    "PZ": 1.8087046,
+    "VY": 6.189386,
+    "VZ": 0.11408395,
+    "DamagePercent": 7,
+    "AirTimeTicks": 6,
+    "JumpsLeft": 2
+  }
+}
