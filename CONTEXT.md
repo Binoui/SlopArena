@@ -98,16 +98,37 @@ _Avoid_: game flow, match lifecycle, session flow
 ## Prediction & Rollback
 
 **ConfirmedTick**:
-The highest match tick for which the client holds server-authoritative states for every entity. The base state every re-simulation starts from; it advances as state packets arrive, one tick at a time.
+The highest match tick for which the client holds a full server-authoritative snapshot for every non-self entity. The base state PredictedTrack rebuilds from; it advances as state packets arrive, one tick at a time. Does not apply to LocalTrack — the self entity is never rebuilt from a snapshot.
 _Avoid_: ack tick, sync tick, last confirmed
 
 **RollbackWindow**:
-The span of ticks between ConfirmedTick and the currently rendered tick. Re-simulation replays this span whenever the confirmed base advances or a mismatch is corrected.
+The span of ticks between ConfirmedTick and the currently rendered tick, replayed on PredictedTrack entities whenever the confirmed base advances or a mismatch is corrected. Applies only to opponents currently in a Predictable ActionState — RawTrack entities have no window (they render the latest packet directly), and LocalTrack has no window (it never rebuilds).
 _Avoid_: rewind window, prediction buffer, lag window
 
 **InputRelay**:
-The server broadcasting each entity's consumed InputState — or an explicit no-input marker when the server had nothing to consume for it that tick (empty queue → drop → `default(InputState)`) — alongside its state packet, so every client can replay opponents' exact inputs *and omissions* during re-simulation. Makes all-entity prediction exact rather than guessed.
+The server broadcasting each entity's consumed InputState — or an explicit no-input marker when the server had nothing to consume for it that tick (empty queue → drop → `default(InputState)`) — alongside its state packet, so every client can replay opponents' exact inputs *and omissions* during re-simulation. Feeds PredictedTrack's replay; LocalTrack uses the player's own true input buffer instead.
 _Avoid_: input forwarding, input piggyback, input echo
+
+**LocalTrack**:
+The self entity's `ServerSimulation`, run continuously on the client from match start — never rebuilt from a received snapshot, fed the player's own true InputState every tick. Corrected only by snapping the wire-serialized fields when a received packet disagrees; fields absent from the wire (attack timers, knockback, ability-instance state) never diverge because this track is never reconstructed from a lossy snapshot.
+_Avoid_: self-prediction, client-side prediction (ambiguous with PredictedTrack), own-entity sim
+
+**PredictedTrack**:
+An opponent entity currently in a Predictable ActionState. Rebuilt from ConfirmedTick's snapshot and replayed forward tick-by-tick using InputRelay data (or the no-input marker) up to the current local tick. Diverges only at the frontier (ticks past the last received relay), corrected by snap on the next packet.
+_Avoid_: opponent prediction, ghost sim, replayed entity
+
+**RawTrack**:
+An opponent entity currently in a Complex ActionState. No local re-simulation — rendered directly from the latest received packet, identical to pre-rollback (Phase 1) behavior, scoped to just this entity for just this window. Switches to PredictedTrack the tick the entity returns to a Predictable ActionState.
+_Avoid_: unpredicted entity, fallback display, snap-only entity
+
+**Predictable ActionState**:
+An `ActionState` whose per-tick behavior depends only on fields carried by the confirmed-base sync: position/velocity, the generic state timer, and the movement-resource fields added for rollback (`AirTimeTicks`, dash timers/direction, jump/dodge counters, etc.). Currently `Idle`, `Dashing`, `JumpSquat`, `AirDodging`. PredictedTrack re-sim is byte-identical for these. (`Sliding` exists in the enum but is unused by any current code — not a member of either partition.)
+_Avoid_: safe state, simple state, movement state
+
+**Complex ActionState**:
+An `ActionState` whose behavior depends on fields no sync packet carries — the per-instance `ServerAbility` layer (private fields like `NilusVoidRift`'s cached aim/seed state) and/or `SpellResolver`'s live hitbox/projectile list, plus knockback/hitstun/DI fields. Currently `Attacking`, `Hitstun`, `Warping`. Never re-simulated on PredictedTrack — entities in these states run RawTrack instead.
+_Avoid_: unsafe state, hard state, ability state
+
 
 ## Game Server (src/Server)
 

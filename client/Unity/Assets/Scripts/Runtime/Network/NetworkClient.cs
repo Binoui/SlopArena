@@ -117,16 +117,16 @@ namespace SlopArena.Client.Network
         }
 
         /// <summary>
-        /// Drain the receive queue into the latest server-authoritative states.
-        /// The input-relay section (issue #80) is deliberately dropped here —
-        /// the rollback bridge drains it via its own accessor when re-sim lands.
+        /// Drain the receive queue into raw per-entity packets — tick, hasInput/Input relay,
+        /// and state all intact. RollbackSimulationBridge routes self packets to
+        /// RollbackSimulator.ReconcileSelf and everything else to IngestOpponentBatch.
         /// </summary>
-        public Dictionary<ulong, CharacterState> ReceiveStates()
+        public List<ServerEntityPacket> ReceiveEntityPackets()
         {
-            var result = new Dictionary<ulong, CharacterState>();
+            var result = new List<ServerEntityPacket>();
             while (_receivedQueue.TryDequeue(out var entry))
             {
-                result[entry.EntityId] = entry.State.ToState();
+                result.Add(entry);
                 LastServerTick = entry.Tick;
             }
             return result;

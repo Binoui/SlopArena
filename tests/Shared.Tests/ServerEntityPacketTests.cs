@@ -175,14 +175,15 @@ public class ServerEntityPacketTests
     [Fact]
     public void SizeConstants_AssertWireLayout()
     {
-        // Downlink max packet size is a wire contract (issue #80): 75B base + 1B flag + 19B input
+        // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10):
+        // 107B base (8 entityId + 4 tick + 95 CharacterStatePacket) + 1B flag + 19B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(75, ServerEntityPacket.BaseSize);
+        Assert.Equal(107, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(20, ServerEntityPacket.RelaySize);
-        Assert.Equal(95, ServerEntityPacket.MaxSize);
-        Assert.Equal(76, ServerEntityPacket.NoInputSize);
-        // Uplink format untouched: 31B (entityId + tick + InputState)
+        Assert.Equal(127, ServerEntityPacket.MaxSize);
+        Assert.Equal(108, ServerEntityPacket.NoInputSize);
+        // Uplink format untouched: 19B InputState (31B full uplink packet with entityId+tick)
         Assert.Equal(19, InputState.Size);
     }
 }

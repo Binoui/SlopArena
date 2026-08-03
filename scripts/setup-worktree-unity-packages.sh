@@ -32,7 +32,7 @@ for pkg in "$MAIN"/client/Unity/Packages/*/; do
   dest="$HERE/client/Unity/Packages/$name"
   [ -e "$dest" ] && continue # already present (copied or linked)
 
-  if git -C "$HERE" check-ignore -q "client/Unity/Packages/$name"; then
+  if git -C "$HERE" check-ignore -q "client/Unity/Packages/$name/"; then
     ln -s "$pkg" "$dest"
     echo "linked $name -> $pkg"
     linked=$((linked + 1))
