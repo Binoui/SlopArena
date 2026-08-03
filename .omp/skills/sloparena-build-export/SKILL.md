@@ -73,6 +73,17 @@ gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
   --notes "$(sed 's/<version>/0.2.0-demo.1/' docs/release/RELEASE_NOTES.template.md)"
 ```
 
+The `--notes` text above is a placeholder: pushing the `v*` tag (which
+`gh release create` does automatically) fires `.github/workflows/patch-notes.yml`
+within a minute or two, which overwrites the release notes with a generated
+factual changelog (parsed from Conventional Commit subjects since the
+previous tag) plus a short DeepSeek-written context blurb, and copies through
+the static Online/How-to-play/Known-issues sections from
+`docs/release/RELEASE_NOTES.template.md`. Requires a `DEEPSEEK_API_KEY` repo
+secret (Settings → Secrets → Actions) — without it the job fails loudly
+(nuget-publish still succeeds independently). To preview or re-run locally:
+`DEEPSEEK_API_KEY=... GH_TOKEN=$(gh auth token) python3 scripts/generate_patch_notes.py v0.2.0-demo.1`.
+
 ## Flow B — Dedicated server on alfred (one command)
 
 ```bash
@@ -125,6 +136,8 @@ compile Unity scripts, so validate with a Unity batchmode import
 
 - `.github/workflows/ci.yml` (this repo): push to main + PR → build Shared, run
   Shared.Tests (~451), build Server.
+- `.github/workflows/patch-notes.yml`: push of tag `v*` → generates and
+  publishes release notes (see Flow A Publish above). Needs `DEEPSEEK_API_KEY`.
 - `.github/workflows/{nuget-publish, discord-push}.yml`: existing.
 - Master repo `.github/workflows/build.yml`: build + test on push/PR to main;
   on `v*` tag push, publishes `dotnet publish -c Release` output as an Actions
