@@ -36,6 +36,20 @@ public class CharacterStatePacketTests
             Cooldown3 = 44,
             Cooldown4 = 55,
             Cooldown5 = 66,
+            AirTimeTicks = 37,
+            DashDurationTicks = 9,
+            DashDirX = 0.6f,
+            DashDirZ = -0.8f,
+            DashCooldownTicks = 20,
+            AirDodgesLeft = 1,
+            JumpsLeft = 2,
+            InvincibilityTicks = 15,
+            TurnaroundTicks = 4,
+            DirHoldTicks = 11,
+            IsSprinting = true,
+            LastDirX = 1f,
+            LastDirZ = 0f,
+            WasAirborneDuringKnockback = true,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -73,22 +87,59 @@ public class CharacterStatePacketTests
         Assert.Equal(original.Cooldown3, restored.Cooldown3);
         Assert.Equal(original.Cooldown4, restored.Cooldown4);
         Assert.Equal(original.Cooldown5, restored.Cooldown5);
+        Assert.Equal(original.AirTimeTicks, restored.AirTimeTicks);
+        Assert.Equal(original.DashDurationTicks, restored.DashDurationTicks);
+        Assert.Equal(original.DashDirX, restored.DashDirX);
+        Assert.Equal(original.DashDirZ, restored.DashDirZ);
+        Assert.Equal(original.DashCooldownTicks, restored.DashCooldownTicks);
+        Assert.Equal(original.AirDodgesLeft, restored.AirDodgesLeft);
+        Assert.Equal(original.JumpsLeft, restored.JumpsLeft);
+        Assert.Equal(original.InvincibilityTicks, restored.InvincibilityTicks);
+        Assert.Equal(original.TurnaroundTicks, restored.TurnaroundTicks);
+        Assert.Equal(original.DirHoldTicks, restored.DirHoldTicks);
+        Assert.Equal(original.IsSprinting, restored.IsSprinting);
+        Assert.Equal(original.LastDirX, restored.LastDirX);
+        Assert.Equal(original.LastDirZ, restored.LastDirZ);
+        Assert.Equal(original.WasAirborneDuringKnockback, restored.WasAirborneDuringKnockback);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // AimPitch (float at offset 44) ends at byte 47, Deaths at 48, then
-        // DamagePercent (49-50) and six cooldowns (51-62) → 63 bytes.
-        // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(63, CharacterStatePacket.Size);
+        // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
+        // fields (AirTimeTicks..WasAirborneDuringKnockback) = 95. Lock the constant:
+        // a silent Size change would break every packet on the wire.
+        Assert.Equal(95, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
-        var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f });
+        var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
         byte[] buffer = new byte[CharacterStatePacket.Size];
         packet.Serialize(buffer); // throws if Size is too small
         var restored = CharacterStatePacket.Deserialize(buffer);
         Assert.Equal(1f, restored.AimPitch);
+        Assert.Equal(2f, restored.LastDirX);
+    }
+
+    [Fact]
+    public void ApplyTo_OverwritesOnlyWireFields_PreservesRest()
+    {
+        // Arrange: a CharacterState with a non-wire field set (AttackElapsedTicks is
+        // never on the wire — this proves ApplyTo doesn't zero it, unlike ToState()).
+        var target = new CharacterState
+        {
+            PX = 1f,
+            AttackElapsedTicks = 500, // NOT carried by CharacterStatePacket — must survive
+            AirTimeTicks = 999,       // IS carried — must be overwritten
+        };
+        var packet = CharacterStatePacket.FromState(new CharacterState { PX = 42f, AirTimeTicks = 7 });
+
+        // Act
+        packet.ApplyTo(ref target);
+
+        // Assert
+        Assert.Equal(42f, target.PX);       // wire field overwritten
+        Assert.Equal((ushort)7, target.AirTimeTicks); // wire field overwritten
+        Assert.Equal((ushort)500, target.AttackElapsedTicks); // non-wire field preserved
     }
 
     [Fact]

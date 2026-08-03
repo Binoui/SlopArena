@@ -14,8 +14,9 @@ using SlopArena.Client.Simulation;
 namespace SlopArena.Client.World
 {
     /// <summary>
-    /// PvP match backed by a remote server. Uses NetworkSimulationBridge — no local sim.
-    /// Phase 1: raw server-state display, no prediction/rollback.
+    /// PvP match backed by a remote server. Uses RollbackSimulationBridge (ADR-0011):
+    /// the local player predicts continuously; opponents predict while in a movement
+    /// state and render raw from the server otherwise.
     /// </summary>
     public class PvPMatch : MatchBase
     {
@@ -33,7 +34,7 @@ namespace SlopArena.Client.World
 
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;
-        private NetworkSimulationBridge _bridge = null!;
+        private RollbackSimulationBridge _bridge = null!;
         protected override ISimulationBridge Bridge => _bridge;
 
         protected override void OnMatchStart()
@@ -61,7 +62,7 @@ namespace SlopArena.Client.World
 
             // Bridge
             _networkClient.EntityId = PlayerEntityId;
-            _bridge = new NetworkSimulationBridge(_networkClient, PlayerEntityId);
+            _bridge = new RollbackSimulationBridge(arena, _networkClient, PlayerEntityId);
             _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
 
             // Character definitions
@@ -215,6 +216,16 @@ namespace SlopArena.Client.World
                 Debug.Log($"[PvP] tick={_tick} connected={_networkClient.IsServerConnected} " +
                           $"pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) serverTick={_networkClient.LastServerTick}");
             }
+        }
+
+        protected override void OnGUI()
+        {
+            base.OnGUI();
+            if (!UnityEngine.Input.GetKey(KeyCode.F3)) return;
+
+            var style = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = Color.white } };
+            GUI.Label(new Rect(10, 10, 400, 20), $"Corrections: {_bridge.CorrectionCount}", style);
+            GUI.Label(new Rect(10, 30, 400, 20), $"Frontier window: {_bridge.LastFrontierTicks} ticks", style);
         }
 
         /// <summary>

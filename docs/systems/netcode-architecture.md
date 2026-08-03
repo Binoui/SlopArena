@@ -173,18 +173,18 @@ Total: 31 bytes (8 + 4 + 19)
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19) = up to 95 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(95) + hasInput(1) + InputState(19) = up to 127 bytes
 
-[0..7]   entityId          (ulong)
-[8..11]  tick              (uint)       ← echoes client's tick number
-[12..74] CharacterStatePacket (63 bytes)
-[75]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
-[76..94] InputState        (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
+[0..7]    entityId          (ulong)
+[8..11]   tick              (uint)       ← echoes client's tick number
+[12..106] CharacterStatePacket (95 bytes) — widened per D10/ADR-0011, see §4b table below
+[107]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
+[108..126] InputState       (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
 ```
 
-**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 76 bytes, a relayed packet 95 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
+**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 108 bytes, a relayed packet 127 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
 
-**CharacterStatePacket layout (63 bytes):**
+**CharacterStatePacket layout (95 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
@@ -209,8 +209,22 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(63) + ha
 | 48     | byte    | Deaths              | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
 | 49-50  | ushort  | DamagePercent       | Smash-style damage %, HUD display (issue #38) |
 | 51-62  | ushort×6| Cooldown0..5        | Per-slot cooldown ticks, local HUD fills (issue #38) |
+| 63-64  | ushort  | AirTimeTicks        | Fall-ramp gravity timer (D10/ADR-0011) |
+| 65-66  | ushort  | DashDurationTicks   | Remaining dash ticks (D10)         |
+| 67-70  | float   | DashDirX            | Dash direction X (D10)              |
+| 71-74  | float   | DashDirZ            | Dash direction Z (D10)              |
+| 75-76  | ushort  | DashCooldownTicks   | Dash cooldown remaining (D10)      |
+| 77     | byte    | AirDodgesLeft       | Remaining air dodges (D10)         |
+| 78     | byte    | JumpsLeft           | Remaining jumps (D10)              |
+| 79-80  | ushort  | InvincibilityTicks  | Post-respawn/dash invincibility (D10) |
+| 81-82  | ushort  | TurnaroundTicks     | Turnaround lag remaining (D10)     |
+| 83-84  | ushort  | DirHoldTicks        | Ticks holding same direction (D10) |
+| 85     | byte    | IsSprinting         | Sprint/dash-dance flag (D10)       |
+| 86-89  | float   | LastDirX            | Last input direction X (D10)       |
+| 90-93  | float   | LastDirZ            | Last input direction Z (D10)       |
+| 94     | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
 
-Total: 75 bytes base (8 + 4 + 63), up to 95 with the relay section (76 no-input marker / 95 relayed — issue #80)
+Total: 107 bytes base (8 + 4 + 95), up to 127 with the relay section (108 no-input marker / 127 relayed — issue #80, widened per D10/ADR-0011)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -220,7 +234,7 @@ Total: 75 bytes base (8 + 4 + 63), up to 95 with the relay section (76 no-input 
 
 ## 5. CharacterState internals (Shared)
 
-`CharacterState` (144 bytes in memory, 63 serialized) is the full per-tick state of one entity:
+`CharacterState` (144 bytes in memory, 95 serialized) is the full per-tick state of one entity:
 
 | Field               | Type    | Notes                                |
 |---------------------|---------|--------------------------------------|
@@ -254,19 +268,19 @@ Total: 75 bytes base (8 + 4 + 63), up to 95 with the relay section (76 no-input 
 | **TargetEntityId**  | **ulong**| **Soft-lock target (0 = none, set server-side per tick)** |
 | ...                 |         |                                      |
 
-Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, facing yaw, match state, buff remaining ticks, and buff active flags are serialized. The remaining fields (jumps, dodges, DI, knockback, etc.) are computed locally.
+Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, facing yaw, match state, buff remaining ticks, buff active flags, and the D10 movement-resource fields (air time, dash duration/direction/cooldown, air dodges/jumps left, invincibility, turnaround, dir-hold, sprinting, last direction, post-knockback airborne flag — ADR-0011, added so PredictedTrack's rebuild-and-replay is byte-identical for Predictable ActionStates) are serialized. The ability-instance-dependent fields (knockback velocity, hitstun ticks, DI, attack-elapsed/combo-timer/anim-lock/charge ticks, buffered chain) stay local-only — Complex ActionStates (Attacking/Hitstun/Warping) are never re-simulated from a snapshot (see §6).
 
 ---
 
-## 6. Prediction & Rollback — Not Implemented
+## 6. Prediction & Rollback
 
-The client does **NOT** predict locally or roll back. `NetworkSimulationBridge`'s doc comment states:
+The client predicts locally via a three-track model (ADR-0011, `docs/plans/2026-08-02-rollback-netcode.md`, implementation in `src/Shared/Rollback/`):
 
-> No local simulation — one-tick display latency is intentional (Phase 1).
+- **LocalTrack** — the self entity's `ServerSimulation` runs continuously from match start, fed the player's true input every tick, never rebuilt from a snapshot. Corrected by patching the wire-serialized fields onto its own history when the server disagrees, replayed forward only across a Predictable-state suffix.
+- **PredictedTrack** — opponents currently in a Predictable `ActionState` (`Idle`/`Dashing`/`JumpSquat`/`AirDodging`) are rebuilt from the confirmed base and replayed forward via the input relay (§4b), holding the last known input at the frontier.
+- **RawTrack** — opponents currently in a Complex `ActionState` (`Attacking`/`Hitstun`/`Warping`) render directly from the latest received packet, unchanged from the original Phase 1 behavior for that entity — the ability-instance layer (`ServerAbility` subclasses' private fields) and `SpellResolver`'s hitbox/projectile list are never serialized, so these states are never re-simulated client-side.
 
-Input is sent each tick; the renderer displays the latest server-authoritative state. There are no input/state ring buffers, no server-vs-predicted mismatch comparison, and no re-simulation anywhere in `client/`.
-
-Prediction and rollback are deferred to **Phase 7 of `docs/plans/2026-08-01-pvp-roadmap-v2.md`** (the roadmap marks it ❌ Absent at line 58). On localhost the round-trip is under one tick, so raw state display is effectively synchronous; the roadmap defers client-side prediction until the server runs remotely.
+See ADR-0011 for the full rationale, including why this is narrower than ADR-0010's original "predict all entities" ambition.
 
 ---
 
