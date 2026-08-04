@@ -97,16 +97,22 @@ internal sealed class NetplayHarness
     public CharacterState ClientState(ulong id) => _client.GetState(id);
 
     /// <summary>True when the client self state equals the server's on every wire
-    /// field (exact — deterministic sim, identical inputs).</summary>
-    public static bool IsSelfConverged(NetplayHarness h)
+    /// field (exact — deterministic sim, identical inputs). On divergence, outputs
+    /// the compared packets so AssertSelfConverged can dump both.</summary>
+    public static bool IsSelfConverged(NetplayHarness h, out CharacterStatePacket expected, out CharacterStatePacket actual)
     {
-        var expected = CharacterStatePacket.FromState(h.ServerState(SelfId));
-        var actual = CharacterStatePacket.FromState(h.ClientState(SelfId));
+        expected = CharacterStatePacket.FromState(h.ServerState(SelfId));
+        actual = CharacterStatePacket.FromState(h.ClientState(SelfId));
         return expected.Equals(actual);
     }
 
     public static void AssertSelfConverged(NetplayHarness h)
-        => Assert.True(IsSelfConverged(h), "client self state diverged from server");
+    {
+        // On divergence, Assert.Equal prints both packets field-by-field — a bare
+        // bool assert would make a fuzz falsification an opaque failure.
+        if (!IsSelfConverged(h, out var expected, out var actual))
+            Assert.Equal(expected, actual);
+    }
 
     /// <summary>Entity 2 (opponent) must track the server within tolerance. Damage and
     /// knockback may legitimately diverge (PredictedTrack has no self hurtbox), so only

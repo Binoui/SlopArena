@@ -48,19 +48,21 @@ public class RollbackInvariantTests
             AssertFinite(h, tick);
         }
 
-        // Idle settle tail with drops DISABLED: no new attacks can occur (idle inputs)
-        // and hitstun is finite (≤ 60, asserted above), so a fresh packet with an
-        // all-Predictable history suffix must eventually arrive and the reconcile +
-        // replay re-converge the self state exactly. The 300-tick bound is far above
-        // the worst case (hitstun 60 + delay ≤ 3 + delivery). Convergence is asserted
-        // to happen, not timed — no fixed-tick assumption.
+        // Idle settle tail with drops DISABLED: no new attacks can be STARTED (idle
+        // inputs), but attacks/projectiles already in flight at tail start can still
+        // land early in the tail and refresh hitstun — which is finite (≤ 60, asserted
+        // above) — so a fresh packet with an all-Predictable history suffix must
+        // eventually arrive and the reconcile + replay re-converge the self state
+        // exactly. The 300-tick bound covers in-flight attacks + 60 hitstun + delay
+        // ≤ 3 + delivery with wide margin. Convergence is asserted to happen, not
+        // timed — no fixed-tick assumption.
         h.SetDropsEnabled(false);
         bool converged = false;
         for (int i = 0; i < 300 && !converged; i++)
         {
             h.Step(default, default);
             AssertFinite(h, traceTicks + i);
-            converged = NetplayHarness.IsSelfConverged(h);
+            converged = NetplayHarness.IsSelfConverged(h, out _, out _);
         }
 
         Assert.True(converged, "self state failed to re-converge within 300 idle ticks");

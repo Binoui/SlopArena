@@ -399,8 +399,14 @@ namespace SlopArena.Server
 					}
 				}
 
-				SendState();
+				// outcome handling (unchanged, stays inside the if)
 			}
+
+			// Broadcast every tick — including empty ones. Otherwise the GO tick's
+			// queue clear (PrimeTickCounter) plus packet RTT stalls state broadcasts
+			// for 2-4 ticks at match start (final review finding). Duplicate-tick
+			// packets on empty ticks are idempotent client-side.
+			SendState();
 		}
 
 		private void SendState()
@@ -455,9 +461,6 @@ namespace SlopArena.Server
 			}
 		}
 
-		/// <summary>
-		/// Flush the input queue: take the last valid packet, discard the rest.
-		/// Returns the packet to process, or null if queue was empty.
 		/// <summary>
 		/// On GO, the clients' tick counters are already ~CountdownDuration ahead (they
 		/// predict and send during countdown). Discard the countdown-era input backlog
