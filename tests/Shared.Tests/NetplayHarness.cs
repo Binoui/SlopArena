@@ -108,10 +108,22 @@ internal sealed class NetplayHarness
 
     public static void AssertSelfConverged(NetplayHarness h)
     {
-        // On divergence, Assert.Equal prints both packets field-by-field — a bare
-        // bool assert would make a fuzz falsification an opaque failure.
-        if (!IsSelfConverged(h, out var expected, out var actual))
-            Assert.Equal(expected, actual);
+        if (IsSelfConverged(h, out var expected, out var actual))
+            return;
+
+        // Field-by-field diff (reflection — failure path only, so the wire struct
+        // can grow without maintenance): CharacterStatePacket has no ToString, so
+        // Assert.Equal would print two identical type names. A fuzz falsification
+        // must name the diverging wire fields to be actionable.
+        var diffs = new List<string>();
+        foreach (var field in typeof(CharacterStatePacket).GetFields())
+        {
+            var serverValue = field.GetValue(expected);
+            var clientValue = field.GetValue(actual);
+            if (!Equals(serverValue, clientValue))
+                diffs.Add($"{field.Name}: server={serverValue} client={clientValue}");
+        }
+        Assert.True(false, "client self state diverged from server:\n" + string.Join("\n", diffs));
     }
 
     /// <summary>Entity 2 (opponent) must track the server within tolerance. Damage and
