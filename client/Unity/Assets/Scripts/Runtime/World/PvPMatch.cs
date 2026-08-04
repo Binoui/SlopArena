@@ -109,11 +109,42 @@ namespace SlopArena.Client.World
                 renderer.LoadModel(def);
                 renderer.transform.position = SpawnPosition(arena, opp.EntityId);
                 _opponentRenderers[opp.EntityId] = renderer;
+
+                // Register with the rollback bridge: populates _defs (prediction needs
+                // the CharacterDefinition) and seeds the RawTrack initial state so the
+                // opponent renders at its spawn until the first server packet. Without
+                // this, PvP crashed on the first predictable opponent packet
+                // (KeyNotFoundException on defs[EntityId]).
+                var oppSpawn = SpawnPointFor(arena, opp.EntityId);
+                _bridge.RegisterEntity(opp.EntityId, def, new CharacterState
+                {
+                    PX = oppSpawn.X, PY = oppSpawn.Y, PZ = oppSpawn.Z,
+                    FacingYaw = oppSpawn.Yaw,
+                    State = ActionState.Idle,
+                    IsGrounded = true,
+                    JumpsLeft = def.Movement.MaxJumps,
+                    AirDodgesLeft = 1,
+                    DamagePercent = 0,
+                }, baked);
             }
             _opponentArray = new List<PlayerRenderer>(_opponentRenderers.Values).ToArray();
 
             // Player spawns at its own roster spawn point (entityId 1..N ↔ spawnPoints[0..N-1]).
             _playerRenderer.transform.position = SpawnPosition(arena, PlayerEntityId);
+
+            // Register the self entity: without this the LocalTrack sim is empty, so the
+            // PvP player never simulates locally (frozen at origin) and _defs stays empty.
+            var selfSpawn = SpawnPointFor(arena, PlayerEntityId);
+            _bridge.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
+            {
+                PX = selfSpawn.X, PY = selfSpawn.Y, PZ = selfSpawn.Z,
+                FacingYaw = selfSpawn.Yaw,
+                State = ActionState.Idle,
+                IsGrounded = true,
+                JumpsLeft = playerDef.Movement.MaxJumps,
+                AirDodgesLeft = 1,
+                DamagePercent = 0,
+            }, playerBaked);
 
             // Track initial Deaths so the first state apply doesn't trigger a false flash.
             _lastDeaths.Clear();
@@ -132,12 +163,19 @@ namespace SlopArena.Client.World
             _inputController.Poll();
         }
 
-        private static Vector3 SpawnPosition(ArenaDefinition arena, ulong entityId)
+        /// <summary>Roster spawn point for an entity (entityId 1..N ↔ spawnPoints[0..N-1]),
+        /// matching the server's PickSpawn fallback (issue #35).</summary>
+        private static SpawnPoint SpawnPointFor(ArenaDefinition arena, ulong entityId)
         {
             int idx = (int)entityId - 1;
             if (idx < 0 || arena.SpawnPoints == null || idx >= arena.SpawnPoints.Length)
-                return new Vector3(40f, 0.5f, 40f);
-            var s = arena.SpawnPoints[idx];
+                return new SpawnPoint { X = 40f, Y = 0.5f, Z = 40f, Yaw = 0f };
+            return arena.SpawnPoints[idx];
+        }
+
+        private static Vector3 SpawnPosition(ArenaDefinition arena, ulong entityId)
+        {
+            var s = SpawnPointFor(arena, entityId);
             return new Vector3(s.X, s.Y, s.Z);
         }
 

@@ -40,8 +40,17 @@ namespace SlopArena.Shared.Rollback
                 var confirmedState = packet.State.ToState();
                 confirmedState.EntityId = packet.EntityId;
 
-                if (_registered.Add(packet.EntityId))
-                    _sim.RegisterEntity(packet.EntityId, defs[packet.EntityId], confirmedState,
+                bool firstRegister = _registered.Add(packet.EntityId);
+                if (!defs.TryGetValue(packet.EntityId, out var def))
+                {
+                    // No definition — cannot simulate this entity. Roll back the
+                    // _registered mark so a later SetState can't create an unpaired
+                    // _states key (missing def → SimulateMovement KeyNotFound).
+                    _registered.Remove(packet.EntityId);
+                    continue;
+                }
+                if (firstRegister)
+                    _sim.RegisterEntity(packet.EntityId, def, confirmedState,
                         baked.TryGetValue(packet.EntityId, out var b) ? b : null);
                 else
                     _sim.SetState(packet.EntityId, confirmedState);

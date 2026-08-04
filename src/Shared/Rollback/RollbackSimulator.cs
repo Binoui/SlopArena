@@ -59,13 +59,15 @@ namespace SlopArena.Shared.Rollback
             foreach (var packet in packets)
             {
                 var state = packet.State.ToState();
-                if (ActionStateClassifier.IsPredictable(state.State))
+                if (ActionStateClassifier.IsPredictable(state.State) && _defs.ContainsKey(packet.EntityId))
                 {
                     predictable.Add(packet);
                     _rawTrackLatest.Remove(packet.EntityId);
                 }
                 else
                 {
+                    // Unknown def (entity never registered) or Complex state: RawTrack —
+                    // render as received, never simulate an entity we have no definition for.
                     _predicted.StopTracking(packet.EntityId);
                     state.EntityId = packet.EntityId;
                     _rawTrackLatest[packet.EntityId] = state;

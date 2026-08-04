@@ -17,9 +17,9 @@ namespace SlopArena.Client.Network
     /// as plain C# events marshalled onto the Unity main thread via <see cref="Pump"/>.
     ///
     /// Server → client pushes: <c>PlayerJoined</c>, <c>PlayerLeft</c>,
-    /// <c>LobbyUpdated</c>, <c>MatchStarting</c>.
+    /// <c>LobbyUpdated</c>, <c>MatchStarting</c>, <c>StageSelect</c>, <c>MatchStarted</c>.
     /// Client → server: <see cref="JoinLobbyAsync"/>, <see cref="LeaveLobbyAsync"/>,
-    /// <see cref="HostStartAsync"/>.
+    /// <see cref="HostStartAsync"/>, <see cref="StartStageSelectAsync"/>, <see cref="StartMatchAsync"/>.
     /// </summary>
     public sealed class LobbyClient
     {
@@ -47,6 +47,8 @@ namespace SlopArena.Client.Network
         public event Action<LobbySnapshot>? LobbyUpdated;
         /// <summary>The host started the match; clients should go to char-select.</summary>
         public event Action<MatchStartingConfig>? MatchStarting;
+        /// <summary>All locked in; the host moved everyone to stage select.</summary>
+        public event Action<MatchStartingConfig>? StageSelect;
         /// <summary>A player locked in / changed their character (issue #34).</summary>
         public event Action<LobbyPlayerInfo>? CharacterSelected;
         /// <summary>The host started the actual match; clients should connect to the game server (issue #34).</summary>
@@ -155,6 +157,13 @@ namespace SlopArena.Client.Network
                 if (cfg is null) return;
                 _pending.Enqueue(() => MatchStarting?.Invoke(cfg));
             });
+            // StageSelect carries the same { serverId, players[] } shape as MatchStarting.
+            _conn.On<JsonElement>("StageSelect", element =>
+            {
+                var cfg = LobbyPayloadCodec.TryParseMatchStarting(element);
+                if (cfg is null) return;
+                _pending.Enqueue(() => StageSelect?.Invoke(cfg));
+            });
             _conn.On<JsonElement>("CharacterSelected", element =>
             {
                 var player = LobbyPayloadCodec.TryParsePlayer(element);
@@ -191,9 +200,17 @@ namespace SlopArena.Client.Network
         public Task SelectCharacterAsync(string characterClass) =>
             InvokeSafe("SelectCharacter", characterClass);
 
-        /// <summary>Host-only: start the actual match from char select (issue #34). Requires all locked in.</summary>
-        public Task StartMatchAsync() =>
-            InvokeSafe("StartMatch");
+        /// <summary>
+        /// Host-only: move everyone from char select to stage select. Requires
+        /// all players locked in; the host picks the arena there, then calls
+        /// <see cref="StartMatchAsync"/>.
+        /// </summary>
+        public Task StartStageSelectAsync() =>
+            InvokeSafe("StartStageSelect");
+
+        /// <summary>Host-only: start the actual match on the given arena (issue #34). Requires all locked in.</summary>
+        public Task StartMatchAsync(string arenaName) =>
+            InvokeSafe("StartMatch", arenaName);
 
         private async Task InvokeSafe(string method, params object[] args)
         {

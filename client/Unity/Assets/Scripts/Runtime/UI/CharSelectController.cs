@@ -128,10 +128,16 @@ namespace SlopArena.Client.UI
             _lblPvPStatus  = root.Q<Label>("lbl-pvp-status");
 
             _btnLockIn.text = "LOCK IN";
-            // Host-only: show Start Match button (enabled when all locked in, min 2)
+            // Host-only: show SELECT STAGE button (enabled when all locked in, min 2).
+            // Clicking it moves everyone to the stage select screen; the host
+            // picks the arena there and the match starts from StageSelect.
             bool isHost = IsLocalHost();
+            // Roster-based host flag for downstream screens (StageSelect):
+            // MatchConfig.IsHost is false for everyone on a dedicated server.
+            ClientSession.IsLobbyHost = isHost;
             if (isHost)
             {
+                _btnStartMatch.text = "SELECT STAGE";
                 _btnStartMatch.style.display = DisplayStyle.Flex;
                 _btnStartMatch.SetEnabled(false);
                 _btnStartMatch.clicked += OnStartMatchClicked;
@@ -156,12 +162,16 @@ namespace SlopArena.Client.UI
 
             _lobby.LobbyUpdated    += OnLobbyUpdated;
             _lobby.CharacterSelected += OnCharacterSelected;
+            _lobby.StageSelect      += OnStageSelect;
             _lobby.MatchStarted     += OnMatchStarted;
             _lobby.Error            += OnPvPError;
 
             _lblPvPStatus.text = "Select your character...";
             RenderRoster();
             UpdateStartMatchButton();
+
+            Debug.Log($"[CharSelect] InitPvP: isHost={isHost}, snapshot={_snapshot?.Players.Count ?? 0} players, " +
+                $"steamId={ClientSession.SteamId}");
         }
 
         private bool IsLocalHost()
@@ -180,14 +190,22 @@ namespace SlopArena.Client.UI
             if (_lockedIn) return;
             _btnLockIn.SetEnabled(false);
             _btnLockIn.text = "LOCKED";
+            Debug.Log($"[CharSelect] Locking in {_selected}");
             _ = _lobby.SelectCharacterAsync(_selected.ToString());
         }
 
         private void OnStartMatchClicked()
         {
             _btnStartMatch.SetEnabled(false);
-            _lblPvPStatus.text = "Starting match...";
-            _ = _lobby.StartMatchAsync();
+            _lblPvPStatus.text = "Selecting stage...";
+            _ = _lobby.StartStageSelectAsync();
+        }
+
+        private void OnStageSelect(MatchStartingConfig config)
+        {
+            // Everyone moves to the stage select screen; the host picks the
+            // arena there, then the match starts from StageSelect.
+            SceneManager.LoadScene("StageSelect");
         }
 
         private void OnLobbyUpdated(LobbySnapshot snapshot)
@@ -195,6 +213,8 @@ namespace SlopArena.Client.UI
             _snapshot = snapshot;
             RenderRoster();
             UpdateStartMatchButton();
+
+            Debug.Log($"[CharSelect] LobbyUpdated: {DescribePlayers(snapshot)}");
         }
 
         private void OnCharacterSelected(LobbyPlayerInfo player)
@@ -202,54 +222,13 @@ namespace SlopArena.Client.UI
             // The LobbyUpdated that follows carries the same info; just re-render.
             RenderRoster();
             UpdateStartMatchButton();
+
+            Debug.Log($"[CharSelect] CharacterSelected: {player.Name} locked={player.LockedIn} char={player.CharacterSelection} host={player.IsHost}");
         }
 
         private void OnMatchStarted(MatchStartedConfig config)
         {
             Debug.Log($"[CharSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
-
-            // Find the local player in the roster (by SteamId). The master
-            // server assigned entity IDs 1..N by join order (issue #35); the
-            // game server spawns each with the roster's character class, so
-            // every client renders the right chars (issue #36).
-            var players = config.Players;
-            LobbyPlayerInfo? local = null;
-            foreach (var p in players)
-            {
-                if (p.SteamId == ClientSession.SteamId)
-                    local = p;
-            }
-
-            if (local == null)
-            {
-                _lblPvPStatus.text = "Match started but you are not in the roster. Returning to server browser.";
-                Debug.LogError("[CharSelect] Local player missing from MatchStarted roster.");
-                SceneManager.LoadScene("ServerBrowser");
-                return;
-            }
-
-            // Stash the match config the PvP scene reads on start.
-            MatchConfig.Mode = GameMode.PvP;
-            MatchConfig.ArenaName = string.IsNullOrEmpty(config.ArenaName) ? "split" : config.ArenaName;
-            MatchConfig.ServerPort = config.MatchPort > 0 ? config.MatchPort : MatchConfig.ServerPort;
-            // ServerIP is already set (host: localhost, joiner: server browser IP).
-            MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, _selected);
-            MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
-            // Codec guarantees [1,99] (default 3); assign directly so a stale value
-            // from a previous match can never leak through (issue #38).
-            MatchConfig.MaxStocks = config.MaxStocks;
-            // Every non-local rostered player is an opponent (issue #36).
-            // entityId <= 0 means the master never assigned it, so the game
-            // server never spawned the entity — skip it.
-            MatchConfig.Opponents.Clear();
-            foreach (var p in players)
-            {
-                if (p.SteamId == ClientSession.SteamId) continue;
-                if (p.EntityId <= 0) continue;
-                MatchConfig.Opponents.Add(new MatchConfig.OpponentInfo(
-                    (ulong)p.EntityId,
-                    ParseClass(p.CharacterSelection, CharacterClass.Manki)));
-            }
 
             // Keep the lobby connection alive through the match (issue #40): the
             // results screen + lobby return rely on it. Just unsubscribe the
@@ -258,33 +237,22 @@ namespace SlopArena.Client.UI
             {
                 _lobby.LobbyUpdated    -= OnLobbyUpdated;
                 _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.StageSelect      -= OnStageSelect;
                 _lobby.MatchStarted     -= OnMatchStarted;
                 _lobby.Error            -= OnPvPError;
             }
 
-            // Stash the roster so the results screen can render names/classes.
-            ClientSession.MatchRoster = config.Players;
-
-            // Go straight to the PvP arena — the master server already picked
-            // the arena and assigned the port, so StageSelect is skipped for
-            // online matches (issue #35).
-            SceneManager.LoadScene("Arena_PvP");
-        }
-
-        private static CharacterClass ParseClass(string? name, CharacterClass fallback)
-        {
-            if (string.IsNullOrEmpty(name))
-                return fallback;
-            return System.Enum.TryParse<CharacterClass>(name, ignoreCase: true, out var c) && c != CharacterClass.None
-                ? c
-                : fallback;
+            ClientSession.ApplyMatchStarted(config);
         }
 
         private void OnPvPError(string message)
         {
             _lblPvPStatus.text = message;
+            Debug.LogWarning($"[CharSelect] PvP error: {message}");
             // Re-enable lock-in on error (e.g. rejected selection)
             _btnLockIn.SetEnabled(!_lockedIn);
+            // Re-enable the stage-select button on a rejected transition.
+            UpdateStartMatchButton();
         }
 
         private void OnPvPBackClicked()
@@ -293,6 +261,7 @@ namespace SlopArena.Client.UI
             {
                 _lobby.LobbyUpdated    -= OnLobbyUpdated;
                 _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.StageSelect      -= OnStageSelect;
                 _lobby.MatchStarted     -= OnMatchStarted;
                 _lobby.Error            -= OnPvPError;
             }
@@ -357,6 +326,8 @@ namespace SlopArena.Client.UI
             bool canStart = players.Count >= 2 && players.All(p => p.LockedIn);
             _btnStartMatch.SetEnabled(canStart);
 
+            Debug.Log($"[CharSelect] StartMatch check: count={players.Count} locked={string.Join(",", players.Select(p => $"{p.Name}:{p.LockedIn}"))} -> canStart={canStart}");
+
             if (!canStart)
             {
                 int locked = 0;
@@ -367,8 +338,15 @@ namespace SlopArena.Client.UI
             }
             else
             {
-                _lblPvPStatus.text = "All players locked in. Host can start.";
+                _lblPvPStatus.text = "All players locked in. Host can select the stage.";
             }
+        }
+
+        private static string DescribePlayers(LobbySnapshot snapshot)
+        {
+            var parts = snapshot?.Players.Select(p =>
+                $"{p.Name}(locked={p.LockedIn},char={p.CharacterSelection ?? "?"},host={p.IsHost},steam={p.SteamId})");
+            return $"server={snapshot?.ServerId}, players=[{string.Join(", ", parts ?? System.Array.Empty<string>())}]";
         }
 
         // ── Shared ──
@@ -442,6 +420,7 @@ namespace SlopArena.Client.UI
             {
                 _lobby.LobbyUpdated    -= OnLobbyUpdated;
                 _lobby.CharacterSelected -= OnCharacterSelected;
+                _lobby.StageSelect      -= OnStageSelect;
                 _lobby.MatchStarted     -= OnMatchStarted;
                 _lobby.Error            -= OnPvPError;
             }

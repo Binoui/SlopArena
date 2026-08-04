@@ -463,7 +463,7 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				// Eliminated (0 stocks / rule) — frozen spectator, no physics (issue #37).
 				if (_rule.IsEliminated(state)) continue;
-				var def = _defs[id];
+				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				Simulation.SimulateTick(ref state, def, input, _arena);
 				_states[id] = state;

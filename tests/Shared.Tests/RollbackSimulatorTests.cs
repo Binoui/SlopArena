@@ -89,4 +89,28 @@ public class RollbackSimulatorTests
         Assert.True(all.ContainsKey(SelfId));
         Assert.True(all.ContainsKey(OpponentId));
     }
+
+    [Fact]
+    public void IngestOpponentBatch_UnregisteredOpponent_FallsBackToRawTrack_NoThrow()
+    {
+        // Regression (PvP crash): PvPMatch originally never registered entities, so the
+        // bridge's _defs was empty. The first Predictable opponent packet threw
+        // KeyNotFoundException on defs[EntityId] — but only AFTER _registered.Add had
+        // already marked the entity, so the next batch took the SetState branch and
+        // created an unpaired _states key (state without def), crashing
+        // SimulateMovement every tick. Unknown entities must fall back to RawTrack.
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var sim = new SlopArena.Shared.Rollback.RollbackSimulator(arena, SelfId);
+        sim.RegisterEntity(SelfId, def, TestHelpers.PlayerState());
+
+        // Opponent 2 is deliberately NOT registered — the PvP bug condition.
+        var idle = TestHelpers.PlayerState(x: 10f);
+        for (int i = 0; i < 3; i++)
+            sim.IngestOpponentBatch(new[] { MakePacket(OpponentId, (uint)(i + 1), idle) });
+
+        // Raw fallback: rendered exactly as reported, no re-simulation, no throw.
+        Assert.Equal(10f, sim.GetState(OpponentId).PX);
+        Assert.Equal(ActionState.Idle, sim.GetState(OpponentId).State);
+    }
 }

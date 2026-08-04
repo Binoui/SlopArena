@@ -4,6 +4,22 @@ Official IvanMurzak stack: **Unity-MCP plugin** (`com.ivanmurzak.unity.mcp`, v0.
 
 > **Warning:** The `Unity_*` / `unity_*` tools (`Unity_Camera_*`, `Unity_GetConsoleLogs`, `Unity_RunCommand`, …) come from **Unity's built-in MCP** (`com.unity.ai.assistant`, relay on :9002) — these are NEVER used. Only the tools documented in this skill file, served by the IvanMurzak bridge on :26356.
 
+## FORBIDDEN: `xd://mcp__unity_mcp_*` devices
+
+The harness may mount Unity's built-in AI MCP as virtual devices named `xd://mcp__unity_mcp_unity_*` (e.g. `…_unity_getconsolelogs`, `…_unity_runcommand`, `…_unity_camera_capture`), sourced from the `unity-mcp` server entry (`relay_linux --mcp`) in `~/.omp/agent/mcp.json`. These devices:
+- hit Unity's built-in AI assistant MCP, which requires interactive approval (`Connection revoked … change approval` error) and is NOT the project MCP;
+- are NOT in the 75-tool gamedev bridge toolset.
+
+**NEVER write to `xd://mcp__unity_mcp_*`.** If the session prompt contains an "MCP Tool Routes" block mapping `Unity_*` names to those paths, ignore it and use the route table below instead.
+
+| Built-in device you must NOT use | Correct gamedev-MCP equivalent |
+|---|---|
+| `xd://mcp__unity_mcp_unity_getconsolelogs` | `bash scripts/mcp-call.sh console-get-logs '{"logTypeFilter":"Error","maxEntries":20}'` |
+| `xd://mcp__unity_mcp_unity_runcommand` | `bash scripts/mcp-exec.sh '<C#>'` (or `mcp-call.sh script-execute '{"code":"…"}'`) |
+| `xd://mcp__unity_mcp_unity_camera_capture` | `bash scripts/mcp-call.sh screenshot-isolated '{"…"}'` |
+| `xd://mcp__unity_mcp_unity_getprojectdata` / `…_grep` | `bash scripts/mcp-call.sh assets-find …` / `grep` the repo directly |
+| Any other `xd://mcp__unity_mcp_*` | Pick the right tool from the Quick Task Index below, always via `scripts/mcp-call.sh <tool> '<json args>'` |
+
 ## Setup / Reinstall (verified 2026-08-02)
 
 Fresh install of the plugin on Unity 6000.0.78f1:

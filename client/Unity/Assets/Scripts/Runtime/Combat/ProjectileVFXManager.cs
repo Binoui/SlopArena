@@ -196,6 +196,10 @@ namespace SlopArena.Client.Combat
 
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;
+            // All three orbital axes must share the same curve mode or Unity throws
+            // "Particle Orbital Velocity curves must all be in the same mode".
+            vel.orbitalX = new ParticleSystem.MinMaxCurve(0f, 0f);
+            vel.orbitalY = new ParticleSystem.MinMaxCurve(0f, 0f);
             vel.orbitalZ = new ParticleSystem.MinMaxCurve(-90f, 90f);
 
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
