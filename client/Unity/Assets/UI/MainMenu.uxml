@@ -1,45 +1,9 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <ui:Style src="SlopArena.uss" />
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
     <ui:VisualElement name="root" class="screen">
-
-        <!-- Static backdrop scene (spec §5) -->
-        <ui:VisualElement name="backdrop" class="backdrop">
-            <ui:VisualElement class="bkg-sun" />
-            <ui:VisualElement class="bkg-cloud bkg-cloud--1" />
-            <ui:VisualElement class="bkg-cloud bkg-cloud--2" />
-            <ui:VisualElement class="bkg-hill bkg-hill--left" />
-            <ui:VisualElement class="bkg-hill bkg-hill--right" />
-            <ui:VisualElement class="bkg-platform bkg-platform--main" />
-            <ui:VisualElement class="bkg-platform bkg-platform--left" />
-            <ui:VisualElement class="bkg-platform bkg-platform--right" />
-            <ui:VisualElement class="bkg-fighter bkg-fighter--1" />
-            <ui:VisualElement class="bkg-fighter bkg-fighter--2" />
-            <ui:VisualElement class="bkg-fighter bkg-fighter--3" />
-            <ui:VisualElement class="bkg-texture" />
-        </ui:VisualElement>
-
-        <!-- Header: extruded logo + status pills -->
-        <ui:VisualElement name="header" class="header">
-            <ui:VisualElement name="title-wrap" class="title-wrap">
-                <ui:Label text="SLOPARENA" class="title title--shadow3" />
-                <ui:Label text="SLOPARENA" class="title title--shadow2" />
-                <ui:Label text="SLOPARENA" class="title title--shadow1" />
-                <ui:Label name="title" text="SLOPARENA" class="title title--face" />
-                <ui:VisualElement class="title-stripes" />
-            </ui:VisualElement>
-            <ui:VisualElement name="status-area" class="status-area">
-                <ui:Label name="online-count" text="● 1,204 ONLINE" class="status-pill status-pill--online" />
-                <ui:Label name="lbl-host-status" text="" class="status-pill status-pill--host" style="display: none;" />
-            </ui:VisualElement>
-        </ui:VisualElement>
-
-        <!-- Center: TRAINING hero -->
         <ui:VisualElement name="center" class="center-col">
-            <ui:Button name="btn-training" text="TRAINING MODE" class="btn-hero" />
-            <ui:Label text="SOLO PRACTICE · ANY STAGE · NO PRESSURE" class="hero-tagline" />
+            <ui:Button name="btn-training" text="Training" class="mp-header" />
         </ui:VisualElement>
-
-        <!-- Chat panel — UI shell only (spec §6) -->
         <ui:VisualElement name="chat-panel" class="chat-panel">
             <ui:VisualElement class="chat-header">
                 <ui:Label text="# GLOBAL CHAT" class="chat-title" />
@@ -51,21 +15,17 @@
                 <ui:Label text="dude420: host is up, join fast" class="chat-msg" />
             </ui:VisualElement>
             <ui:VisualElement class="chat-input-row">
-                <ui:TextField name="chat-input" value="" placeholdertext="type here…" class="ip-input" />
+                <ui:TextField name="chat-input" placeholdertext="type here…" class="ip-input" />
                 <ui:Button name="chat-send" text="➜" class="chat-send" />
             </ui:VisualElement>
         </ui:VisualElement>
-
-        <!-- Multiplayer panel — element name "submenu" kept so the
-             controller's collapse toggle keeps working. Starts VISIBLE
-             (behavior change vs old hidden submenu). -->
-        <ui:VisualElement class="mp-panel">
+        <ui:VisualElement class="mp-panel" style="bottom: 113px; right: 211px;">
             <ui:Button name="btn-multiplayer" text="MULTIPLAYER" class="mp-header" />
             <ui:VisualElement name="submenu" class="mp-body">
                 <ui:Button name="btn-serverbrowser" text="BROWSE SERVERS" class="menu-item" />
                 <ui:Button name="btn-host" text="HOST GAME" class="menu-item" />
                 <ui:VisualElement name="host-row" class="join-row">
-                    <ui:TextField name="host-ip-field" value="" placeholdertext="Public IP or domain (empty = auto)" class="ip-input" />
+                    <ui:TextField name="host-ip-field" placeholdertext="Public IP or domain (empty = auto)" class="ip-input" />
                 </ui:VisualElement>
                 <ui:VisualElement name="join-row" class="join-row">
                     <ui:Button name="btn-join" text="JOIN GAME" class="menu-item menu-item--join" />
@@ -73,8 +33,6 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-
-        <!-- Version -->
         <ui:Label text="v0.1 DEMO" class="version-pill" />
     </ui:VisualElement>
 </ui:UXML>
