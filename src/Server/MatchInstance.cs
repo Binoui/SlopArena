@@ -398,8 +398,6 @@ namespace SlopArena.Server
 						_onMatchResult(matchGuid, winnerSteamId); // fire-and-forget; ReportMatchResultAsync swallows errors
 					}
 				}
-
-				// outcome handling (unchanged, stays inside the if)
 			}
 
 			// Broadcast every tick — including empty ones. Otherwise the GO tick's
