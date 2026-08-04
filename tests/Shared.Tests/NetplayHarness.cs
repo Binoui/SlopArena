@@ -30,6 +30,7 @@ internal sealed class NetplayHarness
     private readonly RollbackSimulator _client;
     private readonly int _delayTicks;
     private readonly int _dropEvery; // 0 = no loss
+    private bool _dropsEnabled = true;
     private readonly Queue<(uint Tick, ServerEntityPacket Self, ServerEntityPacket Opp)> _inFlight = new();
     private uint _serverTick;
 
@@ -80,7 +81,7 @@ internal sealed class NetplayHarness
         if (_inFlight.Count > _delayTicks)
         {
             var (_, self, opp) = _inFlight.Dequeue();
-            if (_dropEvery == 0 || _serverTick % _dropEvery != 0)
+            if (!_dropsEnabled || _dropEvery == 0 || _serverTick % _dropEvery != 0)
             {
                 _client.ReconcileSelf(self);
                 _client.IngestOpponentBatch(new[] { opp });
@@ -88,19 +89,24 @@ internal sealed class NetplayHarness
         }
     }
 
+    /// <summary>Enable/disable packet loss. The fuzz disables loss during its idle
+    /// settle tail so the final reconcile + replay is guaranteed to re-converge.</summary>
+    public void SetDropsEnabled(bool enabled) => _dropsEnabled = enabled;
+
     public CharacterState ServerState(ulong id) => _server.GetState(id);
     public CharacterState ClientState(ulong id) => _client.GetState(id);
 
-    /// <summary>Entity 1 (self) must equal the server on every wire field. Exact: both
-    /// sides run the same deterministic sim with identical inputs. Note: MatchState is
-    /// never set by the sim on either side (both default), so it stays comparable —
-    /// if a future change sets it, normalize it here before comparing.</summary>
-    public static void AssertSelfConverged(NetplayHarness h)
+    /// <summary>True when the client self state equals the server's on every wire
+    /// field (exact — deterministic sim, identical inputs).</summary>
+    public static bool IsSelfConverged(NetplayHarness h)
     {
         var expected = CharacterStatePacket.FromState(h.ServerState(SelfId));
         var actual = CharacterStatePacket.FromState(h.ClientState(SelfId));
-        Assert.Equal(expected, actual);
+        return expected.Equals(actual);
     }
+
+    public static void AssertSelfConverged(NetplayHarness h)
+        => Assert.True(IsSelfConverged(h), "client self state diverged from server");
 
     /// <summary>Entity 2 (opponent) must track the server within tolerance. Damage and
     /// knockback may legitimately diverge (PredictedTrack has no self hurtbox), so only

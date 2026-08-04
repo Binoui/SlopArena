@@ -9,12 +9,14 @@ namespace SlopArena.Shared.Tests;
 /// Property-based fuzz of the netplay/rollback client path: random inputs + random
 /// packet loss/delay through NetplayHarness. Asserts the crash class (KeyNotFound on
 /// defs/states, poisoned dictionaries, NaN drift) never fires, plus exact self-state
-/// re-convergence after an idle loss-free tail.
+/// re-convergence after an idle settle tail (drops disabled).
 ///
 /// Entity 1's ActiveSlot is forced to 0: the self entity's own attacks can diverge
 /// between the local sim (mirror opponent) and the server (real opponent) on combo
-/// chain, which would legitimately break exact equality. Entity 2's inputs are fully
-/// random — they exercise the opponent prediction path (Complex routing, RawTrack,
+/// chain — ReconcileWithServer refuses to patch a history suffix containing a Complex
+/// tick (LocalTrack trusts the live sim through attacks), so an interrupted self-attack
+/// would leave the live combo diverging forever. Entity 2's inputs are fully random —
+/// they exercise the opponent prediction path (Complex routing, RawTrack,
 /// re-registration, lunge, hits on entity 1 server-side).
 ///
 /// On failure FsCheck prints a seed — pass it to the PositiveInt parameter to replay:
@@ -33,7 +35,6 @@ public class RollbackInvariantTests
         int delayTicks = rng.Next(0, 4);
         int dropEvery = rng.Next(3) == 0 ? 0 : rng.Next(4, 9); // ~1/3 of runs lossless
         int traceTicks = 300;
-        int tailTicks = delayTicks + 30; // idle + loss-free tail ⇒ re-convergence
 
         var h = new NetplayHarness(arena, Def, delayTicks, dropEvery);
 
@@ -47,15 +48,22 @@ public class RollbackInvariantTests
             AssertFinite(h, tick);
         }
 
-        // Idle, loss-free tail: every tick Predictable and every packet received, so
-        // the final reconcile + replay must re-converge the self state exactly.
-        for (int tick = 0; tick < tailTicks; tick++)
+        // Idle settle tail with drops DISABLED: no new attacks can occur (idle inputs)
+        // and hitstun is finite (≤ 60, asserted above), so a fresh packet with an
+        // all-Predictable history suffix must eventually arrive and the reconcile +
+        // replay re-converge the self state exactly. The 300-tick bound is far above
+        // the worst case (hitstun 60 + delay ≤ 3 + delivery). Convergence is asserted
+        // to happen, not timed — no fixed-tick assumption.
+        h.SetDropsEnabled(false);
+        bool converged = false;
+        for (int i = 0; i < 300 && !converged; i++)
         {
             h.Step(default, default);
-            AssertFinite(h, traceTicks + tick);
+            AssertFinite(h, traceTicks + i);
+            converged = NetplayHarness.IsSelfConverged(h);
         }
 
-        NetplayHarness.AssertSelfConverged(h);
+        Assert.True(converged, "self state failed to re-converge within 300 idle ticks");
     }
 
     private static void AssertFinite(NetplayHarness h, int tick)
