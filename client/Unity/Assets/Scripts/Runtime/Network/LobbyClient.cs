@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using SlopArena.Shared;
 
@@ -78,6 +79,11 @@ namespace SlopArena.Client.Network
                 .WithUrl($"{_masterServerUrl}/lobby", options =>
                 {
                     options.AccessTokenProvider = () => Task.FromResult<string?>(_authToken);
+                    // LongPolling only: Unity Mono's ClientWebSocket is unreliable in
+                    // standalone players (hub connect fails silently under Proton/Wine
+                    // while plain HttpClient calls work). LongPolling is plain HTTP and
+                    // works on every platform. Revisit if a native WebSocket impl lands.
+                    options.Transports = HttpTransportType.LongPolling;
                 })
                 .WithAutomaticReconnect()
                 .Build();
@@ -114,6 +120,7 @@ namespace SlopArena.Client.Network
             }
             catch (Exception ex)
             {
+                UnityEngine.Debug.LogError($"[LobbyClient] SignalR connect failed: {ex}");
                 _pending.Enqueue(() => Error?.Invoke($"Failed to connect: {ex.Message}"));
                 return false;
             }
@@ -197,11 +204,16 @@ namespace SlopArena.Client.Network
             }
             try
             {
-                await _conn.InvokeAsync(method, args);
+                // Use the object[]-taking overload: InvokeAsync(string, object? arg1, …)
+                // would bind args as a SINGLE argument (the array), serializing
+                // arguments:[[…]] which fails server-side binding. InvokeCoreAsync
+                // passes the array straight through (observed on the wire, fixed 2026-08-04).
+                await _conn.InvokeCoreAsync(method, args);
             }
             catch (Exception ex)
             {
                 // HubException surfaces here (e.g. non-host HostStart rejected).
+                UnityEngine.Debug.LogError($"[LobbyClient] {method} rejected: {ex}");
                 _pending.Enqueue(() => Error?.Invoke($"{method} rejected: {ex.Message}"));
             }
         }
