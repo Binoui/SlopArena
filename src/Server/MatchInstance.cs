@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using SlopArena.Shared;
+using SlopArena.Shared.Rollback;
 
 namespace SlopArena.Server
 {
@@ -287,15 +288,8 @@ namespace SlopArena.Server
 
 					var inputState = InputState.Deserialize(data.AsSpan(12));
 
-					// Prevent duplicates
-					bool exists = false;
-					for (int i = 0; i < slot.Queue.Count; i++)
-					{
-						if (slot.Queue[i].tick == clientTick)
-						{ exists = true; break; }
-					}
-					if (!exists)
-						slot.Queue.Add((clientTick, inputState));
+					// TickInputBuffer.Push replaces same-tick duplicates.
+					slot.Queue.Push(clientTick, inputState);
 				}
 				catch (SocketException ex)
 				{
@@ -327,6 +321,7 @@ namespace SlopArena.Server
 				{
 					_matchState = MatchState.Playing;
 					Console.WriteLine($"[Match:{_matchId}] GO!");
+					PrimeTickCounter();
 				}
 				SendState();
 				return;
@@ -344,22 +339,39 @@ namespace SlopArena.Server
 			}
 
 			var inputs = new Dictionary<ulong, InputState>();
+			uint targetTick = _serverTick + 1;
+			bool anyPending = false;
 			foreach (var slot in _slots)
 			{
-				var input = FlushQueue(slot.Queue, out _);
-				if (input.HasValue)
+				// Disconnected/eliminated players freeze as spectators (issue #36/#37):
+				// discard their inputs and keep the queue bounded.
+				if (slot.Disconnected || _rule.IsEliminated(_sim.GetState(slot.EntityId)))
 				{
-					_serverTick = Math.Max(_serverTick, input.Value.tick);
-					if (slot.Disconnected) continue;
-					if (_rule.IsEliminated(_sim.GetState(slot.EntityId))) continue;
-					inputs[slot.EntityId] = input.Value.input;
+					slot.Queue.Clear();
+					continue;
 				}
+
+				// Drop already-consumed ticks; keep everything newer. Consuming in tick
+				// order (not "newest only") means single-tick inputs — jump presses, slot
+				// presses — survive any backlog or burst instead of being silently dropped.
+				slot.Queue.Prune(_serverTick);
+				if (slot.Queue.Count == 0) continue;
+				anyPending = true;
+
+				// Input for THIS tick, or hold the last-known input (same semantics as the
+				// client's prediction replay). A missing tick never stalls the sim.
+				InputState input = slot.LastInput;
+				if (slot.Queue.TryTake(targetTick, out var queuedInput))
+					input = queuedInput;
+				slot.LastInput = input;
+				inputs[slot.EntityId] = input;
 			}
 
 			// Run authoritative simulation (movement + hit detection + hurtboxes + void death)
 			_lastTickInputs = inputs;
-			if (inputs.Count > 0)
+			if (anyPending)
 			{
+				_serverTick = targetTick;
 				_sim.Tick(inputs);
 
 				// Check for match end: the rule decides (stock: last player standing wins;
@@ -446,16 +458,25 @@ namespace SlopArena.Server
 		/// <summary>
 		/// Flush the input queue: take the last valid packet, discard the rest.
 		/// Returns the packet to process, or null if queue was empty.
+		/// <summary>
+		/// On GO, the clients' tick counters are already ~CountdownDuration ahead (they
+		/// predict and send during countdown). Discard the countdown-era input backlog
+		/// and start the shared tick counter at the clients' current tick, so the server
+		/// and client sim clocks stay aligned from the first Playing tick instead of the
+		/// server replaying three seconds of stale inputs.
 		/// </summary>
-		private static (uint tick, InputState input)? FlushQueue(List<(uint tick, InputState input)> queue, out int count)
+		private void PrimeTickCounter()
 		{
-			count = queue.Count;
-			if (count == 0) return null;
-
-			// Use the LAST packet (most recent input for this tick's batch)
-			var last = queue[count - 1];
-			queue.Clear();
-			return last;
+			uint maxQueued = 0;
+			foreach (var slot in _slots)
+				if (slot.Queue.MaxTick is uint maxTick)
+					maxQueued = Math.Max(maxQueued, maxTick);
+			if (maxQueued > 0)
+			{
+				_serverTick = maxQueued;
+				foreach (var slot in _slots)
+					slot.Queue.Clear();
+			}
 		}
 
 		/// <summary>
@@ -470,7 +491,10 @@ namespace SlopArena.Server
 			public IPEndPoint? EndPoint { get; set; }
 			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
 			public bool Disconnected { get; set; }
-			public List<(uint tick, InputState input)> Queue { get; } = new();
+			public TickInputBuffer Queue { get; } = new();
+			/// <summary>Last input consumed for this slot — held across ticks when a tick's
+			/// input hasn't arrived yet (same semantics as client-side prediction replay).</summary>
+			public InputState LastInput;
 
 			public PlayerSlot(ulong entityId, CharacterClass characterClass, long steamId)
 			{
