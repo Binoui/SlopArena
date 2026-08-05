@@ -9,6 +9,8 @@ namespace SlopArena.Shared.Abilities;
 /// auto-releases <c>ChargedStages[0]</c> (or after 5s failsafe).
 ///
 /// Aerial extras over the ground charge classes:
+///   - <see cref="OnChargeStart"/> zeroes vertical velocity — pressing mid-ascent stops the
+///     climb and the character charges in place (the sim only cancels DOWNWARD VY).
 ///   - <see cref="OnAttackStart"/> applies the resolved stage's LungeForce as a forward burst.
 ///   - <see cref="OnAttackTick"/> drives the stage's per-tick MoveX/MoveY/MoveZ velocity
 ///     every attack tick — the Collapse-style downward slams (see the note in AttackData.cs
@@ -18,6 +20,17 @@ namespace SlopArena.Shared.Abilities;
 public sealed class AirChargeAttack : ChargeAttackAbility
 {
     protected override bool IsAirborne => true;
+
+    protected override void OnChargeStart(ref CharacterState s, CharacterDefinition def)
+    {
+        // Stop a jump's ascent the moment the charge begins. ActivateAbility only cancels
+        // DOWNWARD velocity, and float gravity (AirFloatGravity=0) never bleeds upward
+        // momentum off, so pressing air RMB mid-rise would otherwise carry the climb through
+        // the entire hold — "fly up in the air" while charging. The charge is a stop-and-
+        // wind-up stance (deliberately unlike air LMB, which keeps momentum for its combo).
+        if (!s.IsGrounded)
+            s.VY = 0f;
+    }
 
     protected override void OnAttackStart(ref CharacterState s, CharacterDefinition def, AttackStage stage)
     {

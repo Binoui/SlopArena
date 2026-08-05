@@ -490,6 +490,34 @@ public class AbilityLifecycleTests
     }
 
     /// <summary>
+    /// Pressing air RMB mid-ascent must STOP the climb and charge in place. ActivateAbility
+    /// only cancels DOWNWARD velocity and float gravity never bleeds upward momentum off, so
+    /// without <see cref="Abilities.AirChargeAttack.OnChargeStart"/> zeroing VY the jump's
+    /// rise carries through the entire hold ("fly up in the air while charging").
+    /// </summary>
+    [Fact]
+    public void MankiAirRMB_ChargeStart_StopsJumpAscent()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.VY = 10f; // rising from a jump
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold the charge: the ascent must stop at press, not carry through the hold.
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) } };
+        for (int i = 0; i < 10; i++)
+            sim.Tick(holdInputs);
+
+        var mid = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, mid.State);
+        TestHelpers.AssertNear(0f, mid.VY);
+        Assert.True(mid.PY < state.PY + 1f,
+            $"pressing air RMB mid-ascent must stop the rise: {state.PY:F3} -> {mid.PY:F3}");
+    }
+
+    /// <summary>
     /// The air RMB must fire from a clean hover like air LMB does (StageChainAbility zeroes
     /// downward VY and restarts the float window on every stage). The charge hold burns the
     /// float window, so <see cref="Abilities.AirChargeAttack.OnAttackStart"/> re-applies the
