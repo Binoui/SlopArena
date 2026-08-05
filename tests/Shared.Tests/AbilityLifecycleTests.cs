@@ -490,6 +490,54 @@ public class AbilityLifecycleTests
     }
 
     /// <summary>
+    /// The air RMB must fire from a clean hover like air LMB does (StageChainAbility zeroes
+    /// downward VY and restarts the float window on every stage). The charge hold burns the
+    /// float window, so <see cref="Abilities.AirChargeAttack.OnAttackStart"/> re-applies the
+    /// same reset at release. Without it, AirTimeTicks keeps climbing through the hold.
+    /// </summary>
+    [Fact]
+    public void MankiAirRMB_TapRelease_RestartsHover()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 5); // release at tick 5
+
+        var after = sim.GetState(1);
+        Assert.Equal((byte)1, after.ComboStage); // attack phase reached
+        Assert.Equal((ushort)0, after.AirTimeTicks);   // float window restarted at release
+        TestHelpers.AssertNear(0f, after.VY);          // no downward velocity carried in
+    }
+
+    /// <summary>
+    /// Same reset on the CHARGED release. Manki's float window is 30 ticks + 15 ramp, so by
+    /// the auto-release tick (45) the hold has ramped into real gravity (VY ≈ -4.7 without
+    /// the reset); the release must wipe it and restart the hover for the spike.
+    /// </summary>
+    [Fact]
+    public void MankiAirRMB_ChargedRelease_RestartsHover()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold past ChargeHoldTicks (45) — auto-release fires the charged attack at tick 45.
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) } };
+        for (int i = 0; i < 45; i++)
+            sim.Tick(holdInputs);
+
+        var after = sim.GetState(1);
+        Assert.Equal((byte)1, after.ComboStage); // attack phase reached (charged)
+        Assert.Equal((ushort)0, after.AirTimeTicks);   // hover restarted despite the 45-tick hold
+        TestHelpers.AssertNear(0f, after.VY);
+    }
+
+    /// <summary>
     /// Air RMB is a hold-to-charge attack driven by <see cref="Abilities.AirChargeAttack"/>.
     /// The client indexes <c>AnimationNames</c> by ComboStage (0 = hold, 1 = release) and
     /// falls back to the LMB clip when the index is out of range (PlayerRenderer), so every

@@ -21,6 +21,15 @@ public sealed class AirChargeAttack : ChargeAttackAbility
 
     protected override void OnAttackStart(ref CharacterState s, CharacterDefinition def, AttackStage stage)
     {
+        // Mirror the sim's aerial-attack reset (ServerSimulation.ActivateAbility) at the
+        // moment the attack actually begins. The charge hold lets gravity re-accumulate
+        // downward velocity and burn the float window, so without this the air RMB fires
+        // from a fall while air LMB fires from a hover (StageChainAbility re-applies the
+        // same reset — VY zero + AirTimeTicks=0 — on activation and every chain stage).
+        if (!s.IsGrounded && s.VY < 0f)
+            s.VY = 0f;
+        s.AirTimeTicks = 0;
+
         if (stage.LungeForce != 0f)
             SetVelocityInFacing(ref s, stage.LungeForce);
     }

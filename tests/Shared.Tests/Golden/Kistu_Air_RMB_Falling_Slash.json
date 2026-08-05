@@ -6,7 +6,7 @@
     "PY": 1.5,
     "ComboStage": 1,
     "AttackSlot": 2,
-    "AirTimeTicks": 15
+    "AirTimeTicks": 10
   },
   "NpcSnap": {
     "State": 2,
