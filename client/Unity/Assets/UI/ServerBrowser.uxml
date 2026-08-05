@@ -1,6 +1,6 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <ui:Style src="SlopArena.uss" />
-    <ui:VisualElement name="root" class="screen">
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
+    <ui:VisualElement name="root" class="screen" style="background-image: none;">
         <ui:Label name="title" text="SERVER BROWSER" class="title" />
         <ui:VisualElement name="server-list" class="server-list" />
         <ui:Label name="lbl-status" text="Loading..." class="subtitle" />

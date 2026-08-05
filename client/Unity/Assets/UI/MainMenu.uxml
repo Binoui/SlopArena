@@ -1,35 +1,26 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen">
-        <ui:VisualElement name="center" class="center-col">
-            <ui:Button name="btn-training" text="Training" class="mp-header" />
-        </ui:VisualElement>
-        <ui:VisualElement name="chat-panel" class="chat-panel">
+    <ui:VisualElement name="root" class="screen" style="background-image: none;">
+        <ui:VisualElement name="center" class="center-col" />
+        <ui:VisualElement name="chat-panel" class="chat-panel" style="width: 511px; height: 238px;">
             <ui:VisualElement class="chat-header">
                 <ui:Label text="# GLOBAL CHAT" class="chat-title" />
                 <ui:Label name="chat-online" text="1,204 online" class="chat-online" />
             </ui:VisualElement>
-            <ui:VisualElement name="chat-feed" class="chat-feed">
-                <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="chat-msg" />
-                <ui:Label text="slopqueen: ranked when??" class="chat-msg" />
-                <ui:Label text="dude420: host is up, join fast" class="chat-msg" />
-            </ui:VisualElement>
+            <ui:VisualElement name="chat-feed" class="chat-feed" />
             <ui:VisualElement class="chat-input-row">
                 <ui:TextField name="chat-input" placeholdertext="type here…" class="ip-input" />
                 <ui:Button name="chat-send" text="➜" class="chat-send" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement class="mp-panel" style="bottom: 113px; right: 211px;">
-            <ui:Button name="btn-multiplayer" text="MULTIPLAYER" class="mp-header" />
+        <ui:VisualElement class="mp-panel" style="bottom: 322px; right: 562px;">
+            <ui:Button name="btn-training" text="Training" class="mp-header" style="height: 36px; margin-bottom: 4px; margin-top: 4px;" />
+            <ui:Button name="btn-multiplayer" text="MULTIPLAYER" class="mp-header" style="margin-top: 4px; margin-bottom: 4px;" />
             <ui:VisualElement name="submenu" class="mp-body">
                 <ui:Button name="btn-serverbrowser" text="BROWSE SERVERS" class="menu-item" />
                 <ui:Button name="btn-host" text="HOST GAME" class="menu-item" />
-                <ui:VisualElement name="host-row" class="join-row">
-                    <ui:TextField name="host-ip-field" placeholdertext="Public IP or domain (empty = auto)" class="ip-input" />
-                </ui:VisualElement>
                 <ui:VisualElement name="join-row" class="join-row">
                     <ui:Button name="btn-join" text="JOIN GAME" class="menu-item menu-item--join" />
-                    <ui:TextField name="ip-field" value="127.0.0.1" class="ip-input" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
