@@ -167,14 +167,20 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
             },
 
-            // AirRMB — Collapse (downward spike)
+            // AirRMB — Collapse (downward spike; hold to charge)
             AirRMB = new AbilitySpec
             {
                 Name = "Collapse",
-                Description = "Committed downward void slam. Spikes the target toward the floor.",
+                Description = "Hold to charge a committed downward void slam; tap = quick slam, charged = heavier slam that spikes the target toward the floor.",
                 CooldownTicks = 0,
+                Behavior = AbilityBehavior.ChargeAttack,
+                ChargeHoldTicks = 45,
                 Stages = new AttackStage[]
                 {
+                    // Stage 0: hold/charge phase (no hitboxes)
+                    new() { DurationTicks = 60, ChainWindowTicks = 0, HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 0f, WarpRange = 0f },
+                    // Stage 1: tap slam (same numbers as the pre-charge air RMB; drives Nilus down at 14 m/s)
                     new() { DurationTicks = 36, ChainWindowTicks = 0, MoveY = -14f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.8f,
                                     OffX = 0, OffY = 0.1f, OffZ = 0.4f,
@@ -182,7 +188,17 @@ public static partial class CharacterRegistry
                                     StunTicks = 30, Interruptible = true } },
                             AttackRange = 0f, WarpRange = 0f },
                 },
-                AnimationNames = new[] { "spell_rmb_air" },
+                ChargedStages = new AttackStage[]
+                {
+                    // Charged: bigger rift sphere, faster drop, more damage
+                    new() { DurationTicks = 36, ChainWindowTicks = 0, MoveY = -18f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 10, Shape = HitboxShape.Sphere, Radius = 1.0f,
+                                    OffX = 0, OffY = 0.1f, OffZ = 0.4f,
+                                    Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike },
+                                    StunTicks = 36, Interruptible = true } },
+                            AttackRange = 0f, WarpRange = 0f },
+                },
+                AnimationNames = new[] { "spell_rmb_air", "spell_rmb_air" },
             },
 
             // Q — Void Rift (signature; lobbed seed → grounded lingering rift). Class: NilusVoidRift (Task 3)

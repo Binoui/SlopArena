@@ -98,7 +98,7 @@ public class MankiKitRegressionTests : KitScenarioTests
                 with { PX = 0, PZ = 0, PY = TestHelpers.CombatGroundPY },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 20,   // spike hitbox active (trigger=16, dur=8)
+            SnapshotTick = 24,   // tap hitbox active (release ~tick5, trigger=16, dur=8 → 21-28)
             TotalTicks = 60,
         });
     }

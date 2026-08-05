@@ -6,7 +6,7 @@ namespace SlopArena.Shared.Tests;
 /// Tests that every character's abilities properly transition back to idle
 /// after their attack duration expires.
 /// Covers all slots: LMB (LmbCombo), AirLMB (AirLmbCombo), RMB (MankiAerosolFlame/FightGuyUppercut),
-/// AirRMB (AirRmbAttack), Q (MankiRoundBomb/FightGuyKiShot), E (MankiGrapple/FightGuyCycloneKick),
+/// AirRMB (AirChargeAttack), Q (MankiRoundBomb/FightGuyKiShot), E (MankiGrapple/FightGuyCycloneKick),
 /// R (MankiBazooka/FightGuyDragonKick), F (MankiOverclock/FightGuyTempest).
 public class AttackToIdleTests
 {
@@ -110,7 +110,7 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI AIR RMB — AirRmbAttack
+    //  MANKI AIR RMB — AirChargeAttack
     // ════════════════════════════════════════════════
 
     [Fact]
@@ -122,8 +122,9 @@ public class AttackToIdleTests
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
+        // Tap: 5-tick release debounce + Stages[1] attack duration + margin
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2),
-            MankiDef.AirRMB!.Stages[0].DurationTicks + 10);
+            MankiDef.AirRMB!.Stages[1].DurationTicks + 15);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);

@@ -153,21 +153,37 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
             },
 
-            // AirRMB — Falling Slash (downward spike)
+            // AirRMB — Falling Slash (downward spike; hold to charge)
             AirRMB = new AbilitySpec
             {
                 Name = "Falling Slash",
-                Description = "Committed downward air slash that spikes enemies toward the floor/blast zone.",
+                Description = "Hold to charge a committed downward air slash; tap = quick slash, charged = heavier slash that spikes enemies toward the floor/blast zone.",
                 CooldownTicks = 0,
+                Behavior = AbilityBehavior.ChargeAttack,
+                ChargeHoldTicks = 45,
                 Stages = new AttackStage[]
                 {
+                    // Stage 0: hold/charge phase (no hitboxes; targeting config lives here)
+                    new() { DurationTicks = 60, ChainWindowTicks = 0,
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                    // Stage 1: tap slash (same numbers as the pre-charge air RMB)
                     new() { DurationTicks = 26, ChainWindowTicks = 0, LungeForce = 0f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.4f,
                                     Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 28, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                 },
-                AnimationNames = new[] { "spell_air_rmb" },
+                ChargedStages = new AttackStage[]
+                {
+                    // Charged: wider blade, more damage
+                    new() { DurationTicks = 26, ChainWindowTicks = 0, LungeForce = 0f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Shape = HitboxShape.Capsule, Radius = 0.7f,
+                                    OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.5f,
+                                    Damage = 13f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 36, Interruptible = true } },
+                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                },
+                AnimationNames = new[] { "spell_air_rmb", "spell_air_rmb" },
             },
 
             // Q — Counter (parry window → launch riposte)
@@ -198,37 +214,33 @@ public static partial class CharacterRegistry
                 },
             },
 
-            // E — Charged Dash Slash (gap-close / horizontal recovery, no stun)
+            // E — Dash Slash (aim the direction on the ground, release to dash a set distance)
             E = new AbilitySpec
             {
-                Name = "Charged Dash Slash",
-                Description = "Dash forward and slash. Tap = short reposition, hold = full gap-close. No stun.",
+                Name = "Dash Slash",
+                Description = "Hold to aim the dash direction on the ground (movement stays unlocked), release to dash-slash a set distance.",
                 IconName = "e",
                 CooldownTicks = 90,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 30,
+                Behavior = AbilityBehavior.DirectionalDash,
+                AimMode = AimMode.GroundVector,
                 Stages = new AttackStage[]
                 {
-                    // Stage 0: hold/charge phase
-                    new() { DurationTicks = 120, ChainWindowTicks = 0, HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                            LungeForce = 0f, AttackRange = 0f, WarpRange = 0f },
-                    // Stage 1: short dash slash
-                    new() { DurationTicks = 26, ChainWindowTicks = 0, LungeForce = 18f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.5f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.8f,
-                                    Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f },
+                    // Dash stage: the ability spawns a fresh hitbox at the character's position
+                    // every dash tick (per-tick sweep along the aim axis, radius covers her sides).
+                    // DurationTicks also drives the dash clip playback speed (frameCount / DurationTicks).
+                    new() { DurationTicks = 16, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 1, Shape = HitboxShape.Capsule, Radius = 0.55f,
+                                    OffX = 0, OffY = 0.7f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.3f,
+                                    Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 0f, WarpRange = 0f },
                 },
-                ChargedStages = new AttackStage[]
+                AnimationNames = new[] { "spell_e" },
+                Params = new()
                 {
-                    // Full gap-close dash slash
-                    new() { DurationTicks = 30, ChainWindowTicks = 0, LungeForce = 32f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Shape = HitboxShape.Capsule, Radius = 0.55f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 2.0f,
-                                    Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f },
+                    ["dash_distance"] = 5f,          // exact meters travelled on release
+                    ["dash_duration_ticks"] = 16f,   // dash length in ticks (matches stage duration)
+                    ["max_aim_ticks"] = 180f,        // 3s aim cap, then auto-release
                 },
-                AnimationNames = new[] { "spell_e_loop", "spell_e_attack" },
             },
 
             // R — Rising Slash (signature: homing launcher, refundable charge pool, vertical recovery)

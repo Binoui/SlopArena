@@ -354,7 +354,7 @@ public class AbilityLifecycleTests
 
 
     // ══════════════════════════════════════════════════════════════════
-    // ── AirRMB (slot 2, airborne): ServerAbility (AirRmbAttack) — basic lifecycle ──
+    // ── AirRMB (slot 2, airborne): AirChargeAttack — charge lifecycle ──
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -370,13 +370,149 @@ public class AbilityLifecycleTests
         Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)2, t0.AttackSlot);
 
-        // AirRMB DurationTicks=28, wait 35 for margin
-        for (int i = 0; i < 35; i++)
+        // Tap: 5-tick release debounce + Stages[1] attack (30t), wait with margin
+        int tapDuration = Def.AirRMB!.Stages[1].DurationTicks + 10;
+        for (int i = 0; i < tapDuration; i++)
             TestHelpers.TickDefault(sim, 1);
 
         var ended = sim.GetState(1);
         Assert.Equal(ActionState.Idle, ended.State);
         Assert.Equal((byte)0, ended.AttackSlot);
+    }
+
+    // ── AirRMB charge: hold to power up, release to fire (mirrors the ground RMB tests) ──
+
+    [Fact]
+    public void MankiAirRMB_TapRelease_SpawnsNormalHitbox()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Tap: no aiming → 5-tick debounce release, then Stages[1] (trigger=16, dur=8)
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 5);
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 17);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Tap hitbox params per MankiData AirRMB Stages[1]
+        Assert.Equal(10f, hb.Damage);
+        Assert.Equal(0.8f, hb.Radius);
+    }
+
+    [Fact]
+    public void MankiAirRMB_HoldRelease_SpawnsChargedHitbox()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold with aiming past ChargeHoldTicks (45) — auto-release fires the charged attack.
+        // Release at tick 45, ChargedStages[0] trigger=14 → hitbox spawns runner tick 59.
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 63; i++)
+            sim.Tick(holdInputs);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Charged hitbox params per MankiData AirRMB ChargedStages[0]
+        Assert.Equal(14f, hb.Damage);
+        Assert.Equal(1.0f, hb.Radius);
+    }
+
+    [Fact]
+    public void MankiAirRMB_ReleaseUnderThreshold_StaysNormal()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Aim for 5 ticks (way under ChargeHoldTicks=45), then release — must fire the tap.
+        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, holdInput } };
+        for (int i = 0; i < 5; i++)
+            sim.Tick(holdInputs);
+
+        var releaseInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2) } };
+        for (int i = 0; i < 17; i++) // release at tick 6, trigger=16 → hitbox spawns runner tick 22
+            sim.Tick(releaseInputs);
+
+        var hitboxes = sim.Resolver.GetActiveHitboxes();
+        Assert.NotEmpty(hitboxes);
+        var hb = hitboxes[0];
+        // Should be tap params (not charged)
+        Assert.Equal(10f, hb.Damage);
+        Assert.Equal(0.8f, hb.Radius);
+    }
+
+    [Fact]
+    public void MankiAirRMB_ChargeHold_HasNoHitbox()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var holdInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) } };
+        for (int i = 0; i < 4; i++)
+            sim.Tick(holdInputs);
+
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+
+        var mid = sim.GetState(1);
+        Assert.Equal((byte)0, mid.ComboStage); // still in the charge hold phase
+    }
+
+    [Fact]
+    public void MankiAirRMB_Release_EntersAttackPhase()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 6); // release at tick 5
+
+        var after = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, after.State);
+        Assert.Equal((byte)1, after.ComboStage); // attack phase (AnimIndex 1)
+    }
+
+    /// <summary>
+    /// Air RMB is a hold-to-charge attack driven by <see cref="Abilities.AirChargeAttack"/>.
+    /// The client indexes <c>AnimationNames</c> by ComboStage (0 = hold, 1 = release) and
+    /// falls back to the LMB clip when the index is out of range (PlayerRenderer), so every
+    /// AirRMB spec must declare 2 entries. The charge lifecycle also requires Stages[1] (tap)
+    /// and a charged variant. Pins the shared data shape so a data edit can't silently
+    /// regress the client animation path.
+    /// </summary>
+    [Theory]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Nilus)]
+    public void AirRmbSpec_IsChargeShaped(CharacterClass c)
+    {
+        var spec = CharacterRegistry.Get(c).AirRMB;
+        Assert.NotNull(spec);
+        Assert.Equal(AbilityBehavior.ChargeAttack, spec.Behavior);
+        Assert.True(spec.ChargeHoldTicks > 0, $"{c} AirRMB must declare a charge threshold");
+        Assert.True(spec.Stages.Length >= 2, $"{c} AirRMB: Stages[0]=hold phase, Stages[1]=tap attack");
+        Assert.NotNull(spec.ChargedStages);
+        Assert.True(spec.ChargedStages.Length > 0, $"{c} AirRMB requires a charged variant");
+        Assert.True(spec.AnimationNames != null && spec.AnimationNames.Length >= 2,
+            $"{c} AirRMB: client indexes AnimationNames by ComboStage 0/1 — 2 entries required");
     }
 
     // ══════════════════════════════════════════════════════════════════

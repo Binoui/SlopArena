@@ -83,7 +83,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | **LMB** | Monkey Combo | 3 hits: punch → kick → fire uppercut | Melee rushdown, launcher on final hit |
 | **RMB** | Aerosol + Lighter | Shake aerosol (hold) → cone flame (release) | Two-phase charge: tap = quick burst (8 dmg), hold >45 ticks = charged (14 dmg) |
 | **Air LMB** | Air Kick (2 hits) | Two air kicks | 2-hit combo, first kick lunges, second has higher KB |
-| **Air RMB** | Knuckle Spike | Double knuckle punch down | Slow windup (16 tick startup), downward spike, high KB |
+| **Air RMB** | Knuckle Spike | Double knuckle punch down (hold to charge) | Two-phase charge: tap = quick spike (10 dmg), hold >45 ticks = charged spike (14 dmg). Downward, high KB |
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
 | **E** | Grapple Gun | Fire tether in aim direction | On enemy hit: reel + 3 dmg no stun. On terrain: reel to point. Gap closer + escape |
 | **R** | Bazooka | Short cast → fire rocket in camera direction | FPS-style fire-and-forget. Projectile arcs, explodes on impact. Rocket jump (4 self-dmg) |
@@ -91,7 +91,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 
 ## Design Notes
 - **Air LMB**: Air Kick — 2-hit combo via `AirLmbCombo` (generic `StageChainAbility` subclass, shared by all characters). First kick (16 ticks, 4 dmg, lunge) chains to second kick (18 ticks, 6 dmg, higher KB). Buffer input during stage 1 to chain.
-- **Air RMB**: Knuckle Spike — slow windup (16 tick startup, 30 total). Capsule hitbox straight down (OffY=-0.5 to -1.5). 10 damage, high knockback, -12 upward KB (downward spike). Punish tool for reads.
+- **Air RMB**: Knuckle Spike — hold-to-charge via `AirChargeAttack` (shared charge lifecycle, `ChargeHoldTicks=45`). Tap (release before threshold) = the original spike (16 tick startup, 30 total, capsule straight down OffY=-0.5 to -1.5, 10 damage); charged = bigger knuckle (radius 1.0, 14 damage, 40t stun). Spike knockback (downward). Punish tool for reads.
 - **E**: Grapple Gun. Fire a tether in AimYaw/AimPitch direction. On entity hit: anchor to target, 3 flat damage, no knockback/stun, reel toward them at reel speed. On terrain hit: anchor at impact point, reel there. Arrival within 0.5m threshold ends the ability. No hold-to-aim — fires immediately on press. Functions as gap closer (enemy hit) and escape tool (terrain hit).
 - **R**: Bazooka (FPS-style). Short cast (20 ticks), fire a rocket projectile in camera direction (AimYaw/AimPitch). Projectile has gravity (15 m/s²), speed 40 m/s, max flight 45 ticks. Explodes on entity hit or ground contact with 3m AoE. CanHitOwner=true on explosion — aim at feet for rocket jump (4 self-damage, upward knockback). No rise, no hover, no hold-to-aim. 240 tick cooldown (4s).
 - **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks deal +3 bonus damage and have +0.5m larger hitboxes. No single big hit, makes his whole kit scarier.

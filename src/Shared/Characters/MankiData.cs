@@ -179,15 +179,29 @@ public static partial class CharacterRegistry
             AirRMB = new AbilitySpec
             {
                 Name = "Knuckle Spike",
-                Description = "Downward spike punch that launches enemies straight down",
+                Description = "Hold to charge a downward spike punch; tap = quick spike, charged = heavier spike that launches enemies straight down",
                 CooldownTicks = 0,
+                Behavior = AbilityBehavior.ChargeAttack,
+                ChargeHoldTicks = 45,
                 Stages = new AttackStage[]
                 {
+                    // Stage 0: hold/charge phase (no hitboxes; targeting + warp config live here)
+                    new() { DurationTicks = 60, ChainWindowTicks = 0,
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
+                    // Stage 1: tap spike (same numbers as the pre-charge air RMB)
                     new() { DurationTicks = 30, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 8, Radius = 0.8f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.5f, EndOffZ = 0, Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 32, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
                 },
-                AnimationNames = new[] { "spell_rmb_air" },
+                ChargedStages = new AttackStage[]
+                {
+                    // Charged: bigger knuckle, longer reach, more damage
+                    new() { DurationTicks = 30, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 10, Radius = 1.0f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.6f, EndOffZ = 0, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 40, Interruptible = true } },
+                            AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
+                },
+                AnimationNames = new[] { "spell_rmb_air", "spell_rmb_air" },
             },
 
             Q = new AbilitySpec

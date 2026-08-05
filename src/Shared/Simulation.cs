@@ -217,7 +217,7 @@ namespace SlopArena.Shared
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
-            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat)
+            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 if (s.IsGrounded)
                 {
@@ -249,8 +249,9 @@ namespace SlopArena.Shared
                 OnDebugLog?.Invoke($"[JumpBlocked] input.Jump=true but blocked by {reason}");
             }
 
-            // 6. Input-driven actions (only when not locked by animation or in jump squat)
-            if (s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat)
+            // 6. Input-driven actions (only when not locked by animation or in jump squat;
+            // aiming blocks dash — the ability owns movement until release)
+            if (s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
@@ -297,8 +298,9 @@ namespace SlopArena.Shared
                 }
             }
 
-            // 7. ProcessNormalMovement (only for idle — attacks handle velocity via LungeForce)
-            if (s.State == ActionState.Idle)
+            // 7. ProcessNormalMovement (idle + aiming — attacks handle velocity via LungeForce.
+            // Aiming keeps walk/run unlocked so the player can reposition while aiming.)
+            if (s.State == ActionState.Idle || s.State == ActionState.Aiming)
             {
                 ProcessNormalMovement(ref s, stats, input);
             }

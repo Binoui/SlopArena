@@ -148,8 +148,8 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue;
 
-				// Interrupt: if state left Attacking (dash, idle, or other), deactivate without OnEnd.
-				if (state.State != ActionState.Attacking)
+				// Interrupt: if state left Attacking or Aiming (dash, idle, or other), deactivate without OnEnd.
+				if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 				{
 					ended.Add(id);
 					if (Simulation.OnDebugLog != null)

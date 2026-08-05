@@ -29,7 +29,7 @@ public static class AbilityFactory
         (0, false) => new LmbCombo(),          // LMB ground
         (0, true) => new AirLmbCombo(),        // AirLMB
         (1, false) => new MankiAerosolFlame(), // RMB ground
-        (1, true) => new AirRmbAttack(),       // RMB air
+        (1, true) => new AirChargeAttack(), // RMB air — hold-to-charge aerial heavy
         (2, _) => new MankiRoundBomb(),        // Q
         (3, _) => new MankiGrapple(),          // E
         (4, _) => new MankiBazooka(),          // R
@@ -42,7 +42,7 @@ public static class AbilityFactory
         (0, false) => new LmbCombo(),          // LMB ground
         (0, true) => new AirLmbCombo(),        // AirLMB
         (1, false) => new FightGuyUppercut(),  // RMB ground
-        (1, true) => new AirRmbAttack(),       // RMB air
+        (1, true) => new AirChargeAttack(), // RMB air — hold-to-charge aerial heavy
         (2, _) => new FightGuyKiShot(),        // Q
         (3, _) => new FightGuyCycloneKick(),   // E
         (4, _) => new FightGuyDragonKick(),    // R
@@ -55,9 +55,9 @@ public static class AbilityFactory
         (0, false) => new LmbCombo(),          // LMB ground — light slash combo
         (0, true) => new AirLmbCombo(),        // AirLMB — air slash combo
         (1, false) => new LungeChargeAttack(), // RMB — charged spin (kill move)
-        (1, true) => new AirRmbAttack(),       // AirRMB — falling slash spike
+        (1, true) => new AirChargeAttack(), // AirRMB — falling slash (tap/charged)
         (2, _) => new KistuCounter(),          // Q — counter/parry
-        (3, _) => new LungeChargeAttack(),     // E — charged dash slash
+        (3, _) => new KistuDashSlash(),        // E — directional dash slash (aim + release)
         (4, _) => new KistuRisingSlash(),      // R — rising slash (signature)
         (5, _) => new KistuUltFlurry(),        // F — blade flurry ult
         _ => null,
@@ -68,7 +68,7 @@ public static class AbilityFactory
         (0, false) => new LmbCombo(),          // LMB — rift claws
         (0, true) => new AirLmbCombo(),        // AirLMB — void rake
         (1, false) => new LungeChargeAttack(), // RMB — entropy lance (tap/charged)
-        (1, true) => new AirRmbAttack(),       // AirRMB — collapse
+        (1, true) => new AirChargeAttack(), // AirRMB — collapse (tap/charged)
         (2, _) => new NilusVoidRift(),         // Q — void rift
         (3, _) => new NilusRiftwalk(),         // E — riftwalk
         (4, _) => new NilusNetherGrasp(),      // R — nether grasp

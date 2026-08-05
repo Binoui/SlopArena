@@ -36,7 +36,9 @@ public class KistuAbilityTests
     {
         var sim = SimWithPlayer(out _);
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: slot, aiming: true), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        // E (slot 4) is a hold-to-aim ability: it enters the Aiming state instead of Attacking.
+        ActionState expected = slot == 4 ? ActionState.Aiming : ActionState.Attacking;
+        Assert.Equal(expected, t0.State);
         Assert.Equal(slot, t0.AttackSlot);
     }
 
@@ -96,25 +98,28 @@ public class KistuAbilityTests
         Assert.True(holdDmg > tapDmg, $"charged ({holdDmg}) should exceed tap ({tapDmg})");
     }
 
-    // ── E: charged dash travels farther than the tapped dash ──
+    // ── E: directional dash — tap and hold both travel the same set distance (no charge) ──
 
     [Fact]
-    public void E_ChargedDashTravelsFartherThanTap()
+    public void E_TapAndHold_TravelSameSetDistance()
     {
+        // Tap: press and release immediately.
         var tapSim = SimWithPlayer(out _);
-        tapSim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) } });
+        tapSim.Tick(new() { { 1, new InputState { ActiveSlot = 4, IsAiming = true, AimYaw = 0 } } });
+        tapSim.Tick(new() { { 1, new InputState { IsAiming = false, AimYaw = 0 } } });
         for (int i = 0; i < 60; i++) tapSim.Tick(new() { { 1, default } });
         float tapPZ = tapSim.GetState(1).PZ;
 
+        // Hold: aim until the max-aim auto-release (180 ticks), then the dash runs.
         var holdSim = SimWithPlayer(out _);
-        var hold = TestHelpers.Input(activeSlot: 4, aiming: true);
-        for (int i = 0; i < 80; i++) holdSim.Tick(new() { { 1, hold } });
+        holdSim.Tick(new() { { 1, new InputState { ActiveSlot = 4, IsAiming = true, AimYaw = 0 } } });
+        var hold = new InputState { IsAiming = true, AimYaw = 0 };
+        for (int i = 0; i < 200; i++) holdSim.Tick(new() { { 1, hold } });
         float holdPZ = holdSim.GetState(1).PZ;
 
-        // LungeForce is a decaying burst, so distances are modest; charged (32) must still
-        // out-travel the tap (18).
-        Assert.True(tapPZ > 0.4f, $"tap dash should move forward, got PZ={tapPZ:F2}");
-        Assert.True(holdPZ > tapPZ + 0.2f, $"charged dash ({holdPZ:F2}) should travel farther than tap ({tapPZ:F2})");
+        // Set distance: the E dash always covers 5 m, independent of hold time.
+        Assert.True(MathF.Abs(tapPZ - 5f) < 0.1f, $"tap dash should cover 5 m, got PZ={tapPZ:F2}");
+        Assert.True(MathF.Abs(holdPZ - 5f) < 0.1f, $"hold dash should cover 5 m, got PZ={holdPZ:F2}");
     }
 
     // ── R: rising slash lifts Kistu off the ground (vertical recovery) ──

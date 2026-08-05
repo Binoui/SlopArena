@@ -1,41 +1,39 @@
 {
   "Scenario": "Kistu E Dash Slash",
-  "TickCount": 50,
+  "TickCount": 60,
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "PZ": 0.7878919,
-    "VZ": 0.8096302,
-    "ComboStage": 1,
+    "PZ": 2.4999998,
+    "VZ": 25.56818,
     "AttackSlot": 4,
-    "ChargeTicks": 1,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
     "State": 2,
-    "PY": 0.88765764,
-    "PZ": 1.7344792,
-    "VY": 2.014865,
-    "VZ": 8.017184,
-    "DamagePercent": 6,
-    "HitstunTicks": 16,
+    "PY": 0.9239184,
+    "PZ": 3.1801724,
+    "VY": 2.0203543,
+    "VZ": 8.162073,
+    "DamagePercent": 9,
+    "HitstunTicks": 15,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
     "PY": 0.85,
-    "PZ": 0.82474047,
-    "Cooldown3": 71,
+    "PZ": 4.9999995,
+    "Cooldown3": 51,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 1.8185511,
-    "PZ": 5.522566,
-    "VY": 1.4815321,
-    "VZ": 2.9925656,
-    "DamagePercent": 6,
-    "AirTimeTicks": 20,
+    "PY": 2.1667151,
+    "PZ": 7.229186,
+    "VY": 1.2870214,
+    "VZ": 0.031733565,
+    "DamagePercent": 9,
+    "AirTimeTicks": 33,
     "JumpsLeft": 2
   }
 }

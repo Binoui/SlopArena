@@ -116,29 +116,34 @@ public class KistuKitRegressionTests : KitScenarioTests
                 with { PX = 0, PZ = 1.0f, PY = TestHelpers.CombatGroundPY },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,   // hitbox active (trigger=6, dur=14)
+            SnapshotTick = 14,   // tap hitbox active (release ~tick5, trigger=6, dur=14 → 11-24)
             TotalTicks = 60,
         });
     }
 
     [Fact]
-    public void E_DashSlash_TapHitsNpc()
+    public void E_DashSlash_AimedRelease_HitsNpcAlongPath()
     {
         AssertGoldenScenario(new KitScenario
         {
             Name = "Kistu E Dash Slash",
             Def = Def,
             Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            // Aim toward +Z (AimYaw=0) for 3 ticks, then release → 5 m dash along +Z.
+            // (InputSequence ticks without a Set send default input, so every hold tick
+            // must be explicit — a default tick would read as release.)
             Inputs = new InputSequence()
-                .Set(0, new InputState { ActiveSlot = 4, IsAiming = true })
-                .Set(10, default),  // release after debounce → short reposition dash, not full gap-close
+                .Set(0, new InputState { ActiveSlot = 4, IsAiming = true, AimYaw = 0 })
+                .Set(1, new InputState { IsAiming = true, AimYaw = 0 })
+                .Set(2, new InputState { IsAiming = true, AimYaw = 0 })
+                .Set(3, new InputState { IsAiming = false, AimYaw = 0 }),
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY },
+                with { PX = 0, PZ = 2.5f, PY = TestHelpers.CombatGroundPY },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 14,   // dash-slash hitbox active (release ~tick4, trigger=6, dur=6)
-            TotalTicks = 50,
+            SnapshotTick = 12,   // mid-dash: released tick 3, dash runs ticks 4-19, sweep hits the NPC (~tick 8)
+            TotalTicks = 60,
         });
     }
 

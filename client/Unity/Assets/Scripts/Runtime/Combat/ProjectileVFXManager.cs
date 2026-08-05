@@ -177,6 +177,12 @@ namespace SlopArena.Client.Combat
             };
 
             var ps = go.AddComponent<ParticleSystem>();
+            // AddComponent on an active GameObject auto-plays the system (playOnAwake
+            // defaults to true), so configuring main.* — including duration — while it is
+            // playing throws "Setting the duration while system is still playing is not
+            // supported". Stop + clear before configuring (the error's own suggested remedy);
+            // playOnAwake is disabled below and Play() is called explicitly at the end.
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
             main.startLifetime = 0.3f;
             main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 8f);

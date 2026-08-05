@@ -55,6 +55,7 @@ namespace SlopArena.Client.Entities
             { ActionState.Attacking,  new Color(1f, 0.6f, 0f, 0.8f) },     // orange
             { ActionState.AirDodging, new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
             { ActionState.JumpSquat,  new Color(0.8f, 0.3f, 1f, 0.8f) },   // purple
+            { ActionState.Aiming,     new Color(0.3f, 1f, 1f, 0.8f) },     // cyan-light
         };
 
         [Header("Visual Offset")]

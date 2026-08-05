@@ -120,11 +120,16 @@ private static CharacterDefinition BuildYourClass()
             }
         },
 
-        // Air RMB — downward spike
+        // Air RMB — downward spike (hold to charge, like the ground RMB: Stages[0] = hold
+        // phase, Stages[1] = tap, ChargedStages[0] = charged. Driven by AirChargeAttack,
+        // shared by every character. Set Behavior = AbilityBehavior.ChargeAttack +
+        // ChargeHoldTicks (45) and give AnimationNames 2 entries (charge, attack).)
         AirRMB = new AbilitySpec
         {
             Name = "Aerial Slam",
             CooldownTicks = 0,
+            Behavior = AbilityBehavior.ChargeAttack,
+            ChargeHoldTicks = 45,
             Stages = new AttackStage[]
             {
                 new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, BaseKnockback = 6f, KnockbackGrowth = 9f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, DurationTicks = 10, ChainWindowTicks = 0 },

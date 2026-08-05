@@ -59,10 +59,7 @@ MonoBehaviour:
   - Name: spell_q_riposte
     Clip: {fileID: 0}
     Extrapolation: 0
-  - Name: spell_e_loop
-    Clip: {fileID: 0}
-    Extrapolation: 1
-  - Name: spell_e_attack
+  - Name: spell_e
     Clip: {fileID: 7400000, guid: 2c240d0aa8bf456f4b34bb2728f62aff, type: 2}
     Extrapolation: 0
   - Name: spell_r
@@ -70,4 +67,7 @@ MonoBehaviour:
     Extrapolation: 0
   - Name: spell_f
     Clip: {fileID: -203655887218126122, guid: d3c32a81f3abaf985a22e03e3968fd01, type: 3}
+    Extrapolation: 0
+  - Name: spell_e
+    Clip: {fileID: 7400000, guid: af9973c936e7ae75a8fb52cf0b9405af, type: 2}
     Extrapolation: 0

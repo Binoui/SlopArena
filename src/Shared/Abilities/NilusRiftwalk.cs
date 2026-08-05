@@ -49,8 +49,8 @@ namespace SlopArena.Shared.Abilities;
 /// for any Idle entity, so E handed air control back on tick 5 and undid the blink's own
 /// VX = VZ = 0. It also put burst_tick = 4 exactly ON the end tick, surviving only because
 /// the burst block sits textually above the end check. With the cached duration the full
-/// 8-tick window the data declares is real. KistuUltFlurry.cs:53 and AirRmbAttack.cs:59 are
-/// the in-repo model; KistuRisingSlash and KistuCounter still carry the trap.
+/// 8-tick window the data declares is real. KistuUltFlurry.cs:53 is the in-repo model;
+/// KistuRisingSlash and KistuCounter still carry the trap.
 ///
 /// Params: blink_distance, burst_tick, burst_radius, burst_damage, burst_stun_ticks.
 /// </summary>

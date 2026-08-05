@@ -25,8 +25,8 @@ kit:
     description: "Chargeable void spear. Tap = 9 dmg Medium poke; charged = 15 dmg at Kill *magnitude* but a flatter angle (`Custom{15°, 18, 10}`, not the `Kill` profile's 20°). Single-target, not piercing. The kill move."
   - slot: "Air RMB"
     name: "Collapse"
-    type: "melee"
-    description: "Downward void slam, 10 dmg, Spike knockback. Drives Nilus down at 14 m/s for the whole 36t attack. Edgeguard finisher."
+    type: "charge"
+    description: "Hold to charge a downward void slam. Tap = 10 dmg at 14 m/s descent; charged = 14 dmg at 18 m/s. Spike knockback. Edgeguard finisher."
   - slot: "Q"
     name: "Void Rift"
     type: "zone"
@@ -92,7 +92,7 @@ Riftwalk is both the approach and the only recovery. This is deliberate, and is 
 | **LMB** | Rift Claws | 3 / 4 / 7 | `Custom{12°, 1.5, 1}` x2, **Launcher** | 0 | 3-hit claw chain, 28/28/38t, stun ladder 16/18/28t. Hits 1-2 sit *below* the `Light` profile's base 2 — that is the stickiness |
 | **AirLMB** | Void Rake | 3 / 5 | Light, Launcher | 0 | 2-hit air claw, 24/30t, stun ladder 16/26t. Juggle glue |
 | **RMB** | Entropy Lance | 9 tap / **15** charged | Medium / Kill *magnitude* at a flatter angle: `Custom{15°, 18, 10}` | 60t | `ChargeAttack`, `ChargeHoldTicks=50`, stage 0 is a 300t hold safety net, then 30t tap / 44t charged. Stun 22 tap / 40 charged. Long thin capsule, 2.2 m, **single-target** — `RehitIntervalTicks` is unset on the HitboxEvent, so `SpellResolver.cs:248-251` deactivates it and breaks after its first victim. **Kill move** |
-| **AirRMB** | Collapse | 10 | Spike (−45°) | 0 | Downward slam, 36t, 30t stun. `Stages[0].MoveY = -14` drives Nilus down at 14 m/s for the whole attack — the only stage in the game that uses that field. Edgeguard finisher |
+| **AirRMB** | Collapse | 10 tap / **14** charged | Spike (−45°) | 0 | `ChargeAttack`, `ChargeHoldTicks=45`, 60t hold stage, then 36t tap / 36t charged. Tap `Stages[1].MoveY = -14`, charged `ChargedStages[0].MoveY = -18` — `AirChargeAttack` drives Nilus down the whole attack, the only class that honours the field. Edgeguard finisher |
 | **Q** | Void Rift | 3 per 0.5s | `{15°, base 2, growth 1}` | 600t | **Signature.** Lobbed void seed (ignores bodies) → grounds → lingering r=3m rift, 4s (240t), damage tick every 30t, 6t stun per tick. 24 total on someone who stands in all of it, *in isolation* — a pulse landing on the same tick as another Nilus hitbox is dropped for a full 30t, so the effective total inside the advertised claw string is below 24 (see Resolution rules). No drag (see Resolution rules) |
 | **E** | Riftwalk | 4 on arrival | Light, r=1.6m, 12t stun | 2 charges, 300t regen | 6m blink, works airborne. Runs its authored **8t** in full: the duration is cached from `Stages[0]` at `OnStart` rather than compared against the `AnimLockTicks` down-counter (that idiom ends an ability at `ceil(N/2)` — `KistuRisingSlash` and `KistuCounter` still carry it and are out of scope here). `burst_tick` 4 therefore sits mid-window, not on the last tick. **Primary recovery** |
 | **R** | Nether Grasp | 8 | **inward** + 12t stun | 480t | 8m claw capsule (`AttackRange` 9m), **34t** commitment run in full (same cached-duration fix as E). Knockback aimed *at Nilus* pulls the target ~4.1m in. `pull_stun_ticks` asks 20 but `ApplyKnockback` caps hitstun at 12 for this magnitude; the HitboxEvent's own `StunTicks = 20` is inert too, because its knockback magnitude is 0 and the ability's own `ApplyKnockback` call decides. Combo engine |

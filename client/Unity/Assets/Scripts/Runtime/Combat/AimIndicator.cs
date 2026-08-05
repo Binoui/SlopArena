@@ -29,6 +29,12 @@ namespace SlopArena.Client.Combat
         }
         private AbilityArcParams _arcParams = new() { Gravity = 30f, LaunchAngleDeg = 30f, LaunchOffsetY = 1.2f };
 
+        // ── GroundVector mode (directional dash aim): band from feet + ring at landing ──
+        private bool _vectorMode;
+        private float _vectorDistance;
+        private float _vectorWidth;
+        private Transform _dashBand;
+
         private void Awake() => EnsureVisuals();
 
         private void EnsureVisuals()
@@ -62,6 +68,21 @@ namespace SlopArena.Client.Combat
             lineMat.color = new Color(1f, 0.6f, 0.1f, 0.5f);
             _arcLine.sharedMaterial = lineMat;
             _arcLine.enabled = false;
+
+            // GroundVector dash band: flat translucent box, length = dash distance,
+            // width = hitbox sweep width. Rotated to the aim yaw by SetVectorAim.
+            var bandGO = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bandGO.name = "DashBand";
+            bandGO.transform.SetParent(transform, false);
+            Destroy(bandGO.GetComponent<BoxCollider>());
+            var bandMR = bandGO.GetComponent<MeshRenderer>();
+            var bandMat = new Material(Shader.Find("Sprites/Default"));
+            bandMat.color = new Color(1f, 0.55f, 0.15f, 0.35f);
+            bandMR.sharedMaterial = bandMat;
+            bandMR.receiveShadows = false;
+            bandMR.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _dashBand = bandGO.transform;
+            _dashBand.gameObject.SetActive(false);
         }
 
         public void SetCharacter(Transform character, float capsuleHeight)
@@ -89,7 +110,59 @@ namespace SlopArena.Client.Combat
             if (_groundRing != null)
                 _groundRing.gameObject.SetActive(aiming);
             if (_arcLine != null)
-                _arcLine.enabled = aiming;
+                _arcLine.enabled = aiming && !_vectorMode;
+            if (_dashBand != null && _vectorMode)
+                _dashBand.gameObject.SetActive(aiming);
+        }
+
+        /// <summary>
+        /// Switch the indicator to GroundVector mode (directional dash): a flat band from
+        /// the character's feet in the aim direction plus a ring at the landing point.
+        /// </summary>
+        public void SetVectorMode(bool enabled, float distance, float width)
+        {
+            EnsureVisuals();
+            _vectorMode = enabled;
+            _vectorDistance = distance;
+            _vectorWidth = width;
+            if (_arcLine != null) _arcLine.enabled = false;
+            if (_groundRing != null) _groundRing.gameObject.SetActive(false);
+            if (_dashBand != null) _dashBand.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Position the GroundVector visuals for the given aim yaw (radians). The band is
+        /// length = dash distance, width = hitbox diameter ("a bit wider than her").
+        /// Call after SetAiming(true).
+        /// </summary>
+        public void SetVectorAim(float yawRad)
+        {
+            EnsureVisuals();
+            AimYawRad = yawRad;
+            AimDistance = _vectorDistance;
+            if (!_isAiming || _character == null) return;
+
+            float dirX = Mathf.Sin(yawRad);
+            float dirZ = Mathf.Cos(yawRad);
+            float feetY = _character.position.y - _capsuleHeight * 0.5f;
+
+            // Landing ring at the far end of the dash.
+            _groundRing.position = new Vector3(
+                _character.position.x + dirX * _vectorDistance,
+                feetY + 0.05f,
+                _character.position.z + dirZ * _vectorDistance);
+            _groundRing.localScale = new Vector3(_vectorWidth, 0.05f, _vectorWidth);
+            _groundRing.rotation = Quaternion.Euler(0f, 0f, 0f);
+            _groundRing.gameObject.SetActive(true);
+
+            // Band from her feet to the landing point.
+            _dashBand.position = new Vector3(
+                _character.position.x + dirX * _vectorDistance * 0.5f,
+                feetY + 0.03f,
+                _character.position.z + dirZ * _vectorDistance * 0.5f);
+            _dashBand.rotation = Quaternion.Euler(0f, yawRad * Mathf.Rad2Deg, 0f);
+            _dashBand.localScale = new Vector3(_vectorWidth, 0.03f, _vectorDistance);
+            _dashBand.gameObject.SetActive(true);
         }
 
         public void UpdateAim()

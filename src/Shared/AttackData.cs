@@ -43,17 +43,17 @@ namespace SlopArena.Shared
         public float LungeForce;
         /// <summary>
         /// Per-tick velocity during this stage (world space). Set VY for jump arcs / slams.
-        /// Honoured by <c>AirRmbAttack</c> ONLY (Nilus' Collapse is the sole declarer in the
-        /// game). Every other class that reads <c>AbilitySpec.Stages</c> ignores these three
-        /// fields entirely — <c>StageChainAbility</c> (and its <c>LmbCombo</c> /
-        /// <c>AirLmbCombo</c> subclasses), <c>ChargeAttackAbility</c> (and its
-        /// <c>LungeChargeAttack</c> subclass, which drives Nilus' own RMB),
-        /// <c>KistuRisingSlash</c>, <c>KistuUltFlurry</c>, <c>FightGuyUppercut</c>,
-        /// <c>NilusNetherGrasp</c> and <c>NilusRiftwalk</c>. Declaring <c>Move*</c> on a stage
-        /// driven by any of those is a SILENT no-op that no test will notice, so wire it in
-        /// the consumer first.
+        /// Honoured by <c>AirChargeAttack</c> ONLY (Nilus' Collapse is the sole declarer in the
+        /// game — its tap and charged stages both drive a downward MoveY). Every other class
+        /// that reads <c>AbilitySpec.Stages</c> ignores these three fields entirely —
+        /// <c>StageChainAbility</c> (and its <c>LmbCombo</c> / <c>AirLmbCombo</c> subclasses),
+        /// <c>ChargeAttackAbility</c> (and its <c>LungeChargeAttack</c> subclass, which drives
+        /// Nilus' own RMB), <c>KistuRisingSlash</c>, <c>KistuUltFlurry</c>,
+        /// <c>FightGuyUppercut</c>, <c>NilusNetherGrasp</c> and <c>NilusRiftwalk</c>.
+        /// Declaring <c>Move*</c> on a stage driven by any of those is a SILENT no-op that no
+        /// test will notice, so wire it in the consumer first.
         /// Non-zero components are written each tick; a zero component is left alone so a
-        /// MoveY-only stage keeps its LungeForce horizontal velocity. <c>AirRmbAttack</c>
+        /// MoveY-only stage keeps its LungeForce horizontal velocity. <c>AirChargeAttack</c>
         /// additionally refuses a downward write while grounded — see the note there.
         /// </summary>
         public float MoveX, MoveY, MoveZ;

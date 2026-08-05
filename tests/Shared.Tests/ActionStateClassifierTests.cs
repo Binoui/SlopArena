@@ -10,6 +10,7 @@ public class ActionStateClassifierTests
     [InlineData(ActionState.JumpSquat, true)]
     [InlineData(ActionState.AirDodging, true)]
     [InlineData(ActionState.Attacking, false)]
+    [InlineData(ActionState.Aiming, false)]   // depends on the ServerAbility instance (release detection)
     [InlineData(ActionState.Hitstun, false)]
     [InlineData(ActionState.Warping, false)]
     [InlineData(ActionState.Sliding, false)] // unused by any code path — not a Predictable member

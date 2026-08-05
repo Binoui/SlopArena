@@ -103,7 +103,7 @@ public class FightGuyKitRegressionTests : KitScenarioTests
                 with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,   // hitbox active (trigger=6, dur=16)
+            SnapshotTick = 16,   // tap hitbox active (release ~tick5, trigger=6, dur=16 → 11-26)
             TotalTicks = 60,
         });
     }

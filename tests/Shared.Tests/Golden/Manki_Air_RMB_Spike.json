@@ -4,14 +4,15 @@
   "PlayerSnap": {
     "State": 4,
     "PY": 2,
+    "ComboStage": 1,
     "AttackSlot": 2,
-    "AirTimeTicks": 21
+    "AirTimeTicks": 25
   },
   "NpcSnap": {
     "State": 2,
     "PY": 0.75,
     "DamagePercent": 10,
-    "HitstunTicks": 27,
+    "HitstunTicks": 28,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

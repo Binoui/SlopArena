@@ -31,16 +31,30 @@ public abstract class ChargeAttackAbility : ServerAbility
     private const ushort DebounceTicks = 5;
     private const ushort MaxHoldTicks = 300;
 
+    /// <summary>
+    /// True when this charge attack reads the AIRBORNE slot spec (AirRMB) instead of the
+    /// ground spec. Slot lookup in <see cref="ChargeAttackAbility"/> routes through this,
+    /// so air variants reuse the exact same hold/release lifecycle.
+    /// </summary>
+    protected virtual bool IsAirborne => false;
+
     /// <summary>Override to apply charge-phase lunge or other per-character effects.</summary>
     protected virtual void OnChargeStart(ref CharacterState s, CharacterDefinition def) { }
 
     /// <summary>Override to apply attack-phase lunge on release transition.</summary>
     protected virtual void OnAttackStart(ref CharacterState s, CharacterDefinition def, AttackStage stage) { }
 
+    /// <summary>
+    /// Override to apply per-tick effects during the attack phase (e.g. driving
+    /// <c>AttackStage.MoveX/MoveY/MoveZ</c> velocity — air slams). Called every tick of the
+    /// attack phase with the resolved stage, after hitbox triggers are processed.
+    /// </summary>
+    protected virtual void OnAttackTick(ref CharacterState s, CharacterDefinition def, AttackStage stage) { }
+
     /// <summary>Get the charge hold threshold from the spec. Subclasses can override for a custom default.</summary>
     protected virtual ushort GetChargeHoldTicks(CharacterDefinition def, ushort fallback)
     {
-        var spec = def.GetSlotAbility(Slot, airborne: false);
+        var spec = def.GetSlotAbility(Slot, IsAirborne);
         return spec?.ChargeHoldTicks ?? fallback;
     }
 
@@ -89,7 +103,7 @@ public abstract class ChargeAttackAbility : ServerAbility
                 AnimIndex = 1;
 
                 // Resolve attack stage and duration
-                var spec = def.GetSlotAbility(Slot, airborne: false);
+                var spec = def.GetSlotAbility(Slot, IsAirborne);
                 AttackStage? atkStage = null;
                 if (_wasCharged && spec?.ChargedStages != null && spec.ChargedStages.Length > 0)
                     atkStage = spec.ChargedStages[0];
@@ -110,7 +124,7 @@ public abstract class ChargeAttackAbility : ServerAbility
 
         if (_phase == Phase.Attack)
         {
-            var spec = def.GetSlotAbility(Slot, airborne: false);
+            var spec = def.GetSlotAbility(Slot, IsAirborne);
             if (spec == null) { EndAbility(ref s); return; }
 
             AttackStage stage;
@@ -125,6 +139,9 @@ public abstract class ChargeAttackAbility : ServerAbility
                 if (evt.TriggerTick == _phaseTicks)
                     SpawnHitbox(ref s, evt);
             }
+
+            // Per-tick stage effects (air slams drive MoveX/MoveY/MoveZ here)
+            OnAttackTick(ref s, def, stage);
 
             if (_phaseTicks >= _attackDuration)
                 EndAbility(ref s);

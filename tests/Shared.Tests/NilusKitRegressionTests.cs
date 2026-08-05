@@ -121,14 +121,16 @@ public class NilusKitRegressionTests : KitScenarioTests
 
     /// <summary>
     /// Collapse is the only stage in the game that declares AttackStage.MoveY, and the golden
-    /// is what keeps it wired: tick 12 must show Nilus 2.8 m BELOW his 5 m start with
-    /// VY = -14 while still Attacking. Snapshotting after the attack proves nothing — an
-    /// airborne character falls anyway once his 40-tick float window expires.
+    /// is what keeps it wired: tick 16 must show Nilus ~2.7 m BELOW his 5 m start with
+    /// VY = -14 while still Attacking (the tap attack opens on tick 5, the 5-tick release
+    /// debounce, so 11 slam integrations have run by tick 16). Snapshotting after the attack
+    /// proves nothing — an airborne character falls anyway once his 40-tick float window
+    /// expires.
     ///
     /// The dummy hovers just under his descent path so the slam's Spike knockback actually
     /// fires at something — nothing anywhere else in the suite does that, though both other
     /// characters' AirRMB goldens carry a target. A GROUNDED dummy cannot serve: the hitbox
-    /// lives for ticks 8-16, by which time Nilus is still 2 m above a standing capsule's head.
+    /// lives for ticks 13-20, by which time Nilus is still above a standing capsule's head.
     /// </summary>
     [Fact]
     public void AirRMB_Spikes()
@@ -145,7 +147,7 @@ public class NilusKitRegressionTests : KitScenarioTests
                 with { PX = 0, PZ = 0.5f, PY = TestHelpers.CombatGroundPY + 3f, IsGrounded = false },
             NpcAssert = n => Assert.Equal((ushort)10, n.DamagePercent),
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,
+            SnapshotTick = 16,   // tap hitbox active (release ~tick5, trigger=8, dur=8 → 13-20)
             TotalTicks = 120,
         });
     }

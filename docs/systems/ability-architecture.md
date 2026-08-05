@@ -32,7 +32,7 @@
 │  │  slot 0 ground → LmbCombo                      │ │
 │  │  slot 0 air   → AirLmbCombo                    │ │
 │  │  slot 1 ground → MankiAerosolFlame             │ │
-│  │  slot 1 air   → AirRmbAttack                   │ │
+│  │  slot 1 air   → AirChargeAttack                │ │
 │  │  slot 2       → MankiRoundBomb                 │ │
 │  │  slot 3       → MankiGrapple                   │ │
 │  │  slot 4       → MankiBazooka                   │ │
@@ -64,7 +64,7 @@ All abilities spawn their own hitboxes in `Tick()` via `SpawnHitbox(ref s, evt)`
 | LMB ground (0) | `LmbCombo` | `LmbCombo` | `LmbCombo` | Shared via StageChainAbility |
 | LMB air (0) | `AirLmbCombo` | `AirLmbCombo` | `AirLmbCombo` | Shared via StageChainAbility |
 | RMB ground (1) | `MankiAerosolFlame` | `FightGuyUppercut` | `LungeChargeAttack` | Per-character |
-| RMB air (1) | `AirRmbAttack` | `AirRmbAttack` | `AirRmbAttack` | Shared single-hit spike |
+| RMB air (1) | `AirChargeAttack` | `AirChargeAttack` | `AirChargeAttack` | Shared hold-to-charge aerial heavy |
 | Q (2) | `MankiRoundBomb` | `FightGuyKiShot` | `KistuCounter` | Per-character |
 | E (3) | `MankiGrapple` | `FightGuyCycloneKick` | `LungeChargeAttack` | Per-character |
 | R (4) | `MankiBazooka` | `FightGuyDragonKick` | `KistuRisingSlash` | Per-character |

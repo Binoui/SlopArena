@@ -82,7 +82,9 @@ namespace SlopArena.Client.Camera
                 case CameraMode.Frozen:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
-                    if (_inputAxisController != null) _inputAxisController.enabled = true;
+                    // Disable CinemachineInputAxisController so the orbital camera stops consuming
+                    // mouse input — the caller reads the delta itself (e.g. GroundVector aim).
+                    if (_inputAxisController != null) _inputAxisController.enabled = false;
                     break;
                 case CameraMode.FreeCursor:
                     Cursor.lockState = CursorLockMode.None;

@@ -179,17 +179,31 @@ public static partial class CharacterRegistry
             AirRMB = new AbilitySpec
             {
                 Name = "Helicopter",
-                Description = "Aerial spinning heel drop that spikes enemies downward",
+                Description = "Hold to charge an aerial spinning heel drop; tap = quick spike, charged = heavier heel drop that spikes enemies downward",
                 CooldownTicks = 0,
+                Behavior = AbilityBehavior.ChargeAttack,
+                ChargeHoldTicks = 45,
                 Stages = new AttackStage[]
                 {
+                    // Stage 0: hold/charge phase (no hitboxes; targeting + warp config live here)
+                    new() { DurationTicks = 60, ChainWindowTicks = 0,
+                            HitboxEvents = Array.Empty<HitboxEvent>(),
+                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                    // Stage 1: tap heel drop (same numbers as the pre-charge air RMB)
                     new() { DurationTicks = 25, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Radius = 0.6f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 28, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } 
-                            },
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_air_rmb" },
+                ChargedStages = new AttackStage[]
+                {
+                    // Charged: wider heel drop, more damage
+                    new() { DurationTicks = 25, ChainWindowTicks = 0,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 18, Radius = 0.8f, OffX = 0, OffY = 0.5f, OffZ = 1.2f, Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 36, Interruptible = true } },
+                            AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_air_rmb", "spell_air_rmb" },
             },
 
             Q = new AbilitySpec

@@ -5,17 +5,18 @@
     "State": 4,
     "PY": 3.024998,
     "VY": -14,
+    "ComboStage": 1,
     "AttackSlot": 2,
-    "AirTimeTicks": 13
+    "AirTimeTicks": 17
   },
   "NpcSnap": {
     "State": 2,
-    "PY": 2.9109898,
-    "PZ": 1.230677,
-    "VY": -8.9347925,
+    "PY": 3.059903,
+    "PZ": 1.0845416,
+    "VY": -8.901459,
     "VZ": 8.768124,
     "DamagePercent": 10,
-    "HitstunTicks": 25,
+    "HitstunTicks": 26,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
