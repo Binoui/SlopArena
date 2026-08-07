@@ -141,8 +141,11 @@ namespace SlopArena.Shared
             // The launch queued at hit connect applies at freeze expiry.
             if (s.HitstopTicks > 0)
             {
-                s.DIX = input.MoveX;
-                s.DIY = input.MoveY;
+                if (input.MoveX != 0f || input.MoveY != 0f)
+                {
+                    s.DIX = input.MoveX;
+                    s.DIY = input.MoveY;
+                }
                 s.HitstopTicks--;
                 if (s.HitstopTicks == 0)
                 {
@@ -157,6 +160,7 @@ namespace SlopArena.Shared
                         s.KVX = s.QueuedKVX; s.KVY = s.QueuedKVY; s.KVZ = s.QueuedKVZ;
                         float kvMag = MathF.Sqrt(
                             (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
+                        s.LaunchMagnitude = kvMag;
                         if (s.QueuedKBStun > 0 && kvMag > 0.5f)
                         {
                             s.HitstunTicks = s.QueuedKBStun;
@@ -556,18 +560,26 @@ namespace SlopArena.Shared
             s.VY = s.KVY;
             s.VZ = s.KVZ;
 
-            // Store current input for DI (applied when hitstun expires)
-            s.DIX = input.MoveX;
-            s.DIY = input.MoveY;
+            // Store current input for DI (applied when hitstun expires).
+            // Commit + latest-wins: a nonzero input commits the full vector; neutral
+            // preserves the committed direction; a later nonzero hold overwrites.
+            if (input.MoveX != 0f || input.MoveY != 0f)
+            {
+                s.DIX = input.MoveX;
+                s.DIY = input.MoveY;
+            }
 
-            // When hitstun ends, apply DI influence to remaining knockback
+            // When hitstun ends, apply Combo Influence (ADR-0013): a launch-scaled
+            // additive drift along the committed DI direction, horizontal only.
             if (s.HitstunTicks == 0)
             {
-                const float DIStrength = 3.5f;
-                s.KVX += s.DIX * DIStrength;
-                s.KVZ += s.DIY * DIStrength;
+                const float ComboInfluenceStrength = 0.30f;
+                float launchMag = s.LaunchMagnitude;
+                s.KVX += s.DIX * ComboInfluenceStrength * launchMag;
+                s.KVZ += s.DIY * ComboInfluenceStrength * launchMag;
                 s.DIX = 0f;
                 s.DIY = 0f;
+                s.LaunchMagnitude = 0f; // consumed — never stale into a future hitstun
 
                 // Transfer remaining knockback to main velocity and clear KV.
                 // Without this, HasKnockback() returns true and ProcessKnockback's
@@ -1006,6 +1018,7 @@ namespace SlopArena.Shared
             sbyte angleDeg, float baseKB, float growthKB, ushort stunTicks)
         {
             float magnitude = baseKB + growthKB * (s.DamagePercent * 0.01f);
+            s.LaunchMagnitude = magnitude;
             float rad = angleDeg * MathF.PI / 180f;
             float cosA = MathF.Cos(rad);
             float sinA = MathF.Sin(rad);

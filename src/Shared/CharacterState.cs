@@ -117,6 +117,10 @@ namespace SlopArena.Shared
         /// accumulated DI input during hitstun
         /// </summary>
         public float DIX, DIY;
+        /// <summary>Original launch magnitude (base + growth·(damage%·0.01)) of the current hitstun,
+        /// captured at launch application, consumed by Combo Influence at hitstun expiry.
+        /// 0 when no hitstun is live. Server + local-sim only — NOT on the wire (like the Queued fields).</summary>
+        public float LaunchMagnitude;
 
 
         /// <summary>
