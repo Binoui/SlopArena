@@ -122,6 +122,18 @@ namespace SlopArena.Shared
         /// 0 when no hitstun is live. Server + local-sim only — NOT on the wire (like the Queued fields).</summary>
         public float LaunchMagnitude;
 
+        /// <summary>
+        /// ── Burst (ADR-0014) ──
+        /// </summary>
+        /// <summary>Remaining cooldown ticks for Burst (one use per 60 s). ON THE WIRE — both players' HUDs read it.</summary>
+        public ushort BurstCooldownTicks;
+        /// <summary>Remaining recovery lock ticks after bursting (the punish window). ON THE WIRE — opponent's window must be visible.</summary>
+        public ushort BurstRecoveryTicks;
+        /// <summary>1 = defensive fired (shove attacker pending), 2 = offensive fired (hitbox pending). Set by SimulateTick, consumed+cleared by ServerSimulation each tick. Server + local-sim only — NOT on the wire.</summary>
+        public byte BurstPending;
+        /// <summary>Last entity to land a hit on this state. Set in ResolveHits, consumed by the defensive shove. Server + local-sim only — NOT on the wire.</summary>
+        public ulong LastAttackerEntityId;
+
 
         /// <summary>
         /// ── Facing ──

@@ -388,7 +388,7 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
 				if (input.ActiveSlot == 0) continue;
-				if (state.AnimLockTicks > 0 || state.HitstunTicks > 0 || state.HitstopTicks > 0) continue;
+				if (state.AnimLockTicks > 0 || state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0) continue; // ADR-0014
 				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
 
 				var def = _defs[id];
@@ -510,6 +510,57 @@ namespace SlopArena.Shared
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				Simulation.SimulateTick(ref state, def, input, _arena);
 				_states[id] = state;
+			}
+
+			// ── Step 1a: Burst side effects (ADR-0014): server-only — shove (defensive)
+			// / hitbox (offensive). The user's own state changes already happened inside
+			// SimulateTick. ──
+			foreach (var id in simIds)
+			{
+				if (!_states.TryGetValue(id, out var burstState) || burstState.BurstPending == 0) continue;
+				if (burstState.BurstPending == 1)
+				{
+					ulong attackerId = burstState.LastAttackerEntityId;
+					if (attackerId != 0 && attackerId != id
+					    && _states.TryGetValue(attackerId, out var attackerState))
+					{
+						float dx = attackerState.PX - burstState.PX;
+						float dz = attackerState.PZ - burstState.PZ;
+						float dist = MathF.Sqrt(dx * dx + dz * dz);
+						if (dist > 0.001f) { dx /= dist; dz /= dist; }
+						else { dx = MathF.Sin(burstState.FacingYaw); dz = MathF.Cos(burstState.FacingYaw); }
+						// Small fixed shove, stun 0 → no hitstun, no punish. Interrupts a mid-attack
+						// attacker via ApplyKnockback's State=Idle → TickAbilities drops their ability
+						// (breaks the string — the point of the escape); they are free to act at once.
+						Simulation.ApplyKnockback(ref attackerState, dx, dz,
+							BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0f, 0);
+						_states[attackerId] = attackerState;
+					}
+					burstState.LastAttackerEntityId = 0;
+				}
+				else if (burstState.BurstPending == 2)
+				{
+					float cos = MathF.Cos(burstState.FacingYaw), sin = MathF.Sin(burstState.FacingYaw);
+					float hx = burstState.PX + sin * BurstConfig.HitboxForwardOffset;
+					float hy = burstState.PY + BurstConfig.HitboxHeightOffset;
+					float hz = burstState.PZ + cos * BurstConfig.HitboxForwardOffset;
+					_spellResolver.Spawn(new Hitbox
+					{
+						X = hx, Y = hy, Z = hz,
+						EndX = hx, EndY = hy, EndZ = hz,           // sphere — End == start (BuildHurtboxList convention)
+						Radius = BurstConfig.HitboxRadius, Shape = HitboxShape.Sphere,
+						Damage = BurstConfig.HitboxDamage,
+						BaseKnockback = BurstConfig.HitboxBaseKnockback,
+						KnockbackGrowth = BurstConfig.HitboxKnockbackGrowth, // 0 → ApplyKnockback never scales by DamagePercent
+						KnockbackAngle = BurstConfig.HitboxAngle,
+						StunTicks = BurstConfig.HitboxStunTicks,
+						DurationTicks = BurstConfig.HitboxDurationTicks,
+						OwnerId = id,
+						FreezesOwner = false,   // user is already in recovery; freezing them inside it would muddy the punish window
+					});
+				}
+				burstState.BurstPending = 0;
+				_states[id] = burstState;
 			}
 
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
@@ -782,6 +833,11 @@ namespace SlopArena.Shared
 					}
 				}
 
+				// Burst (ADR-0014): remember who hit us — consumed by the defensive shove.
+				// Placed after the invincibility/counter continues, so ignored hits never mark.
+				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+					targetState.LastAttackerEntityId = hit.OwnerEntityId;
+
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
@@ -977,6 +1033,9 @@ namespace SlopArena.Shared
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
 					Deaths = newDeaths, DamagePercent = 0,
 				};
+				// Burst cooldown persists through KO (issue #99 user story 12) — the ONLY
+				// carry-over. Recovery is deliberately NOT carried: death clears the punish window.
+				respawned.BurstCooldownTicks = oldState.BurstCooldownTicks;
 
 				if (_rule.IsEliminated(respawned))
 				{

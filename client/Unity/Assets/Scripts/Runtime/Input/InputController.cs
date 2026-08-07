@@ -25,6 +25,8 @@ namespace SlopArena.Client.Input
         private bool _pendingJump;
         /// <summary>Pending dash: set by Poll, consumed by BuildInputState.</summary>
         private bool _pendingDash;
+        /// <summary>Pending burst: set by Poll, consumed by BuildInputState (ADR-0014).</summary>
+        private bool _pendingBurst;
         /// <summary>Whether the Q key is currently held down (for aiming release detection).</summary>
         public bool IsQKeyHeld { get; private set; }
         /// <summary>Whether the right mouse button is currently held down (for RMB charge).</summary>
@@ -100,6 +102,7 @@ namespace SlopArena.Client.Input
             var mouse = Mouse.current;
             if (kb.spaceKey.wasPressedThisFrame) _pendingJump = true;
             if (kb.shiftKey.wasPressedThisFrame) _pendingDash = true;
+            if (kb.cKey.wasPressedThisFrame) _pendingBurst = true;
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
                 _pendingSlotPress = 1;
@@ -144,6 +147,7 @@ namespace SlopArena.Client.Input
         {
             _pendingJump = false;
             _pendingDash = false;
+            _pendingBurst = false;
             _pendingSlotPress = 0;
         }
 
@@ -216,7 +220,6 @@ namespace SlopArena.Client.Input
                 input.Down = move.y < -0.3f;
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
-                input.Crouch = false;
                 input.ActiveSlot = pendingSlotPress;
                 if (_pendingJump)
                 {
@@ -283,7 +286,10 @@ namespace SlopArena.Client.Input
             input.Down = moveDirection.z < -0.3f;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
-            input.Crouch = kb != null && kb.ctrlKey.isPressed;
+            // Burst fires even when the FSM gates movement — it must work during
+            // hitstop/hitstun (the gate zeroes Jump/Dash only).
+            input.Burst = _pendingBurst;
+            _pendingBurst = false;
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = aimCtx.IsAiming;
 

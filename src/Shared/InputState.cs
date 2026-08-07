@@ -10,7 +10,7 @@ namespace SlopArena.Shared
     public struct InputState
     {
         public bool Up, Down, Left, Right;
-        public bool Jump, Dash, Crouch;
+        public bool Jump, Dash, Burst;
         public float MoveX, MoveY;
         /// <summary>
         /// 0 = none, 1 = LMB, 2 = RMB, 3 = Q, 4 = E, 5 = R, 6 = F
@@ -35,6 +35,10 @@ namespace SlopArena.Shared
         public float WarpAttackRange;
 
         /// <summary>19 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 pitch + 2 distance + 1 target)</summary>
+        /// <remarks>
+        /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=Dash,
+        /// 0x40=Burst (ADR-0014; formerly Crouch, deprecated), 0x80=IsAiming.
+        /// </remarks>
         public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1;
 
         public void Write(Span<byte> buf)
@@ -48,7 +52,7 @@ namespace SlopArena.Shared
             if (Right) flags |= 8;
             if (Jump) flags |= 0x10;
             if (Dash) flags |= 0x20;
-            if (Crouch) flags |= 0x40;
+            if (Burst) flags |= 0x40;
             if (IsAiming) flags |= 0x80;
             buf[8] = flags;
             buf[9] = ActiveSlot;
@@ -73,7 +77,7 @@ namespace SlopArena.Shared
             input.Right = (flags & 8) != 0;
             input.Jump = (flags & 0x10) != 0;
             input.Dash = (flags & 0x20) != 0;
-            input.Crouch = (flags & 0x40) != 0;
+            input.Burst = (flags & 0x40) != 0;
             input.IsAiming = (flags & 0x80) != 0;
             input.ActiveSlot = buf[9];
             input.FacingYaw = buf.Length >= 12 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(10)) : (short)0;

@@ -51,6 +51,8 @@ public class CharacterStatePacketTests
             LastDirZ = 0f,
             WasAirborneDuringKnockback = true,
             HitstopTicks = 17,
+            BurstCooldownTicks = 1234,
+            BurstRecoveryTicks = 25,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -103,15 +105,18 @@ public class CharacterStatePacketTests
         Assert.Equal(original.LastDirZ, restored.LastDirZ);
         Assert.Equal(original.WasAirborneDuringKnockback, restored.WasAirborneDuringKnockback);
         Assert.Equal(original.HitstopTicks, restored.HitstopTicks);
+        Assert.Equal(original.BurstCooldownTicks, restored.BurstCooldownTicks);
+        Assert.Equal(original.BurstRecoveryTicks, restored.BurstRecoveryTicks);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
         // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
-        // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012) = 97.
+        // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012)
+        // + 4 burst (ADR-0014) = 101.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(97, CharacterStatePacket.Size);
+        Assert.Equal(101, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

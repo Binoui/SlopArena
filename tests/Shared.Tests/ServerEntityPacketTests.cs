@@ -53,7 +53,7 @@ public class ServerEntityPacketTests
         Right = true,
         Jump = true,
         Dash = true,
-        Crouch = true,
+        Burst = true,
         IsAiming = true,
         ActiveSlot = 3,
         FacingYaw = 420,
@@ -111,7 +111,7 @@ public class ServerEntityPacketTests
         Assert.Equal(input.Right, restored.Input.Right);
         Assert.Equal(input.Jump, restored.Input.Jump);
         Assert.Equal(input.Dash, restored.Input.Dash);
-        Assert.Equal(input.Crouch, restored.Input.Crouch);
+        Assert.Equal(input.Burst, restored.Input.Burst);
         Assert.Equal(input.IsAiming, restored.Input.IsAiming);
         Assert.Equal(input.ActiveSlot, restored.Input.ActiveSlot);
         Assert.Equal(input.FacingYaw, restored.Input.FacingYaw);
@@ -176,14 +176,14 @@ public class ServerEntityPacketTests
     public void SizeConstants_AssertWireLayout()
     {
         // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10
-        // + hitstop/ADR-0012): 109B base (8 entityId + 4 tick + 97 CharacterStatePacket)
-        // + 1B flag + 19B input.
+        // + hitstop/ADR-0012 + burst/ADR-0014): 113B base (8 entityId + 4 tick + 101
+        // CharacterStatePacket) + 1B flag + 19B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(109, ServerEntityPacket.BaseSize);
+        Assert.Equal(113, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(20, ServerEntityPacket.RelaySize);
-        Assert.Equal(129, ServerEntityPacket.MaxSize);
-        Assert.Equal(110, ServerEntityPacket.NoInputSize);
+        Assert.Equal(133, ServerEntityPacket.MaxSize);
+        Assert.Equal(114, ServerEntityPacket.NoInputSize);
         // Uplink format untouched: 19B InputState (31B full uplink packet with entityId+tick)
         Assert.Equal(19, InputState.Size);
     }

@@ -100,7 +100,7 @@ public class RollbackInvariantTests
             Right = rng.Next(4) == 0,
             Jump = rng.Next(8) == 0,
             Dash = rng.Next(8) == 0,
-            Crouch = rng.Next(10) == 0,
+            Burst = rng.Next(10) == 0,
             ActiveSlot = rng.Next(7) == 0 ? (byte)rng.Next(1, 7) : (byte)0,
             IsAiming = rng.Next(10) == 0,
         };

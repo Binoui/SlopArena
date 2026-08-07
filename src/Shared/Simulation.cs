@@ -127,6 +127,23 @@ namespace SlopArena.Shared
         {
             var stats = def.Movement;
 
+            // ── Burst (ADR-0014): dual-use escape/extender. Runs before the hitstop gate —
+            // the freeze is the decision window. Cooldown + recovery gate re-use. ──
+            if (input.Burst && s.BurstRecoveryTicks == 0 && s.BurstCooldownTicks == 0)
+            {
+                bool attacking = (s.State is ActionState.Attacking or ActionState.Aiming) && s.AnimLockTicks > 0;
+                if (s.HitstopTicks > 0)
+                {
+                    // Frozen: a defender (launch queued — or any non-attacker, since the queue is
+                    // server-local and absent on predicted tracks) escapes; an attacker frozen by
+                    // their own connecting hit (no queue) cancels offensively.
+                    if (attacking && !HasQueuedLaunch(s)) DoOffensiveBurst(ref s);
+                    else DoDefensiveBurst(ref s);
+                }
+                else if (s.State == ActionState.Hitstun || HasKnockback(s)) DoDefensiveBurst(ref s);
+                else if (attacking) DoOffensiveBurst(ref s);
+            }
+
             // Apply combat aim yaw from input (degrees * 100 → radians)
             // FacingYaw (movement-facing) is handled by ProcessNormalMovement via Atan2
             float aimDeg = input.AimYaw * 0.01f;
@@ -270,6 +287,7 @@ namespace SlopArena.Shared
 
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
+                s.BurstRecoveryTicks == 0 &&
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)
             {
                 byte slot = s.BufferedSlot;
@@ -283,7 +301,7 @@ namespace SlopArena.Shared
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
-            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
+            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.BurstRecoveryTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 if (s.IsGrounded)
                 {
@@ -326,7 +344,7 @@ namespace SlopArena.Shared
                     StartDash(ref s, stats, input.MoveX, input.MoveY);
                 }
 
-                if (input.ActiveSlot > 0 && s.State == ActionState.Idle)
+                if (input.ActiveSlot > 0 && s.State == ActionState.Idle && s.BurstRecoveryTicks == 0)
                 {
                     ushort cd = input.ActiveSlot switch
                     {
@@ -352,12 +370,13 @@ namespace SlopArena.Shared
             // Buffer input if locked within window
             // NOTE: Combo buffering is now handled by ServerAbility.Tick lifecycle
             // Only general input buffering (unlock window) is kept for client prediction
-            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
+            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.BurstRecoveryTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
             {
                 // General buffer: within window of unlock
                 if (s.State == ActionState.JumpSquat ||
                     (s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
-                    (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
+                    (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow) ||
+                    (s.BurstRecoveryTicks > 0 && s.BurstRecoveryTicks <= InputBufferWindow))
                 {
                     // No cooldown check here — ServerSimulation handles ability activation validation
                     s.BufferedSlot = input.ActiveSlot;
@@ -477,6 +496,8 @@ namespace SlopArena.Shared
             if (s.InvincibilityTicks > 0) s.InvincibilityTicks--;
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
             if (s.HitstunTicks > 0) s.HitstunTicks--;
+            if (s.BurstCooldownTicks > 0) s.BurstCooldownTicks--;
+            if (s.BurstRecoveryTicks > 0) s.BurstRecoveryTicks--;
             if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
 
             // Turnaround ticks
@@ -955,6 +976,7 @@ namespace SlopArena.Shared
         /// </summary>
         public static void StartDash(ref CharacterState s, MovementStats stats, float dirX, float dirZ)
         {
+            if (s.BurstRecoveryTicks > 0) return; // ADR-0014: burst recovery blocks dash
             if (s.DashCooldownTicks > 0) return;
             if (s.State != ActionState.Idle && s.State != ActionState.Attacking && s.State != ActionState.Dashing) return;
             if (s.InvincibilityTicks > 0) return; // already invincible
@@ -1055,6 +1077,42 @@ namespace SlopArena.Shared
             s.DashDurationTicks = 0;
             s.StateTicks = 0;
             s.WasAirborneDuringKnockback = !s.IsGrounded;
+        }
+
+        // ── Burst (ADR-0014) ──
+
+        private static bool HasQueuedLaunch(CharacterState s)
+            => s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKVOverride || s.QueuedKBStun > 0;
+
+        private static void DoDefensiveBurst(ref CharacterState s)
+        {
+            // Cancel the pending launch entirely (hitstop path) + break any lock + full stop.
+            s.HitstopTicks = 0;
+            s.QueuedKVOverride = false;
+            s.QueuedKVX = s.QueuedKVY = s.QueuedKVZ = 0f;
+            s.QueuedKBDirX = s.QueuedKBDirZ = 0f;
+            s.QueuedKBAngle = 0;
+            s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBStun = 0;
+            s.HitstunTicks = 0;
+            s.KVX = s.KVY = s.KVZ = 0f;
+            s.VX = s.VY = s.VZ = 0f;
+            s.State = ActionState.Idle;
+            s.InvincibilityTicks = BurstConfig.DefensiveInvincibilityTicks; // startup telegraph beats the triggering hit
+            s.BurstRecoveryTicks = BurstConfig.DefensiveRecoveryTicks;
+            s.BurstCooldownTicks = BurstConfig.CooldownTicks;
+            s.BurstPending = 1; // ServerSimulation shoves the last attacker
+        }
+
+        private static void DoOffensiveBurst(ref CharacterState s)
+        {
+            s.AnimLockTicks = 0;
+            s.AttackElapsedTicks = 0;
+            s.ComboStage = 0;                       // LMB chain resets to stage 1
+            s.AttackSlot = 0;                       // signals TickAbilities to drop the ability (interrupt, no OnEnd)
+            s.State = ActionState.Idle;
+            s.BurstRecoveryTicks = BurstConfig.OffensiveRecoveryTicks;
+            s.BurstCooldownTicks = BurstConfig.CooldownTicks;
+            s.BurstPending = 2;                     // ServerSimulation spawns the forward hitbox
         }
 
         /// <summary>
