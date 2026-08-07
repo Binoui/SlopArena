@@ -100,7 +100,7 @@ public class FightGuyAbilityTests
         state.PY = GroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3, aiming: true, aimDistance: 500), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)3, t0.AttackSlot);
         Assert.True(t0.IsAiming);
     }

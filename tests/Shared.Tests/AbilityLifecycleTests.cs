@@ -64,8 +64,73 @@ public class AbilityLifecycleTests
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)3, t0.AttackSlot);
+    }
+
+    // ── Q hold: Aiming stance — friction-only movement, blocked cancel, auto-release ──
+
+    [Fact]
+    public void MankiQ_AirborneHold_AppliesAirDrag()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = 20f; // well above ground — stays airborne for the whole hold
+        state.IsGrounded = false;
+        state.VZ = 5f;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
+        for (int i = 0; i < 60; i++)
+            sim.Tick(new() { { 1, aim } });
+
+        var s = sim.GetState(1);
+        // Manki AirFriction=0.4: VZ decays as 5 * (1 - 0.4/60)^60 ≈ 3.35.
+        // Guards the fixed-aim friction-only path in ProcessNormalMovement.
+        TestHelpers.AssertNear(3.35f, s.VZ, 0.1f);
+        Assert.Equal(ActionState.Aiming, s.State);
+        Assert.Equal((byte)0, s.ComboStage);
+    }
+
+    [Fact]
+    public void MankiQ_MidHold_DashAndJumpBlocked()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
+        sim.Tick(new() { { 1, aim } });
+        for (int i = 0; i < 9; i++)
+            sim.Tick(new() { { 1, aim } });
+
+        // Past the 8-tick lock: dash/jump stay blocked while the hold owns movement.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 3, IsAiming = true, Jump = true, Dash = true } } });
+        var s = sim.GetState(1);
+        Assert.Equal(ActionState.Aiming, s.State);
+        Assert.Equal((byte)3, s.AttackSlot);
+        Assert.Equal((ushort)0, s.DashDurationTicks);
+        Assert.Equal((byte)2, s.JumpsLeft);
+    }
+
+    [Fact]
+    public void MankiQ_HoldPastChargeCap_AutoReleases()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
+        for (int i = 0; i < 185; i++)
+            sim.Tick(new() { { 1, aim } });
+
+        var s = sim.GetState(1);
+        // ChargeHoldTicks=180: the hold auto-releases into the Attacking throw phase.
+        // Guards the charge-clamp gate extension to the Aiming state.
+        Assert.Equal((byte)1, s.ComboStage);
+        Assert.Equal(ActionState.Attacking, s.State);
     }
 
     // ── RMB: ServerAbility (MankiAerosolFlame) — basic activation ──
@@ -311,15 +376,15 @@ public class AbilityLifecycleTests
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MankiR_BasicActivation_EntersAttacking()
+    public void MankiR_BasicActivation_EntersAiming()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 1);
-        Assert.Equal(ActionState.Attacking, after.State);
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5, aiming: true), 1);
+        Assert.Equal(ActionState.Aiming, after.State);
         Assert.Equal((byte)5, after.AttackSlot);
     }
 
@@ -348,8 +413,8 @@ public class AbilityLifecycleTests
         state.AimPitch = 0.5f;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 1);
-        Assert.Equal(ActionState.Attacking, after.State);
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5, aiming: true), 1);
+        Assert.Equal(ActionState.Aiming, after.State);
     }
 
 
@@ -880,15 +945,15 @@ public class AbilityLifecycleTests
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MankiE_BasicActivation_EntersAttacking()
+    public void MankiE_BasicActivation_EntersAiming()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4, aiming: true), 1);
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)4, t0.AttackSlot);
     }
 

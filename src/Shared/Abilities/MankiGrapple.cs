@@ -47,13 +47,20 @@ namespace SlopArena.Shared.Abilities
             _hitboxRadius = GetParam(def, "hitbox_radius", 0.3f);
             _grappleDamage = GetParam(def, "damage", 3f);
 
-            s.State = ActionState.Attacking;
+            // Hold = aim stance (fixed-stance friction in Simulation's movement gate).
+            s.State = ActionState.Aiming;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0;  // spell_e (loop or start)
+            AnimIndex = 0;  // spell_e_loop (aim hold)
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
             s.IsAiming = true;
             s.AnimLockTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
+
+            // Stop a jump's ascent when the aim hold begins — ActivateAbility only cancels
+            // downward VY and re-opens the zero-g float window (AirTimeTicks=0), so without
+            // this an aim cast mid-rise climbs through the float (mirrors AirChargeAttack).
+            if (!s.IsGrounded)
+                s.VY = 0f;
 
             if (Resolver is SpellResolver resolver)
                 resolver.OnHitboxRemoved += OnTetherRemoved;
@@ -94,8 +101,12 @@ namespace SlopArena.Shared.Abilities
 
             if (!input.IsAiming)
             {
+                // Firing is an action phase — re-enter Attacking (hold was Aiming).
+                s.State = ActionState.Attacking;
                 _phase = GrapplePhase.Firing;
                 s.AttackElapsedTicks = 0;
+                AnimIndex = 1;      // spell_e_attack
+                s.ComboStage = 1;   // renderer switches loop -> attack clip
                 s.AnimLockTicks = _maxFlightTicks;
             }
         }

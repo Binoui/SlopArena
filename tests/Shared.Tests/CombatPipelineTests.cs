@@ -183,7 +183,7 @@ public class CombatPipelineTests
 
         // Tick 0: press Q with aim
         sim.Tick(new() { { 1, aimInput }, { 100, default } });
-        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        Assert.Equal(ActionState.Aiming, sim.GetState(1).State);
 
         // Hold for 8 more ticks (so AttackElapsedTicks reaches 9+, exceeding 8)
         for (int i = 0; i < 8; i++)

@@ -16,77 +16,42 @@ namespace SlopArena.Shared.Abilities;
 /// aged by SpellResolver and is not tied to this ability instance (ServerSimulation
 /// discards ability instances as soon as the caster leaves ActionState.Attacking).
 ///
+/// The hold/aim/throw lifecycle lives in <see cref="AimHoldAbility"/>; the hold cap is
+/// the spec's ChargeHoldTicks (see the base class doc — no charge_hold_ticks Param, so
+/// the auto-release can't drift from the Simulation.cs clamp).
+///
 /// Params: throw_trigger_tick, throw_duration, max_range,
 /// launch_angle, gravity, launch_offset_y, hitbox_radius, seed_damage,
 /// max_flight_ticks, rift_radius, rift_damage, rift_duration_ticks,
 /// rift_rehit_ticks, rift_stun_ticks, rift_kb_angle, rift_kb_base, rift_kb_growth.
 /// </summary>
-public sealed class NilusVoidRift : ServerAbility
+public sealed class NilusVoidRift : AimHoldAbility
 {
-    private bool _seedSpawned;
     private float _cachedAimDistance;
     private float _cachedAimYaw;
 
-    public override void OnStart(ref CharacterState s, CharacterDefinition def)
+    protected override int GetMidHoldAnimIndex(CharacterDefinition def) => 1;
+    protected override byte GetReleaseAnimIndex(CharacterDefinition def) => 2;
+
+    protected override void OnAimStart(ref CharacterState s, CharacterDefinition def)
     {
-        _seedSpawned = false;
         _cachedAimDistance = 0f;
         _cachedAimYaw = 0f;
-
-        s.State = ActionState.Attacking;
-        s.AttackSlot = (byte)(Slot + 1);
-        AnimIndex = 0;
-        s.ComboStage = 0;
-        s.AttackElapsedTicks = 0;
-        s.IsAiming = true;
-        s.AnimLockTicks = 8;
-        s.ChargeTicks = 0;
     }
 
-    public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+    protected override void OnRelease(ref CharacterState s, CharacterDefinition def)
     {
-        // AbilitySpec.ChargeHoldTicks, not a Param: Simulation.cs:307-314 clamps s.ChargeTicks
-        // with that same field for AimedProjectile slots, which is what makes the auto-release
-        // below reachable at all. Two copies of one number would let a retune move the clamp
-        // without moving the release, or the reverse.
-        ushort maxHoldTicks = def.GetSlotAbility(Slot, airborne: false)?.ChargeHoldTicks ?? 180;
-        bool dbg = Simulation.OnDebugLog != null;
-
-        // ── Aim phase ──
-        if (s.ComboStage == 0)
-        {
-            if (s.AttackElapsedTicks > 8 && AnimIndex != 1)
-                AnimIndex = 1;
-
-            bool released = !input.IsAiming || (maxHoldTicks > 0 && s.ChargeTicks >= maxHoldTicks);
-            if (s.AttackElapsedTicks > 8 && released)
-            {
-                if (dbg) Simulation.OnDebugLog?.Invoke(
-                    $"[NilusQ] Release -> throw! ticks={s.AttackElapsedTicks} " +
-                    $"aiming={input.IsAiming} charge={s.ChargeTicks}/{maxHoldTicks} " +
-                    $"aimDist={s.AimTargetDistance:F2} aimYaw={s.AimYaw:F2}");
-                _cachedAimDistance = s.AimTargetDistance;
-                _cachedAimYaw = s.AimYaw;
-                s.ComboStage = 1;
-                AnimIndex = 2;
-                s.AttackElapsedTicks = 0;
-            }
-            return;
-        }
-
-        // ── Throw phase ──
-        ushort throwTick = (ushort)GetParam(def, "throw_trigger_tick", 10f);
-        if (!_seedSpawned && s.AttackElapsedTicks >= throwTick)
-        {
-            _seedSpawned = true;
-            s.IsAiming = false;
-            SpawnSeed(ref s, def);
-        }
-
-        ushort duration = (ushort)GetParam(def, "throw_duration", 40f);
-        if (s.AttackElapsedTicks >= duration)
-            EndAbility(ref s);
+        if (Simulation.OnDebugLog != null)
+            Simulation.OnDebugLog.Invoke(
+                $"[NilusQ] Release -> throw! ticks={s.AttackElapsedTicks} " +
+                $"aiming={s.IsAiming} charge={s.ChargeTicks}/{GetMaxHoldTicks(def)} " +
+                $"aimDist={s.AimTargetDistance:F2} aimYaw={s.AimYaw:F2}");
+        _cachedAimDistance = s.AimTargetDistance;
+        _cachedAimYaw = s.AimYaw;
     }
+
+    protected override void OnFire(ref CharacterState s, CharacterDefinition def)
+        => SpawnSeed(ref s, def);
 
     private void SpawnSeed(ref CharacterState s, CharacterDefinition def)
     {

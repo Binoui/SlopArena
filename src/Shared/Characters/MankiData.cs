@@ -60,7 +60,7 @@ public static partial class CharacterRegistry
             HurtboxBoneScale = 1.0f,
             ModelSoleOffset = 0.0f,
             AutoModelYOffset = true,
-            ModelYOffset = 0f,
+            ModelYOffset = -0.2f,
 
             // Default animation names match Mixamo: idle, run, dash, jump, fall, small_hit, medium_hit, hard_hit
             // Only ClipOverrides needed for custom timelines
@@ -86,13 +86,13 @@ public static partial class CharacterRegistry
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                     // Stage 2: left punch
                     new() { DurationTicks = 35, ChainWindowTicks = 14, LungeForce = 2f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 40, Interruptible = true } },
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 8, Radius = 1f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 40, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 5f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                     // Stage 3: big finisher
                     new() { DurationTicks = 45, ChainWindowTicks = 0, LungeForce = 10f,
                             HitboxEvents = new[] {
-                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1.5f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Kill }, StunTicks = 44, Interruptible = true }
+                                new HitboxEvent { TriggerTick = 16, DurationTicks = 12, Radius = 1.5f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 44, Interruptible = true }
                             },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.2f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
@@ -112,17 +112,17 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     // Stage 1: air kick
-                    new() { DurationTicks = 16, ChainWindowTicks = 10,
+                    new() { DurationTicks = 28, ChainWindowTicks = 10,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 24, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 7f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                     // Stage 2: air kick 2
-                    new() { DurationTicks = 18, ChainWindowTicks = 0,
+                    new() { DurationTicks = 34, ChainWindowTicks = 0,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Radius = 0.8f, OffX = 0, OffY = 0.4f, OffZ = 1.2f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 32, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_lmb_air", "spell_lmb_air" },
+                AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2" },
             },
 
             RMB = new AbilitySpec
@@ -173,7 +173,7 @@ public static partial class CharacterRegistry
                             AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
                 ChargeHoldTicks = 45,
-                AnimationNames = new[] { "spell_rmb_charged", "spell_rmb_attack" },
+                AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
             },
 
             AirRMB = new AbilitySpec
@@ -201,7 +201,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 10, Radius = 1.0f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.6f, EndOffZ = 0, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 40, Interruptible = true } },
                             AttackRange = 5f, WarpRange = 12f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
                 },
-                AnimationNames = new[] { "spell_rmb_air", "spell_rmb_air" },
+                AnimationNames = new[] { "spell_rmb_air_loop", "spell_rmb_air_attack" },
             },
 
             Q = new AbilitySpec
@@ -219,7 +219,8 @@ public static partial class CharacterRegistry
                             HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 20f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_q_start", "spell_q_loop", "spell_q_end" },
+                AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
+                AnimSpeed = 1f,        // loop plays at native rate during the variable-length aim hold
                 SpecialEffectKeys = new[] { "MankiRoundBomb" },
                 Params = new()
                 {
@@ -257,7 +258,8 @@ public static partial class CharacterRegistry
                             HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 15f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_e" },
+                AnimationNames = new[] { "spell_e_loop", "spell_e_attack" },
+                AnimSpeed = 1f,        // loop plays at native rate during the variable-length aim hold
                 Params = new()
                 {
                     ["fire_trigger_tick"] = 8f,
@@ -288,7 +290,8 @@ public static partial class CharacterRegistry
                             HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 40f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
                 },
-                AnimationNames = new[] { "spell_r" },
+                AnimationNames = new[] { "spell_r_loop", "spell_r_attack" },
+                AnimSpeed = 1f,        // loop plays at native rate during the variable-length aim hold
                 Params = new()
                 {
                     ["fire_trigger_tick"] = 6f,

@@ -310,7 +310,7 @@ public class NilusAbilityTests
         sim.Tick(new() { { 1, aim } });
 
         var t0 = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)3, t0.AttackSlot);
         Assert.True(t0.IsAiming);
 

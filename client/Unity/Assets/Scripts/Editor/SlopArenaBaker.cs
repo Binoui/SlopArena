@@ -214,8 +214,36 @@ public class SlopArenaBaker : EditorWindow
             DestroyImmediate(tempGO);
         }
 
+        // Mirror into the Unity project's StreamingAssets: the runtime resolves
+        // StreamingAssets/data BEFORE the repo-root data/ fallback
+        // (BakedContentPaths.FirstExisting), so without this the Editor and any
+        // direct Unity build keep reading a stale bin until build-release.sh
+        // re-stages it. build-release.sh copies from the repo-root file, so the
+        // repo-root write above stays the committed source of truth.
+        if (Path.GetExtension(outputFile).Equals(".bin", StringComparison.OrdinalIgnoreCase))
+        {
+            MirrorToStreamingAssets(outputFile, "data");
+            MirrorToStreamingAssets(outputFile, Path.Combine("Server", "data"));
+        }
+
         AssetDatabase.Refresh();
         Debug.Log($"Baked {transforms.Count} bones x {clips.Count} clips -> {outputFile} ({new FileInfo(outputFile).Length} bytes)");
+    }
+
+    private void MirrorToStreamingAssets(string sourceFile, string subDir)
+    {
+        try
+        {
+            string destDir = Path.Combine(Application.dataPath, "StreamingAssets", subDir);
+            Directory.CreateDirectory(destDir);
+            string destFile = Path.Combine(destDir, Path.GetFileName(sourceFile));
+            File.Copy(sourceFile, destFile, overwrite: true);
+            Debug.Log($"[SlopArenaBaker] Mirrored {Path.GetFileName(sourceFile)} -> {destFile}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SlopArenaBaker] Failed to mirror {Path.GetFileName(sourceFile)} to StreamingAssets/{subDir}: {ex.Message}");
+        }
     }
 
     [MenuItem("Tools/SlopArena/Bake All Characters")]

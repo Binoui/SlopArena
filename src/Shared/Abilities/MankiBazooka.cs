@@ -25,14 +25,21 @@ namespace SlopArena.Shared.Abilities
             _phase = BazookaPhase.Aiming;
             _projectileSpawned = false;
 
-            s.State = ActionState.Attacking;
+            // Hold = aim stance (fixed-stance friction in Simulation's movement gate).
+            s.State = ActionState.Aiming;
             s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0;  // spell_r (loop or start)
+            AnimIndex = 0;  // spell_r_loop (aim hold)
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
             s.IsAiming = true;
             // Lock input for max hold duration (charge_hold_ticks or 180 = 3s)
             s.AnimLockTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
+
+            // Stop a jump's ascent when the aim hold begins — ActivateAbility only cancels
+            // downward VY and re-opens the zero-g float window (AirTimeTicks=0), so without
+            // this an aim cast mid-rise climbs through the float (mirrors AirChargeAttack).
+            if (!s.IsGrounded)
+                s.VY = 0f;
         }
 
         public override void OnEnd(ref CharacterState s)
@@ -67,9 +74,12 @@ namespace SlopArena.Shared.Abilities
 
             if (!input.IsAiming)
             {
+                // Firing is an action phase — re-enter Attacking (hold was Aiming).
+                s.State = ActionState.Attacking;
                 _phase = BazookaPhase.Firing;
                 s.AttackElapsedTicks = 0;
-                AnimIndex = 0;
+                AnimIndex = 1;      // spell_r_attack
+                s.ComboStage = 1;   // renderer switches loop -> attack clip
                 s.AnimLockTicks = (ushort)GetParam(def, "cast_duration", 20f);
             }
         }

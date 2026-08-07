@@ -370,7 +370,7 @@ public class ServerSimulationTests
     }
 
     [Fact]
-    public void Tick_MankiQ_StaysAttackingForDuration()
+    public void Tick_MankiQ_HoldThenThrow_EndsInIdle()
     {
         var arena = MakeTestArena();
         var sim = new ServerSimulation(arena);
@@ -382,16 +382,20 @@ public class ServerSimulationTests
         sim.Tick(new Dictionary<ulong, InputState>
             { { 1, new InputState { ActiveSlot = 3 } } });
         var t0 = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal(ActionState.Aiming, t0.State);
 
         for (int i = 1; i < 75; i++)
         {
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
             var s = sim.GetState(1);
-            // Q: 8-tick hold phase + 60-tick throw phase = ability ends at tick 68
-            bool expectedAttacking = i < 68;
+            // Q: 8-tick aim hold (Aiming) + 60-tick throw phase (Attacking) = ends at tick 68.
+            // Without aim held, the release fires as soon as the 8-tick lock expires (tick 8).
+            bool expectedAiming = i < 8;
+            bool expectedAttacking = i >= 8 && i < 68;
+            Assert.True((s.State == ActionState.Aiming) == expectedAiming,
+                $"tick {i}: expected {(expectedAiming ? "Aiming" : "not-Aiming")} but got {s.State}");
             Assert.True((s.State == ActionState.Attacking) == expectedAttacking,
-                $"tick {i}: expected {(expectedAttacking ? "Attacking" : "Idle")} but got {s.State}");
+                $"tick {i}: expected {(expectedAttacking ? "Attacking" : "not-Attacking")} but got {s.State}");
         }
     }
 

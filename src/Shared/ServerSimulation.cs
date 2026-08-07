@@ -289,7 +289,7 @@ namespace SlopArena.Shared
 
             // Resolve animation name based on current state
             if (state.State == ActionState.Dashing) targetAnim = "dash";
-            else if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+            else if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
             {
                 bool airborne = !state.IsGrounded;
                 var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
@@ -319,7 +319,7 @@ namespace SlopArena.Shared
             _animFrames[id] = nextFrame;
 
             bakedFrame = frame;
-            if (state.State == ActionState.Attacking && state.AttackSlot > 0)
+            if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
             {
                 bool airborne = !state.IsGrounded;
                 var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
@@ -565,8 +565,8 @@ namespace SlopArena.Shared
 					continue;
 				}
 
-				// ── Attacking-only behaviors (warp, rotation) ──
-				if (state.State != ActionState.Attacking || state.AttackSlot == 0)
+				// ── Attacking/Aiming behaviors (warp, rotation) ──
+				if (state.State is not (ActionState.Attacking or ActionState.Aiming) || state.AttackSlot == 0)
 				{
 					_states[id] = state;
 					continue;

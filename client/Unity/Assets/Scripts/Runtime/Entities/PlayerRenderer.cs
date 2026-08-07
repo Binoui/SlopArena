@@ -316,6 +316,75 @@ namespace SlopArena.Client.Entities
             int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
             return (float)frameCount / durationTicks;
         }
+
+        /// <summary>
+        /// Play the ability clip for a combo stage with baked-frame speed and
+        /// extrapolation overrides. Returns true when a clip played.
+        /// </summary>
+        private bool PlayAbilityAnim(CharacterState state, AbilitySpec spec, int comboStage)
+        {
+            if (spec == null)
+                return false;
+
+            string animName = "spell_lmb_1";
+            float animSpeed = 1f;
+            if (spec.AnimationNames != null && comboStage < spec.AnimationNames.Length)
+            {
+                animName = spec.GetAnimationName(comboStage);
+                if (_bakedData != null && spec.Stages != null && comboStage < spec.Stages.Length)
+                {
+                    int bakedIdx = _bakedData.FindAnimIndex(animName);
+                    if (bakedIdx >= 0)
+                    {
+                        int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
+                        int durationTicks = spec.Stages[comboStage].DurationTicks;
+                        if (durationTicks > 0)
+                            animSpeed = (float)frameCount / durationTicks;
+                    }
+                }
+                if (spec.AnimSpeed > 0f)
+                    animSpeed = spec.AnimSpeed;
+            }
+
+            var clip = _charConfig.GetClipByName(animName);
+            if (clip == null)
+                return false;
+
+            var animState = _animancer.Play(clip, 0.05f);
+            animState.Speed = animSpeed;
+            _currentAnimState = animState;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            // Extrapolation is driven entirely by baked skeleton frames. Characters
+            // with no BakedDataPath (placeholders: Nilus, Kistu) have none, and
+            // FromBakedData dereferences its argument — so gate on it here.
+            if (_bakedData != null && _charDef?.ClipOverrides != null)
+            {
+                foreach (var cfg in _charDef.ClipOverrides)
+                {
+                    if (cfg.Name == animName && cfg.Extrapolation == ExtrapolationMode.Continuous)
+                    {
+                        _currentExtrapolationMode = ExtrapolationMode.Continuous;
+                        _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
+                        break;
+                    }
+                }
+            }
+            if (_bakedData != null && _currentExtrapolationMode == ExtrapolationMode.None
+                && _charConfig?.AbilityClips != null)
+            {
+                foreach (var entry in _charConfig.AbilityClips)
+                {
+                    if (entry.Name == animName && entry.Extrapolation == ExtrapolationMode.Continuous)
+                    {
+                        _currentExtrapolationMode = ExtrapolationMode.Continuous;
+                        _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
+                        break;
+                    }
+                }
+            }
+            return true;
+        }
+
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animancer == null || _charConfig == null)
@@ -385,7 +454,17 @@ namespace SlopArena.Client.Entities
             // ── Non-combat: ground/air state machine ──
             if (!isCombat)
             {
-                if (state.State == ActionState.JumpSquat)
+                // Fixed-stance aim holds (AimedProjectile/Projectile behaviors) play the
+                // aim-loop once on entering the hold; mobile aimers (Kistu) fall through
+                // to locomotion below.
+                bool fixedAimHold = state.State == ActionState.Aiming && state.AttackSlot > 0 && _charDef != null
+                    && _charDef.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded)?.Behavior is AbilityBehavior.AimedProjectile or AbilityBehavior.Projectile;
+                if (fixedAimHold)
+                {
+                    if (state.State != _lastAnimState)
+                        PlayAbilityAnim(state, _charDef.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded), 0);
+                }
+                else if (state.State == ActionState.JumpSquat)
                 {
                     var clip = _charConfig.GetClipByName("jump_up");
                     if (clip != null)
@@ -461,66 +540,11 @@ namespace SlopArena.Client.Entities
                 _jumpArcActive = false;
                 if (state.State == ActionState.Attacking)
                 {
-                    string animName = "spell_lmb_1";
-                    float animSpeed = 1f;
                     if (_charDef != null)
                     {
                         byte slot = (byte)(state.AttackSlot - 1);
                         var spec = _charDef.GetSlotAbility(slot, !state.IsGrounded);
-                        if (spec?.AnimationNames != null && state.ComboStage < spec.AnimationNames.Length)
-                        {
-                            animName = spec.GetAnimationName(state.ComboStage);
-                            if (_bakedData != null && spec.Stages != null && state.ComboStage < spec.Stages.Length)
-                            {
-                                int bakedIdx = _bakedData.FindAnimIndex(animName);
-                                if (bakedIdx >= 0)
-                                {
-                                    int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
-                                    int durationTicks = spec.Stages[state.ComboStage].DurationTicks;
-                                    if (durationTicks > 0)
-                                        animSpeed = (float)frameCount / durationTicks;
-                                }
-                            }
-                            if (spec.AnimSpeed > 0f)
-                                animSpeed = spec.AnimSpeed;
-                        }
-                    }
-
-                    var clip = _charConfig.GetClipByName(animName);
-                    if (clip != null)
-                    {
-                        var animState = _animancer.Play(clip, 0.05f);
-                        animState.Speed = animSpeed;
-                        _currentAnimState = animState;
-                        _currentExtrapolationMode = ExtrapolationMode.None;
-                        // Extrapolation is driven entirely by baked skeleton frames. Characters
-                        // with no BakedDataPath (placeholders: Nilus, Kistu) have none, and
-                        // FromBakedData dereferences its argument — so gate on it here.
-                        if (_bakedData != null && _charDef?.ClipOverrides != null)
-                        {
-                            foreach (var cfg in _charDef.ClipOverrides)
-                            {
-                                if (cfg.Name == animName && cfg.Extrapolation == ExtrapolationMode.Continuous)
-                                {
-                                    _currentExtrapolationMode = ExtrapolationMode.Continuous;
-                                    _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
-                                    break;
-                                }
-                            }
-                        }
-                        if (_bakedData != null && _currentExtrapolationMode == ExtrapolationMode.None
-                            && _charConfig?.AbilityClips != null)
-                        {
-                            foreach (var entry in _charConfig.AbilityClips)
-                            {
-                                if (entry.Name == animName && entry.Extrapolation == ExtrapolationMode.Continuous)
-                                {
-                                    _currentExtrapolationMode = ExtrapolationMode.Continuous;
-                                    _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
-                                    break;
-                                }
-                            }
-                        }
+                        PlayAbilityAnim(state, spec, state.ComboStage);
                     }
                 }
                 else if (state.State == ActionState.Dashing)

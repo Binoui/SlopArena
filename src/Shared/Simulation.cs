@@ -300,14 +300,18 @@ namespace SlopArena.Shared
 
             // 7. ProcessNormalMovement (idle + aiming — attacks handle velocity via LungeForce.
             // Aiming keeps walk/run unlocked so the player can reposition while aiming.)
+            // Fixed-stance aim holds process no inputs: momentum bleeds via friction, but the
+            // player cannot steer, dash, or jump. Mobile aim (Kistu's DirectionalDash) keeps control.
+            bool fixedAim = s.State == ActionState.Aiming && s.AttackSlot > 0
+                && def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded)?.Behavior is AbilityBehavior.AimedProjectile or AbilityBehavior.Projectile;
             if (s.State == ActionState.Idle || s.State == ActionState.Aiming)
             {
-                ProcessNormalMovement(ref s, stats, input);
+                ProcessNormalMovement(ref s, stats, input, processInput: !fixedAim);
             }
             
             // 7b. Charge ticks for aimed projectile abilities (Manki Q, FightGuy Q).
             // ServerAbility subclasses read s.ChargeTicks to check max hold duration.
-            if (s.State == ActionState.Attacking && s.AttackSlot > 0 && s.ChargeTicks < ushort.MaxValue)
+            if ((s.State is ActionState.Attacking or ActionState.Aiming) && s.AttackSlot > 0 && s.ChargeTicks < ushort.MaxValue)
             {
                 var spec = def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded);
                 if (spec != null && spec.Behavior == AbilityBehavior.AimedProjectile)
@@ -680,8 +684,30 @@ namespace SlopArena.Shared
         // ── NORMAL MOVEMENT ──
 
         private static void ProcessNormalMovement(
-            ref CharacterState s, MovementStats stats, InputState input)
+            ref CharacterState s, MovementStats stats, InputState input, bool processInput = true)
         {
+            if (!processInput)
+            {
+                // Fixed aim: decay horizontal momentum, nothing else — no accel, no facing,
+                // no resource resets. Ground mirrors the attacking-friction branch exactly;
+                // air uses the per-character AirFriction stat with the air-drag shape from
+                // ProcessAirMovement.
+                if (s.IsGrounded)
+                {
+                    float friction = stats.GroundFriction * TickDt;
+                    s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
+                    s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
+                }
+                else
+                {
+                    float drag = stats.AirFriction * TickDt;
+                    s.VX *= (1f - drag);
+                    s.VZ *= (1f - drag);
+                    ApplyVelocityDeadZone(ref s);
+                }
+                return;
+            }
+
             (float dirX, float dirZ) = GetInputDirection(input);
 
             if (s.IsGrounded)

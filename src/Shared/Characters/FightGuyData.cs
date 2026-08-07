@@ -203,7 +203,7 @@ public static partial class CharacterRegistry
                             AttackRange = 4f, WarpRange = 10f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_air_rmb", "spell_air_rmb" },
+                AnimationNames = new[] { "spell_rmb_air_loop", "spell_rmb_air_attack" },
             },
 
             Q = new AbilitySpec

@@ -3,105 +3,72 @@ using System;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
-    /// FightGuy's Q — Ki Shot: aimed projectile that applies Marked status on hit.
-    /// Hold to aim (TPS camera), release fires a fast ki blast in aim direction.
-    /// Minimal gravity — true ki-blast floating projectile.
+    /// FightGuy's Q — Ki Shot: hold to aim (TPS camera), release fires a fast ki blast
+    /// in aim direction. Minimal gravity — true ki-blast floating projectile.
     /// On entity hit: applies Marked status (StatusType.Marked = bit 2).
+    /// The hold/aim/throw lifecycle lives in <see cref="AimHoldAbility"/>.
     /// </summary>
-    public sealed class FightGuyKiShot : ServerAbility
+    public sealed class FightGuyKiShot : AimHoldAbility
     {
-        private bool _projectileSpawned;
         private float _cachedAimYaw;
         private float _cachedAimPitch;
 
-        public override void OnStart(ref CharacterState s, CharacterDefinition def)
+        // AnimationNames = [spell_q_loop, spell_q_attack]; the mid-hold swap and the
+        // release index are kept verbatim from the original (release index 2 exceeds the
+        // array — preserved intentionally, the renderer indexes by ComboStage, not AnimIndex).
+        protected override int GetMidHoldAnimIndex(CharacterDefinition def) => 1;
+        protected override byte GetReleaseAnimIndex(CharacterDefinition def) => 2;
+
+        protected override void OnAimStart(ref CharacterState s, CharacterDefinition def)
         {
-            _projectileSpawned = false;
             _cachedAimYaw = 0f;
             _cachedAimPitch = 0f;
-
-            s.State = ActionState.Attacking;
-            s.AttackSlot = (byte)(Slot + 1);
-            AnimIndex = 0;
-            s.ComboStage = 0;
-            s.AttackElapsedTicks = 0;
-            s.IsAiming = true;
-            s.AnimLockTicks = 8;
-            s.ChargeTicks = 0;
         }
 
-        public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+        protected override void OnRelease(ref CharacterState s, CharacterDefinition def)
         {
-            ushort maxHoldTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
+            _cachedAimYaw = s.AimYaw;
+            _cachedAimPitch = s.AimPitch;
+        }
 
-            // ── Charge / aim phase ──
-            if (s.ComboStage == 0)
+        protected override void OnFire(ref CharacterState s, CharacterDefinition def)
+        {
+            float speed = GetParam(def, "projectile_speed", 25f);
+            float pitch = _cachedAimPitch;
+            float cosPitch = MathF.Cos(pitch);
+            float vx = speed * cosPitch * MathF.Sin(_cachedAimYaw);
+            float vy = speed * MathF.Sin(pitch);
+            float vz = speed * cosPitch * MathF.Cos(_cachedAimYaw);
+
+            float launchOffsetY = GetParam(def, "launch_offset_y", 1.2f);
+            float projRadius = GetParam(def, "hitbox_radius", 0.5f);
+            float projDamage = GetParam(def, "damage", 6f);
+            ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
+
+            float kbBase = GetParam(def, "knockback_base", 3f);
+            float kbGrowth = GetParam(def, "knockback_growth", 4.5f);
+            float kbAngle = GetParam(def, "kb_angle", 30f);
+            ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 12f);
+            ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
+
+            Resolver.Spawn(new Hitbox
             {
-                if (s.AttackElapsedTicks > 8 && s.AnimIndex != 1)
-                {
-                    AnimIndex = 1;
-                }
-
-                if (s.AttackElapsedTicks > 8 && (!input.IsAiming || (maxHoldTicks > 0 && s.ChargeTicks >= maxHoldTicks)))
-                {
-                    _cachedAimYaw = s.AimYaw;
-                    _cachedAimPitch = s.AimPitch;
-                    s.ComboStage = 1;
-                    AnimIndex = 2;
-                    s.AttackElapsedTicks = 0;
-                }
-                return;
-            }
-
-            // ── Throw phase ──
-            ushort throwTick = (ushort)GetParam(def, "throw_trigger_tick", 10f);
-
-            if (!_projectileSpawned && s.AttackElapsedTicks >= throwTick)
-            {
-                _projectileSpawned = true;
-                s.IsAiming = false;
-
-                float speed = GetParam(def, "projectile_speed", 25f);
-                float pitch = _cachedAimPitch;
-                float cosPitch = MathF.Cos(pitch);
-                float vx = speed * cosPitch * MathF.Sin(_cachedAimYaw);
-                float vy = speed * MathF.Sin(pitch);
-                float vz = speed * cosPitch * MathF.Cos(_cachedAimYaw);
-
-                float launchOffsetY = GetParam(def, "launch_offset_y", 1.2f);
-                float projRadius = GetParam(def, "hitbox_radius", 0.5f);
-                float projDamage = GetParam(def, "damage", 6f);
-                ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
-
-                float kbBase = GetParam(def, "knockback_base", 3f);
-                float kbGrowth = GetParam(def, "knockback_growth", 4.5f);
-                float kbAngle = GetParam(def, "kb_angle", 30f);
-                ushort stunTicks = (ushort)GetParam(def, "stun_ticks", 12f);
-                ushort maxFlight = (ushort)GetParam(def, "max_flight_ticks", 90f);
-
-                Resolver.Spawn(new Hitbox
-                {
-                    X = s.PX,
-                    Y = s.PY + launchOffsetY,
-                    Z = s.PZ,
-                    VX = vx, VY = vy, VZ = vz,
-                    Radius = projRadius,
-                    Shape = HitboxShape.Sphere,
-                    EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
-                    Damage = projDamage,
-                    BaseKnockback = kbBase,
-                    KnockbackGrowth = kbGrowth,
-                    KnockbackAngle = (sbyte)kbAngle,
-                    StunTicks = stunTicks,
-                    DurationTicks = maxFlight,
-                    OwnerId = s.EntityId,
-                    Gravity = GetParam(def, "gravity", 1f),
-                });
-            }
-
-            ushort duration = (ushort)GetParam(def, "throw_duration", 60f);
-            if (s.AttackElapsedTicks >= duration)
-                EndAbility(ref s);
+                X = s.PX,
+                Y = s.PY + launchOffsetY,
+                Z = s.PZ,
+                VX = vx, VY = vy, VZ = vz,
+                Radius = projRadius,
+                Shape = HitboxShape.Sphere,
+                EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
+                Damage = projDamage,
+                BaseKnockback = kbBase,
+                KnockbackGrowth = kbGrowth,
+                KnockbackAngle = (sbyte)kbAngle,
+                StunTicks = stunTicks,
+                DurationTicks = maxFlight,
+                OwnerId = s.EntityId,
+                Gravity = GetParam(def, "gravity", 1f),
+            });
         }
 
         /// <summary>
