@@ -45,6 +45,8 @@ namespace SlopArena.Shared
             public float BaseKnockback;
             public float KnockbackGrowth;
             public ushort StunTicks;
+            /// <summary>If true, the hit freezes the owner too (melee contact, ADR-0012).</summary>
+            public bool FreezesOwner;
         }
 
         /// <summary>
@@ -245,6 +247,7 @@ namespace SlopArena.Shared
                                 BaseKnockback = hb.BaseKnockback,
                                 KnockbackGrowth = hb.KnockbackGrowth,
                                 StunTicks = hb.StunTicks,
+                                FreezesOwner = hb.FreezesOwner,
                             });
 
                             hitThisTick.Add(entity.Id);

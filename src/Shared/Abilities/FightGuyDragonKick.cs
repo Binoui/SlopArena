@@ -127,6 +127,7 @@ namespace SlopArena.Shared.Abilities
                 Radius = 0.6f, Shape = HitboxShape.Capsule,
                 Damage = 5f, StunTicks = 14,
                 DurationTicks = 2, OwnerId = s.EntityId,
+                FreezesOwner = true,
             });
         }
 
@@ -152,6 +153,7 @@ namespace SlopArena.Shared.Abilities
                     Damage = GetParam(def, "hit1_damage", 6f),
                     StunTicks = (ushort)GetParam(def, "hit1_stun", 16f),
                     DurationTicks = 4, OwnerId = s.EntityId,
+                    FreezesOwner = true,
                 });
             }
             else if (_phaseTicks == hit2Tick)
@@ -163,6 +165,7 @@ namespace SlopArena.Shared.Abilities
                     Damage = GetParam(def, "hit2_damage", 8f),
                     StunTicks = (ushort)GetParam(def, "hit2_stun", 20f),
                     DurationTicks = 4, OwnerId = s.EntityId,
+                    FreezesOwner = true,
                 });
             }
             else if (_phaseTicks == hit3Tick)
@@ -177,6 +180,7 @@ namespace SlopArena.Shared.Abilities
                     KnockbackAngle = (sbyte)GetParam(def, "hit3_angle", 25f),
                     StunTicks = (ushort)GetParam(def, "hit3_stun", 24f),
                     DurationTicks = 4, OwnerId = s.EntityId,
+                    FreezesOwner = true,
                 });
             }
 

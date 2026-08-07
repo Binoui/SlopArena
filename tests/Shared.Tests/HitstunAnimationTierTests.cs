@@ -107,9 +107,9 @@ public class HitstunAnimationTierTests
     [Fact]
     public void CharacterStatePacket_Size_IncludesHitstunLevel()
     {
-        // Size should be 95 for the current packet layout (Deaths #37, damage + cooldowns #38,
-        // D10 movement-resource fields for PredictedTrack — ADR-0011)
-        Assert.Equal(95, CharacterStatePacket.Size);
+        // Size should be 97 for the current packet layout (Deaths #37, damage + cooldowns #38,
+        // D10 movement-resource fields for PredictedTrack — ADR-0011, hitstop — ADR-0012)
+        Assert.Equal(97, CharacterStatePacket.Size);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -139,9 +139,20 @@ public class HitstunAnimationTierTests
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterHit = sim.GetState(100);
-        Assert.Equal(ActionState.Hitstun, afterHit.State);
+        // Hitstop (ADR-0012): the hit resolves at tick 11, freezing the victim for
+        // 2 + 2·4 = 10 ticks before the launch. Damage + tier apply at connect; the
+        // Hitstun STATE begins at freeze expiry (tick 21).
         Assert.True(afterHit.DamagePercent > 0, "NPC should have taken damage");
         Assert.Equal(1, (int)afterHit.HitstunLevel);
+        Assert.Equal((ushort)10, afterHit.HitstopTicks);
+        Assert.Equal(ActionState.Idle, afterHit.State); // frozen, not yet launched
+
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var afterLaunch = sim.GetState(100);
+        Assert.Equal(ActionState.Hitstun, afterLaunch.State);
+        Assert.Equal((ushort)32, afterLaunch.HitstunTicks);
     }
 
     [Fact]

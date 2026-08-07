@@ -82,6 +82,8 @@ public class RollbackInvariantTests
                 $"Tick {tick}, entity {id}: non-finite position/velocity ({s.PX}, {s.PY}, {s.PZ}) / ({s.VX}, {s.VY}, {s.VZ})");
             Assert.True(s.HitstunTicks <= 60,
                 $"Tick {tick}, entity {id}: HitstunTicks={s.HitstunTicks} > 60 (stuck)");
+            Assert.True(s.HitstopTicks <= 24,
+                $"Tick {tick}, entity {id}: HitstopTicks={s.HitstopTicks} > 24 (stuck)");
         }
     }
 

@@ -40,7 +40,7 @@ Master Server (SignalR/REST)          Game Server (src/Server, .NET console)
 - All tick durations use `ushort` (max 65535 ticks = ~18 minutes).
 - Packet serialization uses `System.Buffers.Binary.BinaryPrimitives` (little-endian).
 - Client → Server: `entityId(8) + tick(4) + InputState(19)` = 31 bytes, 60Hz.
-- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19)` = up to 95 bytes per entity (input relay, issue #80).
+- Server → Client: `entityId(8) + tick(4) + CharacterStatePacket(65) + hasInput(1) + InputState(19)` = up to 97 bytes per entity (input relay, issue #80; hitstop freeze field, ADR-0012).
 - Match flow: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room (ADR-0008). Master server (SignalR) manages lobby/char-select/results; game server (UDP) manages countdown/fight only.
 
 ## Key Conventions

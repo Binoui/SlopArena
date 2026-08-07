@@ -89,19 +89,33 @@ public class CombatPipelineTests
         // Stage 1 damage = 4 (no buffs active)
         Assert.InRange((int)afterHit.DamagePercent, 4, 4);
 
+        // Hitstop (ADR-0012): at connect the victim freezes for 2 + 2·4 = 10 ticks —
+        // KV is queued, not yet applied; damage + HitstunLevel land immediately.
+        Assert.Equal(10, (int)afterHit.HitstopTicks);
+        Assert.Equal(0f, afterHit.KVX);
+        Assert.Equal(0f, afterHit.KVY);
+        Assert.Equal(0f, afterHit.KVZ);
+        // Manki LMB stage 1: StunTicks=32 → ≤30? no, >30 → level 1 (medium)
+        Assert.Equal(1, (int)afterHit.HitstunLevel);
+
+        // Freeze expires at tick 21 — the queued launch applies there.
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var afterLaunch = sim.GetState(100);
+        Assert.Equal(0, (int)afterLaunch.HitstopTicks);
+
         // Knockback magnitude should be non-zero (direction depends on player
         // lunge position at trigger tick, which shifts between ticks)
-        float kbMag = MathF.Sqrt(afterHit.KVX * afterHit.KVX
-                                 + afterHit.KVY * afterHit.KVY
-                                 + afterHit.KVZ * afterHit.KVZ);
+        float kbMag = MathF.Sqrt(afterLaunch.KVX * afterLaunch.KVX
+                                 + afterLaunch.KVY * afterLaunch.KVY
+                                 + afterLaunch.KVZ * afterLaunch.KVZ);
         Assert.True(kbMag > 0.5f,
             $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}");
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // regardless of ApplyKnockback's internal logic.
-        Assert.Equal(32, (int)afterHit.HitstunTicks);
-        // Manki LMB stage 1: StunTicks=32 → ≤30? no, >30 → level 1 (medium)
-        Assert.Equal(1, (int)afterHit.HitstunLevel);
+        Assert.Equal(32, (int)afterLaunch.HitstunTicks);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -570,17 +584,28 @@ public class CombatPipelineTests
         Assert.True(afterHit.DamagePercent > 0,
             $"NPC should have taken damage from LMB hit, got {afterHit.DamagePercent}");
 
+        // Hitstop (ADR-0012): the launch is deferred — the victim is frozen 10 ticks.
+        Assert.True(afterHit.HitstopTicks > 0, "NPC should be in hitstop at connect");
+        Assert.True(afterHit.IsGrounded, "frozen victim is still grounded");
+
+        // Freeze expires — the launch (KVY up, airborne) applies.
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var afterLaunch = sim.GetState(100);
+        Assert.Equal(0, (int)afterLaunch.HitstopTicks);
+
         // After hit: must be airborne (was ground snap eating vertical KB)
-        Assert.False(afterHit.IsGrounded,
-            $"NPC should be airborne after knockback (ground snap bug), IsGrounded={afterHit.IsGrounded}");
+        Assert.False(afterLaunch.IsGrounded,
+            $"NPC should be airborne after knockback (ground snap bug), IsGrounded={afterLaunch.IsGrounded}");
 
         // KVY must be non-zero (vertical knockback from angle=15°)
-        Assert.True(afterHit.KVY > 0f,
-            $"LMB hit should produce vertical knockback velocity, got KVY={afterHit.KVY:F4}");
+        Assert.True(afterLaunch.KVY > 0f,
+            $"LMB hit should produce vertical knockback velocity, got KVY={afterLaunch.KVY:F4}");
 
         // PY must be above ground (vertical knockback pushed them up)
-        Assert.True(afterHit.PY > gpy + 0.01f,
-            $"LMB hit should lift NPC off ground, PY={afterHit.PY:F4} ground={gpy:F4}");
+        Assert.True(afterLaunch.PY > gpy + 0.01f,
+            $"LMB hit should lift NPC off ground, PY={afterLaunch.PY:F4} ground={gpy:F4}");
 
         // Run 2 more ticks — character should stay airborne (KVY still positive, no ground snap)
         for (int i = 0; i < 2; i++)

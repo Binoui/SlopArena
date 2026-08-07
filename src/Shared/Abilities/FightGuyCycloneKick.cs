@@ -63,6 +63,7 @@ namespace SlopArena.Shared.Abilities
                     StunTicks = stunTicks,
                     DurationTicks = 2,
                     OwnerId = s.EntityId,
+                    FreezesOwner = true,
                 });
 
                 // 4 side hitboxes: front, back, left, right — covers the spin arc

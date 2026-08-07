@@ -2,17 +2,21 @@
   "Scenario": "Manki RMB Uncharged",
   "TickCount": 120,
   "PlayerSnap": {
+    "State": 4,
     "PY": 0.75,
-    "Cooldown1": 22,
+    "ComboStage": 1,
+    "AttackSlot": 2,
+    "ChargeTicks": 1,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "PY": 1.220856,
-    "PZ": 5.251081,
+    "PY": 1.2608573,
+    "PZ": 5.098948,
     "VY": -0.13333583,
+    "VZ": 2.2031188,
     "DamagePercent": 8,
-    "AirTimeTicks": 19,
+    "AirTimeTicks": 1,
     "JumpsLeft": 2
   },
   "PlayerFinal": {

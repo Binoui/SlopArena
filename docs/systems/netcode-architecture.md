@@ -134,7 +134,7 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(63) + hasInput(1) + InputState(19) = up to 95B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(97) + hasInput(1) + InputState(19) = up to 97B
          → tick = _serverTick (echoed back)
          → hasInput/InputState = the input the server consumed for that entity
            that tick, or the no-input marker (issue #80 — input relay)
@@ -173,18 +173,18 @@ Total: 31 bytes (8 + 4 + 19)
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(95) + hasInput(1) + InputState(19) = up to 127 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(97) + hasInput(1) + InputState(19) = up to 129 bytes
 
 [0..7]    entityId          (ulong)
 [8..11]   tick              (uint)       ← echoes client's tick number
-[12..106] CharacterStatePacket (95 bytes) — widened per D10/ADR-0011, see §4b table below
-[107]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
-[108..126] InputState       (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
+[12..108] CharacterStatePacket (97 bytes) — widened per D10/ADR-0011 + hitstop/ADR-0012, see §4b table below
+[109]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
+[110..128] InputState       (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
 ```
 
-**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 108 bytes, a relayed packet 127 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
+**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 110 bytes, a relayed packet 129 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
 
-**CharacterStatePacket layout (95 bytes):**
+**CharacterStatePacket layout (97 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
@@ -223,8 +223,9 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(95) + ha
 | 86-89  | float   | LastDirX            | Last input direction X (D10)       |
 | 90-93  | float   | LastDirZ            | Last input direction Z (D10)       |
 | 94     | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
+| 95-96  | ushort  | HitstopTicks        | Remaining hitstop freeze ticks (ADR-0012) |
 
-Total: 107 bytes base (8 + 4 + 95), up to 127 with the relay section (108 no-input marker / 127 relayed — issue #80, widened per D10/ADR-0011)
+Total: 109 bytes base (8 + 4 + 97), up to 129 with the relay section (110 no-input marker / 129 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

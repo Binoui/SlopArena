@@ -43,8 +43,9 @@ public class NilusKitRegressionTests : KitScenarioTests
     }
 
     /// <summary>
-    /// Stage 1 connects on tick 5. Tick 9 catches the dummy 4 ticks into its 12-tick hitstun,
-    /// so the snapshot carries the live knockback vector as well as the 3% damage.
+    /// Stage 1 connects on tick 5. Hitstop (ADR-0012) freezes the dummy 2 + 2·3 = 8 ticks,
+    /// so tick 9 is mid-freeze: the dummy is pinned at its spawn, 3% taken, launch queued —
+    /// the snapshot pins the frozen receiver rather than a flight vector.
     /// </summary>
     [Fact]
     public void LMB_Stage1_HitConfirm()
@@ -91,9 +92,12 @@ public class NilusKitRegressionTests : KitScenarioTests
     /// and its 3/5 ladder had no full-state snapshot at all — unlike Manki and FightGuy, which
     /// both carry an Air_LMB_Combo. The NpcAssert pins the ladder's total; measured, tick 24 is
     /// the frame where all three live facts coexist — the caster still Attacking on ComboStage 1
-    /// with stage 2's LungeForce of 4 on VZ, and the dummy 3 ticks into the 26-tick Launcher
-    /// hitstun at the full 8%. Tick 20 shows ComboStage 1 but the dummy's stage-1 hitstun has
-    /// already expired and stage 2 has not connected yet, so it pins the chain and nothing else.
+    /// with stage 2's LungeForce of 4 on VZ, and the dummy 4 ticks into a launch hitstun.
+    /// Hitstop (ADR-0012) froze both bodies on stage 1's connect (2 + 2·3 = 8 ticks), which
+    /// delayed the chain: at tick 24 the dummy carries only stage 1's 3% and stage 2's 5%
+    /// lands once the freeze chain clears. Tick 20 shows ComboStage 1 but the dummy's stage-1
+    /// lock has already expired and stage 2 has not connected yet, so it pins the chain and
+    /// nothing else.
     ///
     /// Both bodies start airborne at the same height: Collapse aside, Nilus' aerials cannot
     /// reach a grounded target from a 4 m hover, and a juggle tool is meant to be used on
@@ -174,9 +178,11 @@ public class NilusKitRegressionTests : KitScenarioTests
 
     /// <summary>
     /// The claw lands on tick 6 for 8% and 12 ticks of hitstun (pull_stun_ticks 20 is capped
-    /// by ApplyKnockback). Tick 10 is mid-hitstun: the inward knockback vector is still live
-    /// AND the dummy has already crossed from 6 m to 5.37 m. Tick 20 would miss the whole
-    /// knockback phase — hitstun is over by tick 18, leaving only the coasting tail.
+    /// by ApplyKnockback). Hitstop (ADR-0012) freezes BOTH bodies 2 + 2·8 = 18 ticks first:
+    /// tick 10 is mid-freeze — the dummy is still at 6 m with the yank queued (its KV lives
+    /// in KVX/KVY/KVZ, which EntitySnapshot does not carry). The NpcAssert at TotalTicks
+    /// still sees the drag: ~95 ticks of yank travel put the dummy well inside 5.5 m. Tick 20
+    /// would sit inside the freeze too; only the final state pins the pull.
     /// </summary>
     [Fact]
     public void R_NetherGrasp_PullsNpc()
@@ -203,7 +209,8 @@ public class NilusKitRegressionTests : KitScenarioTests
     /// runs long enough (340 ticks) for the whole zone to expire: 8 pulses at a 30-tick rehit
     /// interval x 3% = 24% total, which the NpcAssert pins. The snapshot sits on tick 111 —
     /// the third pulse — where Nilus is deliberately Idle and free to act while the dummy is in
-    /// rift hitstun. That idle caster IS the contract.
+    /// rift hitstop (ADR-0012: zone hits freeze the receiver only). That idle caster IS the
+    /// contract.
     ///
     /// It was tick 106 until Hitbox.IgnoresEntities landed. This dummy stands squarely on the
     /// seed's arc, so the seed used to clip it at flight tick 26 and burst the rift MID-AIR at
@@ -247,11 +254,13 @@ public class NilusKitRegressionTests : KitScenarioTests
     /// 131 (KitScenario.cs:111-129). The spec and docs quote 132; this field quotes 131.
     ///
     /// It is the one frame that shows the whole ult at once:
-    /// the dummy has been dragged from 5 m to 4.03 m by six drag pulses (18%), and the
-    /// detonation has just added 18% more for 36% total with the full 40-tick launch stun on
-    /// the state. (The launch vector itself lives in KVX/KVY/KVZ, which EntitySnapshot does
-    /// not carry; the settled NpcFinal — 13.7 m up, 18.8 m out — is what pins its magnitude.)
-    /// Anywhere inside the 72-tick telegraph pins an untouched dummy and a stationary caster.
+    /// the dummy has been dragged from 5 m by six drag pulses (18%), and the
+    /// detonation has just added 18% more for 36% total — with the dummy frozen in the
+    /// 24-tick blast hitstop (ADR-0012: 2 + 2·18 → cap 24, receiver-only). The 40-tick launch
+    /// stun lands at freeze expiry. (The launch vector itself lives in KVX/KVY/KVZ, which
+    /// EntitySnapshot does not carry; the settled NpcFinal — up and out — is what pins its
+    /// magnitude.) Anywhere inside the 72-tick telegraph pins an untouched dummy and a
+    /// stationary caster.
     /// </summary>
     [Fact]
     public void F_EventHorizon_DragsThenDetonates()

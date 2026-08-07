@@ -4,24 +4,24 @@
   "PlayerSnap": {
     "State": 4,
     "PY": 0.825,
-    "PZ": 0.4375,
+    "PZ": 0.375,
+    "VZ": 5,
     "AttackSlot": 1,
+    "HitstopTicks": 4,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "State": 2,
-    "PY": 0.76429194,
-    "PZ": 1.292614,
-    "VY": 0.15459566,
-    "VZ": 1.3273348,
+    "PY": 0.75,
+    "PZ": 1.2,
     "DamagePercent": 3,
-    "HitstunTicks": 12,
-    "JumpsLeft": 2
+    "HitstopTicks": 4,
+    "JumpsLeft": 2,
+    "IsGrounded": true
   },
   "PlayerFinal": {
     "PY": 0.825,
-    "PZ": 0.4375,
+    "PZ": 0.375,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

@@ -3,20 +3,19 @@
   "TickCount": 120,
   "PlayerSnap": {
     "State": 4,
-    "PY": 3.024998,
+    "PY": 3.9583313,
     "VY": -14,
     "ComboStage": 1,
     "AttackSlot": 2,
-    "AirTimeTicks": 12
+    "HitstopTicks": 18,
+    "AirTimeTicks": 8
   },
   "NpcSnap": {
-    "State": 2,
-    "PY": 3.1019964,
-    "PZ": 1.0426097,
-    "VY": -7.904166,
-    "VZ": 7.7766275,
+    "PY": 3.65,
+    "PZ": 0.5,
     "DamagePercent": 10,
-    "HitstunTicks": 26,
+    "HitstopTicks": 18,
+    "AirTimeTicks": 13,
     "JumpsLeft": 2
   },
   "PlayerFinal": {

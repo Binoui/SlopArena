@@ -83,6 +83,9 @@ public class SimulationInvariantTests
                 Assert.True(
                     state.HitstunTicks <= 60,
                     $"Tick {tick}, entity {eid}: HitstunTicks={state.HitstunTicks} > 60 (stuck)");
+                Assert.True(
+                    state.HitstopTicks <= 24,
+                    $"Tick {tick}, entity {eid}: HitstopTicks={state.HitstopTicks} > 24 (stuck)");
 
                 // ── Respawn integrity ──
 

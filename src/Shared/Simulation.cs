@@ -136,6 +136,66 @@ namespace SlopArena.Shared
             // Apply combat aim pitch from input (degrees * 100 → radians)
             s.AimPitch = input.AimPitch * 0.01f * (MathF.PI / 180f);
 
+            // ── Hitstop (ADR-0012): per-pair freeze. While frozen, capture the defender's
+            // Combo Influence input, decrement, and skip the state machine, timers, and physics.
+            // The launch queued at hit connect applies at freeze expiry.
+            if (s.HitstopTicks > 0)
+            {
+                s.DIX = input.MoveX;
+                s.DIY = input.MoveY;
+                s.HitstopTicks--;
+                if (s.HitstopTicks == 0)
+                {
+                    // Freeze expired — apply the queued launch, if any was queued.
+                    // All-zero queue = the hit never resolved in this sim (prediction tracks
+                    // don't run the attacker's ability instances) — skip rather than write a
+                    // bogus zero-KB launch; the next authoritative packet corrects.
+                    if (s.QueuedKVOverride)
+                    {
+                        // OnHitEntity rewrote the launch at connect (NetherGrasp yank):
+                        // restore the exact snapshot — KV was untouched during the freeze.
+                        s.KVX = s.QueuedKVX; s.KVY = s.QueuedKVY; s.KVZ = s.QueuedKVZ;
+                        float kvMag = MathF.Sqrt(
+                            (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
+                        if (s.QueuedKBStun > 0 && kvMag > 0.5f)
+                        {
+                            s.HitstunTicks = s.QueuedKBStun;
+                            s.State = ActionState.Hitstun;
+                        }
+                        else
+                        {
+                            s.State = ActionState.Idle;
+                        }
+                        if (s.KVY > 0f) s.IsGrounded = false;
+                        s.AirTimeTicks = 0;
+                        s.DashDurationTicks = 0;
+                        s.StateTicks = 0;
+                        s.WasAirborneDuringKnockback = !s.IsGrounded;
+                    }
+                    else if (s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f)
+                    {
+                        // Standard launch: recompute from the raw hitbox data. DamagePercent
+                        // is unchanged during the freeze (every rehit re-queues), so this
+                        // reproduces the connect-time launch exactly.
+                        ApplyKnockback(ref s, s.QueuedKBDirX, s.QueuedKBDirZ, s.QueuedKBAngle,
+                            s.QueuedKBBase, s.QueuedKBGrowth, s.QueuedKBStun);
+                        s.HitstunTicks = s.QueuedKBStun; // preserve ResolveHits' existing StunTicks override
+                    }
+                    else if (s.QueuedKBStun > 0)
+                    {
+                        // Zero-KB stun tool (CycloneKick): pre-hitstop behavior — wipe any
+                        // in-flight launch, apply the stun lock, return to Idle.
+                        s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
+                        s.HitstunTicks = s.QueuedKBStun;
+                        s.State = ActionState.Idle;
+                    }
+                    s.QueuedKVOverride = false;
+                    s.QueuedKVX = 0f; s.QueuedKVY = 0f; s.QueuedKVZ = 0f;
+                    s.QueuedKBDirX = 0f; s.QueuedKBDirZ = 0f; s.QueuedKBAngle = 0;
+                    s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBStun = 0;
+                }
+                return;
+            }
 
             // 2.5 JumpSquat: tick down, apply jump force on expiry
             if (s.State == ActionState.JumpSquat)

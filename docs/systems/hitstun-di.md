@@ -234,7 +234,7 @@ Hitstun has 3 animation tiers based on the damage of the attack that hits, provi
                                finalDamage < 15f ? (byte)1 : (byte)2;
    ```
 2. **Set once:** The level is set at hit time, not re-derived from `DamagePercent`. This prevents flicker if another hit lands during hitstun.
-3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 63). The client receives it every tick during hitstun.
+3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 97). The client receives it every tick during hitstun.
 4. **Client renderer:** `PlayerRenderer` maps `HitstunLevel` to a clip name (0→`hit_light`/HitSmall, 1→`hit_medium`/HitMedium, 2→`hit_hard`/HitHard) resolved through `CharacterAnimationConfig`, played via `_animancer.Play(clip)` with `Speed = GetAnimSpeedFromDuration(name, HitstunTicks)`
 5. **Server bone resolution:** Both bone-animation spots in `ServerSimulation` use the same switch to pick the clip name for hurtbox alignment.
 

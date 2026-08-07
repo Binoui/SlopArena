@@ -4,31 +4,36 @@
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "PZ": 3.507778,
+    "PZ": 1.9677778,
+    "VZ": 7,
     "AttackSlot": 6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "PY": 0.898234,
-    "PZ": 1.5879084,
-    "VY": 0.044541817,
+    "State": 2,
+    "PY": 0.8399825,
+    "PZ": 1.9473853,
+    "VY": 0.5029141,
+    "VZ": 2.0013027,
     "DamagePercent": 9,
-    "AirTimeTicks": 12,
+    "HitstunTicks": 11,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
+    "State": 4,
     "PY": 0.85,
-    "PZ": 3.507778,
-    "Cooldown5": 514,
+    "PZ": 3.1655557,
+    "AttackSlot": 6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 0.75,
-    "PZ": 1.5879084,
-    "DamagePercent": 9,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "PY": 0.9486528,
+    "PZ": 1.818371,
+    "VY": 0.05266763,
+    "DamagePercent": 12,
+    "AirTimeTicks": 15,
+    "JumpsLeft": 2
   }
 }

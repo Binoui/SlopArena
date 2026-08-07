@@ -15,15 +15,15 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
-    "PY": 0.85,
+    "PY": 1.8349999,
     "PZ": 0.35000005,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "VY": -2.7,
+    "AirTimeTicks": 44
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 4.5679674,
-    "VZ": 0.021413993,
+    "PZ": 4.4290986,
+    "VZ": 2.557286,
     "DamagePercent": 8,
     "JumpsLeft": 2,
     "IsGrounded": true

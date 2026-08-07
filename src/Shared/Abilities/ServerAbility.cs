@@ -186,6 +186,7 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,
+                FreezesOwner = true,
             });
         }
 

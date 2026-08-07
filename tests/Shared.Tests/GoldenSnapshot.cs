@@ -25,6 +25,7 @@ internal record EntitySnapshot
     public byte ComboStage { get; init; }
     public byte AttackSlot { get; init; }
     public ushort HitstunTicks { get; init; }
+    public ushort HitstopTicks { get; init; }
     public ushort AirTimeTicks { get; init; }
     public ushort ChargeTicks { get; init; }
     public ushort Cooldown0 { get; init; }
@@ -49,6 +50,7 @@ internal record EntitySnapshot
         ComboStage = s.ComboStage,
         AttackSlot = s.AttackSlot,
         HitstunTicks = s.HitstunTicks,
+        HitstopTicks = s.HitstopTicks,
         AirTimeTicks = s.AirTimeTicks,
         ChargeTicks = s.ChargeTicks,
         Cooldown0 = s.Cooldown0,

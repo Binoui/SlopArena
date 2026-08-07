@@ -64,10 +64,12 @@ namespace SlopArena.Shared
         public bool IsSprinting;
         public float LastDirX, LastDirZ;
         public bool WasAirborneDuringKnockback;
+        /// <summary>Remaining hitstop freeze ticks (ADR-0012).</summary>
+        public ushort HitstopTicks;
 
-        /// <summary>95 bytes — 63 base + 32 D10 movement-resource fields.</summary>
+        /// <summary>97 bytes — 63 base + 32 D10 movement-resource fields + 2 hitstop (ADR-0012).</summary>
         public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1 + 2 + 2 + 2 + 2 + 2 + 2 + 2
-            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2 + 1 + 4 + 4 + 1;
+            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2 + 1 + 4 + 4 + 1 + 2;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -115,6 +117,7 @@ namespace SlopArena.Shared
                 LastDirX = s.LastDirX,
                 LastDirZ = s.LastDirZ,
                 WasAirborneDuringKnockback = s.WasAirborneDuringKnockback,
+                HitstopTicks = s.HitstopTicks,
             };
         }
 
@@ -162,6 +165,7 @@ namespace SlopArena.Shared
                 LastDirX = LastDirX,
                 LastDirZ = LastDirZ,
                 WasAirborneDuringKnockback = WasAirborneDuringKnockback,
+                HitstopTicks = HitstopTicks,
             };
         }
 
@@ -211,6 +215,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(86, 4), BitConverter.SingleToInt32Bits(LastDirX));
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(90, 4), BitConverter.SingleToInt32Bits(LastDirZ));
             buffer[94] = WasAirborneDuringKnockback ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(95, 2), HitstopTicks);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -260,6 +265,7 @@ namespace SlopArena.Shared
             packet.LastDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(86, 4)));
             packet.LastDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(90, 4)));
             packet.WasAirborneDuringKnockback = buffer[94] != 0;
+            packet.HitstopTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(95, 2));
             return packet;
         }
 
@@ -303,6 +309,7 @@ namespace SlopArena.Shared
             s.IsSprinting = IsSprinting;
             s.LastDirX = LastDirX; s.LastDirZ = LastDirZ;
             s.WasAirborneDuringKnockback = WasAirborneDuringKnockback;
+            s.HitstopTicks = HitstopTicks;
         }
     }
 }

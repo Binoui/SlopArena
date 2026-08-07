@@ -174,6 +174,7 @@ public sealed class KistuDashSlash : ServerAbility
             StunTicks = evt.StunTicks,
             DurationTicks = durationTicks > 0 ? durationTicks : (ushort)1,
             OwnerId = s.EntityId,
+            FreezesOwner = true,
         });
     }
 }

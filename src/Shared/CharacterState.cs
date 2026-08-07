@@ -98,7 +98,19 @@ namespace SlopArena.Shared
         /// <summary>
         /// ── Hitstun + DI (Directional Influence) ──
         /// </summary>
-        public ushort HitstunTicks;     // frames frozen before knockback starts
+        /// <summary>Remaining no-input lock ticks after hitstun begins (ADR-0012 renamed the comment — hitstop is the freeze).</summary>
+        public ushort HitstunTicks;
+        /// <summary>Remaining hitstop freeze ticks (ADR-0012). While > 0 the entity is frozen: no state machine, no physics, no timer decrement, no ability ticking.</summary>
+        public ushort HitstopTicks;
+        /// <summary>Queued launch payload, set at hit connect (ResolveHits), applied at freeze expiry (SimulateTick gate). Server + local-sim only — NOT on the wire.</summary>
+        public float QueuedKBDirX, QueuedKBDirZ;
+        public sbyte QueuedKBAngle;
+        public float QueuedKBBase, QueuedKBGrowth;
+        public ushort QueuedKBStun;
+        /// <summary>True when the hit's OnHitEntity rewrote the launch at connect (e.g. NilusNetherGrasp's yank — the hitbox itself carries zero KB). The freeze-expiry gate then restores the QueuedKVX/Y/Z snapshot instead of recomputing from the raw params. Server + local-sim only — NOT on the wire.</summary>
+        public bool QueuedKVOverride;
+        /// <summary>Final knockback velocity snapshot taken after OnHitEntity (see QueuedKVOverride).</summary>
+        public float QueuedKVX, QueuedKVY, QueuedKVZ;
         /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard. Set at hit time.</summary>
         public byte HitstunLevel;
         /// <summary>

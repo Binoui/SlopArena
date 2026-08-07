@@ -60,6 +60,9 @@ namespace SlopArena.Shared
         /// <summary>If true, this hitbox can hit the entity that spawned it.</summary>
         public bool CanHitOwner;
 
+        /// <summary>If true, this hit freezes the owner too (melee contact). Projectiles, zones, and explosions leave false — the receiver freezes alone (ADR-0012).</summary>
+        public bool FreezesOwner;
+
         /// <summary>
         /// 0 = one-hit-then-die (default melee/projectile behaviour).
         /// &gt; 0 = lingering zone: tests collisions only when AgeTicks % RehitIntervalTicks == 0,

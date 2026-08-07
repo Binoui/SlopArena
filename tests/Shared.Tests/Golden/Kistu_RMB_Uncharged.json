@@ -4,37 +4,42 @@
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "PZ": 0.12906632,
-    "VZ": 0.18400684,
+    "PZ": 0.116114885,
+    "VZ": 0.46658385,
+    "ComboStage": 1,
+    "AttackSlot": 2,
+    "HitstopTicks": 15,
+    "ChargeTicks": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 1.5,
+    "DamagePercent": 8,
+    "HitstopTicks": 15,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 0.13746825,
+    "VZ": 0.0006922445,
     "ComboStage": 1,
     "AttackSlot": 2,
     "ChargeTicks": 1,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
-  "NpcSnap": {
-    "State": 2,
-    "PY": 0.8491362,
-    "PZ": 1.882178,
-    "VY": 1.8898858,
-    "VZ": 7.4154325,
-    "DamagePercent": 8,
-    "HitstunTicks": 19,
-    "JumpsLeft": 2
-  },
-  "PlayerFinal": {
-    "PY": 0.85,
-    "PZ": 0.13748746,
-    "Cooldown1": 45,
-    "JumpsLeft": 2,
-    "IsGrounded": true
-  },
   "NpcFinal": {
-    "PY": 1.3734955,
-    "PZ": 4.146035,
-    "VY": 0.5787512,
+    "State": 2,
+    "PY": 1.1998707,
+    "PZ": 3.5754683,
+    "VY": 0.6307253,
+    "VZ": 4.321329,
     "DamagePercent": 8,
-    "AirTimeTicks": 18,
+    "HitstunTicks": 1,
     "JumpsLeft": 2
   }
 }

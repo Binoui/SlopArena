@@ -50,6 +50,7 @@ public class CharacterStatePacketTests
             LastDirX = 1f,
             LastDirZ = 0f,
             WasAirborneDuringKnockback = true,
+            HitstopTicks = 17,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -101,15 +102,16 @@ public class CharacterStatePacketTests
         Assert.Equal(original.LastDirX, restored.LastDirX);
         Assert.Equal(original.LastDirZ, restored.LastDirZ);
         Assert.Equal(original.WasAirborneDuringKnockback, restored.WasAirborneDuringKnockback);
+        Assert.Equal(original.HitstopTicks, restored.HitstopTicks);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
         // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
-        // fields (AirTimeTicks..WasAirborneDuringKnockback) = 95. Lock the constant:
-        // a silent Size change would break every packet on the wire.
-        Assert.Equal(95, CharacterStatePacket.Size);
+        // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012) = 97.
+        // Lock the constant: a silent Size change would break every packet on the wire.
+        Assert.Equal(97, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
@@ -123,15 +125,18 @@ public class CharacterStatePacketTests
     [Fact]
     public void ApplyTo_OverwritesOnlyWireFields_PreservesRest()
     {
-        // Arrange: a CharacterState with a non-wire field set (AttackElapsedTicks is
-        // never on the wire — this proves ApplyTo doesn't zero it, unlike ToState()).
+        // Arrange: a CharacterState with non-wire fields set (AttackElapsedTicks and the
+        // hitstop queued-launch payload are never on the wire — this proves ApplyTo
+        // doesn't zero them, unlike ToState()).
         var target = new CharacterState
         {
             PX = 1f,
             AttackElapsedTicks = 500, // NOT carried by CharacterStatePacket — must survive
             AirTimeTicks = 999,       // IS carried — must be overwritten
+            QueuedKBDirX = 3.5f,      // NOT carried (queued launch payload, ADR-0012) — must survive
+            HitstopTicks = 0,         // IS carried — must be overwritten
         };
-        var packet = CharacterStatePacket.FromState(new CharacterState { PX = 42f, AirTimeTicks = 7 });
+        var packet = CharacterStatePacket.FromState(new CharacterState { PX = 42f, AirTimeTicks = 7, HitstopTicks = 9 });
 
         // Act
         packet.ApplyTo(ref target);
@@ -139,7 +144,9 @@ public class CharacterStatePacketTests
         // Assert
         Assert.Equal(42f, target.PX);       // wire field overwritten
         Assert.Equal((ushort)7, target.AirTimeTicks); // wire field overwritten
+        Assert.Equal((ushort)9, target.HitstopTicks); // wire field overwritten (ADR-0012)
         Assert.Equal((ushort)500, target.AttackElapsedTicks); // non-wire field preserved
+        Assert.Equal(3.5f, target.QueuedKBDirX);             // non-wire field preserved
     }
 
     [Fact]

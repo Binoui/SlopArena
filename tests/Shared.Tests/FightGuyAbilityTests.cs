@@ -226,8 +226,20 @@ public class FightGuyAbilityTests
 
         Assert.True(npcAfter.DamagePercent > 0,
             $"NPC should take damage from Tornado Kick, got {npcAfter.DamagePercent}");
-        Assert.True(npcAfter.HitstunTicks >= 40,
-            $"Expected HitstunTicks >= 40 (stun), got {npcAfter.HitstunTicks}");
+
+        // Hitstop (ADR-0012): every connecting hit freezes first; the 96-tick stun only
+        // starts once the freeze chain ends (the kick re-frozen the victim each contact).
+        // Find the first tick the stun lock is live — it must reach the full 96.
+        int stunTick = -1;
+        for (int i = 0; i < 120 && stunTick < 0; i++)
+        {
+            sim.Tick(new() { { 1, default }, { 100, default } });
+            var s = sim.GetState(100);
+            if (s.HitstopTicks == 0 && s.HitstunTicks > 0) stunTick = i;
+        }
+        Assert.True(stunTick >= 0, "the stun must eventually land after the freeze chain");
+        Assert.True(sim.GetState(100).HitstunTicks >= 40,
+            $"Expected HitstunTicks >= 40 (stun), got {sim.GetState(100).HitstunTicks}");
     }
 
     [Fact]
@@ -256,9 +268,20 @@ public class FightGuyAbilityTests
         var n1 = sim.GetState(100);
         var n2 = sim.GetState(101);
         Assert.True(n1.DamagePercent > 0, $"NPC1 should take damage, got {n1.DamagePercent}");
-        Assert.True(n1.HitstunTicks >= 20, $"NPC1 stun too short: {n1.HitstunTicks}");
         Assert.True(n2.DamagePercent > 0, $"NPC2 should take damage, got {n2.DamagePercent}");
-        Assert.True(n2.HitstunTicks >= 20, $"NPC2 stun too short: {n2.HitstunTicks}");
+
+        // Hitstop (ADR-0012): stun applies once each freeze chain ends — both victims
+        // must reach the full 96-tick lock.
+        int bothStunned = -1;
+        for (int i = 0; i < 120 && bothStunned < 0; i++)
+        {
+            sim.Tick(new() { { 1, default }, { 100, default }, { 101, default } });
+            var a = sim.GetState(100);
+            var b = sim.GetState(101);
+            if (a.HitstopTicks == 0 && a.HitstunTicks >= 20
+                && b.HitstopTicks == 0 && b.HitstunTicks >= 20) bothStunned = i;
+        }
+        Assert.True(bothStunned >= 0, "both NPCs must be stunned after their freeze chains");
     }
 
     // ── R (FightGuyDragonKick) ──
@@ -355,6 +378,19 @@ public class FightGuyAbilityTests
         for (int i = 0; i < 15; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
+        // Hitstop (ADR-0012): the connecting hit freezes BOTH fighter and victim for
+        // 2 + 2·5 = 12 ticks — the ability's attack-phase transition is paused with the
+        // fighter, then resumes when the freeze expires.
+        var mid = sim.GetState(1);
+        Assert.True(mid.HitstopTicks > 0, "fighter should be frozen at connect");
+        int transitionTick = -1;
+        for (int i = 0; i < 40 && transitionTick < 0; i++)
+        {
+            sim.Tick(new() { { 1, default }, { 100, default } });
+            if (sim.GetState(1).AnimIndex == 1) transitionTick = i;
+        }
+        Assert.True(transitionTick >= 0, "attack-phase transition must fire after the freeze");
+
         var after = sim.GetState(1);
         Assert.Equal((byte)1, after.AnimIndex);
         Assert.Equal(0f, after.VX);
@@ -449,8 +485,10 @@ public class FightGuyAbilityTests
         Assert.True(mid.DamagePercent >= 5,
             $"NPC should take at least loop damage (5), got {mid.DamagePercent}");
 
-        // Now in attack phase — tick through full combo (88 ticks) + margin
-        for (int i = 0; i < 95; i++)
+        // Now in attack phase — tick through full combo (88 ticks) + margin.
+        // Hitstop (ADR-0012) freezes both sides on every connecting hit, pausing the
+        // combo timers, so the ability outlives its nominal duration by the freeze time.
+        for (int i = 0; i < 160; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var ended = sim.GetState(1);

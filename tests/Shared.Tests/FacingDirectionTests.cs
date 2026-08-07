@@ -27,11 +27,18 @@ public class FacingDirectionTests
         for (int i = 0; i < 14; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
-        // Assert: hit connected, facing unchanged
+        // Assert: hit connected, facing unchanged (victim frozen — hitstop, ADR-0012)
         var afterHit = sim.GetState(100);
-        Assert.Equal(ActionState.Hitstun, afterHit.State);
-        Assert.True(afterHit.HitstunTicks > 0);
+        Assert.True(afterHit.HitstopTicks > 0, "victim should be frozen at connect");
         Assert.Equal(MathF.PI / 2f, afterHit.FacingYaw, 5); // unchanged
+
+        // Freeze expires → the launch lands → hitstun begins; facing still unchanged.
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+        var afterLaunch = sim.GetState(100);
+        Assert.Equal(ActionState.Hitstun, afterLaunch.State);
+        Assert.True(afterLaunch.HitstunTicks > 0);
+        Assert.Equal(MathF.PI / 2f, afterLaunch.FacingYaw, 5); // unchanged
     }
 
     [Fact]

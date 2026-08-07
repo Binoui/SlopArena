@@ -6,18 +6,17 @@
     "PY": 0.75,
     "PZ": 1.1244444,
     "AttackSlot": 1,
+    "HitstopTicks": 6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "State": 2,
-    "PY": 0.77760094,
-    "PZ": 1.6231378,
-    "VY": 0.34533882,
-    "VZ": 1.7648004,
+    "PY": 0.75,
+    "PZ": 1.5,
     "DamagePercent": 4,
-    "HitstunTicks": 28,
-    "JumpsLeft": 2
+    "HitstopTicks": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
   },
   "PlayerFinal": {
     "PY": 0.75,
