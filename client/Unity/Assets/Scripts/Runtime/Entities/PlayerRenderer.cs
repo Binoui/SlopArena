@@ -224,6 +224,11 @@ namespace SlopArena.Client.Entities
         private float _hitstunAnimStartTime;
         private float _hitstunAnimLength;
         private string _lastHitstunAnimName = "";
+        // ── Hitstop freeze tracking (ADR-0012) ──
+        // True while the current clip is paused at Speed 0 for a hitstop freeze;
+        // _hitstopPausedSpeed holds the pre-freeze speed for the resume frame.
+        private bool _hitstopPaused;
+        private float _hitstopPausedSpeed = 1f;
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
@@ -393,6 +398,28 @@ namespace SlopArena.Client.Entities
             _activeExtrapolator = null;
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;
+
+            // ── Hitstop (ADR-0012): freeze the animation in place — the pose holds at the
+            // impact frame for the freeze's duration. The server timeline pauses
+            // symmetrically (TickTimers, ability ticks), so the same paused clip resumes
+            // in sync when the freeze pops — no clip restart, no combo-extension artifact.
+            if (state.HitstopTicks > 0)
+            {
+                if (!_hitstopPaused && _animancer.States.Current is { } frozen)
+                {
+                    _hitstopPausedSpeed = frozen.Speed;
+                    _hitstopPaused = true;
+                }
+                if (_animancer.States.Current is { } fs)
+                    fs.Speed = 0f;
+                return; // nothing may change during the freeze
+            }
+            if (_hitstopPaused)
+            {
+                _hitstopPaused = false;
+                if (_animancer.States.Current is { } resumed)
+                    resumed.Speed = _hitstopPausedSpeed;
+            }
 
             float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
 
@@ -675,6 +702,7 @@ namespace SlopArena.Client.Entities
             _activeExtrapolator = null;
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;
+            _hitstopPaused = false;
             _wasAttacking = false;
             DisableAllTrails();
             foreach (var kvp in _activeTrails)
