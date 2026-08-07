@@ -48,7 +48,7 @@ _Avoid_: warp distance, lunge range, approach range
 The forward-facing angle (centered on FacingYaw) within which warp can target an enemy. Currently 120° (60° left/right). Enemies outside the cone are ignored for warp, preventing warp to targets behind the character.
 _Avoid_: warp angle, field of view, targeting cone
 **Knockback**:
-The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses linear deceleration for a fast initial snap that heavily slows down approaching max range. Profile table maps archetypes to angle/base/growth:
+The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses frontloaded exponential decay (λ = 1.8/s): the launch is fastest right after the hit and smoothly slows — most travel happens early, the victim drifts in the tail. Decaying all axes also flattens launch arcs. Profile table maps archetypes to angle/base/growth:
 - **Light**: 15°, base=2, growth=1.5 — combo glue, slight pop
 - **Medium**: 15°, base=8, growth=5 — knockdown, reset
 - **Launcher**: 25°, base=8, growth=4 — pop-up, stays on screen
@@ -56,6 +56,26 @@ The launch velocity applied when hitting a target. Combination of base push and 
 - **Spike**: -45°, base=12, growth=4 — downward, grounded bounce
 Any attack can also use a per-hit **Custom** profile with its own angle/base/growth overrides.
 _Avoid_: push force, hit reaction, knockback velocity
+
+**Hitstun**:
+The victim-side no-input lock after a hit. The victim cannot act (inputs buffer instead) until HitstunTicks expires; control returns with whatever residual speed remains — the lock is the stun, not the flight. Duration is the hitbox's StunTicks capped by the knockback-derived `clamp(8 + magnitude/2, 8, 60)`. Burst (below) is the explicit exception to the lock.
+_Avoid_: stun lock, flinch, hitstun lock
+
+**Hitstop**:
+The brief freeze of attacker and victim when a hit connects — per-pair, not global; the match clock keeps running. Knockback launches only when the freeze ends. The decision beat: the defender picks Combo Influence direction and whether to Burst while both are frozen.
+_Avoid_: hitlag (Melee connotation), freeze, hit pause
+
+**Duration Lock**:
+A fixed-tick state during which a character cannot act. Two kinds: the attacker's attack commitment (AnimLockTicks, from startup through recovery) and the victim's Hitstun. Burst's offensive use cancels the attacker's lock.
+_Avoid_: endlag, animation lock, commitment lock
+
+**Combo Influence**:
+The defender's launch-drift input — additive velocity applied to remaining horizontal knockback in the held direction, scaled to the launch magnitude. Captured during Hitstop + Hitstun, applied when the lock expires. Additive (Smash-4 vectoring model), not rotational (Smash DI) — 3D-native: push where you want to drift.
+_Avoid_: DI (Smash rotation connotation), vectoring (Smash 4), smash DI
+
+**Burst**:
+The universal escape/extender on one long per-entity cooldown that persists through KO. Defensive: breaks Hitstun + knockback, small push on the attacker, then a recovery window — punishable if baited. Offensive: cancels your own Duration Lock and spawns a fixed-knockback hitbox (zero damage scaling) to extend a string. Cooldown visible to both players.
+_Avoid_: trinket (WoW connotation), get-out-of-jail, escape tool
 
 **DashInvincibility**:
 The invincibility frames granted at dash start. The dashing entity cannot take damage or be hit for the full dash duration. Currently shared across all characters (`DashInvincibilityTicks = DashDurationTicks`). Creates the core dash mindgame: burn your dash to dodge an attack, or save it to avoid being baited.
