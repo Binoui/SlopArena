@@ -42,10 +42,10 @@ MonoBehaviour:
     Clip: {fileID: 1827226128182048838, guid: 834cc9d916c1ebe4bb99ee31684b235d, type: 3}
     Extrapolation: 0
   - Name: spell_rmb_loop
-    Clip: {fileID: 1827226128182048838, guid: 5aabb2b55b5f5e31f9135b76d8ace75f, type: 3}
+    Clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
     Extrapolation: 1
   - Name: spell_rmb_attack
-    Clip: {fileID: 1827226128182048838, guid: 5aabb2b55b5f5e31f9135b76d8ace75f, type: 3}
+    Clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
     Extrapolation: 0
   - Name: spell_air_rmb
     Clip: {fileID: 1827226128182048838, guid: 4ed380032ff8b3ca08279551dc70f183, type: 3}
