@@ -11,24 +11,25 @@
   },
   "NpcSnap": {
     "State": 2,
-    "PY": 0.77998894,
-    "PZ": 1.6326537,
-    "VY": 0.39983392,
-    "VZ": 1.9898071,
+    "PY": 0.77760094,
+    "PZ": 1.6231378,
+    "VY": 0.34533882,
+    "VZ": 1.7648004,
     "DamagePercent": 4,
     "HitstunTicks": 16,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
+    "PX": 0.8351119,
     "PY": 0.85,
-    "PZ": 3.764444,
+    "PZ": 3.0841513,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 5.3181,
-    "DamagePercent": 19,
+    "PZ": 2.6418433,
+    "DamagePercent": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
   }

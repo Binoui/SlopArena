@@ -11,10 +11,10 @@
   },
   "NpcSnap": {
     "State": 2,
-    "PY": 4.8879952,
-    "PZ": 2.124755,
-    "VY": 3.416184,
-    "VZ": 7.54048,
+    "PY": 4.855607,
+    "PZ": 1.9758304,
+    "VY": 3.1164763,
+    "VZ": 6.8914795,
     "DamagePercent": 8,
     "HitstunTicks": 23,
     "JumpsLeft": 2
@@ -26,11 +26,10 @@
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 2.6578774,
-    "PZ": 6.725613,
-    "VY": -18.350483,
+    "PY": 0.75,
+    "PZ": 4.1835175,
     "DamagePercent": 8,
-    "AirTimeTicks": 73,
-    "JumpsLeft": 2
+    "JumpsLeft": 2,
+    "IsGrounded": true
   }
 }

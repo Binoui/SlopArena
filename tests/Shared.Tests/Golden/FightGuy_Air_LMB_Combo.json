@@ -22,8 +22,8 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 6.4749703,
-    "VZ": 0.055926863,
+    "PZ": 4.5679674,
+    "VZ": 0.021413993,
     "DamagePercent": 8,
     "JumpsLeft": 2,
     "IsGrounded": true

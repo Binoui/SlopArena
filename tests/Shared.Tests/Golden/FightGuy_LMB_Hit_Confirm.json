@@ -11,10 +11,10 @@
   },
   "NpcSnap": {
     "State": 2,
-    "PY": 0.79165006,
-    "PZ": 1.6989806,
-    "VY": 0.33316725,
-    "VZ": 1.9898071,
+    "PY": 0.78695667,
+    "PZ": 1.6793823,
+    "VY": 0.25954634,
+    "VZ": 1.6620264,
     "DamagePercent": 4,
     "HitstunTicks": 14,
     "JumpsLeft": 2
@@ -27,7 +27,7 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 2.238159,
+    "PZ": 2.032071,
     "DamagePercent": 4,
     "JumpsLeft": 2,
     "IsGrounded": true

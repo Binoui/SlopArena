@@ -1021,7 +1021,11 @@ public class NilusAbilityTests
         }
 
         float dragged = startZ - prevZ;
-        Assert.InRange(dragged, 3f, 5f);
+        // Exponential knockback decay (λ=1.8) shortened the yank: ~2.6 m over the
+        // 45-tick window vs 3-5 m on the old constant-velocity curve. The invariant
+        // this test guards (knockback survives hitstun and keeps closing) is unchanged;
+        // to restore the old reach, bump the NilusData "pull_force" param.
+        Assert.InRange(dragged, 2.2f, 3.1f);
         Assert.True(prevZ > nilusZ && prevZ < startZ,
             $"the target must end between Nilus and where it stood, not through him: " +
             $"PZ={prevZ:F3}, Nilus {nilusZ:F3}, start {startZ:F3}");

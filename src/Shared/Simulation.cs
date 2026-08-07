@@ -32,19 +32,21 @@ namespace SlopArena.Shared
         /// </summary>
         private const float AirDrag = 0.2f;
         /// <summary>
-        /// Linear drag applied to knockback velocity each tick (units/s²).
-        /// Fixed deceleration instead of exponential decay — creates fast initial launch
-        /// velocity with heavy slowdown as the target approaches max distance (Smash/DKO feel).
-        /// Tune this constant to adjust global knockback travel distance.
+        /// Exponential knockback decay rate λ (per second). Applied every tick while
+        /// knockback velocity is alive: KV *= exp(-λ·dt). Frontloaded, DKO-style —
+        /// the launch is fastest right after the hit and smoothly slows, so most travel
+        /// happens early and the victim drifts in the tail. Decaying all axes also
+        /// flattens launch arcs (less vertical hang).
+        /// Velocity halves every ln(2)/λ seconds (~0.39 s at λ=1.8), so a kill-level
+        /// launch is roughly half speed by the end of a 22-tick hitstun.
+        /// Tune this constant to adjust global knockback travel distance/shape.
+        /// </summary>
+        private const float KnockbackDecayRate = 1.8f;
+        /// <summary>
+        /// Gravity applied to vertical knockback velocity each tick (units/s²).
+        /// Small so launches read as launches; the exponential decay does the braking.
         /// </summary>
         private const float KnockbackMinGravity = 2.0f;
-        /// <summary>
-        /// Linear drag applied to knockback velocity each tick (units/s²).
-        /// Fixed deceleration instead of exponential decay — creates fast initial launch
-        /// velocity with heavy slowdown as the target approaches max distance (Smash/DKO feel).
-        /// Tune this constant to adjust global knockback travel distance.
-        /// </summary>
-        private const float KnockbackDrag = 24f;
         private const byte MaxAirDodges = 1;
 
         /// <summary>
@@ -473,9 +475,13 @@ namespace SlopArena.Shared
         /// </summary>
         private static void ProcessHitstun(ref CharacterState s, InputState input)
         {
-            // Apply knockback force plus gravity toward velocity
-            s.VX = s.KVX;
-            s.VZ = s.KVZ;
+            // Exponential (frontloaded) decay: the launch is fastest right after the
+            // hit, then smoothly loses speed over the lock (DKO-style). Decays all
+            // axes, which also flattens launch arcs.
+            float decay = MathF.Exp(-KnockbackDecayRate * TickDt);
+            s.KVX *= decay;
+            s.KVY *= decay;
+            s.KVZ *= decay;
 
             // Apply gravity to KVY during hitstun so the target doesn't
             // coast upward at constant speed for the full duration.
@@ -484,7 +490,11 @@ namespace SlopArena.Shared
             // No clamp: downward KB (spikes) should accelerate downward.
             if (!s.IsGrounded)
                 s.KVY -= KnockbackMinGravity * TickDt;
+
+            // Apply knockback force plus gravity toward velocity
+            s.VX = s.KVX;
             s.VY = s.KVY;
+            s.VZ = s.KVZ;
 
             // Store current input for DI (applied when hitstun expires)
             s.DIX = input.MoveX;
@@ -579,12 +589,12 @@ namespace SlopArena.Shared
 
         private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
         {
-            // Linear drag: fixed deceleration per tick (not exponential decay)
-            // Fast initial launch → heavy slowdown approaching max range (Smash/DKO feel)
-            float drag = KnockbackDrag * TickDt;
-            s.KVX = s.KVX > 0 ? Math.Max(0, s.KVX - drag) : Math.Min(0, s.KVX + drag);
-            s.KVY = s.KVY > 0 ? Math.Max(0, s.KVY - drag) : Math.Min(0, s.KVY + drag);
-            s.KVZ = s.KVZ > 0 ? Math.Max(0, s.KVZ - drag) : Math.Min(0, s.KVZ + drag);
+            // Same exponential decay as ProcessHitstun — one continuous frontloaded
+            // curve whether the victim is in hitstun or drifting after it.
+            float decay = MathF.Exp(-KnockbackDecayRate * TickDt);
+            s.KVX *= decay;
+            s.KVY *= decay;
+            s.KVZ *= decay;
 
             // Apply to main velocity
             s.VX = s.KVX;

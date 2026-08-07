@@ -8,10 +8,9 @@
     "IsGrounded": true
   },
   "NpcSnap": {
-    "PY": 1.9960554,
-    "PZ": 9.0374565,
-    "VY": 0.84074754,
-    "VZ": 3.3265643,
+    "PY": 1.220856,
+    "PZ": 5.251081,
+    "VY": -0.13333583,
     "DamagePercent": 8,
     "AirTimeTicks": 19,
     "JumpsLeft": 2
@@ -23,7 +22,7 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 9.393566,
+    "PZ": 5.251081,
     "DamagePercent": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
