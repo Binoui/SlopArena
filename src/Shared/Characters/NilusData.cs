@@ -92,7 +92,7 @@ public static partial class CharacterRegistry
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.42f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.4f,
                                     Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 12, BaseKnockback = 1.5f, KnockbackGrowth = 1f },
-                                    StunTicks = 18, Interruptible = true } },
+                                    StunTicks = 24, Interruptible = true } },
                             AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     new() { DurationTicks = 38, ChainWindowTicks = 0, LungeForce = 7f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 9, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.5f,

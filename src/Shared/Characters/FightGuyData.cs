@@ -68,7 +68,7 @@ public static partial class CharacterRegistry
                     // Stage 1: fast right foot low kick
                     new() { DurationTicks = 40, ChainWindowTicks = 10, LungeForce = 10f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Radius = 0.9f, OffX = 0, OffY = 0.2f, OffZ = 1.0f,
-                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true } },
+                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 30, Interruptible = true } },
                             AttackRange = 4f, WarpRange = 6f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                     // Stage 2: right foot high kick

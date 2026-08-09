@@ -405,18 +405,31 @@ namespace SlopArena.Client.Entities
             // in sync when the freeze pops — no clip restart, no combo-extension artifact.
             if (state.HitstopTicks > 0)
             {
-                if (!_hitstopPaused && _animancer.States.Current is { } frozen)
+                if (!_hitstopPaused)
                 {
-                    _hitstopPausedSpeed = frozen.Speed;
+                    // DIAG: hitstop lifecycle — correlate with in-game hit reactions.
+                    Debug.Log($"[Hitstop] freeze START ent={_entityId} ticks={state.HitstopTicks} " +
+                        $"dmg={state.DamagePercent} prevDmg={_lastState.DamagePercent} " +
+                        $"clip={CurrentClipName()} level={state.HitstunLevel}");
                     _hitstopPaused = true;
+                    if (_animancer.States.Current is { } frozen)
+                    {
+                        _hitstopPausedSpeed = frozen.Speed;
+                        frozen.Speed = 0f;
+                    }
                 }
-                if (_animancer.States.Current is { } fs)
+                else if (_animancer.States.Current is { } fs)
+                {
                     fs.Speed = 0f;
+                }
                 return; // nothing may change during the freeze
             }
             if (_hitstopPaused)
             {
                 _hitstopPaused = false;
+                // DIAG: hitstop lifecycle — freeze popped, queued launch applied.
+                Debug.Log($"[Hitstop] freeze END ent={_entityId} hs={state.HitstunTicks} " +
+                    $"st={state.State} clip={CurrentClipName()}");
                 if (_animancer.States.Current is { } resumed)
                     resumed.Speed = _hitstopPausedSpeed;
             }
@@ -438,11 +451,17 @@ namespace SlopArena.Client.Entities
                     2 => "hit_hard",
                     _ => "hit_small"
                 };
-                // Re-hit detection: restart animation when HitstunTicks resets upward
-                // (new hit) or on first entry into hitstun.
+                // Re-hit detection: restart the clip on first entry into hitstun OR
+                // whenever HitstunTicks does not follow the natural 1-tick countdown.
+                // ResolveHits OVERWRITES HitstunTicks with the new hit's raw StunTicks,
+                // so a re-hit while the victim is mid-hitstun can send it DOWN (shorter-
+                // stun follow-up); the old ">= last" check missed those and the clip
+                // played only once per string.
                 _jumpArcActive = false;
-                bool newHit = _lastAnimState != ActionState.Hitstun
-                    || state.HitstunTicks >= _lastState.HitstunTicks;
+                bool naturalCountdown = _lastAnimState == ActionState.Hitstun
+                    && _lastState.HitstunTicks > 0
+                    && state.HitstunTicks == _lastState.HitstunTicks - 1;
+                bool newHit = !naturalCountdown;
                 if (newHit)
                 {
                     var clip = _charConfig.GetClipByName(hitName);
@@ -455,6 +474,12 @@ namespace SlopArena.Client.Entities
                         _inHitstunAnim = true;
                         _hitstunAnimStartTime = Time.time;
                         _hitstunAnimLength = clip.length / hsAnimSpeed;
+                        // DIAG: hitstun clip restart — which clip, why, and the
+                        // tick delta vs the previous applied state.
+                        Debug.Log($"[HitstunAnim] RESTART ent={_entityId} clip={hitName} " +
+                            $"ticks={state.HitstunTicks} prevTicks={_lastState.HitstunTicks} " +
+                            $"level={state.HitstunLevel} firstEntry={_lastAnimState != ActionState.Hitstun} " +
+                            $"speed={hsAnimSpeed:F2}");
                     }
                 }
                 _lastAnimState = ActionState.Hitstun;
@@ -753,6 +778,12 @@ namespace SlopArena.Client.Entities
             Vector3 top = capCenter + Vector3.up * halfH;
             Vector3 bot = capCenter - Vector3.up * halfH;
         }
+
+        /// <summary>DIAG: name of the currently playing clip, or "none".</summary>
+        private string CurrentClipName()
+            => _animancer?.States.Current?.Clip != null
+                ? _animancer.States.Current.Clip.name
+                : "none";
 
         private Transform FindBone(string name)
         {
