@@ -7,12 +7,10 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Guards the baked-arena pipeline (issue #77): every shipped .arena file must
-/// parse and carry real ground collision. The hardcoded ArenaRegistry arenas
-/// have Heightmap.Data == null (already documented in NilusAbilityTests), and
-/// Simulation then grounds entities at KillHeight + 1 — the "no floor" bug in
-/// the exe release, caused by the client silently falling back to them when the
-/// baked file was unreachable. These tests fail at bake/commit time instead of
-/// at the player's feet.
+/// parse and carry real ground collision, and the file-driven ArenaRegistry
+/// must serve them (no hardcoded fallback — Simulation grounded entities at
+/// KillHeight + 1 when a stage had no baked heightmap). These tests fail at
+/// bake/commit time instead of at the player's feet.
 /// </summary>
 public class ArenaShippingTests
 {
@@ -25,22 +23,10 @@ public class ArenaShippingTests
         return root;
     }
 
-    /// <summary>
-    /// Known-broken files awaiting re-bake from their Unity scenes: pit, cross,
-    /// split and sanctum are v1-format stubs (metadata only — no heightmap, no
-    /// triangles) exported before the v2/v3 collision format existed, so the
-    /// current loader cannot parse them. They are skipped explicitly so a fresh
-    /// unparseable arena is still caught, and a re-bake is validated the moment
-    /// it lands. Re-bake task: SlopArenaArenaBaker on each stage scene (Unity
-    /// editor — see TESTING-UNITY.md).
-    /// </summary>
-    private static readonly string[] StaleV1Stubs = { "pit.arena", "cross.arena", "split.arena", "sanctum.arena" };
-
     public static IEnumerable<object[]> ArenaFiles()
     {
         foreach (string file in Directory.GetFiles(Path.Combine(RepoRoot(), "data", "arenas"), "*.arena"))
-            if (!StaleV1Stubs.Contains(Path.GetFileName(file)))
-                yield return new object[] { Path.GetFileName(file) };
+            yield return new object[] { Path.GetFileName(file) };
     }
 
     [Theory]
@@ -69,9 +55,11 @@ public class ArenaShippingTests
     }
 
     [Fact]
-    public void Registry_UnknownName_ReturnsNull_NotAnotherArena()
+    public void Registry_AfterLoadFromDirectory_ServesBakedArenas()
     {
+        ArenaRegistry.LoadFromDirectory(Path.Combine(RepoRoot(), "data", "arenas"));
         Assert.Null(ArenaRegistry.Get("no-such-arena-xyz"));
         Assert.True(ArenaRegistry.Get("colosseum").HasValue);
+        Assert.True(ArenaRegistry.Get("training").HasValue);
     }
 }

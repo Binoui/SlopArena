@@ -18,9 +18,13 @@ using SlopArena.Shared;
 /// </summary>
 public class SlopArenaArenaBaker : EditorWindow
 {
+    /// <summary>When true, BakeArena skips modal dialogs (used by automated/CI bakes).</summary>
+    public static bool SuppressDialogs { get; set; }
+
     private GameObject _arenaRoot;
     private string _arenaName = "my_arena";
     private string _displayName = "My Arena";
+    private string _previewColor = "#1a1a1a";
     private float _killHeight = -10f;
     private float _minX = -25f;
     private float _maxX = 25f;
@@ -41,6 +45,7 @@ public class SlopArenaArenaBaker : EditorWindow
         EditorGUILayout.Space();
         _arenaName = EditorGUILayout.TextField("Arena Key (file name)", _arenaName);
         _displayName = EditorGUILayout.TextField("Display Name", _displayName);
+        _previewColor = EditorGUILayout.TextField("Preview Color", _previewColor);
 
         EditorGUILayout.Space();
         _killHeight = EditorGUILayout.FloatField("Kill Height (Y below = death)", _killHeight);
@@ -78,7 +83,7 @@ public class SlopArenaArenaBaker : EditorWindow
     {
         if (_arenaRoot == null)
         {
-            EditorUtility.DisplayDialog("Error", "Select an Arena Root GameObject.", "OK");
+            if (!SuppressDialogs) EditorUtility.DisplayDialog("Error", "Select an Arena Root GameObject.", "OK");
             return;
         }
 
@@ -309,7 +314,7 @@ public class SlopArenaArenaBaker : EditorWindow
         {
             Name = _arenaName,
             DisplayName = _displayName,
-            ScenePath = "Assets/Scenes/" + _arenaName + ".unity",
+            PreviewColor = _previewColor,
             KillHeight = _killHeight,
             Heightmap = heightmap,
             MinX = _minX,
@@ -335,15 +340,16 @@ public class SlopArenaArenaBaker : EditorWindow
             Debug.Log($"  Triangles: {tris.Count}  Spawns: {spawns.Count}  Heightmap: {gridW}x{gridH}");
             Debug.Log($"  Bounds: X[{_minX:F1}, {_maxX:F1}]  Z[{_minZ:F1}, {_maxZ:F1}]");
             Debug.Log($"  Output: {fullPath}");
-            EditorUtility.DisplayDialog("Success",
-                $"Baked {_arenaName}.arena\n" +
-                $"{tris.Count} triangles, {spawns.Count} spawns\n" +
-                $"→ {fullPath}", "OK");
+            if (!SuppressDialogs)
+                EditorUtility.DisplayDialog("Success",
+                    $"Baked {_arenaName}.arena\n" +
+                    $"{tris.Count} triangles, {spawns.Count} spawns\n" +
+                    $"→ {fullPath}", "OK");
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"[ArenaBaker] Failed to bake: {ex.Message}");
-            EditorUtility.DisplayDialog("Error", $"Bake failed: {ex.Message}", "OK");
+            if (!SuppressDialogs) EditorUtility.DisplayDialog("Error", $"Bake failed: {ex.Message}", "OK");
         }
 
         AssetDatabase.Refresh();

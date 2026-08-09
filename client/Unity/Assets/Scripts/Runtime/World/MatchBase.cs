@@ -54,10 +54,26 @@ namespace SlopArena.Client.World
         private void Start()
         {
             _pauseMenu = gameObject.AddComponent<MatchPauseMenu>();
-            _pauseMenu.Init(_cameraMount, _inputController);
+            _pauseMenu.Init(_cameraMount, _inputController, LeaveMatch);
             OnMatchStart();
         }
         private void FixedUpdate() => OnMatchFixedUpdate();
+
+        // ── Leave match (pause menu) ─────────────────────────────────────────
+
+        /// <summary>
+        /// Pause-menu "LEAVE MATCH": return to the stage select screen. PvPMatch
+        /// overrides this to tear down its SignalR lobby connection first; the UDP
+        /// NetworkClient cleans itself up on scene unload.
+        /// </summary>
+        protected virtual void LeaveMatch()
+        {
+            // StageSelect needs a usable mode without a lobby — reset to the
+            // offline picker so leaving an online match doesn't strand the player
+            // on a dead PvP waiting screen.
+            MatchConfig.Mode = GameMode.Training;
+            UnityEngine.SceneManagement.SceneManager.LoadScene("StageSelect");
+        }
 
         // ── Shared setup helpers ────────────────────────────────────────────
 
@@ -91,6 +107,24 @@ namespace SlopArena.Client.World
             if (brain != null)
                 brain.DefaultBlend = new CinemachineBlendDefinition(
                     CinemachineBlendDefinition.Styles.EaseInOut, 0.2f);
+        }
+
+        /// <summary>
+        /// Instantiate the stage's visual prefab (Resources/Stages/&lt;arena.Name&gt;.prefab)
+        /// under a "Stage" root. Collision comes from the baked .arena; the visual is cosmetic.
+        /// </summary>
+        protected void SpawnStageVisual(ArenaDefinition arena)
+        {
+            var prefab = Resources.Load<GameObject>($"Stages/{arena.Name}");
+            if (prefab == null)
+            {
+                Debug.LogWarning($"[{GetType().Name}] No stage visual '{arena.Name}' (missing Resources/Stages/{arena.Name}.prefab) — running collision-only.");
+                return;
+            }
+            var stageRoot = new GameObject("Stage");
+            var visual = Instantiate(prefab, stageRoot.transform);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
         }
 
         protected void SetupHUD(CharacterDefinition def)

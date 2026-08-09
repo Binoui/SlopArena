@@ -30,7 +30,7 @@ namespace SlopArena.Client.World
         [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
  
         [Header("Arena")]
-        [SerializeField] private string _arenaNameOverride = "colosseum";
+        [SerializeField] private string _arenaNameOverride = "";
 
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
@@ -72,6 +72,7 @@ namespace SlopArena.Client.World
             // Wire sim debug logging to Unity console
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
+            SpawnStageVisual(arena);
 
             // Bridge (local). NoWinMatchRule: training never eliminates or ends —
             // the only way out is the Esc exit below (issue #37 follow-up).

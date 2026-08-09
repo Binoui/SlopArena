@@ -37,6 +37,29 @@ namespace SlopArena.Client.World
         private RollbackSimulationBridge _bridge = null!;
         protected override ISimulationBridge Bridge => _bridge;
 
+        protected override void LeaveMatch()
+        {
+            // Drop the SignalR lobby so the master server frees this player's
+            // slot; the UDP NetworkClient shuts itself down on scene unload
+            // (OnDestroy). Best-effort: the connection may already be dead.
+            var lobby = SlopArena.Client.ClientSession.ActiveLobby;
+            if (lobby != null)
+            {
+                SlopArena.Client.ClientSession.ActiveLobby = null;
+                try
+                {
+                    _ = lobby.LeaveLobbyAsync(); // best-effort, fire-and-forget
+                }
+                catch (Exception ex)
+                {
+                    // Dead/half-open connections can throw synchronously — never
+                    // block the scene redirect on a best-effort disconnect.
+                    Debug.LogWarning($"[PvPMatch] LeaveLobbyAsync failed (ignored): {ex.Message}");
+                }
+            }
+            base.LeaveMatch();
+        }
+
         protected override void OnMatchStart()
         {
             Debug.Log($"[{GetType().Name}] Starting match: mode={MatchConfig.Mode} char={MatchConfig.PlayerClass} arena={MatchConfig.ArenaName}");
@@ -64,6 +87,7 @@ namespace SlopArena.Client.World
             _networkClient.EntityId = PlayerEntityId;
             _bridge = new RollbackSimulationBridge(arena, _networkClient, PlayerEntityId);
             _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
+            SpawnStageVisual(arena);
 
             // Character definitions
             var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);

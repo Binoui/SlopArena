@@ -19,9 +19,10 @@ namespace SlopArena.Client.UI
     /// which launches the game server and broadcasts <c>MatchStarted</c>; every
     /// client then loads Arena_PvP via <see cref="ClientSession.ApplyMatchStarted"/>.</item>
     /// </list>
-    /// Only arenas with a valid baked .arena file are offered (issue #77):
-    /// stale or hardcoded arenas carry no collision data and players fall
-    /// through the floor.
+    /// The registry is file-driven (loaded from the arena directory on enable);
+    /// a stage is offered iff its baked .arena parses with real collision AND a
+    /// visual prefab exists at Resources/Stages/&lt;name&gt;.prefab (issue #77:
+    /// hardcoded arenas carried no collision data and players fell through).
     /// </summary>
     public class StageSelectController : MonoBehaviour
     {
@@ -52,16 +53,23 @@ namespace SlopArena.Client.UI
             _btnConfirm.style.display = DisplayStyle.None;
             lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
 
-            // Build stage cards from ArenaRegistry — only arenas that have a
-            // valid baked .arena file on disk (issue #77).
+            // File-driven registry: load the baked arenas from disk (issue #77 —
+            // the old hardcoded ArenaRegistry list carried no collision data).
+            string? arenaDir = BakedContentPaths.ArenaDirectory();
+            if (arenaDir != null) ArenaRegistry.LoadFromDirectory(arenaDir);
+
+            // Build stage cards from the loaded registry — a stage is offered iff
+            // its baked .arena parses with real collision AND a visual prefab exists
+            // (Resources/Stages/<name>.prefab); otherwise the player would fall
+            // through the floor or fight an invisible stage.
             foreach (var arena in ArenaRegistry.All)
             {
                 string? baked = BakedContentPaths.ResolveArena(arena.Name);
-                if (baked == null || ArenaBinaryFormat.LoadFromFile(baked) == null)
-                {
-                    Debug.Log($"[StageSelect] Skipping '{arena.Name}' — no valid baked arena.");
-                    continue;
-                }
+                if (baked == null) continue;
+                var arenaOpt = ArenaBinaryFormat.LoadFromFile(baked);
+                if (arenaOpt is not ArenaDefinition arenaDef) continue;
+                if (arenaDef.CollisionTriangles == null || arenaDef.CollisionTriangles.Length == 0) continue;
+                if (Resources.Load<GameObject>($"Stages/{arena.Name}") == null) continue;
 
                 string capturedName = arena.Name;
                 var card = new Button(() => SelectStage(capturedName, root))

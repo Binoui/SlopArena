@@ -9,26 +9,29 @@ namespace SlopArena.Client.UI
 {
     /// <summary>
     /// In-match pause menu (issue #77): Esc toggles a small centered panel with
-    /// Resume and Quit Game. While paused the simulation is frozen (Time.timeScale
-    /// stops FixedUpdate, and the sim ticks only there), the cursor is released,
-    /// and camera mouse input is suppressed via CameraMount.FreeCursor. Shared by
-    /// TrainingMatch and PvPMatch through MatchBase. The panel is built into the
-    /// match scene's existing UIDocument at runtime — no scene or asset edits.
+    /// Resume, Leave Match (back to stage select) and Quit Game. While paused the
+    /// simulation is frozen (Time.timeScale stops FixedUpdate, and the sim ticks
+    /// only there), the cursor is released, and camera mouse input is suppressed
+    /// via CameraMount.FreeCursor. Shared by TrainingMatch and PvPMatch through
+    /// MatchBase. The panel is built into the match scene's existing UIDocument at
+    /// runtime — no scene or asset edits.
     /// </summary>
     public class MatchPauseMenu : MonoBehaviour
     {
         private bool _paused;
         private CameraMount? _cameraMount;
         private InputController? _inputController;
+        private Action? _onLeaveMatch;
         private VisualElement? _panel;
 
         /// <summary>True while the pause menu is open (gameplay frozen).</summary>
         public bool IsPaused => _paused;
 
-        public void Init(CameraMount? cameraMount, InputController? inputController)
+        public void Init(CameraMount? cameraMount, InputController? inputController, Action? onLeaveMatch = null)
         {
             _cameraMount = cameraMount;
             _inputController = inputController;
+            _onLeaveMatch = onLeaveMatch;
             var doc = FindFirstObjectByType<UIDocument>();
             if (doc == null)
             {
@@ -104,6 +107,7 @@ namespace SlopArena.Client.UI
             box.Add(title);
 
             box.Add(MakeButton("RESUME", () => SetPaused(false)));
+            box.Add(MakeButton("LEAVE MATCH", LeaveMatch));
             box.Add(MakeButton("QUIT GAME", QuitGame));
 
             _panel.Add(box);
@@ -119,6 +123,13 @@ namespace SlopArena.Client.UI
             btn.style.fontSize = 20;
             btn.style.marginBottom = 10;
             return btn;
+        }
+
+        private void LeaveMatch()
+        {
+            Debug.Log("[PauseMenu] Leave match.");
+            SetPaused(false); // restore timeScale + cursor before the scene load
+            _onLeaveMatch?.Invoke();
         }
 
         private void QuitGame()

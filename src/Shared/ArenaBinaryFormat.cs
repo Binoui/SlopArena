@@ -13,7 +13,7 @@ namespace SlopArena.Shared
     ///   Version: uint32 (1, 2, or 3)
     ///   Name:        uint32 len + UTF8 bytes
     ///   DisplayName: uint32 len + UTF8 bytes
-    ///   ScenePath:   uint32 len + UTF8 bytes
+    ///   PreviewColor: uint32 len + UTF8 bytes
     ///   KillHeight:  float32
     ///   MinX, MaxX, MinZ, MaxZ: 4 × float32
     ///   SpawnCount: uint32
@@ -27,12 +27,13 @@ namespace SlopArena.Shared
     ///   1 = Initial format: platforms, spawns, bounds. No triangle collision.
     ///   2 = Added CollisionTriangle[] after spawn data.
     ///   3 = Removed FloorHeight + PlatformDef[]; added Heightmap after spawn data.
+    ///   4 = PreviewColor replaces ScenePath (ScenePath was written but never read).
     /// </summary>
 
     public static class ArenaBinaryFormat
     {
         private const uint Magic = 0x4E455241; // "AREN"
-        private const uint Version = 3;
+        private const uint Version = 4;
 
         /// <summary>
         /// Serialize an ArenaDefinition to a byte array.
@@ -43,7 +44,7 @@ namespace SlopArena.Shared
             int size = 4 + 4; // magic + version
             size += 4 + Encoding.UTF8.GetByteCount(arena.Name ?? "");
             size += 4 + Encoding.UTF8.GetByteCount(arena.DisplayName ?? "");
-            size += 4 + Encoding.UTF8.GetByteCount(arena.ScenePath ?? "");
+            size += 4 + Encoding.UTF8.GetByteCount(arena.PreviewColor ?? "");
 
             size += 4; // KillHeight (float)
 
@@ -78,8 +79,8 @@ namespace SlopArena.Shared
             // DisplayName
             WriteString(buffer, ref pos, arena.DisplayName ?? "");
 
-            // ScenePath
-            WriteString(buffer, ref pos, arena.ScenePath ?? "");
+            // PreviewColor
+            WriteString(buffer, ref pos, arena.PreviewColor ?? "");
 
             // KillHeight
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillHeight)); pos += 4;
@@ -158,9 +159,16 @@ namespace SlopArena.Shared
             arena.DisplayName = ReadString(data, ref pos)!;
             if (arena.DisplayName == null) return null;
 
-            // ScenePath
-            arena.ScenePath = ReadString(data, ref pos)!;
-            if (arena.ScenePath == null) return null;
+            // PreviewColor (v4+); v3 wrote ScenePath here — read and discard it.
+            if (version >= 4)
+            {
+                arena.PreviewColor = ReadString(data, ref pos) ?? "";
+            }
+            else
+            {
+                if (ReadString(data, ref pos) == null) return null; // truncated v3 file
+                arena.PreviewColor = "";
+            }
 
             // KillHeight
             if (pos + 4 > data.Length) return null;

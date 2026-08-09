@@ -31,13 +31,7 @@ namespace SlopArena.Client.Editor
             if (lightGO.GetComponent<UniversalAdditionalLightData>() == null)
                 lightGO.AddComponent<UniversalAdditionalLightData>();
 
-            // ── 2. Floor ──
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            floor.name = "Floor";
-            floor.transform.position = new Vector3(0, -0.25f, 0);
-            floor.transform.localScale = new Vector3(50, 0.5f, 50);
-
-            // ── 3. CameraMount ──
+            // ── 2. CameraMount ──
             var camMountGO = new GameObject("CameraMount");
             var cmCam = camMountGO.AddComponent<CinemachineCamera>();
             var orbital = camMountGO.AddComponent<CinemachineOrbitalFollow>();

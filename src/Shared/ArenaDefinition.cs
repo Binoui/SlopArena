@@ -137,10 +137,6 @@ namespace SlopArena.Shared
         /// <summary>Hex color string for stage select card placeholder e.g. "#2a4a2a"</summary>
         public string PreviewColor;
         /// <summary>
-        /// res://assets/arenas/xxx.tscn
-        /// </summary>
-        public string ScenePath;
-        /// <summary>
         /// Y below this = BLAST ZONE (instant elimination)
         /// </summary>
         public float KillHeight;
@@ -312,22 +308,15 @@ namespace SlopArena.Shared
 
     public static class ArenaRegistry
     {
-        private static ArenaDefinition[] _hardcoded = null!;
-        private static bool _initialized = false;
+        private static ArenaDefinition[] _loaded = System.Array.Empty<ArenaDefinition>();
 
-        public static ArenaDefinition[] All
-        {
-            get
-            {
-                EnsureInitialized();
-                return _hardcoded;
-            }
-        }
+        public static ArenaDefinition[] All => _loaded;
 
         /// <summary>
-        /// Try to load arena definitions from .arena files in a directory.
-        /// Falls back to hardcoded data if no files found or on error.
-        /// Call once at startup, e.g.: ArenaRegistry.LoadFromDirectory("data/arenas");
+        /// Load arena definitions from .arena files in a directory, replacing the
+        /// current list. A missing/empty directory or a directory with no parseable
+        /// files leaves the list empty — callers fail loud, there is no hardcoded
+        /// fallback. Call once at startup, e.g.: ArenaRegistry.LoadFromDirectory("data/arenas");
         /// </summary>
         public static void LoadFromDirectory(string directoryPath)
         {
@@ -335,16 +324,16 @@ namespace SlopArena.Shared
             {
                 if (!System.IO.Directory.Exists(directoryPath))
                 {
-                    Console.WriteLine($"[ArenaRegistry] Directory not found: {directoryPath} — using hardcoded arenas");
-                    EnsureInitialized();
+                    Console.WriteLine($"[ArenaRegistry] Directory not found: {directoryPath} — no arenas loaded");
+                    _loaded = System.Array.Empty<ArenaDefinition>();
                     return;
                 }
 
                 var files = System.IO.Directory.GetFiles(directoryPath, "*.arena");
                 if (files.Length == 0)
                 {
-                    Console.WriteLine($"[ArenaRegistry] No .arena files in {directoryPath} — using hardcoded arenas");
-                    EnsureInitialized();
+                    Console.WriteLine($"[ArenaRegistry] No .arena files in {directoryPath} — no arenas loaded");
+                    _loaded = System.Array.Empty<ArenaDefinition>();
                     return;
                 }
 
@@ -365,174 +354,24 @@ namespace SlopArena.Shared
                     }
                 }
 
-                if (loaded.Count > 0)
-                {
-                    _hardcoded = loaded.ToArray();
-                    _initialized = true;
-                    Console.WriteLine($"[ArenaRegistry] Loaded {loaded.Count} arenas from {directoryPath}");
-                    return;
-                }
+                _loaded = loaded.ToArray();
+                Console.WriteLine($"[ArenaRegistry] Loaded {loaded.Count} arenas from {directoryPath}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[ArenaRegistry] Error loading from {directoryPath}: {ex.Message}");
             }
-
-            // Fallback
-            EnsureInitialized();
         }
 
         /// <summary>
         /// Look up an arena by name. Returns null when the name is unknown —
-        /// callers must NOT silently substitute another arena (issue #77: the
-        /// old fallback to _hardcoded[0] made e.g. "island" silently become
-        /// "pit", and hardcoded arenas carry no baked collision data).
+        /// callers must NOT silently substitute another arena (issue #77).
         /// </summary>
         public static ArenaDefinition? Get(string name)
         {
-            EnsureInitialized();
-            foreach (var a in _hardcoded)
+            foreach (var a in _loaded)
                 if (a.Name == name) return a;
             return null;
-        }
-
-        private static void EnsureInitialized()
-        {
-            if (_initialized) return;
-            var arenas = BuildAll();
-            for (int i = 0; i < arenas.Length; i++)
-            {
-                arenas[i].SpatialGrid = ArenaCollision.BuildSpatialGrid(in arenas[i]);
-            }
-            _hardcoded = arenas;
-            _initialized = true;
-        }
-
-        private static ArenaDefinition[] BuildAll()
-        {
-            return new[]
-            {
-                // The Pit: Large stage → deeper blast zone for longer matches
-                // CSGBox3D floor at position (40, -1, 40) with size (80, 2, 80)
-                // Surface Y = -1 + 1 = 0
-                new ArenaDefinition
-                {
-                    Name = "pit",
-                    DisplayName = "The Pit",
-                    PreviewColor = "#1a2e1a",
-                    ScenePath = "res://assets/arenas/arena_pit.tscn",
-                    KillHeight = -15f,  // Deep blast zone (80x80 large stage)
-                    MinX = 0f, MaxX = 80f,
-                    MinZ = 0f, MaxZ = 80f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = 10f, Y = 0.5f, Z = 10f, Yaw = 0f },
-                        new SpawnPoint { X = 70f, Y = 0.5f, Z = 10f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 10f, Y = 0.5f, Z = 70f, Yaw = 0f },
-                        new SpawnPoint { X = 70f, Y = 0.5f, Z = 70f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 40f, Y = 0.5f, Z = 15f, Yaw = 0f },
-                        new SpawnPoint { X = 40f, Y = 0.5f, Z = 65f, Yaw = MathF.PI },
-                    }
-                },
-                // Crossroads: Medium stage → balanced blast zone
-                // CSGBox3D floors at position Y=-1 with size (..., 2, ...)
-                // All surface Y = 0 (cross shape: center + 4 arms)
-                new ArenaDefinition
-                {
-                    Name = "cross",
-                    DisplayName = "Crossroads",
-                    PreviewColor = "#1a2a3e",
-                    ScenePath = "res://assets/arenas/arena_cross.tscn",
-                    KillHeight = -10f,  // Medium blast zone (60x60 balanced stage)
-                    MinX = 0f, MaxX = 60f,
-                    MinZ = 0f, MaxZ = 60f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = 30f, Y = 0.5f, Z = 5f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 30f, Y = 0.5f, Z = 55f, Yaw = 0f },
-                        new SpawnPoint { X = 5f, Y = 0.5f, Z = 30f, Yaw = MathF.PI / 2f },
-                        new SpawnPoint { X = 55f, Y = 0.5f, Z = 30f, Yaw = -MathF.PI / 2f },
-                        new SpawnPoint { X = 30f, Y = 0.5f, Z = 30f, Yaw = 0f },
-                        new SpawnPoint { X = 22f, Y = 0.5f, Z = 22f, Yaw = 0f },
-                    }
-                },
-                // The Split: Small competitive stage → shallow blast zone for fast KOs
-                // Floor: 4 lower quadrants at Y=0
-                // UpperCenter platform at Y=3, ramps at Y=1
-                new ArenaDefinition
-                {
-                    Name = "split",
-                    DisplayName = "The Split",
-                    PreviewColor = "#2e1a1a",
-                    ScenePath = "res://assets/arenas/arena_split.tscn",
-                    KillHeight = -6f,   // Shallow blast zone (60x60 small competitive stage)
-                    MinX = 0f, MaxX = 60f,
-                    MinZ = 0f, MaxZ = 60f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = 15f, Y = 1.5f, Z = 15f, Yaw = 0f },
-                        new SpawnPoint { X = 45f, Y = 1.5f, Z = 15f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 15f, Y = 1.5f, Z = 45f, Yaw = 0f },
-                        new SpawnPoint { X = 45f, Y = 1.5f, Z = 45f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 30f, Y = 3.5f, Z = 30f, Yaw = 0f },
-                        new SpawnPoint { X = 22f, Y = 1.5f, Z = 30f, Yaw = 0f },
-                    }
-                },
-                // Training Room: Flat floor, no platforms, single spawn at center
-                new ArenaDefinition
-                {
-                    Name = "training",
-                    DisplayName = "Training Room",
-                    PreviewColor = "#1a1a1a",
-                    KillHeight = -15f,
-                    MinX = -25f, MaxX = 25f,
-                    MinZ = -25f, MaxZ = 25f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = 0f, Y = 5f, Z = 0f, Yaw = 0f },
-                        new SpawnPoint { X = 10f, Y = 0f, Z = 0f, Yaw = MathF.PI },
-                    }
-                },
-                // Colosseum: Flat DKO-style arena with pillars for cover
-                // Circular/octagonal floor ~22m diameter with pillar ring
-                new ArenaDefinition
-                {
-                    Name = "colosseum",
-                    DisplayName = "Colosseum",
-                    PreviewColor = "#3a2a1a",
-                    KillHeight = -10f,
-                    MinX = -15f, MaxX = 15f,
-                    MinZ = -15f, MaxZ = 15f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = -6f, Y = 0.5f, Z = 0f, Yaw = 0f },
-                        new SpawnPoint { X = 6f, Y = 0.5f, Z = 0f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 0f, Y = 0.5f, Z = -6f, Yaw = MathF.PI / 2f },
-                        new SpawnPoint { X = 0f, Y = 0.5f, Z = 6f, Yaw = -MathF.PI / 2f },
-                    }
-                },
-                // Sanctum: Large multi-level arena
-                // Floor at Y=0, CentralPlatform at Y=5, Galleries at Y=8, CenterPiece at Y=6
-                new ArenaDefinition
-                {
-                    Name = "sanctum",
-                    DisplayName = "Sanctum",
-                    PreviewColor = "#2a1a2e",
-                    ScenePath = "res://assets/arenas/arena_sanctum.tscn",
-                    KillHeight = -20f,
-                    MinX = 0f, MaxX = 200f,
-                    MinZ = 0f, MaxZ = 200f,
-                    SpawnPoints = new[]
-                    {
-                        new SpawnPoint { X = 100f, Y = 1.5f, Z = 50f, Yaw = MathF.PI },
-                        new SpawnPoint { X = 100f, Y = 1.5f, Z = 150f, Yaw = 0f },
-                        new SpawnPoint { X = 50f, Y = 1.5f, Z = 100f, Yaw = MathF.PI / 2f },
-                        new SpawnPoint { X = 150f, Y = 1.5f, Z = 100f, Yaw = -MathF.PI / 2f },
-                        new SpawnPoint { X = 100f, Y = 6.5f, Z = 100f, Yaw = 0f },
-                        new SpawnPoint { X = 100f, Y = 9.5f, Z = 100f, Yaw = 0f },
-                    }
-                },
-            };
         }
     }
 }
