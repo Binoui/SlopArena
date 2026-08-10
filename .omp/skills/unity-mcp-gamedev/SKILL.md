@@ -177,12 +177,22 @@ Shared/ uses these namespaces that collide with Unity types:
 
 ## C# Recompilation
 
-**`assets-refresh` does NOT trigger C# script recompilation.** It only reimports non-script assets (textures, models, etc.).
+**`script-execute` is NOT a compile gate.** It compiles the injected snippet against the
+*currently loaded* assemblies — if the project's scripts changed on disk but Unity hasn't
+recompiled, the editor keeps running stale assemblies and `script-execute` succeeds even when
+the new scripts would fail to compile (shipped a CS1503 in #116 this way).
 
-To force script recompilation:
 1. The real C# files are in `client/Unity/Assets/Scripts/Shared/`. `src/Shared/` contains symlinks. Writing through `src/Shared/` paths follows the symlink to the real file in Unity Assets.
 2. After the file changes on disk, Unity's file watcher should detect it automatically (when not in play mode).
-3. If it doesn't, use `script-execute` to call `UnityEditor.AssetDatabase.Refresh()` from inside Unity.
+3. To force a REAL project recompile and check the result:
+   ```
+   scripts/mcp-exec.sh 'using UnityEditor.Compilation; public class Script { public static string Main() { CompilationPipeline.RequestScriptCompilation(); return "requested"; } }'
+   sleep 20   # domain reload + compile
+   scripts/mcp-exec.sh 'using UnityEditor; public class Script { public static string Main() { return EditorUtility.scriptCompilationFailed ? "COMPILE-FAILED" : "COMPILE-OK"; } }'
+   scripts/mcp-call.sh console-get-logs '{"logTypeFilter":"Error","maxEntries":25}'   # scan for "error CS"
+   ```
+   Note: console-get-logs keeps stale error entries from earlier failed compiles — the
+   `EditorUtility.scriptCompilationFailed` check is the authoritative signal.
 4. Entering play mode from a stopped state also triggers recompilation if needed.
 
 ## Common Script Templates
