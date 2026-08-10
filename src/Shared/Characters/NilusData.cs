@@ -184,7 +184,7 @@ public static partial class CharacterRegistry
             },
 
             // Q — Void Rift (signature; lobbed seed → grounded lingering rift). Class: NilusVoidRift (Task 3)
-            Q = new AbilitySpec
+            Slot1 = new AbilitySpec
             {
                 Name = "Void Rift",
                 Description = "Lob a void seed. Where it lands, a rift lingers for 4s, damaging anything inside.",

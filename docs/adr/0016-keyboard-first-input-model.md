@@ -1,6 +1,6 @@
 # ADR-0016: Keyboard-First Input — 10 Hotkey Slots, Short Hop, Fast Fall
 
-**Status:** Proposed — 2026-08-10
+**Status:** Accepted — 2026-08-10 (implemented as issue #116)
 **Deciders:** @Binoui
 
 ## Context
@@ -38,3 +38,13 @@ Target: keyboard-competitive platform fighter with the WoW hotkey layout (proven
 - **Ergonomics:** left hand on ZQSD + 1-5 + A/E/R/F + Space/Shift/C; right hand on mouse (aim + LMB/RMB). ~15 inputs, all WoW-proven under high APM.
 - **Data expansion:** 4 × 10 move definitions (ground/air variants) replace the chain data; the auto-combo removal (ADR-0015) and this slot expansion are one data pass.
 - **Feel risk:** 8-way drift is coarser than analog; accepted (Rivals of Aether precedent). The short-hop release window is the single most feel-critical constant — tune 3–5 ticks in playtest.
+
+## Implementation notes (issue #116, 2026-08-10)
+
+- **Slot count is 11, not 10**: the listed key set `1 2 3 4 5 A E R F` + `LMB`/`RMB` is eleven keys; `AbilitySlots` defines ActiveSlot 1-11 (the "10" in the title was a miscount — the role budget has 10 entries). E/R/F keep their historical indices (4/5/6) so kit data and tests stayed stable; the former Q ability moved to key `1` (slot index 2).
+- **Down key = X** (dedicated `FastFall` binding): S is backward movement, and fast-fall-on-S would fire whenever the player drifts backward — the user rejected it ("can't be S.. maybe x for now"). The `Down` input bit is now driven ONLY by this key (human path); NPC/AI input still derives it from MoveY. Crouch stays deprecated (ADR-0014).
+- **Short hop is server-side** via a `JumpHeld` wire bit + a serialized `JumpHeldTicks` counter. The decision runs at JumpSquat expiry and defers one tick at a time while the player is still holding inside the window (so a release just past squat expiry still short-hops); air double jumps are always full. Window constant `Simulation.ShortHopWindowTicks = 5`, velocity multiplier 0.7 — the feel-critical constants to tune.
+- **Fast fall** multiplies the current gravity by 3 (`FastFallGravityMultiplier`) toward MaxFallSpeed, gated airborne + non-hitstun, in every state.
+- **Remappable bindings** via a `ScriptableObject` (`InputBindings`, CreateAssetMenu → Resources/InputBindings or the InputController field); defaults are QWERTY-position keys (the physical ZQSD keys on AZERTY — Unity `Key` is position-based). The `A` slot key is the only layout-dependent default (Key.Q on AZERTY / Key.A on QWERTY). No in-game settings UI yet — config is the asset.
+- **Wire changes:** `InputState` 19 → 20 B (flags2: JumpHeld); `CharacterStatePacket` 101 → 112 B (cooldowns 0-5 → 0-10 + JumpHeldTicks); downlink envelope up to 145 B. HUD still shows 6 cooldown icons (slots 6-10 have no data yet).
+- **Outstanding (kit-expansion tickets):** data for slots 6-10 (keys `2`-`5`, `A`); the 4 × 10-11 move definition pass; HUD slot-icon expansion.

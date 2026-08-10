@@ -187,7 +187,7 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_air_loop", "spell_rmb_air_attack" },
             },
 
-            Q = new AbilitySpec
+            Slot1 = new AbilitySpec
             {
                 Name = "Round Bomb",
                 Description = "Throw a timed explosive round bomb at a ground target",

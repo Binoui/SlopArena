@@ -73,13 +73,16 @@ public static class TestHelpers
     /// Create a minimal input state, defaulting all fields to 0/false.
     /// </summary>
     public static InputState Input(byte activeSlot = 0, bool jump = false, bool dash = false,
-        float moveX = 0f, float moveY = 0f, bool aiming = false, ushort aimDistance = 0)
+        float moveX = 0f, float moveY = 0f, bool aiming = false, ushort aimDistance = 0,
+        bool jumpHeld = false, bool down = false)
     {
         return new InputState
         {
             ActiveSlot = activeSlot,
             Jump = jump,
+            JumpHeld = jumpHeld,
             Dash = dash,
+            Down = down,
             MoveX = moveX,
             MoveY = moveY,
             IsAiming = aiming,
@@ -131,6 +134,19 @@ public static class TestHelpers
     public static CharacterState TickDefault(ServerSimulation sim, int totalTicks)
     {
         return TickN(sim, default, totalTicks);
+    }
+
+    /// <summary>
+    /// Run N ticks feeding the SAME input every tick (a held input — e.g. holding
+    /// the jump key through JumpSquat for a full jump, or holding Down for fast fall).
+    /// Returns entity 1's state after tick N.
+    /// </summary>
+    public static CharacterState TickHold(ServerSimulation sim, InputState heldInput, int totalTicks)
+    {
+        var inputs = new Dictionary<ulong, InputState> { { 1, heldInput } };
+        for (int i = 0; i < totalTicks; i++)
+            sim.Tick(inputs);
+        return sim.GetState(1);
     }
 
     /// <summary>
@@ -194,10 +210,15 @@ public static class TestHelpers
                 RMB = src.RMB,
                 AirLMB = src.AirLMB,
                 AirRMB = src.AirRMB,
-                Q = src.Q,
+                Slot1 = src.Slot1,
                 E = src.E,
                 R = src.R,
                 F = src.F,
+                Slot2 = src.Slot2,
+                Slot3 = src.Slot3,
+                Slot4 = src.Slot4,
+                Slot5 = src.Slot5,
+                A = src.A,
                 ClipOverrides = src.ClipOverrides,
                 // Use a simple full-body capsule instead of bone-attached hurtboxes
                 HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
@@ -251,10 +272,15 @@ public static class TestHelpers
                 RMB = src.RMB,
                 AirLMB = src.AirLMB,
                 AirRMB = src.AirRMB,
-                Q = src.Q,
+                Slot1 = src.Slot1,
                 E = src.E,
                 R = src.R,
                 F = src.F,
+                Slot2 = src.Slot2,
+                Slot3 = src.Slot3,
+                Slot4 = src.Slot4,
+                Slot5 = src.Slot5,
+                A = src.A,
                 ClipOverrides = src.ClipOverrides,
                 // HurtboxBoneDefs for BoneName lookup
                 HurtboxBoneDefs = new HurtboxBoneDef[]
@@ -302,10 +328,15 @@ public static class TestHelpers
             RMB = src.RMB,
             AirLMB = src.AirLMB,
             AirRMB = src.AirRMB,
-            Q = src.Q,
+            Slot1 = src.Slot1,
             E = src.E,
             R = src.R,
             F = src.F,
+                Slot2 = src.Slot2,
+                Slot3 = src.Slot3,
+                Slot4 = src.Slot4,
+                Slot5 = src.Slot5,
+                A = src.A,
             ClipOverrides = src.ClipOverrides,
             HurtboxCapsules = src.HurtboxCapsules,
             HurtboxBoneDefs = src.HurtboxBoneDefs,

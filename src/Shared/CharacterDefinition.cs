@@ -140,23 +140,41 @@ namespace SlopArena.Shared
         public AbilitySpec? RMB;
         public AbilitySpec? AirLMB;
         public AbilitySpec? AirRMB;
-        public AbilitySpec? Q;
+        /// <summary>Slot 2 (key "1" — the former Q key; ADR-0016).</summary>
+        public AbilitySpec? Slot1;
         public AbilitySpec? E;
         public AbilitySpec? R;
         public AbilitySpec? F;
+        /// <summary>Slots 6-10 (keys "2"-"5" + "A") — no kit data yet; kit-expansion
+        /// tickets populate these. Data-less slots resolve to null and presses are no-ops.</summary>
+        public AbilitySpec? Slot2;
+        public AbilitySpec? Slot3;
+        public AbilitySpec? Slot4;
+        public AbilitySpec? Slot5;
+        public AbilitySpec? A;
         // No constructor needed — class fields auto-default
 
-        public AbilitySpec GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
+        /// <summary>
+        /// Resolve the ability spec for a slot index (0-10). Airborne variants exist for
+        /// LMB/RMB only; the remaining slots share one spec for ground and air.
+        /// Returns null for data-less slots (ADR-0016 slots 6-10 until kit data lands).
+        /// </summary>
+        public AbilitySpec? GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
             (0, true) => AirLMB,
             (1, true) => AirRMB,
             (0, _) => LMB,
             (1, _) => RMB,
-            (2, _) => Q,
+            (2, _) => Slot1,
             (3, _) => E,
             (4, _) => R,
             (5, _) => F,
-            _ => throw new ArgumentOutOfRangeException(nameof(slotIndex))
+            (6, _) => Slot2,
+            (7, _) => Slot3,
+            (8, _) => Slot4,
+            (9, _) => Slot5,
+            (10, _) => A,
+            _ => null
         };
     }
 

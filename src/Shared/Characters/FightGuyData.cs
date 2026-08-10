@@ -173,7 +173,7 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_rmb_air_loop", "spell_rmb_air_attack" },
             },
 
-            Q = new AbilitySpec
+            Slot1 = new AbilitySpec
             {
                 Name = "Ki Shot",
                 Description = "Fire a ki projectile that marks the target for bonus damage",

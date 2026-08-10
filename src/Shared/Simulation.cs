@@ -64,6 +64,18 @@ namespace SlopArena.Shared
         private const float DashDeceleration = 80f;
 
         /// <summary>
+        /// Short-hop release window in ticks (issue #116 / ADR-0016): releasing the jump key
+        /// within this many ticks of the press produces a reduced jump. Digital-optimal timing
+        /// tech; tune 3-5 in playtest per ADR-0016.
+        /// </summary>
+        public const byte ShortHopWindowTicks = 5;
+        /// <summary>Short-hop jump velocity as a fraction of JumpForce (issue #116).</summary>
+        private const float ShortHopVelocityMultiplier = 0.7f;
+        /// <summary>Fast-fall gravity multiplier (issue #116 / #107): holding Down in the air
+        /// applies this × the current gravity toward MaxFallSpeed. Tune in playtest.</summary>
+        private const float FastFallGravityMultiplier = 3f;
+
+        /// <summary>
         /// 0.2s
         /// </summary>
         private const ushort SprintThresholdTicks = 12;
@@ -218,16 +230,38 @@ namespace SlopArena.Shared
                 return;
             }
 
+            // Short-hop hold counter (issue #116): consecutive ticks the jump key is held.
+            // Reset on release. Serialized on the wire so rollback replay of a JumpSquat
+            // opponent is byte-identical (ADR-0011).
+            if (input.JumpHeld && s.JumpHeldTicks < 255) s.JumpHeldTicks++;
+            else s.JumpHeldTicks = 0;
+
             // 2.5 JumpSquat: tick down, apply jump force on expiry
             if (s.State == ActionState.JumpSquat)
             {
-                s.StateTicks--;
+                if (s.StateTicks > 0) s.StateTicks--;
                 if (s.StateTicks == 0)
                 {
-                    s.VY = stats.JumpForce;
-                    s.IsGrounded = false;
-                    s.State = ActionState.Idle;
-                    s.AirTimeTicks = (ushort)(stats.FloatWindowTicks + stats.FallRampDuration);
+                    // Short-hop decision (issue #116 / ADR-0016): releasing within
+                    // ShortHopWindowTicks of the press yields a reduced jump. If the player
+                    // is STILL holding inside the window at squat expiry, the decision is
+                    // pending — hold the squat one tick at a time until the release (short)
+                    // or the window elapses (full). The deferral is bounded by the window.
+                    bool withinWindow = s.JumpHeldTicks <= ShortHopWindowTicks;
+                    if (input.JumpHeld && withinWindow)
+                    {
+                        // decision pending — stay in squat, re-check next tick
+                    }
+                    else
+                    {
+                        float force = withinWindow
+                            ? stats.JumpForce * ShortHopVelocityMultiplier
+                            : stats.JumpForce;
+                        s.VY = force;
+                        s.IsGrounded = false;
+                        s.State = ActionState.Idle;
+                        s.AirTimeTicks = (ushort)(stats.FloatWindowTicks + stats.FallRampDuration);
+                    }
                 }
                 // During squat: preserve horizontal momentum, no acceleration
             }
@@ -337,16 +371,7 @@ namespace SlopArena.Shared
 
                 if (input.ActiveSlot > 0 && s.State == ActionState.Idle && s.BurstRecoveryTicks == 0)
                 {
-                    ushort cd = input.ActiveSlot switch
-                    {
-                        1 => s.Cooldown0,
-                        2 => s.Cooldown1,
-                        3 => s.Cooldown2,
-                        4 => s.Cooldown3,
-                        5 => s.Cooldown4,
-                        6 => s.Cooldown5,
-                        _ => 0,
-                    };
+                    ushort cd = s.GetCooldown(input.ActiveSlot);
                     if (cd == 0)
                     {
                         s.State = ActionState.Attacking;
@@ -396,7 +421,7 @@ namespace SlopArena.Shared
             
             // 8. Gravity (skip during hitstun — ProcessHitstun handles KVY decay)
             if (s.State != ActionState.Hitstun)
-                ApplyGravity(ref s, stats);
+                ApplyGravity(ref s, stats, input);
             
             // 9. Position integration
             s.PX += s.VX * TickDt;
@@ -1146,7 +1171,7 @@ namespace SlopArena.Shared
 
         // ── GRAVITY ──
         
-        private static void ApplyGravity(ref CharacterState s, MovementStats stats)
+        private static void ApplyGravity(ref CharacterState s, MovementStats stats, InputState input)
         {
             if (!s.IsGrounded)
             {
@@ -1172,6 +1197,13 @@ namespace SlopArena.Shared
                     // Full gravity (also reached when both FloatWindowTicks and FallRampDuration are 0)
                     gravity = stats.Gravity;
                 }
+
+                // Fast fall (issue #116 / #107): holding Down in the air slams the fall toward
+                // MaxFallSpeed. Applies in every airborne state (attacking, dashing, aiming…);
+                // hitstun is excluded — ApplyGravity is skipped entirely for the Hitstun state.
+                // Release cancels naturally: the gate is per-tick.
+                if (input.Down && s.HitstunTicks == 0)
+                    gravity *= FastFallGravityMultiplier;
 
                 s.VY -= gravity * TickDt;
 

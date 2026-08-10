@@ -12,7 +12,9 @@ namespace SlopArena.Client.Input
     /// Polls Unity InputSystem once per frame and builds InputState for the sim.
     ///
     /// Supports two modes:
-    /// 1. Human input — reads Keyboard.current / Mouse.current directly
+    /// 1. Human input — reads Keyboard.current / Mouse.current through the remappable
+    ///    <see cref="InputBindings"/> config (ADR-0016: ZQSD/WASD movement, Space jump,
+    ///    Shift dodge, C burst, X fast-fall, 10 move slots on 1-5/A/E/R/F + LMB/RMB).
     /// 2. AI input — injected via InjectAI() for NPCs
     ///
     /// Call Poll() at the start of each frame (Update or FixedUpdate)
@@ -20,6 +22,20 @@ namespace SlopArena.Client.Input
     /// </summary>
     public class InputController : MonoBehaviour
     {
+        /// <summary>Remappable bindings. Assign an asset in the inspector or drop one in
+        /// Resources/InputBindings; without either the layout-preset defaults apply.</summary>
+        [SerializeField] private InputBindings _bindings;
+
+        private void Awake()
+        {
+            if (_bindings == null)
+                _bindings = Resources.Load<InputBindings>("InputBindings");
+        }
+
+        /// <summary>Resolved key for a bindable action (override or layout default).</summary>
+        private Key Bind(BindableAction action)
+            => _bindings != null ? _bindings.GetKey(action) : InputBindings.DefaultKey(action);
+
         // ── Frame state (set by Poll) ──
         /// <summary>Pending jump: set by Poll, consumed by BuildInputState.</summary>
         private bool _pendingJump;
@@ -27,27 +43,33 @@ namespace SlopArena.Client.Input
         private bool _pendingDash;
         /// <summary>Pending burst: set by Poll, consumed by BuildInputState (ADR-0014).</summary>
         private bool _pendingBurst;
-        /// <summary>Whether the Q key is currently held down (for aiming release detection).</summary>
-        public bool IsQKeyHeld { get; private set; }
-        /// <summary>Whether the right mouse button is currently held down (for RMB charge).</summary>
-        public bool IsRmbHeld { get; private set; }
-        /// <summary>Whether the R key is currently held down (for R aiming release detection).</summary>
-        public bool IsRKeyHeld { get; private set; }
-        /// <summary>Whether the E key is currently held down (for E aiming release detection).</summary>
-        public bool IsEKeyHeld { get; private set; }
         /// <summary>
         /// Returns true if the key/button for the given slot index (0-based) is currently held.
-        /// Slot 0 = LMB, 1 = RMB, 2 = Q, 3 = E, 4 = R, 5 = F.
+        /// Slot 0 = LMB, 1 = RMB, 2 = key "1", 3 = E, 4 = R, 5 = F, 6-9 = keys "2"-"5", 10 = A.
+        /// Follows the remapped bindings (ADR-0016).
         /// </summary>
         public bool IsSlotKeyHeld(byte slotIdx) => slotIdx switch
         {
             0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
-            1 => IsRmbHeld,
-            2 => IsQKeyHeld,
-            3 => IsEKeyHeld,
-            4 => IsRKeyHeld,
-            _ => false,
+            1 => Mouse.current != null && Mouse.current.rightButton.isPressed,
+            _ => Keyboard.current != null && Keyboard.current[SlotAction(slotIdx)].isPressed,
         };
+
+        /// <summary>Slot index (0-based) → the bindable action that triggers it (slots 2-10).</summary>
+        private static BindableAction SlotAction(byte slotIdx) => slotIdx switch
+        {
+            2 => BindableAction.Slot1,
+            3 => BindableAction.SlotE,
+            4 => BindableAction.SlotR,
+            5 => BindableAction.SlotF,
+            6 => BindableAction.Slot2,
+            7 => BindableAction.Slot3,
+            8 => BindableAction.Slot4,
+            9 => BindableAction.Slot5,
+            10 => BindableAction.SlotA,
+            _ => BindableAction.Slot1,
+        };
+
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;
@@ -85,7 +107,8 @@ namespace SlopArena.Client.Input
         /// Call once per frame before BuildInputState() or any property access.
         /// Uses AI input if InjectAI() was called, otherwise reads from InputSystem.
         ///
-        /// Slot press: LMB=1, RMB=2, Q=3, E=4, R=5, F=6.
+        /// Slot presses (ActiveSlot wire values): LMB=1, RMB=2, key"1"=3, E=4, R=5, F=6,
+        /// key"2"=7, key"3"=8, key"4"=9, key"5"=10, A=11 (AbilitySlots, ADR-0016).
         /// Consume via <see cref="ConsumePendingSlotPress"/> after BuildInputState.
         /// </summary>
         public void Poll()
@@ -100,44 +123,34 @@ namespace SlopArena.Client.Input
 
             var kb = Keyboard.current;
             var mouse = Mouse.current;
-            if (kb.spaceKey.wasPressedThisFrame) _pendingJump = true;
-            if (kb.shiftKey.wasPressedThisFrame) _pendingDash = true;
-            if (kb.cKey.wasPressedThisFrame) _pendingBurst = true;
+            if (kb[Bind(BindableAction.Jump)].wasPressedThisFrame) _pendingJump = true;
+            if (kb[Bind(BindableAction.Dash)].wasPressedThisFrame) _pendingDash = true;
+            if (kb[Bind(BindableAction.Burst)].wasPressedThisFrame) _pendingBurst = true;
             // Ability slot presses (only one per frame — priority order)
             if (mouse.leftButton.wasPressedThisFrame)
-                _pendingSlotPress = 1;
+                _pendingSlotPress = AbilitySlots.Lmb;
             else if (mouse.rightButton.wasPressedThisFrame)
-                _pendingSlotPress = 2;
-            else if (kb.qKey.wasPressedThisFrame)
-                _pendingSlotPress = 3;
-            else if (kb.eKey.wasPressedThisFrame)
-                _pendingSlotPress = 4;
-            else if (kb.rKey.wasPressedThisFrame)
-                _pendingSlotPress = 5;
-            else if (kb.fKey.wasPressedThisFrame)
-                _pendingSlotPress = 6;
-
-            // Track held keys for aiming release detection
-            if (!_aiControlled)
-            {
-                IsQKeyHeld = kb.qKey.isPressed;
-                IsRmbHeld = mouse != null && mouse.rightButton.isPressed;
-                IsRKeyHeld = kb.rKey.isPressed;
-                IsEKeyHeld = kb.eKey.isPressed;
-            }
-            else
-            {
-                IsQKeyHeld = false;
-                IsRmbHeld = false;
-                IsRKeyHeld = false;
-                IsEKeyHeld = false;
-            }
+                _pendingSlotPress = AbilitySlots.Rmb;
+            else if (kb[Bind(BindableAction.Slot1)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.Slot1;
+            else if (kb[Bind(BindableAction.SlotE)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.E;
+            else if (kb[Bind(BindableAction.SlotR)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.R;
+            else if (kb[Bind(BindableAction.SlotF)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.F;
+            else if (kb[Bind(BindableAction.Slot2)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.Slot2;
+            else if (kb[Bind(BindableAction.Slot3)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.Slot3;
+            else if (kb[Bind(BindableAction.Slot4)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.Slot4;
+            else if (kb[Bind(BindableAction.Slot5)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.Slot5;
+            else if (kb[Bind(BindableAction.SlotA)].wasPressedThisFrame)
+                _pendingSlotPress = AbilitySlots.A;
         }
 
-        /// <summary>
-        /// Returns and clears the pending slot press byte.
-        /// Call after BuildInputState() to pass the value, then consume here.
-        /// </summary>
         /// <summary>
         /// Discard buffered jump/dash/slot presses without consuming them. Called
         /// when pausing so stale presses don't fire on the first frame after
@@ -167,7 +180,7 @@ namespace SlopArena.Client.Input
 
         /// <summary>
         /// Get raw movement input for current frame.
-        /// Returns AI input if AI-controlled, otherwise reads WASD from Keyboard.
+        /// Returns AI input if AI-controlled, otherwise reads the bound movement keys.
         /// </summary>
         public Vector2 GetMovement()
         {
@@ -177,10 +190,10 @@ namespace SlopArena.Client.Input
             var kb = Keyboard.current;
             float x = 0f;
             float y = 0f;
-            if (kb.aKey.isPressed) x -= 1f;
-            if (kb.dKey.isPressed) x += 1f;
-            if (kb.wKey.isPressed) y += 1f;
-            if (kb.sKey.isPressed) y -= 1f;
+            if (kb[Bind(BindableAction.MoveLeft)].isPressed) x -= 1f;
+            if (kb[Bind(BindableAction.MoveRight)].isPressed) x += 1f;
+            if (kb[Bind(BindableAction.MoveUp)].isPressed) y += 1f;
+            if (kb[Bind(BindableAction.MoveDown)].isPressed) y -= 1f;
             return new Vector2(x, y);
         }
 
@@ -220,6 +233,7 @@ namespace SlopArena.Client.Input
                 input.Down = move.y < -0.3f;
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
+                input.JumpHeld = _aiInput.JumpHeld;
                 input.ActiveSlot = pendingSlotPress;
                 if (_pendingJump)
                 {
@@ -249,13 +263,13 @@ namespace SlopArena.Client.Input
                 camRight = camera.GetRightDirection();
             }
 
-            // Build raw camera-relative direction from WASD
+            // Build raw camera-relative direction from the bound movement keys
             var kb = Keyboard.current;
             Vector3 rawDir = Vector3.zero;
-            if (kb.wKey.isPressed) rawDir += camForward;
-            if (kb.sKey.isPressed) rawDir -= camForward;
-            if (kb.aKey.isPressed) rawDir -= camRight;
-            if (kb.dKey.isPressed) rawDir += camRight;
+            if (kb[Bind(BindableAction.MoveUp)].isPressed) rawDir += camForward;
+            if (kb[Bind(BindableAction.MoveDown)].isPressed) rawDir -= camForward;
+            if (kb[Bind(BindableAction.MoveLeft)].isPressed) rawDir -= camRight;
+            if (kb[Bind(BindableAction.MoveRight)].isPressed) rawDir += camRight;
 
             Vector3 moveDirection = Vector3.zero;
             Vector2 snappedInputDirection = Vector2.zero;
@@ -283,9 +297,16 @@ namespace SlopArena.Client.Input
             input.MoveX = moveDirection.x;
             input.MoveY = moveDirection.z;
             input.Up = moveDirection.z > 0.3f;
-            input.Down = moveDirection.z < -0.3f;
+            // Down (fast fall, issue #116): driven by the DEDICATED FastFall key (X by
+            // default) — NOT by backward movement. Drifting backward must never fast-fall.
+            // Left un-gated by canMove: the sim gates it (airborne + not hitstun), and it
+            // must work through air attacks.
+            input.Down = kb[Bind(BindableAction.FastFall)].isPressed;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
+            // Short hop (issue #116): Jump is the press edge; JumpHeld is the physical
+            // hold state the sim counts for the release window.
+            input.JumpHeld = kb[Bind(BindableAction.Jump)].isPressed;
             // Burst fires even when the FSM gates movement — it must work during
             // hitstop/hitstun (the gate zeroes Jump/Dash only).
             input.Burst = _pendingBurst;
@@ -316,6 +337,7 @@ namespace SlopArena.Client.Input
                 input.MoveX = 0f;
                 input.MoveY = 0f;
                 input.Jump = false;
+                input.JumpHeld = false;
                 input.Dash = false;
                 moveDirection = Vector3.zero;
                 snappedInputDirection = Vector2.zero;

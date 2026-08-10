@@ -31,21 +31,21 @@ public class PhysicsTests
         state.PY = GroundPx;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Tick with jump input
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
+        // Tick with jump input (held — a held jump is the full jump; taps short-hop, issue #116)
+        var t0 = TestHelpers.TickHold(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
         Assert.Equal(ActionState.JumpSquat, t0.State);
         Assert.Equal(Move.JumpSquatTicks, (int)t0.StateTicks);
         Assert.Equal(1u, t0.JumpsLeft);
 
-        // The rest of the squat ticks
+        // The rest of the squat ticks (still holding)
         for (int i = 1; i < Move.JumpSquatTicks; i++)
         {
-            var s = TestHelpers.TickDefault(sim, 1);
+            var s = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
             Assert.Equal(ActionState.JumpSquat, s.State);
         }
 
         // Squat expires → jump fires, then gravity applies same tick
-        var tJump = TestHelpers.TickDefault(sim, 1);
+        var tJump = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
         Assert.Equal(ActionState.Idle, tJump.State);
         Assert.False(tJump.IsGrounded);
         TestHelpers.AssertNear(Move.JumpForce - GravPerTick, tJump.VY, 0.01f);
@@ -60,15 +60,15 @@ public class PhysicsTests
         state.PY = GroundPx;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Squat to get airborne
-        TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
-        for (int i = 0; i < Move.JumpSquatTicks; i++)
-            TestHelpers.TickDefault(sim, 1);
+        // Squat to get airborne (held = full ground jump; the jump EDGE is 1 tick, the
+        // hold continues — holding the edge would re-trigger as a double jump on fire).
+        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
         var afterJump = sim.GetState(1);
         Assert.False(afterJump.IsGrounded);
         Assert.Equal(1u, afterJump.JumpsLeft);
 
-        // Double jump in air
+        // Double jump in air (air jumps are always full — no short hop in the air, issue #116)
         var doubled = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
         Assert.Equal(0u, doubled.JumpsLeft);
         TestHelpers.AssertNear(Move.JumpForce - GravPerTick, doubled.VY, 0.01f);

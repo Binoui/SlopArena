@@ -137,36 +137,6 @@ namespace SlopArena.Shared
 		}
 
 		/// <summary>
-		/// Get cooldown ticks for a slot (1-6).
-		/// </summary>
-		private static ushort GetCooldown(CharacterState s, byte slot) => slot switch
-		{
-			1 => s.Cooldown0,
-			2 => s.Cooldown1,
-			3 => s.Cooldown2,
-			4 => s.Cooldown3,
-			5 => s.Cooldown4,
-			6 => s.Cooldown5,
-			_ => 0,
-		};
-
-		/// <summary>
-		/// Set cooldown ticks for a slot (1-6).
-		/// </summary>
-		private static void SetCooldown(ref CharacterState s, byte slot, ushort ticks)
-		{
-			switch (slot)
-			{
-				case 1: s.Cooldown0 = ticks; break;
-				case 2: s.Cooldown1 = ticks; break;
-				case 3: s.Cooldown2 = ticks; break;
-				case 4: s.Cooldown3 = ticks; break;
-				case 5: s.Cooldown4 = ticks; break;
-				case 6: s.Cooldown5 = ticks; break;
-			}
-		}
-
-		/// <summary>
 		/// Tick all active abilities. Called after simulation each frame.
 		/// Abilities that set AttackSlot=0 (via EndAbility) are auto-deactivated.
 		/// Abilities are also interrupted (without calling OnEnd) when the state
@@ -234,7 +204,7 @@ namespace SlopArena.Shared
 					// Apply cooldown
 					if (ability.Slot < 6)
 					{
-						SetCooldown(ref state, (byte)(ability.Slot + 1), ability.Cooldown);
+						state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
 						if (Simulation.OnDebugLog != null)
 							Simulation.OnDebugLog.Invoke(
 								$"[Cooldown] Set slot={(byte)(ability.Slot + 1)} cooldown={ability.Cooldown} entity={id}");
@@ -397,7 +367,7 @@ namespace SlopArena.Shared
 				bool airborne = !state.IsGrounded;
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
 
-				ushort cooldown = GetCooldown(state, input.ActiveSlot);
+				ushort cooldown = state.GetCooldown(input.ActiveSlot);
 				if (cooldown > 0)
 				{
 					if (Simulation.OnDebugLog != null)
@@ -455,7 +425,7 @@ namespace SlopArena.Shared
 				tryDirectAttack:
 
                 // Reject F (Overclock) reactivation while buff already active
-                if (input.ActiveSlot == 6 && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
+                if (input.ActiveSlot == AbilitySlots.F && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
                     continue;
 
 				// Create and activate server-side ability

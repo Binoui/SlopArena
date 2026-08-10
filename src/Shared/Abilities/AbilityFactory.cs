@@ -5,7 +5,7 @@ namespace SlopArena.Shared.Abilities;
 /// <summary>
 /// Factory for instantiating server-side abilities.
 /// Maps (CharacterClass, slot) to concrete ServerAbility implementations.
-/// Slot: 0=LMB, 1=RMB, 2=Q, 3=E, 4=R, 5=F
+/// Slot: 0=LMB, 1=RMB, 2=Slot1 (key "1"), 3=E, 4=R, 5=F, 6-10=Slot2-5/A (no kit data yet)
 /// </summary>
 public static class AbilityFactory
 {
@@ -30,7 +30,7 @@ public static class AbilityFactory
         (0, true) => new AirLmbCombo(),        // AirLMB
         (1, false) => new MankiAerosolFlame(), // RMB ground
         (1, true) => new AirChargeAttack(), // RMB air — hold-to-charge aerial heavy
-        (2, _) => new MankiRoundBomb(),        // Q
+        (2, _) => new MankiRoundBomb(),        // Slot1 (key "1")
         (3, _) => new MankiGrapple(),          // E
         (4, _) => new MankiBazooka(),          // R
         (5, _) => new MankiOverclock(),        // F
@@ -43,7 +43,7 @@ public static class AbilityFactory
         (0, true) => new AirLmbCombo(),        // AirLMB
         (1, false) => new FightGuyUppercut(),  // RMB ground
         (1, true) => new AirChargeAttack(), // RMB air — hold-to-charge aerial heavy
-        (2, _) => new FightGuyKiShot(),        // Q
+        (2, _) => new FightGuyKiShot(),        // Slot1 (key "1")
         (3, _) => new FightGuyCycloneKick(),   // E
         (4, _) => new FightGuyDragonKick(),    // R
         (5, _) => new FightGuyTempest(),       // F
@@ -56,7 +56,7 @@ public static class AbilityFactory
         (0, true) => new AirLmbCombo(),        // AirLMB — air slash combo
         (1, false) => new LungeChargeAttack(), // RMB — charged spin (kill move)
         (1, true) => new AirChargeAttack(), // AirRMB — falling slash (tap/charged)
-        (2, _) => new KistuCounter(),          // Q — counter/parry
+        (2, _) => new KistuCounter(),          // Slot1 (key "1") — counter/parry
         (3, _) => new KistuDashSlash(),        // E — directional dash slash (aim + release)
         (4, _) => new KistuRisingSlash(),      // R — rising slash (signature)
         (5, _) => new KistuUltFlurry(),        // F — blade flurry ult
@@ -69,7 +69,7 @@ public static class AbilityFactory
         (0, true) => new AirLmbCombo(),        // AirLMB — void rake
         (1, false) => new LungeChargeAttack(), // RMB — entropy lance (tap/charged)
         (1, true) => new AirChargeAttack(), // AirRMB — collapse (tap/charged)
-        (2, _) => new NilusVoidRift(),         // Q — void rift
+        (2, _) => new NilusVoidRift(),         // Slot1 (key "1") — void rift
         (3, _) => new NilusRiftwalk(),         // E — riftwalk
         (4, _) => new NilusNetherGrasp(),      // R — nether grasp
         (5, _) => new NilusEventHorizon(),     // F — event horizon

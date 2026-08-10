@@ -79,7 +79,7 @@ PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
   2. NetworkSimulationBridge.Tick(inputs)
      → _tick++ (monotonically increasing per frame)
      → NetworkClient.SendInput(input, _tick)
-       → Packet: entityId(8) + tick(4) + InputState(19) = 31B
+       → Packet: entityId(8) + tick(4) + InputState(20) = 32B
 
   3. No local simulation, no prediction ring buffer
      → render the latest server state via PlayerRenderer.ApplyServerState()
@@ -134,7 +134,7 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-       → Packet: entityId(8) + tick(4) + CharacterStatePacket(97) + hasInput(1) + InputState(19) = up to 97B
+       → Packet: entityId(8) + tick(4) + CharacterStatePacket(112) + hasInput(1) + InputState(20) = up to 145B
          → tick = _serverTick (echoed back)
          → hasInput/InputState = the input the server consumed for that entity
            that tick, or the no-input marker (issue #80 — input relay)
@@ -148,43 +148,44 @@ Tick():
 ### 4a. Client → Server
 
 ```
-Send packet: entityId(8) + tick(4) + InputState(19) = 31 bytes
+Send packet: entityId(8) + tick(4) + InputState(20) = 32 bytes
 
 [0..7]   entityId        (ulong)
 [8..11]  tick            (uint)       ← local client frame counter
-[12..30] InputState (19 bytes)
+[12..31] InputState (20 bytes)
 ```
 
-**InputState layout (19 bytes):**
+**InputState layout (20 bytes):**
 | Offset | Type    | Field           | Notes                              |
 |--------|---------|-----------------|------------------------------------|
 | 0-3    | float   | MoveX           | Horizontal analog input            |
 | 4-7    | float   | MoveY           | Vertical analog input              |
-| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:Dash, 6:Crouch, 7:IsAiming |
-| 9      | byte    | ActiveSlot      | 0=none, 1=LMB, 2=RMB, 3=Q, 4=E, 5=R, 6=F |
+| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:Dash, 6:Burst (ADR-0014; formerly Crouch), 7:IsAiming |
+| 9      | byte    | ActiveSlot      | 0=none, 1=LMB, 2=RMB, 3=key"1", 4=E, 5=R, 6=F, 7-10=keys"2"-"5", 11=A (ADR-0016) |
 | 10-11  | short   | FacingYaw       | Degrees × 100 (movement-facing)    |
 | 12-13  | short   | AimYaw          | Degrees × 100 (combat-facing, reserved) |
 | 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
 | 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
+| 19     | byte    | flags2          | bit0: JumpHeld (ADR-0016 short hop, issue #116) |
 
-Total: 31 bytes (8 + 4 + 19)
+Total: 32 bytes (8 + 4 + 20)
 
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(97) + hasInput(1) + InputState(19) = up to 129 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(112) + hasInput(1) + InputState(20) = up to 145 bytes
 
 [0..7]    entityId          (ulong)
 [8..11]   tick              (uint)       ← echoes client's tick number
-[12..108] CharacterStatePacket (97 bytes) — widened per D10/ADR-0011 + hitstop/ADR-0012, see §4b table below
-[109]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
-[110..128] InputState       (19 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
+[12..123] CharacterStatePacket (112 bytes) — widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10 & JumpHeldTicks/ADR-0016, see §4b table below
+[124]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
+[125..144] InputState       (20 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
 ```
 
-**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 110 bytes, a relayed packet 129 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
+**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 125 bytes, a relayed packet 145 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
 
-**CharacterStatePacket layout (97 bytes):**
+**CharacterStatePacket layout (112 bytes):**
 | Offset | Type    | Field               | Notes                              |
 |--------|---------|---------------------|------------------------------------|
 | 0-3    | uint    | TickNumber          | Echoed client tick (for matching)  |
@@ -197,7 +198,7 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(97) + ha
 | 28     | byte    | CurrentActionState  | Idle/Dashing/Attacking/Hitstun     |
 | 29     | byte    | IsGrounded          | 0 or 1                             |
 | 30-31  | ushort  | StateDurationFrames | Remaining ticks in current state   |
-| 32     | byte    | AttackSlot          | 0=none, 1-6=LMB/RMB/Q/E/R/F      |
+| 32     | byte    | AttackSlot          | 0=none, 1-11 (ADR-0016 slot layout)|
 | 33     | byte    | ComboStage          | 0-3 combo chain stage              |
 | 34-37  | float   | FacingYaw           | Server-authoritative facing (radians) |
 | 38     | byte    | MatchState          | Match lifecycle (Waiting/Countdown/Playing/Ended) |
@@ -208,24 +209,27 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(97) + ha
 | 44-47  | float   | AimPitch            | Server-authoritative aim pitch (radians) |
 | 48     | byte    | Deaths              | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
 | 49-50  | ushort  | DamagePercent       | Smash-style damage %, HUD display (issue #38) |
-| 51-62  | ushort×6| Cooldown0..5        | Per-slot cooldown ticks, local HUD fills (issue #38) |
-| 63-64  | ushort  | AirTimeTicks        | Fall-ramp gravity timer (D10/ADR-0011) |
-| 65-66  | ushort  | DashDurationTicks   | Remaining dash ticks (D10)         |
-| 67-70  | float   | DashDirX            | Dash direction X (D10)              |
-| 71-74  | float   | DashDirZ            | Dash direction Z (D10)              |
-| 75-76  | ushort  | DashCooldownTicks   | Dash cooldown remaining (D10)      |
-| 77     | byte    | AirDodgesLeft       | Remaining air dodges (D10)         |
-| 78     | byte    | JumpsLeft           | Remaining jumps (D10)              |
-| 79-80  | ushort  | InvincibilityTicks  | Post-respawn/dash invincibility (D10) |
-| 81-82  | ushort  | TurnaroundTicks     | Turnaround lag remaining (D10)     |
-| 83-84  | ushort  | DirHoldTicks        | Ticks holding same direction (D10) |
-| 85     | byte    | IsSprinting         | Sprint/dash-dance flag (D10)       |
-| 86-89  | float   | LastDirX            | Last input direction X (D10)       |
-| 90-93  | float   | LastDirZ            | Last input direction Z (D10)       |
-| 94     | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
-| 95-96  | ushort  | HitstopTicks        | Remaining hitstop freeze ticks (ADR-0012) |
+| 51-72  | ushort×11| Cooldown0..10      | Per-slot cooldown ticks (ADR-0016: 11 slots), local HUD fills (issue #38) |
+| 73-74  | ushort  | AirTimeTicks        | Fall-ramp gravity timer (D10/ADR-0011) |
+| 75-76  | ushort  | DashDurationTicks   | Remaining dash ticks (D10)         |
+| 77-80  | float   | DashDirX            | Dash direction X (D10)              |
+| 81-84  | float   | DashDirZ            | Dash direction Z (D10)              |
+| 85-86  | ushort  | DashCooldownTicks   | Dash cooldown remaining (D10)      |
+| 87     | byte    | AirDodgesLeft       | Remaining air dodges (D10)         |
+| 88     | byte    | JumpsLeft           | Remaining jumps (D10)              |
+| 89-90  | ushort  | InvincibilityTicks  | Post-respawn/dash invincibility (D10) |
+| 91-92  | ushort  | TurnaroundTicks     | Turnaround lag remaining (D10)     |
+| 93-94  | ushort  | DirHoldTicks        | Ticks holding same direction (D10) |
+| 95     | byte    | IsSprinting         | Sprint/dash-dance flag (D10)       |
+| 96-99  | float   | LastDirX            | Last input direction X (D10)       |
+| 100-103| float   | LastDirZ            | Last input direction Z (D10)       |
+| 104    | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
+| 105-106| ushort  | HitstopTicks        | Remaining hitstop freeze ticks (ADR-0012) |
+| 107-108| ushort  | BurstCooldownTicks  | Burst cooldown (ADR-0014)          |
+| 109-110| ushort  | BurstRecoveryTicks  | Burst recovery lock (ADR-0014)     |
+| 111    | byte    | JumpHeldTicks       | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
 
-Total: 109 bytes base (8 + 4 + 97), up to 129 with the relay section (110 no-input marker / 129 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012)
+Total: 124 bytes base (8 + 4 + 112), up to 145 with the relay section (125 no-input marker / 145 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + ADR-0016)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -251,7 +255,7 @@ Total: 109 bytes base (8 + 4 + 97), up to 129 with the relay section (110 no-inp
 | DashDurationTicks   | ushort  | Remaining dash frames                |
 | DashDirX, DashDirZ  | float   | Dash direction vector                |
 | InvincibilityTicks  | ushort  | Post-respawn/dash invincibility      |
-| **AttackSlot**      | **byte**| **Which slot this attack uses (1-6)**|
+| **AttackSlot**      | **byte**| **Which slot this attack uses (1-11, ADR-0016)**|
 | **AttackElapsedTicks**|**ushort**| **Frames since attack started**    |
 | ComboStage          | byte    | 1-3 for chain combos                 |
 | ComboTimerTicks     | ushort  | Chain window remaining               |

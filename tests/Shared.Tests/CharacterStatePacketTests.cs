@@ -114,9 +114,10 @@ public class CharacterStatePacketTests
     {
         // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
         // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012)
-        // + 4 burst (ADR-0014) = 101.
+        // + 4 burst (ADR-0014) + 10 cooldown slots 6-10 + 1 JumpHeldTicks (ADR-0016)
+        // = 112.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(101, CharacterStatePacket.Size);
+        Assert.Equal(112, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
@@ -125,6 +126,27 @@ public class CharacterStatePacketTests
         var restored = CharacterStatePacket.Deserialize(buffer);
         Assert.Equal(1f, restored.AimPitch);
         Assert.Equal(2f, restored.LastDirX);
+    }
+
+    [Fact]
+    public void Roundtrip_Cooldown6To10_And_JumpHeldTicks()
+    {
+        var original = new CharacterState
+        {
+            Cooldown6 = 111, Cooldown7 = 222, Cooldown8 = 333, Cooldown9 = 444, Cooldown10 = 555,
+            JumpHeldTicks = 4,
+        };
+        var packet = CharacterStatePacket.FromState(original);
+        byte[] buffer = new byte[CharacterStatePacket.Size];
+        packet.Serialize(buffer);
+        var restored = CharacterStatePacket.Deserialize(buffer).ToState();
+
+        Assert.Equal((ushort)111, restored.Cooldown6);
+        Assert.Equal((ushort)222, restored.Cooldown7);
+        Assert.Equal((ushort)333, restored.Cooldown8);
+        Assert.Equal((ushort)444, restored.Cooldown9);
+        Assert.Equal((ushort)555, restored.Cooldown10);
+        Assert.Equal((byte)4, restored.JumpHeldTicks);
     }
 
     [Fact]

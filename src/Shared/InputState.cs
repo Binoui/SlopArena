@@ -11,6 +11,12 @@ namespace SlopArena.Shared
     {
         public bool Up, Down, Left, Right;
         public bool Jump, Dash, Burst;
+        /// <summary>
+        /// True while the jump key is physically held (issue #116 / #106). The sim counts
+        /// consecutive held ticks (<c>CharacterState.JumpHeldTicks</c>) and releases within
+        /// <c>Simulation.ShortHopWindowTicks</c> produce a reduced short hop.
+        /// </summary>
+        public bool JumpHeld;
         public float MoveX, MoveY;
         /// <summary>
         /// 0 = none, 1 = LMB, 2 = RMB, 3 = Q, 4 = E, 5 = R, 6 = F
@@ -34,12 +40,13 @@ namespace SlopArena.Shared
         public float WarpSpeed;
         public float WarpAttackRange;
 
-        /// <summary>19 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 pitch + 2 distance + 1 target)</summary>
+        /// <summary>20 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 pitch + 2 distance + 1 target + 1 flags2)</summary>
         /// <remarks>
         /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=Dash,
         /// 0x40=Burst (ADR-0014; formerly Crouch, deprecated), 0x80=IsAiming.
+        /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116).
         /// </remarks>
-        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1;
+        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1 + 1;
 
         public void Write(Span<byte> buf)
         {
@@ -61,6 +68,9 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt16LittleEndian(buf.Slice(14), AimPitch);
             BinaryPrimitives.WriteUInt16LittleEndian(buf.Slice(16), AimDistance);
             buf[18] = TargetEntityId;
+            byte flags2 = 0;
+            if (JumpHeld) flags2 |= 1;
+            buf[19] = flags2;
         }
 
         public static InputState Deserialize(ReadOnlySpan<byte> buf)
@@ -85,6 +95,8 @@ namespace SlopArena.Shared
             input.AimPitch = buf.Length >= 16 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(14)) : (short)0;
             input.AimDistance = buf.Length >= 18 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(16)) : (ushort)0;
             input.TargetEntityId = buf.Length >= 19 ? buf[18] : (byte)0;
+            if (buf.Length >= 20)
+                input.JumpHeld = (buf[19] & 1) != 0;
             return input;
         }
     }

@@ -249,7 +249,7 @@ namespace SlopArena.Server
 					var remoteEP = new IPEndPoint(IPAddress.Any, 0);
 					byte[] data = _udpServer.Receive(ref remoteEP);
 
-					// Client packet format: entityId(8) + tick(4) + InputState(19) = 31 bytes
+					// Client packet format: entityId(8) + tick(4) + InputState(20) = 32 bytes (ADR-0016 short-hop bit)
 					if (data.Length < 8 + 4 + InputState.Size) continue;
 
 					ulong entityId = BitConverter.ToUInt64(data, 0);
@@ -412,10 +412,10 @@ namespace SlopArena.Server
 			if (_udpServer == null) return;
 
 			// Packet format (matching NetworkClient expectations):
-			//   entityId(8) + tick(4) + CharacterStatePacket(97)
-			//   + hasInput(1) + InputState(19) when this entity's input was consumed
+			//   entityId(8) + tick(4) + CharacterStatePacket(112)
+			//   + hasInput(1) + InputState(20) when this entity's input was consumed
 			//   this tick — the input relay for client rollback prediction (issue #80).
-			// Max 97 bytes per entity; the flag is always present (78B no-input marker).
+			// Max 145 bytes per entity; the flag is always present (125B no-input marker).
 
 			// Build a packet per entity once, then send each to every connected client.
 			var packets = new List<(byte[] buffer, int length)>(_slots.Count);

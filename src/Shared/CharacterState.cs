@@ -33,6 +33,13 @@ namespace SlopArena.Shared
         public byte AirDodgesLeft;
         /// <summary>Ticks since last actionable event (attack, dash, jump, hit, landing). Drives FallRamp gravity.</summary>
         public ushort AirTimeTicks;
+        /// <summary>
+        /// Consecutive ticks the jump key has been held (issue #116 / ADR-0016). Reset when
+        /// <c>InputState.JumpHeld</c> drops. Drives the short-hop decision at JumpSquat expiry:
+        /// releasing within <c>Simulation.ShortHopWindowTicks</c> produces a reduced jump.
+        /// Serialized so rollback replay of a JumpSquat opponent is byte-identical.
+        /// </summary>
+        public byte JumpHeldTicks;
         public bool IsGrounded;
         public bool WasAirborneDuringKnockback;
         public byte Deaths;              // match death counter, server authority
@@ -184,9 +191,47 @@ namespace SlopArena.Shared
         public ulong TargetEntityId;
 
         /// <summary>
-        /// ── Per-slot cooldowns (0-5) ──
+        /// <summary>
+        /// Per-slot cooldown ticks (11 slots — ADR-0016; slots 6-10 have no kit data yet).
         /// </summary>
-        public ushort Cooldown0, Cooldown1, Cooldown2, Cooldown3, Cooldown4, Cooldown5;
+        public ushort Cooldown0, Cooldown1, Cooldown2, Cooldown3, Cooldown4, Cooldown5,
+            Cooldown6, Cooldown7, Cooldown8, Cooldown9, Cooldown10;
+
+        /// <summary>Cooldown for an ActiveSlot value (1-11), 0 for out-of-range.</summary>
+        public ushort GetCooldown(byte activeSlot) => activeSlot switch
+        {
+            AbilitySlots.Lmb => Cooldown0,
+            AbilitySlots.Rmb => Cooldown1,
+            AbilitySlots.Slot1 => Cooldown2,
+            AbilitySlots.E => Cooldown3,
+            AbilitySlots.R => Cooldown4,
+            AbilitySlots.F => Cooldown5,
+            AbilitySlots.Slot2 => Cooldown6,
+            AbilitySlots.Slot3 => Cooldown7,
+            AbilitySlots.Slot4 => Cooldown8,
+            AbilitySlots.Slot5 => Cooldown9,
+            AbilitySlots.A => Cooldown10,
+            _ => 0,
+        };
+
+        /// <summary>Set cooldown for an ActiveSlot value (1-11); out-of-range is ignored.</summary>
+        public void SetCooldown(byte activeSlot, ushort ticks)
+        {
+            switch (activeSlot)
+            {
+                case AbilitySlots.Lmb: Cooldown0 = ticks; break;
+                case AbilitySlots.Rmb: Cooldown1 = ticks; break;
+                case AbilitySlots.Slot1: Cooldown2 = ticks; break;
+                case AbilitySlots.E: Cooldown3 = ticks; break;
+                case AbilitySlots.R: Cooldown4 = ticks; break;
+                case AbilitySlots.F: Cooldown5 = ticks; break;
+                case AbilitySlots.Slot2: Cooldown6 = ticks; break;
+                case AbilitySlots.Slot3: Cooldown7 = ticks; break;
+                case AbilitySlots.Slot4: Cooldown8 = ticks; break;
+                case AbilitySlots.Slot5: Cooldown9 = ticks; break;
+                case AbilitySlots.A: Cooldown10 = ticks; break;
+            }
+        }
         /// <summary>
         /// ── Buff / Self-enhancement ──
         /// </summary>

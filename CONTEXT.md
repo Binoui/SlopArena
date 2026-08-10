@@ -53,7 +53,7 @@ A reduced jump triggered by releasing the jump key within a short window (3–5 
 _Avoid_: mini jump, light jump, tap jump
 
 **FastFall**:
-Pressing down (camera-relative) while airborne to accelerate fall speed toward MaxFallSpeed. The commitment-to-descent tool — what makes aerial gameplay snappy instead of floaty (ADR-0016).
+Holding the dedicated Down key (X by default — deliberately NOT the backward-movement key, so drifting backward never fast-falls; issue #116) while airborne to accelerate fall speed toward MaxFallSpeed. The commitment-to-descent tool — what makes aerial gameplay snappy instead of floaty (ADR-0016). Applies in every airborne state except hitstun.
 _Avoid_: dive, plummet, down air
 
 **RecoveryMove**:
@@ -65,7 +65,7 @@ The symmetric commit resolution (phase 2, ADR-0015): two simultaneous Interrupti
 _Avoid_: parry (Kistu-specific), counter, trade
 
 **Slot**:
-One of the 10 hotkey move units (`1-5`, `A`, `E`, `R`, `F`, `LMB`, `RMB`), each a single move with ground/air variants. The move-budget unit of the keyboard-first design (ADR-0016); replaces the old 6-slot model and chains.
+One of the 11 hotkey move units (`1-5`, `A`, `E`, `R`, `F`, `LMB`, `RMB` — the ADR-0016 layout), each a single move with ground/air variants. The Q key was removed from the layout; the former Q ability moved to key `1` (slot index 2, `AbilitySlots.Slot1`). The move-budget unit of the keyboard-first design (ADR-0016); replaces the old 6-slot model and chains. Slots 6-10 (keys `2`-`5`, `A`) have no kit data yet.
 _Avoid_: button, ability slot, move slot
 **Knockback**:
 The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses frontloaded exponential decay (λ = 1.8/s): the launch is fastest right after the hit and smoothly slows — most travel happens early, the victim drifts in the tail. Decaying all axes also flattens launch arcs. Profile table maps archetypes to angle/base/growth:

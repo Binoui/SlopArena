@@ -176,15 +176,36 @@ public class ServerEntityPacketTests
     public void SizeConstants_AssertWireLayout()
     {
         // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10
-        // + hitstop/ADR-0012 + burst/ADR-0014): 113B base (8 entityId + 4 tick + 101
-        // CharacterStatePacket) + 1B flag + 19B input.
+        // + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10/JumpHeldTicks/ADR-0016): 124B
+        // base (8 entityId + 4 tick + 112 CharacterStatePacket) + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(113, ServerEntityPacket.BaseSize);
+        Assert.Equal(124, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
-        Assert.Equal(20, ServerEntityPacket.RelaySize);
-        Assert.Equal(133, ServerEntityPacket.MaxSize);
-        Assert.Equal(114, ServerEntityPacket.NoInputSize);
-        // Uplink format untouched: 19B InputState (31B full uplink packet with entityId+tick)
-        Assert.Equal(19, InputState.Size);
+        Assert.Equal(21, ServerEntityPacket.RelaySize);
+        Assert.Equal(145, ServerEntityPacket.MaxSize);
+        Assert.Equal(125, ServerEntityPacket.NoInputSize);
+        // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
+        // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
+        Assert.Equal(20, InputState.Size);
+    }
+
+    [Fact]
+    public void InputState_Roundtrips_JumpHeldBit()
+    {
+        var input = new InputState
+        {
+            MoveX = 0.5f, MoveY = -0.5f,
+            Up = true, Down = true, Left = false, Right = true,
+            Jump = true, JumpHeld = true, Dash = true, Burst = true, IsAiming = true,
+            ActiveSlot = AbilitySlots.A,
+        };
+        Span<byte> buf = stackalloc byte[InputState.Size];
+        input.Write(buf);
+        var restored = InputState.Deserialize(buf);
+
+        Assert.True(restored.JumpHeld);
+        Assert.True(restored.Jump);
+        Assert.True(restored.Down);
+        Assert.Equal(AbilitySlots.A, restored.ActiveSlot);
     }
 }

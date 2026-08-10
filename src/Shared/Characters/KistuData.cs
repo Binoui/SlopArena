@@ -167,7 +167,7 @@ public static partial class CharacterRegistry
             },
 
             // Q — Counter (parry window → launch riposte)
-            Q = new AbilitySpec
+            Slot1 = new AbilitySpec
             {
                 Name = "Counter",
                 Description = "Parry stance. If struck during the window, riposte-launches the attacker.",

@@ -23,7 +23,7 @@ public class PivotDataRegressionTests
 
     private static IEnumerable<AttackStage> AllStages(CharacterDefinition def)
     {
-        var specs = new[] { def.LMB, def.RMB, def.AirLMB, def.AirRMB, def.Q, def.E, def.R, def.F };
+        var specs = new[] { def.LMB, def.RMB, def.AirLMB, def.AirRMB, def.Slot1, def.E, def.R, def.F };
         foreach (var spec in specs)
         {
             if (spec == null) continue;
