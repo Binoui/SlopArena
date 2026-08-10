@@ -23,25 +23,15 @@ public sealed class AirChargeAttack : ChargeAttackAbility
 
     protected override void OnChargeStart(ref CharacterState s, CharacterDefinition def)
     {
-        // Stop a jump's ascent the moment the charge begins. ActivateAbility only cancels
-        // DOWNWARD velocity, and float gravity (AirFloatGravity=0) never bleeds upward
-        // momentum off, so pressing air RMB mid-rise would otherwise carry the climb through
-        // the entire hold — "fly up in the air" while charging. The charge is a stop-and-
-        // wind-up stance (deliberately unlike air LMB, which keeps momentum for its combo).
-        if (!s.IsGrounded)
-            s.VY = 0f;
+        // Momentum-preserve (issue #115): the charge keeps the player's current trajectory —
+        // no ascent stop, no hover. Air control resumes when the charge resolves.
     }
 
     protected override void OnAttackStart(ref CharacterState s, CharacterDefinition def, AttackStage stage)
     {
-        // Mirror the sim's aerial-attack reset (ServerSimulation.ActivateAbility) at the
-        // moment the attack actually begins. The charge hold lets gravity re-accumulate
-        // downward velocity and burn the float window, so without this the air RMB fires
-        // from a fall while air LMB fires from a hover (StageChainAbility re-applies the
-        // same reset — VY zero + AirTimeTicks=0 — on activation and every chain stage).
-        if (!s.IsGrounded && s.VY < 0f)
-            s.VY = 0f;
-        s.AirTimeTicks = 0;
+        // Momentum-preserve (issue #115): the air RMB fires from the player's current
+        // trajectory — falling VY and the FloatWindow position carry into the attack.
+        // No hover reset here or in the engine.
 
         if (stage.LungeForce != 0f)
             SetVelocityInFacing(ref s, stage.LungeForce);
@@ -50,9 +40,8 @@ public sealed class AirChargeAttack : ChargeAttackAbility
     protected override void OnAttackTick(ref CharacterState s, CharacterDefinition def, AttackStage stage)
     {
         // Per-tick stage velocity (AttackStage.MoveX/MoveY/MoveZ), re-applied EVERY tick:
-        // ServerSimulation.ActivateAbility zeroes downward VY on activation, and gravity +
-        // friction run before TickAbilities each tick, so a single write would be eaten
-        // immediately. Components are applied individually so a stage that declares only
+        // gravity + friction run before TickAbilities each tick, so a single write would be
+        // eaten immediately. Components are applied individually so a stage that declares only
         // MoveY (Nilus' Collapse) keeps whatever horizontal velocity LungeForce gave it.
         //
         // MoveY is refused while GROUNDED unless it points up. Grounded is reachable here:

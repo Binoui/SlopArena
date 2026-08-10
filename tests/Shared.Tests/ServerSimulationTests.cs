@@ -630,7 +630,7 @@ public class ServerSimulationTests
     // ── Whiff commitment (ADR-0015): warp gone, attack at range is a commitment ──
 
     [Fact]
-    public void AttackAtRange_NoWarp_EndsIdleNoVelocity()
+    public void AttackAtRange_NoWarp_EndsIdleWithLungeDrift()
     {
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
@@ -644,8 +644,9 @@ public class ServerSimulationTests
         var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 50);
 
         Assert.Equal(ActionState.Idle, state.State);
-        Assert.Equal(0f, state.VX);
-        Assert.Equal(0f, state.VZ);
         Assert.Equal(0f, state.WarpSpeed);
+        // Momentum-preserve (issue #115): EndAbility no longer zeroes velocity — the lunge
+        // drift survives into Idle, where friction decays it.
+        Assert.True(state.VZ > 0f, $"lunge drift must persist after the move: VZ={state.VZ}");
     }
 }

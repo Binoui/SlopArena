@@ -30,8 +30,8 @@ namespace SlopArena.Shared
     }
 
     /// <summary>
-    /// One stage of an ability. A simple ability has 1 stage.
-    /// A combo ability (like LMB) has N stages chained by ChainWindowTicks.
+    /// One stage of an ability. A simple ability has 1 stage; multi-hit moves
+    /// declare several HitboxEvents within the stage (issue #115 — no chained stages).
     /// </summary>
     public struct AttackStage
     {
@@ -57,10 +57,6 @@ namespace SlopArena.Shared
         /// additionally refuses a downward write while grounded — see the note there.
         /// </summary>
         public float MoveX, MoveY, MoveZ;
-        /// <summary>
-        /// 0 = final stage / no chain. Non-zero = frames to buffer next input.
-        /// </summary>
-        public ushort ChainWindowTicks;
 
         /// <summary>Distance where auto-dash triggers (e.g., 12m)</summary>
         public float AttackRange;

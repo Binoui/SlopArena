@@ -143,7 +143,7 @@ public class BurstTests
         var s = sim.GetState(1);
         Assert.Null(sim.GetActiveAbility(1));   // interrupted via State=Idle — no OnEnd
         Assert.Equal(0, s.AnimLockTicks);
-        Assert.Equal((byte)0, s.ComboStage);    // chain reset to stage 1
+        Assert.Equal((byte)0, s.ComboStage);    // single move — ComboStage stays 0
         Assert.Equal((byte)0, s.AttackSlot);
         Assert.Equal(ActionState.Idle, s.State);
         Assert.Equal(BurstConfig.OffensiveRecoveryTicks - 1, s.BurstRecoveryTicks);
@@ -249,36 +249,37 @@ public class BurstTests
     }
 
     [Fact]
-    public void OffensiveBurst_LmbChain_ResetsToStage1()
+    public void OffensiveBurst_MidLmbMove_CancelsMove_FreshPressStartsNewMove()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var p = TestHelpers.PlayerState();
         p.PY = TestHelpers.CombatGroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, p);
-        ushort stage1Duration = TestHelpers.CombatDef.LMB!.Stages[0].DurationTicks;
+        ushort moveDuration = TestHelpers.CombatDef.LMB!.Stages[0].DurationTicks;
 
-        // Stage 1 → 2: press LMB, buffer a second press, run to stage end (MankiLmbTests pattern).
+        // Start the single LMB move.
         sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
-        for (int i = 2; i < stage1Duration; i++)
-            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
-
         var mid = sim.GetState(1);
-        Assert.True(mid.ComboStage >= 1, $"expected chain to advance, got ComboStage={mid.ComboStage}");
+        Assert.True(mid.ComboStage == 0 && sim.GetActiveAbility(1) != null,
+            "single LMB move should be live with ComboStage 0");
 
-        // Burst resets the LMB chain to stage 1.
+        // Burst cancels the move (single-move semantics: nothing to reset a chain to).
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
-        Assert.Equal((byte)0, sim.GetState(1).ComboStage);
+        var burst = sim.GetState(1);
+        Assert.Null(sim.GetActiveAbility(1));
+        Assert.Equal(ActionState.Idle, burst.State);
+        Assert.Equal((byte)0, burst.ComboStage);
 
-        // Wait out the short offensive recovery, then a fresh LMB press starts a new stage-1 combo.
+        // Wait out the short offensive recovery, then a fresh LMB press starts a NEW move.
         for (int i = 1; i < BurstConfig.OffensiveRecoveryTicks; i++)
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
         Assert.Equal(0, sim.GetState(1).BurstRecoveryTicks);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
         var after = sim.GetState(1);
-        Assert.Equal((byte)0, after.ComboStage); // stage 1, not a continuation
+        Assert.Equal((byte)0, after.ComboStage); // a fresh move, not a continuation
         Assert.NotNull(sim.GetActiveAbility(1));
         Assert.Equal((byte)0, after.AnimIndex);
+        Assert.True(moveDuration > 0, "sanity: move duration read from spec");
     }
 }

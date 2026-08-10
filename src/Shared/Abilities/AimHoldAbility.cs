@@ -69,12 +69,6 @@ namespace SlopArena.Shared.Abilities
             s.AnimLockTicks = GetHoldLockTicks(def);
             s.ChargeTicks = 0;
 
-            // Stop a jump's ascent when the aim hold begins — ActivateAbility only cancels
-            // downward VY and re-opens the zero-g float window (AirTimeTicks=0), so without
-            // this an aim cast mid-rise climbs through the float (mirrors AirChargeAttack).
-            if (!s.IsGrounded)
-                s.VY = 0f;
-
             OnAimStart(ref s, def);
         }
 

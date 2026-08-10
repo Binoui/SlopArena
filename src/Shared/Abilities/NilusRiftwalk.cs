@@ -5,11 +5,12 @@ namespace SlopArena.Shared.Abilities;
 /// <summary>
 /// Nilus' E — Riftwalk. A short blink in the facing direction that also works
 /// airborne, making it his primary recovery AND his primary approach. It adds no
-/// vertical velocity of its own, but it is not purely horizontal in practice:
-/// ServerSimulation.ActivateAbility (ServerSimulation.cs:80) zeroes downward VY
-/// and resets AirTimeTicks for EVERY aerial ability, so each cast also buys the
-/// front of Nilus' 40-tick zero-gravity float window. That stall is engine-wide
-/// policy, not a Riftwalk knob — count it when tuning his recovery.
+/// vertical velocity of its own, and is not purely horizontal in practice: it
+/// covers distance at his current height, so it recovers horizontally — vertical
+/// recovery is double-jump first (MaxJumps 2, FloatWindowTicks 40), then a blink
+/// in at stage level. Note (issue #115 / ADR-0015): aerial abilities no longer
+/// zero falling VY or reset AirTimeTicks — momentum-preserve removed that
+/// engine-wide policy; Riftwalk rides the trajectory it was cast from.
 ///
 /// The blink does NOT phase through arena geometry: it traces the path in
 /// TraceStep increments and stops at the last valid position. A candidate is

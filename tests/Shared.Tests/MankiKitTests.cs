@@ -138,7 +138,7 @@ public class MankiKitTests
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void AirLMB_TwoHitCombo_ChainsToSecondStage()
+    public void AirLMB_SinglePress_DoesNotChain()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -150,13 +150,15 @@ public class MankiKitTests
         sim.Tick(new() { { 1, input } });
         Assert.Equal(0, sim.GetState(1).ComboStage);
 
+        // Repeat press mid-move: no chain (issue #115).
         sim.Tick(new() { { 1, input } });
 
         for (int i = 2; i < 20; i++)
             sim.Tick(new() { { 1, default } });
 
         var after = sim.GetState(1);
-        Assert.Equal((byte)1, after.ComboStage);
+        Assert.Equal((byte)0, after.ComboStage); // still the single move, never chained
+        Assert.Equal(ActionState.Attacking, after.State);
     }
 
     // ══════════════════════════════════════════════════════════════════

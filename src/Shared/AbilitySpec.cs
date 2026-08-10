@@ -20,7 +20,7 @@ namespace SlopArena.Shared
 
     public enum AbilityBehavior : byte
     {
-        MeleeCombo,          // Multi-stage LMB combo, chained on input
+        MeleeCombo,          // LMB melee — single move per press (chains removed, issue #115)
         ChargeAttack,        // Hold briefly to charge (2 anims: attack, charged). RMB.
         AimedProjectile,     // Hold to aim parabola, release to throw (3 anims: start, loop, throw). Q.
         Projectile,          // Fire-and-forget projectile. Single anim.
@@ -56,6 +56,13 @@ namespace SlopArena.Shared
         public byte AbilityTypeId;
         /// <summary>0 = no cooldown</summary>
         public ushort CooldownTicks;
+        /// <summary>
+        /// ADR-0015 / issue #115: recovery-designated move (Smash up-B analog). Only
+        /// moves with this flag reset the FloatWindow (AirTimeTicks = 0 at activation) —
+        /// normal air attacks no longer hover. The shared <c>RecoveryMove</c> ability class
+        /// implements the burst; bespoke recovery moves just set the flag to get the reset.
+        /// </summary>
+        public bool IsRecoveryMove;
         public AttackStage[] Stages;
         /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
         public AttackStage[]? ChargedStages;

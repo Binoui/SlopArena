@@ -555,13 +555,12 @@ public class AbilityLifecycleTests
     }
 
     /// <summary>
-    /// Pressing air RMB mid-ascent must STOP the climb and charge in place. ActivateAbility
-    /// only cancels DOWNWARD velocity and float gravity never bleeds upward momentum off, so
-    /// without <see cref="Abilities.AirChargeAttack.OnChargeStart"/> zeroing VY the jump's
-    /// rise carries through the entire hold ("fly up in the air while charging").
+    /// Pressing air RMB mid-ascent preserves the climb (issue #115 momentum-preserve).
+    /// The old engine policy zeroed downward VY and restarted the float on every aerial
+    /// ability; the charge no longer stops the rise — the jump carries through the hold.
     /// </summary>
     [Fact]
-    public void MankiAirRMB_ChargeStart_StopsJumpAscent()
+    public void MankiAirRMB_ChargeStart_PreservesJumpAscent()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -570,30 +569,32 @@ public class AbilityLifecycleTests
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Hold the charge: the ascent must stop at press, not carry through the hold.
+        // Hold the charge: the rise carries through the hold (no ascent stop).
         var holdInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) } };
         for (int i = 0; i < 10; i++)
             sim.Tick(holdInputs);
 
         var mid = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, mid.State);
-        TestHelpers.AssertNear(0f, mid.VY);
-        Assert.True(mid.PY < state.PY + 1f,
-            $"pressing air RMB mid-ascent must stop the rise: {state.PY:F3} -> {mid.PY:F3}");
+        Assert.True(mid.VY > 9f,
+            $"pressing air RMB mid-ascent must preserve the rise: VY={mid.VY:F3}");
+        Assert.True(mid.PY > state.PY + 1f,
+            $"pressing air RMB mid-ascent must not stop the climb: {state.PY:F3} -> {mid.PY:F3}");
     }
 
     /// <summary>
-    /// The air RMB must fire from a clean hover like air LMB does (StageChainAbility zeroes
-    /// downward VY and restarts the float window on every stage). The charge hold burns the
-    /// float window, so <see cref="Abilities.AirChargeAttack.OnAttackStart"/> re-applies the
-    /// same reset at release. Without it, AirTimeTicks keeps climbing through the hold.
+    /// The air RMB fires from the player's current trajectory (issue #115 momentum-preserve):
+    /// the release no longer wipes falling VY or restarts the FloatWindow — falling velocity
+    /// and the AirTime position carry into the spike.
     /// </summary>
     [Fact]
-    public void MankiAirRMB_TapRelease_RestartsHover()
+    public void MankiAirRMB_TapRelease_PreservesMomentum()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = 5f;
+        state.VY = -5f; // falling before the press
+        state.AirTimeTicks = 8;
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
@@ -601,17 +602,17 @@ public class AbilityLifecycleTests
 
         var after = sim.GetState(1);
         Assert.Equal((byte)1, after.ComboStage); // attack phase reached
-        Assert.Equal((ushort)0, after.AirTimeTicks);   // float window restarted at release
-        TestHelpers.AssertNear(0f, after.VY);          // no downward velocity carried in
+        Assert.True(after.AirTimeTicks > 8, $"FloatWindow must NOT restart: AirTime={after.AirTimeTicks}");
+        Assert.True(after.VY < 0f, $"falling velocity must carry into the attack: VY={after.VY}");
     }
 
     /// <summary>
-    /// Same reset on the CHARGED release. Manki's float window is 30 ticks + 15 ramp, so by
-    /// the auto-release tick (45) the hold has ramped into real gravity (VY ≈ -4.7 without
-    /// the reset); the release must wipe it and restart the hover for the spike.
+    /// Same momentum-preserve on the CHARGED release. Manki's float window is 30 ticks + 15
+    /// ramp, so by the auto-release tick (45) the hold has ramped into real gravity (VY ≈ -4.7);
+    /// the release must NOT wipe it — the spike fires from the fall (issue #115).
     /// </summary>
     [Fact]
-    public void MankiAirRMB_ChargedRelease_RestartsHover()
+    public void MankiAirRMB_ChargedRelease_PreservesMomentum()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -626,8 +627,8 @@ public class AbilityLifecycleTests
 
         var after = sim.GetState(1);
         Assert.Equal((byte)1, after.ComboStage); // attack phase reached (charged)
-        Assert.Equal((ushort)0, after.AirTimeTicks);   // hover restarted despite the 45-tick hold
-        TestHelpers.AssertNear(0f, after.VY);
+        Assert.True(after.AirTimeTicks > 30, $"FloatWindow must NOT restart: AirTime={after.AirTimeTicks}");
+        Assert.True(after.VY < -3f, $"fall must carry into the charged attack: VY={after.VY}");
     }
 
     /// <summary>

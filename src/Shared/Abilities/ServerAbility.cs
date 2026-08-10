@@ -224,16 +224,15 @@ namespace SlopArena.Shared.Abilities
         }
 
         /// <summary>
-        /// End the ability naturally: calls OnEnd, zeros residual horizontal velocity,
-        /// sets state to Idle. The simulation applies cooldown after return.
+        /// End the ability naturally: calls OnEnd, returns to Idle.
+        /// The simulation applies cooldown after return.
+        /// Horizontal velocity is intentionally NOT zeroed (issue #115 / ADR-0015):
+        /// momentum survives the attack — lunge drift and pre-attack velocity carry
+        /// into the next state, where normal friction/air control resumes.
         /// </summary>
         protected void EndAbility(ref CharacterState s)
         {
             OnEnd(ref s);
-            // Zero residual horizontal velocity from lunge/kick to prevent drift.
-            // All EndAbility callers represent "attack complete, return to neutral".
-            s.VX = 0f;
-            s.VZ = 0f;
             s.State = ActionState.Idle;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;

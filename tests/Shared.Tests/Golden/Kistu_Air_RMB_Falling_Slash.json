@@ -7,7 +7,7 @@
     "ComboStage": 1,
     "AttackSlot": 2,
     "HitstopTicks": 8,
-    "AirTimeTicks": 6
+    "AirTimeTicks": 11
   },
   "NpcSnap": {
     "PY": 0.75,
@@ -18,9 +18,9 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
-    "PY": 1.3799999,
-    "VY": -2.16,
-    "AirTimeTicks": 43
+    "PY": 1.0549998,
+    "VY": -5.1,
+    "AirTimeTicks": 48
   },
   "NpcFinal": {
     "PY": 0.75,

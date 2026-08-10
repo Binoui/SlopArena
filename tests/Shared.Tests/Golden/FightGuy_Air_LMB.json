@@ -5,6 +5,7 @@
     "State": 4,
     "PY": 2,
     "PZ": 0.30000004,
+    "VZ": 3,
     "AttackSlot": 1,
     "AirTimeTicks": 6
   },
@@ -18,7 +19,7 @@
   },
   "PlayerFinal": {
     "PY": 0.85,
-    "PZ": 0.30000004,
+    "PZ": 1.54999,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

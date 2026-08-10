@@ -44,13 +44,6 @@ public sealed class KistuDashSlash : ServerAbility
         s.AttackElapsedTicks = 0;
         s.IsAiming = true;
         s.StateTicks = 0;
-
-        // Stop a jump's ascent when the aim hold begins — ActivateAbility only cancels
-        // downward VY and re-opens the zero-g float window (AirTimeTicks=0), so without
-        // this an aim cast mid-rise climbs through the float (mirrors AirChargeAttack
-        // and AimHoldAbility; this class keeps its own FSM instead of subclassing).
-        if (!s.IsGrounded)
-            s.VY = 0f;
     }
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
@@ -79,15 +72,10 @@ public sealed class KistuDashSlash : ServerAbility
         // ── Dash phase ──
         float dashDuration = GetParam(def, "dash_duration_ticks", 16f);
         float dashDistance = GetParam(def, "dash_distance", 5f);
-        // Grounded attacks decay horizontal velocity by GroundFriction every tick before the
-        // ability re-writes it (Simulation.cs "Ground friction during attacking"). Compensate
-        // so the integrated displacement over the dash is exactly dash_distance. Airborne dashes
-        // skip the friction block, so no compensation there.
-        float frictionFactor = s.IsGrounded
-            ? (1f - def.Movement.GroundFriction * Simulation.TickDt)
-            : 1f;
-        float speed = dashDuration > 0f && frictionFactor > 0f
-            ? dashDistance / (dashDuration * Simulation.TickDt * frictionFactor)
+        // Momentum-preserve (issue #115): attacking applies no ground friction, so the
+        // integrated displacement is exactly speed × duration — no friction compensation.
+        float speed = dashDuration > 0f
+            ? dashDistance / (dashDuration * Simulation.TickDt)
             : 0f;
         s.VX = MathF.Sin(_dashYaw) * speed;
         s.VZ = MathF.Cos(_dashYaw) * speed;
@@ -97,7 +85,7 @@ public sealed class KistuDashSlash : ServerAbility
         // per-tick respawns which would re-hit a knockback-carried target every tick.
         if (!_hitboxSpawned)
         {
-            SpawnDashHitbox(ref s, def, speed * frictionFactor, (ushort)dashDuration);
+            SpawnDashHitbox(ref s, def, speed, (ushort)dashDuration);
             _hitboxSpawned = true;
         }
 
@@ -157,8 +145,8 @@ public sealed class KistuDashSlash : ServerAbility
             Y = s.PY + evt.OffY,
             Z = sz,
             // Follow the dash so the swept capsule stays glued to the character.
-            // followSpeed is the effective post-friction speed (what position integration
-            // actually applies), not the compensated write speed.
+            // followSpeed is the dash speed itself — no friction acts during the dash
+            // (momentum-preserve, issue #115).
             VX = MathF.Sin(_dashYaw) * followSpeed,
             VY = 0f,
             VZ = MathF.Cos(_dashYaw) * followSpeed,
@@ -176,5 +164,16 @@ public sealed class KistuDashSlash : ServerAbility
             OwnerId = s.EntityId,
             FreezesOwner = true,
         });
+    }
+
+    /// <summary>
+    /// Precise landing (issue #115 carve-out): the dash-slash is a REPOSITION move whose
+    /// authored endpoint is the aim distance — like a normal dash, which stops exactly at
+    /// expiry (ProcessDash). Momentum-preserve coasts ATTACKS; movement tech lands exactly.
+    /// </summary>
+    public override void OnEnd(ref CharacterState s)
+    {
+        s.VX = 0f;
+        s.VZ = 0f;
     }
 }

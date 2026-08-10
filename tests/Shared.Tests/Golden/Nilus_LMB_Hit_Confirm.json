@@ -4,7 +4,7 @@
   "PlayerSnap": {
     "State": 4,
     "PY": 0.825,
-    "PZ": 0.375,
+    "PZ": 0.5,
     "VZ": 5,
     "AttackSlot": 1,
     "HitstopTicks": 1,
@@ -21,7 +21,7 @@
   },
   "PlayerFinal": {
     "PY": 0.825,
-    "PZ": 0.375,
+    "PZ": 2.4992073,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

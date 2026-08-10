@@ -274,14 +274,8 @@ namespace SlopArena.Shared
                 // Attacking state is now purely handled by ServerSimulation.TickAbilities
             }
 
-            // Ground friction during attacking (abilities handle velocity via LungeForce)
-            // Skip during warp — warp velocity should stay at SprintSpeed until arrival
-            if (s.State == ActionState.Attacking && s.IsGrounded && s.WarpSpeed <= 0f)
-            {
-                float friction = stats.GroundFriction * TickDt;
-                s.VX = MoveToward(s.VX, 0f, Math.Abs(s.VX) * friction);
-                s.VZ = MoveToward(s.VZ, 0f, Math.Abs(s.VZ) * friction);
-            }
+            // NOTE: no ground friction during Attacking (issue #115) — attacks preserve
+            // drift and lunge momentum; friction resumes when the ability returns to Idle.
 
 
 
@@ -295,9 +289,6 @@ namespace SlopArena.Shared
                 // Ability activation handled by ServerSimulation.Tick pre-sim phase
                 s.State = ActionState.Attacking;
                 s.AttackSlot = slot;
-                s.AirTimeTicks = 0;
-                if (!s.IsGrounded && s.VY < 0f)
-                    s.VY = 0f;
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
@@ -361,9 +352,6 @@ namespace SlopArena.Shared
                         s.State = ActionState.Attacking;
                         s.AttackSlot = input.ActiveSlot;
                         s.StateTicks = 0;
-                        s.AirTimeTicks = 0;
-                        if (!s.IsGrounded && s.VY < 0f)
-                            s.VY = 0f;
                     }
                 }
             }

@@ -88,17 +88,11 @@ public class NilusAbilityTests
     }
 
     /// <summary>
-    /// Void Rake is a 2-stage aerial chain and had literally zero behavioural coverage: the only
-    /// thing touching it was the tautological <c>AirSlot_Activates(1)</c>, so neither the chain,
-    /// nor the 3/5 damage ladder, nor stage 2's <c>Launcher</c> knockback was tested.
-    ///
-    /// The chain is the discriminator no generic path can fake: <c>ComboStage</c> only advances
-    /// inside <see cref="Abilities.StageChainAbility"/> when a second press is buffered inside
-    /// stage 1's 9-tick ChainWindow. Damage on a body is what makes the ladder load-bearing —
-    /// 3 from stage 1, then 5 more from stage 2.
+    /// Single move (issue #115): one press = one rake. The stage-1 hit connects for 3,
+    /// there is no chained stage 2 — the dummy's damage stays at 3.
     /// </summary>
     [Fact]
-    public void AirLmb_VoidRake_ChainsToStage2_AndLandsBothHits()
+    public void AirLmb_VoidRake_SingleMove_HitsOnce_NoChain()
     {
         var sim = TestHelpers.MakeSim();
         var s = TestHelpers.PlayerState();
@@ -113,29 +107,19 @@ public class NilusAbilityTests
         sim.RegisterEntity(100, TestHelpers.CombatDef, npc);
 
         var press = TestHelpers.Input(activeSlot: 1);
-        sim.Tick(new() { { 1, press }, { 100, default } });    // stage 1 opens
-        sim.Tick(new() { { 1, press }, { 100, default } });    // buffered inside the chain window
+        sim.Tick(new() { { 1, press }, { 100, default } });   // the single move opens
+        sim.Tick(new() { { 1, press }, { 100, default } });   // repeat press: no chain
 
-        byte reachedStage = 0;
-        ushort firstHit = 0;
-        float launchKvy = 0f;
-        for (int tick = 2; tick < 60; tick++)
-        {
+        // Mid-move: still the single stage.
+        for (int tick = 2; tick < 12; tick++)
             sim.Tick(new() { { 1, default }, { 100, default } });
+        Assert.Equal((byte)0, sim.GetState(1).ComboStage);    // never chained
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
 
-            var caster = sim.GetState(1);
-            if (caster.ComboStage > reachedStage) reachedStage = caster.ComboStage;
-
-            var dummy = sim.GetState(100);
-            if (firstHit == 0) firstHit = dummy.DamagePercent;
-            if (launchKvy <= 0f && dummy.DamagePercent >= 8) launchKvy = dummy.KVY;
-        }
-
-        Assert.Equal((byte)1, reachedStage);                       // the chain fired
-        Assert.Equal((ushort)3, firstHit);                         // stage 1's 3
-        Assert.Equal((ushort)8, sim.GetState(100).DamagePercent);  // + stage 2's 5
-        Assert.True(launchKvy > 0f,
-            $"stage 2 is a Launcher, so its hit must throw the dummy upward; KVY={launchKvy:F2}");
+        // Run out the move — the dummy keeps only stage-1's 3 damage.
+        for (int tick = 12; tick < 60; tick++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+        Assert.Equal((ushort)3, sim.GetState(100).DamagePercent);
     }
 
     /// <summary>
@@ -610,12 +594,10 @@ public class NilusAbilityTests
     ///
     /// What Riftwalk itself owns airborne is PURELY horizontal displacement: no height
     /// gain, no upward velocity, no free ground snap. It deliberately does NOT assert
-    /// that he keeps falling, because that is not Riftwalk's to give or take —
-    /// ServerSimulation.ActivateAbility (ServerSimulation.cs:76-79) zeroes downward VY
-    /// and resets AirTimeTicks for EVERY aerial ability activation, and Nilus' 40-tick
-    /// AirFloatGravity-0 float window then holds VY at 0 for the whole 8-tick cast. So
-    /// every Riftwalk stalls the fall by engine rule; the ability adds nothing upward
-    /// on top of that, which is what this test pins.
+    /// that he keeps falling, because under momentum-preserve (issue #115) the fall
+    /// carries through the cast by engine rule — no ability activation stalls VY or
+    /// resets the FloatWindow anymore. What this test pins is that Riftwalk adds no
+    /// upward motion of its own on top of that.
     /// </summary>
     [Fact]
     public void E_BlinksWhileAirborne_WithoutGainingHeight()

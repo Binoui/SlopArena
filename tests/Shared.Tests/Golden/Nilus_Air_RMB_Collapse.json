@@ -8,7 +8,7 @@
     "ComboStage": 1,
     "AttackSlot": 2,
     "HitstopTicks": 8,
-    "AirTimeTicks": 8
+    "AirTimeTicks": 13
   },
   "NpcSnap": {
     "PY": 3.65,

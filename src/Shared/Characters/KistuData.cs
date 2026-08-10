@@ -63,60 +63,40 @@ public static partial class CharacterRegistry
 
             // ═══ ABILITIES ═══
 
-            // LMB — Light Slash Combo (4 hits, reach-y capsule slashes, launcher finisher)
+            // LMB — Light Slash (single move, reach-y capsule slash)
             LMB = new AbilitySpec
             {
-                Name = "Light Slash Combo",
-                Description = "Four-hit katana slash chain. Fast, disjointed reach; finisher launches.",
+                Name = "Light Slash",
+                Description = "Fast katana slash — a single committed move (no auto-combo)",
                 IconName = "lmb",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 30, ChainWindowTicks = 10, LungeForce = 6f,
+                    new() { DurationTicks = 30, LungeForce = 6f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.8f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
                             AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
-                    new() { DurationTicks = 28, ChainWindowTicks = 10, LungeForce = 6f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
-                                    OffX = 0, OffY = 0.8f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.9f,
-                                    Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
-                    new() { DurationTicks = 30, ChainWindowTicks = 10, LungeForce = 8f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
-                                    OffX = 0, OffY = 0.6f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.6f, EndOffZ = 2.0f,
-                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
-                    new() { DurationTicks = 42, ChainWindowTicks = 0, LungeForce = 10f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 10, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.45f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.8f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 2.0f,
-                                    Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Launcher }, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3", "spell_lmb_4" },
+                AnimationNames = new[] { "spell_lmb_1" },
                 Params = new() { ["lunge_duration"] = 6f },
             },
 
-            // AirLMB — Air Slash (3 hits, juggle sustain, near-neutral/up KB)
+            // AirLMB — Air Slash (single aerial slash, juggle sustain, near-neutral/up KB)
             AirLMB = new AbilitySpec
             {
                 Name = "Air Slash",
-                Description = "Three-hit aerial slash. Low commit; keeps enemies airborne for juggles.",
+                Description = "Aerial slash. Low commit; keeps enemies airborne for juggles.",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 24, ChainWindowTicks = 9, LungeForce = 3f,
+                    new() { DurationTicks = 24, LungeForce = 3f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.6f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
-                    new() { DurationTicks = 24, ChainWindowTicks = 9, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
-                                    OffX = 0, OffY = 0.9f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.9f, EndOffZ = 1.6f,
-                                    Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
-                AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2" },
+                AnimationNames = new[] { "spell_lmb_air_1" },
             },
 
             // RMB — Charged Spin: tap = horizontal poke, hold = charged kill (big horizontal launch)
@@ -131,10 +111,10 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     // Stage 0: hold/charge phase (safety net 300 ticks)
-                    new() { DurationTicks = 300, ChainWindowTicks = 0, HitboxEvents = System.Array.Empty<HitboxEvent>(),
+                    new() { DurationTicks = 300, HitboxEvents = System.Array.Empty<HitboxEvent>(),
                             LungeForce = 0f, AttackRange = 0f, WarpRange = 0f },
                     // Stage 1: tap poke (quick, horizontal knockback)
-                    new() { DurationTicks = 30, ChainWindowTicks = 0, LungeForce = 3f,
+                    new() { DurationTicks = 30, LungeForce = 3f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.9f,
                                     Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 18, Interruptible = true } },
@@ -143,7 +123,7 @@ public static partial class CharacterRegistry
                 ChargedStages = new AttackStage[]
                 {
                     // Charged: big horizontal-launch kill spin
-                    new() { DurationTicks = 44, ChainWindowTicks = 0, LungeForce = 5f,
+                    new() { DurationTicks = 44, LungeForce = 5f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.6f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 2.1f,
                                     Damage = 16f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 18, KnockbackGrowth = 10 },
@@ -164,11 +144,11 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     // Stage 0: hold/charge phase (no hitboxes; targeting config lives here)
-                    new() { DurationTicks = 60, ChainWindowTicks = 0,
+                    new() { DurationTicks = 60, 
                             HitboxEvents = Array.Empty<HitboxEvent>(),
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
                     // Stage 1: tap slash (same numbers as the pre-charge air RMB)
-                    new() { DurationTicks = 26, ChainWindowTicks = 0, LungeForce = 0f,
+                    new() { DurationTicks = 26, LungeForce = 0f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.4f,
                                     Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 20, Interruptible = true } },
@@ -177,7 +157,7 @@ public static partial class CharacterRegistry
                 ChargedStages = new AttackStage[]
                 {
                     // Charged: wider blade, more damage
-                    new() { DurationTicks = 26, ChainWindowTicks = 0, LungeForce = 0f,
+                    new() { DurationTicks = 26, LungeForce = 0f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Shape = HitboxShape.Capsule, Radius = 0.6f,
                                     OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.5f,
                                     Damage = 13f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 24, Interruptible = true } },
@@ -197,7 +177,7 @@ public static partial class CharacterRegistry
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 40, ChainWindowTicks = 0, HitboxEvents = System.Array.Empty<HitboxEvent>(),
+                    new() { DurationTicks = 40, HitboxEvents = System.Array.Empty<HitboxEvent>(),
                             AttackRange = 0f, WarpRange = 0f },
                 },
                 AnimationNames = new[] { "spell_q_parry", "spell_q_riposte" },
@@ -228,7 +208,7 @@ public static partial class CharacterRegistry
                     // Dash stage: the ability spawns a fresh hitbox at the character's position
                     // every dash tick (per-tick sweep along the aim axis, radius covers her sides).
                     // DurationTicks also drives the dash clip playback speed (frameCount / DurationTicks).
-                    new() { DurationTicks = 16, ChainWindowTicks = 0,
+                    new() { DurationTicks = 16, 
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 1, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.3f,
                                     Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 16, Interruptible = true } },
@@ -254,7 +234,7 @@ public static partial class CharacterRegistry
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 24, ChainWindowTicks = 0,
+                    new() { DurationTicks = 24, 
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.9f,
                                     OffX = 0, OffY = 1.0f, OffZ = 0.6f,
                                     Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 7, KnockbackGrowth = 5 },
@@ -284,7 +264,7 @@ public static partial class CharacterRegistry
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 64, ChainWindowTicks = 0,
+                    new() { DurationTicks = 64, 
                             HitboxEvents = new HitboxEvent[]
                             {
                                 new() { TriggerTick = 8, DurationTicks = 4, Shape = HitboxShape.Capsule, Radius = 0.5f,

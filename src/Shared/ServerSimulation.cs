@@ -117,10 +117,12 @@ namespace SlopArena.Shared
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
 			state.AttackSlot = (byte)(slot + 1);
-            state.AirTimeTicks = 0;
-            // Aerial attacks: cancel downward velocity so FloatWindow starts from hover
-            if (!state.IsGrounded && state.VY < 0f)
-                state.VY = 0f;
+            // ADR-0015 / issue #115: momentum-preserve removed the blanket AirTime reset
+            // and VY-cancel for every aerial ability. The FloatWindow now resets ONLY for
+            // recovery-designated moves (AbilitySpec.IsRecoveryMove) — the Smash up-B analog.
+            var spec = def.GetSlotAbility(slot, !state.IsGrounded);
+            if (spec != null && spec.IsRecoveryMove)
+                state.AirTimeTicks = 0;
 			_states[entityId] = state;
 			_activeAbilities[entityId] = ability;
 		}

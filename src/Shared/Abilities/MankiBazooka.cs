@@ -34,12 +34,6 @@ namespace SlopArena.Shared.Abilities
             s.IsAiming = true;
             // Lock input for max hold duration (charge_hold_ticks or 180 = 3s)
             s.AnimLockTicks = (ushort)GetParam(def, "charge_hold_ticks", 180f);
-
-            // Stop a jump's ascent when the aim hold begins — ActivateAbility only cancels
-            // downward VY and re-opens the zero-g float window (AirTimeTicks=0), so without
-            // this an aim cast mid-rise climbs through the float (mirrors AirChargeAttack).
-            if (!s.IsGrounded)
-                s.VY = 0f;
         }
 
         public override void OnEnd(ref CharacterState s)
