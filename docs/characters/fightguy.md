@@ -29,15 +29,30 @@ FightGuy's theme is **martial arts mastery** — every ability channels ki throu
 
 ## Abilities
 
-| Slot | Name | Animations | Description | Notes |
-|---|---|---|---|---|
-| **LMB** | Dragon Combo | `spell_lmb_1/2/3` | Three-hit punch-kick chain | Stage 3: strong launcher |
-| **AirLMB** | Rising Kick | `spell_lmb_3` | Airborne rising kick | Launches enemies upward |
-| **RMB** | Heavy Strike | `spell_rmb` | Ki-infused ground slam | Shockwave AoE |
-| **Q** | Ki Shot | `spell_q` | Aimed ki projectile | Hold to aim; marks targets for 5s on hit |
-| **E** | Cyclone Kick | `spell_e` | Forward spinning kick ~10m. Stuns enemies passed through. | High stun, risk-reward lunge |
-| **R** | Dragon's Kick | `spell_r_loop/attack/end` | Powerful flying kick | Fly straight ahead with a flying kick, transition into a multi hit aerial attack on hit. If target is marked with Q, fly directly to target |
-| **F** | Tempest (ult) | `spell_f` | Rapid spin in place, cyclone visual | Kicks pull nearby enemies toward center over 1.5s, then a final launcher kick. FightGuy cannot move during it. Big damage + knockback if enemy is caught |
+11-slot kit (issue #117 design, v2). Two tiers: the **universal normal schema** (LMB/RMB +
+keys 1-4 — same roles for every character) and the **ability tier** (Q E R F — the
+identity-defining moves). Ground/air: LMB/RMB have required air variants; keys 1-4 are
+grounded-only in demo (air pass later); ability slots work both unless noted. Q = slot 11
+(key "Q" position — the physical A key on AZERTY).
+
+| Slot | Key | Move | Anim | Description | Notes |
+|---|---|---|---|---|---|
+| **LMB** | LMB | Dragon Jab | `spell_lmb_1` | Fast low-kick jab | 0 CD, neutral poke, lunge-forward |
+| **AirLMB** | LMB (air) | Rising Kick | `spell_lmb_3` | Rising two-hit airborne uppercut | launcher into air combos |
+| **RMB** | RMB | Uppercut | `spell_rmb` | Charged uppercut — hold to charge, release to strike | more charge = more damage/stun, launcher |
+| **AirRMB** | RMB (air) | Helicopter | `spell_rmb_air` | Hold to charge aerial spinning heel drop; tap = quick spike, charged = heavy spike | spikes downward |
+| **Slot1** | 1 | Dragon Thrust | `spell_lmb_2` | Forward palm/kick thrust — medium spacing | more range than jab, the footsies key, ground-only |
+| **Slot2** | 2 | Dragon Uppercut | `spell_lmb_3` | Anti-air uppercut, launches | ground-only |
+| **Slot3** | 3 | Dragon Stomp | `spell_rmb` | Big punish normal — slow, telegraphed, huge KB | ground-only, the reward move |
+| **Slot4** | 4 | Ki Wave | `spell_f` | Get-off-me — 360° knockback around self | ground-only, escapes pressure |
+| **Q** | Q | Ki Shot | `spell_q` | Aimed ki projectile; marks target 5s on hit | on the Q key (slot 11); AZERTY physical-A |
+| **E** | E | Rising Dragon | `spell_r_loop` | Upward mobility — rising kick: anti-air on ground, recovery burst in air (FloatWindow reset) | the up-B analog, `IsRecoveryMove`, ~4s CD |
+| **R** | R | Cyclone Kick | `spell_e` | Forward spinning kick ~10m; stuns enemies passed through | engage, moved from E |
+| **F** | F | Tempest | `spell_f` | Spin in place, pull enemies inward 1.5s, final launcher kick | ult, ground-only |
+
+> Key 5: empty in demo. Dragon's Kick: cut (redundant with Cyclone — both forward kicks);
+> Ki Shot marks remain as a setup hook. Status: slots LMB/F implemented; the rest designed in
+> `docs/plans/issue-117-kit-expansion.md` — implementation in flight.
 
 ## Stats
 
@@ -47,35 +62,37 @@ FightGuy's theme is **martial arts mastery** — every ability channels ki throu
 | Sprint Speed | 14 m/s |
 | Dash Speed | 32 m/s |
 | Air Acceleration | 16 m/s² |
-| Jump Force | 14 m/s |
-| Gravity | 34 m/s² |
+| Jump Force | 12 m/s |
+| Gravity | 36 m/s² |
 | Max Jumps | 2 |
-| Dash Duration | 8 ticks (~130ms) |
-| Dash Cooldown | 48 ticks (~800ms) |
-| Visual Scale | 2.0 |
-| Hurtbox Bone Scale | 2.0 |
+| Jump Squat | 4 ticks (~67ms) |
+| Float Window / Fall Ramp | 35 / 10 ticks |
+| Max Fall Speed | 48 m/s |
+| Dash Duration / Cooldown | 18 / 48 ticks |
 | Capsule (Radius × Height) | 0.35 × 1.7 m |
 | Hurtbox Radius | 1.0 m |
 
 ## Gameplay
 
 ### Strengths
-- **Zone control** with Ki Shot (Q) — forces opponents to respect the projectile
-- **High burst damage** from Dragon's Kick (R) executing marked targets
-- **Strong engage** with Cyclone Kick (E) into follow-ups
-- **Excellent air game** — Rising Kick (AirLMB) launches into combos
+- **Complete normal tier** — jab (LMB), spacing (1), anti-air (2), punish (3), get-off-me (4)
+- **Projectile pressure** — Ki Shot (Q) zones and marks; camera-aimed
+- **Strong engage** — Cyclone Kick (R) stun-lunges into follow-ups
+- **Excellent air game** — Rising Kick (AirLMB) launches, Helicopter (AirRMB) spikes
+- **Upward mobility** — Rising Dragon (E) doubles as anti-air and the once-per-life recovery
 
 ### Weaknesses
-- **Slow projectiles** — Ki Shot has predictable arc, can be dodged
-- **Commit-heavy** — Cyclone Kick and Dragon's Kick are all-in
-- **No ranged poke** without Ki Shot mark setup
-- **Tempest locks in place** — vulnerable if enemies aren't inside the pull
+- **Commit-heavy** — Cyclone (R) and Tempest (F) are all-in; whiffs are punished
+- **No zoning outside Ki Shot** — the normal tier is melee
+- **Recovery is one-shot** — Rising Dragon (E) has a long cooldown; off-stage mistakes cost the stock
+- **No defensive/armor tier in demo** — Ki Wave (4) is the only escape, and it's a normal, not a save
 
 ### Combos
-1. Q (Ki Shot) → wait for mark → R (Dragon's Kick) → LMB chain — optimal execution punish
-2. E (Cyclone Kick) → LMB chain → AirLMB (Rising Kick) — close-range burst
-3. RMB (Heavy Strike) → follow-up pressure — ground control
-4. F (Tempest) → hold enemies in AoE → all abilities off cooldown
+1. Cyclone Kick (R) stun → jab (LMB) → spacing (1) — close-range burst
+2. Anti-air (2) launch → Rising Kick (AirLMB) follow-up — air combo
+3. Stomp (3) reads → huge punish — the reward move
+4. Ki Shot (Q) marks — setup hook for future execute synergy
+5. Tempest (F) → hold enemies in AoE → all abilities off cooldown
 
 ## Unity Pipeline Notes
 

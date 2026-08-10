@@ -319,10 +319,20 @@ namespace SlopArena.Shared
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)
             {
                 byte slot = s.BufferedSlot;
-                s.BufferedSlot = 0;
-                // Ability activation handled by ServerSimulation.Tick pre-sim phase
-                s.State = ActionState.Attacking;
-                s.AttackSlot = slot;
+                // Issue #117: grounded-only moves (no air spec) buffered while airborne must
+                // NOT consume into a stuck Attacking placeholder — drop the buffer instead.
+                // The ServerAbility path re-resolves the spec on the next PreTickAbilities.
+                if (def.GetSlotAbility(slot - 1, !s.IsGrounded) == null)
+                {
+                    s.BufferedSlot = 0;
+                }
+                else
+                {
+                    s.BufferedSlot = 0;
+                    // Ability activation handled by ServerSimulation.Tick pre-sim phase
+                    s.State = ActionState.Attacking;
+                    s.AttackSlot = slot;
+                }
             }
 
             // 5.75 Jump detection (unconditional except hitstun / already squatting)
@@ -526,13 +536,13 @@ namespace SlopArena.Shared
                 }
             }
 
-            // Cooldowns
-            if (s.Cooldown0 > 0) s.Cooldown0--;
-            if (s.Cooldown1 > 0) s.Cooldown1--;
-            if (s.Cooldown2 > 0) s.Cooldown2--;
-            if (s.Cooldown3 > 0) s.Cooldown3--;
-            if (s.Cooldown4 > 0) s.Cooldown4--;
-            if (s.Cooldown5 > 0) s.Cooldown5--;
+            // Cooldowns (all 11 slots — issue #117; slots 6-10 got fields in #116 but the
+            // decrement only covered 1-6, so their cooldowns never expired).
+            for (byte slot = 1; slot <= AbilitySlots.Count; slot++)
+            {
+                ushort cd = s.GetCooldown(slot);
+                if (cd > 0) s.SetCooldown(slot, (ushort)(cd - 1));
+            }
 
             // Charge-stock regen (refundable ability pools, e.g. Kistu Rising Slash).
             // Only active when a charge is spent; recovers one charge per regen period.

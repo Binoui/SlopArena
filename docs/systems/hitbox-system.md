@@ -293,7 +293,7 @@ HitboxEvents = new[]
 ```
 
 **ServerAbility limitation:**
-ServerAbility subclasses (e.g., `FightGuyDragonKick`, `MankiBazooka`) manage their own hitbox spawning in `Tick()` via `ServerAbility.SpawnHitbox()`, which always uses entity-relative `OffX/Y/Z`. Bone-attached `HitboxEvent` fields on a ServerAbility's data are ignored. ServerAbilities that need bone-attached hitboxes must resolve baked data and call `Resolver.Spawn()` directly.
+ServerAbility subclasses (e.g., `FightGuyCycloneKick`, `MankiBazooka`) manage their own hitbox spawning in `Tick()` via `ServerAbility.SpawnHitbox()`, which always uses entity-relative `OffX/Y/Z`. Bone-attached `HitboxEvent` fields on a ServerAbility's data are ignored. ServerAbilities that need bone-attached hitboxes must resolve baked data and call `Resolver.Spawn()` directly.
 ---
 
 ## 🔵 Hurtbox (target)

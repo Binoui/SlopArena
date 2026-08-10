@@ -25,7 +25,7 @@ public static partial class CharacterRegistry
 {
     private static CharacterDefinition BuildManki()
     {
-        return new CharacterDefinition
+        var def = new CharacterDefinition
         {
             Class = CharacterClass.Manki,
             DisplayName = "Manki",
@@ -311,6 +311,14 @@ public static partial class CharacterRegistry
                     ["duration_ticks"] = 480f,   // 8s
                 },
             },
+
         };
+
+        // ── Air variants (issue #117 migration — preserve air use of ability slots) ──
+        def.AirSlot1 = def.Slot1;
+        def.AirE = def.E;
+        def.AirR = def.R;
+        def.AirF = def.F;
+        return def;
     }
 }

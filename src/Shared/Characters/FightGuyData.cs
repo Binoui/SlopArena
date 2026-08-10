@@ -9,7 +9,7 @@ public static partial class CharacterRegistry
 {
     private static CharacterDefinition BuildFightGuy()
     {
-        return new CharacterDefinition
+        var def = new CharacterDefinition
         {
             Class = CharacterClass.FightGuy,
             DisplayName = "FightGuy",
@@ -175,43 +175,46 @@ public static partial class CharacterRegistry
 
             Slot1 = new AbilitySpec
             {
-                Name = "Ki Shot",
-                Description = "Fire a ki projectile that marks the target for bonus damage",
-                IconName = "q",
-                CooldownTicks = 120,
-                Behavior = AbilityBehavior.AimedProjectile,
-                AimMode = AimMode.CameraForward3D,
+                Name = "Dragon Thrust",
+                Description = "Forward palm/kick thrust — medium spacing normal (issue #117 normal tier)",
+                IconName = "1",
+                CooldownTicks = 15,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 60, 
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                    new() { DurationTicks = 30, LungeForce = 6f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Radius = 0.5f, OffX = 0, OffY = 0.7f, OffZ = 1.3f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
+                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-            AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
-                SpecialEffectKeys = new[] { "FightGuyKiShot" },
-                Params = new()
-                {
-                    ["charge_hold_ticks"] = 180f,    // 3s max aim
-                    ["throw_duration"] = 60f,
-                    ["throw_trigger_tick"] = 10f,
-                    ["projectile_speed"] = 25f,
-                    ["gravity"] = 1f,                // ki blast — minimal float
-                    ["hitbox_radius"] = 0.5f,
-                    ["damage"] = 6f,
-                    ["knockback_base"] = 3f,
-                    ["knockback_growth"] = 4.5f,
-                    ["kb_angle"] = 30f,
-                    ["stun_ticks"] = 20f,
-                    ["max_flight_ticks"] = 90f,
-                    ["mark_duration_ticks"] = 300f,  // 5s
-                },
+                AnimationNames = new[] { "spell_lmb_2" },
+                Params = new() { ["lunge_duration"] = 5f, },
             },
 
             E = new AbilitySpec
             {
-                Name = "Tornado Kick",
-                Description = "Dash forward with a rapid spinning kick",
+                Name = "Rising Dragon",
+                Description = "Rising kick — anti-air launcher on the ground, recovery burst in the air (resets the float window)",
                 IconName = "e",
+                CooldownTicks = 240,
+                IsRecoveryMove = true,
+                Behavior = AbilityBehavior.MeleeCombo,
+                AimMode = AimMode.None,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 24,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.6f, OffX = 0, OffY = 1.2f, OffZ = 0.6f, Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 10, KnockbackGrowth = 6 }, StunTicks = 22, Interruptible = true } },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_r_loop" },
+                Params = new() { ["burst_vy"] = 15f, },
+            },
+
+            R = new AbilitySpec
+            {
+                Name = "Cyclone Kick",
+                Description = "Dash forward with a rapid spinning kick",
+                IconName = "r",
                 CooldownTicks = 120,
                 Behavior = AbilityBehavior.MeleeCombo,
                 AimMode = AimMode.None,
@@ -235,46 +238,6 @@ public static partial class CharacterRegistry
                     ["stun_ticks"] = 20f,
                     ["body_y"] = 0.8f,
                     ["side_y"] = 0.3f,
-                },
-            },
-
-            R = new AbilitySpec
-            {
-                Name = "Dragon's Kick",
-                Description = "Dash forward with a flying kick. On hit: unleash aerial combo. Whiff: recovery.",
-                IconName = "r",
-                CooldownTicks = 180,
-                Behavior = AbilityBehavior.MeleeCombo,
-                AimMode = AimMode.None,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 60,
-                            HitboxEvents = new HitboxEvent[]
-                            {
-                                // Forward-facing capsule: sweeps ahead during dash (loop hurtbox)
-                                new() { TriggerTick = 6, DurationTicks = 57, Radius = 0.5f,
-                                    OffX = 0, OffY = 0.5f, OffZ = 0.5f,
-                                    EndOffX = 0, EndOffY = 0.5f, EndOffZ = 1.5f,
-                                    Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light },
-                                    StunTicks = 20, Shape = HitboxShape.Capsule },
-                            },
-                            AttackRange = 5f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
-                    new() { DurationTicks = 88 },
-                    new() { DurationTicks = 15 },
-                },
-                AnimationNames = new[] { "spell_r_loop", "spell_r_attack", "spell_r_end" },
-                SpecialEffectKeys = new[] { "FightGuyDragonKick" },
-                Params = new()
-                {
-                    ["forward_speed"] = 20f,
-                    ["max_flight_ticks"] = 60f,
-                    ["min_ticks_before_cancel"] = 10f,
-                    ["attack_duration"] = 88f,
-                    ["end_duration"] = 15f,
-                    ["hit1_tick"] = 4f, ["hit1_damage"] = 6f, ["hit1_stun"] = 20f,
-                    ["hit2_tick"] = 10f, ["hit2_damage"] = 8f, ["hit2_stun"] = 24f,
-                    ["hit3_tick"] = 26f, ["hit3_damage"] = 16f, ["hit3_stun"] = 25f,
-                    ["hit3_base"] = 16f, ["hit3_growth"] = 8f, ["hit3_angle"] = 20f,
                 },
             },
 
@@ -311,7 +274,102 @@ public static partial class CharacterRegistry
                     ["spin_duration_ticks"] = 60f,
                 },
             },
+
+            // ═══ ISSUE #117 — NORMAL TIER (keys 1-4) + Q-SLOT PROJECTILE ═══
+
+            Slot2 = new AbilitySpec
+            {
+                Name = "Dragon Uppercut",
+                Description = "Anti-air uppercut — launches into air combos",
+                IconName = "2",
+                CooldownTicks = 25,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 32, LungeForce = 4f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 5, Radius = 0.55f, OffX = 0, OffY = 1.5f, OffZ = 0.5f, Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 70, BaseKnockback = 10, KnockbackGrowth = 5 }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_lmb_3" },
+                Params = new() { ["lunge_duration"] = 4f, },
+            },
+
+            Slot3 = new AbilitySpec
+            {
+                Name = "Dragon Stomp",
+                Description = "Slow, telegraphed stomp — huge knockback reward",
+                IconName = "3",
+                CooldownTicks = 50,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 40,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 22, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 13f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 16, KnockbackGrowth = 9 }, StunTicks = 26, Interruptible = true } },
+                            AttackRange = 1.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_rmb_attack" },
+                Params = new() { ["lunge_duration"] = 2f, },
+            },
+
+            Slot4 = new AbilitySpec
+            {
+                Name = "Ki Wave",
+                Description = "Ki burst around the body — knocks nearby enemies back",
+                IconName = "4",
+                CooldownTicks = 35,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 26,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 8, Radius = 2.2f, OffX = 0, OffY = 0.6f, OffZ = 0f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 12, KnockbackGrowth = 4 }, StunTicks = 18, Interruptible = true } },
+                            AttackRange = 0f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_rmb_attack" },
+            },
+
+            // Q slot (slot 11) — Ki Shot, moved from key "1" (issue #117). On AZERTY this key
+            // is the physical "A" key (QWERTY-Q position = the InputBindings Azerty preset).
+            A = new AbilitySpec
+            {
+                Name = "Ki Shot",
+                Description = "Fire a ki projectile that marks the target for bonus damage",
+                IconName = "q",
+                CooldownTicks = 120,
+                Behavior = AbilityBehavior.AimedProjectile,
+                AimMode = AimMode.CameraForward3D,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 60, 
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
+                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                },
+                AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
+                SpecialEffectKeys = new[] { "FightGuyKiShot" },
+                Params = new()
+                {
+                    ["charge_hold_ticks"] = 180f,    // 3s max aim
+                    ["throw_duration"] = 60f,
+                    ["throw_trigger_tick"] = 10f,
+                    ["projectile_speed"] = 25f,
+                    ["gravity"] = 1f,                // ki blast — minimal float
+                    ["hitbox_radius"] = 0.5f,
+                    ["damage"] = 6f,
+                    ["knockback_base"] = 3f,
+                    ["knockback_growth"] = 4.5f,
+                    ["kb_angle"] = 30f,
+                    ["stun_ticks"] = 20f,
+                    ["max_flight_ticks"] = 90f,
+                    ["mark_duration_ticks"] = 300f,  // 5s
+                },
+            },
+
         };
+
+        // ── Air variants (issue #117) — ability slots shared, normals grounded-only ──
+        def.AirE = def.E;   // Rising Dragon: same move in the air — recovery burst + FloatWindow reset
+        def.AirR = def.R;   // Cyclone: works identically in the air
+        def.AirA = def.A;   // Ki Shot: works in the air
+        return def;
     }
 }
 // __TEST_MARKER_FIGHTGUY_DATA_INCLUDED__

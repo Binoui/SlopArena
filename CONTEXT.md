@@ -65,7 +65,7 @@ The symmetric commit resolution (phase 2, ADR-0015): two simultaneous Interrupti
 _Avoid_: parry (Kistu-specific), counter, trade
 
 **Slot**:
-One of the 11 hotkey move units (`1-5`, `A`, `E`, `R`, `F`, `LMB`, `RMB` — the ADR-0016 layout), each a single move with ground/air variants. The Q key was removed from the layout; the former Q ability moved to key `1` (slot index 2, `AbilitySlots.Slot1`). The move-budget unit of the keyboard-first design (ADR-0016); replaces the old 6-slot model and chains. Slots 6-10 (keys `2`-`5`, `A`) have no kit data yet.
+One of the 11 hotkey move units (`1-5`, `A`, `E`, `R`, `F`, `LMB`, `RMB` — the ADR-0016 layout). The tiers (issue #117): `1`-`4` = FG normals (light/medium/heavy/tilt world — universal schema across characters), `Q`/`E`/`R`/`F` = abilities (projectile, upward mobility, engage, ult), `LMB`/`RMB` = base normals (jab / chargeable heavy, air variants mandatory). The Q key is slot 11 (`AbilitySlots.A` — the QWERTY-Q position, physical "A" key on AZERTY); the former Q ability (Ki Shot) lives there. Ground/air: an `Air*` spec is required to fire in the air — null = grounded-only, same reference = shared (issue #117). Slots `5` and `A` are optional extras; key `5` is empty in the demo.
 _Avoid_: button, ability slot, move slot
 **Knockback**:
 The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses frontloaded exponential decay (λ = 1.8/s): the launch is fastest right after the hit and smoothly slows — most travel happens early, the victim drifts in the tail. Decaying all axes also flattens launch arcs. Profile table maps archetypes to angle/base/growth:

@@ -24,7 +24,7 @@ public static partial class CharacterRegistry
         const float fWindupTicks = 72f;         // 1.2s telegraph
         const float fDragDurationTicks = 60f;
 
-        return new CharacterDefinition
+        var def = new CharacterDefinition
         {
             Class = CharacterClass.Nilus,
             DisplayName = "Nilus",
@@ -325,6 +325,14 @@ public static partial class CharacterRegistry
                     ["detonation_stun_ticks"] = 24f,
                 },
             },
+
         };
+
+        // ── Air variants (issue #117 migration — preserve air use of ability slots) ──
+        def.AirSlot1 = def.Slot1;
+        def.AirE = def.E;
+        def.AirR = def.R;
+        def.AirF = def.F;
+        return def;
     }
 }

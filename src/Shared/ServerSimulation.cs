@@ -201,8 +201,9 @@ namespace SlopArena.Shared
 					// StartDash already cleared AttackSlot/AnimLockTicks, so
 					// the clean-up below (cooldown, buffered slot, AnimLockTicks) is still correct.
 					
-					// Apply cooldown
-					if (ability.Slot < 6)
+					// Apply cooldown (all 11 slots — issue #117; the old < 6 gate skipped
+					// slots 6-10 entirely, so Ki Shot on the Q slot would never cooldown)
+					if (ability.Slot < AbilitySlots.Count)
 					{
 						state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
 						if (Simulation.OnDebugLog != null)
@@ -366,6 +367,17 @@ namespace SlopArena.Shared
 				var def = _defs[id];
 				bool airborne = !state.IsGrounded;
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
+
+				// Issue #117: no spec for this (slot, state) — grounded-only move pressed in
+				// the air, or a data-less slot. Reject and consume (nothing to buffer); the
+				// old code NRE'd on spec.Stages below for data-less slots 6-10.
+				if (spec == null)
+				{
+					var rejected = input;
+					rejected.ActiveSlot = 0;
+					inputs[id] = rejected;
+					continue;
+				}
 
 				ushort cooldown = state.GetCooldown(input.ActiveSlot);
 				if (cooldown > 0)
@@ -649,7 +661,18 @@ namespace SlopArena.Shared
 				var attackDef = _defs[id];
 				bool attackAirborne = !state.IsGrounded;
 				var attackSpec = attackDef.GetSlotAbility(state.AttackSlot - 1, attackAirborne);
-				if (attackSpec == null) { _states[id] = state; continue; }
+				if (attackSpec == null)
+				{
+					// Issue #117 backstop: an AttackSlot placeholder with no air spec
+					// (grounded-only move buffered mid-air) must reset, not stick in
+					// Attacking forever.
+					state.State = ActionState.Idle;
+					state.AttackSlot = 0;
+					state.AnimLockTicks = 0;
+					state.ComboStage = 0;
+					_states[id] = state;
+					continue;
+				}
 
 				if (attackSpec.Stages == null || attackSpec.Stages.Length == 0) { _states[id] = state; continue; }
 				var attackStage = Simulation.ResolveStage(attackSpec, state);

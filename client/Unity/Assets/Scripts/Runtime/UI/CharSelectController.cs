@@ -51,7 +51,15 @@ namespace SlopArena.Client.UI
             return playable.ToArray();
         }
 
-        // Slot index → key label: Q=2, E=3, R=4, F=5 (matches GetSlotAbility)
+        // Ability card slot indices per class (issue #117): FightGuy rekeyed — Ki Shot on the
+        // Q slot (10); other kits still host their Q-tier ability on key "1" (slot 2) until
+        // their kit passes land. Matches GetSlotAbility indices, not key positions.
+        private static readonly int[] LegacyAbilityCardSlots = { 2, 3, 4, 5 };
+        private static readonly System.Collections.Generic.Dictionary<CharacterClass, int[]>
+            AbilityCardSlotsByClass = new()
+            {
+                { CharacterClass.FightGuy, new[] { 10, 3, 4, 5 } },
+            };
         private static readonly string[] AbilitySlots =
             { "ability-q", "ability-e", "ability-r", "ability-f" };
 
@@ -366,11 +374,14 @@ namespace SlopArena.Client.UI
             // Update name
             root.Q<Label>("char-name").text = cls.ToString().ToUpper();
 
-            // Load ability data: Q=slot2, E=slot3, R=slot4, F=slot5
+            // Load ability data (per-class card slots — issue #117)
             var def = CharacterRegistry.Get(cls);
+            var cardSlots = AbilityCardSlotsByClass.TryGetValue(cls, out var mapped)
+                ? mapped
+                : LegacyAbilityCardSlots;
             for (int i = 0; i < AbilitySlots.Length; i++)
             {
-                var spec = def.GetSlotAbility(i + 2, airborne: false);
+                var spec = def.GetSlotAbility(cardSlots[i], airborne: false);
                 var card = root.Q<VisualElement>(AbilitySlots[i]);
                 if (card == null) continue;
                 card.Q<Label>($"{AbilitySlots[i]}-name").text = spec?.Name ?? "—";

@@ -39,15 +39,19 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateFightGuyAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        (0, false) => new LmbCombo(),          // LMB ground
-        (0, true) => new AirLmbCombo(),        // AirLMB
-        (1, false) => new FightGuyUppercut(),  // RMB ground
-        (1, true) => new AirChargeAttack(), // RMB air — hold-to-charge aerial heavy
-        (2, _) => new FightGuyKiShot(),        // Slot1 (key "1")
-        (3, _) => new FightGuyCycloneKick(),   // E
-        (4, _) => new FightGuyDragonKick(),    // R
-        (5, _) => new FightGuyTempest(),       // F
-        _ => null,
+        (0, false) => new LmbCombo(),          // LMB ground — jab
+        (0, true) => new AirLmbCombo(),        // AirLMB — rising kick
+        (1, false) => new FightGuyUppercut(),  // RMB ground — charged uppercut
+        (1, true) => new AirChargeAttack(),    // RMB air — helicopter spike
+        (2, _) => new LmbCombo(),              // key "1" — Dragon Thrust (normal)
+        (3, _) => new FightGuyRisingKick(),    // E — Rising Dragon (upward mobility / recovery)
+        (4, _) => new FightGuyCycloneKick(),   // R — Cyclone Kick (moved from E, issue #117)
+        (5, _) => new FightGuyTempest(),       // F — Tempest
+        (6, _) => new LmbCombo(),              // key "2" — Dragon Uppercut (normal)
+        (7, _) => new LmbCombo(),              // key "3" — Dragon Stomp (normal)
+        (8, _) => new LmbCombo(),              // key "4" — Ki Wave (normal)
+        (10, _) => new FightGuyKiShot(),       // Q key (slot 11) — Ki Shot (moved from slot 2, issue #117)
+        _ => null,                             // key "5" — empty (demo)
     };
 
     private static ServerAbility? CreateKistuAbility(byte slot, bool airborne) => (slot, airborne) switch

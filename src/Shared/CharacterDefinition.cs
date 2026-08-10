@@ -140,29 +140,52 @@ namespace SlopArena.Shared
         public AbilitySpec? RMB;
         public AbilitySpec? AirLMB;
         public AbilitySpec? AirRMB;
-        /// <summary>Slot 2 (key "1" — the former Q key; ADR-0016).</summary>
+        /// <summary>Slot 2 (key "1" — the FG-normal tier, issue #117).</summary>
         public AbilitySpec? Slot1;
         public AbilitySpec? E;
         public AbilitySpec? R;
         public AbilitySpec? F;
-        /// <summary>Slots 6-10 (keys "2"-"5" + "A") — no kit data yet; kit-expansion
-        /// tickets populate these. Data-less slots resolve to null and presses are no-ops.</summary>
+        /// <summary>Slots 6-10 (keys "2"-"5" + "A"/Q) — issue #117 fills these.</summary>
         public AbilitySpec? Slot2;
         public AbilitySpec? Slot3;
         public AbilitySpec? Slot4;
         public AbilitySpec? Slot5;
         public AbilitySpec? A;
+        // ── Air variants (issue #117 — the 3-state model) ──
+        // null = grounded-only (the move cannot fire airborne); same object reference as
+        // the ground spec = shared (works identically in the air); separate spec = distinct
+        // air move. LMB/RMB air variants are mandatory schema; the ability slots declare
+        // air specs only where a real air identity exists.
+        public AbilitySpec? AirSlot1;
+        public AbilitySpec? AirE;
+        public AbilitySpec? AirR;
+        public AbilitySpec? AirF;
+        public AbilitySpec? AirSlot2;
+        public AbilitySpec? AirSlot3;
+        public AbilitySpec? AirSlot4;
+        public AbilitySpec? AirSlot5;
+        public AbilitySpec? AirA;
         // No constructor needed — class fields auto-default
 
         /// <summary>
-        /// Resolve the ability spec for a slot index (0-10). Airborne variants exist for
-        /// LMB/RMB only; the remaining slots share one spec for ground and air.
-        /// Returns null for data-less slots (ADR-0016 slots 6-10 until kit data lands).
+        /// Resolve the ability spec for a slot index (0-10) and airborne state (issue #117).
+        /// Air semantics: an air spec is REQUIRED to fire a move in the air — null Air =
+        /// grounded-only; shared = Air references the ground spec; distinct = separate spec.
+        /// Returns null for data-less slots.
         /// </summary>
         public AbilitySpec? GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
             (0, true) => AirLMB,
             (1, true) => AirRMB,
+            (2, true) => AirSlot1,
+            (3, true) => AirE,
+            (4, true) => AirR,
+            (5, true) => AirF,
+            (6, true) => AirSlot2,
+            (7, true) => AirSlot3,
+            (8, true) => AirSlot4,
+            (9, true) => AirSlot5,
+            (10, true) => AirA,
             (0, _) => LMB,
             (1, _) => RMB,
             (2, _) => Slot1,

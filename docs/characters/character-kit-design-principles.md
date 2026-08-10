@@ -229,6 +229,37 @@ Examples: Loki (DKO), Izanami (DKO), Croak (Battlerite), Shifu (Battlerite)
 
 ---
 
+## The Standard Normal Schema (SlopArena, issue #117 — 2026-08-10)
+
+The normal tier is **universal across characters** — every kit uses the same six keys with the
+same roles. Only damage/hitbox/flavor change per character. This is the foundation for all
+future kits; abilities (Q E R F) layer on top.
+
+| Key | Role | Design |
+|---|---|---|
+| **LMB** | jab | light, fastest, lowest commit, short range. Universal + **air variant required** |
+| **RMB** | chargeable poke/lunge | medium-heavy, hold-to-charge, more range. Universal + **air variant required** |
+| **1** | medium spacing | more range than jab, mid speed/damage — the footsies key |
+| **2** | anti-air | upward geometry, launches into air combos |
+| **3** | big punish normal | slow, telegraphed, high KB — the reward move (FightGuy: stomp) |
+| **4** | get-off-me | hits around the character (360°), small-medium KB, escapes pressure |
+
+- **Ground/air:** LMB/RMB always have air variants (schema); keys 1-4 air variants are
+  **optional per character** — engine rule: no air spec = grounded-only.
+- **All four (1-4) are single presses, pure data** (`LmbCombo` plays `spec.Stages`); no
+  charge/aim machinery on the normal tier.
+- Ladder: LMB (light) → 1 (medium) → RMB (heavy charge) → 3 (punish). 2/4 are the directional
+  utilities (up / around).
+
+## The Ability Tier (Q E R F — B-moves / MOBA layer, issue #117)
+
+The four ability slots carry the spectacular, identity-defining moves: projectile (Q),
+upward mobility / recovery (E), engage or burst (R), ult (F). Role assignment is per
+character but the *tier* is fixed — abilities never live on the 1-4 keys and normals never
+live on QERF. Keys 5/A are optional extras (demo phase skips them).
+
+---
+
 ## Applying to SlopArena — Current Roster
 
 Only one character is active in the codebase. Design others from scratch following these patterns.
