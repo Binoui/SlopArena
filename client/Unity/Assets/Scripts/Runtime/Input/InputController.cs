@@ -52,7 +52,7 @@ namespace SlopArena.Client.Input
         {
             0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
             1 => Mouse.current != null && Mouse.current.rightButton.isPressed,
-            _ => Keyboard.current != null && Keyboard.current[SlotAction(slotIdx)].isPressed,
+            _ => Keyboard.current != null && Keyboard.current[Bind(SlotAction(slotIdx))].isPressed,
         };
 
         /// <summary>Slot index (0-based) → the bindable action that triggers it (slots 2-10).</summary>
