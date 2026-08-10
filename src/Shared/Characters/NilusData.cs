@@ -64,7 +64,7 @@ public static partial class CharacterRegistry
                 new(-0.15f, 0f, 0f, -0.15f, -0.8f, 0f, 0.16f),
             },
             VisualScale = 1f,
-            HurtboxBoneScale = 1.0f,
+            HurtboxBoneScale = 0.85f,
             ModelSoleOffset = 0f,
             AutoModelYOffset = true,
             ModelYOffset = 0f,
@@ -83,23 +83,23 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 28, ChainWindowTicks = 10, LungeForce = 5f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.42f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.4f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 12, BaseKnockback = 1.5f, KnockbackGrowth = 1f },
-                                    StunTicks = 16, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                                    StunTicks = 14, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     new() { DurationTicks = 28, ChainWindowTicks = 10, LungeForce = 5f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.42f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.4f,
                                     Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 12, BaseKnockback = 1.5f, KnockbackGrowth = 1f },
-                                    StunTicks = 24, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
+                                    StunTicks = 18, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
                     new() { DurationTicks = 38, ChainWindowTicks = 0, LungeForce = 7f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 9, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.5f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 9, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.6f,
                                     Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Launcher },
-                                    StunTicks = 28, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                                    StunTicks = 20, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_1", "spell_lmb_2", "spell_lmb_3" },
                 Params = new() { ["lunge_duration"] = 6f },
@@ -114,17 +114,17 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 24, ChainWindowTicks = 9, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.42f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.4f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light },
-                                    StunTicks = 16, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                                    StunTicks = 14, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                     new() { DurationTicks = 30, ChainWindowTicks = 0, LungeForce = 4f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.48f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.45f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.5f,
-                                    Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Launcher },
-                                    StunTicks = 26, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
+                                    Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Medium },
+                                    StunTicks = 18, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_air_1", "spell_lmb_air_2" },
             },
@@ -145,10 +145,10 @@ public static partial class CharacterRegistry
                             LungeForce = 0f, AttackRange = 0f, WarpRange = 0f },
                     // Stage 1: tap poke
                     new() { DurationTicks = 30, ChainWindowTicks = 0, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 2.2f,
                                     Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium },
-                                    StunTicks = 22, Interruptible = true } },
+                                    StunTicks = 18, Interruptible = true } },
                             AttackRange = 3f, WarpRange = 0f },
                 },
                 ChargedStages = new AttackStage[]
@@ -158,10 +158,10 @@ public static partial class CharacterRegistry
                     // the hitbox after its first victim (SpellResolver.cs:250-251). Give it
                     // RehitIntervalTicks = 1 if piercing is ever actually wanted.
                     new() { DurationTicks = 44, ChainWindowTicks = 0, LungeForce = 5f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.6f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 2.2f,
                                     Damage = 15f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 18, KnockbackGrowth = 10 },
-                                    StunTicks = 40, Interruptible = true } },
+                                    StunTicks = 24, Interruptible = true } },
                             AttackRange = 3f, WarpRange = 0f },
                 },
                 AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
@@ -182,20 +182,20 @@ public static partial class CharacterRegistry
                             AttackRange = 0f, WarpRange = 0f },
                     // Stage 1: tap slam (same numbers as the pre-charge air RMB; drives Nilus down at 14 m/s)
                     new() { DurationTicks = 36, ChainWindowTicks = 0, MoveY = -14f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.8f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.7f,
                                     OffX = 0, OffY = 0.1f, OffZ = 0.4f,
                                     Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Spike },
-                                    StunTicks = 30, Interruptible = true } },
+                                    StunTicks = 20, Interruptible = true } },
                             AttackRange = 0f, WarpRange = 0f },
                 },
                 ChargedStages = new AttackStage[]
                 {
                     // Charged: bigger rift sphere, faster drop, more damage
                     new() { DurationTicks = 36, ChainWindowTicks = 0, MoveY = -18f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 10, Shape = HitboxShape.Sphere, Radius = 1.0f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 10, Shape = HitboxShape.Sphere, Radius = 0.8f,
                                     OffX = 0, OffY = 0.1f, OffZ = 0.4f,
                                     Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike },
-                                    StunTicks = 36, Interruptible = true } },
+                                    StunTicks = 24, Interruptible = true } },
                             AttackRange = 0f, WarpRange = 0f },
                 },
                 AnimationNames = new[] { "spell_rmb_air", "spell_rmb_air" },
@@ -282,7 +282,7 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 34, ChainWindowTicks = 0,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 10, Shape = HitboxShape.Capsule, Radius = 0.6f,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 10, Shape = HitboxShape.Capsule, Radius = 0.55f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 8f,
                                     Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 0, BaseKnockback = 0f, KnockbackGrowth = 0f },
                                     // INERT as shipped: this HitboxEvent's knockback is all
@@ -308,7 +308,7 @@ public static partial class CharacterRegistry
                     // ApplyKnockback caps hitstun at min(8 + kbMagnitude*0.5, stunTicks)
                     // (Simulation.cs:930-931) = 12 at pull_force 9.5, so any value >= 12 here
                     // is a no-op — INERT as shipped. Lower it below 12 to actually shorten the grab.
-                    ["pull_stun_ticks"] = 20f,
+                    ["pull_stun_ticks"] = 12f,
                 },
             },
 
@@ -337,10 +337,10 @@ public static partial class CharacterRegistry
                     ["drag_interval_ticks"] = 10f,
                     ["drag_damage"] = 3f,
                     ["detonation_damage"] = 18f,
-                    ["detonation_kb_angle"] = 40f,
+                    ["detonation_kb_angle"] = 25f,
                     ["detonation_kb_base"] = 16f,
                     ["detonation_kb_growth"] = 9f,
-                    ["detonation_stun_ticks"] = 40f,
+                    ["detonation_stun_ticks"] = 24f,
                 },
             },
         };

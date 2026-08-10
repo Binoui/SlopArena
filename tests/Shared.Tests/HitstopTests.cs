@@ -11,7 +11,7 @@ namespace SlopArena.Shared.Tests;
 ///
 /// Verifies the per-pair freeze:
 ///   - On a melee hit BOTH attacker and victim freeze for F ticks
-///     (F = 2 + 2·damage, cap 24; <3 damage ×2; beyond-first ×0.5).
+///     (F = 1 + 1.5·damage, cap 12; <3 damage ×2; beyond-first ×0.5).
 ///   - The victim is fully stationary during the freeze; the launch (KV +
 ///     hitstun) is deferred to freeze expiry.
 ///   - The attacker's ability ticks and AnimLockTicks/AttackElapsedTicks
@@ -30,8 +30,8 @@ public class HitstopTests
 
     /// <summary>Manki LMB stage 1 connects at the 12th sim tick (Tick 0 = press).</summary>
     private const int ConnectTick = 11;
-    /// <summary>Manki LMB stage 1 damage = 4 → F = 2 + 2·4 = 10.</summary>
-    private const int LmbFreeze = 10;
+    /// <summary>Manki LMB stage 1 damage = 4 → F = 1 + 1.5·4 = 7.</summary>
+    private const int LmbFreeze = 7;
 
     /// <summary>Player LMB vs NPC — the canonical freeze scenario (mirrors CombatPipelineTests.LMB_HitsNpc).</summary>
     private static (ServerSimulation sim, CharacterDefinition def) LmbScenario()
@@ -73,7 +73,7 @@ public class HitstopTests
         Assert.Equal(0f, atConnect.KVY);
         Assert.Equal(0f, atConnect.KVZ);
         Assert.Equal((ushort)0, atConnect.HitstunTicks);   // launch deferred
-        Assert.Equal(1, (int)atConnect.HitstunLevel);      // tier still set at connect
+        Assert.Equal(0, (int)atConnect.HitstunLevel);      // tier still set at connect (stun 20 → light)
         Assert.Equal((ushort)4, atConnect.DamagePercent);
         (float px, float py, float pz) frozenPos = (atConnect.PX, atConnect.PY, atConnect.PZ);
 
@@ -92,7 +92,7 @@ public class HitstopTests
         var atLaunch = sim.GetState(100);
         Assert.Equal((ushort)0, atLaunch.HitstopTicks);
         Assert.Equal(ActionState.Hitstun, atLaunch.State);
-        Assert.Equal((ushort)32, atLaunch.HitstunTicks);   // forced StunTicks override
+        Assert.Equal((ushort)20, atLaunch.HitstunTicks);   // forced StunTicks override
         float kbMag = MathF.Sqrt(atLaunch.KVX * atLaunch.KVX
                                  + atLaunch.KVY * atLaunch.KVY
                                  + atLaunch.KVZ * atLaunch.KVZ);
@@ -147,8 +147,8 @@ public class HitstopTests
     public void Multihit_SecondHit_FreezesHalf()
     {
         // Deterministic formula half-halving.
-        Assert.Equal(10, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: false, null));
-        Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: true, null));
+        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: false, null));
+        Assert.Equal(3, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: true, null));
 
         // Integration: a RehitIntervalTicks zone rehits the still-frozen victim —
         // the second pulse's freeze equals half the first.
@@ -158,7 +158,7 @@ public class HitstopTests
         npc.PY = Gpy;
         sim.RegisterEntity(100, def, npc);
 
-        // Zone at the NPC, pulse every 3 ticks, damage 4 (F = 10, discounted 5).
+        // Zone at the NPC, pulse every 3 ticks, damage 4 (F = 7, discounted 3).
         sim.Resolver.Spawn(new Hitbox
         {
             X = 0f, Y = Gpy, Z = 2.2f,
@@ -170,13 +170,13 @@ public class HitstopTests
         });
 
         sim.Tick(new() { { 100, default } });       // tick 1: first pulse (AgeTicks 0)
-        Assert.Equal((ushort)10, sim.GetState(100).HitstopTicks);
+        Assert.Equal((ushort)7, sim.GetState(100).HitstopTicks);
         sim.Tick(new() { { 100, default } });       // tick 2
-        Assert.Equal((ushort)9, sim.GetState(100).HitstopTicks);
+        Assert.Equal((ushort)6, sim.GetState(100).HitstopTicks);
         sim.Tick(new() { { 100, default } });       // tick 3
-        Assert.Equal((ushort)8, sim.GetState(100).HitstopTicks);
-        sim.Tick(new() { { 100, default } });       // tick 4: second pulse (AgeTicks 3) — still frozen → half
         Assert.Equal((ushort)5, sim.GetState(100).HitstopTicks);
+        sim.Tick(new() { { 100, default } });       // tick 4: second pulse (AgeTicks 3) — still frozen → half
+        Assert.Equal((ushort)3, sim.GetState(100).HitstopTicks);
     }
 
     [Fact]
@@ -219,11 +219,11 @@ public class HitstopTests
     public void Formula_Contract()
     {
         // (damage, beyondFirst, spec) → freeze ticks.
-        Assert.Equal(8, ServerSimulation.ComputeHitstopTicks(1, false, null));   // low damage ×2 (2+2 → 4 → 8)
-        Assert.Equal(10, ServerSimulation.ComputeHitstopTicks(4, false, null));  // 2 + 2·4
-        Assert.Equal(24, ServerSimulation.ComputeHitstopTicks(14, false, null)); // 2 + 28 → capped 24
-        Assert.Equal(12, ServerSimulation.ComputeHitstopTicks(14, true, null));  // cap first, then ×0.5
-        Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(4, true, null));    // 10 × 0.5
+        Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(1, false, null));   // low damage ×2 (1+1.5 → 2.5 → 5)
+        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, false, null));   // 1 + 1.5·4
+        Assert.Equal(12, ServerSimulation.ComputeHitstopTicks(14, false, null)); // 1 + 21 → capped 12
+        Assert.Equal(6, ServerSimulation.ComputeHitstopTicks(14, true, null));   // cap first, then ×0.5
+        Assert.Equal(3, ServerSimulation.ComputeHitstopTicks(4, true, null));    // 7 × 0.5 → 3 (truncated)
         // Per-ability override via spec.Params.
         var capped = new AbilitySpec { Params = new() { ["hitstop_cap_ticks"] = 5f } };
         Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(14, false, capped));

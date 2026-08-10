@@ -27,25 +27,11 @@ public class NilusKitRegressionTests : KitScenarioTests
     /// (stages 1-2 use 5), so the snapshot pins ComboStage = 2 with VZ = 7 still undecayed.
     /// ComboStage is a 0-based index capped at 2 — it is 0 again by the settled tick 199.
     /// </summary>
-    [Fact]
-    public void LMB_FullCombo_ChainsThroughAllStages()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Nilus LMB Full Combo",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, 1).Press(10, 1).Press(40, 1),
-            Assert = _ => { },
-            SnapshotTick = 45,
-            TotalTicks = 200,
-        });
-    }
-
     /// <summary>
-    /// Stage 1 connects on tick 5. Hitstop (ADR-0012) freezes the dummy 2 + 2·3 = 8 ticks,
-    /// so tick 9 is mid-freeze: the dummy is pinned at its spawn, 3% taken, launch queued —
-    /// the snapshot pins the frozen receiver rather than a flight vector.
+    /// Stage 1 connects on tick 5. Hitstop (ADR-0015 timing, F = 1 + 1.5·damage) freezes
+    /// the dummy 1 + 1.5·3 ≈ 5 ticks, so tick 9 is just past the freeze: the dummy is
+    /// pinned at its spawn, 3% taken, launch queued — the snapshot pins the frozen
+    /// receiver rather than a flight vector.
     /// </summary>
     [Fact]
     public void LMB_Stage1_HitConfirm()
@@ -88,37 +74,28 @@ public class NilusKitRegressionTests : KitScenarioTests
     }
 
     /// <summary>
-    /// Void Rake, chained. Nothing else in the suite gave AirLMB a golden, so the 2-stage chain
-    /// and its 3/5 ladder had no full-state snapshot at all — unlike Manki and FightGuy, which
-    /// both carry an Air_LMB_Combo. The NpcAssert pins the ladder's total; measured, tick 24 is
-    /// the frame where all three live facts coexist — the caster still Attacking on ComboStage 1
-    /// with stage 2's LungeForce of 4 on VZ, and the dummy 4 ticks into a launch hitstun.
-    /// Hitstop (ADR-0012) froze both bodies on stage 1's connect (2 + 2·3 = 8 ticks), which
-    /// delayed the chain: at tick 24 the dummy carries only stage 1's 3% and stage 2's 5%
-    /// lands once the freeze chain clears. Tick 20 shows ComboStage 1 but the dummy's stage-1
-    /// lock has already expired and stage 2 has not connected yet, so it pins the chain and
-    /// nothing else.
-    ///
-    /// Both bodies start airborne at the same height: Collapse aside, Nilus' aerials cannot
-    /// reach a grounded target from a 4 m hover, and a juggle tool is meant to be used on
-    /// something already off the floor.
+    /// Void Rake, single press: stage 1's rake connects on tick 5 for 3%. Hitstop
+    /// (ADR-0015 timing, F = 1 + 1.5·damage) freezes both bodies ~5 ticks, so tick 9
+    /// is just past the freeze: the dummy pinned at spawn with 3%, launch queued.
+    /// The dummy must start airborne — a rake is a juggle tool, and from hover height
+    /// it cannot reach a grounded capsule (honest whiff, per ADR-0015).
     /// </summary>
     [Fact]
-    public void AirLMB_VoidRake_ChainsIntoTheDummy()
+    public void AirLMB_VoidRake_HitsAirborneDummy()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Nilus Air LMB Combo",
+            Name = "Nilus Air LMB",
             Def = Def,
             Setup = () => TestHelpers.PlayerState()
                 with { PX = 0, PZ = 0, PY = Gpy + 4f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 1).Press(1, 1),
+            Inputs = new InputSequence().Press(0, 1),
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
                 with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY + 4f, IsGrounded = false },
-            NpcAssert = n => Assert.Equal((ushort)8, n.DamagePercent),
+            NpcAssert = n => Assert.Equal((ushort)3, n.DamagePercent),
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 24,
+            SnapshotTick = 9,
             TotalTicks = 120,
         });
     }
@@ -256,11 +233,11 @@ public class NilusKitRegressionTests : KitScenarioTests
     /// It is the one frame that shows the whole ult at once:
     /// the dummy has been dragged from 5 m by six drag pulses (18%), and the
     /// detonation has just added 18% more for 36% total — with the dummy frozen in the
-    /// 24-tick blast hitstop (ADR-0012: 2 + 2·18 → cap 24, receiver-only). The 40-tick launch
-    /// stun lands at freeze expiry. (The launch vector itself lives in KVX/KVY/KVZ, which
-    /// EntitySnapshot does not carry; the settled NpcFinal — up and out — is what pins its
-    /// magnitude.) Anywhere inside the 72-tick telegraph pins an untouched dummy and a
-    /// stationary caster.
+    /// 12-tick blast hitstop (ADR-0012: 1 + 1.5·18 = 28 → cap 12, receiver-only). The 24-tick
+    /// launch stun lands at freeze expiry. (The launch vector itself lives in KVX/KVY/KVZ,
+    /// which EntitySnapshot does not carry; the settled NpcFinal — flat send along the ground
+    /// at 25° — is what pins its magnitude.) Anywhere inside the 72-tick telegraph pins an
+    /// untouched dummy and a stationary caster.
     /// </summary>
     [Fact]
     public void F_EventHorizon_DragsThenDetonates()
@@ -274,8 +251,8 @@ public class NilusKitRegressionTests : KitScenarioTests
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
                 with { PX = 0, PZ = 5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = n => Assert.True(n.PZ > 6f && n.PY > 5f,
-                $"detonation should launch the NPC outward and up, PZ={n.PZ} PY={n.PY}"),
+            NpcAssert = n => Assert.True(n.PZ > 6f && n.PY > 2f,
+                $"detonation should launch the NPC outward and up (flat 25° send), PZ={n.PZ} PY={n.PY}"),
             NpcDef = TestHelpers.CombatDef,
             SnapshotTick = 131,
             TotalTicks = 200,

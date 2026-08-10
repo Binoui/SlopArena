@@ -9,26 +9,6 @@ public class FightGuyKitRegressionTests : KitScenarioTests
     private static float Gpy => FightGuyGpy;
 
     [Fact]
-    public void LMB_FullCombo_ChainsThroughAllStages()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "FightGuy LMB Full Combo",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence()
-                .Press(0, 1).Press(10, 1).Press(55, 1).Press(100, 1),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 10,   // stage 1 hitbox active (trigger=7, dur=6)
-            TotalTicks = 250,
-        });
-    }
-
-    [Fact]
     public void LMB_Stage1_HitsNpcFor4Damage()
     {
         AssertGoldenScenario(new KitScenario
@@ -48,21 +28,21 @@ public class FightGuyKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void AirLMB_RisingKickThenSpike_HitsNpc()
+    public void AirLMB_RisingKick_HitsAirborneNpc()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "FightGuy Air LMB Combo",
+            Name = "FightGuy Air LMB",
             Def = Def,
             Setup = () => TestHelpers.PlayerState()
                 with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 1).Press(1, 1),
+            Inputs = new InputSequence().Press(0, 1),
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,   // stage 1 active (trigger=6, window at 18)
+            SnapshotTick = 12,   // stage 1, second hitbox active (trigger=13, dur=5)
             TotalTicks = 80,
         });
     }

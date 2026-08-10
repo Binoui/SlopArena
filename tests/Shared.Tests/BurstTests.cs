@@ -165,8 +165,8 @@ public class BurstTests
         sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } }); // LMB stage 1
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });                    // burst → hitbox connects
 
-        // Hitstop on the NPC: 2 + 2·4 = 10 ticks; the queued launch applies at freeze expiry.
-        for (int i = 0; i < 10; i++)
+        // Hitstop on the NPC: 1 + 1.5·4 = 7 ticks; the queued launch applies at freeze expiry.
+        for (int i = 0; i < 7; i++)
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
 
         var n = sim.GetState(100);

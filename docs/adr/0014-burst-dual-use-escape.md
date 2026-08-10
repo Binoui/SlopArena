@@ -1,6 +1,9 @@
 # ADR-0014: Burst — Dual-Use Escape and Combo Extender
 
-**Status:** Proposed — 2026-08-07
+**Status:** Proposed — 2026-08-07 (assumptions amended by ADR-0015)
+**Deciders:** @Binoui
+
+> Note (ADR-0015): the "LMB chain allowed" bullet dies with the auto-combo removal — burst's offensive use now cancels the single move's Duration Lock only. Decision otherwise unchanged.
 **Deciders:** @Binoui
 
 ## Context

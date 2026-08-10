@@ -1,33 +1,31 @@
 {
-  "Scenario": "Nilus LMB Hit Confirm",
-  "TickCount": 80,
+  "Scenario": "Nilus Air LMB",
+  "TickCount": 120,
   "PlayerSnap": {
     "State": 4,
-    "PY": 0.825,
-    "PZ": 0.375,
-    "VZ": 5,
+    "PY": 4.825,
+    "PZ": 0.25000003,
+    "VZ": 3,
     "AttackSlot": 1,
-    "HitstopTicks": 1,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "AirTimeTicks": 5
   },
   "NpcSnap": {
-    "PY": 0.75,
+    "State": 2,
+    "PY": 4.65,
     "PZ": 1.2,
     "DamagePercent": 3,
-    "HitstopTicks": 1,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "HitstunTicks": 14,
+    "JumpsLeft": 2
   },
   "PlayerFinal": {
     "PY": 0.825,
-    "PZ": 0.375,
+    "PZ": 0.30000004,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 1.517343,
+    "PZ": 1.5983065,
     "DamagePercent": 3,
     "JumpsLeft": 2,
     "IsGrounded": true

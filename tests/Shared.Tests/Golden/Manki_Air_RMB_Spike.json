@@ -6,26 +6,24 @@
     "PY": 2,
     "ComboStage": 1,
     "AttackSlot": 2,
-    "HitstopTicks": 18,
+    "HitstopTicks": 8,
     "AirTimeTicks": 16
   },
   "NpcSnap": {
     "PY": 0.75,
     "DamagePercent": 10,
-    "HitstopTicks": 18,
+    "HitstopTicks": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "PlayerFinal": {
-    "PY": 1.9935186,
-    "VY": -0.23333335,
-    "AirTimeTicks": 33
+    "PY": 1.7050925,
+    "VY": -3.5388892,
+    "AirTimeTicks": 43
   },
   "NpcFinal": {
-    "State": 2,
     "PY": 0.75,
     "DamagePercent": 10,
-    "HitstunTicks": 15,
     "JumpsLeft": 2,
     "IsGrounded": true
   }

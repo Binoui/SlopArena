@@ -502,14 +502,15 @@ public class ServerSimulationTests
 
 
     [Fact]
-    public void TargetEntityId_SetOnLmbAttack_NpcAtWarpRange()
+    public void TargetEntityId_SetOnLmbAttack_BeyondEngageRange()
     {
-        // Manki LMB is a ServerAbility — warp is now active for all attacks with UseTargetLock
+        // Warp is gone (ADR-0015): an enemy beyond the move's engage range still gets
+        // soft-locked as TargetEntityId, but nothing warps — the attack is a commitment.
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
+        npc.PZ = 5.5f; // beyond engage range (2.0), inside the 20m target-lock search
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
@@ -517,8 +518,7 @@ public class ServerSimulationTests
 
         var state = sim.GetState(1);
         Assert.Equal(100ul, state.TargetEntityId);
-        // Warp IS set for ServerAbility attacks now — should activate when within WarpRange
-        Assert.True(state.WarpSpeed > 0f, $"Expected WarpSpeed > 0 (warp active for ServerAbility), got {state.WarpSpeed}");
+        Assert.Equal(0f, state.WarpSpeed); // warp never initiates — no auto-approach
     }
 
     [Fact]
@@ -529,7 +529,7 @@ public class ServerSimulationTests
         var player = MakeIdleState(1);
         player.FacingYaw = 0f; // facing +Z
         var npc = MakeIdleState(100);
-        npc.PX = 5f; // to the right (+X) from player
+        npc.PX = 1f; // to the right (+X) from player, within engage range (2.0)
         npc.PZ = 0f;
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
@@ -572,28 +572,35 @@ public class ServerSimulationTests
     }
 
     [Fact]
-    public void Tick_TargetLock_InWarpRange_Rotates()
+    public void Tick_TargetLock_InEngageRange_Rotates()
     {
-        // Zone 2: AttackRange < dist ≤ WarpRange → rotates toward target + warps toward target
+        // Zone 2: dist ≤ AttackRange (the engage/tracking radius, warp gone) →
+        // rotates toward target, never warps
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         player.FacingYaw = 0f; // facing +Z
         var npc = MakeIdleState(100);
-        npc.PX = 2f; // slightly right of center, inside 120° facing cone
-        npc.PZ = 5f; // within WarpRange=10, outside AttackRange=2 (dist≈5.4, angle≈21.8°)
+        npc.PX = 0.75f; // slightly right of center
+        npc.PZ = 1.75f; // dist ≈ 1.90 < engage range 2.0
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
+        // Target is only 23° off axis, so per-tick rotation is small (≈0.006 rad);
+        // tick through the attack until it accumulates past the threshold.
         var input = TestHelpers.Input(activeSlot: 1);
-        sim.Tick(new() { { 1, input }, { 100, default } });
+        float yaw = 0f;
+        for (int i = 0; i < 30 && yaw <= 0.05f; i++)
+        {
+            sim.Tick(new() { { 1, input }, { 100, default } });
+            input = default;
+            yaw = sim.GetState(1).FacingYaw;
+        }
 
-        var state = sim.GetState(1);
         // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
-        Assert.True(state.FacingYaw > 0.01f,
-            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
-        // Warp IS set for ServerAbility attacks now — should activate when in WarpRange
-        Assert.True(state.WarpSpeed > 0f, $"Expected WarpSpeed > 0 (warp active), got {state.WarpSpeed}");
+        Assert.True(yaw > 0.05f,
+            $"Expected FacingYaw > 0.05 (should rotate toward +X), got {yaw:F4}");
+        Assert.Equal(0f, sim.GetState(1).WarpSpeed); // warp never initiates
 
     }
     [Fact]
@@ -620,102 +627,20 @@ public class ServerSimulationTests
         // No warp — already within attack range
         Assert.Equal(0f, state.WarpSpeed);
     }
-    // ── Warp velocity: constant SprintSpeed (replaced exponential 0.3) ──
-    // Manki CombatDef: SprintSpeed=12 m/s → 0.2m per tick at 60Hz
-    // Manki LMB stage 1: AttackRange=4, WarpRange=10
+    // ── Whiff commitment (ADR-0015): warp gone, attack at range is a commitment ──
 
     [Fact]
-    public void Warp_VelocityEqualsSprintSpeed_PerTick()
-    {
-        // 1 tick: velocity should be exactly SprintSpeed toward target
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        // VZ = SprintSpeed = 12 m/s toward target (+Z)
-        TestHelpers.AssertNear(12f, state.VZ, tolerance: 0.01f);
-        // PZ advanced by 12/60 = 0.2m
-        TestHelpers.AssertNear(0.2f, state.PZ, tolerance: 0.01f);
-        Assert.True(state.WarpSpeed > 0f); // still warping
-    }
-
-    [Fact]
-    public void Warp_MovesCharacterTowardTarget()
+    public void AttackAtRange_NoWarp_EndsIdleNoVelocity()
     {
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
         var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4 (1.5m warp)
+        npc.PZ = 5.5f; // beyond the move's engage range — no auto-approach exists
         sim.RegisterEntity(1, def, player);
         sim.RegisterEntity(100, def, npc);
 
-        // 15 ticks: close 1.5m at 0.2m/tick, warp completes ~tick 8, lunge applies tick 9+
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 15);
-
-        // Warp completed — WarpSpeed should be 0
-        Assert.Equal(0f, state.WarpSpeed);
-        // State remains Attacking after warp
-        Assert.Equal(ActionState.Attacking, state.State);
-        // Progressed past warp arrival (PZ≈1.6) with lunge
-        Assert.True(state.PZ > 1.6f, $"Expected PZ > 1.6 (warp arrival + lunge), got {state.PZ:F4}");
-    }
-
-    [Fact]
-    public void WarpCompletes_StateRemainsAttacking()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 6f; // need to close 2m → 10 ticks at 0.2m/tick
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // 12 ticks: warp completes ~tick 10, then ability continues
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 12);
-
-        Assert.Equal(ActionState.Attacking, state.State);
-        Assert.Equal(0f, state.WarpSpeed);
-    }
-
-    [Fact]
-    public void WarpCompletes_LungeApplies()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // close 1.5m → ~8 ticks warp, lunge 10-tick window still open
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // 13 ticks: warp completes ~tick 8, lunge applies tick 9+ (LungeForce=4, 10 tick default duration)
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 13);
-
-        // Lunge velocity (4 m/s) after warp completed — should be > 0
-        Assert.True(state.VZ > 1.0f, $"Expected VZ > 1.0 (lunge after warp), got {state.VZ:F4}");
-        Assert.Equal(0f, state.WarpSpeed);
-        Assert.Equal(ActionState.Attacking, state.State);
-    }
-
-    [Fact]
-    public void Warp_NoVelocityPersistsAfterAbilityEnds()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // within WarpRange=6, outside AttackRange=4
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // 50 ticks: stage 0 is 35 ticks, no chain — ability ends naturally
+        // 50 ticks: the attack starts anyway (commitment), whiffs, ends naturally
         var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 50);
 
         Assert.Equal(ActionState.Idle, state.State);

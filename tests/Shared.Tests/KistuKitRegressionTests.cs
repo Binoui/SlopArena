@@ -26,26 +26,6 @@ public class KistuKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void LMB_FullCombo_ChainsThroughAllStages()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Kistu LMB Full Combo",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence()
-                .Press(0, 1).Press(22, 1).Press(45, 1).Press(70, 1),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 84,   // stage 4 launcher hitbox active (trigger=10, dur=6)
-            TotalTicks = 130,
-        });
-    }
-
-    [Fact]
     public void LMB_Stage1_HitsNpcFor3Damage()
     {
         AssertGoldenScenario(new KitScenario
@@ -65,18 +45,22 @@ public class KistuKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void AirLMB_Combo_ChainsBothHits()
+    public void AirLMB_AirSlash_HitsAirborneNpc()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Kistu Air LMB Combo",
+            Name = "Kistu Air LMB",
             Def = Def,
             Setup = () => TestHelpers.PlayerState()
                 with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 1).Press(18, 1),
+            Inputs = new InputSequence().Press(0, 1),
             Assert = _ => { },
-            SnapshotTick = 27,   // stage 2 hitbox active (chained at ~18, trigger=5, dur=5)
-            TotalTicks = 70,
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 8,   // stage 1 sweep hitbox active (trigger=5, dur=5)
+            TotalTicks = 80,
         });
     }
 

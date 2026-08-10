@@ -1,6 +1,9 @@
 # ADR-0013: Combo Influence — Additive Launch Drift
 
-**Status:** Proposed — 2026-08-07
+**Status:** Proposed — 2026-08-07 (assumptions amended by ADR-0015)
+**Deciders:** @Binoui
+
+> Note (ADR-0015): this decision's context cited warp + tracking erasing the drift. Warp is removed — nothing erases Combo Influence now; it becomes the primary combo-escape tool. Decision itself unchanged.
 **Deciders:** @Binoui
 
 ## Context

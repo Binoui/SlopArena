@@ -174,13 +174,13 @@ namespace SlopArena.Shared
         /// </summary>
         private static readonly HurtboxBoneDef[] MixamorigBoneDefs = new HurtboxBoneDef[]
         {
-            new("mixamorig:Head", 0, 0, 0, 0.25f),
-            new("mixamorig:Spine2", 0, 0, 0, 0.3f),
-            new("mixamorig:Hips", 0, 0, 0, 0.3f),
-            new("mixamorig:RightHand", 0, 0, 0, 0.14f),
-            new("mixamorig:LeftHand", 0, 0, 0, 0.14f),
-            new("mixamorig:RightFoot", 0, 0, 0, 0.18f),
-            new("mixamorig:LeftFoot", 0, 0, 0, 0.18f),
+            new("mixamorig:Head", 0, 0, 0, 0.22f),
+            new("mixamorig:Spine2", 0, 0, 0, 0.26f),
+            new("mixamorig:Hips", 0, 0, 0, 0.26f),
+            new("mixamorig:RightHand", 0, 0, 0, 0.12f),
+            new("mixamorig:LeftHand", 0, 0, 0, 0.12f),
+            new("mixamorig:RightFoot", 0, 0, 0, 0.16f),
+            new("mixamorig:LeftFoot", 0, 0, 0, 0.16f),
         };
 
         private static CharacterDefinition[]? _definitions;

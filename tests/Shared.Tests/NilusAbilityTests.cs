@@ -1281,9 +1281,9 @@ public class NilusAbilityTests
         Assert.Equal((ushort)18, damageBeforeBlast);                              // 6 drag pulses
         Assert.Equal((ushort)36, sim.GetState(100).DamagePercent);                // + detonation
 
-        // Hitstop (ADR-0012): the 18-damage blast freezes the victim 2 + 2·18 → cap 24
+        // Hitstop (ADR-0012): the 18-damage blast freezes the victim 1 + 1.5·18 = 28 → cap 12
         // ticks (receiver-only — Nilus never freezes); the launch applies at expiry.
-        Assert.Equal((ushort)24, sim.GetState(100).HitstopTicks);
+        Assert.Equal((ushort)12, sim.GetState(100).HitstopTicks);
         Assert.Equal(ActionState.Idle, sim.GetState(100).State);                  // frozen, not launched
 
         // The ability completed itself: Idle, and the 540t cooldown charged. Neither happens
@@ -1294,12 +1294,12 @@ public class NilusAbilityTests
         Assert.Equal(ActionState.Idle, caster.State);
         Assert.Equal((ushort)540, caster.Cooldown5);
 
-        for (int i = 0; i < 24; i++)
+        for (int i = 0; i < 12; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var hit = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, hit.State);
-        Assert.Equal((ushort)40, hit.HitstunTicks);
+        Assert.Equal((ushort)24, hit.HitstunTicks);
         Assert.True(hit.KVZ > 1f,
             $"the blast must throw the target OUTWARD (+Z, away from Nilus), got KVZ={hit.KVZ:F2} — " +
             "a drag pulse resolving after the detonation would zero this");
@@ -1310,7 +1310,7 @@ public class NilusAbilityTests
         // window. This is what catches a drag pulse that shares the detonation tick: the
         // detonation resolves first, but the pulse survives to the NEXT tick, and its
         // ApplyKnockback (zero base, zero growth) wipes KVX/KVY/KVZ and hands the victim
-        // straight back to Idle one tick into a 40-tick send.
+        // straight back to Idle one tick into a 24-tick send.
         float prevZ = sim.GetState(100).PZ;
         for (int i = 1; i <= 20; i++)
         {
@@ -1355,11 +1355,11 @@ public class NilusAbilityTests
 
         var hit = sim.GetState(100);
         Assert.Equal((ushort)36, hit.DamagePercent);       // 6 drag pulses + the detonation
-        Assert.Equal((ushort)24, hit.HitstopTicks);        // blast freeze (ADR-0012), receiver-only
+        Assert.Equal((ushort)12, hit.HitstopTicks);        // blast freeze (ADR-0012), receiver-only
         TestHelpers.AssertNear(0f, sim.GetState(1).PZ, 0.3f);
 
         // Freeze expires — the blast launch lands.
-        for (int i = 0; i < 24; i++) sim.Tick(new() { { 1, mashing }, { 100, default } });
+        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, mashing }, { 100, default } });
         var launched = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, launched.State);
         Assert.True(launched.KVZ > 1f, $"the blast still has to land, got KVZ={launched.KVZ:F2}");

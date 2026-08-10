@@ -35,9 +35,9 @@ namespace SlopArena.Shared
 
 		// ── Hitstop tuning (ADR-0012). Game-wide defaults; per-ability overrides via
 		// AbilitySpec.Params keys below. Tune from playtest. ──
-		private const float HitstopBaseTicks = 2f;
-		private const float HitstopPerDamageTicks = 2f;
-		private const float HitstopMaxTicks = 24f;
+		private const float HitstopBaseTicks = 1f;
+		private const float HitstopPerDamageTicks = 1.5f;
+		private const float HitstopMaxTicks = 12f;
 		private const float HitstopLowDamageThreshold = 3f;
 		private const float HitstopLowDamageMult = 2f;
 		private const float HitstopMultihitMult = 0.5f;

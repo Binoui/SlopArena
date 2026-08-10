@@ -89,17 +89,17 @@ public class CombatPipelineTests
         // Stage 1 damage = 4 (no buffs active)
         Assert.InRange((int)afterHit.DamagePercent, 4, 4);
 
-        // Hitstop (ADR-0012): at connect the victim freezes for 2 + 2·4 = 10 ticks —
+        // Hitstop (ADR-0012): at connect the victim freezes for 1 + 1.5·4 = 7 ticks —
         // KV is queued, not yet applied; damage + HitstunLevel land immediately.
-        Assert.Equal(10, (int)afterHit.HitstopTicks);
+        Assert.Equal(7, (int)afterHit.HitstopTicks);
         Assert.Equal(0f, afterHit.KVX);
         Assert.Equal(0f, afterHit.KVY);
         Assert.Equal(0f, afterHit.KVZ);
-        // Manki LMB stage 1: StunTicks=32 → ≤30? no, >30 → level 1 (medium)
-        Assert.Equal(1, (int)afterHit.HitstunLevel);
+        // Manki LMB stage 1: StunTicks=20 (banded) → ≤30 → level 0 (light)
+        Assert.Equal(0, (int)afterHit.HitstunLevel);
 
-        // Freeze expires at tick 21 — the queued launch applies there.
-        for (int i = 0; i < 10; i++)
+        // Freeze expires at tick 18 — the queued launch applies there.
+        for (int i = 0; i < 7; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterLaunch = sim.GetState(100);
@@ -115,7 +115,7 @@ public class CombatPipelineTests
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // regardless of ApplyKnockback's internal logic.
-        Assert.Equal(32, (int)afterLaunch.HitstunTicks);
+        Assert.Equal(20, (int)afterLaunch.HitstunTicks);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -303,8 +303,8 @@ public class CombatPipelineTests
         // ApplyBuffBonuses is called in ServerAbility.SpawnHitbox BEFORE the hitbox
         // enters the resolver, so Hitbox.Damage = 7. ResolveHits applies it directly.
         Assert.InRange((int)afterHit.DamagePercent, 7, 7);
-        // Base 4 + Overclock 3 = 7 → HitstunLevel = 1 (medium tier)
-        Assert.Equal(1, (int)afterHit.HitstunLevel);
+        // Base 4 + Overclock 3 = 7 → StunTicks 20 (banded) → HitstunLevel = 0 (light tier)
+        Assert.Equal(0, (int)afterHit.HitstunLevel);
     }
     // ═══════════════════════════════════════════════════════════════════
     // EDGE CASE: Mutual combat — two entities attack each other
@@ -375,65 +375,7 @@ public class CombatPipelineTests
     }
 
     [Fact]
-    public void Warp_OutOfAttackRange_EntersWarpingState()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-        float gpy = TestHelpers.CombatGroundPY;
-
-        // NPC at Z=5.9: within WarpRange=6 but outside AttackRange=4
-        var player = TestHelpers.PlayerState(z: 0f);
-        player.PY = gpy;
-        var npc = TestHelpers.NpcState(z: 5.9f);
-        sim.RegisterEntity(1, def, player);
-
-        npc.PY = gpy;
-        sim.RegisterEntity(100, def, npc);
-
-        // Press LMB → should NOT enter Attacking (too far), should enter Warping
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(ActionState.Warping, state.State);
-    }
-
-    [Fact]
-    public void Warp_ArrivingAtTarget_StartsAttack()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-        float gpy = TestHelpers.CombatGroundPY;
-
-        // NPC at Z=5: within WarpRange=10 but outside AttackRange=4
-        // Warp distance = 1m. SprintSpeed=12m/s → ~5 ticks.
-        var player = TestHelpers.PlayerState(z: 0f);
-        player.PY = gpy;
-        sim.RegisterEntity(1, def, player);
-
-        var npc = TestHelpers.NpcState(z: 5f);
-        npc.PY = gpy;
-        sim.RegisterEntity(100, def, npc);
-
-        // Press LMB → enters Warping state
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-        Assert.Equal(ActionState.Warping, sim.GetState(1).State);
-
-        // Tick until warp completes (20 ticks is well beyond the ~5 needed)
-        for (int i = 0; i < 20; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, state.State);
-        Assert.True(state.AttackElapsedTicks > 0,
-            "Attack should be running (elapsed ticks should be > 0)");
-        Assert.True(state.AttackElapsedTicks < 40,
-            $"Attack should be within stage duration (40 ticks), elapsed={state.AttackElapsedTicks}");
-    }
-
-    [Fact]
-    public void Warp_WithinAttackRange_AttacksDirectly()
+    public void Attack_WithinEngageRange_StartsDirectly()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -456,9 +398,10 @@ public class CombatPipelineTests
     }
 
     [Fact]
-    public void Warp_BehindEnemy_AttacksDirectly()
+    public void Attack_BehindEnemy_StartsDirectly()
     {
-        // NPC behind player (negative Z): inside WarpRange but outside facing cone
+        // NPC behind player (negative Z) — warp is gone, so the attack starts anyway
+        // (commitment model: you whiff if out of reach).
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var def = TestHelpers.CombatDef;
@@ -473,61 +416,12 @@ public class CombatPipelineTests
         npc.PY = gpy;
         sim.RegisterEntity(100, def, npc);
 
-        // Press LMB → should NOT warp (enemy behind), should attack directly
+        // Press LMB → no warp, direct attack
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
 
         var state = sim.GetState(1);
         Assert.Equal(0f, state.WarpSpeed);
         Assert.Equal(ActionState.Attacking, state.State);
-    }
-
-    [Fact]
-    public void Warp_EnemyInCone_EntersWarpingState()
-    {
-        // NPC at slight angle but within 120° cone: should warp
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-        float gpy = TestHelpers.CombatGroundPY;
-
-        var player = TestHelpers.PlayerState(z: 0f);
-        player.PY = gpy;
-        player.FacingYaw = 0f; // facing +Z
-        sim.RegisterEntity(1, def, player);
-
-        // NPC at PX=2, PZ=5: distance≈5.4, angle≈21.8° from facing → inside 60° half-cone
-        var npc = TestHelpers.NpcState(x: 2f, z: 5f);
-        npc.PY = gpy;
-        sim.RegisterEntity(100, def, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(ActionState.Warping, state.State);
-        Assert.True(state.WarpSpeed > 0f, "Expected warp to activate for enemy inside cone");
-    }
-    [Fact]
-    public void Warp_FacingEast_NpcAhead_EntersWarpingState()
-    {
-        // Player facing +X (FacingYaw=π/2), NPC directly ahead at +X within WarpRange
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-        float gpy = TestHelpers.CombatGroundPY;
-
-        var player = TestHelpers.PlayerState(z: 0f);
-        player.PY = gpy;
-        player.FacingYaw = MathF.PI / 2f; // facing east (+X)
-        sim.RegisterEntity(1, def, player);
-
-        var npc = TestHelpers.NpcState(x: 5.9f, z: 0f); // directly ahead at +X, distance=5.9 (strictly < WarpRange=6)
-        npc.PY = gpy;
-        sim.RegisterEntity(100, def, npc);
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(ActionState.Warping, state.State);
-        Assert.True(state.WarpSpeed > 0f, "Expected warp to activate for enemy ahead at non-zero facing");
     }
 
     // ═══════════════════════════════════════════════════════════════════

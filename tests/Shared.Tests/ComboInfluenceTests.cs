@@ -19,24 +19,24 @@ namespace SlopArena.Shared.Tests;
 ///
 /// Tick accounting: a zone hitbox spawned pre-tick resolves at the END of
 /// tick 1 (ResolveHits runs after SimulateMovement), freezing the victim
-/// F = 2 + 2·damage(4) = 10 ticks, decremented ticks 2..11. The launch
-/// applies at the end of tick 11: KVY = 14·sin45° ≈ 9.899, KVX = KVZ = 0,
+/// F = 1 + 1.5·damage(4) = 7 ticks, decremented ticks 2..8. The launch
+/// applies at the end of tick 8: KVY = 14·sin45° ≈ 9.899, KVX = KVZ = 0,
 /// LaunchMagnitude = 14. HitstunTicks = 12 — the freeze-expiry gate forces
 /// it to QueuedKBStun (= the hitbox StunTicks, see Simulation.cs line 186),
 /// so the zone's StunTicks must BE 12 for the 12-tick hitstun the scenario
 /// intends (the ADR-0013 design doc's 60 was the pre-override cap).
-/// Hitstun decrements ticks 12..23, so the drift lands at the END of tick
-/// 23 — the first tick whose VX carries the influence (design-doc tick 26
+/// Hitstun decrements ticks 9..20, so the drift lands at the END of tick
+/// 20 — the first tick whose VX carries the influence (design-doc tick 26
 /// was an off-by-three slip; the doc's own formula KVY 9.899 → 6.91 over
-/// 12 ticks and "post-expiry VX ≈ 4.42" describe tick 23 exactly).
+/// 12 ticks and "post-expiry VX ≈ 4.42" describe tick 20 exactly).
 /// ═══════════════════════════════════════════════════════════════════════
 /// </summary>
 public class ComboInfluenceTests
 {
-    /// <summary>Freeze = 2 + 2·damage(4) = 10 ticks, decremented ticks 2..11.</summary>
-    private const int LaunchTick = 11;
-    /// <summary>Hitstun = 12 ticks (hitbox StunTicks), decremented ticks 12..23.</summary>
-    private const int ExpiryTick = 23;
+    /// <summary>Freeze = 1 + 1.5·damage(4) = 7 ticks, decremented ticks 2..8.</summary>
+    private const int LaunchTick = 8;
+    /// <summary>Hitstun = 12 ticks (hitbox StunTicks), decremented ticks 9..20.</summary>
+    private const int ExpiryTick = 20;
     /// <summary>Launch magnitude = base 14 + growth 0·(damage%·0.01) = 14.</summary>
     private const float LaunchMag = 14f;
     /// <summary>Drift band: 0.25·launch to 0.35·launch around 0.30·launch = 4.2.</summary>

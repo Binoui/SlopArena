@@ -118,9 +118,9 @@ public class HitstunAnimationTierTests
     // ═══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void LMB_Stage1_MediumStun_SetsHitstunLevel1()
+    public void LMB_Stage1_BandedStun_SetsHitstunLevel0()
     {
-        // Manki LMB stage 1: StunTicks = 32 → HitstunLevel = 1 (medium)
+        // Manki LMB stage 1: StunTicks = 20 (ADR-0015 band) → HitstunLevel = 0 (light)
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var def = TestHelpers.CombatDef;
@@ -141,19 +141,19 @@ public class HitstunAnimationTierTests
 
         var afterHit = sim.GetState(100);
         // Hitstop (ADR-0012): the hit resolves at tick 11, freezing the victim for
-        // 2 + 2·4 = 10 ticks before the launch. Damage + tier apply at connect; the
-        // Hitstun STATE begins at freeze expiry (tick 21).
+        // 1 + 1.5·4 = 7 ticks before the launch. Damage + tier apply at connect; the
+        // Hitstun STATE begins at freeze expiry (tick 18).
         Assert.True(afterHit.DamagePercent > 0, "NPC should have taken damage");
-        Assert.Equal(1, (int)afterHit.HitstunLevel);
-        Assert.Equal((ushort)10, afterHit.HitstopTicks);
+        Assert.Equal(0, (int)afterHit.HitstunLevel);
+        Assert.Equal((ushort)7, afterHit.HitstopTicks);
         Assert.Equal(ActionState.Idle, afterHit.State); // frozen, not yet launched
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 7; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterLaunch = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, afterLaunch.State);
-        Assert.Equal((ushort)32, afterLaunch.HitstunTicks);
+        Assert.Equal((ushort)20, afterLaunch.HitstunTicks);
     }
 
     [Fact]

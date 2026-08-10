@@ -8,7 +8,7 @@
     "VZ": 0.46658385,
     "ComboStage": 1,
     "AttackSlot": 2,
-    "HitstopTicks": 15,
+    "HitstopTicks": 9,
     "ChargeTicks": 1,
     "JumpsLeft": 2,
     "IsGrounded": true
@@ -17,29 +17,24 @@
     "PY": 0.75,
     "PZ": 1.5,
     "DamagePercent": 8,
-    "HitstopTicks": 15,
+    "HitstopTicks": 9,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "PlayerFinal": {
-    "State": 4,
     "PY": 0.85,
-    "PZ": 0.13746825,
-    "VZ": 0.0006922445,
-    "ComboStage": 1,
-    "AttackSlot": 2,
-    "ChargeTicks": 1,
+    "PZ": 0.13748291,
+    "Cooldown1": 56,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
-    "State": 2,
-    "PY": 1.1998707,
-    "PZ": 3.5754683,
-    "VY": 0.6307253,
-    "VZ": 4.321329,
+    "PY": 1.28508,
+    "PZ": 3.8366356,
+    "VY": 0.79633904,
+    "VZ": 2.2820406,
     "DamagePercent": 8,
-    "HitstunTicks": 1,
+    "AirTimeTicks": 10,
     "JumpsLeft": 2
   }
 }

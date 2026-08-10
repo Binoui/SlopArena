@@ -1,0 +1,35 @@
+{
+  "Scenario": "Manki Air LMB",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "PZ": 0.30000004,
+    "VZ": 3,
+    "AttackSlot": 1,
+    "HitstopTicks": 2,
+    "AirTimeTicks": 6
+  },
+  "NpcSnap": {
+    "PY": 2.65,
+    "PZ": 1.5,
+    "DamagePercent": 4,
+    "HitstopTicks": 2,
+    "AirTimeTicks": 6,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "PZ": 0.50000006,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 1.5848827,
+    "PZ": 1.9730716,
+    "VY": -7.743234,
+    "DamagePercent": 4,
+    "AirTimeTicks": 50,
+    "JumpsLeft": 2
+  }
+}

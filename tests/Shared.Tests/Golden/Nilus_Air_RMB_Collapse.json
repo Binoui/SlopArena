@@ -7,14 +7,14 @@
     "VY": -14,
     "ComboStage": 1,
     "AttackSlot": 2,
-    "HitstopTicks": 18,
+    "HitstopTicks": 8,
     "AirTimeTicks": 8
   },
   "NpcSnap": {
     "PY": 3.65,
     "PZ": 0.5,
     "DamagePercent": 10,
-    "HitstopTicks": 18,
+    "HitstopTicks": 8,
     "AirTimeTicks": 13,
     "JumpsLeft": 2
   },
@@ -25,7 +25,7 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 3.4824047,
+    "PZ": 3.2332892,
     "DamagePercent": 10,
     "JumpsLeft": 2,
     "IsGrounded": true

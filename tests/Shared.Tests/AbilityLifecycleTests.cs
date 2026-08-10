@@ -465,7 +465,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Tap hitbox params per MankiData AirRMB Stages[1]
         Assert.Equal(10f, hb.Damage);
-        Assert.Equal(0.8f, hb.Radius);
+        Assert.Equal(0.7f, hb.Radius);
     }
 
     [Fact]
@@ -489,7 +489,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Charged hitbox params per MankiData AirRMB ChargedStages[0]
         Assert.Equal(14f, hb.Damage);
-        Assert.Equal(1.0f, hb.Radius);
+        Assert.Equal(0.8f, hb.Radius);
     }
 
     [Fact]
@@ -516,7 +516,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Should be tap params (not charged)
         Assert.Equal(10f, hb.Damage);
-        Assert.Equal(0.8f, hb.Radius);
+        Assert.Equal(0.7f, hb.Radius);
     }
 
     [Fact]
@@ -706,7 +706,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Normal hitbox params per MankiData
         Assert.Equal(8f, hb.Damage);
-        Assert.Equal(0.8f, hb.Radius);
+        Assert.Equal(0.7f, hb.Radius);
         Assert.Equal(8f, hb.BaseKnockback);
         Assert.Equal(5f, hb.KnockbackGrowth);
     }
@@ -737,7 +737,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Charged hitbox params per MankiData
         Assert.Equal(14f, hb.Damage);
-        Assert.Equal(1.0f, hb.Radius);
+        Assert.Equal(0.8f, hb.Radius);
         Assert.Equal(8f, hb.BaseKnockback);
         Assert.Equal(5f, hb.KnockbackGrowth);
     }
@@ -767,7 +767,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Should be normal params (not charged)
         Assert.Equal(8f, hb.Damage);
-        Assert.Equal(0.8f, hb.Radius);
+        Assert.Equal(0.7f, hb.Radius);
     }
 
     [Fact]
@@ -793,7 +793,7 @@ public class AbilityLifecycleTests
         var hb = hitboxes[0];
         // Should be charged params (auto-release past ChargeHoldTicks = always charged)
         Assert.Equal(14f, hb.Damage);
-        Assert.Equal(1.0f, hb.Radius);
+        Assert.Equal(0.8f, hb.Radius);
     }
 
     [Fact]

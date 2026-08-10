@@ -9,10 +9,10 @@
   },
   "NpcSnap": {
     "PY": 0.75,
-    "PZ": 4.3072314,
-    "VZ": -5.3494363,
+    "PZ": 4.091466,
+    "VZ": -1.4093975,
     "DamagePercent": 36,
-    "HitstopTicks": 24,
+    "HitstopTicks": 12,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -23,12 +23,12 @@
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 5.354819,
-    "PZ": 10.178148,
-    "VY": 2.9367785,
-    "VZ": 3.2106593,
+    "PY": 4.6952,
+    "PZ": 11.161656,
+    "VY": 3.1456609,
+    "VZ": 0.32336056,
     "DamagePercent": 36,
-    "AirTimeTicks": 5,
+    "AirTimeTicks": 33,
     "JumpsLeft": 2
   }
 }
