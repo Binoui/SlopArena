@@ -1,0 +1,20 @@
+{
+  "Scenario": "IASA Act At Unlock Interrupts Into Slot1",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 1.0500001,
+    "VZ": 5,
+    "AttackSlot": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 3.5261848,
+    "VZ": 0.065041415,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

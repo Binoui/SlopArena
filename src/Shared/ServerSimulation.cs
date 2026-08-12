@@ -357,6 +357,33 @@ namespace SlopArena.Shared
             return true;
         }
 
+		/// <summary>
+		/// IASA early-out (issue #124): true when the current attack's stage has passed its
+		/// IasaTicks. From that tick on, ability inputs interrupt the recovery. 0 = none
+		/// (full ADR-0014 lock — the pre-IASA behavior). Never true outside Attacking.
+		/// </summary>
+		private static bool IsIasaUnlocked(CharacterState state, CharacterDefinition def)
+		{
+			if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
+			var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
+			if (spec?.Stages is not { Length: > 0 }) return false;
+			int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+			var stage = spec.Stages[stageIdx];
+			if (stage.IasaTicks == 0) return false;
+
+			// AttackElapsedTicks counts ticks since the last stage reset. Stage-driven moves
+			// (StageChainAbility) never reset it mid-attack, so subtracting prior stages yields
+			// the current stage's elapsed. Charge abilities reset it at their mid-attack stage
+			// transition (ChargeAttackAbility/AimHoldAbility), which underflows the
+			// subtraction — fall back to the raw clock (elapsed since the transition).
+			int elapsedInStage = state.AttackElapsedTicks;
+			for (int i = 0; i < stageIdx; i++)
+				elapsedInStage -= spec.Stages[i].DurationTicks;
+			if (elapsedInStage < 0) elapsedInStage = state.AttackElapsedTicks;
+
+			return elapsedInStage >= stage.IasaTicks;
+		}
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -368,10 +395,19 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
 				if (input.ActiveSlot == 0) continue;
-				if (state.AnimLockTicks > 0 || state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0) continue; // ADR-0014
-				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
 
 				var def = _defs[id];
+				// IASA early-out (issue #124): an attack stage that has passed its IasaTicks
+				// releases the anim lock for ability inputs — the press interrupts the recovery.
+				// IasaTicks = 0 (default) keeps the full ADR-0014 lock. Only the AnimLockTicks
+				// term relaxes: hitstun, hitstop and burst recovery always block — attacker
+				// hitstop (FreezesOwner) keeps State == Attacking, so relaxing those too would
+				// let a press cancel the attack mid-freeze (ADR-0012).
+				bool iasaUnlocked = IsIasaUnlocked(state, def);
+				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
+					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
+				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
+
 				bool airborne = !state.IsGrounded;
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
 
@@ -447,9 +483,6 @@ namespace SlopArena.Shared
                 if (input.ActiveSlot == AbilitySlots.F && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
                     continue;
 
-				// Create and activate server-side ability
-				if (_activeAbilities.ContainsKey(id)) continue;
-
 				// ── Charge-stock gate: abilities that declare a "max_charges" param are
 				// limited by a refundable charge pool (Kistu Rising Slash) rather than a flat
 				// cooldown. Blocked when the pool is exhausted. ──
@@ -465,6 +498,31 @@ namespace SlopArena.Shared
 
 				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
 				if (ability == null) continue; // unsupported character or slot
+
+				// ── IASA interrupt ──
+				// An active ability whose stage has passed its IasaTicks is dropped without
+				// OnEnd (same semantics as hitstun/dash interrupts) so the new ability takes
+				// over. Placed AFTER the activation gates (cooldown, charge stock, factory
+				// support) so a blocked press never cancels the current attack. The move was
+				// used — its cooldown still applies, mirroring the dash-cancel path in
+				// TickAbilities. Attack state is cleared so the new ability's OnStart begins
+				// clean and no stale buffered press double-fires when the new attack's lock
+				// expires.
+				if (_activeAbilities.TryGetValue(id, out var currentAbility))
+				{
+					if (!iasaUnlocked) continue;
+
+					_activeAbilities.Remove(id);
+					if (currentAbility.Slot < AbilitySlots.Count)
+						state.SetCooldown((byte)(currentAbility.Slot + 1), currentAbility.Cooldown);
+					state.AttackSlot = 0;
+					state.ComboStage = 0;
+					state.AttackElapsedTicks = 0;
+					state.AnimLockTicks = 0;
+					state.BufferedSlot = 0;
+					_states[id] = state;
+				}
+
 				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 

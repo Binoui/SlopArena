@@ -37,6 +37,13 @@ namespace SlopArena.Shared
     {
         /// <summary>Total animation lock duration in ticks.</summary>
         public ushort DurationTicks;
+        /// <summary>
+        /// IASA early-out tick (issue #124): from this tick of the stage onward, any ability
+        /// input interrupts the recovery — the current animation stops and the new ability
+        /// starts immediately. 0 = none (default): full lock until the stage ends, the
+        /// pre-IASA behavior. No input still lets the move complete at its normal duration.
+        /// </summary>
+        public ushort IasaTicks;
         /// <summary>Hitbox events triggered during this stage.</summary>
         public HitboxEvent[] HitboxEvents;
         /// <summary>Forward burst at attack start (applied once).</summary>

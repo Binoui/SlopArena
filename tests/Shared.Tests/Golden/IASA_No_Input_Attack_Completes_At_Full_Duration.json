@@ -1,0 +1,19 @@
+{
+  "Scenario": "IASA No Input Attack Completes At Full Duration",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 1.0000001,
+    "VZ": 3,
+    "AttackSlot": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 1.1867946,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}
