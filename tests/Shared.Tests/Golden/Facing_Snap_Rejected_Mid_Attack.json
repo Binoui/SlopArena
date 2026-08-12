@@ -1,0 +1,21 @@
+{
+  "Scenario": "Facing Snap Rejected Mid Attack",
+  "TickCount": 40,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "PZ": 1.1000001,
+    "VZ": 6,
+    "AttackSlot": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "PZ": 3.2626297,
+    "VZ": 0.2698767,
+    "Cooldown2": 5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

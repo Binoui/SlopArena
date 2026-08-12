@@ -1,0 +1,42 @@
+{
+  "Scenario": "Facing Snap Then Normal",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "FacingYaw": 3.1415927,
+    "PX": 100,
+    "PY": 0.85,
+    "PZ": 99.40001,
+    "VX": -5.2453663E-07,
+    "VZ": -6,
+    "AttackSlot": 3,
+    "HitstopTicks": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PX": 100,
+    "PY": 0.85,
+    "PZ": 98.7,
+    "DamagePercent": 5,
+    "HitstopTicks": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "FacingYaw": 2.6742089,
+    "PX": 100,
+    "PY": 0.85,
+    "PZ": 96.82579,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PX": 100,
+    "PY": 0.85,
+    "PZ": 98.20897,
+    "DamagePercent": 5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

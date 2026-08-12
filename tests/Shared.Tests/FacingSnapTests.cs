@@ -7,13 +7,110 @@ namespace SlopArena.Shared.Tests;
 /// Facing model (ADR-0017 / issue #126) — the unlocked-mode rules the persistent
 /// target lock (ADR-0018) overrides: air facing is sticky (no velocity re-facing),
 /// ground facing follows movement, and LMB snaps facing to the camera azimuth at the
-/// input gate. Implemented as the prerequisite for #127's LMB-exits-lock; the lock
-/// tests live in <see cref="TargetLockTests"/>.
+/// input gate. Golden scenarios pin drift-no-reface, snap-then-normal (hit-confirm
+/// along the snapped facing) and both rejection gates; behavioral tests cover the
+/// same seams with angle asserts. The lock tests live in <see cref="TargetLockTests"/>.
 /// </summary>
-public class FacingSnapTests
+public class FacingSnapTests : KitScenarioTests
 {
     private static readonly CharacterDefinition Def = TestHelpers.CombatDef;
     private static float Gpy => TestHelpers.CombatGroundPY;
+
+    // ────────────────────────── Golden scenarios (issue #126) ──────────────────────────
+
+    [Fact]
+    public void Golden_AirDrift_DoesNotReface()
+    {
+        // Sticky air facing: drift +X during the airborne window (ticks 0-3) must not
+        // re-face the fighter — the snapshot pins takeoff yaw (PI/4) while drifting.
+        // Input stops before landing (~t4); with no input the ground rule never writes
+        // facing either, so the final tick pins the same yaw.
+        var inputs = new InputSequence();
+        for (int t = 0; t <= 3; t++) inputs.Set(t, new InputState { MoveX = 1f });
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Facing Air Drift Without Reface",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PY = 2f, IsGrounded = false, JumpsLeft = 0, FacingYaw = MathF.PI / 4f },
+            Inputs = inputs,
+            Assert = _ => { },
+            SnapshotTick = 2,   // airborne, drifting, facing unchanged
+            TotalTicks = 40,
+        });
+    }
+
+    [Fact]
+    public void Golden_SnapThenNormal_FiresAlongSnappedFacing()
+    {
+        // The #126 playtest, grounded: snap to camera azimuth (-Z, AimYaw 18000), then
+        // press 1 — Dragon Thrust fires along the snapped facing and hits the NPC placed
+        // at -Z. Golden pins the snapped facing THROUGH the attack (the stage's own
+        // tracking keeps it — the target sits exactly at the snapped yaw, diff 0) and
+        // the hit landing (NPC damage).
+        var fg = TestHelpers.FightGuyDef;
+        float fgGpy = TestHelpers.GroundPY(fg);
+        // Grid-center positions: the arena heightmap spans [0,200]² — a -Z lunge from
+        // the origin would exit the grid (no surface → airborne → null air spec).
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Facing Snap Then Normal",
+            Def = fg,
+            Setup = () => TestHelpers.PlayerState(100f, 100f) with { PY = fgGpy, FacingYaw = 0f },
+            Inputs = new InputSequence()
+                .Set(0, new InputState { FaceToCamera = true, AimYaw = 18000 })
+                .Set(1, new InputState { ActiveSlot = AbilitySlots.Slot1 }),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState(100f, 98.7f) with { PY = fgGpy },
+            NpcAssert = _ => { },
+            NpcDef = fg,
+            SnapshotTick = 8,   // hitbox active (trigger 6, dur 5), hit landed
+            TotalTicks = 60,
+        });
+    }
+
+    [Fact]
+    public void Golden_Snap_RejectedMidAttack()
+    {
+        // LMB during the attack lock (AnimLockTicks > 0) is rejected: facing stays 0,
+        // NOT the camera (PI). No NPC — the stage's own tracking has no target, so the
+        // pin is purely "no snap". FacingYaw in the golden makes this regression-proof.
+        var fg = TestHelpers.FightGuyDef;
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Facing Snap Rejected Mid Attack",
+            Def = fg,
+            Setup = () => TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(fg), FacingYaw = 0f },
+            Inputs = new InputSequence()
+                .Set(0, new InputState { ActiveSlot = AbilitySlots.Slot1 })
+                .Set(2, new InputState { FaceToCamera = true, AimYaw = 18000 }),
+            Assert = _ => { },
+            SnapshotTick = 10,  // mid Dragon Thrust (dur 30); snap rejected at t2
+            TotalTicks = 40,
+        });
+    }
+
+    [Fact]
+    public void Golden_Snap_RejectedInHitstun()
+    {
+        // Hitstun rejects the snap outright: facing stays 0 through the lock.
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Facing Snap Rejected In Hitstun",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with
+            {
+                PY = Gpy, FacingYaw = 0f,
+                State = ActionState.Hitstun, HitstunTicks = 10, KVY = 3f,
+            },
+            Inputs = new InputSequence().Set(0, new InputState { FaceToCamera = true, AimYaw = 18000 }),
+            Assert = _ => { },
+            SnapshotTick = 5,   // still in hitstun, snap rejected, facing 0
+            TotalTicks = 40,
+        });
+    }
+
+    // ────────────────────────── Behavioral ──────────────────────────
 
     [Fact]
     public void AirDrift_DoesNotReface()
@@ -69,7 +166,7 @@ public class FacingSnapTests
         // none, so use FightGuy to prove the air attack fires along the snapped facing.
         var fg = TestHelpers.FightGuyDef;
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var player = TestHelpers.PlayerState() with
+        var player = TestHelpers.PlayerState(100f, 100f) with
         {
             PY = 2f, IsGrounded = false, JumpsLeft = 0, FacingYaw = 0f,
         };

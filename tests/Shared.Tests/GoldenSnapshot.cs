@@ -14,6 +14,14 @@ namespace SlopArena.Shared.Tests;
 internal record EntitySnapshot
 {
     public int State { get; init; }
+    /// <summary>
+    /// Facing yaw in radians (ADR-0017/0018: sticky air facing, LMB snap, target-lock
+    /// tracking). Included so the facing-behavior scenarios (drift-no-reface,
+    /// snap-then-normal, snap-rejected, lock tracking) are actually pinned. Existing
+    /// goldens predate the field; they gain it on the next regeneration — the values
+    /// are the pinned behavior going forward.
+    /// </summary>
+    public float FacingYaw { get; init; }
     public float PX { get; init; }
     public float PY { get; init; }
     public float PZ { get; init; }
@@ -45,6 +53,7 @@ internal record EntitySnapshot
     public static EntitySnapshot FromState(CharacterState s) => new()
     {
         State = (int)s.State,
+        FacingYaw = s.FacingYaw,
         PX = s.PX, PY = s.PY, PZ = s.PZ,
         VX = s.VX, VY = s.VY, VZ = s.VZ,
         DamagePercent = s.DamagePercent,

@@ -2,6 +2,7 @@
   "Scenario": "Target Lock Death Re-target",
   "TickCount": 120,
   "PlayerSnap": {
+    "FacingYaw": 1.052559,
     "PY": 0.75,
     "PZ": 5,
     "LockOn": true,
@@ -15,6 +16,7 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
+    "FacingYaw": 1.7337599,
     "PY": 0.75,
     "PZ": 5,
     "LockOn": true,

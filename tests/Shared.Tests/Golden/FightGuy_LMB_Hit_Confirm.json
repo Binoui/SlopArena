@@ -20,6 +20,7 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
+    "FacingYaw": 0.59911525,
     "PY": 0.85,
     "PZ": 6.9574037,
     "JumpsLeft": 2,

@@ -1,0 +1,17 @@
+{
+  "Scenario": "Facing Snap Rejected In Hitstun",
+  "TickCount": 40,
+  "PlayerSnap": {
+    "State": 2,
+    "PY": 0.9124398,
+    "VY": 2.3487082,
+    "HitstunTicks": 4,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 2.0295365,
+    "VY": 1.9166903,
+    "AirTimeTicks": 31,
+    "JumpsLeft": 2
+  }
+}

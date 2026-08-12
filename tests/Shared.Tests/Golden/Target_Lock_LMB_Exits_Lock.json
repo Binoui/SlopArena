@@ -2,6 +2,7 @@
   "Scenario": "Target Lock LMB Exits Lock",
   "TickCount": 120,
   "PlayerSnap": {
+    "FacingYaw": 3.1415927,
     "PY": 0.75,
     "JumpsLeft": 2,
     "IsGrounded": true
@@ -13,6 +14,7 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
+    "FacingYaw": 3.1415927,
     "PY": 0.75,
     "JumpsLeft": 2,
     "IsGrounded": true

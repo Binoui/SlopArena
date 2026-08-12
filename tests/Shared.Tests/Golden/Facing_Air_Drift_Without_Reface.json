@@ -1,0 +1,18 @@
+{
+  "Scenario": "Facing Air Drift Without Reface",
+  "TickCount": 40,
+  "PlayerSnap": {
+    "FacingYaw": 0.7853982,
+    "PX": 0.02320392,
+    "PY": 2,
+    "VX": 0.69534373,
+    "AirTimeTicks": 3
+  },
+  "PlayerFinal": {
+    "FacingYaw": 0.7853982,
+    "PX": 0.061397597,
+    "PY": 1.8574075,
+    "VY": -2.138889,
+    "AirTimeTicks": 40
+  }
+}

@@ -66,6 +66,25 @@ public class RollbackConvergenceTests
     }
 
     [Fact]
+    public void FacingSnapTrace_ConvergesExact_WithRttDelay()
+    {
+        // FaceToCamera (ADR-0017 / issue #126) rides the relayed InputState: the
+        // client's rollback replay must reproduce the server's snapped facing exactly —
+        // including the one-tick turnaround on the ground (movement re-faces the next
+        // tick). FacingYaw is a wire field, so exact self-convergence covers it.
+        var h = Harness(delayTicks: 2);
+        for (int t = 0; t < 120; t++)
+        {
+            InputState in1 = t == 30
+                ? new InputState { MoveX = 1f, FaceToCamera = true, AimYaw = 18000 }
+                : TestHelpers.Input(moveX: 1f);
+            h.Step(in1, TestHelpers.Input(moveX: -1f));
+        }
+        NetplayHarness.AssertSelfConverged(h);
+        NetplayHarness.AssertOpponentConverged(h);
+    }
+
+    [Fact]
     public void OpponentAttack_RawTrackThenReRegistration_ConvergesAfterComplexEnds()
     {
         // Entity 2 attacks early while ~9.5m from entity 1 (no cross-hit): the client

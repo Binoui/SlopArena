@@ -84,6 +84,7 @@ public abstract class KitScenarioTests
     private static void AssertEntityEqual(EntitySnapshot expected, EntitySnapshot actual, string label)
     {
         Assert.Equal(expected.State, actual.State);
+        Assert.Equal(expected.FacingYaw, actual.FacingYaw, 3);
         Assert.Equal(expected.PX, actual.PX, 3);
         Assert.Equal(expected.PY, actual.PY, 3);
         Assert.Equal(expected.PZ, actual.PZ, 3);

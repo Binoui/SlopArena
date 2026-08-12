@@ -2,6 +2,7 @@
   "Scenario": "Target Lock On Facing Tracking",
   "TickCount": 200,
   "PlayerSnap": {
+    "FacingYaw": 1.3984473,
     "PY": 0.75,
     "LockOn": true,
     "JumpsLeft": 2,
@@ -14,6 +15,7 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
+    "FacingYaw": 0.8244265,
     "PY": 0.75,
     "LockOn": true,
     "JumpsLeft": 2,
