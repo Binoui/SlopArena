@@ -83,10 +83,12 @@ namespace SlopArena.Client.World
             _projectileVFX.SetSimulation(_bridge.InternalSim);
             var playerClass = _playerClassOverride != CharacterClass.None ? _playerClassOverride : MatchConfig.PlayerClass;
             var playerDef = CharacterRegistry.Get(playerClass);
-            _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
+            playerDef = ApplyHurtboxOverride(playerDef, playerBaked);
+            _playerDef = playerDef;
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
+            npcDef = ApplyHurtboxOverride(npcDef, npcBaked);
  
             // Shared player renderer + HUD setup
             SetupPlayerRenderer(playerDef, playerBaked);

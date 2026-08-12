@@ -233,7 +233,7 @@ namespace SlopArena.Shared
 
 		public static List<SpellResolver.EntityData> BuildEntitiesFromState(
 			CharacterState state, CharacterDefinition def, BakedAnimationData baked,
-			string targetAnim, int animFrame)
+			string targetAnim, int animFrame, ulong entityId = 0)
 		{
 			var list = new List<SpellResolver.EntityData>();
 			if (baked != null && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
@@ -256,16 +256,23 @@ namespace SlopArena.Shared
 						float wx = px + ((bx * cos) + (bz * sin));
 						float wy = def.BoneYToWorldY(py, by);
 						float wz = pz + ((-bx * sin) + (bz * cos));
+						// Per-def offset (Ability Lab authored, spec #119): applied in
+						// sim-meter space, rotated by facing — matches the hitbox
+						// BoneOff* convention. All shipped defs use zero offsets, so
+						// this is behavior-preserving for existing characters.
+						wx += (hbd.OffX * cos) + (hbd.OffZ * sin);
+						wy += hbd.OffY;
+						wz += (-hbd.OffX * sin) + (hbd.OffZ * cos);
 						list.Add(new SpellResolver.EntityData
 						{
-							Id = 0, PosX = wx, PosY = wy, PosZ = wz,
+							Id = entityId, PosX = wx, PosY = wy, PosZ = wz,
 							Radius = hbd.Radius, Shape = HitboxShape.Sphere,
 							EndX = wx, EndY = wy, EndZ = wz, Active = true,
 						});
 					}
 				}
 			}
-			else
+			else if (def.HurtboxCapsules != null)
 			{
 				float cos = MathF.Cos(state.FacingYaw);
 				float sin = MathF.Sin(state.FacingYaw);
@@ -279,7 +286,7 @@ namespace SlopArena.Shared
 					float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
 					list.Add(new SpellResolver.EntityData
 					{
-						PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
+						Id = entityId, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
 						Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
 						EndX = ex, EndY = ey, EndZ = ez, Active = true,
 					});
@@ -721,6 +728,9 @@ namespace SlopArena.Shared
 		private List<SpellResolver.EntityData> BuildHurtboxList()
 		{
 			// ── Step 2: Build entity list for hit detection ──
+			// Unified pose resolution (spec #119): every entity's hurtboxes come from
+			// BuildEntitiesFromState — the same function the Ability Lab preview uses —
+			// so what the tool displays is exactly what collides.
 			var entityList = new List<SpellResolver.EntityData>();
 			foreach (var kvp in _states)
 			{
@@ -733,48 +743,12 @@ namespace SlopArena.Shared
 
 				if (ResolveBoneAnimFrame(id, state, def, out var baked, out var targetAnim, out var bakedFrame))
 				{
-
-						float px = state.PX, py = state.PY, pz = state.PZ;
-						float yaw = state.FacingYaw;
-						float cos = MathF.Cos(yaw), sin = MathF.Sin(yaw);
-
-						for (int bi = 0; bi < def.HurtboxBoneDefs.Length; bi++)
-						{
-							var hbd = def.HurtboxBoneDefs[bi];
-							if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz)) continue;
-							float scale = def.HurtboxBoneScale;
-							bx *= scale; by *= scale; bz *= scale;
-							float wx = px + ((bx * cos) + (bz * sin));
-							float wy = def.BoneYToWorldY(py, by);
-							float wz = pz + ((-bx * sin) + (bz * cos));
-							wx += hbd.OffX; wy += hbd.OffY; wz += hbd.OffZ;
-							entityList.Add(new SpellResolver.EntityData
-							{
-								Id = id, PosX = wx, PosY = wy, PosZ = wz,
-								Radius = hbd.Radius, Shape = HitboxShape.Sphere,
-								EndX = wx, EndY = wy, EndZ = wz, Active = true,
-							});
-						}
+					entityList.AddRange(BuildEntitiesFromState(state, def, baked, targetAnim, bakedFrame, id));
 				}
 				else if (def.HurtboxCapsules != null)
 				{
-					float cos = MathF.Cos(state.FacingYaw);
-					float sin = MathF.Sin(state.FacingYaw);
-					foreach (var cap in def.HurtboxCapsules)
-					{
-						float sx = state.PX + (cap.Sx * cos) + (cap.Sz * sin);
-						float sy = state.PY + cap.Sy;
-						float sz = state.PZ + ((-cap.Sx * sin) + (cap.Sz * cos));
-						float ex = state.PX + (cap.Ex * cos) + (cap.Ez * sin);
-						float ey = state.PY + cap.Ey;
-						float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
-						entityList.Add(new SpellResolver.EntityData
-						{
-							Id = id, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
-							Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
-							EndX = ex, EndY = ey, EndZ = ez, Active = true,
-						});
-					}
+					// No baked data / no bone defs → capsule fallback.
+					entityList.AddRange(BuildEntitiesFromState(state, def, null!, "idle", 0, id));
 				}
 			}
 			_lastEntityList = entityList;

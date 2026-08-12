@@ -239,6 +239,23 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void SetBakedData(BakedAnimationData? data) => _bakedData = data;
 
+        /// <summary>
+        /// Play a clip at a fixed normalized time with zero speed — Ability Lab frame
+        /// scrubbing (spec #119). Normalized time matches the game's playback mapping
+        /// (clip progress = tick / stage duration, speed = frameCount / DurationTicks),
+        /// so the scrubbed pose is exactly the in-game pose at that tick. A missing
+        /// clip is a no-op (the previous pose stays).
+        /// </summary>
+        public void PlayScrubbed(string clipName, float normalizedTime)
+        {
+            if (_animancer == null || _charConfig == null) return;
+            var clip = _charConfig.GetClipByName(clipName);
+            if (clip == null) return;
+            var state = _animancer.Play(clip, 0f);
+            state.Time = clip.length > 0f ? normalizedTime * clip.length : 0f;
+            state.Speed = 0f;
+        }
+
         // ── Lifecycle ──
 
         private void Awake()

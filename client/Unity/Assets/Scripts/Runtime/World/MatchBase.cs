@@ -235,5 +235,32 @@ namespace SlopArena.Client.World
                 return null;
             }
         }
+
+        /// <summary>
+        /// Apply the Ability Lab hurtbox override (spec #119) when one exists for the
+        /// character: a per-character JSON next to the baked skeleton that fully
+        /// replaces HurtboxBoneDefs. Returns the def unchanged when absent or invalid.
+        /// Keeps local/training hurtboxes identical to the game server's.
+        /// </summary>
+        protected static CharacterDefinition ApplyHurtboxOverride(CharacterDefinition def, BakedAnimationData? baked)
+        {
+            var overridePath = HurtboxOverride.OverridePathFor(def);
+            if (overridePath == null || baked == null) return def;
+            string? sysPath = BakedContentPaths.ResolveBaked(overridePath);
+            if (sysPath == null) return def;
+            try
+            {
+                string json = File.ReadAllText(sysPath);
+                if (!HurtboxOverride.TryParse(json, out _, out var defs) || defs == null) return def;
+                if (!HurtboxOverride.ValidateOrder(defs, baked)) return def;
+                Debug.Log($"[MatchBase] Applied hurtbox override: {sysPath} ({defs.Length} bones)");
+                return HurtboxOverride.Apply(def, defs);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[MatchBase] Failed to apply hurtbox override {sysPath}: {ex.Message} — using C# defs");
+                return def;
+            }
+        }
     }
 }

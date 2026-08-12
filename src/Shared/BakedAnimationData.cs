@@ -158,5 +158,14 @@ namespace SlopArena.Shared
                     return i;
             return -1;
         }
+
+        /// <summary>
+        /// Frame count for an animation, or -1 when the animation is not in the bake.
+        /// </summary>
+        public int FrameCountFor(string animName)
+        {
+            int idx = FindAnimIndex(animName);
+            return idx >= 0 ? Animations[idx].FrameCount : -1;
+        }
     }
 }

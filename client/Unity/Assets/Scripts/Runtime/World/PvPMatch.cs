@@ -91,8 +91,9 @@ namespace SlopArena.Client.World
 
             // Character definitions
             var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
-            _playerDef = playerDef;
             var playerBaked = LoadBakedData(playerDef);
+            playerDef = ApplyHurtboxOverride(playerDef, playerBaked);
+            _playerDef = playerDef;
 
             // Shared player renderer + HUD setup
             SetupPlayerRenderer(playerDef, playerBaked);
@@ -124,6 +125,7 @@ namespace SlopArena.Client.World
 
                 var def = CharacterRegistry.Get(opp.Class);
                 var baked = LoadBakedData(def);
+                def = ApplyHurtboxOverride(def, baked);
                 renderer.ModelYOffset = def.ModelYOffset;
                 renderer.CapsuleRadius = def.CapsuleRadius;
                 renderer.CapsuleHeight = def.CapsuleHeight;

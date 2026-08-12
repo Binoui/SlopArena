@@ -78,6 +78,18 @@ namespace SlopArena.Shared
         public HurtboxBoneDef[]? HurtboxBoneDefs;
         /// <summary>Path to the baked skeleton .bin file (pre-computed bone positions per frame).</summary>
         public string BakedDataPath = "";
+
+        /// <summary>
+        /// Shallow copy with HurtboxBoneDefs replaced (Ability Lab override, spec #119).
+        /// The original definition is left untouched — registry defs may be shared.
+        /// </summary>
+        public CharacterDefinition WithHurtboxBoneDefs(HurtboxBoneDef[] defs)
+        {
+            var clone = (CharacterDefinition)MemberwiseClone();
+            clone.HurtboxBoneDefs = defs;
+            return clone;
+        }
+
         /// <summary>Unity Resources path for the model prefab. E.g. "Characters/Manki"</summary>
         public string ModelResourcePath = "";
         /// <summary>

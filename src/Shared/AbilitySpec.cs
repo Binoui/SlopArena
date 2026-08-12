@@ -90,7 +90,6 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
-        /// Called when a hitbox event triggers during simulation.
         /// Override for custom hitbox spawning (projectiles, mines, etc.).
         /// Return true if handled (skip default melee hitbox), false to fall through.
         /// </summary>

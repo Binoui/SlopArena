@@ -112,6 +112,7 @@ namespace SlopArena.Server
 				var slot = _slots[i];
 				var def = CharacterRegistry.Get(slot.CharacterClass);
 				var baked = LoadBakedData(def);
+				def = TryApplyHurtboxOverride(def, baked);
 				_sim.RegisterEntity(slot.EntityId, def, CreateInitialState(def, i), baked);
 				// Respawn at the same distributed spawn point as initial spawn (issue #37).
 				var respawnSpawn = PickSpawn(i);
@@ -206,6 +207,32 @@ namespace SlopArena.Server
 			{
 				Console.WriteLine($"[Match] Failed to load baked data: {ex.Message} — using fallback");
 				return null;
+			}
+		}
+
+		/// <summary>
+		/// Apply the Ability Lab hurtbox override (spec #119) when one exists for the
+		/// character: a per-character JSON next to the baked skeleton that fully
+		/// replaces HurtboxBoneDefs. Returns the def unchanged when absent or invalid.
+		/// </summary>
+		private static CharacterDefinition TryApplyHurtboxOverride(CharacterDefinition def, BakedAnimationData? baked)
+		{
+			var overridePath = HurtboxOverride.OverridePathFor(def);
+			if (overridePath == null || baked == null) return def;
+			try
+			{
+				string sysPath = overridePath.Replace("res://", "");
+				if (!File.Exists(sysPath)) return def;
+				string json = File.ReadAllText(sysPath);
+				if (!HurtboxOverride.TryParse(json, out _, out var defs) || defs == null) return def;
+				if (!HurtboxOverride.ValidateOrder(defs, baked)) return def;
+				Console.WriteLine($"[Match] Applied hurtbox override: {sysPath} ({defs.Length} bones)");
+				return HurtboxOverride.Apply(def, defs);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Match] Failed to apply hurtbox override: {ex.Message} — using C# defs");
+				return def;
 			}
 		}
 

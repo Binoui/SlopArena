@@ -21,6 +21,7 @@
 | [`systems/combat-systems.md`](systems/combat-systems.md) | Universal combat mechanics |
 | [`systems/hitbox-system.md`](systems/hitbox-system.md) | Hitbox/hurtbox architecture |
 | [`systems/attack-hitbox-system.md`](systems/attack-hitbox-system.md) | Attack hitbox data pipeline |
+| [`systems/ability-lab.md`](systems/ability-lab.md) | Visual hitbox/hurtbox authoring tool |
 | [`systems/hitstun-di.md`](systems/hitstun-di.md) | Hitstun & directional influence |
 | [`systems/netcode-architecture.md`](systems/netcode-architecture.md) | Server-authoritative model, prediction, reconciliation |
 | [`systems/blast-zones.md`](systems/blast-zones.md) | Void death, kill boundaries |
