@@ -44,6 +44,29 @@ namespace SlopArena.Shared
         /// pre-IASA behavior. No input still lets the move complete at its normal duration.
         /// </summary>
         public ushort IasaTicks;
+        /// <summary>
+        /// Landing lag lock applied when the character lands while this stage's ability is
+        /// active (issue #125): the full attack-lock semantics — no ability input, no jump,
+        /// no dash, no burst, no input movement — for this many ticks. 0 = none (default):
+        /// landing never locks, the pre-issue behavior. Air stages only: the lock fires when
+        /// the ability that was started airborne lands mid-stage. Independent of IasaTicks —
+        /// landing lag is a hard lock that even an IASA-unlocked stage does not bypass.
+        /// </summary>
+        public ushort LandingLagTicks;
+        /// <summary>
+        /// Auto-cancel window start (issue #125): a landing at stage-elapsed tick
+        /// <c>&lt;= AutoCancelBeforeTicks</c> skips the landing lag entirely — act immediately.
+        /// 0 = window disabled. The early Melee window: land right after the move starts,
+        /// before the hitbox comes out, and there is no commitment.
+        /// </summary>
+        public ushort AutoCancelBeforeTicks;
+        /// <summary>
+        /// Auto-cancel window end (issue #125): a landing at stage-elapsed tick
+        /// <c>&gt;= AutoCancelAfterTicks</c> skips the landing lag entirely — act immediately.
+        /// 0 = window disabled. The classic Melee autocancel: land after the active frames
+        /// are over and there is no landing lag. Declare <c>&gt;= DurationTicks</c> to disable.
+        /// </summary>
+        public ushort AutoCancelAfterTicks;
         /// <summary>Hitbox events triggered during this stage.</summary>
         public HitboxEvent[] HitboxEvents;
         /// <summary>Forward burst at attack start (applied once).</summary>

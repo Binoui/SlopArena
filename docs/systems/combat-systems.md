@@ -55,6 +55,16 @@ Each stage can declare an **`IasaTicks`** interrupt point (Melee's "IASA" — in
 - Hitstun, hitstop, and burst recovery always block — IASA only relaxes the animation lock.
 - Frame data for FightGuy normals (#120) is authored with IASA-derived stage ticks once this lands.
 
+### Aerial Landing Lag + Auto-Cancel Windows (issue #125)
+
+Air stages can declare a **`LandingLagTicks`** commitment (Melee's landing lag): landing while the aerial is active applies that lock — **no ability input, no jump/dash/burst, no input movement** — unless the landing frame falls inside an auto-cancel window, in which case there is no lag and the player acts immediately.
+
+- **`LandingLagTicks = 0` = no landing commitment** (the default — existing moves are unchanged; only air stages that author the field lock on landing). Orthogonal to `IasaTicks`: they sit on the same attack-lock seam, but landing lag is a **hard** lock that an IASA-unlocked stage does not bypass.
+- **Auto-cancel windows** are per-stage: landing at stage-elapsed `<= AutoCancelBeforeTicks` (early — right after the move starts, before the hitbox comes out) or `>= AutoCancelAfterTicks` (late — after the active frames) skips the lag entirely **and ends the aerial on the landing frame** — the player acts immediately instead of riding out the move's ground recovery (Melee's AC). `0` disables a window; declare `AutoCancelAfterTicks >= DurationTicks` for no late window.
+- Implemented server-side in `ServerSimulation.SimulateMovement`: a landing is detected as airborne-at-tick-start → grounded-after-`SimulateTick` (a ledge snap boosts `VY`, so it is excluded); the stage is resolved with `airborne: true` (the ability in progress was started in the air), and the lock is written to `CharacterState.LandingLagTicks`. The lock field is sim-internal like `AnimLockTicks` — the client renders the state the packet says and the authority enforces the lock.
+- While the lock is live, `TickAbilities` still advances the move (stages complete, lingering hitboxes resolve — the aerial is *not* cancelled), but a post-tick freeze zeroes velocity so the move's per-tick writes (lunge re-apply, `MoveY`) cannot move the character.
+- The lock is cleared by hitstun (`ApplyKnockback`) — being hit ends the commitment; it never buffers inputs (a press inside the lock is dropped, Melee-style).
+
 ---
 
 

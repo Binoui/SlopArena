@@ -82,6 +82,16 @@ namespace SlopArena.Shared
         /// </summary>
         public ushort AnimLockTicks;
         /// <summary>
+        /// Landing lag lock from landing mid-aerial (issue #125): remaining ticks the
+        /// character is planted — no ability input, no jump/dash/burst, no input movement —
+        /// after touching ground while an air-started attack whose stage declared
+        /// LandingLagTicks is still active (unless the landing tick fell in an auto-cancel
+        /// window). Sim-internal like AnimLockTicks: applied server-side, not on the wire;
+        /// the client renders the state the packet says and the authority enforces the lock.
+        /// Cleared by hitstun (ApplyKnockback) — being hit ends the commitment.
+        /// </summary>
+        public ushort LandingLagTicks;
+        /// <summary>
         /// aimed charge progress (0 = none, >0 = charging)
         /// </summary>
         public ushort ChargeTicks;

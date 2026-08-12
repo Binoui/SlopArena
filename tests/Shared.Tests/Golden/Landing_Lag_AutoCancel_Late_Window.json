@@ -1,0 +1,15 @@
+{
+  "Scenario": "Landing Lag AutoCancel Late Window",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 6,
+    "PY": 0.85,
+    "JumpsLeft": 1,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

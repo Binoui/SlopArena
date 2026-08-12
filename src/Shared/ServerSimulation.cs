@@ -367,21 +367,89 @@ namespace SlopArena.Shared
 			if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
 			var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
 			if (spec?.Stages is not { Length: > 0 }) return false;
-			int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
-			var stage = spec.Stages[stageIdx];
+			var stage = Simulation.ResolveStage(spec, state);
 			if (stage.IasaTicks == 0) return false;
 
-			// AttackElapsedTicks counts ticks since the last stage reset. Stage-driven moves
-			// (StageChainAbility) never reset it mid-attack, so subtracting prior stages yields
-			// the current stage's elapsed. Charge abilities reset it at their mid-attack stage
-			// transition (ChargeAttackAbility/AimHoldAbility), which underflows the
-			// subtraction — fall back to the raw clock (elapsed since the transition).
-			int elapsedInStage = state.AttackElapsedTicks;
-			for (int i = 0; i < stageIdx; i++)
-				elapsedInStage -= spec.Stages[i].DurationTicks;
-			if (elapsedInStage < 0) elapsedInStage = state.AttackElapsedTicks;
+			return ElapsedInStage(state, spec) >= stage.IasaTicks;
+		}
 
-			return elapsedInStage >= stage.IasaTicks;
+		/// <summary>
+		/// Current stage's elapsed ticks for an attacking entity. AttackElapsedTicks counts
+		/// ticks since the last stage reset; stage-driven moves (StageChainAbility) never
+		/// reset it mid-attack, so subtracting prior stages' durations yields the current
+		/// stage's elapsed. Charge abilities reset it at their mid-attack stage transition
+		/// (ChargeAttackAbility/AimHoldAbility), which underflows the subtraction — fall back
+		/// to the raw clock (elapsed since the transition). Shared by the IASA check
+		/// (issue #124) and the landing-lag auto-cancel windows (issue #125).
+		/// </summary>
+		private static int ElapsedInStage(CharacterState state, AbilitySpec? spec)
+		{
+			if (spec?.Stages is not { Length: > 0 }) return 0;
+			int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+			int elapsed = state.AttackElapsedTicks;
+			for (int i = 0; i < stageIdx; i++)
+				elapsed -= spec.Stages[i].DurationTicks;
+			return elapsed < 0 ? state.AttackElapsedTicks : elapsed;
+		}
+
+		/// <summary>
+		/// Landing lag (issue #125): when the character lands this tick while an air-started
+		/// ability whose stage declares <c>LandingLagTicks</c> is still active, apply the
+		/// lock — no input, no movement — unless the landing frame fell in an auto-cancel
+		/// window (stage-elapsed <c>&lt;= AutoCancelBeforeTicks</c> or <c>&gt;=
+		/// AutoCancelAfterTicks</c>), in which case the aerial ENDS on the landing frame and
+		/// the player acts immediately (Melee's AC: no landing commitment at all). All-zero
+		/// fields = current behavior, landing never locks.
+		///
+		/// Detection: airborne at tick start + grounded after SimulateTick = a landing.
+		/// A ledge snap also flips IsGrounded but boosts VY (LedgeSnapUpwardBoost) — that is
+		/// not a landing, so the <c>VY &lt;= 0</c> guard excludes it. The spec is resolved
+		/// with <c>airborne: true</c>: the only air-started ability classes in the game
+		/// (AirLmbCombo, AirChargeAttack) resolve their own stages from the airborne variant,
+		/// so this reads the exact stages the running ability uses. Ground-started abilities
+		/// that land mid-stage (KistuRisingSlash) resolve the slot's AIR spec here — they are
+		/// unaffected while no air stage declares LandingLagTicks; a designer giving e.g.
+		/// AirRMB (Collapse) a lag must know the declaration governs that slot's landings.
+		///
+		/// Known 1-frame limitation: the input gates (burst especially) run inside
+		/// SimulateTick BEFORE this applies the lock, so a press on the landing frame itself
+		/// is processed pre-lock — an offensive burst on the landing frame still cancels the
+		/// aerial (pre-issue behavior). Every later locked tick is fully gated.
+		/// </summary>
+		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded)
+		{
+			if (wasGrounded || !state.IsGrounded) return; // no landing this tick
+			if (state.VY > 0f) return;                    // ledge snap boost, not a landing
+			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming) return;
+			if (state.AttackSlot == 0 || state.LandingLagTicks > 0) return;
+
+			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
+			if (spec?.Stages is not { Length: > 0 }) return;
+			var stage = Simulation.ResolveStage(spec, state);
+			if (stage.LandingLagTicks == 0) return;
+
+			int elapsed = ElapsedInStage(state, spec);
+			bool autoCancel = (stage.AutoCancelBeforeTicks > 0 && elapsed <= stage.AutoCancelBeforeTicks)
+				|| (stage.AutoCancelAfterTicks > 0 && elapsed >= stage.AutoCancelAfterTicks);
+			if (autoCancel)
+			{
+				// Auto-cancel landing: the move ends here — the player acts immediately
+				// instead of riding out the move's ground recovery. Same interrupt semantics
+				// as dash/IASA cancels: dropped without OnEnd, cooldown still applies
+				// (TickAbilities' cleanup), stale buffer cleared.
+				state.State = ActionState.Idle;
+				state.AttackSlot = 0;
+				state.ComboStage = 0;
+				state.AttackElapsedTicks = 0;
+				state.AnimLockTicks = 0;
+				state.BufferedSlot = 0;
+				return;
+			}
+
+			state.LandingLagTicks = stage.LandingLagTicks;
+			// The lag is a hard no-input window: a press buffered mid-air must not fire
+			// through it (Simulation also refuses to buffer new presses while it is live).
+			state.BufferedSlot = 0;
 		}
 
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
@@ -400,11 +468,13 @@ namespace SlopArena.Shared
 				// IASA early-out (issue #124): an attack stage that has passed its IasaTicks
 				// releases the anim lock for ability inputs — the press interrupts the recovery.
 				// IasaTicks = 0 (default) keeps the full ADR-0014 lock. Only the AnimLockTicks
-				// term relaxes: hitstun, hitstop and burst recovery always block — attacker
-				// hitstop (FreezesOwner) keeps State == Attacking, so relaxing those too would
-				// let a press cancel the attack mid-freeze (ADR-0012).
+				// term relaxes: hitstun, hitstop, burst recovery and landing lag (issue #125)
+				// always block — attacker hitstop (FreezesOwner) keeps State == Attacking, so
+				// relaxing those too would let a press cancel the attack mid-freeze (ADR-0012),
+				// and landing lag is a hard no-input lock that IASA must not bypass.
 				bool iasaUnlocked = IsIasaUnlocked(state, def);
 				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
+					|| state.LandingLagTicks > 0
 					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
 				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
 
@@ -557,7 +627,11 @@ namespace SlopArena.Shared
 				if (_rule.IsEliminated(state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
+				bool wasGrounded = state.IsGrounded;
 				Simulation.SimulateTick(ref state, def, input, _arena);
+				// Landing lag (issue #125): land mid-aerial → lock, unless the landing frame
+				// falls in an auto-cancel window. Server-only — the lock is authority-enforced.
+				ApplyLandingLag(ref state, def, wasGrounded);
 				_states[id] = state;
 			}
 
@@ -614,6 +688,22 @@ namespace SlopArena.Shared
 
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
 			TickAbilities(inputs);
+
+			// ── Step 1c: Landing lag freeze (issue #125) ──
+			// The lock is "no input, no movement": while it is live, the active ability's
+			// per-tick velocity writes (StageChainAbility's lunge re-apply, AirChargeAttack's
+			// MoveY) must not move the character. Zero velocity every lagged tick — the move
+			// itself keeps running (stages advance, lingering hitboxes resolve), which is the
+			// Melee landing commitment: the active window is the air cost, landing is the lock.
+			foreach (var id in simIds)
+			{
+				if (!_states.TryGetValue(id, out var lagState) || lagState.LandingLagTicks == 0) continue;
+				if (lagState.VX != 0f || lagState.VY != 0f || lagState.VZ != 0f)
+				{
+					lagState.VX = 0f; lagState.VY = 0f; lagState.VZ = 0f;
+					_states[id] = lagState;
+				}
+			}
 		}
 
 		/// <summary>

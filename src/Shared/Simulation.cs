@@ -141,7 +141,7 @@ namespace SlopArena.Shared
 
             // ── Burst (ADR-0014): dual-use escape/extender. Runs before the hitstop gate —
             // the freeze is the decision window. Cooldown + recovery gate re-use. ──
-            if (input.Burst && s.BurstRecoveryTicks == 0 && s.BurstCooldownTicks == 0)
+            if (input.Burst && s.LandingLagTicks == 0 && s.BurstRecoveryTicks == 0 && s.BurstCooldownTicks == 0)
             {
                 bool attacking = (s.State is ActionState.Attacking or ActionState.Aiming) && s.AnimLockTicks > 0;
                 if (s.HitstopTicks > 0)
@@ -315,7 +315,7 @@ namespace SlopArena.Shared
 
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
-                s.BurstRecoveryTicks == 0 &&
+                s.BurstRecoveryTicks == 0 && s.LandingLagTicks == 0 &&
                 s.State == ActionState.Idle && !input.Jump && !input.Dash)
             {
                 byte slot = s.BufferedSlot;
@@ -335,8 +335,9 @@ namespace SlopArena.Shared
                 }
             }
 
-            // 5.75 Jump detection (unconditional except hitstun / already squatting)
-            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.BurstRecoveryTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
+            // 5.75 Jump detection (unconditional except hitstun / already squatting /
+            // in landing lag — the lag is a hard no-input lock, issue #125)
+            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.BurstRecoveryTicks == 0 && s.LandingLagTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 if (s.IsGrounded)
                 {
@@ -362,15 +363,16 @@ namespace SlopArena.Shared
             else if (input.Jump)
             {
                 string reason = s.AnimLockTicks > 0 ? "anim_lock" :
+                    s.LandingLagTicks > 0 ? "landing_lag" :
                     s.HitstunTicks > 0 ? "hitstun" :
                     s.State == ActionState.JumpSquat ? "already_squatting" :
                     s.JumpsLeft <= 0 ? "no_jumps" : "unknown";
                 OnDebugLog?.Invoke($"[JumpBlocked] input.Jump=true but blocked by {reason}");
             }
 
-            // 6. Input-driven actions (only when not locked by animation or in jump squat;
-            // aiming blocks dash — the ability owns movement until release)
-            if (s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
+            // 6. Input-driven actions (only when not locked by animation, landing lag or in
+            // jump squat; aiming blocks dash — the ability owns movement until release)
+            if (s.LandingLagTicks == 0 && s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
@@ -392,8 +394,10 @@ namespace SlopArena.Shared
             }
             // Buffer input if locked within window
             // NOTE: Combo buffering is now handled by ServerAbility.Tick lifecycle
-            // Only general input buffering (unlock window) is kept for client prediction
-            if (input.ActiveSlot > 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.BurstRecoveryTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
+            // Only general input buffering (unlock window) is kept for client prediction.
+            // Landing lag never buffers (issue #125): the lock is a hard no-input window —
+            // a press inside it is dropped, like Melee, not queued for unlock.
+            if (input.ActiveSlot > 0 && s.LandingLagTicks == 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.BurstRecoveryTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
             {
                 // General buffer: within window of unlock
                 if (s.State == ActionState.JumpSquat ||
@@ -412,7 +416,9 @@ namespace SlopArena.Shared
             // player cannot steer, dash, or jump. Mobile aim (Kistu's DirectionalDash) keeps control.
             bool fixedAim = s.State == ActionState.Aiming && s.AttackSlot > 0
                 && def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded)?.Behavior is AbilityBehavior.AimedProjectile or AbilityBehavior.Projectile;
-            if (s.State == ActionState.Idle || s.State == ActionState.Aiming)
+            // Landing lag (issue #125): "no input, no movement" — the stick cannot steer
+            // during the lock, even once the aerial has ended and the state is Idle.
+            if (s.LandingLagTicks == 0 && (s.State == ActionState.Idle || s.State == ActionState.Aiming))
             {
                 ProcessNormalMovement(ref s, stats, input, processInput: !fixedAim);
             }
@@ -518,6 +524,7 @@ namespace SlopArena.Shared
             if (s.DashDurationTicks > 0) s.DashDurationTicks--;
             if (s.InvincibilityTicks > 0) s.InvincibilityTicks--;
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
+            if (s.LandingLagTicks > 0) s.LandingLagTicks--;
             if (s.HitstunTicks > 0) s.HitstunTicks--;
             if (s.BurstCooldownTicks > 0) s.BurstCooldownTicks--;
             if (s.BurstRecoveryTicks > 0) s.BurstRecoveryTicks--;
@@ -1062,6 +1069,9 @@ namespace SlopArena.Shared
         public static void ApplyKnockback(ref CharacterState s, float dirX, float dirZ,
             sbyte angleDeg, float baseKB, float growthKB, ushort stunTicks)
         {
+            // Landing lag ends when the character is hit (issue #125): the lock must not
+            // survive into hitstun and re-lock the victim on its expiry.
+            s.LandingLagTicks = 0;
             float magnitude = baseKB + growthKB * (s.DamagePercent * 0.01f);
             s.LaunchMagnitude = magnitude;
             float rad = angleDeg * MathF.PI / 180f;
