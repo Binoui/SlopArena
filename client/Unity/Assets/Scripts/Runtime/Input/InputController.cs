@@ -43,6 +43,12 @@ namespace SlopArena.Client.Input
         private bool _pendingDash;
         /// <summary>Pending burst: set by Poll, consumed by BuildInputState (ADR-0014).</summary>
         private bool _pendingBurst;
+        /// <summary>Pending LMB facing snap (ADR-0017, issue #126): set by Poll on the LMB
+        /// press edge, consumed by BuildInputState. One tick of FaceToCamera.</summary>
+        private bool _pendingFaceToCamera;
+        /// <summary>Pending RMB target-lock toggle (ADR-0018, issue #127): set by Poll on
+        /// the RMB press edge, consumed by BuildInputState. One tick of ToggleLock.</summary>
+        private bool _pendingToggleLock;
         /// <summary>
         /// Returns true if the key/button for the given slot index (0-based) is currently held.
         /// Slot 0 = LMB, 1 = RMB, 2 = key "1", 3 = E, 4 = R, 5 = F, 6-9 = keys "2"-"5", 10 = A.
@@ -126,11 +132,14 @@ namespace SlopArena.Client.Input
             if (kb[Bind(BindableAction.Jump)].wasPressedThisFrame) _pendingJump = true;
             if (kb[Bind(BindableAction.Dash)].wasPressedThisFrame) _pendingDash = true;
             if (kb[Bind(BindableAction.Burst)].wasPressedThisFrame) _pendingBurst = true;
-            // Ability slot presses (only one per frame — priority order)
+            // Utility inputs — LMB snaps facing to the camera azimuth (ADR-0017, #126),
+            // RMB toggles the persistent target lock (ADR-0018, #127). Neither is an
+            // ability slot anymore (8-slot re-tier): the old LMB/RMB ability slots are
+            // unreachable from the client. Keyboard slot presses follow (one per frame).
             if (mouse.leftButton.wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Lmb;
+                _pendingFaceToCamera = true;
             else if (mouse.rightButton.wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Rmb;
+                _pendingToggleLock = true;
             else if (kb[Bind(BindableAction.Slot1)].wasPressedThisFrame)
                 _pendingSlotPress = AbilitySlots.Slot1;
             else if (kb[Bind(BindableAction.SlotE)].wasPressedThisFrame)
@@ -161,6 +170,8 @@ namespace SlopArena.Client.Input
             _pendingJump = false;
             _pendingDash = false;
             _pendingBurst = false;
+            _pendingFaceToCamera = false;
+            _pendingToggleLock = false;
             _pendingSlotPress = 0;
         }
 
@@ -234,6 +245,8 @@ namespace SlopArena.Client.Input
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
                 input.JumpHeld = _aiInput.JumpHeld;
+                input.FaceToCamera = _aiInput.FaceToCamera;
+                input.ToggleLock = _aiInput.ToggleLock;
                 input.ActiveSlot = pendingSlotPress;
                 if (_pendingJump)
                 {
@@ -313,6 +326,12 @@ namespace SlopArena.Client.Input
             _pendingBurst = false;
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = aimCtx.IsAiming;
+            // Utility edges (ADR-0017/0018): consumed here, one tick each. Set before the
+            // FSM gate — a snap/toggle is not movement and must survive a canMove=false.
+            input.FaceToCamera = _pendingFaceToCamera;
+            _pendingFaceToCamera = false;
+            input.ToggleLock = _pendingToggleLock;
+            _pendingToggleLock = false;
 
             // Facing yaw from body rotation
             float deg = bodyYawDeg;

@@ -422,7 +422,25 @@ namespace SlopArena.Shared
             {
                 ProcessNormalMovement(ref s, stats, input, processInput: !fixedAim);
             }
-            
+
+            // 6c. Facing snap (LMB, ADR-0017 / issue #126): utility input honored at the
+            // input gate — instant facing to the camera azimuth (AimYaw), usable when not
+            // attack-locked, not in hitstun, not in burst recovery / landing lag / jump
+            // squat / aim stance. Runs AFTER normal movement so the snap wins the tick it
+            // is pressed (on the ground, the next tick's movement re-faces — one-tick
+            // turnaround for poke spacing). Air facing is sticky, so an air snap holds
+            // until the next snap / lock / landing.
+            // While locked (ADR-0018 / issue #127), an accepted snap exits the lock —
+            // the manual-facing button is the "break free" escape hatch. Rejected snaps
+            // (mid-attack, hitstun) leave the lock untouched.
+            if (input.FaceToCamera && s.LandingLagTicks == 0 && s.AnimLockTicks == 0
+                && s.BurstRecoveryTicks == 0 && s.State != ActionState.Hitstun
+                && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
+            {
+                s.FacingYaw = input.AimYaw * 0.01f * (MathF.PI / 180f);
+                s.LockOn = false;
+            }
+
             // 7b. Charge ticks for aimed projectile abilities (Manki Q, FightGuy Q).
             // ServerAbility subclasses read s.ChargeTicks to check max hold duration.
             if ((s.State is ActionState.Attacking or ActionState.Aiming) && s.AttackSlot > 0 && s.ChargeTicks < ushort.MaxValue)
@@ -924,7 +942,11 @@ namespace SlopArena.Shared
             }
             ApplyVelocityDeadZone(ref s);
 
-            if (hasInput)
+            // Ground rule: facing follows movement — UNLESS the persistent target lock
+            // is on (ADR-0018), in which case ProcessTargetLock owns facing (lerp toward
+            // the locked target). Locked players still move camera-relative; only facing
+            // is decoupled.
+            if (hasInput && !s.LockOn)
             {
                 s.FacingYaw = MathF.Atan2(dirX, dirZ);
             }
@@ -952,11 +974,12 @@ namespace SlopArena.Shared
             // Dash initiation is handled by PlayerController outside of Simulation
             // (works both ground and air, has cooldown, grants invincibility)
 
-            bool hasAirInput = ((dirX * dirX) + (dirZ * dirZ)) > 0.0001f;
-            if (hasAirInput)
-            {
-                s.FacingYaw = MathF.Atan2(dirX, dirZ);
-            }
+            // Air facing is sticky (ADR-0017, issue #126): it locks at takeoff (last
+            // ground facing) and drift / camera rotation never re-face the fighter
+            // mid-air. Air normals are deterministic — attack direction = the faced
+            // direction, changed only by the LMB facing snap or a target lock
+            // (ADR-0018). The old velocity-facing overwrite is what made drift re-face
+            // the fighter every frame and is deliberately gone.
         }
 
         // ── ATTACK PROCESSING ──

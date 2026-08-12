@@ -22,6 +22,8 @@ internal record EntitySnapshot
     public float VZ { get; init; }
     public ushort DamagePercent { get; init; }
     public byte Deaths { get; init; }
+    /// <summary>Persistent target lock (ADR-0018). Default false, omitted from JSON when off.</summary>
+    public bool LockOn { get; init; }
     public byte ComboStage { get; init; }
     public byte AttackSlot { get; init; }
     public ushort HitstunTicks { get; init; }
@@ -47,6 +49,7 @@ internal record EntitySnapshot
         VX = s.VX, VY = s.VY, VZ = s.VZ,
         DamagePercent = s.DamagePercent,
         Deaths = s.Deaths,
+        LockOn = s.LockOn,
         ComboStage = s.ComboStage,
         AttackSlot = s.AttackSlot,
         HitstunTicks = s.HitstunTicks,

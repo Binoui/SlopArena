@@ -66,6 +66,13 @@ public class KitScenario
     public int TotalTicks { get; init; } = 200;
 
     /// <summary>
+    /// Optional arena override. Defaults to <c>TestHelpers.TestArena()</c> — override for
+    /// scenarios that need custom spawn points (e.g. a void-death respawn that must land
+    /// on its feet), kill height, or floor geometry.
+    /// </summary>
+    public ArenaDefinition? Arena { get; init; }
+
+    /// <summary>
     /// Tick at which the golden snapshot is taken (0-based).
     /// Should point to mid-ability (hitbox active, knockback applied) for rich diffs.
     /// Defaults to TotalTicks - 1 (end state, most values settled to 0).
@@ -87,7 +94,7 @@ public static class ScenarioRunner
     public static (CharacterState Player, CharacterState? Npc,
                    CharacterState PlayerSnapshot, CharacterState? NpcSnapshot) Run(KitScenario scenario)
     {
-        var arena = TestHelpers.TestArena();
+        var arena = scenario.Arena ?? TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
 
         // Spawn primary entity

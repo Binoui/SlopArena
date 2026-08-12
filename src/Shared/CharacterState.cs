@@ -199,6 +199,15 @@ namespace SlopArena.Shared
         /// </summary>
         /// <summary>Soft-lock target entity ID. 0 = none.</summary>
         public ulong TargetEntityId;
+        /// <summary>
+        /// Persistent target lock (ADR-0018, issue #127): sim-authoritative toggle set
+        /// from the client's RMB edge bit. While true, <c>ProcessTargetLock</c> lerps
+        /// facing toward the resolved target every tick — ground and air, outside
+        /// attacks too. Cleared by toggle-off, target beyond lock range, an accepted
+        /// LMB facing snap (ADR-0017), or death (fresh respawn state). ON THE WIRE —
+        /// the client reads it for the lock indicator.
+        /// </summary>
+        public bool LockOn;
 
         /// <summary>
         /// <summary>

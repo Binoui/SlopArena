@@ -92,6 +92,7 @@ public abstract class KitScenarioTests
         Assert.Equal(expected.VZ, actual.VZ, 3);
         Assert.Equal(expected.DamagePercent, actual.DamagePercent);
         Assert.Equal(expected.Deaths, actual.Deaths);
+        Assert.Equal(expected.LockOn, actual.LockOn);
         Assert.Equal(expected.ComboStage, actual.ComboStage);
         Assert.Equal(expected.AttackSlot, actual.AttackSlot);
         Assert.Equal(expected.HitstunTicks, actual.HitstunTicks);

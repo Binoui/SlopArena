@@ -33,6 +33,7 @@ public class ServerEntityPacketTests
             AimPitch = -0.5f,
             Deaths = 2,
             DamagePercent = 87,
+            LockOn = true,
             Cooldown0 = 1,
             Cooldown1 = 12,
             Cooldown2 = 33,
@@ -102,6 +103,7 @@ public class ServerEntityPacketTests
         Assert.Equal(statePacket.FacingYaw, restored.State.FacingYaw);
         Assert.Equal(statePacket.MatchState, restored.State.MatchState);
         Assert.Equal(statePacket.DamagePercent, restored.State.DamagePercent);
+        Assert.True(restored.State.LockOn);
 
         Assert.Equal(input.MoveX, restored.Input.MoveX);
         Assert.Equal(input.MoveY, restored.Input.MoveY);
@@ -176,14 +178,15 @@ public class ServerEntityPacketTests
     public void SizeConstants_AssertWireLayout()
     {
         // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10
-        // + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10/JumpHeldTicks/ADR-0016): 124B
-        // base (8 entityId + 4 tick + 112 CharacterStatePacket) + 1B flag + 20B input.
+        // + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10/JumpHeldTicks/ADR-0016
+        // + LockOn/ADR-0018): 125B base (8 entityId + 4 tick + 113 CharacterStatePacket)
+        // + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(124, ServerEntityPacket.BaseSize);
+        Assert.Equal(125, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(145, ServerEntityPacket.MaxSize);
-        Assert.Equal(125, ServerEntityPacket.NoInputSize);
+        Assert.Equal(146, ServerEntityPacket.MaxSize);
+        Assert.Equal(126, ServerEntityPacket.NoInputSize);
         // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
         // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
         Assert.Equal(20, InputState.Size);
@@ -207,5 +210,34 @@ public class ServerEntityPacketTests
         Assert.True(restored.Jump);
         Assert.True(restored.Down);
         Assert.Equal(AbilitySlots.A, restored.ActiveSlot);
+    }
+
+    [Fact]
+    public void InputState_Roundtrips_FaceToCamera_And_ToggleLock_Bits()
+    {
+        // flags2 bits 2 (LMB facing snap, ADR-0017) and 4 (RMB lock toggle, ADR-0018)
+        // must survive the wire — they drive sim-authoritative facing/lock state that
+        // rollback replay depends on. Bit 1 (JumpHeld) must coexist.
+        var input = new InputState
+        {
+            FaceToCamera = true,
+            ToggleLock = true,
+            JumpHeld = true,
+        };
+        Span<byte> buf = stackalloc byte[InputState.Size];
+        input.Write(buf);
+        var restored = InputState.Deserialize(buf);
+
+        Assert.True(restored.FaceToCamera);
+        Assert.True(restored.ToggleLock);
+        Assert.True(restored.JumpHeld);
+
+        // Defaults decode as off
+        Span<byte> cleanBuf = stackalloc byte[InputState.Size];
+        default(InputState).Write(cleanBuf);
+        var restoredClean = InputState.Deserialize(cleanBuf);
+        Assert.False(restoredClean.FaceToCamera);
+        Assert.False(restoredClean.ToggleLock);
+        Assert.False(restoredClean.JumpHeld);
     }
 }

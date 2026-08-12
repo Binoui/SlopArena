@@ -1,0 +1,28 @@
+{
+  "Scenario": "Target Lock On Facing Tracking",
+  "TickCount": 200,
+  "PlayerSnap": {
+    "PY": 0.75,
+    "LockOn": true,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "LockOn": true,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

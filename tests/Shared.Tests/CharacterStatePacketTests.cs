@@ -115,9 +115,9 @@ public class CharacterStatePacketTests
         // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
         // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012)
         // + 4 burst (ADR-0014) + 10 cooldown slots 6-10 + 1 JumpHeldTicks (ADR-0016)
-        // = 112.
+        // + 1 LockOn (ADR-0018) = 113.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(112, CharacterStatePacket.Size);
+        Assert.Equal(113, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
@@ -174,6 +174,24 @@ public class CharacterStatePacketTests
         Assert.Equal((ushort)9, target.HitstopTicks); // wire field overwritten (ADR-0012)
         Assert.Equal((ushort)500, target.AttackElapsedTicks); // non-wire field preserved
         Assert.Equal(3.5f, target.QueuedKBDirX);             // non-wire field preserved
+    }
+
+    [Fact]
+    public void RoundTrip_LockOn_Flag()
+    {
+        // LockOn (ADR-0018) rides the packet for the client lock indicator.
+        var original = new CharacterState { LockOn = true };
+        var packet = CharacterStatePacket.FromState(original);
+        byte[] buffer = new byte[CharacterStatePacket.Size];
+        packet.Serialize(buffer);
+        var restored = CharacterStatePacket.Deserialize(buffer).ToState();
+
+        Assert.True(restored.LockOn);
+
+        // And it must survive ApplyTo (LocalTrack patch path), not just ToState
+        var target = new CharacterState();
+        CharacterStatePacket.FromState(original).ApplyTo(ref target);
+        Assert.True(target.LockOn);
     }
 
     [Fact]

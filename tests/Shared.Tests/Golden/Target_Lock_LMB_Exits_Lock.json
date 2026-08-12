@@ -1,0 +1,26 @@
+{
+  "Scenario": "Target Lock LMB Exits Lock",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

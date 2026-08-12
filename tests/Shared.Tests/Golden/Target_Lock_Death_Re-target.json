@@ -1,0 +1,30 @@
+{
+  "Scenario": "Target Lock Death Re-target",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "PY": 0.75,
+    "PZ": 5,
+    "LockOn": true,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "Deaths": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "PZ": 5,
+    "LockOn": true,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "Deaths": 1,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

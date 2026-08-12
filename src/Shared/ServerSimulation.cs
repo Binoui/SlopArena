@@ -727,13 +727,28 @@ namespace SlopArena.Shared
 		}
 
 		/// <summary>
+		/// Persistent target-lock range (meters, ADR-0018 / issue #127): beyond this the
+		/// lock disengages. The soft-lock resolver still scans 20m — the indicator keeps
+		/// tracking, but facing control returns to the manual rules.
+		/// </summary>
+		private const float LockRangeMeters = 10f;
+
+		/// <summary>
+		/// Persistent-lock turn strength (ADR-0018 / issue #127): same lerp form as attack
+		/// stage TrackingStrength — FacingYaw += diff * strength * TickDt. 0.4 = gradual
+		/// (~90° over ~5s), deliberately not an instant pivot. Feel-critical; playtest-tune.
+		/// </summary>
+		private const float LockTurnStrength = 0.4f;
+
+		/// <summary>
 		/// Compute soft-lock target for every entity each tick.
 		/// Prefers client-provided target (from screen-center) when input.TargetEntityId > 0,
 		/// otherwise brute-force scans for nearest enemy within 20m.
 		/// Stores the result in state.TargetEntityId for abilities, camera, and indicator to query.
 		///
 		/// When the entity is attacking with UseTargetLock=true, also processes warp
-		/// (auto-dash toward target) and rotation (face toward target).
+		/// (auto-dash toward target) and rotation (face toward target). When LockOn
+		/// (ADR-0018), also lerps facing toward the resolved target every tick.
 		/// </summary>
 		private void ProcessTargetLock(Dictionary<ulong, InputState> inputs)
 		{
@@ -743,11 +758,18 @@ namespace SlopArena.Shared
 			foreach (var id in ids)
 			{
 				if (!_states.TryGetValue(id, out var state)) continue;
+				bool hasInput = inputs.TryGetValue(id, out var input);
+
+				// ── Persistent lock toggle (ADR-0018 / issue #127) ──
+				// RMB edge bit → sim-authoritative LockOn on/off. No gate: the toggle is
+				// a persistent mode switch, honored even through hitstop/locks.
+				if (hasInput && input.ToggleLock)
+					state.LockOn = !state.LockOn;
 
 				// ── Find target ──
 				// Check if client provided a target (screen-center override)
 				ulong targetId = 0;
-				if (inputs.TryGetValue(id, out var input) && input.TargetEntityId > 0)
+				if (hasInput && input.TargetEntityId > 0)
 				{
 					ulong candidateId = input.TargetEntityId;
 					if (_states.ContainsKey(candidateId))
@@ -762,6 +784,42 @@ namespace SlopArena.Shared
 				}
 
 				state.TargetEntityId = targetId;
+
+				// ── Persistent lock (ADR-0018 / issue #127): facing tracks the resolved
+				// target every tick — ground and air, outside attacks too (per-stage
+				// UseTargetLock becomes redundant while locked). Gradual turn, not instant:
+				// FacingYaw += diff * LockTurnStrength * TickDt. Disengages on toggle-off
+				// (above), no resolved target, or target beyond LockRangeMeters; a dead
+				// target is handled by the resolver re-picking (death re-target). The lerp
+				// pauses during the owner's own hitstop/hitstun — no mid-launch spinning.
+				if (state.LockOn)
+				{
+					if (targetId == 0)
+					{
+						state.LockOn = false;
+					}
+					else
+					{
+						var lockTarget = _states[targetId];
+						float lockDx = lockTarget.PX - state.PX;
+						float lockDz = lockTarget.PZ - state.PZ;
+						float lockDistSq = lockDx * lockDx + lockDz * lockDz;
+						if (lockDistSq > LockRangeMeters * LockRangeMeters)
+						{
+							state.LockOn = false;
+						}
+						else if (state.HitstopTicks == 0 && state.State != ActionState.Hitstun
+						         && lockDistSq > 0.001f)
+						{
+							float targetYaw = MathF.Atan2(lockDx, lockDz);
+							float diff = targetYaw - state.FacingYaw;
+							while (diff > MathF.PI) diff -= 2f * MathF.PI;
+							while (diff < -MathF.PI) diff += 2f * MathF.PI;
+							state.FacingYaw += diff * LockTurnStrength * Simulation.TickDt;
+						}
+					}
+				}
+
 				if (targetId == 0) { _states[id] = state; continue; }
 				// ── Warping: rotation tracking (no warp init — already set by PreTickAbilities) ──
 				if (state.State == ActionState.Warping)

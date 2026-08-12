@@ -52,6 +52,8 @@ namespace SlopArena.Shared
             Cooldown6, Cooldown7, Cooldown8, Cooldown9, Cooldown10;
         /// <summary>Consecutive jump-held ticks (issue #116) — needed for byte-identical replay of a JumpSquat opponent.</summary>
         public byte JumpHeldTicks;
+        /// <summary>Persistent target lock state (ADR-0018, issue #127) — client lock indicator.</summary>
+        public bool LockOn;
         // ── D10: movement-resource fields (ADR-0011) — needed for PredictedTrack's
         // rebuild-and-replay of Predictable ActionStates (Idle/Dashing/JumpSquat/AirDodging)
         // to be byte-identical. None of these touch the ability-instance or hitbox layer.
@@ -74,9 +76,9 @@ namespace SlopArena.Shared
         /// <summary>Remaining Burst recovery lock ticks (ADR-0014) — opponent's punish window must be visible.</summary>
         public ushort BurstRecoveryTicks;
 
-        /// <summary>112 bytes — 63 base + 12 cooldowns×6→11 (ADR-0016, +10) + 32 D10 movement-resource fields + 2 hitstop (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016).</summary>
+        /// <summary>113 bytes — 63 base + 12 cooldowns×6→11 (ADR-0016, +10) + 32 D10 movement-resource fields + 2 hitstop (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018).</summary>
         public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1 + 2 + 2 + 2 + 2 + 2 + 2 + 2
-            + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2 + 1 + 4 + 4 + 1 + 2 + 2 + 2 + 1;
+            + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2 + 1 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -116,6 +118,7 @@ namespace SlopArena.Shared
                 Cooldown9 = s.Cooldown9,
                 Cooldown10 = s.Cooldown10,
                 JumpHeldTicks = s.JumpHeldTicks,
+                LockOn = s.LockOn,
                 AirTimeTicks = s.AirTimeTicks,
                 DashDurationTicks = s.DashDurationTicks,
                 DashDirX = s.DashDirX,
@@ -172,6 +175,7 @@ namespace SlopArena.Shared
                 Cooldown9 = Cooldown9,
                 Cooldown10 = Cooldown10,
                 JumpHeldTicks = JumpHeldTicks,
+                LockOn = LockOn,
                 AirTimeTicks = AirTimeTicks,
                 DashDurationTicks = DashDurationTicks,
                 DashDirX = DashDirX,
@@ -247,6 +251,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), BurstCooldownTicks);
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(109, 2), BurstRecoveryTicks);
             buffer[111] = JumpHeldTicks;
+            buffer[112] = LockOn ? (byte)1 : (byte)0;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -305,6 +310,7 @@ namespace SlopArena.Shared
             packet.BurstCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
             packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(109, 2));
             packet.JumpHeldTicks = buffer[111];
+            packet.LockOn = buffer[112] != 0;
             return packet;
         }
 
@@ -339,6 +345,7 @@ namespace SlopArena.Shared
             s.Cooldown6 = Cooldown6; s.Cooldown7 = Cooldown7; s.Cooldown8 = Cooldown8;
             s.Cooldown9 = Cooldown9; s.Cooldown10 = Cooldown10;
             s.JumpHeldTicks = JumpHeldTicks;
+            s.LockOn = LockOn;
             s.AirTimeTicks = AirTimeTicks;
             s.DashDurationTicks = DashDurationTicks;
             s.DashDirX = DashDirX; s.DashDirZ = DashDirZ;

@@ -1,0 +1,30 @@
+{
+  "Scenario": "Target Lock Out Of Range Disengage",
+  "TickCount": 200,
+  "PlayerSnap": {
+    "PX": 23.450018,
+    "PY": 0.75,
+    "VX": 12,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PX": 39.250076,
+    "PY": 0.75,
+    "VX": 12,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 3,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

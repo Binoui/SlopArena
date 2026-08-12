@@ -17,6 +17,17 @@ namespace SlopArena.Shared
         /// <c>Simulation.ShortHopWindowTicks</c> produce a reduced short hop.
         /// </summary>
         public bool JumpHeld;
+        /// <summary>
+        /// LMB facing snap (ADR-0017, issue #126): one-tick edge set on the LMB press —
+        /// the sim snaps <c>FacingYaw</c> to the camera azimuth (<c>AimYaw</c>) when the
+        /// input gate allows, and exits a persistent target lock (ADR-0018) when accepted.
+        /// </summary>
+        public bool FaceToCamera;
+        /// <summary>
+        /// RMB target-lock toggle (ADR-0018, issue #127): one-tick edge set on the RMB
+        /// press. The sim toggles sim-authoritative <c>CharacterState.LockOn</c>.
+        /// </summary>
+        public bool ToggleLock;
         public float MoveX, MoveY;
         /// <summary>
         /// 0 = none, 1 = LMB, 2 = RMB, 3 = Q, 4 = E, 5 = R, 6 = F
@@ -44,7 +55,9 @@ namespace SlopArena.Shared
         /// <remarks>
         /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=Dash,
         /// 0x40=Burst (ADR-0014; formerly Crouch, deprecated), 0x80=IsAiming.
-        /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116).
+        /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116),
+        /// 2=FaceToCamera (ADR-0017 LMB facing snap, issue #126), 4=ToggleLock
+        /// (ADR-0018 RMB target-lock toggle, issue #127).
         /// </remarks>
         public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1 + 1;
 
@@ -70,6 +83,8 @@ namespace SlopArena.Shared
             buf[18] = TargetEntityId;
             byte flags2 = 0;
             if (JumpHeld) flags2 |= 1;
+            if (FaceToCamera) flags2 |= 2;
+            if (ToggleLock) flags2 |= 4;
             buf[19] = flags2;
         }
 
@@ -96,7 +111,11 @@ namespace SlopArena.Shared
             input.AimDistance = buf.Length >= 18 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(16)) : (ushort)0;
             input.TargetEntityId = buf.Length >= 19 ? buf[18] : (byte)0;
             if (buf.Length >= 20)
+            {
                 input.JumpHeld = (buf[19] & 1) != 0;
+                input.FaceToCamera = (buf[19] & 2) != 0;
+                input.ToggleLock = (buf[19] & 4) != 0;
+            }
             return input;
         }
     }
