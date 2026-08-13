@@ -1,273 +1,86 @@
 # Hitstun + DI System
 
-Smash Bros-style hitstun with Directional Influence (DI) for competitive depth.
+Melee-based hit response — knockback formula, hitstun, hitstop, DI/SDI/ASDI, and the flight law. Decided by the wayfinder map ([#128](https://github.com/Binoui/SlopArena/issues/128)); the authoritative record is **[ADR-0019](https://github.com/Binoui/SlopArena/blob/main/docs/adr/0019-melee-based-hit-response.md)**. This doc is the working reference.
 
-## How It Works
+## Hit Sequence
 
-### Hit Sequence
 ```
-Attack lands → Hitstun (8-60 frames) → Knockback (influenced by DI)
-```
-
-**1. Hitstun Phase** (ActionState.Hitstun)
-- Victim is **frozen in place** (VX = VZ = 0)
-- Duration: 8-60 frames based on knockback strength
-- **Gate:** Controlled by `StunTicks > 0` from the hitbox data (not an arbitrary KB threshold)
-  - `StunTicks = 0`: No hitstun (true weak jab -- instant knockback recovery)
-  - `StunTicks > 0`: Hitstun triggers if knockback magnitude > 0.5 (floor to prevent glitchy near-zero push)
-- **Maximum** hitstun is `min(computedFromKB, StunTicks)` -- StunTicks acts as a per-move cap
-- **Examples at default settings:**
-  - Base 1.5 + Growth 2.5 (combo jab): ~8-10 frames
-  - Base 7 + Growth 18 (launcher at 100%): ~25-40 frames
-  - Kill moves at high %: up to 60 frames (1 second)
-- **Visual:** White flash on victim
-
-**2. DI Window**
-- During hitstun, player can **hold a direction** (WASD)
-- The **held direction at the END** of hitstun modifies knockback
-- NOT accumulated (no button mashing needed)
-- Just hold the stick where you want to go
-
-**3. Knockback Application**
-- Effective horizontal: `effectiveHorizontal = baseKB + growthKB * (dmg% * 0.01)`
-- Effective upward: `effectiveUpward = kbUpward * (1 + dmg% * 0.01)`
-- DI influence applied: `KBX += DIX * 3.5`, `KBZ += DIY * 3.5`
-- Victim enters knockback state
-
-## DI Strategy
-
-### Survival DI
-**Goal:** Live longer at high %
-
-- **Knocked horizontally:** Hold UP (increase vertical angle)
-- **Knocked diagonally up:** Hold AWAY from stage center
-- **Knocked straight up:** Hold horizontal (spread out trajectory)
-
-**Why it works:** DI perpendicular to knockback maximizes distance from blast zone.
-
-### Combo DI
-**Goal:** Escape combos at low %
-
-- **Upward launcher:** Hold DOWN (reduce height, faster landing)
-- **Horizontal hit:** Hold UP (pop out of combo range)
-- **Multi-hit moves:** Alternate DI each hit (SDI-like escape)
-
-### No DI
-- **At ledge, high %:** Sometimes best to NOT DI (opponent expects it)
-- **Tech situations:** Save inputs for tech timing
-
-## Technical Details
-
-### Code Flow
-
-**CharacterState.cs:**
-```csharp
-public ushort HitstunTicks;  // Remaining freeze frames
-public float DIX, DIY;       // Held direction (updated each frame)
+Attack lands → Hitstop (freeze, DI/SDI decision window) → Launch (KV, DI-rotated)
+            → Hitstun lock (constant KV flight, no input) → actionable flight
+            → post-hitstun drift (linear friction + flight gravity) → landing / tech
 ```
 
-**Simulation.cs ProcessHitstun():**
-```csharp
-// Each frame during hitstun:
-s.VX = 0; s.VZ = 0;          // Freeze victim
-s.DIX = input.MoveX;         // Store held direction
-s.DIY = input.MoveY;
+1. **Hitstop** (`HitstopTicks`): per-pair freeze (ADR-0012). The defender commits DI input and one-shot SDI here; Burst is pressable (ADR-0014).
+2. **Launch**: at hitstop exit, the queued knockback velocity (KV) is applied, rotated by DI (below).
+3. **Hitstun** (`ActionState.Hitstun`): the **no-input lock** — the victim flies at **constant KV** (no decay, no freeze). Control returns at lock end with residual speed.
+4. **Post-hitstun flight**: linear horizontal-azimuth friction (10 m/s²), flight gravity (8 m/s²), aerials usable, no airdodge (ADR-0019 §6).
 
-// Last frame of hitstun:
-s.KVX += s.DIX * 3.5f;       // Apply DI to knockback
-s.KVZ += s.DIY * 3.5f;
-s.State = ActionState.Idle;  // Exit to knockback
+## Knockback Formula (ADR-0019 §1)
+
+```
+mag = (base + growth·(P/100 + 1.0) + Damage·0.1) · 200/(W + 100)
 ```
 
-**Simulation.cs ApplyKnockback():**
-```csharp
-// New Smash-style formula: effectiveHorizontal = baseKB + growthKB * (dmg% * 0.01)
-float scaling = 1f + (s.DamagePercent * 0.01f);
-float effectiveHorizontal = baseKB + growthKB * (s.DamagePercent * 0.01f);
-float effectiveUpward = kbUpward * scaling;
+- `base` / `growth`: per-hitbox (custom-only — `KnockbackProfile` is gone).
+- `P` = victim DamagePercent; `Damage` = the hit's damage; `W` = victim weight (`CharacterDefinition.Weight`, default 100; **KB-only** — no throws exist).
+- Growth floor f = 1.0 (growth lives at 0% victim damage). No cap (999 unreachable).
 
-s.KVX = dirX * effectiveHorizontal;
-s.KVY = effectiveUpward;
-s.KVZ = dirZ * effectiveHorizontal;
+## Hitstun (ADR-0019 §2)
 
-float kbMagnitude = sqrt(KVX² + KVY² + KVZ²);
-
-// Gate: hitstun triggers on StunTicks > 0 (not an arbitrary KB threshold)
-// The 0.5f floor prevents glitchy near-zero push with hitstun
-if (stunTicks > 0 && kbMagnitude > 0.5f)
-{
-    ushort hitstunFromKB = (ushort)clamp(8 + (int)(kbMagnitude * 0.5f), 8, 60);
-    ushort hitstunFinal = min(hitstunFromKB, stunTicks); // cap at stage's StunTicks
-    s.HitstunTicks = hitstunFinal;
-    s.State = ActionState.Hitstun;  // Enter freeze
-}
-else
-{
-    s.State = ActionState.Idle;    // Skip hitstun
-}
+```
+hitstun = max(1, (int)(0.5 · kbMag))     // k = 0.5 provisional
 ```
 
-### Constants (Tweakable)
+- **Pure function of the applied KB** — `StunTicks` is **gate-only**: `0` → no lock at all (zero-KB hitboxes AND KB-bearing moves like the burst shove stay lock-free). This is the one deviation from Melee's min-1.
+- Cap / floor-8 / ceiling-60 dropped.
+- `HitstunLevel` anim tier re-derives from the *applied* hitstun (was: authored `StunTicks`).
+- Burst is the explicit exception — the only thing that acts inside the lock (ADR-0014).
 
-**Simulation.cs:**
-```csharp
-const float DIStrength = 3.5f;           // DI multiplier (line 157)
-const float MinHitstun = 8f;             // Min frames (line 475)
-const float MaxHitstun = 60f;            // Max frames (1 second, was 25)
-const float HitstunScaling = 0.5f;       // KB → frames conversion (line 475)
+## Hitstop (ADR-0019 §3)
+
+```
+hitstop = min(12, (int)((damage/3 + 6) · mul))    // mul = hitstop_multiplier, default 1.0
 ```
 
-> **Hitstun gate removed:** `HitstunThreshold = 3f` is gone. Hitstun now gates on `StunTicks > 0` from the hitbox data (see Hitstun Phase above). Set `StunTicks = 0` on a hitbox to skip hitstun entirely.
+Jabs 7, mediums 8, kills 10 ticks. Cap 12 = never-biting safety. The old `hitstop_*` key set (low-damage ×2, multihit ×0.5, floor, beyondFirst) is gone — one `hitstop_multiplier` per hit.
 
-**To increase DI influence:** Raise `DIStrength` (default 3.5)
-**To make hitstun longer:** Raise `HitstunScaling` or `MaxHitstun`
-**To make weak hits have hitstun:** Increase `StunTicks` on the hitbox data
-## Balancing
+## DI (ADR-0019 §4)
 
-### Current Values (v1.1)
-- **DIStrength:** 3.5 (strong influence, rewards good DI)
-- **Hitstun range:** 8-60 frames (0.13-1.0 seconds at 60Hz)
-- **Hitstun gate:** `StunTicks > 0` from hitbox data (designer-controlled per move)
-- **Knockback decay:** 2% per tick (was 13.3% -- flight lasts ~1s instead of 0.25s)
-- **Manki LMB example (stage 1/2/3):**
-  - S1: Base 1.5 + Growth 2.5, Up 1, Stun 10 -- combo starter, gentle at all %
-  - S2: Base 3 + Growth 5, Up 1.5, Stun 14 -- moderate pop, links into S3
-  - S3: Base 7 + Growth 18, Up 6, Stun 22 -- launcher, ~37 m/s at 150%
+- **Capture** the committed 8-way input (`DIX`/`DIY`) during `HitstopTicks`; **rotate at hitstop exit** (hitstop = 0 → capture at the hit tick, rotate immediately).
+- Rotate the launch toward `(DIX, 0, DIY)` by up to **`18°·sin²(angle)`**, **magnitude preserved**. Perpendicular input = full rotation; input along the launch = no rotation.
+- **Plane rotation** (3D): elevation tilts toward horizontal for vertical launches (survival-DI works on spikes/launchers); horizontal launches degenerate to azimuth.
+- Combo Influence is **gone** (ADR-0013 superseded) — no additive drift, no `LaunchMagnitude`.
 
-### Competitive Considerations
+## SDI + ASDI (ADR-0019 §5)
 
-**If DI feels too weak:**
-- Increase `DIStrength` to 4.5-5.0
-- Players can't escape kill moves
+- **One-shot SDI**: the first nonzero input during `HitstopTicks` → one position shift along the 8-way hold.
+- **ASDI**: one more shift at flight start along the committed DI direction (~0.4× magnitude). Up to 2 shifts/hit; **mashing adds nothing**.
+- **No timers/flag** — the first-input tick is a pure function of replayed relayed input → zero wire bytes (CSP stays 113).
 
-**If DI feels too strong:**
-- Decrease `DIStrength` to 2.5-3.0
-- Players survive everything
+## Knockback During Flight
 
-**If hitstun feels unresponsive:**
-- Decrease `MinHitstun` to 5-6 frames
-- Faster reaction window
+- **Hitstun**: constant KV; **Melee hard-set bounce** on stage contact during hitstun.
+- **Post-hitstun**: horizontal-azimuth KV decays linearly (10 m/s²), KVY untouched (flight gravity 8 m/s²). No re-lock — the victim is actionable (jump, aerials, specials) once the lock ends.
 
-**If combos are too easy:**
-- Increase `MinHitstun` to 10-12 frames
-- Longer DI window = easier escapes
+## Balancing (post-design, ADR-0019 Consequences)
 
-## Visual Feedback
+| Axis | Current | Lever |
+|------|---------|-------|
+| Hitstun k | 0.5 | per-char weight, k, vertical-KB lean (steeper angles + magnitude) |
+| DI rotation | 18°·sin² | rotation cap |
+| SDI | global scale + ASDI ~0.4× | `sdiScale`, ASDI fraction |
+| Weight | W=100 all | per-character values |
+| Hitstop | Melee shape | `hitstop_multiplier` per hit |
 
-**During Hitstun:**
-- White flash on victim (PlayerRenderer.cs)
-- Victim frozen in place
-- **Duration indicator:** Flash brightness = remaining hitstun
-
-**Future Enhancements:**
-- Input display during hitstun (show held direction)
-- DI trajectory preview (arrow showing modified angle)
-- Hitstun sound effect (metal clang)
-## Testing
-
-**Test scenarios:**
-
-1. **Weak jab spam (StunTicks = 0):**
-   - Should NOT freeze victim (instant knockback recovery)
-   - Fast, responsive combos
-
-2. **Strong smash attack at 100%:**
-   - 15-20 frame freeze
-   - Victim can DI perpendicular to survive
-
-3. **Mid % combo:**
-   - 8-12 frame hitstun
-   - Attacker can react, victim can DI out
-
-4. **DI survival test:**
-   - Hit at 150% near ledge
-   - Good DI = survive, no DI = death
-
-## Comparison to Smash Bros
-
-**Similarities:**
-- ✅ Hitstun scales with knockback
-- ✅ DI modifies trajectory
-- ✅ Perpendicular DI is optimal
-- ✅ Visual freeze on strong hits
-
-**Differences:**
-- ❌ No SDI (Smash DI) - single DI input only
-- ❌ No ASDI (Automatic SDI) - input must be during hitstun
-- ❌ Simpler formula (Smash has complex frame data per move)
-
-**Design choice:** Keep it simple but deep. One DI input per hit is easier to learn but still rewards skill.
-
-## FAQ
-
-**Q: Can I mash during hitstun to get out faster?**
-A: No. Hitstun duration is fixed. Use the time to input DI.
-
-**Q: Does DI work on grabs/throws?**
-A: Not yet implemented. Future feature.
-
-**Q: Can I DI while in knockback?**
-A: No. DI only works during the hitstun freeze window.
-
-**Q: What if I input DI too early (before hit)?**
-A: Doesn't matter. System reads held direction at END of hitstun.
-
-**Q: Does DI affect damage taken?**
-A: No. DI only affects knockback trajectory, not damage.
-
+Golden tests: movement/hitstop/DI snapshots regenerate (REGENERATE_GOLDENS) when the model lands.
 
 ## Animation Tiers
 
-Hitstun has 3 animation tiers based on the damage of the attack that hits, providing visual feedback proportional to impact strength:
-
-| Tier | Damage Range | `HitstunLevel` | Anim Clip              |
-|------|-------------|----------------|------------------------|
-| Light  | < 5        | 0              | `hit_light` (HitSmall) |
-| Medium | 5–14       | 1              | `hit_medium` (HitMedium) |
-| Hard   | ≥ 15       | 2              | `hit_hard` (HitHard)   |
-
-### How It Works
-
-1. **Server-side computation:** When a hit lands in `ServerSimulation.ResolveHits()`, `HitstunLevel` is computed from the raw damage of the hitbox event (before any damage modifiers):
-   ```csharp
-   targetState.HitstunLevel = finalDamage < 5f ? (byte)0 :
-                               finalDamage < 15f ? (byte)1 : (byte)2;
-   ```
-2. **Set once:** The level is set at hit time, not re-derived from `DamagePercent`. This prevents flicker if another hit lands during hitstun.
-3. **Serialized:** Packed into `CharacterStatePacket` at byte offset 43 (Size = 97). The client receives it every tick during hitstun.
-4. **Client renderer:** `PlayerRenderer` maps `HitstunLevel` to a clip name (0→`hit_light`/HitSmall, 1→`hit_medium`/HitMedium, 2→`hit_hard`/HitHard) resolved through `CharacterAnimationConfig`, played via `_animancer.Play(clip)` with `Speed = GetAnimSpeedFromDuration(name, HitstunTicks)`
-5. **Server bone resolution:** Both bone-animation spots in `ServerSimulation` use the same switch to pick the clip name for hurtbox alignment.
-
-### CharacterDefinition Defaults
-
-```csharp
-public string HitSmallAnim = "hit_light";   // Clip name in GLB
-public string HitMediumAnim = "hit_medium";
-public string HitHardAnim = "hit_hard";
-```
-
-These map to the actual FBX clip names. Per-character overrides go in `CharacterDefinition.ClipOverrides`.
-
-### Configuration Assets
-
-`CharacterAnimationConfig` ScriptableObject exposes:
-- `HitSmall` — clip for light hits (< 5 damage)
-- `HitMedium` — clip for medium hits (5–14 damage)
-- `HitHard` — clip for hard hits (≥ 15 damage)
-
-The `CharacterAnimationConfig` ScriptableObject exposes `HitSmall`/`HitMedium`/`HitHard` clip slots; aliases (`hit_light`↔`hit_small`, `hit_hard`↔`hit_large`) are resolved in `PlayerRenderer`'s hitstun clip lookup.
-
-### Testing
-
-See `tests/Shared.Tests/HitstunAnimationTierTests.cs` for:
-- Boundary tests for damage→level computation
-- End-to-end LMB S1 pipeline (damage=4 → level 0), Q projectile (damage≥6 → level 1)
+`HitstunLevel` — 0 = small / 1 = medium / 2 = hard — **re-derived from applied hitstun** at hit time (ADR-0019 consequence), not from authored `StunTicks`. The client maps level → clip (`hit_light` / `hit_medium` / `hit_hard`) through `CharacterAnimationConfig`, played via `_animancer` with speed from `HitstunTicks`.
 
 ## References
 
-- **CharacterState.cs:** Line 47-48 (HitstunTicks, DIX, DIY), Line 102 (HitstunLevel)
-- **ActionState.cs:** Line 7 (Hitstun enum)
-- **Simulation.cs:** Line 61-67 (ProcessHitstun call), Line 141-176 (ProcessHitstun function), Line 462-495 (ApplyKnockback with hitstun)
-- **CharacterStatePacket.cs:** Offset 43 (HitstunLevel), Size 63
-- **PlayerRenderer.cs:** (hitstun clip play + speed)
-- **HitstunAnimationTierTests.cs:** Full unit + integration coverage
+- **[ADR-0019](docs/adr/0019-melee-based-hit-response.md)** — authoritative decision record.
+- ADR-0012 (hitstop per-pair freeze), ADR-0013 (superseded — Combo Influence), ADR-0014 (Burst exception), ADR-0020 (movement), ADR-0021 (frame timing).
+- `docs/research/melee-knockback-model.md`, `melee-frame-analysis.md` — the Melee research.
+- Ticket lineage: [#130](https://github.com/Binoui/SlopArena/issues/130) flight, [#131](https://github.com/Binoui/SlopArena/issues/131) hitstun, [#132](https://github.com/Binoui/SlopArena/issues/132) KB formula, [#133](https://github.com/Binoui/SlopArena/issues/133) DI, [#134](https://github.com/Binoui/SlopArena/issues/134) SDI, [#143](https://github.com/Binoui/SlopArena/issues/143) hitstop.

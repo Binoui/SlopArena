@@ -60,7 +60,10 @@
 |-----|--------|
 | [`research/dko-character-kits.md`](research/dko-character-kits.md) | DKO character kit analysis |
 | [`research/dko-mechanics.md`](research/dko-mechanics.md) | DKO systems reference |
-| [`research/frame-data-reference.md`](research/frame-data-reference.md) | Frame data reference |
+| [`research/frame-data-reference.md`](research/frame-data-reference.md) | DKO manual frame counts |
+| [`research/melee-frame-data.md`](research/melee-frame-data.md) | Melee frame data — full reference (25 chars) |
+| [`research/melee-frame-analysis.md`](research/melee-frame-analysis.md) | Melee comparative analysis → 8+4 kit profiles |
+| [`research/melee-knockback-model.md`](research/melee-knockback-model.md) | Melee KB/hitstun/flight/DI/weight — decompiled formulas + migration deltas |
 
 ---
 

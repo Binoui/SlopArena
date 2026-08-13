@@ -1,6 +1,6 @@
 # ADR-0013: Combo Influence — Additive Launch Drift
 
-**Status:** Proposed — 2026-08-07 (assumptions amended by ADR-0015)
+**Status:** Superseded — 2026-08-13 by [ADR-0019 §4](0019-melee-based-hit-response.md) (DI): Combo Influence is dropped. The Melee angle rotation at hitstop exit (up to `18°·sin²` toward the committed 8-way input, magnitude preserved) replaces the additive drift — both would stack to double-strength. `LaunchMagnitude` removed (server-local, never on the wire). The `DIX/DIY` capture fields survive (ADR-0019 §4 reuses them).
 **Deciders:** @Binoui
 
 > Note (ADR-0015): this decision's context cited warp + tracking erasing the drift. Warp is removed — nothing erases Combo Influence now; it becomes the primary combo-escape tool. Decision itself unchanged.
