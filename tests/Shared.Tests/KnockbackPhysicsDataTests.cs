@@ -136,12 +136,12 @@ public class KnockbackPhysicsDataTests
     }
 
     /// <summary>
-    /// Fire one knockback and tick to rest. Start at (50,50) so up to ~150 m of
+    /// Fire one knockback and tick to rest. Start at (10,10) so up to ~190 m of
     /// flight stays inside the TestArena heightmap [0,200)².
     /// </summary>
     private static Flight SimulateFlight(string name, sbyte angle, float baseKB, float growthKB, int pct)
     {
-        var s = TestHelpers.PlayerState(x: 50f, z: 50f);
+        var s = TestHelpers.PlayerState(x: 10f, z: 10f);
         s.PY = GroundPy;
         s.DamagePercent = (ushort)pct;
 

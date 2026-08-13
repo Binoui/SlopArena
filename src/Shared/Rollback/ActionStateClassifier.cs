@@ -12,6 +12,13 @@ namespace SlopArena.Shared.Rollback
     public static class ActionStateClassifier
     {
         public static bool IsPredictable(ActionState state) => state is
-            ActionState.Idle or ActionState.Dashing or ActionState.JumpSquat or ActionState.AirDodging;
+            ActionState.Idle or ActionState.Dashing or ActionState.JumpSquat or ActionState.AirDodging or ActionState.Run;
+
+        /// <summary>True when the self entity's continuous sim may snap wire fields and replay
+        /// through this state (LocalTrack correction). LedgeHang has no ServerAbility instance and
+        /// recomputes its ledge from the wire position, so it is snap-safe in both directions even
+        /// though it is NOT Predictable for opponents (occupancy is a multi-entity server decision).</summary>
+        public static bool IsSnapSafe(ActionState state)
+            => IsPredictable(state) || state == ActionState.LedgeHang;
     }
 }

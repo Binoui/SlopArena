@@ -16,26 +16,29 @@ namespace SlopArena.Shared
     [Serializable]
     public struct MovementStats
     {
-        public float WalkSpeed;
-        public float SprintSpeed;
+        public float RunSpeed;              // m/s (replaces SprintSpeed)
+        public float RunAccelerationA;      // m/s² stick coefficient (Run accel = A·|stick| + B)
+        public float RunAccelerationB;      // m/s² base
         public float DashSpeed;
-        public float AirAcceleration;
+        public float AirSpeedMax;           // m/s
+        public float AirAccelStick;         // m/s²
+        public float AirAccelBase;          // m/s²
         public float JumpForce;
+        public float ShortHopForce;         // m/s (replaces ShortHopVelocityMultiplier)
+        public float AirJumpVMultiplier;    // factor on JumpForce
+        public float AirJumpHMultiplier;    // factor on AirSpeedMax
         public float Gravity;
-        /// <summary>Reduced gravity while attacking/aiming in the air (m/s²). Default 6f.</summary>
         public float AirFloatGravity;
         public ushort DashDurationTicks;
         public ushort DashCooldownTicks;
-        public float GroundFriction;
-        public float AirFriction;
+        public float GroundFriction;        // m/s² (linear)
+        public float AirFriction;           // m/s² (linear)
         public float MaxFallSpeed;
+        public float FastFallSpeed;         // m/s
         public byte MaxJumps;
-        /// <summary>Jump squat duration in ticks (1 tick = 1/60s). Character locks during this window before airborne.</summary>
         public ushort JumpSquatTicks;
-        /// <summary>Ticks of reduced gravity (AirFloatGravity) after AirTime resets. 0 = no float window.</summary>
         public ushort FloatWindowTicks;
-        /// <summary>Ticks to ramp from AirFloatGravity to full Gravity after FloatWindow expires. 0 = instant transition.</summary>
-        public ushort FallRampDuration;
+        public ushort RushTicks;           // Rush window (ground dash-dance), ticks
     }
 
     public class CharacterDefinition

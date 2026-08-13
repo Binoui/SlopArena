@@ -225,7 +225,7 @@ public class FacingSnapTests : KitScenarioTests
         // Ground snap wins the tick it is pressed (instant turnaround for poke spacing),
         // then the next tick's movement re-faces the walk direction.
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var player = TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = MathF.PI }; // facing -Z
+        var player = TestHelpers.PlayerState(50f, 50f) with { PY = Gpy, FacingYaw = MathF.PI }; // facing -Z; grid-center so -Z walk stays in-grid
         sim.RegisterEntity(1, Def, player);
 
         // Walking -Z (facing -Z already) + snap to +Z on the same tick

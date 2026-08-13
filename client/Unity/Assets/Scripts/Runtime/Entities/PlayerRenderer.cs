@@ -56,6 +56,8 @@ namespace SlopArena.Client.Entities
             { ActionState.AirDodging, new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
             { ActionState.JumpSquat,  new Color(0.8f, 0.3f, 1f, 0.8f) },   // purple
             { ActionState.Aiming,     new Color(0.3f, 1f, 1f, 0.8f) },     // cyan-light
+            { ActionState.Run,        new Color(0f, 1f, 1f, 0.8f) },       // cyan
+            { ActionState.LedgeHang,  new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
         };
 
         [Header("Visual Offset")]
@@ -542,6 +544,13 @@ namespace SlopArena.Client.Entities
                         _jumpArcActive = true;
                     }
                 }
+                else if (state.State == ActionState.LedgeHang)
+                {
+                    // Placeholder pose: no hang anim asset yet (ADR-0020 §4) — play fall.
+                    var clip = _charConfig.GetClipByName("fall");
+                    if (clip != null && _animancer.States.Current?.Clip != clip)
+                        _animancer.Play(clip, 0.1f);
+                }
                 else if (!state.IsGrounded)
                 {
                     bool isAscending = state.VY > 0f;
@@ -781,7 +790,7 @@ namespace SlopArena.Client.Entities
 #if UNITY_EDITOR
             // UnityEditor.Handles is editor-only; the guard keeps the player
             // build compiling (release blocker found 2026-08-02).
-            UnityEditor.Handles.Label(labelPos, $"{_entityName} [{_lastState.State}]");
+            UnityEditor.Handles.Label(labelPos, $"{_lastState.State}");
 #endif
 
             // ── State color indicator sphere (above label) ──

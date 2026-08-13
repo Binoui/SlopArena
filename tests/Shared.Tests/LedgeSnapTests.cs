@@ -3,17 +3,18 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Tests for ledge snap (auto-grab when near stage edge).
-/// Characters falling off the stage edge snap back to the surface
-/// with a small upward hop, unless in hitstun or active knockback.
+/// Tests for the ledge hang (ADR-0020): an off-grid entity within grab range of a stage
+/// edge enters the occupied <see cref="ActionState.LedgeHang"/> state — not the old
+/// auto-pop. Three escapes leave it: jump, W (stand onto the stage), S (drop). A second
+/// entity cannot grab an already-hung ledge (occupancy).
 /// </summary>
 public class LedgeSnapTests
 {
     private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
-    private static readonly float GroundPx = TestHelpers.MankiGroundPY; // 0.65
+    private static readonly float GroundPx = TestHelpers.MankiGroundPY; // 0.75 (capsuleHalf)
 
     [Fact]
-    public void FallsOffEdge_LedgeSnapsToSurface()
+    public void FallsOffEdge_EntersLedgeHang()
     {
         // Manki at edge (X=199.5 is off the 200-wide heightmap), airborne, falling
         var arena = TestHelpers.TestArena();
@@ -22,20 +23,18 @@ public class LedgeSnapTests
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         var t0 = sim.GetState(1);
-
-        // Initially off-grid and falling
         Assert.False(t0.IsGrounded);
 
         var after = TestHelpers.TickDefault(sim, 1);
 
-        // Snapped to ground with upward boost
-        Assert.True(after.IsGrounded);
-        TestHelpers.AssertNear(GroundPx, after.PY, 0.01f);
-        Assert.True(after.VY > 0);
+        Assert.Equal(ActionState.LedgeHang, after.State);
+        Assert.False(after.IsGrounded);
+        Assert.Equal(0f, after.VY);
+        Assert.True(after.InvincibilityTicks > 0);
     }
 
     [Fact]
-    public void FallingFarBelowEdge_DoesNotSnap()
+    public void FallingFarBelowEdge_DoesNotGrab()
     {
         // Manki far below the stage surface — too deep for ledge grab
         var arena = TestHelpers.TestArena();
@@ -46,13 +45,13 @@ public class LedgeSnapTests
         var beforePy = sim.GetState(1).PY;
         var after = TestHelpers.TickDefault(sim, 1);
 
-        // Keeps falling — no snap
+        // Keeps falling — no grab
         Assert.False(after.IsGrounded);
         Assert.True(after.PY < beforePy - 0.1f);
     }
 
     [Fact]
-    public void HitstunDuringLedgeFall_DoesNotSnap()
+    public void HitstunDuringLedgeFall_DoesNotGrab()
     {
         // At edge, airborne, in hitstun with knockback velocity
         var arena = TestHelpers.TestArena();
@@ -65,12 +64,12 @@ public class LedgeSnapTests
 
         var after = TestHelpers.TickDefault(sim, 1);
 
-        // Hitstun takes priority — no ledge snap
+        // Hitstun takes priority — no grab
         Assert.False(after.IsGrounded);
     }
 
     [Fact]
-    public void KnockbackWithoutHitstun_DoesNotSnap()
+    public void KnockbackWithoutHitstun_DoesNotGrab()
     {
         // At edge, airborne, knockback active with no hitstun (rare edge case)
         var arena = TestHelpers.TestArena();
@@ -83,12 +82,12 @@ public class LedgeSnapTests
 
         var after = TestHelpers.TickDefault(sim, 1);
 
-        // Knockback path runs first — returns before ledge snap
+        // Knockback path runs first — no grab
         Assert.False(after.IsGrounded);
     }
 
     [Fact]
-    public void OverPlatform_DoesNotLedgeSnap()
+    public void OverPlatform_DoesNotGrab()
     {
         // Manki over the platform (center of arena), not at edge
         var arena = TestHelpers.TestArena();
@@ -101,26 +100,82 @@ public class LedgeSnapTests
 
         var after = TestHelpers.TickDefault(sim, 1);
 
-        // Normal ground collision (not ledge snap — no VY boost)
+        // Normal ground collision (not a grab)
         Assert.True(after.IsGrounded);
         TestHelpers.AssertNear(GroundPx, after.PY, 0.01f);
         TestHelpers.AssertNear(0f, after.VY, 0.01f);
     }
 
     [Fact]
-    public void FallsOffEdgeWithAirDodge_ClearsAirDodgeOnSnap()
+    public void LedgeHang_Jump_EscapesToJumpSquat()
     {
-        // At edge, airborne, air dodging
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.EdgeState(posX: 199.5f);
-        state.State = ActionState.AirDodging;
-        TestHelpers.RegisterPlayer(sim, Def, state);
+        TestHelpers.RegisterPlayer(sim, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
 
-        var after = TestHelpers.TickDefault(sim, 1);
+        var jumped = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
+        Assert.Equal(ActionState.JumpSquat, jumped.State);
+        Assert.Equal(1u, jumped.JumpsLeft); // one jump consumed
+    }
 
-        // Ledge snap clears air dodge state
-        Assert.True(after.IsGrounded);
-        Assert.Equal(ActionState.Idle, after.State);
+    [Fact]
+    public void LedgeHang_TowardStage_StandsUp()
+    {
+        // The +X edge's inward normal points -X, so "toward the stage" is MoveX=-1.
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        TestHelpers.RegisterPlayer(sim, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+
+        var stood = TestHelpers.TickN(sim, TestHelpers.Input(moveX: -1f), 1);
+        Assert.True(stood.IsGrounded);
+        Assert.Equal(ActionState.Run, stood.State);
+    }
+
+    [Fact]
+    public void LedgeHang_AwayDrops_ThenNoRegrabWhileLocked()
+    {
+        // Away from the stage (MoveX=+1) = S-drop.
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        TestHelpers.RegisterPlayer(sim, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+
+        var dropped = TestHelpers.TickN(sim, TestHelpers.Input(moveX: 1f), 1);
+        Assert.Equal(ActionState.Idle, dropped.State);
+        Assert.False(dropped.IsGrounded);
+        Assert.True(dropped.VY < 0f);
+        Assert.True(dropped.LedgeRegrabLockTicks > 0);
+
+        // No re-grab while the lock is still live.
+        for (int i = 0; i < 5; i++)
+        {
+            TestHelpers.TickDefault(sim, 1);
+            Assert.NotEqual(ActionState.LedgeHang, sim.GetState(1).State);
+        }
+    }
+
+    [Fact]
+    public void OccupiedLedge_SecondEntityFallsPast()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+
+        // Entity 1 grabs the edge.
+        sim.RegisterEntity(1, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+
+        // Entity 2 approaches the SAME edge — must fall past (occupied).
+        sim.RegisterEntity(2, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+
+        var e2 = sim.GetState(2);
+        Assert.NotEqual(ActionState.LedgeHang, e2.State);
+        Assert.False(e2.IsGrounded);
     }
 }

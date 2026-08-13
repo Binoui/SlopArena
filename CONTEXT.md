@@ -7,7 +7,7 @@
 **AirTime**:
 An airborne tick counter that determines fall gravity phase. Incremented each tick while airborne. Reset behavior is conditional:
 - **0** on: the RecoveryMove, taking damage, landing (re-grants FloatWindow; aerial attacks no longer reset — ADR-0015)
-- **FloatWindowTicks + FallRampDuration** on: any jump (ground or double). JumpArc handles the ascent visually, so the float window is skipped — full gravity applies immediately after jump.
+- **FloatWindowTicks** on: any jump (ground or double). JumpArc handles the ascent visually, so the float window is skipped — full gravity applies immediately after jump.
 - **clamped to ≥ FloatWindowTicks** on: aerial dash (never resets the float window, but doesn't advance past it either)
 Ground dash sets AirTime to 0.
 _Avoid_: air timer, hang time, air duration
@@ -17,15 +17,15 @@ The initial period of AirTime during which reduced (`AirFloatGravity`) gravity a
 _Avoid_: hover time, stall window, float duration
 
 **FallRamp**:
-The progressive acceleration of fall speed from FloatWindow gravity to full gravity. Gravity increases linearly over `FallRampDuration` ticks once `AirTime >= FloatWindowTicks`.
+~~Deprecated — removed by ADR-0020 (gravity ramp → float-window-only).~~ The old progressive fall-speed acceleration from FloatWindow gravity to full gravity.
 _Avoid_: gravity ramp, fall acceleration curve
 
 **FallGravity**:
-The full gravity constant applied after the FallRamp completes. Equivalent to `MovementStats.Gravity`.
+The full gravity constant applied once the FloatWindow ends. Equivalent to `MovementStats.Gravity`.
 _Avoid_: terminal velocity, max gravity
 
 **FallRampDuration**:
-The number of ticks over which gravity ramps from `AirFloatGravity` to `FallGravity`. Per-character tuning value.
+~~Deprecated — removed by ADR-0020.~~ The old per-character ramp tick count.
 _Avoid_: ramp time, acceleration window
 
 **JumpArc**:
@@ -53,8 +53,28 @@ A reduced jump triggered by releasing the jump key within a short window (3–5 
 _Avoid_: mini jump, light jump, tap jump
 
 **FastFall**:
-Holding the dedicated Down key (X by default — deliberately NOT the backward-movement key, so drifting backward never fast-falls; issue #116) while airborne to accelerate fall speed toward MaxFallSpeed. The commitment-to-descent tool — what makes aerial gameplay snappy instead of floaty (ADR-0016). Applies in every airborne state except hitstun.
+Holding the dedicated Down key (X by default — deliberately NOT the backward-movement key, so drifting backward never fast-falls; issue #116) while airborne and falling to **set** `VY = -FastFallSpeed` instantly (set-velocity, ADR-0020 — no gravity that tick). The commitment-to-descent tool — what makes aerial gameplay snappy instead of floaty (ADR-0016). Applies in every airborne state except hitstun.
 _Avoid_: dive, plummet, down air
+
+**Run**:
+The single ground locomotion tier (ADR-0020 §1 — replaces the old walk/sprint split; Melee's "dash" tier is NOT adopted). Reached instantly from the Rush; the soft-start accel survives only to recover from a Turnaround (parallel velocity). Releasing brakes to a stop fast (`GroundStopFriction`, 36 m/s² — no semi-truck drift). Changing axis while at run speed is an instant redirect — the perpendicular velocity is cleared, never carried between axes (no diagonal drag). No selectable walk speed on 8-way input.
+_Avoid_: walk, sprint (the deleted two-tier model)
+
+**Rush**:
+The reversal-free burst that starts a Run from a standstill — a fixed window (`RushTicks`, ~10 ticks) during which velocity is at `RunSpeed` immediately. Reversing within the window is an instant full-speed flip that restarts it — Melee's "dash-dance", renamed because "Dash" is the SA mechanic. A perpendicular (90°) redirect also restarts the window, so an 8-way WASD dash-dance never drops out of Rush. Releasing inside the window stops dead (no drift — a tap is a fixed burst, not a slide). Holding one direction steady past the window enters Run proper, where reversal becomes a Turnaround.
+_Avoid_: dash, dash-dance, initial dash
+
+**Turnaround**:
+The turn-lag reversal from a full Run — friction-through-zero, the pivot skid. Decelerates hard (`TurnaroundFriction` 70 m/s², ~0.2 s / ~1.4 m) so it's a short, decisive pivot, not an ice slide. Slower than the instant Rush flip; the skid is the commitment. Applies only once the Rush window has expired.
+_Avoid_: pivot turn, skid, about-face
+
+**Dash** (SA Dash):
+The Shift-triggered burst — the shield substitute (SA has no shields), used for quick dodges and approaches (wavedash-like). A *mechanic*, not a locomotion tier (ADR-0020 §1). Short burst (2-10 m per character style); grounded dash **hard-stops** on expiry, aerial dash **preserves momentum** (approach tool). I-frames cover only the start (`DashInvincibilityTicks` = 4) — dodging through is doable but timing-tight. See **DashInvincibility**.
+_Avoid_: SA dash, shift dash, dodge
+
+**LedgeHang**:
+The occupied hanging state at a ledge (ADR-0020 §4). Grab is briefly invincible with full refresh on re-grab; no auto-getup — the fighter hangs until it acts. Escapes: S = drop, jump = ledge jump, W = stand. Single-occupancy (ledgehog): a second grab fails and the would-be grabber falls past.
+_Avoid_: ledge grab (the action), edge hang, tether
 
 **RecoveryMove**:
 The per-character dedicated upward/diagonal burst used to return to the stage after being knocked out — one Slot per kit, long cooldown. The only move that resets the FloatWindow; normal air attacks no longer do (ADR-0015).
@@ -98,11 +118,11 @@ The universal escape/extender on one long per-entity cooldown that persists thro
 _Avoid_: trinket (WoW connotation), get-out-of-jail, escape tool
 
 **DashInvincibility**:
-The invincibility frames granted at dash start. The dashing entity cannot take damage or be hit for the full dash duration. Currently shared across all characters (`DashInvincibilityTicks = DashDurationTicks`). Creates the core dash mindgame: burn your dash to dodge an attack, or save it to avoid being baited.
+The i-frames granted at the START of a dash — the opening few ticks only (`DashInvincibilityTicks` = 4, shared const), not the full dash. The dash tail and recovery are vulnerable, so dodging an attack with the dash is possible but requires tight timing. Shared across all characters for now.
 _Avoid_: i-frames, dodge window, invuln
 
 **FloatWindowReset**:
-The restoration of FloatWindow gravity by setting AirTime to 0 mid-air. Triggered by: the RecoveryMove, taking damage, or landing (ADR-0015: aerial attacks no longer reset it — that was the hover crutch). Without a reset, the character progresses through FallRamp into full gravity.
+The restoration of FloatWindow gravity by setting AirTime to 0 mid-air. Triggered by: the RecoveryMove, taking damage, or landing (ADR-0015: aerial attacks no longer reset it — that was the hover crutch). Without a reset, the character progresses into full gravity (the old FallRamp is removed by ADR-0020).
 _Avoid_: air reset, float restore, hover refresh
 
 ## PvP / Multiplayer
@@ -162,11 +182,11 @@ An opponent entity currently in a Complex ActionState. No local re-simulation �
 _Avoid_: unpredicted entity, fallback display, snap-only entity
 
 **Predictable ActionState**:
-An `ActionState` whose per-tick behavior depends only on fields carried by the confirmed-base sync: position/velocity, the generic state timer, and the movement-resource fields added for rollback (`AirTimeTicks`, dash timers/direction, jump/dodge counters, etc.). Currently `Idle`, `Dashing`, `JumpSquat`, `AirDodging`. PredictedTrack re-sim is byte-identical for these. (`Sliding` exists in the enum but is unused by any current code — not a member of either partition.)
+An `ActionState` whose per-tick behavior depends only on fields carried by the confirmed-base sync: position/velocity, the generic state timer, and the movement-resource fields added for rollback (`AirTimeTicks`, dash timers/direction, jump/dodge counters, etc.). Currently `Idle`, `Dashing`, `JumpSquat`, `AirDodging`, `Run`. PredictedTrack re-sim is byte-identical for these. (`Sliding` exists in the enum but is unused by any current code — not a member of either partition.)
 _Avoid_: safe state, simple state, movement state
 
 **Complex ActionState**:
-An `ActionState` whose behavior depends on fields no sync packet carries — the per-instance `ServerAbility` layer (private fields like `NilusVoidRift`'s cached aim/seed state) and/or `SpellResolver`'s live hitbox/projectile list, plus knockback/hitstun/DI fields. Currently `Attacking`, `Hitstun`, `Warping`. Never re-simulated on PredictedTrack — entities in these states run RawTrack instead.
+An `ActionState` whose behavior depends on fields no sync packet carries — the per-instance `ServerAbility` layer (private fields like `NilusVoidRift`'s cached aim/seed state) and/or `SpellResolver`'s live hitbox/projectile list, plus knockback/hitstun/DI fields. Currently `Attacking`, `Hitstun`, `Warping`, `LedgeHang`. Never re-simulated on PredictedTrack — entities in these states run RawTrack instead.
 _Avoid_: unsafe state, hard state, ability state
 
 

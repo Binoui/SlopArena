@@ -7,7 +7,7 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class PhysicsTests
 {
-    // Classic definition with FloatWindowTicks=0, FallRampDuration=0 for backward-compatible gravity tests
+    // Classic definition with FloatWindowTicks=0 for backward-compatible gravity tests
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
     private static readonly float GroundPx = TestHelpers.MankiGroundPY;
@@ -17,7 +17,6 @@ public class PhysicsTests
     {
         var mov = TestHelpers.MankiDef.Movement;
         mov.FloatWindowTicks = 0;
-        mov.FallRampDuration = 0;
         return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
     }
     // ── Jump ──
@@ -71,7 +70,7 @@ public class PhysicsTests
         // Double jump in air (air jumps are always full — no short hop in the air, issue #116)
         var doubled = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
         Assert.Equal(0u, doubled.JumpsLeft);
-        TestHelpers.AssertNear(Move.JumpForce - GravPerTick, doubled.VY, 0.01f);
+        TestHelpers.AssertNear(Move.JumpForce * Move.AirJumpVMultiplier - GravPerTick, doubled.VY, 0.01f);
     }
 
     [Fact]
@@ -81,24 +80,24 @@ public class PhysicsTests
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
         state.PY = GroundPx;
-        state.VX = Move.WalkSpeed; // running at walk speed
+        state.VX = Move.RunSpeed; // running at run speed
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         // Enter JumpSquat — VX preserved (not zeroed)
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
         Assert.Equal(ActionState.JumpSquat, t0.State);
-        Assert.Equal(Move.WalkSpeed, t0.VX);
+        Assert.Equal(Move.RunSpeed, t0.VX);
 
-        // Remainder of JumpSquat — VX stays at walk speed (no friction during squat)
+        // Remainder of JumpSquat — VX stays at run speed (no friction during squat)
         for (int i = 1; i < Move.JumpSquatTicks; i++)
         {
-            var s = TestHelpers.TickDefault(sim, 1);
+            var s = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
             Assert.Equal(ActionState.JumpSquat, s.State);
-            Assert.Equal(Move.WalkSpeed, s.VX);
+            Assert.Equal(Move.RunSpeed, s.VX);
         }
 
-        // Squat expires → airborne, momentum preserved (air drag reduces slightly)
-        var tJump = TestHelpers.TickDefault(sim, 1);
+        // Squat expires → full hop airborne, momentum preserved (air friction reduces slightly)
+        var tJump = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
         Assert.False(tJump.IsGrounded);
         Assert.True(tJump.VX > 0f, $"Expected VX > 0 after jump, got {tJump.VX:F3}");
     }
@@ -212,10 +211,10 @@ public class PhysicsTests
         Assert.Equal(1u, landed.AirDodgesLeft);
     }
 
-    // ── Walk / Sprint / Friction ──
+    // ── Run / Friction ──
 
     [Fact]
-    public void WalkForward_MovesPosition()
+    public void RunForward_MovesPosition()
     {
         var arena = TestHelpers.TestArena();
         var state = TestHelpers.PlayerState();
@@ -231,13 +230,14 @@ public class PhysicsTests
             final = sim.GetState(1);
         }
 
-        // VZ = SprintSpeed (12) during sprint portion, WalkSpeed (9) during non-sprint
-        // After 60 ticks total: at least WalkSpeed * 1s ~ 9m, at most SprintSpeed * 1s ~ 12m
-        TestHelpers.AssertNear(10.5f, final.PZ, 2.0f);
+        // Single Run tier: VZ accelerates to RunSpeed and holds there.
+        Assert.Equal(ActionState.Run, final.State);
+        TestHelpers.AssertNear(Move.RunSpeed, final.VZ, 0.1f);
+        Assert.True(final.PZ > 5f, $"Expected meaningful forward progress, got PZ={final.PZ:F2}");
     }
 
     [Fact]
-    public void Sprint_MovesFasterThanWalk()
+    public void Run_AcceleratesToRunSpeed()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -245,37 +245,181 @@ public class PhysicsTests
         state.PY = GroundPx;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 40; i++)
             sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
 
         var s = sim.GetState(1);
-        Assert.True(s.IsSprinting);
-        Assert.True(s.VZ > Move.WalkSpeed,
-            $"Expected VZ > {Move.WalkSpeed} but got {s.VZ:F2}");
+        Assert.Equal(ActionState.Run, s.State);
+        TestHelpers.AssertNear(Move.RunSpeed, s.VZ, 0.1f);
     }
 
     [Fact]
-    public void Friction_DecaysVelocityOnRelease()
+    public void RushReversal_FlipsInstantlyWithinRushWindow()
     {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
         state.PY = GroundPx;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Walk for 1 tick (VZ=WalkSpeed), then coast
-        TestHelpers.TickN(sim, TestHelpers.Input(moveY: 1f), 1);
-        var afterWalk = sim.GetState(1);
-        Assert.True(afterWalk.VZ > 0f);
+        // Move +Z for 5 ticks — still inside the Rush window (RushTicks = 10). Velocity
+        // is already at cruise (instant kick-off), not ramping.
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        var before = sim.GetState(1);
+        Assert.Equal(ActionState.Run, before.State);
+        TestHelpers.AssertNear(Move.RunSpeed, before.VZ, 0.1f);
 
-        float prevVz = afterWalk.VZ;
-        for (int i = 0; i < 10; i++)
+        // Reverse within the Rush window: instant full-speed flip (no friction).
+        sim.Tick(new() { { 1, TestHelpers.Input(moveY: -1f) } });
+        var after = sim.GetState(1);
+        TestHelpers.AssertNear(-Move.RunSpeed, after.VZ, 0.1f);
+    }
+
+    [Fact]
+    public void RunReversal_AfterRushWindowUsesFrictionNotInstantFlip()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold +Z past the Rush window (RushTicks = 10) into Run proper.
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        var before = sim.GetState(1);
+        TestHelpers.AssertNear(Move.RunSpeed, before.VZ, 0.1f);
+
+        // Reverse at Run: a Turnaround (friction), NOT an instant flip — VZ stays
+        // positive and merely decays.
+        sim.Tick(new() { { 1, TestHelpers.Input(moveY: -1f) } });
+        var after = sim.GetState(1);
+        Assert.True(after.VZ > 0f && after.VZ < before.VZ,
+            $"Run reversal must friction (stay +Z, decay), got VZ={after.VZ:F3}");
+    }
+
+    [Fact]
+    public void Turnaround_DeceleratesHardShortSkid()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Run +Z past the Rush window into Run proper.
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        TestHelpers.AssertNear(Move.RunSpeed, sim.GetState(1).VZ, 0.1f);
+
+        // Reverse: the Turnaround pivot decelerates hard (~TurnaroundFriction), stopping
+        // in ~10-12 ticks — a short skid, not the old ~90-tick coast (ice slide).
+        for (int i = 0; i < 12; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: -1f) } });
+        var s = sim.GetState(1);
+        Assert.True(MathF.Abs(s.VZ) < 1.0f,
+            $"Turnaround should nearly stop within 12 ticks, got VZ={s.VZ:F3}");
+    }
+
+    [Fact]
+    public void RushRelease_StopsInstantly()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // A short press opens the Rush window; releasing inside it stops dead (no drift).
+        TestHelpers.TickHold(sim, TestHelpers.Input(moveY: 1f), 3);
+        Assert.True(sim.GetState(1).VZ > 0f, "should be moving");
+
+        sim.Tick(new() { { 1, default(InputState) } });
+        Assert.Equal(0f, sim.GetState(1).VZ);
+        Assert.Equal(0f, sim.GetState(1).VX);
+    }
+
+    [Fact]
+    public void RunRelease_BrakesToStop()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold +Z past the Rush window into Run, then release: brake to a stop (not instant).
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        var before = sim.GetState(1);
+        TestHelpers.AssertNear(Move.RunSpeed, before.VZ, 0.1f);
+
+        sim.Tick(new() { { 1, default(InputState) } });
+        var after = sim.GetState(1);
+        Assert.True(after.VZ > 0f && after.VZ < before.VZ,
+            $"Run release should brake (not stop dead), got VZ={after.VZ:F3}");
+    }
+
+    [Fact]
+    public void RunPerpendicularRedirect_ClearsOldAxis()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Run right past the Rush window (Run mode), then press forward (+Z): the
+        // rightward velocity must be cleared instantly — no diagonal drag.
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveX: 1f) } });
+        TestHelpers.AssertNear(Move.RunSpeed, sim.GetState(1).VX, 0.1f);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        var after = sim.GetState(1);
+        Assert.Equal(0f, after.VX);
+        TestHelpers.AssertNear(Move.RunSpeed, after.VZ, 0.1f);
+    }
+
+    [Fact]
+    public void RushDance_WasdCycleStaysInRushThenReversesCrisply()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // W→A→S→D is a chain of 90° redirects. Each must restart the Rush window
+        // (previously it burned down and dropped the fighter into Run, where a
+        // reversal skids as a Turnaround instead of flipping instantly).
+        var dirs = new (float x, float z)[] { (0f, 1f), (-1f, 0f), (0f, -1f), (1f, 0f) };
+        for (int i = 0; i < 12; i++)
         {
-            var s = TestHelpers.TickDefault(sim, 1);
-            Assert.True(s.VZ < prevVz || Math.Abs(s.VZ) < 0.001f,
-                $"Tick {i}: VZ should decay from {prevVz:F4} but got {s.VZ:F4}");
-            prevVz = s.VZ;
+            var (x, z) = dirs[i % 4];
+            sim.Tick(new() { { 1, TestHelpers.Input(moveX: x, moveY: z) } });
+            Assert.True(sim.GetState(1).RushTicks > 0,
+                $"tick {i}: fell out of Rush (RushTicks={sim.GetState(1).RushTicks})");
         }
+
+        // Last dir was D (+X); reverse to A (−X) — must be an instant full-speed flip.
+        sim.Tick(new() { { 1, TestHelpers.Input(moveX: -1f) } });
+        var s = sim.GetState(1);
+        TestHelpers.AssertNear(-Move.RunSpeed, s.VX, 0.01f);
+        Assert.Equal(0f, s.VZ);
+    }
+
+    [Fact]
+    public void RunDiagonalStraighten_ClearsReleasedAxis()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = GroundPx;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // Hold up-right diagonal past the Rush window into Run.
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveX: 0.707f, moveY: 0.707f) } });
+
+        // Release W (keep D): the released Z axis must clear instantly.
+        sim.Tick(new() { { 1, TestHelpers.Input(moveX: 1f) } });
+        var after = sim.GetState(1);
+        Assert.Equal(0f, after.VZ);
+        TestHelpers.AssertNear(Move.RunSpeed, after.VX, 0.1f);
     }
 
     // ── ServerAbility attack lifecycle (hitstun after hit) ──
@@ -308,9 +452,8 @@ public class PhysicsTests
         Assert.Equal(0, (int)after.HitstunTicks);
         Assert.Equal(ActionState.Idle, after.State);
     }
-    // ── FallRamp (progressive gravity) ──
-    
-    // FallRampChar: Manki definition with FloatWindowTicks=10, FallRampDuration=20 for testing
+    // ── Float-window gravity ──
+    // FallRampChar: Manki definition with FloatWindowTicks=10 for float-window gravity tests
     private static readonly CharacterDefinition FallRampDef = CreateFallRampDef();
     private static readonly float FallRampFloatPerTick = FallRampDef.Movement.AirFloatGravity * Simulation.TickDt;
     private static readonly float FallRampFullPerTick = 35f * Simulation.TickDt;   // Gravity=35
@@ -320,7 +463,6 @@ public class PhysicsTests
         var mov = TestHelpers.MankiDef.Movement;
         mov.AirFloatGravity = 6f;
         mov.FloatWindowTicks = 10;
-        mov.FallRampDuration = 20;
         return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
     }
 
@@ -389,64 +531,26 @@ public class PhysicsTests
     }
     
     [Fact]
-    public void FallRamp_RampIncreasesGravityProgressively()
+    public void AfterFloatWindow_UsesFullGravity()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var state = TestHelpers.PlayerState();
-        state.PY = 3f;
+        state.PY = 8f;
         state.IsGrounded = false;
         state.JumpsLeft = 0;
         state.VY = 0f;
         TestHelpers.RegisterPlayer(sim, FallRampDef, state);
-        
-        // Run through tick 10 (end of FloatWindow, start of ramp)
+
+        // Tick through the FloatWindow (10 ticks) — full gravity past it.
         for (int i = 0; i < 10; i++)
             TestHelpers.TickDefault(sim, 1);
-        
-        
-        // Track VY deltas during ramp (ticks 11-30 = ramp phase)
-        float[] deltas = new float[FallRampDef.Movement.FallRampDuration];
-        for (int i = 0; i < deltas.Length; i++)
-        {
-            float beforeVy = sim.GetState(1).VY;
-            TestHelpers.TickDefault(sim, 1);
-            float afterVy = sim.GetState(1).VY;
-            deltas[i] = afterVy - beforeVy; // negative = falling faster
-        }
-        
-        // Each delta should be >= the previous (gravity increases monotonically)
-        for (int i = 1; i < deltas.Length; i++)
-        {
-            Assert.True(deltas[i] <= deltas[i - 1],
-                $"Ramp delta at step {i} ({deltas[i]:F6}) should be <= step {i - 1} ({deltas[i - 1]:F6})");
-        }
-        // First ramp tick should be close to AirFloatGravity
-        TestHelpers.AssertNear(-FallRampFloatPerTick, deltas[0], 0.05f);
-    }
-    
-    [Fact]
-    public void FallRamp_FullGravityAfterRamp()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        state.JumpsLeft = 0;
-        state.VY = 0f;
-        TestHelpers.RegisterPlayer(sim, FallRampDef, state);
-        
-        // Tick through FloatWindow (10) + Ramp (20) = 30 ticks
-        for (int i = 0; i < 10 + 20; i++)
-            TestHelpers.TickDefault(sim, 1);
-        
-        // Now past ramp: full gravity should apply
+
         float vyBefore = sim.GetState(1).VY;
         TestHelpers.TickDefault(sim, 1);
-        float vyDeltaFull = sim.GetState(1).VY - vyBefore;
-        
-        TestHelpers.AssertNear(-FallRampFullPerTick, vyDeltaFull, 0.01f);
+        float vyDelta = sim.GetState(1).VY - vyBefore;
+
+        TestHelpers.AssertNear(-FallRampFullPerTick, vyDelta, 0.01f);
     }
     
     [Fact]
@@ -484,10 +588,10 @@ public class PhysicsTests
             TestHelpers.TickDefault(sim, 1);
         Assert.True(sim.GetState(1).AirTimeTicks > 0, "Should have accumulated AirTime");
         
-        // Double jump — AirTime set past FloatWindow+Ramp, then gravity increments by 1
-        // FallRampDef: FloatWindowTicks=10, FallRampDuration=20 → AirTime = 10+20+1 = 31
+        // Double jump — AirTime set to FloatWindowTicks, then gravity increments by 1.
+        // FallRampDef: FloatWindowTicks=10 → AirTime = 10 + 1 = 11.
         var afterJump = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
-        Assert.Equal(31, (int)afterJump.AirTimeTicks);
+        Assert.Equal(FallRampDef.Movement.FloatWindowTicks + 1, (int)afterJump.AirTimeTicks);
     }
 
         // ── Jump arc timing ──

@@ -3,28 +3,28 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Short-hop tests (issue #116 / #106, ADR-0016): releasing the jump key within
-/// <see cref="Simulation.ShortHopWindowTicks"/> of the press produces a reduced jump;
-/// holding past the window produces the full jump. The decision runs at JumpSquat
-/// expiry, deferring the force one tick at a time while the player is still holding
-/// inside the window (so a release just past squat expiry still counts as a short hop).
-/// Air double jumps are always full.
+/// Short-hop tests (issue #116 / #106, ADR-0016 → ADR-0020): releasing the jump key within
+/// <see cref="Simulation.ShortHopWindowTicks"/> of the press produces a reduced jump
+/// (<c>MovementStats.ShortHopForce</c>); holding past the window produces the full jump
+/// (<c>JumpForce</c>). The decision runs at JumpSquat expiry, deferring the force one tick at
+/// a time while the player is still holding inside the window (so a release just past squat
+/// expiry still counts as a short hop). Air double jumps always use the air-jump force
+/// (<c>JumpForce × AirJumpVMultiplier</c>) — no short hop in the air.
 /// </summary>
 public class ShortHopTests
 {
-    // Classic def: no FloatWindow/FallRamp so post-jump gravity is full from the first air tick.
+    // Classic def: no FloatWindow so post-jump gravity is full from the first air tick.
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
     private static readonly float GroundPy = TestHelpers.MankiGroundPY;
     private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
-    /// <summary>Must mirror Simulation.ShortHopVelocityMultiplier (0.7).</summary>
-    private const float ShortHopVelocity = 0.7f;
+    /// <summary>The reduced jump force — a per-character m/s value, not a JumpForce fraction.</summary>
+    private static readonly float ShortHopForce = Move.ShortHopForce;
 
     private static CharacterDefinition CreateClassicDef()
     {
         var mov = TestHelpers.MankiDef.Movement;
         mov.FloatWindowTicks = 0;
-        mov.FallRampDuration = 0;
         return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
     }
 
@@ -41,13 +41,21 @@ public class ShortHopTests
     public void TapRelease_ShortHop_ReducedJumpVelocity()
     {
         // Press for 1 tick then release: at squat expiry JumpHeldTicks = 0 ≤ window → short hop.
-        var sim = SimWithGroundedPlayer();
-        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), Move.JumpSquatTicks + 1);
+        // FightGuy's ShortHopForce (7.2) clears the ground snap; Manki's 6.0 sits below the
+        // snap threshold (ADR-0020 data note) and re-grounds instead of hopping.
+        var fg = TestHelpers.FightGuyDef;
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(fg);
+        TestHelpers.RegisterPlayer(sim, fg, state);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), fg.Movement.JumpSquatTicks + 1);
         var s = sim.GetState(1);
 
         Assert.False(s.IsGrounded);
         Assert.Equal(ActionState.Idle, s.State);
-        TestHelpers.AssertNear(Move.JumpForce * ShortHopVelocity - GravPerTick, s.VY, 0.01f);
+        float fgGrav = fg.Movement.Gravity * Simulation.TickDt;
+        TestHelpers.AssertNear(fg.Movement.ShortHopForce - fgGrav, s.VY, 0.01f);
     }
 
     [Fact]
@@ -112,7 +120,7 @@ public class ShortHopTests
         Assert.Equal(ActionState.Idle, s.State);
         Assert.False(s.IsGrounded);
         float fgGrav = fg.Movement.Gravity * Simulation.TickDt;
-        TestHelpers.AssertNear(fg.Movement.JumpForce * ShortHopVelocity - fgGrav, s.VY, 0.01f);
+        TestHelpers.AssertNear(fg.Movement.ShortHopForce - fgGrav, s.VY, 0.01f);
     }
 
     [Fact]
@@ -126,7 +134,8 @@ public class ShortHopTests
         state.PY = TestHelpers.GroundPY(fg);
         TestHelpers.RegisterPlayer(sim, fg, state);
 
-        TestHelpers.TickHold(sim, TestHelpers.Input(jump: true, jumpHeld: true), 6);
+        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 5);
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Idle, s.State);
         Assert.False(s.IsGrounded);
@@ -135,15 +144,16 @@ public class ShortHopTests
     }
 
     [Fact]
-    public void AirDoubleJump_AlwaysFullJump()
+    public void AirDoubleJump_UsesAirJumpForce()
     {
-        // Air jumps apply the force on the press tick — no short hop in the air (issue #116).
+        // Air jumps apply the (weaker) air-jump force on the press tick — no short hop in the
+        // air (issue #116), but ADR-0020 scales it by AirJumpVMultiplier.
         var sim = SimWithGroundedPlayer();
         TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
         TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
 
         var doubled = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
         Assert.Equal(0u, doubled.JumpsLeft);
-        TestHelpers.AssertNear(Move.JumpForce - GravPerTick, doubled.VY, 0.01f);
+        TestHelpers.AssertNear(Move.JumpForce * Move.AirJumpVMultiplier - GravPerTick, doubled.VY, 0.01f);
     }
 }

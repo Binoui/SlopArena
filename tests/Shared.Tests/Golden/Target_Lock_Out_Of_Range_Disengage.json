@@ -2,8 +2,9 @@
   "Scenario": "Target Lock Out Of Range Disengage",
   "TickCount": 200,
   "PlayerSnap": {
+    "State": 9,
     "FacingYaw": 1.5707964,
-    "PX": 23.450018,
+    "PX": 24.00002,
     "PY": 0.75,
     "VX": 12,
     "JumpsLeft": 2,
@@ -16,8 +17,9 @@
     "IsGrounded": true
   },
   "PlayerFinal": {
+    "State": 9,
     "FacingYaw": 1.5707964,
-    "PX": 39.250076,
+    "PX": 39.80008,
     "PY": 0.75,
     "VX": 12,
     "JumpsLeft": 2,

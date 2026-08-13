@@ -85,9 +85,9 @@ public class AbilityLifecycleTests
             sim.Tick(new() { { 1, aim } });
 
         var s = sim.GetState(1);
-        // Manki AirFriction=0.4: VZ decays as 5 * (1 - 0.4/60)^60 ≈ 3.35.
+        // Manki AirFriction=6 m/s² (linear): VZ decays 5 → 0 within 50 ticks.
         // Guards the fixed-aim friction-only path in ProcessNormalMovement.
-        TestHelpers.AssertNear(3.35f, s.VZ, 0.1f);
+        TestHelpers.AssertNear(0f, s.VZ, 0.1f);
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)0, s.ComboStage);
     }

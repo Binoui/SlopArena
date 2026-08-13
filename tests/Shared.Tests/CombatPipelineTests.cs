@@ -534,7 +534,7 @@ public class CombatPipelineTests
 
         var frozen = sim.GetState(100);
         Assert.True(frozen.HitstopTicks > 0);
-        Assert.Equal(ActionState.Idle, frozen.State);
+        Assert.Equal(ActionState.Run, frozen.State);
 
         for (int i = 0; i < 4 && sim.GetState(100).HitstopTicks > 0; i++)
         {

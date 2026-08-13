@@ -218,18 +218,17 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(112) + h
 | 87     | byte    | AirDodgesLeft       | Remaining air dodges (D10)         |
 | 88     | byte    | JumpsLeft           | Remaining jumps (D10)              |
 | 89-90  | ushort  | InvincibilityTicks  | Post-respawn/dash invincibility (D10) |
-| 91-92  | ushort  | TurnaroundTicks     | Turnaround lag remaining (D10)     |
-| 93-94  | ushort  | DirHoldTicks        | Ticks holding same direction (D10) |
-| 95     | byte    | IsSprinting         | Sprint/dash-dance flag (D10)       |
-| 96-99  | float   | LastDirX            | Last input direction X (D10)       |
-| 100-103| float   | LastDirZ            | Last input direction Z (D10)       |
-| 104    | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
-| 105-106| ushort  | HitstopTicks        | Remaining hitstop freeze ticks (ADR-0012) |
-| 107-108| ushort  | BurstCooldownTicks  | Burst cooldown (ADR-0014)          |
-| 109-110| ushort  | BurstRecoveryTicks  | Burst recovery lock (ADR-0014)     |
-| 111    | byte    | JumpHeldTicks       | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
+| 91-92  | ushort  | RushTicks           | Rush window remaining (ADR-0020, was TurnaroundTicks) |
+| 93-96  | float   | LastDirX            | Last input direction X (D10)       |
+| 97-100 | float   | LastDirZ            | Last input direction Z (D10)       |
+| 101    | byte    | WasAirborneDuringKnockback | Landing/tech context flag (D10) |
+| 102-103| ushort  | HitstopTicks        | Remaining hitstop freeze ticks (ADR-0012) |
+| 104-105| ushort  | BurstCooldownTicks  | Burst cooldown (ADR-0014)          |
+| 106-107| ushort  | BurstRecoveryTicks  | Burst recovery lock (ADR-0014)     |
+| 108    | byte    | JumpHeldTicks       | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
+| 109    | byte    | LockOn              | Persistent target-lock flag (ADR-0018) |
 
-Total: 124 bytes base (8 + 4 + 112), up to 145 with the relay section (125 no-input marker / 145 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + ADR-0016)
+Total: 122 bytes base (8 + 4 + 110), up to 143 with the relay section (123 no-input marker / 143 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + ADR-0016/0018 + the ADR-0020 repack)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

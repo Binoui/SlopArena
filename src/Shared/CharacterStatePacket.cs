@@ -64,9 +64,7 @@ namespace SlopArena.Shared
         public byte AirDodgesLeft;
         public byte JumpsLeft;
         public ushort InvincibilityTicks;
-        public ushort TurnaroundTicks;
-        public ushort DirHoldTicks;
-        public bool IsSprinting;
+        public ushort RushTicks;
         public float LastDirX, LastDirZ;
         public bool WasAirborneDuringKnockback;
         /// <summary>Remaining hitstop freeze ticks (ADR-0012).</summary>
@@ -76,9 +74,13 @@ namespace SlopArena.Shared
         /// <summary>Remaining Burst recovery lock ticks (ADR-0014) — opponent's punish window must be visible.</summary>
         public ushort BurstRecoveryTicks;
 
-        /// <summary>113 bytes — 63 base + 12 cooldowns×6→11 (ADR-0016, +10) + 32 D10 movement-resource fields + 2 hitstop (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018).</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1 + 1 + 2 + 1 + 1 + 1 + 4 + 1 + 2 + 1 + 1 + 4 + 1 + 2 + 2 + 2 + 2 + 2 + 2 + 2
-            + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 2 + 1 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1;
+        /// <summary>110 bytes — 63 base + 11 cooldown slots (ADR-0016) + 28 D10 movement-resource
+        /// fields (ADR-0011; −3 for the dropped DirHoldTicks/IsSprinting in ADR-0020) + 2 hitstop
+        /// (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018).</summary>
+        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4   // tick + pos + vel (28)
+            + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 2   // 23
+            + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2   // cooldowns (22)
+            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1; // 37
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -127,9 +129,7 @@ namespace SlopArena.Shared
                 AirDodgesLeft = s.AirDodgesLeft,
                 JumpsLeft = s.JumpsLeft,
                 InvincibilityTicks = s.InvincibilityTicks,
-                TurnaroundTicks = s.TurnaroundTicks,
-                DirHoldTicks = s.DirHoldTicks,
-                IsSprinting = s.IsSprinting,
+                RushTicks = s.RushTicks,
                 LastDirX = s.LastDirX,
                 LastDirZ = s.LastDirZ,
                 WasAirborneDuringKnockback = s.WasAirborneDuringKnockback,
@@ -184,9 +184,7 @@ namespace SlopArena.Shared
                 AirDodgesLeft = AirDodgesLeft,
                 JumpsLeft = JumpsLeft,
                 InvincibilityTicks = InvincibilityTicks,
-                TurnaroundTicks = TurnaroundTicks,
-                DirHoldTicks = DirHoldTicks,
-                IsSprinting = IsSprinting,
+                RushTicks = RushTicks,
                 LastDirX = LastDirX,
                 LastDirZ = LastDirZ,
                 WasAirborneDuringKnockback = WasAirborneDuringKnockback,
@@ -241,17 +239,15 @@ namespace SlopArena.Shared
             buffer[87] = AirDodgesLeft;
             buffer[88] = JumpsLeft;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(89, 2), InvincibilityTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(91, 2), TurnaroundTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(93, 2), DirHoldTicks);
-            buffer[95] = IsSprinting ? (byte)1 : (byte)0;
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(96, 4), BitConverter.SingleToInt32Bits(LastDirX));
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(100, 4), BitConverter.SingleToInt32Bits(LastDirZ));
-            buffer[104] = WasAirborneDuringKnockback ? (byte)1 : (byte)0;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(105, 2), HitstopTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), BurstCooldownTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(109, 2), BurstRecoveryTicks);
-            buffer[111] = JumpHeldTicks;
-            buffer[112] = LockOn ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(91, 2), RushTicks);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(93, 4), BitConverter.SingleToInt32Bits(LastDirX));
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(97, 4), BitConverter.SingleToInt32Bits(LastDirZ));
+            buffer[101] = WasAirborneDuringKnockback ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(102, 2), HitstopTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(104, 2), BurstCooldownTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(106, 2), BurstRecoveryTicks);
+            buffer[108] = JumpHeldTicks;
+            buffer[109] = LockOn ? (byte)1 : (byte)0;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -300,17 +296,15 @@ namespace SlopArena.Shared
             packet.AirDodgesLeft = buffer[87];
             packet.JumpsLeft = buffer[88];
             packet.InvincibilityTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(89, 2));
-            packet.TurnaroundTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(91, 2));
-            packet.DirHoldTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(93, 2));
-            packet.IsSprinting = buffer[95] != 0;
-            packet.LastDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(96, 4)));
-            packet.LastDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(100, 4)));
-            packet.WasAirborneDuringKnockback = buffer[104] != 0;
-            packet.HitstopTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(105, 2));
-            packet.BurstCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
-            packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(109, 2));
-            packet.JumpHeldTicks = buffer[111];
-            packet.LockOn = buffer[112] != 0;
+            packet.RushTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(91, 2));
+            packet.LastDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(93, 4)));
+            packet.LastDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(97, 4)));
+            packet.WasAirborneDuringKnockback = buffer[101] != 0;
+            packet.HitstopTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(102, 2));
+            packet.BurstCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(104, 2));
+            packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(106, 2));
+            packet.JumpHeldTicks = buffer[108];
+            packet.LockOn = buffer[109] != 0;
             return packet;
         }
 
@@ -353,9 +347,7 @@ namespace SlopArena.Shared
             s.AirDodgesLeft = AirDodgesLeft;
             s.JumpsLeft = JumpsLeft;
             s.InvincibilityTicks = InvincibilityTicks;
-            s.TurnaroundTicks = TurnaroundTicks;
-            s.DirHoldTicks = DirHoldTicks;
-            s.IsSprinting = IsSprinting;
+            s.RushTicks = RushTicks;
             s.LastDirX = LastDirX; s.LastDirZ = LastDirZ;
             s.WasAirborneDuringKnockback = WasAirborneDuringKnockback;
             s.HitstopTicks = HitstopTicks;

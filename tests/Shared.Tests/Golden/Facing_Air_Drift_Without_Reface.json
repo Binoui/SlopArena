@@ -3,16 +3,16 @@
   "TickCount": 40,
   "PlayerSnap": {
     "FacingYaw": 0.7853982,
-    "PX": 0.02320392,
+    "PX": 0.028,
     "PY": 2,
-    "VX": 0.69534373,
+    "VX": 0.84000003,
     "AirTimeTicks": 3
   },
   "PlayerFinal": {
     "FacingYaw": 0.7853982,
-    "PX": 0.061397597,
-    "PY": 1.8574075,
-    "VY": -2.138889,
+    "PX": 0.14199997,
+    "PY": 1.3583331,
+    "VY": -6.416668,
     "AirTimeTicks": 40
   }
 }

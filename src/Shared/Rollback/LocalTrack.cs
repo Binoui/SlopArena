@@ -70,7 +70,7 @@ namespace SlopArena.Shared.Rollback
             if (idx < 0) return; // outside the window — trust the continuous sim, self-heals next packet
 
             for (int i = idx; i < _history.Count; i++)
-                if (!ActionStateClassifier.IsPredictable(_history[i].State.State))
+                if (!ActionStateClassifier.IsSnapSafe(_history[i].State.State))
                     return;
 
             CorrectionCount++;

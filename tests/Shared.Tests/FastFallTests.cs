@@ -3,24 +3,23 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Fast-fall tests (issue #116 / #107, ADR-0016): holding Down in the air multiplies
-/// gravity toward MaxFallSpeed. Applies in every airborne state except hitstun; release
-/// cancels; Down on the ground does nothing (crouch is deprecated — ADR-0014).
+/// Fast-fall tests (issue #116 / #107, ADR-0016 → ADR-0020 set-velocity model): holding
+/// Down in the air sets VY to <see cref="MovementStats.FastFallSpeed"/> directly (no gravity
+/// that tick), only while already falling. Applies in every airborne state except hitstun;
+/// release cancels back to natural gravity; Down on the ground does nothing.
 /// The client maps the Down bit to a dedicated key (X by default, issue #116) — NOT to
 /// the backward-movement key, so drifting backward never fast-falls.
 /// </summary>
 public class FastFallTests
 {
-    // Classic def: no FloatWindow/FallRamp → full gravity from the first air tick.
+    // Classic def: no FloatWindow → full gravity from the first air tick.
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
-    private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
 
     private static CharacterDefinition CreateClassicDef()
     {
         var mov = TestHelpers.MankiDef.Movement;
         mov.FloatWindowTicks = 0;
-        mov.FallRampDuration = 0;
         return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
     }
 
@@ -37,32 +36,11 @@ public class FastFallTests
     }
 
     [Fact]
-    public void DownHeld_Air_AcceleratesFall()
+    public void DownHeld_Air_SetsFastFallVelocity()
     {
-        var normal = SimFalling();
         var fast = SimFalling();
-
-        TestHelpers.TickDefault(normal, 20);
-        TestHelpers.TickHold(fast, TestHelpers.Input(down: true), 20);
-
-        var a = normal.GetState(1);
-        var b = fast.GetState(1);
-        Assert.True(b.VY < a.VY,
-            $"fast fall must fall faster: normal VY={a.VY:F3} vs fast VY={b.VY:F3}");
-        // 20 ticks at 3× gravity ≈ -36 m/s vs -12 m/s — assert the multiplier bit is real.
-        Assert.True(a.VY > -15f && b.VY < -30f,
-            $"expected 3× gravity effect: normal={a.VY:F3} fast={b.VY:F3}");
-    }
-
-    [Fact]
-    public void DownHeld_ClampsAtMaxFallSpeed()
-    {
-        // From 40 m: 25 ticks to reach the cap (108 m/s²), then it must hold there —
-        // sample at tick 50, mid-fall, still at exactly the cap.
-        var fast = SimFalling(py: 40f);
-        TestHelpers.TickHold(fast, TestHelpers.Input(down: true), 50);
-        var s = fast.GetState(1);
-        TestHelpers.AssertNear(-Move.MaxFallSpeed, s.VY, 0.01f);
+        TestHelpers.TickHold(fast, TestHelpers.Input(down: true), 5);
+        TestHelpers.AssertNear(-Move.FastFallSpeed, fast.GetState(1).VY, 0.001f);
     }
 
     [Fact]
@@ -81,9 +59,8 @@ public class FastFallTests
         var b = keptFalling.GetState(1);
         Assert.True(a.VY > b.VY,
             $"released fall must slow relative to continuing fast fall: released={a.VY:F3} kept={b.VY:F3}");
-        // Released sim should be back on the normal gravity trajectory.
-        float expectedNormal = -3f * 15f * GravPerTick;
-        TestHelpers.AssertNear(expectedNormal, a.VY, 2f);
+        // Released sim returns to natural gravity and clamps at MaxFallSpeed.
+        TestHelpers.AssertNear(-Move.MaxFallSpeed, a.VY, 0.01f);
     }
 
     [Fact]
@@ -101,7 +78,7 @@ public class FastFallTests
     }
 
     [Fact]
-    public void DownDuringAirAttack_AcceleratesFall()
+    public void DownDuringAirAttack_FastFalls()
     {
         // "Works in all airborne states except hitstun" — an active air attack is the
         // commitment case: fast-falling through an aerial is the point of the mechanic.

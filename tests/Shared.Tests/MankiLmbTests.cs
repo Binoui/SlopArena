@@ -87,7 +87,7 @@ public class MankiLmbTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), Stage.DurationTicks + 30);
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), Stage.DurationTicks + 60);
 
         // Move ended; Idle ground friction has decayed the lunge drift.
         Assert.True(after.VZ < 2f, $"Expected drift to decay after move, got VZ={after.VZ}");

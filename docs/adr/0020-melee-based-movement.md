@@ -13,16 +13,17 @@ The map's movement arc ([#128](https://github.com/Binoui/SlopArena/issues/128)):
 
 ### 1. Terminology (locked)
 
-- **SA Dash = the Shift-triggered invincible burst** — a *mechanic*, the shield substitute (SA has no shields): kept **in full** (burst 30-34, 15-tick i-frames, cooldown 44-60; Burst/ADR-0014 untouched). It is the defensive layer, not a locomotion tier.
+- **SA Dash = the Shift-triggered burst** — a *mechanic*, the shield substitute (SA has no shields): a wavedash-like quick dodge/approach, not a locomotion tier. Redesigned (v2, [#136]): short burst (2-10 m per character), **grounded dash hard-stops** on expiry while **aerial dash preserves momentum** (approach tool), and **i-frames cover only the start** (`DashInvincibilityTicks` = 4) — dodging through is timing-tight.
 - Melee's "dash" (locomotion tier between walk and run) is **NOT adopted under that name**. The new locomotion tier is called **Run**.
+- The reversal-free burst at the start of a Run is called **Rush**; the turn-lag reversal at Run cruise is called **Turnaround**. Both keep "dash" reserved for the SA mechanic.
 - Keeping the terms distinct in all docs/ADRs.
 
 ### 2. Ground movement ([#136])
 
-- **Run cruise**: 12-tick sprint-hold + instant snap die → accel toward `RunSpeed` (soft start, `a·dir ± b` shape). Walk tier dies as a selectable speed (no analog on 8-way); the field survives only for air coupling → §3.
-- **Dash ending changes**: 80 m/s² decel + hard stop → **friction coast** (the only dash-behavior change; everything else about the mechanic stays).
-- **Pivot**: friction-through-zero (locomotion dash-dance); the standing turn keeps timed `TurnaroundTicks`.
-- **Ground friction**: linear (`V -= sign·f·dt`, `VelocityDeadZone` snap, ~6-9 m/s²).
+- **Run cruise**: `RunSpeed` is reached instantly from the Rush (no soft-start ramp — Melee's instant dash); the soft-start accel (`a·dir ± b`) survives only to recover from a Turnaround (velocity parallel to input). A perpendicular redirect at run speed is instant — the perpendicular velocity is cleared, never carried between axes (no diagonal drag). Walk tier dies as a selectable speed (no analog on 8-way).
+- **Dash ending (v2)**: grounded dash **hard-stops** (`VX=VZ=0`) — the burst is the move, wavedash-like; aerial dash **preserves horizontal momentum** so it stays an approach tool. (An earlier "friction coast" ending was reverted by the wavedash redesign.)
+- **Rush window** (`MovementStats.RushTicks`, ~10 ticks): starting from a standstill opens a fixed dash-dance window. Within it, velocity is set to `RunSpeed` immediately and a reversal is an instant full-speed flip that restarts the window (the Melee dash-dance); a perpendicular (90°) redirect also restarts the window, so an 8-way dash-dance never drops to Run. Only holding a *steady* direction lets the window expire: once expired, the fighter is in Run proper, where a reversal is a **Turnaround** — friction-through-zero, the pivot skid. The runtime window rides the old `TurnaroundTicks` wire slot, now `CharacterState.RushTicks` (no new wire field).
+- **Ground friction**: linear (`V -= sign·f·dt`, `VelocityDeadZone` snap, ~6-9 m/s²) — the coast value (fixed-aim decel). The **Turnaround** pivot is a separate, harder decel (`TurnaroundFriction` 70 m/s² → ~0.2 s / ~1.4 m skid from full run speed), so reversing reads as a short pivot, not an ice slide.
 - **Dash-attack = attack-from-motion** (Q5=b): the attack gate opens to Dashing/Run with momentum preserved; dedicated dash-attack moves deferred past POC.
 
 ### 3. Air movement ([#137], completes the walk-death from §2)
@@ -47,14 +48,14 @@ The map's movement arc ([#128](https://github.com/Binoui/SlopArena/issues/128)):
 ## Considered Options
 
 - **Keep Melee's dash as a locomotion tier** — rejected by terminology lock: SA's Dash is a *mechanic*; Run takes the locomotion slot (#136).
-- **Dash-end hard stop vs friction coast** — hard stop rejected: kills the run-out feel and dash-dancing; friction coast sanctioned explicitly (Q1=B) (#136).
+- **Dash-end hard stop vs friction coast** — initially friction coast (Q1=B), then **reversed in v2**: the dash became a wavedash-like burst, so the grounded dash hard-stops and only the aerial dash preserves momentum (#136).
 - **Multiplicative AirDrag vs linear friction** — multiplicative rejected: asymptotic tail never settles; linear friction + dead-zone snap lands cleanly (#137).
 - **Three-phase gravity ramp vs float-window-only** — the audit showed the ramp machinery mostly dead (recovery/post-hit only); Option A: float window for recovery/post-hit, ramp deleted (#137).
 - **Full Melee ledge kit vs hang** — full kit not yet wanted; hang + basic escapes decided now, aggressive getups deferred (#144).
 
 ## Consequences
 
-- **Cleanup**: remove `WalkSpeed`, `SprintThresholdTicks`, `IsSprinting`; add `ActionState.Run`. `TurnaroundTicks` + `DashDurationTicks` stay.
+- **Cleanup**: remove `WalkSpeed`, `SprintThresholdTicks`, `IsSprinting`; add `ActionState.Run`. `TurnaroundTicks` is repurposed as `RushTicks` (same wire slot); `DashDurationTicks` stays.
 - **All §3 fields are MovementStats** — zero wire change (per-character static data).
 - **`LedgeHang` = new ActionState value** — the state byte already exists on the wire (**0B netcode**); the rollback classifier marks it **Complex** (like AirDodging — never rebuilt from snapshots); invincibility is a server-side off-wire timer; landing-lag exclusion.
 - **`TryLedgeSnap` → grab path** (state set, KV cleared, VY=0) replacing the pop, **+ occupancy check** (§4).

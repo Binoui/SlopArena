@@ -171,7 +171,7 @@ namespace SlopArena.Shared
 
         /// <summary>
         /// Warp active flag. > 0 = currently warping toward target.
-        /// Velocity is set to SprintSpeed (constant) in ProcessWarp.
+        /// Velocity is set to RunSpeed (constant) in ProcessWarp.
         /// Set to 0 by ProcessWarp on arrival (within AttackRange).
         /// </summary>
         public float WarpTargetX;
@@ -179,14 +179,18 @@ namespace SlopArena.Shared
         public float WarpSpeed;
         public float WarpAttackRange;  // stop warping when this close
         /// <summary>
-        /// ── Sprint / Dash-dance ──
+        /// ── Rush / ledge ──
         /// </summary>
-        public ushort DirHoldTicks;      // ticks holding same direction
-        public bool IsSprinting;
         /// <summary>
-        /// turnaround lag remaining
+        /// Rush window remaining ticks (ADR-0020): counts down while the fighter moves
+        /// from a standstill. A reversal within the window is an instant Rush flip that
+        /// restarts it; zero means Run proper (a reversal becomes a Turnaround).
         /// </summary>
-        public ushort TurnaroundTicks;
+        public ushort RushTicks;
+        /// <summary>Re-grab lockout after a voluntary ledge drop (off-wire, sim-internal).
+        /// Prevents an immediate re-grab so the S-drop escape actually falls. Snapped wire
+        /// corrections never overwrite it; it self-expires and only delays a re-grab.</summary>
+        public ushort LedgeRegrabLockTicks;
 
         /// <summary>
         /// ── Last input direction (for tech roll, air dodge fallback) ──

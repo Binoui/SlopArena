@@ -54,23 +54,23 @@ public class DashTests
         Assert.Equal(ActionState.Idle, ended.State);
         Assert.Equal((ushort)0, ended.DashDurationTicks);
 
-        // Velocity should be zeroed
+        // Grounded dash hard-stops on expiry (wavedash) — velocity is zeroed.
         float residual = System.MathF.Sqrt(ended.VX * ended.VX + ended.VZ * ended.VZ);
-        Assert.True(residual < 1f,
-            $"Expected velocity near 0 after dash end, got {residual:F3}");
+        Assert.True(residual < 0.001f,
+            $"Expected hard stop after grounded dash end, got {residual:F3}");
     }
 
     [Fact]
     public void Dash_UsesCharacterDefDuration()
     {
-        // FightGuy has DashDurationTicks = 18 vs Manki's 15
+        // FightGuy has DashDurationTicks = 10 vs Manki's 15
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(dash: true, moveY: 1f), 1);
-        Assert.Equal((ushort)18, t0.DashDurationTicks);
+        Assert.Equal((ushort)10, t0.DashDurationTicks);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class DashTests
         // Try to dash again while cooldown still active
         var afterTry = TestHelpers.TickN(sim, TestHelpers.Input(dash: true, moveY: 1f), 1);
         Assert.NotEqual(ActionState.Dashing, afterTry.State);
-        Assert.Equal(ActionState.Idle, afterTry.State);
+        Assert.Equal(ActionState.Run, afterTry.State);
     }
 
     [Fact]
@@ -199,9 +199,9 @@ public class DashTests
         var ended = sim.GetState(1);
         Assert.Equal(ActionState.Idle, ended.State);
 
-        // Should be able to walk after dash ends
-        var walking = TestHelpers.TickN(sim, TestHelpers.Input(moveY: 1f), 5);
-        Assert.Equal(ActionState.Idle, walking.State);
+        // Should be able to run after dash ends (the dash coasts into Run)
+        var walking = TestHelpers.TickHold(sim, TestHelpers.Input(moveY: 1f), 5);
+        Assert.Equal(ActionState.Run, walking.State);
         Assert.True(System.MathF.Abs(walking.VZ) > 0.1f,
             "Character should be able to move after dash completes");
     }
@@ -243,10 +243,50 @@ public class DashTests
         Assert.Equal((ushort)0, s.DashDurationTicks);
         Assert.Equal((ushort)0, s.InvincibilityTicks);
 
-        // Velocity must be near zero after all this time
+        // Grounded dash hard-stops (wavedash) — velocity zeroed, no coast.
         float hSpeed = System.MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
-        Assert.True(hSpeed < 1f,
-            $"Velocity should be near 0 after dash + friction, got {hSpeed:F3}");
+        Assert.True(hSpeed < 0.001f,
+            $"Grounded dash should hard-stop after it ends, got {hSpeed:F3}");
+    }
+
+    [Fact]
+    public void Dash_IframesExpireBeforeDashEnds()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = TestHelpers.GroundPY(FightGuyDef);
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
+
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(dash: true, moveY: 1f), 1);
+        Assert.True(t0.InvincibilityTicks > 0, "dash should open with i-frames");
+
+        // i-frames (4 ticks) close before the dash (10 ticks) ends: the tail is vulnerable,
+        // so dodging through an attack is timing-tight (ADR-0020 v2).
+        for (int i = 0; i < 20 && sim.GetState(1).InvincibilityTicks > 0; i++)
+            TestHelpers.TickDefault(sim, 1);
+        var s = sim.GetState(1);
+        Assert.Equal((ushort)0, s.InvincibilityTicks);
+        Assert.Equal(ActionState.Dashing, s.State);
+    }
+
+    [Fact]
+    public void AerialDash_PreservesMomentum()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(50f, 50f);
+        state.PY = 5f;
+        state.IsGrounded = false;
+        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(dash: true, moveX: 1f) } });
+
+        // Tick past the dash duration — still airborne, horizontal momentum preserved
+        // (no hard stop in the air; the dash remains an approach tool).
+        for (int i = 0; i < 12; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { { 1, default(InputState) } });
+        var s = sim.GetState(1);
+        Assert.False(s.IsGrounded, "should still be airborne");
+        Assert.True(s.VX > 0.5f, $"aerial dash should preserve momentum, got VX={s.VX:F3}");
     }
 
     [Fact]
@@ -277,7 +317,7 @@ public class DashTests
         state.VZ = 0.006f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.MankiDef, state);
 
-        // One tick with no input → air drag applies, dead zone snaps to zero
+        // One tick with no input → linear air friction applies, dead zone snaps to zero
         TestHelpers.TickDefault(sim, 1);
         var after = sim.GetState(1);
         Assert.Equal(0f, after.VX);
@@ -287,8 +327,8 @@ public class DashTests
     [Fact]
     public void VelocityDeadZone_AboveThreshold_DoesNotSnap()
     {
-        // Ground friction is proportional (asymptotic), so velocity above threshold
-        // should never snap to zero — the dead zone only catches subthreshold residuals.
+        // Ground friction (release brake) decays a fixed m/s² per tick, so an above-threshold
+        // velocity decays toward zero and reaches it exactly (no asymptotic tail, no instant snap).
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
@@ -296,32 +336,18 @@ public class DashTests
         state.VZ = 1.0f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.MankiDef, state);
 
-        // Tick with no input → ground friction reduces but doesn't snap
-        for (int i = 0; i < 60; i++)
+        // One tick of friction has not yet zeroed it.
+        TestHelpers.TickDefault(sim, 1);
+        var mid = sim.GetState(1);
+        Assert.True(mid.VX > 0f && mid.VZ > 0f,
+            $"Velocity should still be positive after 1 tick of friction, got VX={mid.VX} VZ={mid.VZ}");
+
+        // After enough ticks, linear friction drives it to exactly zero.
+        for (int i = 0; i < 57; i++)
             TestHelpers.TickDefault(sim, 1);
 
         var after = sim.GetState(1);
-        // After 60 ticks of proportional friction (V *= 0.767^60 ≈ 2e-7), velocity
-        // should be well below 0.015 and snapped to exactly 0 by the dead zone.
-        // But with VX=1.0, after ~30 ticks it should still be above 0.015.
-        // After 60 ticks, it's well below and snapped.
         Assert.Equal(0f, after.VX);
         Assert.Equal(0f, after.VZ);
-
-        // Verify the dead zone is the reason: with the same starting velocity,
-        // after a partial number of ticks it should still be positive.
-        var sim2 = TestHelpers.MakeSim();
-        var state2 = TestHelpers.PlayerState();
-        state2.PY = TestHelpers.MankiGroundPY;
-        state2.VX = 1.0f;
-        state2.VZ = 1.0f;
-        TestHelpers.RegisterPlayer(sim2, TestHelpers.MankiDef, state2);
-
-        for (int i = 0; i < 10; i++)
-            TestHelpers.TickDefault(sim2, 1);
-
-        var mid = sim2.GetState(1);
-        Assert.True(mid.VX > 0f && mid.VZ > 0f,
-            $"Velocity should still be positive after 10 ticks of friction, got VX={mid.VX} VZ={mid.VZ}");
     }
  }

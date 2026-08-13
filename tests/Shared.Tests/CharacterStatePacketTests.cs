@@ -44,9 +44,7 @@ public class CharacterStatePacketTests
             AirDodgesLeft = 1,
             JumpsLeft = 2,
             InvincibilityTicks = 15,
-            TurnaroundTicks = 4,
-            DirHoldTicks = 11,
-            IsSprinting = true,
+            RushTicks = 4,
             LastDirX = 1f,
             LastDirZ = 0f,
             WasAirborneDuringKnockback = true,
@@ -98,9 +96,7 @@ public class CharacterStatePacketTests
         Assert.Equal(original.AirDodgesLeft, restored.AirDodgesLeft);
         Assert.Equal(original.JumpsLeft, restored.JumpsLeft);
         Assert.Equal(original.InvincibilityTicks, restored.InvincibilityTicks);
-        Assert.Equal(original.TurnaroundTicks, restored.TurnaroundTicks);
-        Assert.Equal(original.DirHoldTicks, restored.DirHoldTicks);
-        Assert.Equal(original.IsSprinting, restored.IsSprinting);
+        Assert.Equal(original.RushTicks, restored.RushTicks);
         Assert.Equal(original.LastDirX, restored.LastDirX);
         Assert.Equal(original.LastDirZ, restored.LastDirZ);
         Assert.Equal(original.WasAirborneDuringKnockback, restored.WasAirborneDuringKnockback);
@@ -112,12 +108,12 @@ public class CharacterStatePacketTests
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 63 bytes base (locked pre-rollback) + 32 bytes of D10 movement-resource
-        // fields (AirTimeTicks..WasAirborneDuringKnockback) + 2 hitstop (ADR-0012)
+        // 63 bytes base (locked pre-rollback) + 28 bytes of D10 movement-resource fields
+        // (ADR-0011; DirHoldTicks/IsSprinting dropped in ADR-0020, −3) + 2 hitstop (ADR-0012)
         // + 4 burst (ADR-0014) + 10 cooldown slots 6-10 + 1 JumpHeldTicks (ADR-0016)
-        // + 1 LockOn (ADR-0018) = 113.
+        // + 1 LockOn (ADR-0018) = 110.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(113, CharacterStatePacket.Size);
+        Assert.Equal(110, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

@@ -460,7 +460,40 @@ namespace SlopArena.Shared
 			// The lag is a hard no-input window: a press buffered mid-air must not fire
 			// through it (Simulation also refuses to buffer new presses while it is live).
 			state.BufferedSlot = 0;
-		}
+        }
+
+        /// <summary>Occupancy-aware ledge grab (ADR-0020): an off-grid, non-hitstun entity
+        /// within grab range of a ledge enters LedgeHang — unless another entity already
+        /// hangs that ledge (edge sample point within 0.2 m), in which case it falls past.</summary>
+        private void TryLedgeGrab(ulong id, ref CharacterState state, CharacterDefinition def)
+        {
+            if (state.IsGrounded || state.State == ActionState.Hitstun || state.State == ActionState.LedgeHang
+                || state.State == ActionState.JumpSquat || state.State == ActionState.Attacking || state.State == ActionState.Aiming
+                || state.HitstunTicks != 0 || state.VY >= 0f
+                || Simulation.HasKnockback(state) || state.LedgeRegrabLockTicks > 0) return;
+            float capsuleHalf = def.CapsuleHeight * 0.5f;
+            if (!Simulation.FindLedge(state, _arena, capsuleHalf, out float surfaceY, out _, out _, out float edgeX, out float edgeZ)) return;
+
+            foreach (var kvp in _states)
+            {
+                if (kvp.Key == id) continue;
+                var other = kvp.Value;
+                if (other.State != ActionState.LedgeHang) continue;
+                if (!Simulation.FindLedge(other, _arena, _defs[kvp.Key].CapsuleHeight * 0.5f, out _, out _, out _, out float ox, out float oz)) continue;
+                float dxx = ox - edgeX, dzz = oz - edgeZ;
+                if (dxx * dxx + dzz * dzz < 0.2f * 0.2f) return;   // occupied — fall past
+            }
+
+            // Grab
+            state.State = ActionState.LedgeHang;
+            state.IsGrounded = false;
+            state.VX = state.VY = state.VZ = 0f;
+            state.KVX = state.KVY = state.KVZ = 0f;
+            state.InvincibilityTicks = Simulation.LedgeGrabInvincibilityTicks;
+            state.JumpsLeft = def.Movement.MaxJumps;
+            state.AirTimeTicks = 0;
+            state.PY = surfaceY + capsuleHalf;
+        }
 
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
@@ -486,7 +519,7 @@ namespace SlopArena.Shared
 				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
 					|| state.LandingLagTicks > 0
 					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
-				if (state.State != ActionState.Idle && state.State != ActionState.Attacking) continue;
+				if (state.State != ActionState.Idle && state.State != ActionState.Attacking && state.State != ActionState.Run) continue;
 
 				bool airborne = !state.IsGrounded;
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
@@ -512,7 +545,7 @@ namespace SlopArena.Shared
 				}
 
 				// ── Warp check: sprint to target if between WarpRange and AttackRange ──
-				if (state.State == ActionState.Idle && spec.Stages != null && spec.Stages.Length > 0)
+				if ((state.State == ActionState.Idle || state.State == ActionState.Run) && spec.Stages != null && spec.Stages.Length > 0)
 				{
 					var firstStage = spec.Stages[0];
 					if (firstStage.WarpRange > 0f)
@@ -638,7 +671,8 @@ namespace SlopArena.Shared
 				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				bool wasGrounded = state.IsGrounded;
-				Simulation.SimulateTick(ref state, def, input, _arena);
+                Simulation.SimulateTick(ref state, def, input, _arena);
+                TryLedgeGrab(id, ref state, def);
 				// Landing lag (issue #125): land mid-aerial → lock, unless the landing frame
 				// falls in an auto-cancel window. Server-only — the lock is authority-enforced.
 				ApplyLandingLag(ref state, def, wasGrounded);

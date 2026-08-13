@@ -30,7 +30,7 @@ public class AirDashAnalysisTests
         var sb = new StringBuilder();
         sb.AppendLine($"Air dash frame-by-frame (Manki, holding forward)");
         sb.AppendLine($"Pre-dash: airborne 3m, VY=-2, AirTimeTicks=10");
-        sb.AppendLine($"FloatWindowTicks={Def.Movement.FloatWindowTicks}, FallRampDuration={Def.Movement.FallRampDuration}");
+        sb.AppendLine($"FloatWindowTicks={Def.Movement.FloatWindowTicks}");
         sb.AppendLine($"AirFloatGravity={Def.Movement.AirFloatGravity}, Gravity={Def.Movement.Gravity}");
         sb.AppendLine($"DashDurationTicks={Def.Movement.DashDurationTicks}, DashSpeed={Def.Movement.DashSpeed}");
         sb.AppendLine($"");

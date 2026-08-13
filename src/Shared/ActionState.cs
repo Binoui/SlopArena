@@ -11,6 +11,8 @@ namespace SlopArena.Shared
         JumpSquat = 6,
         Warping = 7,
         /// <summary>Hold-to-aim phase (Kistu E): ability active, movement unlocked, jump/dash blocked.</summary>
-        Aiming = 8
+        Aiming = 8,
+        Run = 9,
+        LedgeHang = 10
     }
 }
