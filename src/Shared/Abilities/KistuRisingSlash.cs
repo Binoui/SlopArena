@@ -82,7 +82,8 @@ public sealed class KistuRisingSlash : ServerAbility
 
     /// <summary>Refund the spent charge on a connect so a landed juggle keeps its charges.</summary>
     public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
-        CharacterDefinition attackerDef, ref float damage, ref float knockbackForce)
+        CharacterDefinition attackerDef, CharacterDefinition targetDef,
+        ref float damage, ref float knockbackForce)
     {
         if (attacker.ChargeStockSpent > 0)
         {

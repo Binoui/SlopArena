@@ -95,7 +95,8 @@ public sealed class NilusNetherGrasp : ServerAbility
     /// class remarks for why a VX/VZ write here cannot work.
     /// </summary>
     public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
-        CharacterDefinition attackerDef, ref float damage, ref float knockbackForce)
+        CharacterDefinition attackerDef, CharacterDefinition targetDef,
+        ref float damage, ref float knockbackForce)
     {
         float dx = attacker.PX - target.PX;
         float dz = attacker.PZ - target.PZ;
@@ -110,6 +111,6 @@ public sealed class NilusNetherGrasp : ServerAbility
         // A grab that reaches further the more damage the victim has taken would drag them
         // clean past Nilus at high percent.
         Simulation.ApplyKnockback(ref target, dx / dist, dz / dist,
-            (sbyte)angle, force, 0f, (ushort)stun);
+            (sbyte)angle, force, 0f, damage, (ushort)stun, targetDef.Weight);
     }
 }

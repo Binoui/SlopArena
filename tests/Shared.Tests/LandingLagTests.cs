@@ -336,7 +336,7 @@ public class LandingLagTests : KitScenarioTests
     public void Hitstun_ClearsLandingLag()
     {
         var s = TestHelpers.PlayerState() with { LandingLagTicks = 18 };
-        Simulation.ApplyKnockback(ref s, 1f, 0f, 45, 10f, 5f, 20);
+        Simulation.ApplyKnockback(ref s, 1f, 0f, 45, 10f, 5f, 0f, 20, 100f);
         Assert.Equal((ushort)0, s.LandingLagTicks);
         Assert.Equal(ActionState.Hitstun, s.State);
     }

@@ -92,7 +92,7 @@ public class HitstopTests
         var atLaunch = sim.GetState(100);
         Assert.Equal((ushort)0, atLaunch.HitstopTicks);
         Assert.Equal(ActionState.Hitstun, atLaunch.State);
-        Assert.Equal((ushort)20, atLaunch.HitstunTicks);   // forced StunTicks override
+        Assert.Equal((ushort)1, atLaunch.HitstunTicks);   // ADR-0019 derives stun from applied knockback
         float kbMag = MathF.Sqrt(atLaunch.KVX * atLaunch.KVX
                                  + atLaunch.KVY * atLaunch.KVY
                                  + atLaunch.KVZ * atLaunch.KVZ);

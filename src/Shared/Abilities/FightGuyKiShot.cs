@@ -76,7 +76,7 @@ namespace SlopArena.Shared.Abilities
         /// Ignores self-hit (no self-mark).
         /// </summary>
         public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
-            CharacterDefinition attackerDef,
+            CharacterDefinition attackerDef, CharacterDefinition targetDef,
             ref float damage, ref float knockbackForce)
         {
             // Skip self-mark

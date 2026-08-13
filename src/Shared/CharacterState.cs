@@ -122,10 +122,15 @@ namespace SlopArena.Shared
         /// <summary>Queued launch payload, set at hit connect (ResolveHits), applied at freeze expiry (SimulateTick gate). Server + local-sim only — NOT on the wire.</summary>
         public float QueuedKBDirX, QueuedKBDirZ;
         public sbyte QueuedKBAngle;
-        public float QueuedKBBase, QueuedKBGrowth;
+        public float QueuedKBBase, QueuedKBGrowth, QueuedKBDamage;
+        public float QueuedKBForce;
         public ushort QueuedKBStun;
-        /// <summary>True when the hit's OnHitEntity rewrote the launch at connect (e.g. NilusNetherGrasp's yank — the hitbox itself carries zero KB). The freeze-expiry gate then restores the QueuedKVX/Y/Z snapshot instead of recomputing from the raw params. Server + local-sim only — NOT on the wire.</summary>
+        /// <summary>True when the hit's OnHitEntity supplied a complete direct launch force.</summary>
+        public bool QueuedKBResolvedForce;
+        /// <summary>True when the hit's OnHitEntity rewrote the launch velocity directly.</summary>
         public bool QueuedKVOverride;
+        /// <summary>True when the resolved hit intentionally has zero launch magnitude.</summary>
+        public bool QueuedKBZero;
         /// <summary>Final knockback velocity snapshot taken after OnHitEntity (see QueuedKVOverride).</summary>
         public float QueuedKVX, QueuedKVY, QueuedKVZ;
         /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard. Set at hit time.</summary>
@@ -134,10 +139,8 @@ namespace SlopArena.Shared
         /// accumulated DI input during hitstun
         /// </summary>
         public float DIX, DIY;
-        /// <summary>Original launch magnitude (base + growth·(damage%·0.01)) of the current hitstun,
-        /// captured at launch application, consumed by Combo Influence at hitstun expiry.
-        /// 0 when no hitstun is live. Server + local-sim only — NOT on the wire (like the Queued fields).</summary>
-        public float LaunchMagnitude;
+        /// <summary>Server/local-only marker for the one-shot hitstop SDI.</summary>
+        public bool SdiApplied;
 
         /// <summary>
         /// ── Burst (ADR-0014) ──

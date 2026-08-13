@@ -187,7 +187,8 @@ namespace SlopArena.Shared.Abilities
         }
 
         public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
-            CharacterDefinition attackerDef, ref float damage, ref float knockbackForce)
+            CharacterDefinition attackerDef, CharacterDefinition targetDef,
+            ref float damage, ref float knockbackForce)
         {
             if (_phase != GrapplePhase.Firing) return;
             if (target.EntityId == attacker.EntityId) return;

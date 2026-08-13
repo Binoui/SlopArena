@@ -102,15 +102,16 @@ public class KnockbackPhysicsDataTests
         _output.WriteLine(sb.ToString());
         _output.WriteLine($"CSV written to {csvPath}");
 
-        // Sanity invariants — pin the formulas the harness measures.
+        // ADR-0019 invariant: launch magnitude includes accumulated damage,
+        // hit damage, and target weight.
         foreach (var f in rows)
         {
             Assert.True(f.Landed, $"{f.Profile}@{f.Percent}% never settled (flew off the 200x200 heightmap?)");
 
-            float expectedMag = f.Base + f.Growth * (f.Percent * 0.01f);
+            float expectedMag = (f.Base + f.Growth * (f.Percent * 0.01f + 1f)) * 200f / (Def.Weight + 100f);
             TestHelpers.AssertNear(expectedMag, f.LaunchSpeed, 0.01f);
 
-            int expectedHitstun = Math.Clamp(8 + (int)(f.LaunchSpeed * 0.5f), 8, 60);
+            int expectedHitstun = Math.Clamp((int)(f.LaunchSpeed * 0.5f), 1, ushort.MaxValue);
             Assert.Equal(expectedHitstun, f.HitstunTicks);
 
             Assert.True(f.TotalDistance >= f.DistanceAtHitstunEnd - 0.01f,
@@ -123,7 +124,7 @@ public class KnockbackPhysicsDataTests
         var s = TestHelpers.PlayerState(x: 50f, z: 50f);
         s.PY = GroundPy;
         s.DamagePercent = (ushort)pct;
-        Simulation.ApplyKnockback(ref s, 1f, 0f, angle, baseKB, growthKB, 60);
+        Simulation.ApplyKnockback(ref s, 1f, 0f, angle, baseKB, growthKB, 0f, 60, 100f);
 
         var arena = TestHelpers.TestArena();
         for (int t = 0; t < 120 && !(s.IsGrounded && s.VX == 0f && s.VZ == 0f && s.VY == 0f); t++)
@@ -145,7 +146,7 @@ public class KnockbackPhysicsDataTests
         s.DamagePercent = (ushort)pct;
 
         // dirX=1, dirZ=0 → pure +X launch.
-        Simulation.ApplyKnockback(ref s, 1f, 0f, angle, baseKB, growthKB, /*stunTicks*/ 60);
+        Simulation.ApplyKnockback(ref s, 1f, 0f, angle, baseKB, growthKB, 0f, 60, 100f);
 
         float launchSpeed = MathF.Sqrt((s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
         int hitstunTicks = s.HitstunTicks;

@@ -665,8 +665,10 @@ namespace SlopArena.Shared
 						// Small fixed shove, stun 0 → no hitstun, no punish. Interrupts a mid-attack
 						// attacker via ApplyKnockback's State=Idle → TickAbilities drops their ability
 						// (breaks the string — the point of the escape); they are free to act at once.
-						Simulation.ApplyKnockback(ref attackerState, dx, dz,
-							BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0f, 0);
+                        Simulation.ApplyKnockback(ref attackerState, dx, dz,
+                            BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0f,
+                            0f, 0, _defs[attackerId].Weight);
+
 						_states[attackerId] = attackerState;
 					}
 					burstState.LastAttackerEntityId = 0;
@@ -972,7 +974,7 @@ namespace SlopArena.Shared
 		}
 
 
-		private void ResolveHits(List<SpellResolver.EntityData> entityList)
+        private void ResolveHits(List<SpellResolver.EntityData> entityList, Dictionary<ulong, InputState> inputs)
 		{
 			// ── Step 3: Resolve hitboxes ──
 			var hits = _spellResolver.Tick(entityList);
@@ -993,7 +995,8 @@ namespace SlopArena.Shared
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId
 				    && _activeAbilities.TryGetValue(hit.TargetEntityId, out var defenderAbility))
 				{
-					if (defenderAbility.TryCounter(ref targetState, ref attackerState, hit.Damage))
+                    if (defenderAbility.TryCounter(ref targetState, ref attackerState,
+                        _defs[hit.OwnerEntityId], hit.Damage))
 					{
 						_states[hit.TargetEntityId] = targetState;
 						_states[hit.OwnerEntityId] = attackerState;
@@ -1026,9 +1029,7 @@ namespace SlopArena.Shared
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
-				// Resolve hitstun animation tier from stun duration
-				targetState.HitstunLevel = hit.StunTicks <= 30 ? (byte)0 :
-				    hit.StunTicks <= 50 ? (byte)1 : (byte)2;
+
 
 				// ── Hitstop (ADR-0012): freeze both (melee) or receiver only, defer the launch.
 				// 'Beyond first' = attacker or victim already frozen — covers melee multihits
@@ -1039,42 +1040,88 @@ namespace SlopArena.Shared
 				if (attackerExists && attackerState.AttackSlot > 0
 				    && _defs.TryGetValue(hit.OwnerEntityId, out var hitOwnerDef))
 					hitstopSpec = hitOwnerDef.GetSlotAbility(attackerState.AttackSlot - 1, !attackerState.IsGrounded);
-				ushort freeze = ComputeHitstopTicks(finalDamage, beyondFirst, hitstopSpec);
-				float kvBeforeOnHitX = targetState.KVX;
-				float kvBeforeOnHitY = targetState.KVY;
-				float kvBeforeOnHitZ = targetState.KVZ;
+                ushort freeze = 0;
+                float kvBeforeOnHitX = targetState.KVX;
+                float kvBeforeOnHitY = targetState.KVY;
+                float kvBeforeOnHitZ = targetState.KVZ;
+                float kbForce = hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
+                bool hookSuppliedForce = false;
+                bool hookZeroForce = false;
+                if (attackerExists
+                    && _activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
+                    && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
+                {
+                    attackerAbility.OnHitEntity(ref attackerState, ref targetState,
+                        attackerDef, _defs[hit.TargetEntityId], ref finalDamage, ref kbForce);
+                    hookSuppliedForce = kbForce != hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
+                    hookZeroForce = hookSuppliedForce && kbForce <= 0f;
+                }
+                float launchBase = hookSuppliedForce ? 0f : hit.BaseKnockback;
+                float launchGrowth = hookSuppliedForce ? 0f : hit.KnockbackGrowth;
+                freeze = ComputeHitstopTicks(finalDamage, beyondFirst, hitstopSpec);
 				if (freeze > 0)
 				{
 					targetState.HitstopTicks = freeze;
-					targetState.QueuedKBDirX = dirX; targetState.QueuedKBDirZ = dirZ;
-					targetState.QueuedKBAngle = hit.KnockbackAngle;
-					targetState.QueuedKBBase = hit.BaseKnockback;
-					targetState.QueuedKBGrowth = hit.KnockbackGrowth;
-					targetState.QueuedKBStun = hit.StunTicks;
-					// Only the LAST hit's queue applies at expiry — reset any previous
-					// hit's override snapshot on this victim.
-					targetState.QueuedKVOverride = false;
-					targetState.QueuedKVX = 0f; targetState.QueuedKVY = 0f; targetState.QueuedKVZ = 0f;
-					if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
-						attackerState.HitstopTicks = freeze; // overwrite, not max: each hit pops fresh (discounted)
-				}
-				else
-				{
-					// Tuner zeroed the freeze for this ability — launch immediately (pre-hitstop behavior).
-					Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
-					    hit.KnockbackAngle, hit.BaseKnockback, hit.KnockbackGrowth, hit.StunTicks);
-					targetState.HitstunTicks = hit.StunTicks;
-				}
+                    targetState.QueuedKBDirX = dirX; targetState.QueuedKBDirZ = dirZ;
+                    targetState.QueuedKBAngle = hit.KnockbackAngle;
+                    targetState.QueuedKBBase = launchBase;
+                    targetState.QueuedKBGrowth = launchGrowth;
+                    targetState.QueuedKBForce = kbForce;
+                    targetState.QueuedKBResolvedForce = hookSuppliedForce;
+                    targetState.QueuedKBZero = hookZeroForce;
+                    targetState.QueuedKBDamage = finalDamage;
+                    targetState.QueuedKBStun = hit.StunTicks;
 
-				// Let the attacker's active ability apply hit effects (e.g., FightGuy R mark consumption)
-				if (attackerExists
-				    && _activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
-				    && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
-				{
-					float kbForce = hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
-					attackerAbility.OnHitEntity(ref attackerState, ref targetState, attackerDef, ref finalDamage, ref kbForce);
-				}
+                    // Only the LAST hit's queue applies at expiry — reset any previous
+                    // hit's override snapshot on this victim.
+                    targetState.QueuedKVOverride = false;
+                    targetState.QueuedKVX = 0f; targetState.QueuedKVY = 0f; targetState.QueuedKVZ = 0f;
+                    if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+                        attackerState.HitstopTicks = freeze;
+                }
+                else
+                {
+                    // Tuner zeroed the freeze for this ability — launch immediately.
+                    bool hookAppliedLaunch = targetState.KVX != kvBeforeOnHitX
+                        || targetState.KVY != kvBeforeOnHitY
+                        || targetState.KVZ != kvBeforeOnHitZ;
+                    if (hookAppliedLaunch)
+                    {
+                    }
+                    else if (hookSuppliedForce)
+                    {
+                        Simulation.ApplyKnockbackForce(ref targetState, dirX, dirZ,
+                            hit.KnockbackAngle, kbForce, hit.StunTicks);
+                    }
+                    else if (hookZeroForce)
+                    {
+                        targetState.KVX = targetState.KVY = targetState.KVZ = 0f;
+                        targetState.HitstunTicks = 0;
+                        targetState.HitstunLevel = 0;
+                        targetState.State = ActionState.Idle;
+                    }
+                    else
+                    {
+                        Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
+                            hit.KnockbackAngle, launchBase, launchGrowth,
+                            finalDamage, hit.StunTicks, _defs[hit.TargetEntityId].Weight);
+                    }
+                    if (inputs.TryGetValue(hit.TargetEntityId, out var targetInput)
+                        && (targetInput.MoveX != 0f || targetInput.MoveY != 0f))
+                    {
+                        targetState.DIX = targetInput.MoveX;
+                        targetState.DIY = targetInput.MoveY;
+                        Simulation.ApplySdi(ref targetState, targetState.DIX, targetState.DIY);
+                        Simulation.ApplyDirectionalInfluence(ref targetState);
+                        targetState.DIX = targetState.DIY = 0f;
+                    }
+                }
 
+
+
+				// Write the attacker's state back even when the owner has no active ability
+				// (e.g. a projectile hitting after its ability ended) — the freeze must land.
+				if (attackerExists) _states[hit.OwnerEntityId] = attackerState;
 				// If the hit's OnHitEntity rewrote the launch at connect (NetherGrasp's yank —
 				// the hitbox carries zero KB, the yank is applied here), snapshot the final
 				// launch state so the freeze-expiry gate restores it exactly instead of
@@ -1090,10 +1137,6 @@ namespace SlopArena.Shared
 					targetState.QueuedKVZ = targetState.KVZ;
 					targetState.QueuedKBStun = targetState.HitstunTicks;
 				}
-
-				// Write the attacker's state back even when the owner has no active ability
-				// (e.g. a projectile hitting after its ability ended) — the freeze must land.
-				if (attackerExists) _states[hit.OwnerEntityId] = attackerState;
 				_states[hit.TargetEntityId] = targetState;
 			}
 		}
@@ -1251,7 +1294,7 @@ namespace SlopArena.Shared
 
 			var entityList = BuildHurtboxList();
 
-			ResolveHits(entityList);
+            ResolveHits(entityList, inputs);
 
 			ProcessProjectileExplosions();
 

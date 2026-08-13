@@ -40,14 +40,15 @@ namespace SlopArena.Shared
 
     public class CharacterDefinition
     {
-        
-
         public CharacterClass Class;
         public string DisplayName = "";
         public MovementStats Movement;
+        /// <summary>Static mass used by the ADR-0019 knockback formula.</summary>
+        public float Weight = 100f;
 
         public float CapsuleRadius;
         public float CapsuleHeight;
+
 
         /// <summary>
         /// Y distance from character feet (ground contact) to Hips bone, in meters.

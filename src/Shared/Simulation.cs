@@ -172,6 +172,11 @@ namespace SlopArena.Shared
             {
                 if (input.MoveX != 0f || input.MoveY != 0f)
                 {
+                    if (!s.SdiApplied)
+                    {
+                        ApplySdi(ref s, input.MoveX, input.MoveY);
+                        s.SdiApplied = true;
+                    }
                     s.DIX = input.MoveX;
                     s.DIY = input.MoveY;
                 }
@@ -189,14 +194,16 @@ namespace SlopArena.Shared
                         s.KVX = s.QueuedKVX; s.KVY = s.QueuedKVY; s.KVZ = s.QueuedKVZ;
                         float kvMag = MathF.Sqrt(
                             (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
-                        s.LaunchMagnitude = kvMag;
-                        if (s.QueuedKBStun > 0 && kvMag > 0.5f)
+                        if (s.QueuedKBStun > 0 && kvMag > 0f)
                         {
-                            s.HitstunTicks = s.QueuedKBStun;
+                            s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * kvMag), 1, ushort.MaxValue);
+                            s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 :
+                                s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
                             s.State = ActionState.Hitstun;
                         }
                         else
                         {
+                            s.HitstunTicks = 0;
                             s.State = ActionState.Idle;
                         }
                         if (s.KVY > 0f) s.IsGrounded = false;
@@ -205,27 +212,29 @@ namespace SlopArena.Shared
                         s.StateTicks = 0;
                         s.WasAirborneDuringKnockback = !s.IsGrounded;
                     }
-                    else if (s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f)
+                    else if (s.QueuedKBResolvedForce)
                     {
-                        // Standard launch: recompute from the raw hitbox data. DamagePercent
-                        // is unchanged during the freeze (every rehit re-queues), so this
-                        // reproduces the connect-time launch exactly.
-                        ApplyKnockback(ref s, s.QueuedKBDirX, s.QueuedKBDirZ, s.QueuedKBAngle,
-                            s.QueuedKBBase, s.QueuedKBGrowth, s.QueuedKBStun);
-                        s.HitstunTicks = s.QueuedKBStun; // preserve ResolveHits' existing StunTicks override
+                        ApplyKnockbackForce(ref s, s.QueuedKBDirX, s.QueuedKBDirZ,
+                            s.QueuedKBAngle, s.QueuedKBForce, s.QueuedKBStun);
                     }
-                    else if (s.QueuedKBStun > 0)
+                    else if (!s.QueuedKBZero && (s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKBDamage != 0f || s.QueuedKBStun > 0))
                     {
-                        // Zero-KB stun tool (CycloneKick): pre-hitstop behavior — wipe any
-                        // in-flight launch, apply the stun lock, return to Idle.
+                        ApplyKnockback(ref s, s.QueuedKBDirX, s.QueuedKBDirZ, s.QueuedKBAngle,
+                            s.QueuedKBBase, s.QueuedKBGrowth, s.QueuedKBDamage,
+                            s.QueuedKBStun, def.Weight);
+                    }
+                    else
+                    {
                         s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
-                        s.HitstunTicks = s.QueuedKBStun;
+                        s.HitstunTicks = 0;
                         s.State = ActionState.Idle;
                     }
-                    s.QueuedKVOverride = false;
+                    ApplyDirectionalInfluence(ref s);
+                    s.SdiApplied = false;
+                    s.QueuedKBZero = false;
                     s.QueuedKVX = 0f; s.QueuedKVY = 0f; s.QueuedKVZ = 0f;
                     s.QueuedKBDirX = 0f; s.QueuedKBDirZ = 0f; s.QueuedKBAngle = 0;
-                    s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBStun = 0;
+                    s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBDamage = 0f; s.QueuedKBForce = 0f; s.QueuedKBResolvedForce = false; s.QueuedKBStun = 0;
                 }
                 return;
             }
@@ -499,7 +508,8 @@ namespace SlopArena.Shared
                         s.IsGrounded = false;
                     }
                 }
-                else if (s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance)
+                else if (s.PY <= groundY + PlatformLandTolerance
+                    && (s.PY >= groundY - PlatformSnapTolerance || s.PY < groundY))
                 {
                     s.IsGrounded = true;
                     s.VY = 0f;
@@ -608,61 +618,74 @@ namespace SlopArena.Shared
         /// </summary>
         private static void ProcessHitstun(ref CharacterState s, InputState input)
         {
-            // Exponential (frontloaded) decay: the launch is fastest right after the
-            // hit, then smoothly loses speed over the lock (DKO-style). Decays all
-            // axes, which also flattens launch arcs.
-            float decay = MathF.Exp(-KnockbackDecayRate * TickDt);
-            s.KVX *= decay;
-            s.KVY *= decay;
-            s.KVZ *= decay;
-
-            // Apply gravity to KVY during hitstun so the target doesn't
-            // coast upward at constant speed for the full duration.
-            // Without this, gravity only starts in ProcessKnockback after
-            // hitstun expires, making upward trajectories feel floaty.
-            // No clamp: downward KB (spikes) should accelerate downward.
-            if (!s.IsGrounded)
-                s.KVY -= KnockbackMinGravity * TickDt;
-
-            // Apply knockback force plus gravity toward velocity
+            // ADR-0019: constant knockback velocity during hitstun.
             s.VX = s.KVX;
             s.VY = s.KVY;
             s.VZ = s.KVZ;
+            s.PX += s.VX * TickDt;
+            s.PY += s.VY * TickDt;
+            s.PZ += s.VZ * TickDt;
+            if (s.VY > 0f) s.IsGrounded = false;
 
-            // Store current input for DI (applied when hitstun expires).
-            // Commit + latest-wins: a nonzero input commits the full vector; neutral
-            // preserves the committed direction; a later nonzero hold overwrites.
+            // Post-hitstop input updates DI only. SDI is exclusively committed
+            // during hitstop and applied at the freeze boundary.
             if (input.MoveX != 0f || input.MoveY != 0f)
             {
                 s.DIX = input.MoveX;
                 s.DIY = input.MoveY;
             }
 
-            // When hitstun ends, apply Combo Influence (ADR-0013): a launch-scaled
-            // additive drift along the committed DI direction, horizontal only.
             if (s.HitstunTicks == 0)
             {
-                const float ComboInfluenceStrength = 0.30f;
-                float launchMag = s.LaunchMagnitude;
-                s.KVX += s.DIX * ComboInfluenceStrength * launchMag;
-                s.KVZ += s.DIY * ComboInfluenceStrength * launchMag;
+                // Hitstun expiry applies ASDI and transitions to actionable state.
+                s.PX += s.DIX * 0.4f;
+                s.PZ += s.DIY * 0.4f;
                 s.DIX = 0f;
                 s.DIY = 0f;
-                s.LaunchMagnitude = 0f; // consumed — never stale into a future hitstun
-
-                // Transfer remaining knockback to main velocity and clear KV.
-                // Without this, HasKnockback() returns true and ProcessKnockback's
-                // early return blocks all movement/action processing for 9+ seconds
-                // while KV exponentially decays toward zero.
+                s.SdiApplied = false;
                 s.VX = s.KVX;
                 s.VY = s.KVY;
                 s.VZ = s.KVZ;
                 s.KVX = 0f;
                 s.KVY = 0f;
                 s.KVZ = 0f;
-
                 s.State = ActionState.Idle;
             }
+        }
+        public static void ApplySdi(ref CharacterState s, float dx, float dz)
+        {
+            s.PX += dx * 0.4f;
+            s.PZ += dz * 0.4f;
+        }
+
+        public static void ApplyDirectionalInfluence(ref CharacterState s)
+        {
+            float mag = MathF.Sqrt(s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ);
+            float inputMag = MathF.Sqrt(s.DIX * s.DIX + s.DIY * s.DIY);
+            if (mag <= 0.0001f || inputMag <= 0.0001f) return;
+            float tx = s.DIX / inputMag;
+            float tz = s.DIY / inputMag;
+            float horizontal = MathF.Sqrt(s.KVX * s.KVX + s.KVZ * s.KVZ);
+            if (horizontal <= 0.0001f)
+            {
+                float elevation = 18f * MathF.PI / 180f;
+                float signY = s.KVY >= 0f ? 1f : -1f;
+                s.KVX = tx * mag * MathF.Sin(elevation);
+                s.KVZ = tz * mag * MathF.Sin(elevation);
+                s.KVY = signY * mag * MathF.Cos(elevation);
+                return;
+            }
+            float hx = s.KVX / horizontal;
+            float hz = s.KVZ / horizontal;
+            float dot = Math.Clamp(hx * tx + hz * tz, -1f, 1f);
+            float angle = MathF.Acos(dot);
+            float turn = MathF.Min(angle, 18f * MathF.PI / 180f * MathF.Sin(angle) * MathF.Sin(angle));
+            float cross = hx * tz - hz * tx;
+            float sign = cross >= 0f ? 1f : -1f;
+            float c = MathF.Cos(turn * sign);
+            float sn = MathF.Sin(turn * sign);
+            s.KVX = (hx * c - hz * sn) * horizontal;
+            s.KVZ = (hx * sn + hz * c) * horizontal;
         }
 
         // ── KNOCKBACK ──
@@ -730,21 +753,23 @@ namespace SlopArena.Shared
 
         private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
         {
-            // Same exponential decay as ProcessHitstun — one continuous frontloaded
-            // curve whether the victim is in hitstun or drifting after it.
-            float decay = MathF.Exp(-KnockbackDecayRate * TickDt);
-            s.KVX *= decay;
-            s.KVY *= decay;
-            s.KVZ *= decay;
+            // ADR-0019 post-hitstun flight: linear horizontal friction only;
+            // knockback vertical velocity is preserved while flight gravity
+            // affects the integrated vertical velocity.
+            float horizontal = MathF.Sqrt(s.KVX * s.KVX + s.KVZ * s.KVZ);
+            float retained = MathF.Max(0f, horizontal - 10f * TickDt);
+            if (horizontal > 0.0001f)
+            {
+                float scale = retained / horizontal;
+                s.KVX *= scale;
+                s.KVZ *= scale;
+            }
 
-            // Apply to main velocity
+            if (!s.IsGrounded)
+                s.KVY -= 8f * TickDt;
             s.VX = s.KVX;
             s.VY = s.KVY;
             s.VZ = s.KVZ;
-
-            // Minimal gravity during knockback
-            if (!s.IsGrounded)
-                s.VY -= KnockbackMinGravity * TickDt;
 
             // Position update
             s.PX += s.VX * TickDt;
@@ -760,7 +785,9 @@ namespace SlopArena.Shared
             if (kbSurfaceY > float.MinValue)
             {
                 float groundY = kbSurfaceY + capsuleHalfKb;
-                s.IsGrounded = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
+                s.IsGrounded = s.KVY <= 0f
+                    && s.PY <= groundY + PlatformLandTolerance
+                    && (wasAirborne || s.PY >= groundY - PlatformSnapTolerance);
             }
             else
             {
@@ -1085,18 +1112,18 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
-        /// Apply knockback using a fixed launch angle + Smash-style magnitude scaling.
-        /// KnockbackUpward/KnockbackY replaced by angleDeg: -90 (straight down) to 90 (straight up).
-        /// Magnitude = baseKB + growthKB * (damage% * 0.01). Angle determines KVX/KVY/KVZ split.
+        /// Apply knockback using the ADR-0019 damage/weight formula.
+        /// Magnitude = (base + growth * (damage% / 100 + 1) + damage * 0.1)
+        /// * 200 / (weight + 100). StunTicks is a zero/nonzero gate only.
         /// </summary>
         public static void ApplyKnockback(ref CharacterState s, float dirX, float dirZ,
-            sbyte angleDeg, float baseKB, float growthKB, ushort stunTicks)
+            sbyte angleDeg, float baseKB, float growthKB, float damage,
+            ushort stunTicks, float weight)
         {
-            // Landing lag ends when the character is hit (issue #125): the lock must not
-            // survive into hitstun and re-lock the victim on its expiry.
             s.LandingLagTicks = 0;
-            float magnitude = baseKB + growthKB * (s.DamagePercent * 0.01f);
-            s.LaunchMagnitude = magnitude;
+            float mass = MathF.Max(0.01f, weight + 100f);
+            float magnitude = (baseKB + growthKB * (s.DamagePercent * 0.01f + 1f)
+                + damage * 0.1f) * 200f / mass;
             float rad = angleDeg * MathF.PI / 180f;
             float cosA = MathF.Cos(rad);
             float sinA = MathF.Sin(rad);
@@ -1104,32 +1131,57 @@ namespace SlopArena.Shared
             s.KVX = dirX * magnitude * cosA;
             s.KVY = magnitude * sinA;
             s.KVZ = dirZ * magnitude * cosA;
-
-            // Launch victim off the ground — prevents ground snap from eating vertical KB
-            // (was: IsGrounded stayed true, ground collision reset PY and VY=0 each tick)
             if (s.KVY > 0f)
                 s.IsGrounded = false;
+
             float kbMagnitude = MathF.Sqrt(
                 (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
-
-            // Hitstun gates on StunTicks from the hitbox data, not arbitrary 3f threshold.
-            // If StunTicks=0, no hitstun (true weak jab). Any positive = hitstun triggers.
-            // kbMagnitude < 0.5f is a safety floor (near-zero KB with hitstun looks glitchy).
-            if (stunTicks > 0 && kbMagnitude > 0.5f)
+            if (stunTicks > 0 && kbMagnitude > 0f)
             {
-                ushort hitstunFromKB = (ushort)Math.Clamp(8 + (int)(kbMagnitude * 0.5f), 8, 60);
-                ushort hitstunFinal = Math.Min(hitstunFromKB, stunTicks);
-                s.HitstunTicks = hitstunFinal;
+                s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * kbMagnitude), 1, ushort.MaxValue);
+                s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 :
+                    s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
                 s.State = ActionState.Hitstun;
             }
             else
             {
+                s.HitstunTicks = 0;
+                s.HitstunLevel = 0;
                 s.State = ActionState.Idle;
             }
 
-            // AirTime resets on any damage/hit, regardless of hitstun
             s.AirTimeTicks = 0;
+            s.DashDurationTicks = 0;
+            s.StateTicks = 0;
+            s.WasAirborneDuringKnockback = !s.IsGrounded;
+        }
 
+        /// <summary>Apply a fully resolved launch force supplied by an ability hook.</summary>
+        public static void ApplyKnockbackForce(ref CharacterState s, float dirX, float dirZ,
+            sbyte angleDeg, float force, ushort stunTicks)
+        {
+            s.LandingLagTicks = 0;
+            float rad = angleDeg * MathF.PI / 180f;
+            float cosA = MathF.Cos(rad);
+            float sinA = MathF.Sin(rad);
+            s.KVX = dirX * force * cosA;
+            s.KVY = force * sinA;
+            s.KVZ = dirZ * force * cosA;
+            if (s.KVY > 0f) s.IsGrounded = false;
+            float magnitude = MathF.Sqrt(s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ);
+            if (stunTicks > 0 && magnitude > 0f)
+            {
+                s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * magnitude), 1, ushort.MaxValue);
+                s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 : s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
+                s.State = ActionState.Hitstun;
+            }
+            else
+            {
+                s.HitstunTicks = 0;
+                s.HitstunLevel = 0;
+                s.State = ActionState.Idle;
+            }
+            s.AirTimeTicks = 0;
             s.DashDurationTicks = 0;
             s.StateTicks = 0;
             s.WasAirborneDuringKnockback = !s.IsGrounded;
@@ -1138,13 +1190,14 @@ namespace SlopArena.Shared
         // ── Burst (ADR-0014) ──
 
         private static bool HasQueuedLaunch(CharacterState s)
-            => s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKVOverride || s.QueuedKBStun > 0;
+            => s.QueuedKBZero || s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKVOverride || s.QueuedKBStun > 0;
 
         private static void DoDefensiveBurst(ref CharacterState s)
         {
             // Cancel the pending launch entirely (hitstop path) + break any lock + full stop.
             s.HitstopTicks = 0;
             s.QueuedKVOverride = false;
+            s.QueuedKBZero = false;
             s.QueuedKVX = s.QueuedKVY = s.QueuedKVZ = 0f;
             s.QueuedKBDirX = s.QueuedKBDirZ = 0f;
             s.QueuedKBAngle = 0;

@@ -61,7 +61,8 @@ public sealed class KistuCounter : ServerAbility
             EndAbility(ref s);
     }
 
-    public override bool TryCounter(ref CharacterState defender, ref CharacterState attacker, float incomingDamage)
+    public override bool TryCounter(ref CharacterState defender, ref CharacterState attacker,
+        CharacterDefinition attackerDef, float incomingDamage)
     {
         if (_countered) return false;
         if (_ticks < _windowStart || _ticks > _windowEnd) return false;
@@ -78,8 +79,8 @@ public sealed class KistuCounter : ServerAbility
 
         attacker.DamagePercent += (ushort)_riposteDamage;
         if (attacker.DamagePercent > 999) attacker.DamagePercent = 999;
-        Simulation.ApplyKnockback(ref attacker, dirX, dirZ, _riposteAngle, _riposteBase, _riposteGrowth, _riposteStun);
-        attacker.HitstunTicks = _riposteStun;
+        Simulation.ApplyKnockback(ref attacker, dirX, dirZ, _riposteAngle,
+            _riposteBase, _riposteGrowth, 0f, _riposteStun, attackerDef.Weight);
 
         return true;
     }

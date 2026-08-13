@@ -1,196 +1,177 @@
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
 
-/// <summary>
-/// ═══════════════════════════════════════════════════════════════════════
-/// COMBO INFLUENCE TESTS (ADR-0013, issue #100)
-/// ═══════════════════════════════════════════════════════════════════════
-///
-/// Verifies launch-scaled vectoring (replaces the flat +3.5 m/s DI):
-///   - A committed held direction adds 0.30 × original launch magnitude
-///     to horizontal velocity, applied once at hitstun expiry.
-///   - Capture is commit + latest-wins: a nonzero input commits the full
-///     vector; releasing to neutral preserves the committed direction;
-///     a later nonzero hold overwrites.
-///   - Vertical (KVY) is untouched — the drift is horizontal-only.
-///
-/// Tick accounting: a zone hitbox spawned pre-tick resolves at the END of
-/// tick 1 (ResolveHits runs after SimulateMovement), freezing the victim
-/// F = 1 + 1.5·damage(4) = 7 ticks, decremented ticks 2..8. The launch
-/// applies at the end of tick 8: KVY = 14·sin45° ≈ 9.899, KVX = KVZ = 0,
-/// LaunchMagnitude = 14. HitstunTicks = 12 — the freeze-expiry gate forces
-/// it to QueuedKBStun (= the hitbox StunTicks, see Simulation.cs line 186),
-/// so the zone's StunTicks must BE 12 for the 12-tick hitstun the scenario
-/// intends (the ADR-0013 design doc's 60 was the pre-override cap).
-/// Hitstun decrements ticks 9..20, so the drift lands at the END of tick
-/// 20 — the first tick whose VX carries the influence (design-doc tick 26
-/// was an off-by-three slip; the doc's own formula KVY 9.899 → 6.91 over
-/// 12 ticks and "post-expiry VX ≈ 4.42" describe tick 20 exactly).
-/// ═══════════════════════════════════════════════════════════════════════
-/// </summary>
+/// <summary>ADR-0019 hit-response contract tests.</summary>
 public class ComboInfluenceTests
 {
-    /// <summary>Freeze = 1 + 1.5·damage(4) = 7 ticks, decremented ticks 2..8.</summary>
-    private const int LaunchTick = 8;
-    /// <summary>Hitstun = 12 ticks (hitbox StunTicks), decremented ticks 9..20.</summary>
-    private const int ExpiryTick = 20;
-    /// <summary>Launch magnitude = base 14 + growth 0·(damage%·0.01) = 14.</summary>
-    private const float LaunchMag = 14f;
-    /// <summary>Drift band: 0.25·launch to 0.35·launch around 0.30·launch = 4.2.</summary>
-    private static readonly (float Lo, float Hi) DriftBand = (0.25f * LaunchMag, 0.35f * LaunchMag);
-
-    /// <summary>
-    /// Zone-launch scenario: NPC at (0, ground, 2.2), zone hitbox spawned pre-tick
-    /// CENTERED on the NPC. The resolver computes direction hitbox→entity center,
-    /// so a centered zone yields direction (0,0) → pure vertical launch — the drift
-    /// axis is deliberately orthogonal to the launch direction (ADR's core property).
-    /// </summary>
-    private static ServerSimulation ZoneScenario()
+    [Fact]
+    public void Knockback_UsesHitDamageAndAccumulatedDamage()
     {
+        var state = TestHelpers.PlayerState();
+        state.DamagePercent = 50;
+        Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 10f, 2f, 12f, 20, 100f);
+
+        // (10 + 2 * (0.5 + 1) + 12 * 0.1) * 200 / (100 + 100) = 14.2
+        Assert.Equal(14.2f, state.KVX, 3);
+        Assert.Equal((ushort)7, state.HitstunTicks);
+    }
+
+    [Fact]
+    public void Knockback_HitstunIsDerivedFromAppliedMagnitude()
+    {
+        var state = TestHelpers.PlayerState();
+        Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 20f, 0f, 0f, 60, 100f);
+
+        Assert.Equal((ushort)10, state.HitstunTicks);
+        Assert.Equal(ActionState.Hitstun, state.State);
+    }
+
+    [Fact]
+    public void Knockback_ZeroStunTicksDoesNotLock()
+    {
+        var state = TestHelpers.PlayerState();
+        Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 20f, 0f, 0f, 0, 100f);
+
+        Assert.Equal((ushort)0, state.HitstunTicks);
+        Assert.Equal(ActionState.Idle, state.State);
+    }
+
+    [Fact]
+    public void Knockback_ZeroMagnitudeWithStunMetadata_StaysIdle()
+    {
+        var state = TestHelpers.PlayerState();
+        Simulation.ApplyKnockback(ref state, 1f, 0f, 20, 0f, 0f, 0f, 20, 100f);
+
+        Assert.Equal(0f, state.KVX);
+        Assert.Equal(0f, state.KVY);
+        Assert.Equal(0f, state.KVZ);
+        Assert.Equal((ushort)0, state.HitstunTicks);
+        Assert.Equal(ActionState.Idle, state.State);
+    }
+
+    [Fact]
+    public void QueuedResolvedForce_ZeroStunStillAppliesLaunch()
+    {
+        var state = TestHelpers.PlayerState();
+        state.HitstopTicks = 1;
+        state.QueuedKBResolvedForce = true;
+        state.QueuedKBForce = 12f;
+        state.QueuedKBDirX = 1f;
+        state.QueuedKBAngle = 30;
+        state.QueuedKBStun = 0;
+
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var def = TestHelpers.CombatDef;
-        var npc = TestHelpers.NpcState(0f, 2.2f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(100, def, npc);
-        sim.Resolver.Spawn(new Hitbox
-        {
-            X = 0f, Y = TestHelpers.CombatGroundPY, Z = 2.2f,
-            Radius = 1.2f, Damage = 4f, DurationTicks = 1,
-            OwnerId = 0, KnockbackAngle = 45, BaseKnockback = LaunchMag,
-            KnockbackGrowth = 0f, StunTicks = 12,
-        });
-        return sim;
-    }
-
-    [Fact]
-    public void HeldDirection_AddsAboutThirtyPercentOfLaunch()
-    {
-        var simA = ZoneScenario();
-        var simB = ZoneScenario();
-        // Tick 1: the zone resolves at the END of this tick — freeze queued, no input yet
-        // (holding on tick 1 would add a pre-hit walk tick to the physics).
-        simA.Tick(new() { { 100, default } });
-        simB.Tick(new() { { 100, default } });
-
-        var held = TestHelpers.Input(moveX: 1f);
-        // Freeze ticks 2..11: commit the direction inside the decision window.
-        for (int t = 2; t <= LaunchTick; t++)
-        {
-            simA.Tick(new() { { 100, held } });
-            simB.Tick(new() { { 100, default } });
-        }
-
-        // Precondition: launch applied at end of tick 11 with the raw magnitude captured.
-        var atLaunch = simA.GetState(100);
-        Assert.Equal(LaunchMag, atLaunch.LaunchMagnitude);
-        Assert.Equal(0f, atLaunch.KVX);                       // centered zone → pure vertical
-        Assert.Equal((ushort)12, atLaunch.HitstunTicks);
-
-        // Hitstun ticks 12..23: keep holding; drift lands at end of tick 23.
-        for (int t = LaunchTick + 1; t <= ExpiryTick; t++)
-        {
-            simA.Tick(new() { { 100, held } });
-            simB.Tick(new() { { 100, default } });
-        }
-
-        var a = simA.GetState(100);
-        var b = simB.GetState(100);
-        float dVX = a.VX - b.VX;
-        Assert.InRange(dVX, DriftBand.Lo, DriftBand.Hi);
-        Assert.Equal(0f, a.VY - b.VY);                        // vertical untouched
-        Assert.Equal(0f, a.VZ - b.VZ);                        // no cross-axis drift
-    }
-
-    [Fact]
-    public void ZeroInput_ChangesNothing()
-    {
-        var sim = ZoneScenario();
-        sim.Tick(new() { { 100, default } });
-        for (int t = 2; t <= ExpiryTick; t++)
-            sim.Tick(new() { { 100, default } });
-
-        var s = sim.GetState(100);
-        Assert.Equal(0f, s.VX);                               // no drift into a zero-remnant axis
-        Assert.True(s.VY > 0f, "vertical launch intact");     // KVY ≈ 6.9 after 12 hitstun ticks
-    }
-
-    [Fact]
-    public void FreezeOnlyInput_StillCounts()
-    {
-        var simC = ZoneScenario();
-        var simB = ZoneScenario();
-        simC.Tick(new() { { 100, default } });
-        simB.Tick(new() { { 100, default } });
-
-        var held = TestHelpers.Input(moveX: 1f);
-        // Freeze is the decision window: commit, then release for the whole hitstun.
-        for (int t = 2; t <= LaunchTick; t++)
-        {
-            simC.Tick(new() { { 100, held } });
-            simB.Tick(new() { { 100, default } });
-        }
-        for (int t = LaunchTick + 1; t <= ExpiryTick; t++)
-        {
-            simC.Tick(new() { { 100, default } });            // neutral — must NOT cancel the pick
-            simB.Tick(new() { { 100, default } });
-        }
-
-        var c = simC.GetState(100);
-        var b = simB.GetState(100);
-        Assert.InRange(c.VX - b.VX, DriftBand.Lo, DriftBand.Hi);
-    }
-
-    [Fact]
-    public void LatestNonzeroInput_Wins()
-    {
-        var simD = ZoneScenario();
-        var simB = ZoneScenario();
-        simD.Tick(new() { { 100, default } });
-        simB.Tick(new() { { 100, default } });
-
-        var held = TestHelpers.Input(moveX: 1f);
-        for (int t = 2; t <= LaunchTick; t++)
-        {
-            simD.Tick(new() { { 100, held } });
-            simB.Tick(new() { { 100, default } });
-        }
-        var flipped = TestHelpers.Input(moveX: -1f);
-        // Latest-wins: the hold flips during hitstun and overwrites the freeze commit.
-        for (int t = LaunchTick + 1; t <= ExpiryTick; t++)
-        {
-            simD.Tick(new() { { 100, flipped } });
-            simB.Tick(new() { { 100, default } });
-        }
-
-        var d = simD.GetState(100);
-        var b = simB.GetState(100);
-        Assert.InRange(d.VX - b.VX, -DriftBand.Hi, -DriftBand.Lo);
-    }
-
-    [Fact]
-    public void OverrideLaunch_CapturesSnapshotMagnitude()
-    {
-        // Synthetic NetherGrasp-style path: OnHitEntity rewrote the launch at connect,
-        // so the freeze-expiry gate restores the QueuedKVX/Y/Z snapshot (magnitude
-        // sqrt(3²+4²) = 5) instead of recomputing from raw hitbox params.
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var def = TestHelpers.CombatDef;
-        var player = TestHelpers.PlayerState();
-        player.HitstopTicks = 1;
-        player.QueuedKVOverride = true;
-        player.QueuedKVX = 3f; player.QueuedKVY = 4f; player.QueuedKVZ = 0f;
-        player.QueuedKBStun = 10;
-        sim.RegisterEntity(1, def, player);
-
+        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
         sim.Tick(new() { { 1, default } });
 
-        var s = sim.GetState(1);
-        Assert.Equal(5f, s.LaunchMagnitude);                  // snapshot magnitude captured
-        Assert.Equal(3f, s.KVX);
-        Assert.Equal(4f, s.KVY);
-        Assert.Equal((ushort)10, s.HitstunTicks);
+        var launched = sim.GetState(1);
+        Assert.True(launched.KVX > 10f, $"resolved queued force was lost: KVX={launched.KVX}");
+        Assert.True(launched.KVY > 5f, $"resolved queued angle was lost: KVY={launched.KVY}");
+        Assert.Equal((ushort)0, launched.HitstunTicks);
+        Assert.Equal(ActionState.Idle, launched.State);
+        Assert.False(launched.QueuedKBResolvedForce);
+    }
+    [Fact]
+    public void QueuedLaunch_MatchesDirectLaunch()
+    {
+        var direct = TestHelpers.PlayerState();
+        direct.DamagePercent = 50;
+        Simulation.ApplyKnockback(ref direct, 1f, 0f, 20, 10f, 2f, 12f, 20, 100f);
+
+        var queued = TestHelpers.PlayerState();
+        queued.DamagePercent = 50;
+        queued.HitstopTicks = 1;
+        queued.QueuedKBDirX = 1f;
+        queued.QueuedKBAngle = 20;
+        queued.QueuedKBBase = 10f;
+        queued.QueuedKBGrowth = 2f;
+        queued.QueuedKBDamage = 12f;
+        queued.QueuedKBStun = 20;
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, TestHelpers.CombatDef, queued);
+        sim.Tick(new() { { 1, default } });
+        queued = sim.GetState(1);
+
+        Assert.Equal(direct.KVX, queued.KVX, 3);
+        Assert.Equal(direct.KVY, queued.KVY, 3);
+        Assert.Equal(direct.HitstunTicks, queued.HitstunTicks);
+    }
+
+    [Fact]
+    public void DirectionalInfluence_VerticalLaunchTiltsWithoutChangingMagnitude()
+    {
+        var state = TestHelpers.PlayerState();
+        state.KVY = 10f;
+        state.DIX = 1f;
+        state.DIY = 0f;
+
+        Simulation.ApplyDirectionalInfluence(ref state);
+
+        float magnitude = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
+        TestHelpers.AssertNear(10f, magnitude, 0.001f);
+        Assert.True(state.KVX > 0f);
+        Assert.True(state.KVY < 10f);
+    }
+
+
+    [Fact]
+    public void HitstopSdi_UsesFirstInput_WhileDiUsesLatestInput()
+    {
+        var state = TestHelpers.PlayerState(x: 10f, z: 10f);
+        state.HitstopTicks = 2;
+        state.KVX = 10f;
+        state.KVY = 5f;
+        state.QueuedKBResolvedForce = true;
+        state.QueuedKBForce = 10f;
+        state.QueuedKBDirX = 1f;
+        state.QueuedKBAngle = 30;
+
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
+        sim.Tick(new() { { 1, new InputState { MoveX = 1f } } });
+        var first = sim.GetState(1);
+        sim.Tick(new() { { 1, new InputState { MoveY = 1f } } });
+        var second = sim.GetState(1);
+
+        TestHelpers.AssertNear(10.4f, second.PX, 0.001f);
+        TestHelpers.AssertNear(10f, second.PZ, 0.001f);
+        Assert.True(second.KVZ > 0f);
+        Assert.True(second.KVX < first.KVX);
+        Assert.False(second.SdiApplied);
+    }
+    [Fact]
+    public void PostHitstunFlight_AppliesFrictionGravity_AndTerminates()
+    {
+        var state = TestHelpers.PlayerState(x: 50f, z: 50f);
+        state.PY = 10f;
+        state.IsGrounded = false;
+        state.KVX = 10f;
+        state.KVY = 5f;
+        state.State = ActionState.Idle;
+
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
+
+        sim.Tick(new() { { 1, default } });
+        var first = sim.GetState(1);
+        TestHelpers.AssertNear(10f - (10f / 60f), first.KVX, 0.001f);
+        TestHelpers.AssertNear(5f - (8f / 60f), first.KVY, 0.001f);
+
+        sim.Tick(new() { { 1, default } });
+        var second = sim.GetState(1);
+        TestHelpers.AssertNear(first.KVX - (10f / 60f), second.KVX, 0.001f);
+        TestHelpers.AssertNear(first.KVY - (8f / 60f), second.KVY, 0.001f);
+
+        for (int i = 0; i < 240 && (second.KVX != 0f || second.KVY != 0f || second.KVZ != 0f); i++)
+        {
+            sim.Tick(new() { { 1, default } });
+            second = sim.GetState(1);
+        }
+
+        Assert.Equal(0f, second.KVX);
+        Assert.Equal(0f, second.KVY);
+        Assert.Equal(0f, second.KVZ);
     }
 }
+

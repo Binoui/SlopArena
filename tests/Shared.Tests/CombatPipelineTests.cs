@@ -42,10 +42,8 @@ public class CombatPipelineTests
     //   Combined radius: 1.0 + 0.3 = 1.3 → HIT within margin
     //
     // Expected: NPC takes 4 damage, gains knockback velocity
-    // NOTE: HitstunTicks is forced to HitboxEvent.StunTicks (=10) by
-    // ResolveHits (line 449) AFTER ApplyKnockback runs, so even though
-    // ApplyKnockback's weak-hit branch (kbMagnitude=3 not >3) would set
-    // State=Idle, ResolveHits overwrites HitstunTicks=10.
+    // ADR-0019 derives hitstun from the applied knockback magnitude.
+    // The old authored StunTicks override is intentionally removed.
 
     [Fact]
     public void LMB_HitsNpc_AppliesDamageKnockbackHitstun()
@@ -114,8 +112,8 @@ public class CombatPipelineTests
             $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}");
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
-        // regardless of ApplyKnockback's internal logic.
-        Assert.Equal(20, (int)afterLaunch.HitstunTicks);
+        // ADR-0019 derives this from the resulting launch magnitude.
+        Assert.Equal(1, (int)afterLaunch.HitstunTicks);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -435,7 +433,7 @@ public class CombatPipelineTests
         state.DamagePercent = 50;
 
         Simulation.ApplyKnockback(ref state, dirX: 1f, dirZ: 0f,
-            angleDeg: 5, baseKB: 2f, growthKB: 1.5f, stunTicks: 20);
+            angleDeg: 5, baseKB: 2f, growthKB: 1.5f, damage: 0f, stunTicks: 20, weight: 100f);
 
         Assert.True(state.KVY > 0f,
             $"Light profile (5°) should produce vertical knockback, got KVY={state.KVY:F4}");
@@ -448,7 +446,7 @@ public class CombatPipelineTests
         state.DamagePercent = 50;
 
         Simulation.ApplyKnockback(ref state, dirX: 1f, dirZ: 0f,
-            angleDeg: 15, baseKB: 8f, growthKB: 5f, stunTicks: 20);
+            angleDeg: 15, baseKB: 8f, growthKB: 5f, damage: 0f, stunTicks: 20, weight: 100f);
 
         Assert.True(state.KVY > 0.5f,
             $"Medium profile (15°) should produce noticeable vertical knockback, got KVY={state.KVY:F4}");
@@ -487,8 +485,7 @@ public class CombatPipelineTests
         Assert.True(afterHit.HitstopTicks > 0, "NPC should be in hitstop at connect");
         Assert.True(afterHit.IsGrounded, "frozen victim is still grounded");
 
-        // Freeze expires — the launch (KVY up, airborne) applies.
-        for (int i = 0; i < 10; i++)
+        while (sim.GetState(100).HitstopTicks > 0)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var afterLaunch = sim.GetState(100);
@@ -506,12 +503,53 @@ public class CombatPipelineTests
         Assert.True(afterLaunch.PY > gpy + 0.01f,
             $"LMB hit should lift NPC off ground, PY={afterLaunch.PY:F4} ground={gpy:F4}");
 
-        // Run 2 more ticks — character should stay airborne (KVY still positive, no ground snap)
-        for (int i = 0; i < 2; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
+    }
 
-        var afterAirborne = sim.GetState(100);
-        Assert.False(afterAirborne.IsGrounded,
-            $"NPC should stay airborne during hitstun rise, got IsGrounded={afterAirborne.IsGrounded}");
+    [Fact]
+    public void RealHit_ZeroHitstop_AppliesTargetDIImmediately()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var attacker = TestHelpers.PlayerState();
+        attacker.PY = TestHelpers.CombatGroundPY;
+        sim.RegisterEntity(1, TestHelpers.CombatDef, attacker);
+        var target = TestHelpers.NpcState(0f, 1.5f);
+        target.PY = TestHelpers.CombatGroundPY;
+        sim.RegisterEntity(100, TestHelpers.CombatDef, target);
+
+        sim.Resolver.Spawn(new Hitbox
+        {
+            X = target.PX, Y = target.PY, Z = target.PZ,
+            EndX = target.PX, EndY = target.PY, EndZ = target.PZ,
+            Radius = 1f, Shape = HitboxShape.Sphere,
+            Damage = 0f, BaseKnockback = 10f, KnockbackGrowth = 0f,
+            KnockbackAngle = 45, StunTicks = 20, DurationTicks = 1,
+            OwnerId = 1, RehitIntervalTicks = 0,
+        });
+
+        sim.Tick(new()
+        {
+            { 1, default },
+            { 100, new InputState { MoveX = 1f, MoveY = 0f } },
+        });
+
+        var frozen = sim.GetState(100);
+        Assert.True(frozen.HitstopTicks > 0);
+        Assert.Equal(ActionState.Idle, frozen.State);
+
+        for (int i = 0; i < 4 && sim.GetState(100).HitstopTicks > 0; i++)
+        {
+            sim.Tick(new()
+            {
+                { 1, default },
+                { 100, new InputState { MoveX = 1f, MoveY = 0f } },
+            });
+        }
+        var state = sim.GetState(100);
+        Assert.Equal(0, state.HitstopTicks);
+        Assert.Equal(ActionState.Hitstun, state.State);
+        Assert.True(state.KVX > 0f);
+        Assert.True(state.KVY > 0f);
+        Assert.Equal(1f, state.DIX);
+        Assert.True(state.KVZ > 0f, $"DI should preserve the launch-side horizontal direction, got KVZ={state.KVZ}");
     }
 }
