@@ -6,8 +6,10 @@
 //   - launch: ApplyKnockback (:1092) — mag = base + growth*(damage/100),
 //     KV = mag*cos(angle) horizontal, mag*sin(angle) vertical
 //   - hitstun: clamp(8 + (int)(mag*0.5), 8, 60) capped by StunTicks (:1118)
-//   - in-flight: KV *= exp(-1.8*dt) all axes (ProcessHitstun :614, ProcessKnockback :735)
-//   - gravity: KnockbackMinGravity = 2.0 m/s² (:49)
+//   - during hitstun: KV *= exp(-1.8*dt) all axes + KVY -= 2.0*dt (:611-624)
+//   - hitstun expiry: KV→V transfer, KV cleared, State=Idle (:657-664)
+//   - after: Idle air physics — no-input brake (AirAccel 16), drag 0.2/s,
+//     float-window gravity ramp (0 → 36 m/s²), MaxFallSpeed 48, actionable
 // Model (b) "optionA" — Melee-shaped: constant KV through hitstun, full gravity
 //   does the vertical work, linear horizontal friction (10 m/s²) after hitstun.
 // Model (c) "optionB" — hybrid: linear (constant m/s²) horizontal decay instead
@@ -28,6 +30,14 @@ class Program
     const float LinearDecel = 10f;      // m/s², within research doc's suggested 5-15
     const float DeadZone = 0.015f;      // Simulation.cs VelocityDeadZone
     const int MaxTicks = 600;
+
+    // Real post-hitstun Idle physics (Simulation.cs step 5/8 + FightGuyData.cs)
+    const float AirAcceleration = 16f;  // no-input brake toward 0 (MoveToward, :963)
+    const float AirDrag = 0.2f;         // :33 multiplicative drag /s
+    const float AirFloatGravity = 0f;   // FightGuy float window gravity
+    const int FloatWindowTicks = 35;    // FightGuy
+    const int FallRampDuration = 10;    // FightGuy
+    const float MaxFallSpeed = 48f;     // FightGuy cap (:1254)
 
     const int PlotW = 72, PlotH = 18;
 
@@ -68,14 +78,15 @@ class Program
         sb.AppendLine("- 60 Hz ticks (`TickDt = 1/60`), launch along +Z from ground height 0; flight ends at landing (`Y <= 0`) or the 10 s cap (600 ticks).");
         sb.AppendLine("- Launch magnitude: `base + growth × (damage% / 100)` — the current `ApplyKnockback` formula (Simulation.cs:1097). Angle per profile (`KnockbackProfile.cs`).");
         sb.AppendLine("- Hitstun: `clamp(8 + (int)(mag × 0.5), 8, 60)` capped by the move's `StunTicks` (Simulation.cs:1118) — identical across models, since it is computed at connect from the launch magnitude.");
+        sb.AppendLine("- Model (a) mirrors the **real in-game flight path**: exp decay during hitstun, then the KV→V transfer at hitstun expiry (Simulation.cs:657-664 — KV cleared, `State = Idle`), then Idle air physics: no-input brake toward 0 (MoveToward, AirAccel 16), multiplicative drag 0.2/s, float-window gravity ramp (FightGuy: 35 t @ 0 m/s² → 10 t ramp → 36 m/s²), MaxFallSpeed 48. Neutral-input reference: a real player DI-drifts / jumps / fast-falls, which shortens flight.");
         sb.AppendLine("- Blast zones are stage-specific and **not** modeled: the sweep shows trajectory shape and flight metrics, not kill power.");
         sb.AppendLine();
         sb.AppendLine("### Models");
         sb.AppendLine();
-        sb.AppendLine("| Model | During hitstun | After hitstun (tumble) | Vertical gravity |");
+        sb.AppendLine("| Model | During hitstun | After hitstun | Vertical gravity |");
         sb.AppendLine("|---|---|---|---|");
-        sb.AppendLine("| (a) current | `KV *= exp(-1.8·dt)` all axes | same decay | 2.0 m/s² (`KnockbackMinGravity`) |");
-        sb.AppendLine("| (b) Option A (Melee-shaped) | **constant KV** | linear friction 10 m/s² on horizontal, azimuth-preserving | 36 m/s² full (does the vertical work) |");
+        sb.AppendLine("| (a) current | `KV *= exp(-1.8·dt)` all axes + 2.0 m/s² on KVY (Simulation.cs:611-624) | **KV→V transfer, KV cleared, Idle** (:657-664) — normal air physics: brake toward 0 (AirAccel 16), drag 0.2/s, float-window ramp, victim actionable | 2.0 in hitstun, then float 0 → ramp → 36 m/s² (FightGuy) |");
+        sb.AppendLine("| (b) Option A (Melee-shaped) | **constant KV** | tumble: linear friction 10 m/s² on horizontal, azimuth-preserving | 36 m/s² full (does the vertical work) |");
         sb.AppendLine("| (c) Option B (hybrid) | linear decay 10 m/s² per axis (constant rate) | same linear decay | 2.0 m/s² (min, kept) |");
         sb.AppendLine();
         sb.AppendLine("Gravity/friction constants are the tunables under discussion in #130; 10 m/s² sits in the middle of the research doc's suggested 5–15 range.");
@@ -131,15 +142,16 @@ class Program
         sb.AppendLine();
         sb.AppendLine("## Reading the sweep");
         sb.AppendLine();
-        sb.AppendLine("- **Current (a)** front-loads travel: most horizontal distance accrues in the first ~0.5 s, then an asymptotically dead tail — the flight path is a flattened arc. The all-axis exponential decay is what keeps the vertical in check (KVY shrinks every tick).");
+        sb.AppendLine("- **Current (a)** is two-phase: exp-decay flight during hitstun (frontloaded, flattened arc), then at expiry the KV→V transfer drops the victim into Idle physics. The Idle phase is *braking*, not decaying: horizontal is pushed toward 0 at 16 m/s² (no-input brake) and the float-window gravity ramp (0 → 36 m/s²) returns the victim to the ground fast. There is **no long exp-decay tail** — the transfer at Simulation.cs:657-664 exists precisely to kill that tail (its comment says the alternative blocks movement for 9+ seconds).");
         sb.AppendLine("- **Option A (b)** holds launch speed through hitstun, so the *hitstun-end* distance is much larger; the arc is gravity-dominated (taller at low %, lower-and-longer at high %) **provided flight gravity is rebalanced down** (see coupling table). At current gravity (36) and current KB magnitudes it produces almost no flight.");
         sb.AppendLine("- **Option B (c), per-axis linear** — the direct analog of the current per-axis exponential — has a **hover artifact**: at the apex the sign-preserving linear decay starts counteracting min gravity (KVY oscillates near 0), so launcher/kill victims never land within the 10 s cap. The all-axis decay shape does *not* survive the switch from multiplicative to additive. The alternative reading — decay horizontal only, let min gravity own the vertical — gives runaway vertical (31 m arc on the kill move) because 2.0 m/s² cannot tame a 33 m/s launch without KVY decay.");
         sb.AppendLine("- Compare the `Hdist at hitstun end` column across models — that is the distance a combo follow-up must cover to reach the victim while they are still in hitstun.");
         sb.AppendLine();
         sb.AppendLine("## What this says for #130");
         sb.AppendLine();
-        sb.AppendLine("- The current model's all-axis exponential decay is load-bearing on the **vertical**: it is the only thing keeping arcs low at 2.0 m/s² gravity. Any replacement must either keep a vertical decay, or raise gravity (Option A's wager), or rebalance KB magnitudes.");
-        sb.AppendLine("- Option A is viable only as a *package*: constant KV + gravity rebalance (~8 m/s² per the coupling table) + optional KB-scale retune (#132). Its pitch — combo-relevant hitstun-end distances, Melee-like arcs — shows up clearly in the `Hdist at hitstun end` column (e.g. kill @ 150%: 12.4 m vs 8.7 m current).");
+        sb.AppendLine("- **The game already rejected continuous post-hitstun decay.** The KV→V transfer at hitstun expiry (ADR-0013 era, Simulation.cs:653-664) exists so the victim exits hitstun into *actionable Idle physics*, not a decaying KB drift. Any flight-model change should be read against that: Option B reintroduces a post-hitstun decay the codebase deliberately removed; Option A's *tumble* phase (locked, frictioned) is a different beast that must be judged on its own — it replaces Idle with a new state.");
+        sb.AppendLine("- During hitstun, the all-axis exponential decay is still load-bearing on the **vertical**: it is what keeps arcs low at 2.0 m/s² gravity. Any replacement must either keep a vertical decay in-hitstun, or raise gravity (Option A's wager), or rebalance KB magnitudes.");
+        sb.AppendLine("- Option A is viable only as a *package*: constant KV + gravity rebalance (~8 m/s² per the coupling table) + optional KB-scale retune (#132) + a tumble state decision. Its pitch — combo-relevant hitstun-end distances — shows up clearly in the `Hdist at hitstun end` column (e.g. kill @ 150%: 12.4 m vs 8.7 m current).");
         sb.AppendLine("- Option B as a *pure* linear swap is not viable without extra machinery (dead-zone on the vertical, or a distinct vertical law) — the hover artifact is structural, not a tuning miss.");
 
         File.WriteAllText("docs/research/flight-model-sweep.md", sb.ToString());
@@ -178,6 +190,7 @@ class Program
         float kvH = l.KvH, kvY = l.KvY;
         int hs = l.HitstunTicks;
         int hsEndIdx = -1;
+        int airTimeTicks = 0; // post-transfer Idle flight (ApplyGravity :1220)
         int t;
         for (t = 1; t <= MaxTicks; t++)
         {
@@ -188,10 +201,42 @@ class Program
             {
                 case Model.Current:
                 {
-                    float decay = MathF.Exp(-ExpLambda * TickDt);
-                    kvH *= decay;
-                    kvY *= decay;
-                    kvY -= MinGravity * TickDt;
+                    if (inHitstun)
+                    {
+                        // ProcessHitstun (:611-635): exp decay all axes, min gravity
+                        // on KVY, V=KV, position integrates (main loop fall-through :277).
+                        float decay = MathF.Exp(-ExpLambda * TickDt);
+                        kvH *= decay;
+                        kvY *= decay;
+                        kvY -= MinGravity * TickDt;
+                    }
+                    else
+                    {
+                        // Post-hitstun = Idle flight. KV was cleared at expiry
+                        // (:657-664, KV→V transfer, State=Idle); the victim runs
+                        // normal air physics: no-input brake toward 0 (ProcessAirMovement
+                        // :963 MoveToward), multiplicative drag (:971), float-window
+                        // gravity ramp (:1227-1242), MaxFallSpeed cap (:1254).
+                        // Neutral input reference — a real player drifts/jumps.
+                        float brake = MathF.Min(MathF.Abs(kvH), AirAcceleration * TickDt);
+                        kvH -= MathF.CopySign(brake, kvH);
+                        kvH *= (1f - AirDrag * TickDt);
+                        if (MathF.Abs(kvH) < DeadZone) kvH = 0f;
+
+                        float g;
+                        if (airTimeTicks < FloatWindowTicks)
+                            g = AirFloatGravity;
+                        else if (airTimeTicks < FloatWindowTicks + FallRampDuration)
+                        {
+                            float ramp = (airTimeTicks - FloatWindowTicks) / (float)FallRampDuration;
+                            g = AirFloatGravity + (FullGravity - AirFloatGravity) * ramp;
+                        }
+                        else
+                            g = FullGravity;
+                        kvY -= g * TickDt;
+                        if (kvY < -MaxFallSpeed) kvY = -MaxFallSpeed;
+                        airTimeTicks++;
+                    }
                     break;
                 }
                 case Model.OptionA:
