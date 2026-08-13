@@ -20,7 +20,7 @@ The map's timing arc ([#128](https://github.com/Binoui/SlopArena/issues/128)): I
 ### 2. Cooldowns ([#138])
 
 - **Normals = 0 cooldown — policy locked.** Commitment + IASA is the only gate (Melee-faithful: Melee normals have no cooldowns). Current data already reflects this.
-- **No charge normals** — charge mechanics are **specials-only** (user: charge belongs on specials). The current RMB `ChargeAttack` moves are temp data, reworked as specials in the balance pass.
+- **No charge normals** — charge mechanics are **specials-only** (user: charge belongs on specials). **Post-decision (2026-08-13): the RMB is removed as an attack slot entirely** — it is the camera-lock toggle (ADR-0018), no attack. The `ChargeAttack` ability classes are kept as scaffolding for a future special; the RMB/AirRMB specs and tests are deleted.
 - **Special cooldowns kept** — the deliberate SA deviation (60-600 tick resource gating, keyboard-friendly; Melee specials have none).
 
 ### 3. Landing lag + auto-cancel ([#139])
@@ -44,6 +44,6 @@ The map's timing arc ([#128](https://github.com/Binoui/SlopArena/issues/128)): I
 
 - **`StartDash` gate change** — the only engine touch from #138 (`AnimLockTicks == 0 || IsIasaUnlocked`).
 - **Lag-zone landing cleanup** — the lag branch ends the aerial like the AC branch (end ability + lock); reword the 1-frame comment; verify the Idle-consume / Attacking-IASA double-fire check.
-- **Kit authoring pass** (balance-pass content, temp data): fill `IasaTicks` on Kistu/Manki/Nilus normals; populate `LandingLagTicks` + both AC windows on all aerials; rework the RMB charge moves as specials.
+- **Kit authoring pass** (balance-pass content, temp data): fill `IasaTicks` on Kistu/Manki/Nilus normals; populate `LandingLagTicks` + both AC windows on all aerials; RMB removed as an attack (charge stays specials-only, scaffolding kept).
 - **Goldens shift** where IASA, dash-cancel, and aerial-landing scenarios exist → regenerate (REGENERATE_GOLDENS).
 - **0B netcode** — all fields are per-stage static data or sim-internal locks.

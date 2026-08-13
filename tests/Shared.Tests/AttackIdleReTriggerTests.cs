@@ -46,7 +46,7 @@ public class AttackIdleReTriggerTests
     }
 
     [Fact]
-    public void MankiAirLMB_HeldButton_DoesNotReTrigger()
+    public void MankiAirLMB_SinglePress_DoesNotReTrigger()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -56,41 +56,22 @@ public class AttackIdleReTriggerTests
 
         var stageDuration = MankiDef.AirLMB!.Stages[0].DurationTicks;
 
+        // ActiveSlot is one-tick (edge) by client contract (ADR-0016): press once, then
+        // release. The aerial runs once and returns to Idle — it must not machine-gun
+        // (no auto-combo, ADR-0015). A level-held slot is never sent by the client.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+
         bool everIdle = false;
         for (int i = 0; i < stageDuration * 3 + 10; i++)
         {
-            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
+            sim.Tick(new() { { 1, default } });
             var s = sim.GetState(1);
             if (s.State == ActionState.Idle)
                 everIdle = true;
         }
 
         Assert.True(everIdle,
-            "AirLMB held input should not re-trigger");
-    }
-
-    [Fact]
-    public void MankiAirRMB_HeldButton_DoesNotReTrigger()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        var stageDuration = MankiDef.AirRMB!.Stages[0].DurationTicks;
-
-        bool everIdle = false;
-        for (int i = 0; i < stageDuration * 3 + 10; i++)
-        {
-            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) } });
-            var s = sim.GetState(1);
-            if (s.State == ActionState.Idle)
-                everIdle = true;
-        }
-
-        Assert.True(everIdle,
-            "AirRMB held input should not re-trigger");
+            "AirLMB single press should complete and return to Idle");
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -98,37 +79,6 @@ public class AttackIdleReTriggerTests
     //  Both used `AttackElapsedTicks >= AnimLockTicks` (increasing vs
     //  decreasing counter) halving the animation duration.
     // ══════════════════════════════════════════════════════════════
-
-    [Fact]
-    public void MankiRMB_Normal_DurationMatchesSpec()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        ushort expectedDuration = MankiDef.RMB!.Stages[1].DurationTicks; // 58
-
-        // Tick 0: activate RMB
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) } });
-
-        // Feed default input until Idle
-        int idleTick = -1;
-        for (int i = 1; i <= expectedDuration + 20; i++)
-        {
-            sim.Tick(new() { { 1, default } });
-            var s = sim.GetState(1);
-            if (s.State == ActionState.Idle)
-            {
-                idleTick = i;
-                break;
-            }
-        }
-
-        // Should idle near expectedDuration (allow ±2 for tick boundary)
-        Assert.True(idleTick >= expectedDuration - 2,
-            $"Normal RMB should last ~{expectedDuration} ticks, but Idle at tick {idleTick}");
-    }
 
     [Fact]
     public void MankiOverclock_InjectionDurationMatchesSpec()

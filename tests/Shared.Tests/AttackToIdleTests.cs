@@ -70,67 +70,6 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  MANKI RMB — MankiAerosolFlame
-    // ════════════════════════════════════════════════
-
-    [Fact]
-    public void MankiRMB_Normal_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = MankiGroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2),
-            5 + MankiDef.RMB!.Stages[1].DurationTicks + 20);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    [Fact]
-    public void MankiRMB_Charged_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = MankiGroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        // Hold RMB with IsAiming=true for 55 ticks (past charge_threshold=45)
-        var holdInput = TestHelpers.Input(activeSlot: 2, aiming: true);
-        TestHelpers.TickN(sim, holdInput, 55);
-
-        // Release — charged attack lasts charged_duration (50) ticks
-        var releaseInput = TestHelpers.Input(activeSlot: 2);
-        var after = TestHelpers.TickN(sim, releaseInput,
-            MankiDef.RMB!.ChargedStages![0].DurationTicks + 30);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    // ════════════════════════════════════════════════
-    //  MANKI AIR RMB — AirChargeAttack
-    // ════════════════════════════════════════════════
-
-    [Fact]
-    public void MankiAirRMB_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        // Tap: 5-tick release debounce + Stages[1] attack duration + margin
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2),
-            MankiDef.AirRMB!.Stages[1].DurationTicks + 15);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    // ════════════════════════════════════════════════
     //  MANKI Q — MankiRoundBomb (hold → throw)
     // ════════════════════════════════════════════════
 

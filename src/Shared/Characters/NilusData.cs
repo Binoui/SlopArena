@@ -89,7 +89,7 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 28, LungeForce = 5f,
+                    new() { DurationTicks = 28, IasaTicks = 24, LungeForce = 5f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.4f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 12, BaseKnockback = 1.5f, KnockbackGrowth = 1f },
@@ -108,7 +108,7 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 24, LungeForce = 3f,
+                    new() { DurationTicks = 24, IasaTicks = 20, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 16, LungeForce = 3f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.4f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light },
@@ -116,78 +116,6 @@ public static partial class CharacterRegistry
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_air_1" },
-            },
-
-            // RMB — Entropy Lance: tap = poke, charged = the kill move
-            RMB = new AbilitySpec
-            {
-                Name = "Entropy Lance",
-                Description = "Hold to charge a void spear. Tap = quick poke; charged = blast-zone kill.",
-                IconName = "rmb",
-                CooldownTicks = 60,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 50,
-                Stages = new AttackStage[]
-                {
-                    // Stage 0: hold/charge phase (safety net)
-                    new() { DurationTicks = 300, HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                            LungeForce = 0f, AttackRange = 0f, WarpRange = 0f },
-                    // Stage 1: tap poke
-                    new() { DurationTicks = 30, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
-                                    OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 2.2f,
-                                    Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium },
-                                    StunTicks = 18, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    // Charged: long thin void spear (2.2 m capsule), kill-tier knockback.
-                    // SINGLE-target: RehitIntervalTicks is unset, so SpellResolver deactivates
-                    // the hitbox after its first victim (SpellResolver.cs:250-251). Give it
-                    // RehitIntervalTicks = 1 if piercing is ever actually wanted.
-                    new() { DurationTicks = 44, LungeForce = 5f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.5f,
-                                    OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 2.2f,
-                                    Damage = 15f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 18, KnockbackGrowth = 10 },
-                                    StunTicks = 24, Interruptible = true } },
-                            AttackRange = 3f, WarpRange = 0f },
-                },
-                AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
-            },
-
-            // AirRMB — Collapse (downward spike; hold to charge)
-            AirRMB = new AbilitySpec
-            {
-                Name = "Collapse",
-                Description = "Hold to charge a committed downward void slam; tap = quick slam, charged = heavier slam that spikes the target toward the floor.",
-                CooldownTicks = 0,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 45,
-                Stages = new AttackStage[]
-                {
-                    // Stage 0: hold/charge phase (no hitboxes)
-                    new() { DurationTicks = 60, HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 0f, WarpRange = 0f },
-                    // Stage 1: tap slam (same numbers as the pre-charge air RMB; drives Nilus down at 14 m/s)
-                    new() { DurationTicks = 36, MoveY = -14f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.7f,
-                                    OffX = 0, OffY = 0.1f, OffZ = 0.4f,
-                                    Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Spike },
-                                    StunTicks = 20, Interruptible = true } },
-                            AttackRange = 0f, WarpRange = 0f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    // Charged: bigger rift sphere, faster drop, more damage
-                    new() { DurationTicks = 36, MoveY = -18f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 10, Shape = HitboxShape.Sphere, Radius = 0.8f,
-                                    OffX = 0, OffY = 0.1f, OffZ = 0.4f,
-                                    Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike },
-                                    StunTicks = 24, Interruptible = true } },
-                            AttackRange = 0f, WarpRange = 0f },
-                },
-                AnimationNames = new[] { "spell_rmb_air", "spell_rmb_air" },
             },
 
             // Q — Void Rift (signature; lobbed seed → grounded lingering rift). Class: NilusVoidRift (Task 3)

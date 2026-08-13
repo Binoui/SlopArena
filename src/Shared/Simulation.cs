@@ -120,6 +120,41 @@ namespace SlopArena.Shared
             return spec.Stages[stageIdx];
         }
 
+        /// <summary>
+        /// IASA early-out (issue #124 / ADR-0021 §1): true when the current attack's stage
+        /// has passed its <c>IasaTicks</c>. From that tick on, ability inputs AND the dash
+        /// interrupt the recovery (the jab → IASA → dash → dash-attack string). 0 = none
+        /// (full ADR-0014 lock — the pre-IASA behavior). Never true outside Attacking.
+        /// </summary>
+        internal static bool IsIasaUnlocked(CharacterState state, CharacterDefinition def)
+        {
+            if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
+            var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
+            if (spec?.Stages is not { Length: > 0 }) return false;
+            var stage = ResolveStage(spec, state);
+            if (stage.IasaTicks == 0) return false;
+            return ElapsedInStage(state, spec) >= stage.IasaTicks;
+        }
+
+        /// <summary>
+        /// Current stage's elapsed ticks for an attacking entity. AttackElapsedTicks counts
+        /// ticks since the last stage reset; stage-driven moves (StageChainAbility) never
+        /// reset it mid-attack, so subtracting prior stages' durations yields the current
+        /// stage's elapsed. Charge abilities reset it at their mid-attack stage transition
+        /// (ChargeAttackAbility/AimHoldAbility), which underflows the subtraction — fall back
+        /// to the raw clock (elapsed since the transition). Shared by the IASA check and the
+        /// landing-lag auto-cancel windows.
+        /// </summary>
+        internal static int ElapsedInStage(CharacterState state, AbilitySpec? spec)
+        {
+            if (spec?.Stages is not { Length: > 0 }) return 0;
+            int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+            int elapsed = state.AttackElapsedTicks;
+            for (int i = 0; i < stageIdx; i++)
+                elapsed -= spec.Stages[i].DurationTicks;
+            return elapsed < 0 ? state.AttackElapsedTicks : elapsed;
+        }
+
         // ── MAIN ENTRY POINT ──
 
         /// <summary>
@@ -378,8 +413,12 @@ namespace SlopArena.Shared
             }
 
             // 6. Input-driven actions (only when not locked by animation, landing lag or in
-            // jump squat; aiming blocks dash — the ability owns movement until release)
-            if (s.LandingLagTicks == 0 && s.AnimLockTicks == 0 && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang)
+            // jump squat; aiming blocks dash — the ability owns movement until release).
+            // The dash unlocks on IASA (ADR-0021 §1): a normal whose stage has passed its
+            // IasaTicks may be dash-cancelled out of recovery, even while AnimLockTicks is
+            // still counting down. Attack activation below stays Idle/Run-gated, so this
+            // term only ever opens the DASH here.
+            if (s.LandingLagTicks == 0 && (s.AnimLockTicks == 0 || IsIasaUnlocked(s, def)) && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang)
             {
                 // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
                 // Dash
@@ -1153,7 +1192,7 @@ namespace SlopArena.Shared
             s.DashDirZ = dirZ;
             s.DashDurationTicks = stats.DashDurationTicks;
             s.DashCooldownTicks = stats.DashCooldownTicks;
-            s.InvincibilityTicks = DashInvincibilityTicks; // invincible for full dash
+            s.InvincibilityTicks = DashInvincibilityTicks; // i-frames only at the start (tight dodge)
             s.State = ActionState.Dashing;
             s.StateTicks = 0;
 

@@ -47,47 +47,6 @@ public class FightGuyKitRegressionTests : KitScenarioTests
         });
     }
 
-    [Fact]
-    public void RMB_UnchargedUppercut_HitsNpc()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "FightGuy RMB Uncharged",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence()
-                .Set(0, new InputState { ActiveSlot = 2, IsAiming = true })
-                .Set(10, default),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 50,   // attack phase, hitboxes at 5/10/15
-            TotalTicks = 80,
-        });
-    }
-
-    [Fact]
-    public void AirRMB_Helicopter_SpikesNpcDownward()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "FightGuy Air RMB Helicopter",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PX = 0, PZ = 0, PY = 1.5f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 2),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 16,   // tap hitbox active (release ~tick5, trigger=6, dur=16 → 11-26)
-            TotalTicks = 60,
-        });
-    }
-
     // ── Normal tier 1-4 + air variants (melee frame-data pass, 2026-08-12) ──
 
     [Fact]

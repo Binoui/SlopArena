@@ -368,77 +368,44 @@ namespace SlopArena.Shared
         }
 
 		/// <summary>
-		/// IASA early-out (issue #124): true when the current attack's stage has passed its
-		/// IasaTicks. From that tick on, ability inputs interrupt the recovery. 0 = none
-		/// (full ADR-0014 lock — the pre-IASA behavior). Never true outside Attacking.
-		/// </summary>
-		private static bool IsIasaUnlocked(CharacterState state, CharacterDefinition def)
-		{
-			if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
-			var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
-			if (spec?.Stages is not { Length: > 0 }) return false;
-			var stage = Simulation.ResolveStage(spec, state);
-			if (stage.IasaTicks == 0) return false;
-
-			return ElapsedInStage(state, spec) >= stage.IasaTicks;
-		}
-
-		/// <summary>
-		/// Current stage's elapsed ticks for an attacking entity. AttackElapsedTicks counts
-		/// ticks since the last stage reset; stage-driven moves (StageChainAbility) never
-		/// reset it mid-attack, so subtracting prior stages' durations yields the current
-		/// stage's elapsed. Charge abilities reset it at their mid-attack stage transition
-		/// (ChargeAttackAbility/AimHoldAbility), which underflows the subtraction — fall back
-		/// to the raw clock (elapsed since the transition). Shared by the IASA check
-		/// (issue #124) and the landing-lag auto-cancel windows (issue #125).
-		/// </summary>
-		private static int ElapsedInStage(CharacterState state, AbilitySpec? spec)
-		{
-			if (spec?.Stages is not { Length: > 0 }) return 0;
-			int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
-			int elapsed = state.AttackElapsedTicks;
-			for (int i = 0; i < stageIdx; i++)
-				elapsed -= spec.Stages[i].DurationTicks;
-			return elapsed < 0 ? state.AttackElapsedTicks : elapsed;
-		}
-
-		/// <summary>
-		/// Landing lag (issue #125): when the character lands this tick while an air-started
-		/// ability whose stage declares <c>LandingLagTicks</c> is still active, apply the
-		/// lock — no input, no movement — unless the landing frame fell in an auto-cancel
-		/// window (stage-elapsed <c>&lt;= AutoCancelBeforeTicks</c> or <c>&gt;=
-		/// AutoCancelAfterTicks</c>), in which case the aerial ENDS on the landing frame and
-		/// the player acts immediately (Melee's AC: no landing commitment at all). All-zero
-		/// fields = current behavior, landing never locks.
+		/// Landing lag (issue #125 / ADR-0021 §3): when the character lands this tick while
+		/// an air-started ability whose stage declares <c>LandingLagTicks</c> is still active,
+		/// the aerial ENDS on the landing frame and the lock applies — no input, no movement —
+		/// unless the landing fell in an auto-cancel window (stage-elapsed <c>&lt;=
+		/// AutoCancelBeforeTicks</c> or <c>&gt;= AutoCancelAfterTicks</c>), in which case the
+		/// aerial ENDS with no lock at all (Melee's AC: no landing commitment). The landing lag
+		/// is the only cost — it no longer rides on top of the stage's remaining recovery + IASA.
+		/// All-zero fields = current behavior, landing never locks.
 		///
 		/// Detection: airborne at tick start + grounded after SimulateTick = a landing.
 		/// A ledge snap also flips IsGrounded but boosts VY (LedgeSnapUpwardBoost) — that is
-		/// not a landing, so the <c>VY &lt;= 0</c> guard excludes it. The spec is resolved
-		/// with <c>airborne: true</c>: the only air-started ability classes in the game
-		/// (AirLmbCombo, AirChargeAttack) resolve their own stages from the airborne variant,
-		/// so this reads the exact stages the running ability uses. Ground-started abilities
-		/// that land mid-stage (KistuRisingSlash) resolve the slot's AIR spec here — they are
-		/// unaffected while no air stage declares LandingLagTicks; a designer giving e.g.
-		/// AirRMB (Collapse) a lag must know the declaration governs that slot's landings.
+		/// not a landing, so the <c>VY &lt;= 0</c> guard excludes it. The spec is resolved with
+		/// the SAME airborne flag the move started with: only genuinely air-started moves
+		/// (<c>AirLmbCombo</c>, <c>AirChargeAttack</c>) read their airborne variant's landing
+		/// lag. A ground move that is launched and lands mid-move (e.g. a mutual LMB trade)
+		/// keeps its GROUND spec — its landing carries no lag, because the ground spec declares
+		/// none (ADR-0021 §3: landing lag belongs to aerials, not to ground normals).
 		///
-		/// Known 1-frame limitation: the input gates (burst especially) run inside
-		/// SimulateTick BEFORE this applies the lock, so a press on the landing frame itself
-		/// is processed pre-lock — an offensive burst on the landing frame still cancels the
-		/// aerial (pre-issue behavior). Every later locked tick is fully gated.
+		/// Landing frame is pre-lock for committal escapes — by design (ADR-0021 §3): the
+		/// input gates (burst especially) run inside SimulateTick BEFORE this applies the lock,
+		/// so a press on the landing frame itself is processed pre-lock. That lets a burst
+		/// (offensive cancel — costs the ~60 s committal cooldown, ADR-0014) or an air-jump
+		/// (costs a double jump) cancel on the landing frame; dash and abilities stay blocked
+		/// by their own gates, so there is no free cancel. Every later locked tick is fully gated.
 		/// </summary>
-		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded)
+		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded, bool startedAirborne)
 		{
 			if (wasGrounded || !state.IsGrounded) return; // no landing this tick
 			if (state.VY > 0f) return;                    // ledge snap boost, not a landing
 			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming) return;
 			if (state.AttackSlot == 0 || state.LandingLagTicks > 0) return;
 
-			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
+			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: startedAirborne);
 			if (spec?.Stages is not { Length: > 0 }) return;
 			var stage = Simulation.ResolveStage(spec, state);
 			if (stage.LandingLagTicks == 0) return;
 
-			int elapsed = ElapsedInStage(state, spec);
+			int elapsed = Simulation.ElapsedInStage(state, spec);
 			bool autoCancel = (stage.AutoCancelBeforeTicks > 0 && elapsed <= stage.AutoCancelBeforeTicks)
 				|| (stage.AutoCancelAfterTicks > 0 && elapsed >= stage.AutoCancelAfterTicks);
 			if (autoCancel)
@@ -456,10 +423,17 @@ namespace SlopArena.Shared
 				return;
 			}
 
-			state.LandingLagTicks = stage.LandingLagTicks;
-			// The lag is a hard no-input window: a press buffered mid-air must not fire
-			// through it (Simulation also refuses to buffer new presses while it is live).
+			// Lag-zone landing (ADR-0021 §3): the aerial ENDS here — the same interrupt
+			// semantics as the auto-cancel branch (dropped without OnEnd, cooldown still
+			// applies via TickAbilities) — then the hard lock applies. The landing lag is the
+			// ONLY cost: no riding out the stage's remaining recovery + IASA.
+			state.State = ActionState.Idle;
+			state.AttackSlot = 0;
+			state.ComboStage = 0;
+			state.AttackElapsedTicks = 0;
+			state.AnimLockTicks = 0;
 			state.BufferedSlot = 0;
+			state.LandingLagTicks = stage.LandingLagTicks;
         }
 
         /// <summary>Occupancy-aware ledge grab (ADR-0020): an off-grid, non-hitstun entity
@@ -515,7 +489,7 @@ namespace SlopArena.Shared
 				// always block — attacker hitstop (FreezesOwner) keeps State == Attacking, so
 				// relaxing those too would let a press cancel the attack mid-freeze (ADR-0012),
 				// and landing lag is a hard no-input lock that IASA must not bypass.
-				bool iasaUnlocked = IsIasaUnlocked(state, def);
+				bool iasaUnlocked = Simulation.IsIasaUnlocked(state, def);
 				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
 					|| state.LandingLagTicks > 0
 					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
@@ -673,9 +647,11 @@ namespace SlopArena.Shared
 				bool wasGrounded = state.IsGrounded;
                 Simulation.SimulateTick(ref state, def, input, _arena);
                 TryLedgeGrab(id, ref state, def);
-				// Landing lag (issue #125): land mid-aerial → lock, unless the landing frame
-				// falls in an auto-cancel window. Server-only — the lock is authority-enforced.
-				ApplyLandingLag(ref state, def, wasGrounded);
+				// Landing lag (issue #125 / ADR-0021 §3): land mid-aerial → lock, unless the
+				// landing frame falls in an auto-cancel window. Only air-started moves resolve
+				// their airborne variant's landing lag (ground moves keep their ground spec).
+				_activeAbilities.TryGetValue(id, out var activeAbility);
+				ApplyLandingLag(ref state, def, wasGrounded, activeAbility is AirLmbCombo or AirChargeAttack);
 				_states[id] = state;
 			}
 
@@ -735,12 +711,11 @@ namespace SlopArena.Shared
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
 			TickAbilities(inputs);
 
-			// ── Step 1c: Landing lag freeze (issue #125) ──
-			// The lock is "no input, no movement": while it is live, the active ability's
-			// per-tick velocity writes (StageChainAbility's lunge re-apply, AirChargeAttack's
-			// MoveY) must not move the character. Zero velocity every lagged tick — the move
-			// itself keeps running (stages advance, lingering hitboxes resolve), which is the
-			// Melee landing commitment: the active window is the air cost, landing is the lock.
+			// ── Step 1c: Landing lag freeze (issue #125 / ADR-0021 §3) ──
+			// The lock is "no input, no movement": the aerial has already ENDED on the landing
+			// frame (ApplyLandingLag), but the residual lunge/air drift is still live. Zero
+			// velocity every lagged tick so the character plants and stays pinned — the lock
+			// is the only cost, not an overlay on the move's remaining recovery.
 			foreach (var id in simIds)
 			{
 				if (!_states.TryGetValue(id, out var lagState) || lagState.LandingLagTicks == 0) continue;

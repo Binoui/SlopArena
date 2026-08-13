@@ -160,23 +160,4 @@ public class MankiKitTests
         Assert.Equal((byte)0, after.ComboStage); // still the single move, never chained
         Assert.Equal(ActionState.Attacking, after.State);
     }
-
-    // ══════════════════════════════════════════════════════════════════
-    //  AIR RMB (slot 1 airborne, activeSlot=2)
-    // ══════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public void AirRMB_Activation_SetsAttacking()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 3f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 2), 5);
-
-        Assert.Equal(ActionState.Attacking, after.State);
-        Assert.True(after.AttackSlot > 0, "AttackSlot should be set");
-    }
 }

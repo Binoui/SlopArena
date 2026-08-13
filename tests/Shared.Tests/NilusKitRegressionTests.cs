@@ -53,27 +53,6 @@ public class NilusKitRegressionTests : KitScenarioTests
     }
 
     /// <summary>
-    /// Tap RMB: press on tick 0, released on tick 1, so the uncharged branch (stage index 1)
-    /// opens on tick 4 with a lunge of 3. Tick 6 is two ticks into that lunge, with the
-    /// velocity still visibly decaying — by tick 20 friction has eaten it and the frame is
-    /// indistinguishable from the tail of any other RMB.
-    /// </summary>
-    [Fact]
-    public void RMB_Uncharged_Pokes()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Nilus RMB Uncharged",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, 2),
-            Assert = _ => { },
-            SnapshotTick = 6,
-            TotalTicks = 120,
-        });
-    }
-
-    /// <summary>
     /// Void Rake, single press: stage 1's rake connects on tick 5 for 3%. Hitstop
     /// (ADR-0015 timing, F = 1 + 1.5·damage) freezes both bodies ~5 ticks, so tick 9
     /// is just past the freeze: the dummy pinned at spawn with 3%, launch queued.
@@ -96,39 +75,6 @@ public class NilusKitRegressionTests : KitScenarioTests
             NpcAssert = n => Assert.Equal((ushort)3, n.DamagePercent),
             NpcDef = TestHelpers.CombatDef,
             SnapshotTick = 9,
-            TotalTicks = 120,
-        });
-    }
-
-    /// <summary>
-    /// Collapse is the only stage in the game that declares AttackStage.MoveY, and the golden
-    /// is what keeps it wired: tick 16 must show Nilus ~2.7 m BELOW his 5 m start with
-    /// VY = -14 while still Attacking (the tap attack opens on tick 5, the 5-tick release
-    /// debounce, so 11 slam integrations have run by tick 16). Snapshotting after the attack
-    /// proves nothing — an airborne character falls anyway once his 40-tick float window
-    /// expires.
-    ///
-    /// The dummy hovers just under his descent path so the slam's Spike knockback actually
-    /// fires at something — nothing anywhere else in the suite does that, though both other
-    /// characters' AirRMB goldens carry a target. A GROUNDED dummy cannot serve: the hitbox
-    /// lives for ticks 13-20, by which time Nilus is still above a standing capsule's head.
-    /// </summary>
-    [Fact]
-    public void AirRMB_Spikes()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Nilus Air RMB Collapse",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PY = Gpy + 5f, IsGrounded = false, JumpsLeft = 0 },
-            Assert = _ => { },
-            Inputs = new InputSequence().Press(0, 2),
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 0.5f, PY = TestHelpers.CombatGroundPY + 3f, IsGrounded = false },
-            NpcAssert = n => Assert.Equal((ushort)10, n.DamagePercent),
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 16,   // tap hitbox active (release ~tick5, trigger=8, dur=8 → 13-20)
             TotalTicks = 120,
         });
     }

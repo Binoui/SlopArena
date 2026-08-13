@@ -41,15 +41,9 @@ public class NilusAbilityTests
     /// leaves Attacking — activation sets <c>StateTicks = 0</c>, so TickTimers' generic expiry
     /// (Simulation.cs:413-419) never fires — so a slot with no class behind it attacks forever.
     /// Completing and handing the slot back is the assertion with teeth.
-    ///
-    /// Per-slot behaviour lives in dedicated tests: <see cref="Lmb_DamagesEnemyInClawRange"/>,
-    /// <see cref="Rmb_ChargedHitsHarderThanTap"/>,
-    /// <see cref="AirLmb_VoidRake_ChainsToStage2_AndLandsBothHits"/> and
-    /// <see cref="AirRmb_Collapse_DrivesNilusDownward_DuringTheAttack"/>.
     /// </summary>
     [Theory]
     [InlineData((byte)1)] // LMB
-    [InlineData((byte)2)] // RMB
     public void DataDrivenGroundSlot_ActivatesAndRunsToCompletion(byte slot)
     {
         var sim = SimWithPlayer();
@@ -67,7 +61,6 @@ public class NilusAbilityTests
     /// <inheritdoc cref="DataDrivenGroundSlot_ActivatesAndRunsToCompletion"/>
     [Theory]
     [InlineData((byte)1)] // AirLMB
-    [InlineData((byte)2)] // AirRMB
     public void AirSlot_ActivatesAndRunsToCompletion(byte slot)
     {
         var sim = TestHelpers.MakeSim();
@@ -122,159 +115,11 @@ public class NilusAbilityTests
         Assert.Equal((ushort)3, sim.GetState(100).DamagePercent);
     }
 
-    /// <summary>
-    /// Collapse is a committed downward slam: <c>AirRMB.Stages[1].MoveY = -14</c> (tap) and
-    /// <c>ChargedStages[0].MoveY = -18</c> are its identity, and
-    /// <see cref="Abilities.AirChargeAttack"/> is the one class in the engine that honours
-    /// <c>AttackStage.MoveY</c>.
-    ///
-    /// The assertion is deliberately taken DURING the attack, not after it. Nilus has
-    /// <c>AirFloatGravity = 0</c> for a 40-tick float window, so a 36-tick aerial attack from
-    /// a hover ends before gravity ever engages: "he is lower afterwards" passes with the
-    /// field completely unread, because the float window simply expires on tick 40 and he
-    /// falls like anyone else. Only in-attack descent distinguishes a live MoveY from a dead
-    /// one. Measured with the field wired: the tap attack opens on tick 5 (5-tick release
-    /// debounce), so by tick 16 the -14 m/s slam has run 11 ticks: PY 5.75 -> ~3.18.
-    /// </summary>
-    [Fact]
-    public void AirRmb_Collapse_DrivesNilusDownward_DuringTheAttack()
-    {
-        var sim = TestHelpers.MakeSim();
-        var s = TestHelpers.PlayerState();
-        s.PY = GroundPY + 5f;
-        s.IsGrounded = false;
-        s.JumpsLeft = 0;
-        TestHelpers.RegisterPlayer(sim, Def, s);
-        float startY = s.PY;
-
-        float moveY = Def.AirRMB!.Stages[1].MoveY;
-        Assert.True(moveY < 0f, $"Collapse must declare a downward MoveY, got {moveY}");
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) } });
-        for (int i = 0; i < 15; i++) sim.Tick(new() { { 1, default } });
-
-        var mid = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, mid.State);
-        Assert.Equal(moveY, mid.VY, 3);
-        Assert.True(mid.PY < startY - 2f,
-            $"Collapse must lose height while the attack is still running: " +
-            $"{startY:F3} -> {mid.PY:F3} on tick 16 (state {mid.State})");
-    }
-
-    /// <summary>
-    /// The charged Collapse is the air kill move, so the charged branch must actually be
-    /// reachable: tap resolves <c>Stages[1]</c> (10 dmg), holding past ChargeHoldTicks (45)
-    /// auto-releases <c>ChargedStages[0]</c> (14 dmg), which hits substantially harder.
-    /// </summary>
-    [Fact]
-    public void AirRmb_ChargedHitsHarderThanTap()
-    {
-        // Tap: press then release immediately (uncharged Stages[1]). NPC hovers at +3 m,
-        // in the tap hitbox's path (release ~tick5, hitbox runner ticks 13-20).
-        var tapSim = SimWithPlayer();
-        var tapPlayer = tapSim.GetState(1);
-        tapPlayer.PY = GroundPY + 5f;
-        tapPlayer.IsGrounded = false;
-        tapPlayer.JumpsLeft = 0;
-        tapSim.SetState(1, tapPlayer);
-        var tapNpc = TestHelpers.NpcState(0f, 0.5f);
-        tapNpc.PY = GroundPY + 3f;
-        tapNpc.IsGrounded = false;
-        TestHelpers.RegisterNpc(tapSim, Def, tapNpc);
-
-        tapSim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) }, { 100, default } });
-        for (int i = 0; i < 40; i++) tapSim.Tick(new() { { 1, default }, { 100, default } });
-        ushort tapDmg = tapSim.GetState(100).DamagePercent;
-
-        // Hold: keep aiming past the charge threshold (auto-releases charged). Nilus floats
-        // for the 40-tick float window, so the charged hitbox (runner ticks 53-62) finds the
-        // NPC higher up than the tap does — spawn it at +5 m.
-        var holdSim = SimWithPlayer();
-        var holdPlayer = holdSim.GetState(1);
-        holdPlayer.PY = GroundPY + 5f;
-        holdPlayer.IsGrounded = false;
-        holdPlayer.JumpsLeft = 0;
-        holdSim.SetState(1, holdPlayer);
-        var holdNpc = TestHelpers.NpcState(0f, 0.5f);
-        holdNpc.PY = GroundPY + 5f;
-        holdNpc.IsGrounded = false;
-        TestHelpers.RegisterNpc(holdSim, Def, holdNpc);
-
-        var holdInput = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) }, { 100, default } };
-        for (int i = 0; i < 70; i++) holdSim.Tick(holdInput);
-        for (int i = 0; i < 40; i++) holdSim.Tick(new() { { 1, default }, { 100, default } });
-        ushort holdDmg = holdSim.GetState(100).DamagePercent;
-
-        Assert.Equal((ushort)10, tapDmg);
-        Assert.Equal((ushort)14, holdDmg);
-        Assert.True(holdDmg > tapDmg,
-            $"charged Collapse must out-damage the tap: tap={tapDmg} charged={holdDmg}");
-    }
-
-    /// <summary>
-    /// The charged Collapse declares its own slam speed (<c>ChargedStages[0].MoveY = -18</c>,
-    /// faster than the tap's -14) and <see cref="Abilities.AirChargeAttack"/> must honour it
-    /// during the charged attack, not just the tap.
-    /// </summary>
-    [Fact]
-    public void AirRmb_ChargedCollapse_DescendsDuringTheAttack()
-    {
-        var sim = SimWithPlayer();
-        var player = sim.GetState(1);
-        player.PY = GroundPY + 5f;
-        player.IsGrounded = false;
-        player.JumpsLeft = 0;
-        sim.SetState(1, player);
-        float startY = player.PY;
-
-        float moveY = Def.AirRMB!.ChargedStages![0].MoveY;
-        Assert.True(moveY < 0f, $"charged Collapse must declare a downward MoveY, got {moveY}");
-
-        // Hold past ChargeHoldTicks (45): auto-release at tick 45, then 10 attack ticks.
-        var holdInputs = new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) } };
-        for (int i = 0; i < 55; i++) sim.Tick(holdInputs);
-
-        var mid = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, mid.State);
-        Assert.Equal(moveY, mid.VY, 3);
-        Assert.True(mid.PY < startY - 2f,
-            $"charged Collapse must lose height while the attack is still running: " +
-            $"{startY:F3} -> {mid.PY:F3} on tick 55 (state {mid.State})");
-    }
-
     // Lmb_DamagesEnemyInClawRange used to live here, asserting DamagePercent > 0 for a dummy at
     // z = 1.2. Nilus_LMB_Hit_Confirm.json runs the same cast against a dummy at the same z and
     // pins the damage at exactly 3 (NpcSnap and NpcFinal both), so the `> 0` form could only
     // ever fail where the golden already fails with a better message. Removed rather than kept
     // as a weaker duplicate.
-
-    /// <summary>
-    /// Entropy Lance is the kill move, so the charged branch must actually be
-    /// reachable: tap resolves Stages[1], holding past ChargeHoldTicks (50)
-    /// auto-releases ChargedStages[0], which hits substantially harder.
-    /// </summary>
-    [Fact]
-    public void Rmb_ChargedHitsHarderThanTap()
-    {
-        // Tap: press then release immediately (uncharged Stages[1]).
-        var tapSim = SimWithPlayer();
-        var tapNpc = TestHelpers.NpcState(0f, 1.4f); tapNpc.PY = GroundPY;
-        TestHelpers.RegisterNpc(tapSim, Def, tapNpc);
-        tapSim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) }, { 100, default } });
-        for (int i = 0; i < 40; i++) tapSim.Tick(new() { { 1, default }, { 100, default } });
-        ushort tapDmg = tapSim.GetState(100).DamagePercent;
-
-        // Hold: keep aiming past the charge threshold (auto-releases charged).
-        var holdSim = SimWithPlayer();
-        var holdNpc = TestHelpers.NpcState(0f, 1.4f); holdNpc.PY = GroundPY;
-        TestHelpers.RegisterNpc(holdSim, Def, holdNpc);
-        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
-        for (int i = 0; i < 110; i++) holdSim.Tick(new() { { 1, hold }, { 100, default } });
-        ushort holdDmg = holdSim.GetState(100).DamagePercent;
-
-        Assert.True(tapDmg > 0, $"tap should deal damage, got {tapDmg}");
-        Assert.True(holdDmg > tapDmg, $"charged ({holdDmg}) should exceed tap ({tapDmg})");
-    }
 
     // ── Q: Void Rift ──
 
@@ -1382,59 +1227,6 @@ public class NilusAbilityTests
         Assert.Equal(ActionState.Idle, sim.GetState(1).State);
         Assert.True(sim.GetState(100).DamagePercent > dragDmg,
             $"detonation should have added damage beyond {dragDmg}; got {sim.GetState(100).DamagePercent}");
-    }
-
-    /// <summary>
-    /// <see cref="Abilities.AirChargeAttack"/> refuses a DOWNWARD <c>AttackStage.MoveY</c> while
-    /// grounded. Collapse's -14 (tap) / -18 (charged) is only 0.233-0.3 m/tick against
-    /// <c>PlatformSnapTolerance = 0.5</c>, so the unguarded write was harmless for everything
-    /// that ships — but at |MoveY| &gt; 30 the post-integration PY lands below the snap window
-    /// (Simulation.cs:363), control falls to <c>IsGrounded = false</c>, and the ability
-    /// re-dirties VY every tick: the character drills through the floor to the blast zone.
-    /// No golden could catch that, because no shipped stage declares a value anywhere near it.
-    ///
-    /// The fixture is a test-local clone with MoveY = -48 (0.8 m/tick). Nothing in NilusData
-    /// moves; the shipped -14 tap is asserted to be inside the safe band by the same maths.
-    /// </summary>
-    [Fact]
-    public void AirRmb_GroundedDownwardMoveY_CannotDrillThroughTheFloor()
-    {
-        var shipped = Def.AirRMB!.Stages[1];
-        Assert.True(MathF.Abs(shipped.MoveY) / 60f < 0.5f,
-            $"the shipped Collapse must stay inside PlatformSnapTolerance; " +
-            $"{shipped.MoveY} gives {MathF.Abs(shipped.MoveY) / 60f:F3} m/tick");
-
-        // Clone the SHIPPING AirRMB shape (charge phase + tap) and drill the tap stage:
-        // a single-stage fixture would auto-release with _wasCharged on tick 1 (vacuous
-        // 0 >= 0 comparison with ChargeHoldTicks unset), exercising a shape that never ships.
-        var tap = shipped;
-        tap.MoveY = -48f;   // 0.8 m/tick, past the 0.5 m snap window
-        var def = TestHelpers.CloneDef(Def);
-        def.AirRMB = new AbilitySpec
-        {
-            Name = Def.AirRMB.Name,
-            CooldownTicks = Def.AirRMB.CooldownTicks,
-            Behavior = AbilityBehavior.ChargeAttack,
-            ChargeHoldTicks = Def.AirRMB.ChargeHoldTicks,
-            Stages = new[] { Def.AirRMB.Stages[0], tap },
-            ChargedStages = Def.AirRMB.ChargedStages,
-            AnimationNames = Def.AirRMB.AnimationNames,
-        };
-
-        var sim = TestHelpers.MakeSim();
-        var s = TestHelpers.PlayerState();
-        s.PY = GroundPY + 0.6f;   // one tick of the drill above the floor
-        s.IsGrounded = false;
-        s.JumpsLeft = 0;
-        TestHelpers.RegisterPlayer(sim, def, s);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2) } });
-        for (int i = 0; i < 60; i++) sim.Tick(new() { { 1, default } });
-
-        var after = sim.GetState(1);
-        Assert.True(after.IsGrounded, $"the slam must stop at the floor; PY={after.PY:F3}");
-        TestHelpers.AssertNear(GroundPY, after.PY, 0.001f);
-        Assert.Equal((byte)0, after.Deaths);
     }
 
     /// <summary>

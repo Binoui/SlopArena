@@ -65,47 +65,6 @@ public class KistuKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void RMB_UnchargedPoke_HitsNpc()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Kistu RMB Uncharged",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence()
-                .Set(0, new InputState { ActiveSlot = 2, IsAiming = true })
-                .Set(10, default),  // release after debounce → tap poke, not the charged spin
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 13,   // tap-poke hitbox active (release ~tick4, trigger=6, dur=5)
-            TotalTicks = 50,
-        });
-    }
-
-    [Fact]
-    public void AirRMB_FallingSlash_SpikesNpcDownward()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Kistu Air RMB Falling Slash",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PX = 0, PZ = 0, PY = 1.5f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 2),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.0f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 14,   // tap hitbox active (release ~tick5, trigger=6, dur=14 → 11-24)
-            TotalTicks = 60,
-        });
-    }
-
-    [Fact]
     public void E_DashSlash_AimedRelease_HitsNpcAlongPath()
     {
         AssertGoldenScenario(new KitScenario

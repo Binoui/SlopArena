@@ -87,7 +87,7 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     // Single move: right punch
-                    new() { DurationTicks = 40, LungeForce = 8f,
+                    new() { DurationTicks = 40, IasaTicks = 36, LungeForce = 8f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 8, Radius = 0.8f, OffX = 0f, OffY = 0.4f, OffZ = 1f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 20, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.9f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
@@ -107,91 +107,12 @@ public static partial class CharacterRegistry
                 Stages = new AttackStage[]
                 {
                     // Single move: air kick
-                    new() { DurationTicks = 28, 
+                    new() { DurationTicks = 28, IasaTicks = 24, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 19, 
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 6, Radius = 0.55f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
                             AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f, LungeForce = 3f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.15f, R = 1f, G = 0.6f, B = 0f, A = 1f } } },
                 },
                 AnimationNames = new[] { "spell_lmb_air_1" },
-            },
-
-            RMB = new AbilitySpec
-            {
-                Name = "Aerosol + Lighter",
-                Description = "Charge aerosol and ignite — hold to release a larger flame burst",
-                IconName = "rmb",
-                Behavior = AbilityBehavior.ChargeAttack,
-                CooldownTicks = 30,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 128,     // Stage 0: charge phase
-                            HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 6f, WarpRange = 0f, UseTargetLock = false,
-                            RotateTowardTarget = false, TrackingStrength = 0f },
-                    new() { DurationTicks = 58,      // Stage 1: normal attack
-                        HitboxEvents = new[]
-                        {
-                            new HitboxEvent
-                            {
-                                TriggerTick = 8, DurationTicks = 38,
-                                Shape = HitboxShape.Capsule, Radius = 0.7f,
-                                OffX = 0, OffY = 1.0f, OffZ = 2.0f,
-                                EndOffX = 0, EndOffY = 0, EndOffZ = 1.0f,
-                                Damage = 8f,
-                                Knockback = new() { Profile = KnockbackProfile.Medium },
-                                StunTicks = 22, Interruptible = true,
-                            },
-                        },
-                            AttackRange = 6f, WarpRange = 0f, UseTargetLock = false,
-                            RotateTowardTarget = false, TrackingStrength = 0f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    new() { DurationTicks = 50, 
-                            HitboxEvents = new[]
-                            {
-                                new HitboxEvent
-                                {
-                                    TriggerTick = 10, DurationTicks = 30,
-                                    Shape = HitboxShape.Capsule, Radius = 0.8f,
-                                    OffX = 0, OffY = 1.0f, OffZ = 2.5f,
-                                    EndOffX = 0, EndOffY = 0, EndOffZ = 1.5f,
-                                    Damage = 14f,
-                                    Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 22, Interruptible = true,
-                                },
-                            },
-                            AttackRange = 8f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
-                },
-                ChargeHoldTicks = 45,
-                AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
-            },
-
-            AirRMB = new AbilitySpec
-            {
-                Name = "Knuckle Spike",
-                Description = "Hold to charge a downward spike punch; tap = quick spike, charged = heavier spike that launches enemies straight down",
-                CooldownTicks = 0,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 45,
-                Stages = new AttackStage[]
-                {
-                    // Stage 0: hold/charge phase (no hitboxes; targeting + warp config live here)
-                    new() { DurationTicks = 60, 
-                            HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
-                    // Stage 1: tap spike (same numbers as the pre-charge air RMB)
-                    new() { DurationTicks = 30, 
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 16, DurationTicks = 8, Radius = 0.7f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.5f, EndOffZ = 0, Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    // Charged: bigger knuckle, longer reach, more damage
-                    new() { DurationTicks = 30, 
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 14, DurationTicks = 10, Radius = 0.8f, Shape = HitboxShape.Capsule, OffX = 0, OffY = -0.5f, OffZ = 0, EndOffX = 0, EndOffY = -1.6f, EndOffZ = 0, Damage = 14f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 22, Interruptible = true } },
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.3f },
-                },
-                AnimationNames = new[] { "spell_rmb_air_loop", "spell_rmb_air_attack" },
             },
 
             Slot1 = new AbilitySpec

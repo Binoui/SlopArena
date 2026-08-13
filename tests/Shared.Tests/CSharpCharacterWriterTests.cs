@@ -192,38 +192,6 @@ public class CSharpCharacterWriterTests
         Assert.DoesNotContain("TriggerTick = 6, DurationTicks = 6", result);
     }
 
-    [Fact]
-    public void Replace_RealManki_RmbStage0_ArrayEmptyBecomesEvents()
-    {
-        string src = RealMankiSource();
-        var newEvents = new[] { SingleSphereEvent() };
-        Assert.True(CSharpCharacterWriter.TryReplaceHitboxEvents(src, "RMB", 0, newEvents, out string result));
-        // Stage 0 (charge phase) had no events; the replacement is a single line
-        // swapping a single line, so the file diff is exactly one line.
-        Assert.Equal(1, CountChangedLines(src, result));
-        Assert.Contains("TriggerTick = 20, DurationTicks = 10", result);
-    }
-
-    [Fact]
-    public void Replace_RealManki_SecondStage_DoesNotMatchChargedStages()
-    {
-        // RMB stage 1 is a multi-line block (12 lines → 1), so the index-wise line
-        // metric is meaningless; assert structure instead: prefix and suffix identical,
-        // new events in, old events out, ChargedStages untouched.
-        string src = RealMankiSource();
-        var newEvents = new[] { SingleSphereEvent() };
-        Assert.True(CSharpCharacterWriter.TryReplaceHitboxEvents(src, "RMB", 1, newEvents, out string result));
-
-        string stage1Marker = "new() { DurationTicks = 58,";
-        Assert.StartsWith(src.Substring(0, src.IndexOf(stage1Marker, StringComparison.Ordinal)), result);
-        Assert.EndsWith(src.Substring(src.IndexOf("ChargedStages = new AttackStage[]", StringComparison.Ordinal)), result);
-
-        Assert.Contains("TriggerTick = 20, DurationTicks = 10", result);
-        Assert.DoesNotContain("TriggerTick = 8, DurationTicks = 38", result); // old stage-1 event
-        // The charged flame keeps its own events.
-        Assert.Contains("TriggerTick = 10, DurationTicks = 30", result);
-    }
-
     // ── Structural edge cases (synthetic sources) ──
 
     private const string TwoStageSource = @"

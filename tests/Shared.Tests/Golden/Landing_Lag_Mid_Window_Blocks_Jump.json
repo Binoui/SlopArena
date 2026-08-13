@@ -2,9 +2,7 @@
   "Scenario": "Landing Lag Mid Window Blocks Jump",
   "TickCount": 120,
   "PlayerSnap": {
-    "State": 4,
     "PY": 0.85,
-    "AttackSlot": 1,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

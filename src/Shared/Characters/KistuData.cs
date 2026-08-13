@@ -79,7 +79,7 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 30, LungeForce = 6f,
+                    new() { DurationTicks = 30, IasaTicks = 26, LungeForce = 6f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.8f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
@@ -97,80 +97,13 @@ public static partial class CharacterRegistry
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 24, LungeForce = 3f,
+                    new() { DurationTicks = 24, IasaTicks = 20, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 16, LungeForce = 3f,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
                                     OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.6f,
                                     Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
                 },
                 AnimationNames = new[] { "spell_lmb_air_1" },
-            },
-
-            // RMB — Charged Spin: tap = horizontal poke, hold = charged kill (big horizontal launch)
-            RMB = new AbilitySpec
-            {
-                Name = "Charged Spin",
-                Description = "Hold to charge a spinning slash. Tap = quick poke; charged = blast-zone kill.",
-                IconName = "rmb",
-                CooldownTicks = 60,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 50,
-                Stages = new AttackStage[]
-                {
-                    // Stage 0: hold/charge phase (safety net 300 ticks)
-                    new() { DurationTicks = 300, HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                            LungeForce = 0f, AttackRange = 0f, WarpRange = 0f },
-                    // Stage 1: tap poke (quick, horizontal knockback)
-                    new() { DurationTicks = 30, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.45f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.9f,
-                                    Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 2.25f, WarpRange = 0f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    // Charged: big horizontal-launch kill spin
-                    new() { DurationTicks = 44, LungeForce = 5f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 12, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.6f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 2.1f,
-                                    Damage = 16f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 18, KnockbackGrowth = 10 },
-                                    StunTicks = 24, Interruptible = true } },
-                            AttackRange = 2.25f, WarpRange = 0f },
-                },
-                AnimationNames = new[] { "spell_rmb_loop", "spell_rmb_attack" },
-            },
-
-            // AirRMB — Falling Slash (downward spike; hold to charge)
-            AirRMB = new AbilitySpec
-            {
-                Name = "Falling Slash",
-                Description = "Hold to charge a committed downward air slash; tap = quick slash, charged = heavier slash that spikes enemies toward the floor/blast zone.",
-                CooldownTicks = 0,
-                Behavior = AbilityBehavior.ChargeAttack,
-                ChargeHoldTicks = 45,
-                Stages = new AttackStage[]
-                {
-                    // Stage 0: hold/charge phase (no hitboxes; targeting config lives here)
-                    new() { DurationTicks = 60, 
-                            HitboxEvents = Array.Empty<HitboxEvent>(),
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
-                    // Stage 1: tap slash (same numbers as the pre-charge air RMB)
-                    new() { DurationTicks = 26, LungeForce = 0f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.45f,
-                                    OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.4f,
-                                    Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
-                },
-                ChargedStages = new AttackStage[]
-                {
-                    // Charged: wider blade, more damage
-                    new() { DurationTicks = 26, LungeForce = 0f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 16, Shape = HitboxShape.Capsule, Radius = 0.6f,
-                                    OffX = 0, OffY = 0.4f, OffZ = 0.6f, EndOffX = 0, EndOffY = -0.6f, EndOffZ = 1.5f,
-                                    Damage = 13f, Knockback = new() { Profile = KnockbackProfile.Spike }, StunTicks = 24, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
-                },
-                AnimationNames = new[] { "spell_air_rmb", "spell_air_rmb" },
             },
 
             // Q — Counter (parry window → launch riposte)

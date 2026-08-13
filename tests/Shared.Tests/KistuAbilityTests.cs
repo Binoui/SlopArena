@@ -27,7 +27,6 @@ public class KistuAbilityTests
 
     [Theory]
     [InlineData((byte)1)] // LMB
-    [InlineData((byte)2)] // RMB
     [InlineData((byte)3)] // Q
     [InlineData((byte)4)] // E
     [InlineData((byte)5)] // R
@@ -44,7 +43,6 @@ public class KistuAbilityTests
 
     [Theory]
     [InlineData((byte)1)] // AirLMB
-    [InlineData((byte)2)] // AirRMB
     public void AirSlot_Activates(byte slot)
     {
         var sim = TestHelpers.MakeSim();
@@ -71,31 +69,6 @@ public class KistuAbilityTests
         for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
         Assert.True(sim.GetState(100).DamagePercent > 0);
-    }
-
-    // ── RMB: charged spin deals more than the tap poke ──
-
-    [Fact]
-    public void Rmb_ChargedHitsHarderThanTap()
-    {
-        // Tap: press then release immediately (uncharged Stages[1]).
-        var tapSim = SimWithPlayer(out _);
-        var tapNpc = TestHelpers.NpcState(0f, 1.4f); tapNpc.PY = GroundPY;
-        TestHelpers.RegisterNpc(tapSim, Def, tapNpc);
-        tapSim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 2, aiming: true) }, { 100, default } });
-        for (int i = 0; i < 40; i++) tapSim.Tick(new() { { 1, default }, { 100, default } });
-        ushort tapDmg = tapSim.GetState(100).DamagePercent;
-
-        // Hold: keep aiming past the charge threshold (auto-releases charged).
-        var holdSim = SimWithPlayer(out _);
-        var holdNpc = TestHelpers.NpcState(0f, 1.4f); holdNpc.PY = GroundPY;
-        TestHelpers.RegisterNpc(holdSim, Def, holdNpc);
-        var hold = TestHelpers.Input(activeSlot: 2, aiming: true);
-        for (int i = 0; i < 100; i++) holdSim.Tick(new() { { 1, hold }, { 100, default } });
-        ushort holdDmg = holdSim.GetState(100).DamagePercent;
-
-        Assert.True(tapDmg > 0, $"tap should deal damage, got {tapDmg}");
-        Assert.True(holdDmg > tapDmg, $"charged ({holdDmg}) should exceed tap ({tapDmg})");
     }
 
     // ── E: directional dash — tap and hold both travel the same set distance (no charge) ──
