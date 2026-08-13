@@ -43,13 +43,17 @@ public static class AbilityFactory
         (0, true) => new AirLmbCombo(),        // AirLMB — rising kick
         (1, false) => new FightGuyUppercut(),  // RMB ground — charged uppercut
         (1, true) => new AirChargeAttack(),    // RMB air — helicopter spike
-        (2, _) => new LmbCombo(),              // key "1" — Dragon Thrust (normal)
+        (2, false) => new LmbCombo(),          // key "1" — Low Kick (normal)
+        (2, true) => new AirLmbCombo(),        // key "1" air — Double Punch
         (3, _) => new FightGuyRisingKick(),    // E — Rising Dragon (upward mobility / recovery)
         (4, _) => new FightGuyCycloneKick(),   // R — Cyclone Kick (moved from E, issue #117)
         (5, _) => new FightGuyTempest(),       // F — Tempest
-        (6, _) => new LmbCombo(),              // key "2" — Dragon Uppercut (normal)
-        (7, _) => new LmbCombo(),              // key "3" — Dragon Stomp (normal)
-        (8, _) => new LmbCombo(),              // key "4" — Ki Wave (normal)
+        (6, false) => new LmbCombo(),          // key "2" — Roundhouse (normal)
+        (6, true) => new AirLmbCombo(),        // key "2" air — Floating Kick
+        (7, false) => new LmbCombo(),          // key "3" — Double Uppercut (normal)
+        (7, true) => new AirLmbCombo(),        // key "3" air — High Kick
+        (8, false) => new LmbCombo(),          // key "4" — Tornado Kick (normal)
+        (8, true) => new AirLmbCombo(),        // key "4" air — Air Tornado
         (10, _) => new FightGuyKiShot(),       // Q key (slot 11) — Ki Shot (moved from slot 2, issue #117)
         _ => null,                             // key "5" — empty (demo)
     };

@@ -1,0 +1,33 @@
+{
+  "Scenario": "FightGuy AirSlot4 Air Tornado",
+  "TickCount": 70,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2.5,
+    "AttackSlot": 9,
+    "HitstopTicks": 10,
+    "AirTimeTicks": 18
+  },
+  "NpcSnap": {
+    "PY": 3.5,
+    "PZ": 1.5,
+    "DamagePercent": 12,
+    "HitstopTicks": 10,
+    "AirTimeTicks": 18,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 5.0460696,
+    "PZ": 5.727992,
+    "VY": 1.7036349,
+    "VZ": 1.5096483,
+    "DamagePercent": 12,
+    "AirTimeTicks": 19,
+    "JumpsLeft": 2
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "Scenario": "FightGuy Slot4 Tornado Kick",
+  "TickCount": 70,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "AttackSlot": 9,
+    "HitstopTicks": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 1.5,
+    "DamagePercent": 12,
+    "HitstopTicks": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 2.2960732,
+    "PZ": 5.727992,
+    "VY": 1.7036349,
+    "VZ": 1.5096483,
+    "DamagePercent": 12,
+    "AirTimeTicks": 19,
+    "JumpsLeft": 2
+  }
+}

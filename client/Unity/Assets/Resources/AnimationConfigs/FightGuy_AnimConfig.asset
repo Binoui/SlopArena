@@ -23,29 +23,44 @@ MonoBehaviour:
   HitHard: {fileID: -203655887218126122, guid: 05fa095eee4e8bb52a4c0c926592faff, type: 3}
   Death: {fileID: 8993902097722301239, guid: e2eb8871bf81bb449ab74e86581b3f3a, type: 3}
   AbilityClips:
-  - Name: spell_lmb_1
+  - Name: spell_lmb
     Clip: {fileID: 7400000, guid: eb14612d3e2086d5dbbc4f6176ca362d, type: 2}
     Extrapolation: 0
-  - Name: spell_lmb_2
-    Clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
-    Extrapolation: 0
-  - Name: spell_lmb_3
-    Clip: {fileID: 7400000, guid: da8f21f261cb15302898c2b46af8a4a9, type: 2}
-    Extrapolation: 0
-  - Name: spell_lmb_4
-    Clip: {fileID: 7400000, guid: 85dfb50c9840100369920ab6a4a2b4c8, type: 2}
-    Extrapolation: 0
-  - Name: spell_lmb_air_1
+  - Name: spell_air_lmb
     Clip: {fileID: 7400000, guid: ef68c8deeec6feeb7be8cdd4f6263483, type: 2}
-    Extrapolation: 0
-  - Name: spell_lmb_air_2
-    Clip: {fileID: 7400000, guid: 4ada0a01199bdd0c99902bc886c34f37, type: 2}
     Extrapolation: 0
   - Name: spell_rmb_loop
     Clip: {fileID: 7400000, guid: f788476bcf8c076c8a09815fbf0cfde5, type: 2}
     Extrapolation: 1
   - Name: spell_rmb_attack
     Clip: {fileID: 7400000, guid: 53ecdafd3e06daa8eb5eadc86f50e364, type: 2}
+    Extrapolation: 0
+  - Name: spell_g_1
+    Clip: {fileID: 7400000, guid: eb14612d3e2086d5dbbc4f6176ca362d, type: 2}
+    Extrapolation: 0
+  - Name: spell_a_1
+    Clip: {fileID: 7400000, guid: ef68c8deeec6feeb7be8cdd4f6263483, type: 2}
+    Extrapolation: 0
+  - Name: spell_g_2
+    Clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
+    Extrapolation: 0
+  - Name: spell_a_2
+    Clip: {fileID: 7400000, guid: 34fbf978157a3a889b7e7d58c95dc8d8, type: 2}
+    Extrapolation: 2
+  - Name: spell_g_3
+    Clip: {fileID: 7400000, guid: 620857fce10c658228bdf2f8afe03cf5, type: 2}
+    Extrapolation: 0
+  - Name: spell_a_3
+    Clip: {fileID: 7400000, guid: 4e90ecac4c0d8c718aa349996204222e, type: 2}
+    Extrapolation: 0
+  - Name: spell_g_4
+    Clip: {fileID: 7400000, guid: 9cbe6f9b5899e5b8c9e88098f6c21f47, type: 2}
+    Extrapolation: 0
+  - Name: spell_a_4
+    Clip: {fileID: 7400000, guid: 4f310a06569ec0eea85b7f11a292e401, type: 2}
+    Extrapolation: 0
+  - Name: spell_air_1
+    Clip: {fileID: 7400000, guid: 4ada0a01199bdd0c99902bc886c34f37, type: 2}
     Extrapolation: 0
   - Name: spell_q_attack
     Clip: {fileID: 3094330708855449807, guid: e40302a18e6c6e526bf471320e9fd420, type: 3}

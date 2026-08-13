@@ -1,0 +1,32 @@
+{
+  "Scenario": "FightGuy Slot3 Double Uppercut",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "AttackSlot": 8,
+    "HitstopTicks": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 0.8,
+    "DamagePercent": 5,
+    "HitstopTicks": 6,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 1.2644272,
+    "DamagePercent": 5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

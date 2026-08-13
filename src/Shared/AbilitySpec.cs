@@ -63,6 +63,14 @@ namespace SlopArena.Shared
         /// implements the burst; bespoke recovery moves just set the flag to get the reset.
         /// </summary>
         public bool IsRecoveryMove;
+        /// <summary>
+        /// Momentum override (ADR-0015 §2 refinement, 2026-08-12): a grounded activation
+        /// zeroes the incoming horizontal velocity (VX/VZ) by default — "grounded moves stop
+        /// movement". Set to true to keep run/dash momentum through the attack start
+        /// (dash-attack style moves). Aerials always preserve momentum regardless of this
+        /// flag — momentum-preserve is an aerial property.
+        /// </summary>
+        public bool PreserveMomentumOnStart;
         public AttackStage[] Stages;
         /// <summary>Hold-to-charge variant. Triggers after ChargeHoldTicks.</summary>
         public AttackStage[]? ChargedStages;

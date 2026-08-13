@@ -44,14 +44,14 @@ public class FacingSnapTests : KitScenarioTests
     public void Golden_SnapThenNormal_FiresAlongSnappedFacing()
     {
         // The #126 playtest, grounded: snap to camera azimuth (-Z, AimYaw 18000), then
-        // press 1 — Dragon Thrust fires along the snapped facing and hits the NPC placed
+        // press 1 — Low Kick fires along the snapped facing and hits the NPC placed
         // at -Z. Golden pins the snapped facing THROUGH the attack (the stage's own
         // tracking keeps it — the target sits exactly at the snapped yaw, diff 0) and
         // the hit landing (NPC damage).
         var fg = TestHelpers.FightGuyDef;
         float fgGpy = TestHelpers.GroundPY(fg);
         // Grid-center positions: the arena heightmap spans [0,200]² — a -Z lunge from
-        // the origin would exit the grid (no surface → airborne → null air spec).
+        // the origin would exit the grid (no surface → airborne).
         AssertGoldenScenario(new KitScenario
         {
             Name = "Facing Snap Then Normal",
@@ -64,7 +64,7 @@ public class FacingSnapTests : KitScenarioTests
             NpcSetup = () => TestHelpers.NpcState(100f, 98.7f) with { PY = fgGpy },
             NpcAssert = _ => { },
             NpcDef = fg,
-            SnapshotTick = 8,   // hitbox active (trigger 6, dur 5), hit landed
+            SnapshotTick = 8,   // post-hit recovery of Low Kick (hitbox 2-4, lock until 17), hit landed
             TotalTicks = 60,
         });
     }
@@ -85,7 +85,7 @@ public class FacingSnapTests : KitScenarioTests
                 .Set(0, new InputState { ActiveSlot = AbilitySlots.Slot1 })
                 .Set(2, new InputState { FaceToCamera = true, AimYaw = 18000 }),
             Assert = _ => { },
-            SnapshotTick = 10,  // mid Dragon Thrust (dur 30); snap rejected at t2
+            SnapshotTick = 10,  // mid Low Kick (dur 17, IASA 13); snap rejected at t2
             TotalTicks = 40,
         });
     }

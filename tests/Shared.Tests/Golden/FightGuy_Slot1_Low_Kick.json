@@ -1,38 +1,30 @@
 {
-  "Scenario": "Facing Snap Then Normal",
-  "TickCount": 60,
+  "Scenario": "FightGuy Slot1 Low Kick",
+  "TickCount": 40,
   "PlayerSnap": {
     "State": 4,
-    "FacingYaw": 3.1415927,
-    "PX": 100,
     "PY": 0.85,
-    "PZ": 100,
     "AttackSlot": 3,
-    "HitstopTicks": 1,
+    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "PX": 100,
-    "PY": 0.85,
-    "PZ": 98.7,
+    "PY": 0.75,
+    "PZ": 1,
     "DamagePercent": 4,
-    "HitstopTicks": 1,
+    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "PlayerFinal": {
-    "FacingYaw": 3.1415927,
-    "PX": 100,
     "PY": 0.85,
-    "PZ": 100,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PX": 100,
-    "PY": 0.85,
-    "PZ": 98.2892,
+    "PY": 0.75,
+    "PZ": 1.4222441,
     "DamagePercent": 4,
     "JumpsLeft": 2,
     "IsGrounded": true

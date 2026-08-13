@@ -175,19 +175,44 @@ public static partial class CharacterRegistry
 
             Slot1 = new AbilitySpec
             {
-                Name = "Dragon Thrust",
-                Description = "Forward palm/kick thrust — medium spacing normal (issue #117 normal tier)",
+                Name = "Low Kick",
+                Description = "Fast low right-foot kick — quick poke, low commitment (normal tier, key 1)",
                 IconName = "1",
-                CooldownTicks = 15,
+                CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 30, LungeForce = 6f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Radius = 0.5f, OffX = 0, OffY = 0.7f, OffZ = 1.3f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                    // Melee jab profile: 2-frame startup, 3-frame active, ~17 total. No lunge —
+                    // grounded activation stops run momentum; aerials carry theirs (ADR-0015 §2).
+                    new() { DurationTicks = 17, IasaTicks = 13,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 2, DurationTicks = 3, Radius = 0.55f, OffX = 0, OffY = 0.3f, OffZ = 1.0f,
+                                    Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_lmb_2" },
-                Params = new() { ["lunge_duration"] = 5f, },
+                AnimationNames = new[] { "spell_g_1" },
+            },
+
+            AirSlot1 = new AbilitySpec
+            {
+                Name = "Double Punch",
+                Description = "Left then right punch — fast air poke (air variant, key 1)",
+                IconName = "1",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Melee uair profile: 5-frame startup, two hitboxes (4 / 13), ~33 total
+                    new() { DurationTicks = 33, IasaTicks = 29,
+                            HitboxEvents = new HitboxEvent[]
+                            {
+                                new() { TriggerTick = 4, DurationTicks = 4, Radius = 0.5f, OffX = 0, OffY = 0.9f, OffZ = 1.0f, Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 12, Interruptible = true },
+                                new() { TriggerTick = 13, DurationTicks = 5, Radius = 0.55f, OffX = 0, OffY = 0.9f, OffZ = 1.1f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true },
+                            },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] {
+                                new BoneTrailDef { BoneName = "mixamorig:LeftHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f },
+                                new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_a_1" },
             },
 
             E = new AbilitySpec
@@ -279,52 +304,115 @@ public static partial class CharacterRegistry
 
             Slot2 = new AbilitySpec
             {
-                Name = "Dragon Uppercut",
-                Description = "Anti-air uppercut — launches into air combos",
+                Name = "Roundhouse",
+                Description = "Roundhouse left kick — mid-range spacing normal (normal tier, key 2)",
                 IconName = "2",
-                CooldownTicks = 25,
+                CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 32, LungeForce = 4f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 5, Radius = 0.55f, OffX = 0, OffY = 1.5f, OffZ = 0.5f, Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 70, BaseKnockback = 10, KnockbackGrowth = 5 }, StunTicks = 20, Interruptible = true } },
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                    // Melee ftilt profile: 8-frame startup, 4-frame active, ~29 total. No lunge —
+                    // grounded activation stops run momentum; aerials carry theirs (ADR-0015 §2).
+                    new() { DurationTicks = 29, IasaTicks = 27,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 4, Radius = 0.65f, OffX = 0, OffY = 0.8f, OffZ = 1.15f,
+                                    Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_lmb_3" },
-                Params = new() { ["lunge_duration"] = 4f, },
+                AnimationNames = new[] { "spell_g_2" },
+            },
+
+            AirSlot2 = new AbilitySpec
+            {
+                Name = "Floating Kick",
+                Description = "Long static kick — lingering air hitbox, nair-style spacing (air variant, key 2)",
+                IconName = "2",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Melee nair profile: late startup, long active window, ~42 total; static (no lunge)
+                    new() { DurationTicks = 42, IasaTicks = 36,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 7, DurationTicks = 12, Radius = 0.6f, OffX = 0, OffY = 0.8f, OffZ = 1.0f,
+                                    Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 18, Interruptible = true } },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_a_2" },
             },
 
             Slot3 = new AbilitySpec
             {
-                Name = "Dragon Stomp",
-                Description = "Slow, telegraphed stomp — huge knockback reward",
+                Name = "Double Uppercut",
+                Description = "Low right-hand starter then a rising right uppercut — anti-air launcher (normal tier, key 3)",
                 IconName = "3",
-                CooldownTicks = 50,
+                CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 40,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 22, DurationTicks = 6, Radius = 0.7f, OffX = 0, OffY = 0.4f, OffZ = 1.0f, Damage = 13f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 16, KnockbackGrowth = 9 }, StunTicks = 26, Interruptible = true } },
-                            AttackRange = 1.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                    // Melee utilt profile: two hitboxes (low starter 12, uppercut 20, launch up), ~39 total.
+                    // No lunge — grounded activation stops run momentum; aerials carry theirs (ADR-0015 §2).
+                    new() { DurationTicks = 39, IasaTicks = 36,
+                            HitboxEvents = new HitboxEvent[]
+                            {
+                                new() { TriggerTick = 12, DurationTicks = 4, Radius = 0.55f, OffX = 0, OffY = 0.5f, OffZ = 0.8f, Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true },
+                                new() { TriggerTick = 20, DurationTicks = 5, Radius = 0.6f, OffX = 0, OffY = 1.6f, OffZ = 0.5f, Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 10, KnockbackGrowth = 5 }, StunTicks = 22, Interruptible = true },
+                            },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_rmb_attack" },
-                Params = new() { ["lunge_duration"] = 2f, },
+                AnimationNames = new[] { "spell_g_3" },
+            },
+
+            AirSlot3 = new AbilitySpec
+            {
+                Name = "High Kick",
+                Description = "High-reaching left-foot kick — aerial juggle launcher (air variant, key 3)",
+                IconName = "3",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Melee dair-ish profile: 15-frame startup, 5-frame active, ~44 total, upward send
+                    new() { DurationTicks = 44, IasaTicks = 41,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 15, DurationTicks = 5, Radius = 0.6f, OffX = 0, OffY = 1.3f, OffZ = 1.0f,
+                                    Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 70, BaseKnockback = 8, KnockbackGrowth = 4 }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_a_3" },
             },
 
             Slot4 = new AbilitySpec
             {
-                Name = "Ki Wave",
-                Description = "Ki burst around the body — knocks nearby enemies back",
+                Name = "Tornado Kick",
+                Description = "Spinning right-foot tornado kick — 360° get-off-me normal (normal tier, key 4)",
                 IconName = "4",
-                CooldownTicks = 35,
+                CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 26,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 8, Radius = 2.2f, OffX = 0, OffY = 0.6f, OffZ = 0f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 15, BaseKnockback = 12, KnockbackGrowth = 4 }, StunTicks = 18, Interruptible = true } },
-                            AttackRange = 0f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                    // Melee dsmash profile: 18-frame startup, long 10-frame active ring, ~49 total
+                    new() { DurationTicks = 49, IasaTicks = 46,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 18, DurationTicks = 10, Radius = 1.7f, OffX = 0, OffY = 0.6f, OffZ = 0f,
+                                    Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 20, BaseKnockback = 12, KnockbackGrowth = 6 }, StunTicks = 22, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_rmb_attack" },
+                AnimationNames = new[] { "spell_g_4" },
+            },
+
+            AirSlot4 = new AbilitySpec
+            {
+                Name = "Air Tornado",
+                Description = "Spinning tornado kick — 360° air get-off-me, same as ground key 4 (air variant, key 4)",
+                IconName = "4",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Identical frame data to ground Tornado Kick (fightguy_a_4 = same kick)
+                    new() { DurationTicks = 49, IasaTicks = 46,
+                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 18, DurationTicks = 10, Radius = 1.7f, OffX = 0, OffY = 0.6f, OffZ = 0f,
+                                    Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 20, BaseKnockback = 12, KnockbackGrowth = 6 }, StunTicks = 22, Interruptible = true } },
+                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_a_4" },
             },
 
             // Q slot (slot 11) — Ki Shot, moved from key "1" (issue #117). On AZERTY this key
@@ -365,7 +453,8 @@ public static partial class CharacterRegistry
 
         };
 
-        // ── Air variants (issue #117) — ability slots shared, normals grounded-only ──
+        // ── Air variants (issue #117) — ability slots shared, normals have distinct air specs ──
+        // Normal tier air variants (AirSlot1-4) are declared inline above (keys 1-4 air pass).
         def.AirE = def.E;   // Rising Dragon: same move in the air — recovery burst + FloatWindow reset
         def.AirR = def.R;   // Cyclone: works identically in the air
         def.AirA = def.A;   // Ki Shot: works in the air

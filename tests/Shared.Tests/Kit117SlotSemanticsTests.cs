@@ -5,7 +5,8 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Issue #117 — the 3-state ground/air slot semantics and the FightGuy kit rework:
-///   - null air spec = grounded-only (normals 1-4, Tempest)
+///   - null air spec = grounded-only (Tempest; slot 5 empty)
+///   - normals 1-4 have DISTINCT air specs (AirSlot1-4 — the air normal pass)
 ///   - Air* = ground spec reference = shared (Rising Dragon, Cyclone, Ki Shot)
 ///   - the E-slot rising kick: anti-air on the ground, recovery burst in the air
 ///   - cooldowns on slots 6-11 now tick down (TickTimers loop fix)
@@ -27,14 +28,19 @@ public class Kit117SlotSemanticsTests
     // ── GetSlotAbility air resolution (unit) ──
 
     [Fact]
-    public void GetSlotAbility_GroundedOnlyNormals_NullInAir()
+    public void GetSlotAbility_NormalsHaveDistinctAirSpecs()
     {
-        // Normals 1-4 (slot indices 2, 6, 7, 8) declare no air spec → grounded-only.
-        Assert.Null(Def.GetSlotAbility(2, true));   // Dragon Thrust
-        Assert.Null(Def.GetSlotAbility(6, true));   // Dragon Uppercut
-        Assert.Null(Def.GetSlotAbility(7, true));   // Dragon Stomp
-        Assert.Null(Def.GetSlotAbility(8, true));   // Ki Wave
-        Assert.Null(Def.GetSlotAbility(5, true));   // Tempest — ult is grounded-only
+        // Normals 1-4 (slot indices 2, 6, 7, 8) each declare a DISTINCT air spec —
+        // AirSlot1-4 are separate objects, not aliases of the ground spec.
+        Assert.NotNull(Def.GetSlotAbility(2, true));   // Low Kick → Double Punch
+        Assert.NotNull(Def.GetSlotAbility(6, true));   // Roundhouse → Floating Kick
+        Assert.NotNull(Def.GetSlotAbility(7, true));   // Double Uppercut → High Kick
+        Assert.NotNull(Def.GetSlotAbility(8, true));   // Tornado Kick → Air Tornado
+        Assert.NotSame(Def.GetSlotAbility(2, false), Def.GetSlotAbility(2, true));
+        Assert.NotSame(Def.GetSlotAbility(6, false), Def.GetSlotAbility(6, true));
+        Assert.NotSame(Def.GetSlotAbility(7, false), Def.GetSlotAbility(7, true));
+        Assert.NotSame(Def.GetSlotAbility(8, false), Def.GetSlotAbility(8, true));
+        Assert.Null(Def.GetSlotAbility(5, true));      // Tempest — ult is grounded-only
         Assert.NotNull(Def.GetSlotAbility(2, false));
     }
 
@@ -51,26 +57,25 @@ public class Kit117SlotSemanticsTests
     // ── Grounded-only gating (behavior) ──
 
     [Fact]
-    public void GroundedOnlyNormal_RejectedWhileAirborne()
+    public void AirNormal_ActivatesWhileAirborne()
     {
         var sim = TestHelpers.MakeSim();
-        var state = AirborneState();
-        TestHelpers.RegisterPlayer(sim, Def, state);
+        TestHelpers.RegisterPlayer(sim, Def, AirborneState());
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1); // Dragon Thrust
-        Assert.Equal(ActionState.Idle, t0.State);
-        Assert.Equal((byte)0, t0.AttackSlot);
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1); // key 1 air — Double Punch
+        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal((byte)3, t0.AttackSlot);
     }
 
     [Fact]
-    public void GroundedOnlyNormal_ActivatesOnGround()
+    public void NormalSlot1_ActivatesOnGround()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1); // Dragon Thrust
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1); // Low Kick
         Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)3, t0.AttackSlot);
     }

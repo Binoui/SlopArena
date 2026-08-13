@@ -1,0 +1,34 @@
+{
+  "Scenario": "FightGuy Slot2 Roundhouse",
+  "TickCount": 50,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.85,
+    "AttackSlot": 7,
+    "HitstopTicks": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "PY": 0.75,
+    "PZ": 1.2,
+    "DamagePercent": 8,
+    "HitstopTicks": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 1.3034061,
+    "PZ": 3.6764646,
+    "VY": 0.6842823,
+    "VZ": 1.7764536,
+    "DamagePercent": 8,
+    "AirTimeTicks": 11,
+    "JumpsLeft": 2
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "Scenario": "FightGuy AirSlot2 Floating Kick",
+  "TickCount": 70,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 7,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 7
+  },
+  "NpcSnap": {
+    "PY": 3,
+    "PZ": 1,
+    "DamagePercent": 6,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 7,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 2.915769,
+    "PZ": 1.4805235,
+    "VY": -0.9720418,
+    "DamagePercent": 6,
+    "AirTimeTicks": 36,
+    "JumpsLeft": 2
+  }
+}

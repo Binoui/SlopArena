@@ -114,13 +114,23 @@ namespace SlopArena.Shared
 			ability.CharacterDef = def;
 			ability.Arena = _arena;
 			ability.Slot = slot;
+            var spec = def.GetSlotAbility(slot, !state.IsGrounded);
+            // ADR-0015 §2 refinement (2026-08-12): momentum-preserve is an AERIAL property —
+            // air attacks ride their trajectory. A GROUNDED activation stops the incoming
+            // run/dash momentum (VX/VZ = 0) unless the spec opts out with
+            // PreserveMomentumOnStart (dash-attack style moves). Applied BEFORE OnStart so a
+            // move's own lunge / OnStart velocity still lands.
+            if (state.IsGrounded && (spec == null || !spec.PreserveMomentumOnStart))
+            {
+                state.VX = 0f;
+                state.VZ = 0f;
+            }
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
 			state.AttackSlot = (byte)(slot + 1);
             // ADR-0015 / issue #115: momentum-preserve removed the blanket AirTime reset
             // and VY-cancel for every aerial ability. The FloatWindow now resets ONLY for
             // recovery-designated moves (AbilitySpec.IsRecoveryMove) — the Smash up-B analog.
-            var spec = def.GetSlotAbility(slot, !state.IsGrounded);
             if (spec != null && spec.IsRecoveryMove)
                 state.AirTimeTicks = 0;
 			_states[entityId] = state;

@@ -1,0 +1,32 @@
+{
+  "Scenario": "FightGuy AirSlot1 Double Punch",
+  "TickCount": 60,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 3,
+    "HitstopTicks": 3,
+    "AirTimeTicks": 4
+  },
+  "NpcSnap": {
+    "PY": 3,
+    "PZ": 1,
+    "DamagePercent": 3,
+    "HitstopTicks": 3,
+    "AirTimeTicks": 4,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 1.6399999,
+    "VY": -4.5,
+    "AirTimeTicks": 47
+  },
+  "NpcFinal": {
+    "PY": 3.0634973,
+    "PZ": 1.6834186,
+    "VY": -0.09043528,
+    "DamagePercent": 8,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  }
+}
