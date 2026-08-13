@@ -31,9 +31,10 @@ FightGuy's theme is **martial arts mastery** — every ability channels ki throu
 
 11-slot kit (issue #117 design, v2). Two tiers: the **universal normal schema** (LMB/RMB +
 keys 1-4 — same roles for every character) and the **ability tier** (Q E R F — the
-identity-defining moves). Ground/air: LMB/RMB have required air variants; keys 1-4 are
-grounded-only in demo (air pass later); ability slots work both unless noted. Q = slot 11
-(key "Q" position — the physical A key on AZERTY).
+identity-defining moves). Ground/air: LMB/RMB have required air variants; keys 1-4 have
+**distinct air variants** (melee frame-data pass, 2026-08-12 — frame data per
+`docs/research/melee-frame-analysis.md`); ability slots work both unless noted.
+Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 
 | Slot | Key | Move | Anim | Description | Notes |
 |---|---|---|---|---|---|
@@ -41,10 +42,14 @@ grounded-only in demo (air pass later); ability slots work both unless noted. Q 
 | **AirLMB** | LMB (air) | Rising Kick | `spell_lmb_3` | Rising two-hit airborne uppercut | launcher into air combos |
 | **RMB** | RMB | Uppercut | `spell_rmb` | Charged uppercut — hold to charge, release to strike | more charge = more damage/stun, launcher |
 | **AirRMB** | RMB (air) | Helicopter | `spell_rmb_air` | Hold to charge aerial spinning heel drop; tap = quick spike, charged = heavy spike | spikes downward |
-| **Slot1** | 1 | Dragon Thrust | `spell_lmb_2` | Forward palm/kick thrust — medium spacing | more range than jab, the footsies key, ground-only |
-| **Slot2** | 2 | Dragon Uppercut | `spell_lmb_3` | Anti-air uppercut, launches | ground-only |
-| **Slot3** | 3 | Dragon Stomp | `spell_rmb` | Big punish normal — slow, telegraphed, huge KB | ground-only, the reward move |
-| **Slot4** | 4 | Ki Wave | `spell_f` | Get-off-me — 360° knockback around self | ground-only, escapes pressure |
+| **Slot1** | 1 | Low Kick | `spell_g_1` | Fast low right-foot kick — jab-class poke | startup 2, ~17 total, IASA 13 |
+| **AirSlot1** | 1 (air) | Double Punch | `spell_a_1` | Left then right punch — fast air poke | two hitboxes (trig 4/13), ~33 total |
+| **Slot2** | 2 | Roundhouse | `spell_g_2` | Roundhouse left kick — mid-range spacing normal | startup 8, ~29 total |
+| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Long static kick — nair-style lingering air hitbox | 12-tick active window, ~42 total |
+| **Slot3** | 3 | Double Uppercut | `spell_g_3` | Low right-hand starter + rising right uppercut — anti-air launcher | hits at 12/20, ~39 total |
+| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High-reaching left-foot kick — aerial juggle launcher | startup 15, ~44 total |
+| **Slot4** | 4 | Tornado Kick | `spell_g_4` | Spinning right-foot tornado — 360° get-off-me | startup 18, 10-tick ring, ~49 total |
+| **AirSlot4** | 4 (air) | Air Tornado | `spell_a_4` | Same tornado kick as ground key 4 | identical frame data |
 | **Q** | Q | Ki Shot | `spell_q` | Aimed ki projectile; marks target 5s on hit | on the Q key (slot 11); AZERTY physical-A |
 | **E** | E | Rising Dragon | `spell_r_loop` | Upward mobility — rising kick: anti-air on ground, recovery burst in air (FloatWindow reset) | the up-B analog, `IsRecoveryMove`, ~4s CD |
 | **R** | R | Cyclone Kick | `spell_e` | Forward spinning kick ~10m; stuns enemies passed through | engage, moved from E |
@@ -85,14 +90,15 @@ grounded-only in demo (air pass later); ability slots work both unless noted. Q 
 - **Commit-heavy** — Cyclone (R) and Tempest (F) are all-in; whiffs are punished
 - **No zoning outside Ki Shot** — the normal tier is melee
 - **Recovery is one-shot** — Rising Dragon (E) has a long cooldown; off-stage mistakes cost the stock
-- **No defensive/armor tier in demo** — Ki Wave (4) is the only escape, and it's a normal, not a save
+- **No defensive/armor tier in demo** — Tornado Kick (4) is the only escape, and it's a normal, not a save
 
 ### Combos
-1. Cyclone Kick (R) stun → jab (LMB) → spacing (1) — close-range burst
-2. Anti-air (2) launch → Rising Kick (AirLMB) follow-up — air combo
-3. Stomp (3) reads → huge punish — the reward move
-4. Ki Shot (Q) marks — setup hook for future execute synergy
-5. Tempest (F) → hold enemies in AoE → all abilities off cooldown
+1. Cyclone Kick (R) stun → jab (LMB) → Low Kick (1) — close-range burst
+2. Double Uppercut (3) launch → Rising Kick (AirLMB) or High Kick (air 3) — air combo
+3. Roundhouse (2) spacing → whiff punish on the recovery
+4. Tornado Kick (4) / Air Tornado (air 4) — get-off-me reset when pressured
+5. Ki Shot (Q) marks — setup hook for future execute synergy
+6. Tempest (F) → hold enemies in AoE → all abilities off cooldown
 
 ## Unity Pipeline Notes
 

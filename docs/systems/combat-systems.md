@@ -2,6 +2,8 @@
 
 > Universal combat mechanics for SlopArena — attack patterns, aerial rules, targeting, and aiming.
 > These apply to **every** character. Per-character kit design is in `character-kit-design-principles.md`.
+>
+> **Melee-based feel engine (2026-08-13, wayfinder map #128):** the hit-response, movement, and frame-timing models are locked in **[ADR-0019](../adr/0019-melee-based-hit-response.md)** (KB formula, hitstun, hitstop, DI/SDI, flight), **[ADR-0020](../adr/0020-melee-based-movement.md)** (run/dash/pivot, air drift, ledge hang), and **[ADR-0021](../adr/0021-melee-based-frame-timing.md)** (IASA policy, cooldowns, landing lag/AC). Sections below marked with their ADR.
 
 ---
 
@@ -19,6 +21,8 @@
 
 
 ### RMB — Heavy Attack (Charge Variant)
+
+> **Policy (ADR-0021 §2):** charge mechanics are **specials-only** — normals are cooldown-free and charge-free. The current RMB `ChargeAttack` data is temp and is reworked as a special in the balance pass. This section describes the generic mechanic as it exists today.
 
 - Uses a **two-phase hold-to-charge** lifecycle via `ServerAbility`:
   - **Phase 1 (charge hold)**: Player holds RMB, character enters charge pose animation.
@@ -44,6 +48,30 @@
 - **Single hit**
 - Stronger knockback than Air LMB
 - Can only be used **once per flight**
+
+### IASA Early-Out (issue #124)
+
+Each stage can declare an **`IasaTicks`** interrupt point (Melee's "IASA" — interruptible as soon as). From that tick of the stage onward, **any ability input starts a new ability immediately**, dropping the current one mid-animation; before it, the full animation lock applies; with no input, the move still completes at its normal `DurationTicks`.
+
+- **`IasaTicks = 0` = no early-out** (the default — existing moves are unchanged; only stages that author the field become interruptible).
+- Implemented as an engine gate in `ServerSimulation.PreTickAbilities`: the check runs against the **current attack's** stage (`AttackSlot`/`ComboStage`, elapsed via `AttackElapsedTicks`), so the unlock is per-stage, not per-ability.
+- Interrupt semantics match hitstun/dash cancels: the active ability is dropped **without `OnEnd`**, its cooldown still applies, and stale buffered input is cleared so it cannot double-fire into the new move.
+- Hitstun, hitstop, and burst recovery always block — IASA only relaxes the animation lock.
+- Frame data for FightGuy normals (#120) is authored with IASA-derived stage ticks once this lands.
+
+**Policy (ADR-0021 §1):** normals (LMB, aerials, attack stages) author `IasaTicks` = **1-8 ticks before stage end** (Melee medians; specials have no IASA — verified 0%). **Specials/recovery/charge stages stay 0** (full commitment, and it keeps their dash-cancel protection). **Dash unlocks on IASA** — `StartDash` gates on `AnimLockTicks == 0 || IsIasaUnlocked` (jab → IASA → dash → dash-attack is a bread-and-butter string). Buffered presses (6-tick `InputBufferWindow`) already fire the moment the window opens — the interrupt consumes them (`ServerSimulation.cs:582-602`); blocked presses never cancel.
+
+### Aerial Landing Lag + Auto-Cancel Windows (issue #125)
+
+Air stages can declare a **`LandingLagTicks`** commitment (Melee's landing lag): landing while the aerial is active applies that lock — **no ability input, no jump/dash/burst, no input movement** — unless the landing frame falls inside an auto-cancel window, in which case there is no lag and the player acts immediately.
+
+- **`LandingLagTicks = 0` = no landing commitment** (the default — existing moves are unchanged; only air stages that author the field lock on landing). Orthogonal to `IasaTicks`: they sit on the same attack-lock seam, but landing lag is a **hard** lock that an IASA-unlocked stage does not bypass.
+- **Auto-cancel windows** are per-stage: landing at stage-elapsed `<= AutoCancelBeforeTicks` (early — right after the move starts, before the hitbox comes out) or `>= AutoCancelAfterTicks` (late — after the active frames) skips the lag entirely **and ends the aerial on the landing frame** — the player acts immediately instead of riding out the move's ground recovery (Melee's AC). `0` disables a window; declare `AutoCancelAfterTicks >= DurationTicks` for no late window.
+- Implemented server-side in `ServerSimulation.SimulateMovement`: a landing is detected as airborne-at-tick-start → grounded-after-`SimulateTick` (a ledge snap boosts `VY`, so it is excluded); the stage is resolved with `airborne: true` (the ability in progress was started in the air), and the lock is written to `CharacterState.LandingLagTicks`. The lock field is sim-internal like `AnimLockTicks` — the client renders the state the packet says and the authority enforces the lock.
+- While the lock is live, `TickAbilities` still advances the move (stages complete, lingering hitboxes resolve — the aerial is *not* cancelled), but a post-tick freeze zeroes velocity so the move's per-tick writes (lunge re-apply, `MoveY`) cannot move the character.
+- The lock is cleared by hitstun (`ApplyKnockback`) — being hit ends the commitment; it never buffers inputs (a press inside the lock is dropped, Melee-style).
+
+**Policy (ADR-0021 §3):** **no empty stages** — every air stage declares `LandingLagTicks` + both AC windows by authoring policy; the all-zero "lands and keeps playing" path is a cleanup artifact, not an escape hatch. **The aerial always ends on landing** (Melee): AC window → free; lag zone → aerial ends + hard lock, act when lag expires (never lock + leftover recovery). **Lag scale = L-cancelled-by-default** (6-16t, median ~9-10 — L-cancel is ruled out, so the base IS the cost). The landing frame stays pre-lock for **committal escapes only** — Burst (offensive cancel, ~60s cooldown) and air-jump (costs a double jump) may cancel there; dash/abilities stay gated (no free cancels). IASA does NOT bypass landing lag.
 
 ---
 

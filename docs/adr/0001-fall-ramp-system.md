@@ -1,5 +1,7 @@
 # ADR-0001: FallRamp progressive gravity system
 
+**Status:** Superseded in part — 2026-08-13 by [ADR-0020 §3](0020-melee-based-movement.md) (gravity): the three-phase ramp (FloatWindow → FallRamp → FullGravity) is replaced by **float-window-only** gravity — the ramp machinery (`FallRampDuration` lerp) is deleted; the float window survives only for recovery/post-hit states (ADR-0020 §3, Option A). ADR-0002 (jump-arc anim) untouched.
+
 Context: DKO-inspired platform fighter feel requires aerial recovery loops (chain attacks to stay floaty), smoother air combat, and progressive fall speed rather than the current binary on/off gravity with a constant-velocity fall threshold. Change affects `ApplyGravity()` in Simulation.cs and adds `AirTimeTicks`, `FloatWindowTicks`, `FallRampDuration` to CharacterState/CharacterDefinition.
 
 Decision: Replace the current gravity model (binary AirFloatGravity vs Gravity with VY > -3 cutoff) with a three-phase progressive ramp: FloatWindow (reduced gravity while AirTime is fresh) → FallRamp (linear increase to full gravity) → FullGravity. AirTime resets on any action (attack, dash, jump), taking damage, or landing.
