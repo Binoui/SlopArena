@@ -22,6 +22,7 @@ namespace SlopArena.Shared
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
 		private readonly IMatchRule _rule;
+		private readonly ArenaCollision.BlastLines _blastLines;
 		/// <summary>Ticks of invincibility granted on respawn (60 = 1s at 60Hz). Issue #37.</summary>
 		public ushort RespawnInvincibilityTicks { get; set; } = 60;
 
@@ -29,6 +30,7 @@ namespace SlopArena.Shared
 		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null)
 		{
 			_arena = arena;
+			_blastLines = ArenaCollision.ResolveBlastLines(in arena);
 			_rule = rule ?? new StockMatchRule(3);
 		}
 		private const float WarpConeHalfAngleRad = 120f * MathF.PI / 180f / 2f; // 60° half-cone = 120° total facing cone
@@ -1228,12 +1230,18 @@ namespace SlopArena.Shared
 			}
 		}
 
-		private void CheckVoidDeaths()
+		private void CheckBlastDeaths()
 		{
-			// ── Step 4: Void death check ──
+			// ── Step 4: Blast zone death check (void + side + top; inactive planes are ±inf) ──
 			var deadIds = new List<ulong>();
 			foreach (var kvp in _states)
-				if (kvp.Value.PY < _arena.KillHeight) deadIds.Add(kvp.Key);
+			{
+				var s = kvp.Value;
+				if (s.PY < _blastLines.KillHeight || s.PY > _blastLines.KillTop
+					|| s.PX < _blastLines.KillMinX || s.PX > _blastLines.KillMaxX
+					|| s.PZ < _blastLines.KillMinZ || s.PZ > _blastLines.KillMaxZ)
+					deadIds.Add(kvp.Key);
+			}
 			foreach (var id in deadIds)
 			{
 				var d = _defs[id];
@@ -1302,7 +1310,7 @@ namespace SlopArena.Shared
 
 			ProcessProjectileExplosions();
 
-			CheckVoidDeaths();
+			CheckBlastDeaths();
 		}
 	}
 }

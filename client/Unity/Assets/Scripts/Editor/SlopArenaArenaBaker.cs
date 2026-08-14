@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using SlopArena.Shared;
 
 /// <summary>
@@ -26,6 +27,12 @@ public class SlopArenaArenaBaker : EditorWindow
     private string _displayName = "My Arena";
     private string _previewColor = "#1a1a1a";
     private float _killHeight = -10f;
+    private bool _autoBlastLines = true;
+    private float _killTop;
+    private float _killMinX;
+    private float _killMaxX;
+    private float _killMinZ;
+    private float _killMaxZ;
     private float _minX = -25f;
     private float _maxX = 25f;
     private float _minZ = -25f;
@@ -49,6 +56,19 @@ public class SlopArenaArenaBaker : EditorWindow
 
         EditorGUILayout.Space();
         _killHeight = EditorGUILayout.FloatField("Kill Height (Y below = death)", _killHeight);
+
+        EditorGUILayout.Space();
+        _autoBlastLines = EditorGUILayout.Toggle("Auto Side/Top Blast Lines", _autoBlastLines);
+        if (!_autoBlastLines)
+        {
+            EditorGUI.indentLevel++;
+            _killTop = EditorGUILayout.FloatField("Kill Top (Y above = death)", _killTop);
+            _killMinX = EditorGUILayout.FloatField("Kill Min X", _killMinX);
+            _killMaxX = EditorGUILayout.FloatField("Kill Max X", _killMaxX);
+            _killMinZ = EditorGUILayout.FloatField("Kill Min Z", _killMinZ);
+            _killMaxZ = EditorGUILayout.FloatField("Kill Max Z", _killMaxZ);
+            EditorGUI.indentLevel--;
+        }
 
         EditorGUILayout.Space();
         _autoBounds = EditorGUILayout.Toggle("Auto Bounds from Mesh", _autoBounds);
@@ -310,12 +330,22 @@ public class SlopArenaArenaBaker : EditorWindow
         }
 
         // 4. Build ArenaDefinition
+        // Blast lines: auto mode derives from the heightmap/bounds with the shared
+        // margins (same numbers the server uses for 0 = auto at resolve time);
+        // manual mode writes exactly what was entered (0 = auto at resolve time).
+        float hmMax = heightData.Length > 0 ? heightData.Max() : _killHeight + 20f;
+        if (hmMax <= float.MinValue / 2f || hmMax < _killHeight) hmMax = _killHeight + 20f;
         var arena = new ArenaDefinition
         {
             Name = _arenaName,
             DisplayName = _displayName,
             PreviewColor = _previewColor,
             KillHeight = _killHeight,
+            KillTop = _autoBlastLines ? hmMax + ArenaCollision.TopBlastMargin : _killTop,
+            KillMinX = _autoBlastLines ? _minX - ArenaCollision.SideBlastMargin : _killMinX,
+            KillMaxX = _autoBlastLines ? _maxX + ArenaCollision.SideBlastMargin : _killMaxX,
+            KillMinZ = _autoBlastLines ? _minZ - ArenaCollision.SideBlastMargin : _killMinZ,
+            KillMaxZ = _autoBlastLines ? _maxZ + ArenaCollision.SideBlastMargin : _killMaxZ,
             Heightmap = heightmap,
             MinX = _minX,
             MaxX = _maxX,

@@ -141,6 +141,21 @@ namespace SlopArena.Shared
         /// </summary>
         public float KillHeight;
         /// <summary>
+        /// Y above this = BLAST ZONE (top kill line). 0 = auto: derived at resolve
+        /// time from the heightmap's highest surface + <see cref="ArenaCollision.TopBlastMargin"/>.
+        /// </summary>
+        public float KillTop;
+        /// <summary>
+        /// X outside [KillMinX, KillMaxX] = BLAST ZONE (side kill lines). 0 = auto:
+        /// derived at resolve time from the mesh bounds ± <see cref="ArenaCollision.SideBlastMargin"/>.
+        /// </summary>
+        public float KillMinX, KillMaxX;
+        /// <summary>
+        /// Z outside [KillMinZ, KillMaxZ] = BLAST ZONE (side kill lines). 0 = auto:
+        /// derived at resolve time from the mesh bounds ± <see cref="ArenaCollision.SideBlastMargin"/>.
+        /// </summary>
+        public float KillMinZ, KillMaxZ;
+        /// <summary>
         /// Precomputed heightmap for fast ground-surface lookup.
         /// Replaces PlatformDef[] + FloorHeight. Built from collision triangles at bake time.
         /// Null for hardcoded arenas that haven't been baked yet.
@@ -174,6 +189,59 @@ namespace SlopArena.Shared
     /// </summary>
     public static class ArenaCollision
     {
+        /// <summary>Distance beyond the stage mesh bounds for auto side blast lines.</summary>
+        public const float SideBlastMargin = 10f;
+        /// <summary>Height above the heightmap's highest surface for the auto top blast line.</summary>
+        public const float TopBlastMargin = 20f;
+
+        /// <summary>
+        /// Resolved blast-zone planes for one arena. Inactive planes are ±infinity,
+        /// so the death check can compare unconditionally.
+        /// </summary>
+        public readonly struct BlastLines
+        {
+            public readonly float KillHeight, KillTop, KillMinX, KillMaxX, KillMinZ, KillMaxZ;
+
+            public BlastLines(float killHeight, float killTop,
+                float killMinX, float killMaxX, float killMinZ, float killMaxZ)
+            {
+                KillHeight = killHeight;
+                KillTop = killTop;
+                KillMinX = killMinX;
+                KillMaxX = killMaxX;
+                KillMinZ = killMinZ;
+                KillMaxZ = killMaxZ;
+            }
+        }
+
+        /// <summary>
+        /// Resolve the arena's effective blast lines. Authored values (nonzero) win;
+        /// unset lines (0 — the struct default) are derived: sides from the mesh bounds
+        /// ± <see cref="SideBlastMargin"/>, top from the heightmap's highest surface +
+        /// <see cref="TopBlastMargin"/>. Arenas without meaningful bounds (zero bounds —
+        /// test fixtures, unbaked arenas) keep void-only death: side/top resolve to ±infinity.
+        /// </summary>
+        public static BlastLines ResolveBlastLines(in ArenaDefinition arena)
+        {
+            bool hasBounds = !(arena.MinX == 0f && arena.MaxX == 0f
+                && arena.MinZ == 0f && arena.MaxZ == 0f);
+
+            float killTop = arena.KillTop != 0f ? arena.KillTop
+                : hasBounds && arena.Heightmap.Data is { Length: > 0 }
+                    ? arena.Heightmap.Data.Max() + TopBlastMargin
+                    : float.PositiveInfinity;
+            float killMinX = arena.KillMinX != 0f ? arena.KillMinX
+                : hasBounds ? arena.MinX - SideBlastMargin : float.NegativeInfinity;
+            float killMaxX = arena.KillMaxX != 0f ? arena.KillMaxX
+                : hasBounds ? arena.MaxX + SideBlastMargin : float.PositiveInfinity;
+            float killMinZ = arena.KillMinZ != 0f ? arena.KillMinZ
+                : hasBounds ? arena.MinZ - SideBlastMargin : float.NegativeInfinity;
+            float killMaxZ = arena.KillMaxZ != 0f ? arena.KillMaxZ
+                : hasBounds ? arena.MaxZ + SideBlastMargin : float.PositiveInfinity;
+
+            return new BlastLines(arena.KillHeight, killTop, killMinX, killMaxX, killMinZ, killMaxZ);
+        }
+
         /// <summary>
         /// Build a spatial grid from the arena's collision triangles.
         /// Grid cells are cubes of the given size. Each triangle is assigned to every cell

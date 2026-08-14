@@ -10,11 +10,12 @@ namespace SlopArena.Shared
     ///
     /// Format:
     ///   Magic:  "AREN" (0x4E455241)
-    ///   Version: uint32 (1, 2, or 3)
+    ///   Version: uint32 (1, 2, 3, 4, or 5)
     ///   Name:        uint32 len + UTF8 bytes
     ///   DisplayName: uint32 len + UTF8 bytes
     ///   PreviewColor: uint32 len + UTF8 bytes
     ///   KillHeight:  float32
+    ///   [Version 5+]: KillTop, KillMinX, KillMaxX, KillMinZ, KillMaxZ: 5 × float32
     ///   MinX, MaxX, MinZ, MaxZ: 4 × float32
     ///   SpawnCount: uint32
     ///     For each: X, Y, Z, Yaw (4 × float32)
@@ -28,12 +29,15 @@ namespace SlopArena.Shared
     ///   2 = Added CollisionTriangle[] after spawn data.
     ///   3 = Removed FloorHeight + PlatformDef[]; added Heightmap after spawn data.
     ///   4 = PreviewColor replaces ScenePath (ScenePath was written but never read).
+    ///   5 = Added side/top blast lines (KillTop, KillMinX/MaxX, KillMinZ/MaxZ) after KillHeight.
+    ///       0 in a v5 file means "auto" (derived from bounds/heightmap at resolve time);
+    ///       v4 files carry no lines and resolve the same way.
     /// </summary>
 
     public static class ArenaBinaryFormat
     {
         private const uint Magic = 0x4E455241; // "AREN"
-        private const uint Version = 4;
+        private const uint Version = 5;
 
         /// <summary>
         /// Serialize an ArenaDefinition to a byte array.
@@ -47,6 +51,7 @@ namespace SlopArena.Shared
             size += 4 + Encoding.UTF8.GetByteCount(arena.PreviewColor ?? "");
 
             size += 4; // KillHeight (float)
+            size += 5 * 4; // KillTop, KillMinX, KillMaxX, KillMinZ, KillMaxZ (v5)
 
             // Heightmap (v3+)
             int hmDataLen = arena.Heightmap.Data?.Length ?? 0;
@@ -84,6 +89,13 @@ namespace SlopArena.Shared
 
             // KillHeight
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillHeight)); pos += 4;
+
+            // Blast lines (v5)
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillTop)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillMinX)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillMaxX)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillMinZ)); pos += 4;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.KillMaxZ)); pos += 4;
 
             // Bounds
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(pos), BitConverter.SingleToInt32Bits(arena.MinX)); pos += 4;
@@ -174,6 +186,16 @@ namespace SlopArena.Shared
             if (pos + 4 > data.Length) return null;
             arena.KillHeight = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
 
+            // Blast lines (v5+); v4 files carry none — fields stay 0 = auto-derive.
+            if (version >= 5)
+            {
+                if (pos + 20 > data.Length) return null;
+                arena.KillTop = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                arena.KillMinX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                arena.KillMaxX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                arena.KillMinZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+                arena.KillMaxZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos))); pos += 4;
+            }
 
             // Bounds
             if (pos + 16 > data.Length) return null;

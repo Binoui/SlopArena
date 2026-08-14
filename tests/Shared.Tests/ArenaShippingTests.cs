@@ -62,4 +62,32 @@ public class ArenaShippingTests
         Assert.True(ArenaRegistry.Get("colosseum").HasValue);
         Assert.True(ArenaRegistry.Get("training").HasValue);
     }
+
+    [Theory]
+    [MemberData(nameof(ArenaFiles))]
+    public void ShippedArena_ResolvesSideAndTopBlastLines(string fileName)
+    {
+        // Every shipped stage must have real side/top kill lines (issue: side/top blast
+        // zones were missing — only void death). Baked arenas carry meaningful bounds,
+        // so the auto-derivation must produce finite lines strictly beyond the mesh.
+        string path = Path.Combine(RepoRoot(), "data", "arenas", fileName);
+        var arenaOpt = ArenaBinaryFormat.LoadFromFile(path);
+        Assert.True(arenaOpt.HasValue, $"failed to parse {fileName}");
+        ArenaDefinition arena = arenaOpt.Value;
+
+        var lines = ArenaCollision.ResolveBlastLines(in arena);
+
+        Assert.True(lines.KillTop < float.PositiveInfinity,
+            $"{fileName}: top blast line is inactive");
+        Assert.True(lines.KillTop > arena.Heightmap.Data.Max(),
+            $"{fileName}: top line {lines.KillTop} not above highest surface {arena.Heightmap.Data.Max()}");
+        Assert.True(lines.KillMinX < arena.MinX,
+            $"{fileName}: min X line {lines.KillMinX} not beyond mesh {arena.MinX}");
+        Assert.True(lines.KillMaxX > arena.MaxX,
+            $"{fileName}: max X line {lines.KillMaxX} not beyond mesh {arena.MaxX}");
+        Assert.True(lines.KillMinZ < arena.MinZ,
+            $"{fileName}: min Z line {lines.KillMinZ} not beyond mesh {arena.MinZ}");
+        Assert.True(lines.KillMaxZ > arena.MaxZ,
+            $"{fileName}: max Z line {lines.KillMaxZ} not beyond mesh {arena.MaxZ}");
+    }
 }
