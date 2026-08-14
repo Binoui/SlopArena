@@ -404,6 +404,37 @@ public class PhysicsTests
     }
 
     [Fact]
+    public void AbilityActivation_RefreshesRushWindow_AndFreezesThroughTheMove()
+    {
+        // ADR-0020: activating an ability refills the Rush dash-dance window, and the
+        // countdown only drains while purely running (Simulation.TickTimers gates it on
+        // the Run state). A poke mid-footsie keeps the instant-reversal privilege;
+        // Run's slow Turnaround appears only after holding one direction a long time.
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState(50f, 50f) with { PY = TestHelpers.GroundPY(def) };
+        TestHelpers.RegisterPlayer(sim, def, state);
+
+        // Run +Z past the Rush window (RushTicks = 10) into Run proper.
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
+        Assert.Equal((ushort)0, sim.GetState(1).RushTicks);
+
+        // Poke (Slot1 Low Kick) while running: the activation refills the window.
+        sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f, activeSlot: AbilitySlots.Slot1) } });
+        Assert.Equal(def.Movement.RushTicks, sim.GetState(1).RushTicks);
+
+        // The countdown is frozen for the whole move, so the fighter exits in Rush —
+        // the window is full on the tick control returns to Idle.
+        int guard = 0;
+        while (sim.GetState(1).State == ActionState.Attacking && guard++ < 120)
+            sim.Tick(new() { { 1, default } });
+        var after = sim.GetState(1);
+        Assert.NotEqual(ActionState.Attacking, after.State);
+        Assert.Equal(def.Movement.RushTicks, after.RushTicks);
+    }
+
+    [Fact]
     public void RunDiagonalStraighten_ClearsReleasedAxis()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());

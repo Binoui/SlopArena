@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using SlopArena.Shared;
@@ -163,6 +164,25 @@ namespace SlopArena.EditorTools
                 float dist = EditorGUILayout.Slider("Dummy distance", _lab.DummyDistance, 0.5f, 8f);
                 if (Mathf.Abs(dist - _lab.DummyDistance) > 0.0001f) { _lab.DummyDistance = dist; _lab.RefreshPose(); }
             }
+            bool traj = EditorGUILayout.Toggle("Knockback trajectory (cyan→blue)", _lab.ShowTrajectory);
+            if (traj != _lab.ShowTrajectory) _lab.ShowTrajectory = traj;
+            if (_lab.ShowTrajectory)
+            {
+                float pct = EditorGUILayout.Slider("Victim %", _lab.TrajectoryPercent, 0f, 200f);
+                if (Mathf.Abs(pct - _lab.TrajectoryPercent) > 0.001f) _lab.TrajectoryPercent = pct;
+                var events = _lab.CurrentWorkingEvents();
+                if (events.Length > 0)
+                {
+                    int idx = Mathf.Clamp(_lab.PreviewHitboxIndex, 0, events.Length - 1);
+                    int pick = EditorGUILayout.Popup("Preview hitbox", idx,
+                        Enumerable.Range(0, events.Length).Select(i => $"Hitbox {i}").ToArray());
+                    if (pick != idx) _lab.PreviewHitboxIndex = pick;
+                }
+                EditorGUILayout.HelpBox(
+                    "Arc = victim launched by the previewed hitbox's knockback at the chosen %; " +
+                    "cyan = hitstun, blue = flight, white = apex, red = landing.",
+                    MessageType.None);
+            }
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Reset camera", GUILayout.Width(100))) _lab.ResetCameraView();
             EditorGUILayout.LabelField("drag right: orbit · drag middle: pan · scroll: zoom");
@@ -319,8 +339,49 @@ namespace SlopArena.EditorTools
                         var n = evt; n.BoneName = pickedBone;
                         _lab.SetWorkingEvent(i, n);
                     }
+                    // Damage / Stun (editable)
+                    EditorGUILayout.BeginHorizontal();
+                    float dmg = EditorGUILayout.FloatField("Damage", evt.Damage);
+                    if (Mathf.Abs(dmg - evt.Damage) > 0.001f) { var n = evt; n.Damage = Mathf.Max(0f, dmg); _lab.SetWorkingEvent(i, n); }
+                    int stun = EditorGUILayout.IntField("Stun", evt.StunTicks);
+                    if (stun != evt.StunTicks) { var n = evt; n.StunTicks = (ushort)Mathf.Clamp(stun, 0, 999); _lab.SetWorkingEvent(i, n); }
+                    EditorGUILayout.EndHorizontal();
+                    // Knockback (editable): angle + base + growth — the shape the trajectory preview draws.
+                    bool customKb = evt.Knockback.Profile == KnockbackProfile.Custom;
+                    EditorGUILayout.BeginHorizontal();
+                    if (customKb)
+                    {
+                        int angle = EditorGUILayout.IntField("Angle", evt.Knockback.Angle);
+                        if (angle != evt.Knockback.Angle)
+                        {
+                            var n = evt; var kb = n.Knockback; kb.Angle = (sbyte)Mathf.Clamp(angle, -180, 180); n.Knockback = kb;
+                            _lab.SetWorkingEvent(i, n);
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField($"Angle: {evt.Knockback.Profile} (fixed)");
+                    }
+                    EditorGUILayout.EndHorizontal();
+                    if (customKb)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        float baseKb = EditorGUILayout.FloatField("Base KB", evt.Knockback.BaseKnockback);
+                        if (Mathf.Abs(baseKb - evt.Knockback.BaseKnockback) > 0.001f)
+                        {
+                            var n = evt; var kb = n.Knockback; kb.BaseKnockback = baseKb; n.Knockback = kb;
+                            _lab.SetWorkingEvent(i, n);
+                        }
+                        float growth = EditorGUILayout.FloatField("Growth", evt.Knockback.KnockbackGrowth);
+                        if (Mathf.Abs(growth - evt.Knockback.KnockbackGrowth) > 0.001f)
+                        {
+                            var n = evt; var kb = n.Knockback; kb.KnockbackGrowth = growth; n.Knockback = kb;
+                            _lab.SetWorkingEvent(i, n);
+                        }
+                        EditorGUILayout.EndHorizontal();
+                    }
                     EditorGUILayout.LabelField(
-                        $"dmg {evt.Damage:0.#} · stun {evt.StunTicks} · kb {evt.Knockback.Profile}" +
+                        $"stun gate {evt.StunTicks} · kb {evt.Knockback.Profile}" +
                         (evt.Interruptible ? " · interruptible" : " · armor"));
                     EditorGUI.indentLevel--;
                 }

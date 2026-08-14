@@ -864,7 +864,11 @@ public class NilusAbilityTests
         // 45-tick window vs 3-5 m on the old constant-velocity curve. The invariant
         // this test guards (knockback survives hitstun and keeps closing) is unchanged;
         // to restore the old reach, bump the NilusData "pull_force" param.
-        Assert.InRange(dragged, 2.2f, 3.1f);
+        // The post-stun coast brakes (GroundStopFriction) instead of a rush stop-dead:
+        // the rush-release stop is gated on the Run state (Simulation.cs), so a target
+        // that lands from a yank in Idle coasts to rest — ~3.4 m total vs ~3.1 with
+        // the old accidental dead-stop.
+        Assert.InRange(dragged, 2.9f, 3.9f);
         Assert.True(prevZ > nilusZ && prevZ < startZ,
             $"the target must end between Nilus and where it stood, not through him: " +
             $"PZ={prevZ:F3}, Nilus {nilusZ:F3}, start {startZ:F3}");

@@ -612,8 +612,13 @@ namespace SlopArena.Shared
             if (s.BurstRecoveryTicks > 0) s.BurstRecoveryTicks--;
             if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
 
-            // Rush window ticks (ADR-0020)
-            if (s.RushTicks > 0) s.RushTicks--;
+            // Rush window ticks (ADR-0020): counts ONLY while the fighter is purely
+            // moving in one direction on the ground (Run). Any other action — attack,
+            // jump, dash, hitstun, aim — freezes it; landings and ability activations
+            // refill it. The fighter stays in Rush through footsies and only falls
+            // into Run (slow Turnaround) after a long same-direction hold.
+            if (s.RushTicks > 0 && s.IsGrounded && s.State == ActionState.Run)
+                s.RushTicks--;
             if (s.LedgeRegrabLockTicks > 0) s.LedgeRegrabLockTicks--;
 
             // State ticks (generic expiry — JumpSquat is handled specially below)
@@ -1002,9 +1007,14 @@ namespace SlopArena.Shared
             {
                 bool inRush = s.RushTicks > 0;   // capture before reset
                 s.RushTicks = 0;
-                if (inRush)
+                if (inRush && s.State == ActionState.Run)
                 {
                     // Rush release: a tap is a fixed burst, not a slide — stop dead.
+                    // Gated on Run: the stop is a dash-tap property. A fighter at rest
+                    // in Idle — e.g. just finished a move with lunge drift — brakes
+                    // instead, so end-of-move momentum carries into Idle
+                    // (MomentumPreserve). The window refresh from ability activation
+                    // must not turn every attack into a dead stop on release.
                     s.VX = 0f;
                     s.VZ = 0f;
                 }

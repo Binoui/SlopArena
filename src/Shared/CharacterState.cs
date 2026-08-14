@@ -188,9 +188,12 @@ namespace SlopArena.Shared
         /// ── Rush / ledge ──
         /// </summary>
         /// <summary>
-        /// Rush window remaining ticks (ADR-0020): counts down while the fighter moves
-        /// from a standstill. A reversal within the window is an instant Rush flip that
-        /// restarts it; zero means Run proper (a reversal becomes a Turnaround).
+        /// Rush window remaining ticks (ADR-0020): counts down only while the fighter is
+        /// purely running in one direction on the ground (Simulation.TickTimers gates it
+        /// on the Run state). Any other action freezes it; landings and ability
+        /// activations refill it to full. A reversal within the window is an instant
+        /// Rush flip that restarts it; zero means Run proper (a reversal becomes a
+        /// Turnaround).
         /// </summary>
         public ushort RushTicks;
         /// <summary>Re-grab lockout after a voluntary ledge drop (off-wire, sim-internal).

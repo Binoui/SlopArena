@@ -110,6 +110,12 @@ namespace SlopArena.Shared
                 state.VX = 0f;
                 state.VZ = 0f;
             }
+            // Ability refresh (ADR-0020): activating any ability refills the Rush
+            // dash-dance window to full. Combined with the state-gated countdown in
+            // Simulation.TickTimers (only counts while purely running in one direction),
+            // this keeps the fighter in Rush through footsies — Run with its slow
+            // Turnaround only appears after holding one direction a long time.
+            state.RushTicks = def.Movement.RushTicks;
 			// ADR-0019 §6: acting ends the post-hitstun flight regime — an aerial out of
 			// the tail is a normal attack (its own FloatWindow hover applies), not a floaty one.
 			state.InPostHitstunFlight = false;

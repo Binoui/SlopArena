@@ -47,6 +47,18 @@ namespace SlopArena.Client.Tools
         public bool ShowDummy { get; set; }
         public float DummyDistance { get; set; } = 2.5f;
 
+        // ── Knockback trajectory preview ──
+        /// <summary>Draw the knockback arc for the selected hitbox on the dummy (opt-in).</summary>
+        public bool ShowTrajectory { get; set; }
+        /// <summary>Victim damage % used for the trajectory preview (shape is %-dependent).</summary>
+        public float TrajectoryPercent { get; set; } = 0f;
+        /// <summary>Hitbox index (into CurrentWorkingEvents) whose knockback the preview draws.</summary>
+        public int PreviewHitboxIndex { get; set; }
+        /// <summary>Last computed arc: (world pos, phase 'H'=hitstun 'F'=flight 'A'=apex 'G'=landing).</summary>
+        public IReadOnlyList<(Vector3 pos, char phase)> Trajectory => _trajectory;
+        /// <summary>Cache guard: recompute only when a preview input changes.</summary>
+        private string _trajDirty = "";
+
         // ── Loaded data ──
         public CharacterDefinition Def { get; private set; } = null!;
         public CharacterDefinition DisplayDef { get; private set; } = null!; // Def + hurtbox override
@@ -64,6 +76,7 @@ namespace SlopArena.Client.Tools
 
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
+        private readonly List<(Vector3 pos, char phase)> _trajectory = new();
         private PlayerRenderer _dummyRenderer = null!;
         private float _playAccum;
         [SerializeField] private UnityEngine.Camera _camera = null!;
@@ -440,6 +453,87 @@ namespace SlopArena.Client.Tools
             return list;
         }
 
+        /// <summary>
+        /// Knockback arc for the previewed hitbox: launches the dummy victim (at the current
+        /// TrajectoryPercent) with the hitbox's authored knockback through the REAL sim
+        /// (Simulation.ApplyKnockback + ServerSimulation tick loop — the same flight law the
+        /// move-data tool uses), and samples the path to landing. Recompute on input change;
+        /// draw via <see cref="Trajectory"/> in OnRenderObject.
+        /// </summary>
+        public IReadOnlyList<(Vector3 pos, char phase)> ResolveTrajectory()
+        {
+            if (Def == null || Baked == null) { _trajectory.Clear(); return _trajectory; }
+            var events = CurrentWorkingEvents();
+            if (events.Length == 0 || PreviewHitboxIndex < 0 || PreviewHitboxIndex >= events.Length) { _trajectory.Clear(); return _trajectory; }
+            var hit = events[PreviewHitboxIndex];
+            if (hit.Knockback.Profile != KnockbackProfile.Custom) { _trajectory.Clear(); return _trajectory; } // custom-only (like the tool)
+
+            // Cache: recompute only when a preview input (hitbox values, %, facing, dummy pos) changes.
+            string key = $"{PreviewHitboxIndex}|{TrajectoryPercent:0.0}|{FacingYaw:0.000}|{DummyPosition():0.00}|{hit.Radius:0.00}|" +
+                $"{hit.Damage:0.0}|{hit.StunTicks}|{hit.Knockback.Angle}|{hit.Knockback.BaseKnockback:0.0}|{hit.Knockback.KnockbackGrowth:0.0}";
+            if (_trajectory.Count > 0 && key == _trajDirty) return _trajectory;
+            _trajDirty = key;
+            _trajectory.Clear();
+
+            // Launch the dummy away from the attacker, along the attack's facing.
+            float groundY = DummyPosition().y - Def.CapsuleHeight * 0.5f; // arena floor under the dummy's feet
+            var state = new CharacterState
+            {
+                PX = DummyPosition().x,
+                PY = DummyPosition().y,
+                PZ = DummyPosition().z,
+                IsGrounded = true,
+                State = ActionState.Idle,
+                FacingYaw = FacingYaw,
+                DamagePercent = (ushort)(TrajectoryPercent + (int)hit.Damage), // post-hit, matches tool parity
+            };
+            float dirX = Mathf.Sin(FacingYaw), dirZ = Mathf.Cos(FacingYaw);
+            SlopArena.Shared.Simulation.ApplyKnockback(ref state, dirX, dirZ, (sbyte)hit.Knockback.Angle,
+                hit.Knockback.BaseKnockback, hit.Knockback.KnockbackGrowth,
+                hit.Damage, hit.StunTicks, Def.Weight);
+
+            var sim = new ServerSimulation(LabArena(groundY));
+            sim.RegisterEntity(1, Def, state);
+            var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+            _trajectory.Add((new Vector3(state.PX, state.PY, state.PZ), 'H'));
+            float maxPy = state.PY;
+            bool apexMarked = false;
+            for (int t = 0; t < 2400; t++)
+            {
+                sim.Tick(inputs);
+                var s = sim.GetState(1);
+                bool atApex = !apexMarked && s.PY <= maxPy && t > 0 && !s.IsGrounded && s.HitstunTicks == 0;
+                if (s.PY > maxPy) maxPy = s.PY;
+                else if (atApex) apexMarked = true;
+                char phase = s.IsGrounded ? 'G'
+                    : s.HitstunTicks > 0 ? 'H'
+                    : atApex ? 'A' : 'F';
+                _trajectory.Add((new Vector3(s.PX, s.PY, s.PZ), phase));
+                if (s.IsGrounded) break;
+            }
+            return _trajectory;
+        }
+
+        /// <summary>A minimal flat arena for trajectory stepping (floor at the given world Y).</summary>
+        private static ArenaDefinition LabArena(float floorY)
+        {
+            const int w = 100, h = 100;
+            var data = new float[w * h];
+            for (int i = 0; i < data.Length; i++) data[i] = floorY;
+            return new ArenaDefinition
+            {
+                Name = "lab",
+                DisplayName = "Ability Lab",
+                KillHeight = floorY - 20f,
+                SpawnPoints = new[] { new SpawnPoint { X = 0, Y = floorY, Z = 0, Yaw = 0 } },
+                Heightmap = new ArenaHeightmap
+                {
+                    Data = data, Width = w, Height = h, CellSize = 1f, OriginX = 0f, OriginZ = 0f,
+                },
+            };
+        }
+
         // ── Scrub / edit ──
 
         /// <summary>
@@ -656,6 +750,25 @@ namespace SlopArena.Client.Tools
                 GL.Color(new Color(1f, 0.35f, 0.35f));
                 foreach (var hb in ResolveDummyHurtboxes())
                     WireSphere(new Vector3(hb.PosX, hb.PosY, hb.PosZ), hb.Radius);
+            }
+            if (ShowTrajectory)
+            {
+                var arc = ResolveTrajectory();
+                if (arc.Count > 1)
+                {
+                    // Hitstun portion in cyan, post-hitstun flight in blue; apex marker white.
+                    for (int i = 0; i < arc.Count - 1; i++)
+                    {
+                        char phase = arc[i].phase;
+                        GL.Color(phase == 'H' ? new Color(0.2f, 0.9f, 0.9f)
+                            : phase == 'A' ? new Color(1f, 1f, 1f)
+                            : new Color(0.3f, 0.55f, 1f));
+                        Line(arc[i].pos, arc[i + 1].pos);
+                    }
+                    // Landing point: red marker.
+                    GL.Color(new Color(1f, 0.3f, 0.2f));
+                    WireSphere(arc[^1].pos, 0.12f);
+                }
             }
             GL.End();
             GL.PopMatrix();

@@ -46,6 +46,8 @@ at `% + damage` (the game applies damage first — verified by the parity sectio
 ## Tool (tools/MoveDataReport)
 
 - `scripts/move-data.sh fightguy [--pcts 0,30,...] [--out path]` — full report
+- `fightguy --shape [step]` — knockback feel surface: sampled launch arcs (height/travel/
+  V/phase, hit-indexed) for every hitbox at every %, default step 12 ≈ 0.2s
 - `fightguy --parity` — pipeline parity (16 cells: 8 slots × 0%/150%)
 - `fightguy --traj <slot>` — per-tick CSV of a launch at 10% steps
 - `fightguy --pipe` — single-slot full-pipeline launch diagnostic
@@ -59,31 +61,42 @@ at `% + damage` (the game applies damage first — verified by the parity sectio
 
 ## Current feel numbers (0.14 / g14, post-hit %)
 
-| move | @0% | @150% |
-|---|---|---|
-| g1 jab | KV 4.1, apex 0.6m, 0.62s | 7.4, 2.0m |
-| g2 roundhouse | KV 6.0, apex 1.2m | 11.5, 4.5m |
-| g3 uppercut | KV 4.9, apex 2.1m (launcher) | 9.5, 8.1m |
-| a3 high kick | KV 6.5, apex 1.5m | 11.9, 5.3m |
+Post air-knockback pass (2026-08-15) and g3 70° launcher fix. Full per-%-rows live in
+`docs/generated/fightguy-move-data.md` (+ `fightguy-knockback-shapes.txt`); summary:
 
-Combo probes at these values: g3→a2 juggles at every %; g3→g2 at 30-120 (T at 150);
-g1→g2 T from 60%; g3→a1 and g3→a3 are timing/reach windows. Known weak spot:
-high-% kill drama is soft (flat %-curve) — see next steps.
+| move | angle/base/growth | @0% | @150% |
+|---|---|---|---|
+| g1 jab | 30 / 4 / 20 | KV 3.5, apex 0.4m | 7.7, 2.2m |
+| g2 roundhouse | 28 / 6 / 32 | KV 5.8, apex 1.1m | 12.5, 5.4m |
+| g3 uppercut | **70** / 6 / 26 (was 82° dead-vertical) | KV 4.9, apex 2.0m (launcher) | 10.4, 9.2m |
+| g4 tornado | 40 / 4+2 / 22+12 | KV 4.0, apex 0.8m | 8.6, 3.7m |
+| a1 DP h1/h2 | **55**/5/24, **45**/7/30 (was 75°/60°) | KV 4.2/5.5, drift 0.6/1.2m | 9.2/11.8, drift 2.9/5.8m |
+| a2 FK sweet/weak | **35**/7/36, **30**/2/22 | KV 6.6/3.6, drift 2.1/0.6m | 14.2/8.2, drift 9.7/3.5m |
+| a3 high kick | **25**/7/36 (was 30°) | KV 6.8, drift 2.5m | 14.4, drift 11.1m |
+| a4 tornado | **35**/4/24, ender **25**/4/20 (was 40°, ender 2/12) | KV 4.3/3.5, drift 0.9/0.6m | 9.3/7.7, drift 4.2/3.2m |
 
-## Next steps (in order)
+Air pass goal met: all aerials carry more horizontally and pop less vertically; a4's final
+hit is a real launcher (was the weakest hit). Ground normals + ground Slot4 tornado untouched.
 
-1. **Blast zones** — engine has only void death (`PY < KillHeight`), no top/side
-   kill lines. Kills can't happen; kill-% tuning impossible until added.
-2. **a1 reach decision** — a1 (Double Punch) can't juggle anything (probe shows L
-   everywhere): hitbox reach too short. Design call: extend reach or accept as a
-   non-juggle tool.
-3. **Growth-curve steepening (Melee shape)** — base:growth is ~1:2 here vs ~1:5-8 in
-   Melee; the % curve is too flat: low-% pops and high-% kills can't both be right
-   with one linear scale. Raise growth, lower base per move — also shortens low-%
-   hitstun ("not every hit combos" gets truer).
-4. **Mid-% timing windows** — g3→a3 C only at 30/60: press-window tuning.
-5. Later: DI/SDI victim probes; dash-startup authoring (adds PARTIAL column to the
-   matrix); flight-gravity re-check after playtesting (still ~1s float at low %).
+## Feel tooling added this pass
+
+- Move-data report gains **`adv` / `advL`** columns: on-hit frame advantage (ticks) =
+  `stun − (IASA − trigger)`, with a landed-follow-up variant paying `LandingLagTicks` for
+  aerials (AC windows / aerial chase skip it). Hitstop freezes both players so it cancels
+  out. This is the metric that tells you whether a hit lets you press again.
+- **`--shape [step]`** mode (default 12 ≈ 0.2s): sampled launch arcs (height/travel/V/phase)
+  for every hitbox at every %, hit-indexed — the combo-free feel surface.
+- **Ability Lab** (Unity): knockback trajectory preview (victim-% slider, per-hitbox picker,
+  cyan hitstun → blue flight → white apex → red landing) + editable angle/base/growth fields.
+
+## Next steps (updated)
+
+1. ~~Blast zones~~ — **done** (commit `053d279`).
+2. ~~Growth-curve steepening~~ — **done** (g1-4 + a1-4; Melee 1:4-6 shape applied).
+3. **Remaining feel tuning**: kill-% drama (high-% curve still soft vs Melee's kill moves),
+   mid-% timing windows (g3→a3 connect only 30/60), a1 reach decision (double punch reach).
+4. Later: DI/SDI victim probes; dash-startup authoring; Manki/Nilus feel pass with the new
+   `--shape` tool once FightGuy feel is locked.
 
 ## Test suite (expected red)
 

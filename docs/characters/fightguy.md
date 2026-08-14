@@ -43,13 +43,13 @@ Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 | **RMB** | RMB | Uppercut | `spell_rmb` | Charged uppercut — hold to charge, release to strike | more charge = more damage/stun, launcher |
 | **AirRMB** | RMB (air) | Helicopter | `spell_rmb_air` | Hold to charge aerial spinning heel drop; tap = quick spike, charged = heavy spike | spikes downward |
 | **Slot1** | 1 | Low Kick | `spell_g_1` | Fast low right-foot kick — jab-class poke | startup 2, ~17 total, IASA 13 |
-| **AirSlot1** | 1 (air) | Double Punch | `spell_a_1` | Left then right punch — fast air poke | two hitboxes (trig 4/13), ~33 total |
+| **AirSlot1** | 1 (air) | Double Punch | `spell_a_1` | Left then right punch — fast air poke | two hitboxes (trig 6/16), ~33 total, IASA 29 |
 | **Slot2** | 2 | Roundhouse | `spell_g_2` | Roundhouse left kick — mid-range spacing normal | startup 8, ~29 total |
-| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Long static kick — nair-style lingering air hitbox | 12-tick active window, ~42 total |
+| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Long static kick — nair-style lingering air hitbox | strong 7-11 + weak trailing 12-31/6-40, ~42 total, IASA 36 |
 | **Slot3** | 3 | Double Uppercut | `spell_g_3` | Low right-hand starter + rising right uppercut — anti-air launcher | hits at 12/20, ~39 total |
-| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High-reaching left-foot kick — aerial juggle launcher | startup 15, ~44 total |
+| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High-reaching left-foot kick — aerial kill move | startup 13, ~44 total, IASA 41 |
 | **Slot4** | 4 | Tornado Kick | `spell_g_4` | Spinning right-foot tornado — 360° get-off-me | startup 18, 10-tick ring, ~49 total |
-| **AirSlot4** | 4 (air) | Air Tornado | `spell_a_4` | Same tornado kick as ground key 4 | identical frame data |
+| **AirSlot4** | 4 (air) | Air Tornado | `spell_a_4` | Tatsu-style spin — air combo starter; final hit launches out | distinct KB from ground: rakes 35°/24g, ender 25°/20g; ~49 total, IASA 46 |
 | **Q** | Q | Ki Shot | `spell_q` | Aimed ki projectile; marks target 5s on hit | on the Q key (slot 11); AZERTY physical-A |
 | **E** | E | Rising Dragon | `spell_r_loop` | Upward mobility — rising kick: anti-air on ground, recovery burst in air (FloatWindow reset) | the up-B analog, `IsRecoveryMove`, ~4s CD |
 | **R** | R | Cyclone Kick | `spell_e` | Forward spinning kick ~10m; stuns enemies passed through | engage, moved from E |

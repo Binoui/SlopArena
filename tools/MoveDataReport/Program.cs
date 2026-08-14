@@ -79,6 +79,21 @@ internal static class Program
             return 0;
         }
 
+        // --shape [step]: the knockback feel surface. For EVERY hitbox (normals + aerials)
+        // at each %, prints the real sampled arc — height above ground, horizontal travel,
+        // vertical/horizontal velocity, and phase (H=hitstun, F=flight, A=apex, G=landed) —
+        // sampled every `step` ticks (default 12 ≈ 0.2s) so the shape reads without per-tick
+        // noise. This is the report's combo-free view of how far, how high, and at what angle
+        // each hit launches at a given %. Also prints a one-line summary (KV, launch angle,
+        // stun in seconds) per block.
+        string? shapeStepArg = ParseArg(args, "--shape");
+        if (shapeStepArg != null)
+        {
+            int step = int.TryParse(shapeStepArg, out int s) && s > 0 ? s : 12;
+            DumpShapes(def, hits, pcts, step);
+            return 0;
+        }
+
         // --traj: raw per-tick launch trace only (no report/doc). Verifies the in-game
         // feel against the sim numbers without the summary tables.
         if (trajSlot.HasValue)
@@ -111,28 +126,35 @@ internal static class Program
             PrintParity(parity);
             return 0;
         }
-        var probeRoutes = DefaultRoutes.Where(r => r.From != r.To).ToArray();
-        var starterSpawns = new Dictionary<SlotRef, (float AtkY, float NpcY, float NpcZ)>();
-        foreach (var r in probeRoutes)
-        {
-            if (starterSpawns.ContainsKey(r.From)) continue;
-            var spawn = CalibrateStarter(def, r.From, baked);
-            if (spawn == null)
-                Console.Error.WriteLine($"probe {r.Label}: no starter placement connects — route will report NO");
-            else
-                starterSpawns[r.From] = spawn.Value;
-        }
+        // Combo matrix + movement probes are opt-in (--combos). They encode designed
+        // route *ideas*, not a feel contract — default output is pure knockback data.
+        bool combos = args.Contains("--combos");
+        var probeRoutes = Array.Empty<Route>();
         var probes = new Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)>();
-        foreach (var r in probeRoutes)
-        foreach (var p in pcts)
+        if (combos)
         {
-            if (!starterSpawns.TryGetValue(r.From, out var spawn))
-                probes[(r.From, r.To, p)] = (ProbeVerdict.None, -1);
-            else
-                probes[(r.From, r.To, p)] = RunProbe(def, r, p, baked, spawn);
+            probeRoutes = DefaultRoutes.Where(r => r.From != r.To).ToArray();
+            var starterSpawns = new Dictionary<SlotRef, (float AtkY, float NpcY, float NpcZ)>();
+            foreach (var r in probeRoutes)
+            {
+                if (starterSpawns.ContainsKey(r.From)) continue;
+                var spawn = CalibrateStarter(def, r.From, baked);
+                if (spawn == null)
+                    Console.Error.WriteLine($"probe {r.Label}: no starter placement connects — route will report NO");
+                else
+                    starterSpawns[r.From] = spawn.Value;
+            }
+            foreach (var r in probeRoutes)
+            foreach (var p in pcts)
+            {
+                if (!starterSpawns.TryGetValue(r.From, out var spawn))
+                    probes[(r.From, r.To, p)] = (ProbeVerdict.None, -1);
+                else
+                    probes[(r.From, r.To, p)] = RunProbe(def, r, p, baked, spawn);
+            }
         }
 
-        string md = BuildMarkdown(def, hits, runs, pcts, probeRoutes, probes, parity, which);
+        string md = BuildMarkdown(def, hits, runs, pcts, probeRoutes, probes, parity, which, combos);
         Console.WriteLine(md);
         if (outPath != null)
         {
@@ -279,9 +301,68 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Knockback feel surface for every hitbox (normals + aerials) at each %: prints the
+    /// real sampled arc — height above ground, horizontal travel, V/H velocity, phase
+    /// (H=hitstun, F=flight, A=apex, G=landed) — sampled every `step` ticks (default 12 ≈
+    /// 0.2s). Uses the post-hit % (pct + damage) so rows match the Per-hit trajectories.
+    /// This is the combo-free view: how far, how high, and at what angle each hit sends.
+    /// </summary>
+    private static void DumpShapes(CharacterDefinition def, List<HitSpec> hits, int[] pcts, int step)
+    {
+        foreach (var h in hits)
+        foreach (var pct in pcts)
+        {
+            var sim = new ServerSimulation(BuildArena());
+            float groundY = def.CapsuleHeight * 0.5f;
+            var state = new CharacterState
+            {
+                PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
+                State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)(pct + (int)h.Hit.Damage),
+            };
+            Simulation.ApplyKnockback(ref state, 0f, 1f, (sbyte)h.Hit.Knockback.Angle,
+                h.Hit.Knockback.BaseKnockback, h.Hit.Knockback.KnockbackGrowth,
+                h.Hit.Damage, h.Hit.StunTicks, def.Weight);
+            float kv = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
+            ushort stun = state.HitstunTicks;
+            sim.RegisterEntity(1, def, state);
+            var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+            Console.WriteLine($"\n=== {Label(h)} hit {h.HitIndex + 1} at {pct}% ===");
+            Console.WriteLine($"launch {kv:F2} m/s  stun {stun} ticks ({stun / 60f:F2}s)  hitstop {ServerSimulation.ComputeHitstopTicks(h.Hit.Damage, null)}");
+            Console.WriteLine("tick,height(m),travel(m),vY,vX,phase");
+            float maxPy = state.PY;
+            bool apexMarked = false;
+            int apexTick = -1;
+            for (int t = 0; t < MaxTicks; t++)
+            {
+                sim.Tick(inputs);
+                var s = sim.GetState(1);
+                // Apex = the tick after height stops increasing (post-hitstun flight).
+                if (!apexMarked && t > 0 && s.PY <= maxPy && !s.IsGrounded && s.HitstunTicks == 0)
+                {
+                    apexMarked = true;
+                    apexTick = t + 1;
+                }
+                if (s.PY > maxPy) maxPy = s.PY;
+                if (s.IsGrounded)
+                {
+                    Console.WriteLine($"{t + 1},{s.PY - groundY:F2},{s.PZ:F2},0.00,0.00,G");
+                    break;
+                }
+                bool atApex = t + 1 == apexTick;
+                // Print the apex tick and every `step`-th tick (plus tick 0-ish via the loop start).
+                if (!atApex && t % step != 0) continue;
+                char phase = s.HitstunTicks > 0 ? 'H' : atApex ? 'A' : 'F';
+                float vy = s.HitstunTicks > 0 ? s.KVY : s.VY;
+                float vz = s.HitstunTicks > 0 ? s.KVZ : s.VZ;
+                Console.WriteLine($"{t + 1},{s.PY - groundY:F2},{s.PZ:F2},{vy:F2},{vz:F2},{phase}");
+            }
+        }
+    }
+
     private sealed record ParityResult(string Label, int Pct, float DirectKv, float PipeKv,
         int DirectStun, int PipeStun, float DirectApex, float PipeApex, bool Ok);
-
     /// <summary>
     /// Runs the REAL launch path (input → hitbox → ResolveHits → freeze queue → queued
     /// launch) for each slot's first hitbox at 0% and the last requested %, and compares
@@ -680,7 +761,7 @@ internal static class Program
     private static string BuildMarkdown(CharacterDefinition def, List<HitSpec> hits,
         Dictionary<(SlotRef, int, int), RunResult> runs, int[] pcts,
         Route[] probeRoutes, Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)> probes,
-        List<ParityResult> parity, string which)
+        List<ParityResult> parity, string which, bool combos)
     {
         var sb = new System.Text.StringBuilder();
         string charName = def.DisplayName;
@@ -713,16 +794,32 @@ internal static class Program
 
         sb.AppendLine("## Per-hit trajectories (simulated)");
         sb.AppendLine();
-        sb.AppendLine("| move | hit | % | KV m/s | hitstop | stun | rise@stun m | drift@stun m | apex m | actionable tick | landed tick |");
-        sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|");
+        sb.AppendLine("| move | hit | % | KV m/s | hitstop | stun | adv | advL | rise@stun m | drift@stun m | apex m | actionable tick | landed tick |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
         foreach (var h in hits)
         foreach (var p in pcts)
         {
             var r = runs[(h.Slot, h.HitIndex, p)];
-            sb.AppendLine($"| {Label(h)} | {h.HitIndex + 1} | {p} | {r.Kv:0.0} | {r.Hitstop} | {r.Stun} | " +
+            // Frame advantage on hit (ticks): victim stun minus the attacker's remaining
+            // recovery after the hit connects on its first active frame. Hitstop freezes
+            // both players so it cancels out. unlock = IASA early-out, or stage end when
+            // no IASA is authored (full commitment).
+            int unlock = h.Stage.IasaTicks > 0 ? h.Stage.IasaTicks : h.Stage.DurationTicks;
+            int recovery = Math.Max(0, unlock - h.Hit.TriggerTick);
+            int adv = r.Stun - recovery;
+            // advL: landed follow-up after an aerial pays landing lag (unless the landing
+            // frame sits in an AC window, or the attacker continues with an aerial at IASA).
+            string advL = h.Slot.Air ? (adv - h.Stage.LandingLagTicks).ToString() : "—";
+            sb.AppendLine($"| {Label(h)} | {h.HitIndex + 1} | {p} | {r.Kv:0.0} | {r.Hitstop} | {r.Stun} | {adv} | {advL} | " +
                           $"{r.Rise:0.00} | {r.Drift:0.00} | {r.Apex:0.0} | {r.ActionableTick} | {r.LandedTick?.ToString() ?? ">2400"} |");
         }
         sb.AppendLine();
+        sb.AppendLine("> **adv** = on-hit frame advantage (ticks): `stun − (IASA − trigger)`; positive = the attacker acts before the");
+        sb.AppendLine("> victim leaves hitstun (can press/continue), negative = the victim recovers first. Hitstop freezes both, so it");
+        sb.AppendLine("> cancels out. Assumes the hit connects on the first active frame — later connects only improve advantage.");
+        sb.AppendLine("> **advL** (aerials): the landed follow-up pays `LandingLagTicks` on top (SHFFL-style); land inside an AC window");
+        sb.AppendLine("> (`≤ AC bef` / `≥ AC aft`) or chase with an aerial at IASA and the lag is skipped — the true landed number sits");
+        sb.AppendLine("> between `advL` and `adv`. Grounded moves land free (no lag), so `advL` is `—`.");
 
         sb.AppendLine("## Pipeline parity (real hit path vs direct formula)");
         sb.AppendLine();
@@ -740,28 +837,33 @@ internal static class Program
                           $"{p.DirectApex:0.0} | {p.PipeApex:0.0} | {(p.Ok ? "OK" : "**DIVERGE**")} |");
         sb.AppendLine();
 
-        sb.AppendLine("## Combo matrix (no-travel bound)");
-        sb.AppendLine();
-        sb.AppendLine("T = follow-up connects before stun ends (attacker recovers at IASA, jumpsquat when follow-up is aerial,");
-        sb.AppendLine("landing lag when the route lands between hits). Most routes SHOULD be `-` at low % and some at all % —");
-        sb.AppendLine("reads and movement are what make combos happen (Melee-style), TRUE everywhere = flowchart bait.");
-        sb.AppendLine();
-        sb.AppendLine("| route (TA ticks) | " + string.Join(" | ", pcts.Select(p => p.ToString())) + " |");
-        sb.AppendLine("|---" + string.Join("", pcts.Select(_ => "|---")) + "|");
-        foreach (var r in DefaultRoutes)
+        if (combos)
         {
-            int ta = AttackerBudget(def, hits, r);
-            string cells = string.Join(" | ", pcts.Select(p =>
+            sb.AppendLine("## Combo matrix (no-travel bound)");
+            sb.AppendLine();
+            sb.AppendLine("T = follow-up connects before stun ends (attacker recovers at IASA, jumpsquat when follow-up is aerial,");
+            sb.AppendLine("landing lag when the route lands between hits). Most routes SHOULD be `-` at low % and some at all % —");
+            sb.AppendLine("reads and movement are what make combos happen (Melee-style), TRUE everywhere = flowchart bait.");
+            sb.AppendLine();
+            sb.AppendLine("| route (TA ticks) | " + string.Join(" | ", pcts.Select(p => p.ToString())) + " |");
+            sb.AppendLine("|---" + string.Join("", pcts.Select(_ => "|---")) + "|");
+            foreach (var r in DefaultRoutes)
             {
-                var stun = runs[(r.From, r.FromHit, p)].Stun;
-                return ta < stun ? "**T**" : "-";
-            }));
-            sb.AppendLine($"| {r.Label} ({ta}) | {cells} |");
+                int ta = AttackerBudget(def, hits, r);
+                string cells = string.Join(" | ", pcts.Select(p =>
+                {
+                    var stun = runs[(r.From, r.FromHit, p)].Stun;
+                    return ta < stun ? "**T**" : "-";
+                }));
+                sb.AppendLine($"| {r.Label} ({ta}) | {cells} |");
+            }
+            sb.AppendLine();
         }
-        sb.AppendLine();
 
-        sb.AppendLine("## Combo probes (movement chase, real sim)");
-        sb.AppendLine();
+        if (combos && probeRoutes.Length > 0)
+        {
+            sb.AppendLine("## Combo probes (movement chase, real sim)");
+            sb.AppendLine();
         sb.AppendLine("T = frame-true (matrix above). C = the chase policy connected while the victim was airborne — a real");
         sb.AppendLine("juggle/read; the victim is likely actionable by then, so these are not true combos. L = connected only");
         sb.AppendLine("after the victim landed (neutral hit on a passive target — opponent fully actionable, so not a combo).");
@@ -806,6 +908,8 @@ internal static class Program
         }
         sb.AppendLine("```");
         sb.AppendLine();
+        }
+
         sb.AppendLine($"_Weight: {def.Weight}. Jump squat: {def.Movement.JumpSquatTicks} ticks. Dash startup: not authored (0) — revisit later._");
         return sb.ToString();
     }
