@@ -26,7 +26,7 @@ public class AuthoringPolicyTests
     {
         foreach (var (name, def) in Kits)
         {
-            var lmb = def.LMB!;
+            var lmb = def.LMB ?? def.Slot1;
             Assert.NotNull(lmb);
             Assert.True(lmb.Stages.Length > 0, $"{name} LMB has no stages");
             Assert.True(lmb.Stages[0].IasaTicks > 0,
@@ -41,7 +41,7 @@ public class AuthoringPolicyTests
     {
         foreach (var (name, def) in Kits)
         {
-            var airLmb = def.AirLMB!;
+            var airLmb = def.AirLMB ?? def.AirSlot1;
             Assert.NotNull(airLmb);
             var stage = airLmb.Stages[0];
             Assert.True(stage.IasaTicks > 0,

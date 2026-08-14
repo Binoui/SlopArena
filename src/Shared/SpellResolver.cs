@@ -76,6 +76,8 @@ namespace SlopArena.Shared
         {
             hb.Active = true;
             hb.AgeTicks = 0;
+            if (hb.HitsMultipleOpponents)
+                hb.HitEntities = new HashSet<ulong>();
             _hitboxes.Add(hb);
         }
 
@@ -161,6 +163,31 @@ namespace SlopArena.Shared
         }
 
         /// <summary>
+        /// Re-resolve every bone-tracked hitbox to its owner's current bone position.
+        /// Call once per tick, before Tick(), so melee hitboxes sweep with the limb
+        /// instead of freezing at their spawn position. Projectiles and non-bone
+        /// hitboxes are untouched (they carry their own velocity).
+        /// </summary>
+        public void UpdateBoneHitboxes(IReadOnlyDictionary<ulong, CharacterState> states)
+        {
+            for (int i = 0; i < _hitboxes.Count; i++)
+            {
+                var hb = _hitboxes[i];
+                if (!hb.Active || !hb.TracksBone || hb.Baked == null || hb.Def == null) continue;
+                if (!states.TryGetValue(hb.OwnerId, out var owner)) continue;
+                if (owner.AttackSlot == 0) continue; // owner interrupted/ended — leave the lingering hitbox as-is
+
+                HitboxGeometry.ResolvePositions(owner, hb.SourceEvent, hb.Baked, hb.Def,
+                    hb.AnimationNames, hb.AnimIndex, hb.Slot, hb.Airborne,
+                    out float wx, out float wy, out float wz,
+                    out float wex, out float wey, out float wez);
+                hb.X = wx; hb.Y = wy; hb.Z = wz;
+                hb.EndX = wex; hb.EndY = wey; hb.EndZ = wez;
+                _hitboxes[i] = hb;
+            }
+        }
+
+        /// <summary>
         /// Process one tick: move projectiles, check collisions, age hitboxes.
         /// Returns all hits this tick (one per entity, first hitbox to connect wins).
         /// Already-hit entities in this tick are skipped (no double-hit).
@@ -233,6 +260,10 @@ namespace SlopArena.Shared
 
                         if (hit)
                         {
+                            // One-hit-per-opponent: skip entities this hitbox already tagged.
+                            if (hb.HitsMultipleOpponents && hb.HitEntities!.Contains(entity.Id))
+                                continue;
+
                             // Calculate knockback direction (normalized, no force multiplier)
                             float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
                             float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
@@ -251,9 +282,14 @@ namespace SlopArena.Shared
                             });
 
                             hitThisTick.Add(entity.Id);
+                            if (hb.HitsMultipleOpponents)
+                            {
+                                hb.HitEntities!.Add(entity.Id);
+                                continue;   // tag every opponent once, expire at DurationTicks
+                            }
                             if (isZone)
                                 continue;   // zone survives and keeps scanning other entities
-                            hb.Active = false; // one-hit per hitbox
+                            hb.Active = false; // one-hit per hitbox (projectiles)
                             break;
                         }
                     }

@@ -155,26 +155,6 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  FIGHTGUY LMB — LmbCombo (StageChainAbility)
-    // ════════════════════════════════════════════════
-
-    [Fact]
-    public void FightGuyLMB_SingleStage_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(FightGuyDef);
-        state.FacingYaw = 0;
-        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
-
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1),
-            FightGuyDef.LMB!.Stages[0].DurationTicks + 10);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    // ════════════════════════════════════════════════
     //  FIGHTGUY Q — FightGuyKiShot (hold → throw)
     // ════════════════════════════════════════════════
 

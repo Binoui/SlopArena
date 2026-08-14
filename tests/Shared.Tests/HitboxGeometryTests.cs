@@ -67,7 +67,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 1f, PY = 2f, PZ = 3f, FacingYaw = 0f };
         var evt = new HitboxEvent { OffX = 0f, OffY = 0.5f, OffZ = 1.5f };
 
-        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // Facing +Z (yaw 0): OffZ=front → wz, OffY=up → wy, OffX=0.
@@ -82,7 +82,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 1f, PY = 2f, PZ = 3f, FacingYaw = MathF.PI / 2f };
         var evt = new HitboxEvent { OffZ = 1.5f };
 
-        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // Facing +X: local +Z (front) maps to world +X.
@@ -97,7 +97,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 0f, PY = 1f, PZ = 0f, FacingYaw = 0f };
         var evt = new HitboxEvent { OffZ = 0.5f, EndOffZ = 1.2f, EndOffY = 0.1f };
 
-        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, null, null, null, 0, 0, false,
             out float wx, out float wy, out float wz,
             out float wex, out float wey, out float wez);
 
@@ -122,7 +122,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 1f, PY = 0.75f, PZ = 2f, FacingYaw = 0f, AttackElapsedTicks = 30 };
         var evt = new HitboxEvent { BoneName = "mixamorig:Head" };
 
-        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // bakedFrame = min(30 * 60 / 60, 59) = 30 → Head Y = 0.9 + 0.3 = 1.2
@@ -141,9 +141,9 @@ public class HitboxGeometryTests
             (f, bone, axis) => 0f));
         var def = BoneDef();
         var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = MathF.PI / 2f };
-        var evt = new HitboxEvent { BoneName = "mixamorig:Hips", BoneOffZ = 0.2f, BoneOffY = 0.1f };
+        var evt = new HitboxEvent { BoneName = "mixamorig:Hips", OffZ = 0.2f, OffY = 0.1f };
 
-        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // Hips at (0,0,0) baked → world (0, 0.5, 0); BoneOffZ=0.2 at yaw PI/2 → +X.
@@ -166,7 +166,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f };
         var evt = new HitboxEvent { BoneName = "mixamorig:LeftToes" };
 
-        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // LeftToes at (0,0,0) baked → world (0, py - h/2 + HipHeight + 0, 0) = (0, 0.5, 0).
@@ -182,7 +182,7 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 1f, PY = 2f, PZ = 3f, FacingYaw = 0f };
         var evt = new HitboxEvent { BoneName = "mixamorig:Head", OffZ = 1.5f };
 
-        HitboxGeometry.ResolvePositions(s, evt, null, def, new[] { "attack" }, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, null, def, new[] { "attack" }, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         Assert.Equal(1f, wx, 5); // entity-relative: OffZ lands on wz at yaw 0
@@ -201,11 +201,43 @@ public class HitboxGeometryTests
         var s = new CharacterState { PX = 0f, PY = 2f, PZ = 0f, FacingYaw = 0f };
         var evt = new HitboxEvent { BoneName = "mixamorig:LeftFoot", OffZ = 0.5f };
 
-        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0,
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         Assert.Equal(0f, wx, 5);
         Assert.Equal(2f, wy, 5);
         Assert.Equal(0.5f, wz, 5);
+    }
+
+    [Fact]
+    public void AirborneMove_UsesAirStageDurationForFrameProjection()
+    {
+        // 60-frame "attack": frame f puts Head at Y = 0.9 + f*0.01, X/Z = 0.
+        var baked = BakedAnimationData.LoadFromBin(BuildTestBin(
+            new[] { "mixamorig:Head", "mixamorig:Hips" },
+            new[] { ("attack", 60) },
+            (f, bone, axis) => (bone, axis) switch { (0, 1) => 0.9f + f * 0.01f, (1, 1) => 0.4f, _ => 0f }));
+
+        var def = BoneDef(); // ground LMB: 60-tick stage
+        // Air slot 0 (AirLMB): 30-tick stage, same "attack" animation. With the ground
+        // (60-tick) duration, tick 15 projects to frame 15 (Head Y 1.05 → world 1.55);
+        // with the air (30-tick) duration it projects to frame 30 (Head Y 1.20 → world 1.7).
+        def.AirLMB = new AbilitySpec
+        {
+            Stages = new[] { new AttackStage { DurationTicks = 30 } },
+            AnimationNames = new[] { "attack" },
+        };
+
+        var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f, AttackElapsedTicks = 15 };
+        var evt = new HitboxEvent { BoneName = "mixamorig:Head" };
+
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, airborne: true,
+            out float wx, out float wy, out float wz, out _, out _, out _);
+
+        // bakedFrame = min(15 * 60 / 30, 59) = 30 → Head Y = 0.9 + 0.3 = 1.2
+        // world Y = py - h/2 + HipHeight + by = 0.75 - 0.75 + 0.5 + 1.2 = 1.7
+        Assert.Equal(0f, wx, 5);
+        Assert.Equal(1.7f, wy, 5); // would be 1.55 if the ground duration were used
+        Assert.Equal(0f, wz, 5);
     }
 }

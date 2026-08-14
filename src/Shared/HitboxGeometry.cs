@@ -13,8 +13,9 @@ public static class HitboxGeometry
     /// <summary>
     /// Resolve a hitbox's world-space start/end positions.
     /// When evt.BoneName is set and baked data is available, positions at the bone's
-    /// world position (plus BoneOff*) instead of the fixed OffX/Y/Z entity-relative
-    /// offset. Mirrors the pre-extraction logic of ServerAbility.SpawnHitbox exactly.
+    /// world position plus the OffX/Y/Z offset — the offset is anchor-relative (bone when
+    /// BoneName is set, entity origin otherwise), matching the Ability Lab editor, which
+    /// only authors Off*. Mirrors ServerAbility.SpawnHitbox.
     /// Bone names resolve against the baked skeleton's bone set — any baked bone is
     /// attachable (the bake can carry bones the hurtbox defs don't, e.g. toes).
     /// </summary>
@@ -25,10 +26,11 @@ public static class HitboxGeometry
     /// <param name="animationNames">Ability's AnimationNames[] (AnimIndex selects the pose animation).</param>
     /// <param name="animIndex">Current animation index into animationNames.</param>
     /// <param name="slot">0-based ability slot (for stage duration lookup).</param>
+    /// <param name="airborne">True when the ability is an air slot — selects the air spec's stage duration.</param>
     public static void ResolvePositions(
         in CharacterState s, in HitboxEvent evt,
         BakedAnimationData? baked, CharacterDefinition? def,
-        string[]? animationNames, byte animIndex, byte slot,
+        string[]? animationNames, byte animIndex, byte slot, bool airborne,
         out float wx, out float wy, out float wz,
         out float wex, out float wey, out float wez)
     {
@@ -71,7 +73,7 @@ public static class HitboxGeometry
                 if (animIdx >= 0)
                 {
                     int fc = baked.Animations[animIdx].FrameCount;
-                    var spec = def.GetSlotAbility(slot, airborne: false);
+                    var spec = def.GetSlotAbility(slot, airborne);
                     int durationTicks = (spec != null && animIndex < spec.Stages.Length)
                         ? spec.Stages[animIndex].DurationTicks
                         : 60;
@@ -87,9 +89,9 @@ public static class HitboxGeometry
                         wx = s.PX + ((bx * cos) + (bz * sin));
                         wy = def.BoneYToWorldY(s.PY, by);
                         wz = s.PZ + ((-bx * sin) + (bz * cos));
-                        wx += (evt.BoneOffX * cos) + (evt.BoneOffZ * sin);
-                        wy += evt.BoneOffY;
-                        wz += (-evt.BoneOffX * sin) + (evt.BoneOffZ * cos);
+                        wx += (evt.OffX * cos) + (evt.OffZ * sin);
+                        wy += evt.OffY;
+                        wz += (-evt.OffX * sin) + (evt.OffZ * cos);
                         resolved = true;
                     }
                 }

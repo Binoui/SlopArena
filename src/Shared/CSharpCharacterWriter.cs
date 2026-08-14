@@ -211,9 +211,6 @@ namespace SlopArena.Shared
             if (e.BoneName != null)
             {
                 sb.Append("BoneName = \"").Append(e.BoneName).Append("\", ");
-                if (e.BoneOffX != 0f) sb.Append("BoneOffX = ").Append(F(e.BoneOffX)).Append(", ");
-                if (e.BoneOffY != 0f) sb.Append("BoneOffY = ").Append(F(e.BoneOffY)).Append(", ");
-                if (e.BoneOffZ != 0f) sb.Append("BoneOffZ = ").Append(F(e.BoneOffZ)).Append(", ");
             }
             sb.Append("Damage = ").Append(F(e.Damage)).Append(", ");
             AppendKnockback(sb, in e.Knockback);

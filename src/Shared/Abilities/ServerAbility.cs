@@ -101,7 +101,7 @@ namespace SlopArena.Shared.Abilities
             // Position resolution is shared with the Ability Lab preview + tests
             // (spec #119) — one implementation, previews cannot drift from the server.
             HitboxGeometry.ResolvePositions(
-                s, evt, BakedData, CharacterDef, AnimationNames, AnimIndex, Slot,
+                s, evt, BakedData, CharacterDef, AnimationNames, AnimIndex, Slot, !s.IsGrounded,
                 out float wx, out float wy, out float wz,
                 out float wex, out float wey, out float wez);
 
@@ -112,13 +112,19 @@ namespace SlopArena.Shared.Abilities
             // Resolve knockback profile to flat values
             var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
 
+            // Bone-attached melee hitboxes re-resolve their bone position every tick
+            // (SpellResolver.UpdateBoneHitboxes) — the limb sweeps the hitbox.
+            bool tracksBone = evt.BoneName != null && BakedData != null;
+
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
-                // Bone-attached hitboxes get velocity to follow the character
-                VX = evt.BoneName != null ? s.VX : 0f,
-                VY = evt.BoneName != null ? s.VY : 0f,
-                VZ = evt.BoneName != null ? s.VZ : 0f,
+                // Tracked hitboxes are re-resolved to the bone's absolute world
+                // position each tick; velocity would double-apply the owner's
+                // translation on top of that.
+                VX = tracksBone ? 0f : (evt.BoneName != null ? s.VX : 0f),
+                VY = tracksBone ? 0f : (evt.BoneName != null ? s.VY : 0f),
+                VZ = tracksBone ? 0f : (evt.BoneName != null ? s.VZ : 0f),
                 Radius = radius,
                 Shape = evt.Shape,
                 EndX = wex, EndY = wey, EndZ = wez,
@@ -130,6 +136,15 @@ namespace SlopArena.Shared.Abilities
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,
                 FreezesOwner = true,
+                HitsMultipleOpponents = true,
+                TracksBone = tracksBone,
+                SourceEvent = evt,
+                Baked = BakedData,
+                Def = CharacterDef,
+                AnimationNames = AnimationNames,
+                AnimIndex = AnimIndex,
+                Slot = Slot,
+                Airborne = !s.IsGrounded,
             });
         }
 
@@ -191,7 +206,7 @@ namespace SlopArena.Shared.Abilities
         {
             // Slot is 0-based, but GetSlotAbility expects 0-based slot index
             var spec = def.GetSlotAbility(Slot, airborne: false);
-            if (spec.Params != null && spec.Params.TryGetValue(key, out float val))
+            if (spec?.Params != null && spec.Params.TryGetValue(key, out float val))
                 return val;
             return fallback;
         }

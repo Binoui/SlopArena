@@ -326,8 +326,8 @@ namespace SlopArena.Shared
             {
                 bool airborne = !state.IsGrounded;
                 var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-                targetAnim = (stageIdx >= 0 && stageIdx < ability.AnimationNames.Length) ? ability.AnimationNames[stageIdx] : "melee";
+                int stageIdx = ability != null ? Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1)) : 0;
+                targetAnim = ability != null && stageIdx >= 0 && stageIdx < ability.AnimationNames.Length ? ability.AnimationNames[stageIdx] : "melee";
             }
             else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
             {
@@ -356,11 +356,14 @@ namespace SlopArena.Shared
             {
                 bool airborne = !state.IsGrounded;
                 var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-                if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                if (ability != null)
                 {
-                    int durationTicks = ability.Stages[stageIdx].DurationTicks;
-                    if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                    int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                    if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                    {
+                        int durationTicks = ability.Stages[stageIdx].DurationTicks;
+                        if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                    }
                 }
             }
 
@@ -985,6 +988,10 @@ namespace SlopArena.Shared
 
         private void ResolveHits(List<SpellResolver.EntityData> entityList, Dictionary<ulong, InputState> inputs)
 		{
+			// Bone-tracked hitboxes sweep with their limb: re-resolve positions from
+			// the owners' current (post-movement) states before the collision pass.
+			_spellResolver.UpdateBoneHitboxes(_states);
+
 			// ── Step 3: Resolve hitboxes ──
 			var hits = _spellResolver.Tick(entityList);
 			LastTickHits.Clear();

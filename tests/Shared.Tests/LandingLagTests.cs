@@ -56,6 +56,16 @@ public class LandingLagTests : KitScenarioTests
                 },
             },
         };
+        // GetParam reads the GROUND spec's params (airborne:false), so the lunge window
+        // lives on LMB — the spec the air ability actually reads for "lunge_duration".
+        def.LMB = new AbilitySpec
+        {
+            Name = "Test Ground",
+            CooldownTicks = 0,
+            AnimationNames = new[] { "test_ground" },
+            Params = new() { ["lunge_duration"] = 6f },
+            Stages = new[] { new AttackStage { DurationTicks = 1 } },
+        };
         return def;
     }
 

@@ -42,6 +42,11 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
+### 3a. Explain once, then execute
+Before editing, state the plan in 2-3 sentences and get ONE "go ahead"/"vas y".
+Ask the question once. After approval, execute fully — do not re-confirm each step.
+Do not commit or push without explicit instruction ("commit" / "commit push").
+
 ## 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**

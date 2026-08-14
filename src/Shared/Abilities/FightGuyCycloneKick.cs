@@ -64,6 +64,7 @@ namespace SlopArena.Shared.Abilities
                     DurationTicks = 2,
                     OwnerId = s.EntityId,
                     FreezesOwner = true,
+                    HitsMultipleOpponents = true,
                 });
 
                 // 4 side hitboxes: front, back, left, right — covers the spin arc
@@ -75,6 +76,7 @@ namespace SlopArena.Shared.Abilities
                     Radius = sideRadius, Shape = HitboxShape.Sphere,
                     Damage = damage, StunTicks = stunTicks,
                     DurationTicks = 2, OwnerId = s.EntityId,
+                    HitsMultipleOpponents = true,
                 });
                 // Back
                 Resolver.Spawn(new Hitbox
@@ -83,6 +85,7 @@ namespace SlopArena.Shared.Abilities
                     Radius = sideRadius, Shape = HitboxShape.Sphere,
                     Damage = damage, StunTicks = stunTicks,
                     DurationTicks = 2, OwnerId = s.EntityId,
+                    HitsMultipleOpponents = true,
                 });
                 // Right
                 Resolver.Spawn(new Hitbox
@@ -91,6 +94,7 @@ namespace SlopArena.Shared.Abilities
                     Radius = sideRadius, Shape = HitboxShape.Sphere,
                     Damage = damage, StunTicks = stunTicks,
                     DurationTicks = 2, OwnerId = s.EntityId,
+                    HitsMultipleOpponents = true,
                 });
                 // Left
                 Resolver.Spawn(new Hitbox
@@ -99,6 +103,7 @@ namespace SlopArena.Shared.Abilities
                     Radius = sideRadius, Shape = HitboxShape.Sphere,
                     Damage = damage, StunTicks = stunTicks,
                     DurationTicks = 2, OwnerId = s.EntityId,
+                    HitsMultipleOpponents = true,
                 });
             }
 

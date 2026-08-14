@@ -415,7 +415,7 @@ namespace SlopArena.Client.Tools
                 var evt = events[i];
                 if (Tick < evt.TriggerTick || Tick >= evt.TriggerTick + evt.DurationTicks) continue;
                 HitboxGeometry.ResolvePositions(state, evt, Baked, DisplayDef,
-                    spec.AnimationNames, (byte)StageIndex, (byte)SlotIndex,
+                    spec.AnimationNames, (byte)StageIndex, (byte)SlotIndex, Airborne,
                     out float wx, out float wy, out float wz,
                     out float wex, out float wey, out float wez);
                 _hitboxes.Add((i, evt, new Vector3(wx, wy, wz), new Vector3(wex, wey, wez)));

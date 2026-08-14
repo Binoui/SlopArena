@@ -7,92 +7,6 @@ public class FightGuyAbilityTests
 {
     private static readonly float GroundPY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
 
-    // ── LMB (FightGuyLmbCombo) ──
-
-    [Fact]
-    public void FightGuyLmbCombo_Activates()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.Equal((byte)1, t0.AttackSlot);
-    }
-
-    [Fact]
-    public void FightGuyLmb_RepeatPressMidMove_DoesNotChain()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        var def = TestHelpers.FightGuyDef;
-        var stageTicks = def.LMB!.Stages[0].DurationTicks;
-        TestHelpers.RegisterPlayer(sim, def, state);
-        // Tick 0: LMB to start the single move
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        // Tick 1: repeat press — no chain, no stage advance (issue #115)
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-
-        // Mid-move: still the single move, never chained.
-        for (int i = 2; i < stageTicks / 2; i++)
-            TestHelpers.TickDefault(sim, 1);
-        var mid = sim.GetState(1);
-        Assert.Equal((byte)0, mid.ComboStage); // never chained
-        Assert.Equal(ActionState.Attacking, mid.State);
-
-        // Full duration: ends Idle, no queued second move.
-        for (int i = 0; i < stageTicks; i++)
-            TestHelpers.TickDefault(sim, 1);
-        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
-    }
-
-    [Fact]
-    public void FightGuyLmb_MoveExpiresToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        int duration = TestHelpers.FightGuyDef.LMB!.Stages[0].DurationTicks;
-        for (int i = 0; i < duration + 10; i++)
-            TestHelpers.TickDefault(sim, 1);
-        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
-    }
-
-    [Fact]
-    public void FightGuyLmbCombo_Stage1DealsDamageToNpc()
-    {
-        var sim = TestHelpers.MakeSim();
-        var player = TestHelpers.PlayerState();
-        player.PY = GroundPY;
-        player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
-
-        // NPC in front of player, within LMB hitbox range
-        var npc = TestHelpers.NpcState(0f, 1.5f);
-        npc.PY = GroundPY;
-        npc.DamagePercent = 0;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-
-        // LMB and tick through hitbox trigger (tick 6)
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        // Player should have lunged forward
-        var playerAfter = sim.GetState(1);
-        Assert.True(playerAfter.PZ > 0.3f,
-            $"Expected player to lunge forward (PZ > 0.3), got PZ={playerAfter.PZ:F3}");
-
-        // NPC should have taken damage
-        var npcAfter = sim.GetState(100);
-        Assert.True(npcAfter.DamagePercent > 0,
-            $"NPC should have taken damage from LMB, got {npcAfter.DamagePercent}");
-    }
-
     // ── Q (FightGuyKiShot) ──
 
     [Fact]
@@ -403,7 +317,7 @@ public class FightGuyAbilityTests
                             DurationTicks = 5,
                             Radius = 0.8f,
                             BoneName = "mixamorig:RightFoot",
-                            BoneOffY = 0.1f,
+                            OffY = 0.1f,
                             Damage = 10f,
                             Knockback = new() { Profile = KnockbackProfile.Medium },
                             StunTicks = 10,
@@ -469,23 +383,54 @@ public class FightGuyAbilityTests
     [Fact]
     public void BoneHitbox_EntityOffsetHitboxStillWorks()
     {
-        // Uses FightGuyDef LMB (entity-relative OffX/OffY/OffZ, BoneName=null default).
-        // HitboxEvent with no BoneName → standard positioning path.
+        // Entity-relative offset (no BoneName) still hits via the standard path now that
+        // bone-attached hitboxes exist — Off* is anchor-relative (bone or entity origin).
+        var entityLMB = new AbilitySpec
+        {
+            Name = "EntityLMB",
+            CooldownTicks = 0,
+            Stages = new AttackStage[]
+            {
+                new()
+                {
+                    DurationTicks = 20,
+                    HitboxEvents = new[]
+                    {
+                        new HitboxEvent
+                        {
+                            TriggerTick = 5,
+                            DurationTicks = 5,
+                            Radius = 0.8f,
+                            OffY = 0.8f,
+                            OffZ = 1.2f,
+                            Damage = 10f,
+                            Knockback = new() { Profile = KnockbackProfile.Medium },
+                            StunTicks = 10,
+                            Interruptible = true,
+                        },
+                    },
+                    LungeForce = 0f,
+                },
+            },
+            AnimationNames = new[] { "melee" },
+        };
+
+        var def = TestHelpers.CloneDef(TestHelpers.BoneHitboxTestDef);
+        def.LMB = entityLMB;
+        def.BakedDataPath = ""; // no baked data — entity offset must not need it
+
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.GroundPY(TestHelpers.FightGuyDef); // 0.85
+        player.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
         player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+        sim.RegisterEntity(1, def, player);
 
-        // FightGuy LMB stage 0 hitbox: OffX=0, OffY=0.8, OffZ=1.2, Radius=0.5
-        // Player at (0, 0.85, 0), lunge forward ~0.8m by tick 6 (hitbox trigger)
-        // → hitbox center approx at (0, 1.65, 2.0). NPC at (0, 0.65, 1.5): overlap
-        var npc = TestHelpers.NpcState(0f, 1.5f);
-        npc.PY = TestHelpers.CombatGroundPY;
+        // NPC directly in front at the entity-offset hitbox position (OffZ = 1.2).
+        var npc = TestHelpers.NpcState(0f, 1.2f);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
         npc.DamagePercent = 0;
-        sim.RegisterEntity(100, TestHelpers.CombatDef, npc);
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
-        // LMB stage 0, hitbox triggers at tick 6
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });

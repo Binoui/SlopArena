@@ -16,7 +16,8 @@ namespace SlopArena.Shared;
 ///     Positive OffZ = in front, OffY = up from feet
 ///   - Capsule shape: OffX/OffY/OffZ = start, EndOffX/Y/Z = capsule end (relative to Off)
 ///   - Damage: flat value, BaseKnockback: minimum horizontal push, KnockbackGrowth: %-scaling knockback component, KnockbackUpward: vertical launch
-        ///   - Hitbox BoneName: if set, hitbox follows bone position instead of OffX/Y/Z. BoneOffX/Y/Z = local offset from bone.
+///   - Hitbox BoneName: if set, the hitbox anchors at the bone's world position (plus the
+///     OffX/Y/Z offset — anchor-relative). OffX/Y/Z is the one offset field, bone or entity.
 ///   - Interruptible: if true, attacker's hitbox cancels if they get hit during it
 ///   - No chain windows (issue #115): every slot is a single move — one stage, one press
 ///   - TriggerTick: when during the animation the hitbox spawns (must be < DurationTicks)

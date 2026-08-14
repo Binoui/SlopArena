@@ -140,13 +140,13 @@ public class CSharpCharacterWriterTests
             DurationTicks = 4,
             Radius = 0.5f,
             BoneName = "mixamorig:RightHand",
-            BoneOffZ = 0.3f,
+            OffZ = 0.3f,
             Damage = 9f,
             StunTicks = 14,
             Interruptible = false,
         };
         string text = CSharpCharacterWriter.FormatHitboxEvents(new[] { evt }, "");
-        Assert.Contains("BoneName = \"mixamorig:RightHand\", BoneOffZ = 0.3f", text);
+        Assert.Contains("OffZ = 0.3f, BoneName = \"mixamorig:RightHand\"", text);
         Assert.Contains("Interruptible = false", text);
     }
 

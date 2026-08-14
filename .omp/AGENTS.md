@@ -17,6 +17,13 @@
 
 SlopArena is a 3D platform fighter (Smash/DKO-style) with a server-authoritative 60Hz UDP model with client-side prediction + rollback reconciliation.
 
+### Active Gate (2026-08-13)
+- **Goal:** PvP demo for friends, playable and fun, **before end of August** (announced to friends).
+- **Current blocker:** all character abilities must be finished (melee-feel correction is done).
+- **Order:** FightGuy fully kitted first (template) → replicate to other characters → demo.
+- **Do not** re-litigate the melee-feel design; it is settled. Focus is ability completion.
+- **Framing:** the demo is the first rung that unlocks the community the project is designed for.
+
 ### Architecture
 
 Three server-like things (see `CONTEXT.md` "Disambiguation: server"):

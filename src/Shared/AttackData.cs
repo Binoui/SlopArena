@@ -17,10 +17,10 @@ namespace SlopArena.Shared
         public float OffX, OffY, OffZ;
         /// <summary>Capsule end offset (relative to OffX/Y/Z, rotated by facing yaw).</summary>
         public float EndOffX, EndOffY, EndOffZ;
-        /// <summary>If set, position hitbox at this bone's world position instead of OffX/Y/Z. Null = use existing entity-relative offset.</summary>
+        /// <summary>If set, anchor the hitbox at this bone's world position (plus the
+        /// OffX/Y/Z offset). Null = anchor at entity origin.</summary>
         public string? BoneName;
-        /// <summary>Local offset from bone origin (applied after bone position is resolved).</summary>
-        public float BoneOffX, BoneOffY, BoneOffZ;
+
         public float Damage;
         /// <summary>Knockback profile + optional custom overrides. Resolved at spawn time.</summary>
         public KnockbackData Knockback;
