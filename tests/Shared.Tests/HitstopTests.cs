@@ -11,7 +11,7 @@ namespace SlopArena.Shared.Tests;
 ///
 /// Verifies the per-pair freeze:
 ///   - On a melee hit BOTH attacker and victim freeze for F ticks
-///     (F = 1 + 1.5·damage, cap 12; <3 damage ×2; beyond-first ×0.5).
+///     (F = min(12, damage/3 + 6), ADR-0019; per-ability hitstop_multiplier override).
 ///   - The victim is fully stationary during the freeze; the launch (KV +
 ///     hitstun) is deferred to freeze expiry.
 ///   - The attacker's ability ticks and AnimLockTicks/AttackElapsedTicks
@@ -134,7 +134,7 @@ public class HitstopTests
         var attackerAt40 = sim.GetState(1);
         Assert.Equal((ushort)(elapsedAtConnect + (40 - ConnectTick) - LmbFreeze), attackerAt40.AttackElapsedTicks);
         Assert.True(attackerAt40.AttackElapsedTicks < 40,
-            $"attack must NOT have completed by tick 40 (frozen 10 ticks), elapsed={attackerAt40.AttackElapsedTicks}");
+            $"attack must NOT have completed by tick 40 (frozen {LmbFreeze} ticks), elapsed={attackerAt40.AttackElapsedTicks}");
 
         // The attack completes strictly later and the attacker returns to Idle.
         for (int i = 0; i < 25; i++)
@@ -144,14 +144,15 @@ public class HitstopTests
     }
 
     [Fact]
-    public void Multihit_SecondHit_FreezesHalf()
+    public void Multihit_SecondHit_FreezeNotDiscounted()
     {
-        // Deterministic formula half-halving.
-        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: false, null));
-        Assert.Equal(3, ServerSimulation.ComputeHitstopTicks(4, beyondFirst: true, null));
+        // Deterministic formula: ADR-0019 dropped the beyond-first ×0.5 discount —
+        // every connecting hit freezes at the full rate.
+        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, null));
+        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, null));
 
         // Integration: a RehitIntervalTicks zone rehits the still-frozen victim —
-        // the second pulse's freeze equals half the first.
+        // the second pulse applies a full fresh freeze.
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var def = TestHelpers.CombatDef;
         var npc = TestHelpers.NpcState(0f, 2.2f);
@@ -175,8 +176,8 @@ public class HitstopTests
         Assert.Equal((ushort)6, sim.GetState(100).HitstopTicks);
         sim.Tick(new() { { 100, default } });       // tick 3
         Assert.Equal((ushort)5, sim.GetState(100).HitstopTicks);
-        sim.Tick(new() { { 100, default } });       // tick 4: second pulse (AgeTicks 3) — still frozen → half
-        Assert.Equal((ushort)3, sim.GetState(100).HitstopTicks);
+        sim.Tick(new() { { 100, default } });       // tick 4: second pulse (AgeTicks 3) — still frozen → full fresh freeze
+        Assert.Equal((ushort)7, sim.GetState(100).HitstopTicks);
     }
 
     [Fact]
@@ -218,14 +219,14 @@ public class HitstopTests
     [Fact]
     public void Formula_Contract()
     {
-        // (damage, beyondFirst, spec) → freeze ticks.
-        Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(1, false, null));   // low damage ×2 (1+1.5 → 2.5 → 5)
-        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, false, null));   // 1 + 1.5·4
-        Assert.Equal(12, ServerSimulation.ComputeHitstopTicks(14, false, null)); // 1 + 21 → capped 12
-        Assert.Equal(6, ServerSimulation.ComputeHitstopTicks(14, true, null));   // cap first, then ×0.5
-        Assert.Equal(3, ServerSimulation.ComputeHitstopTicks(4, true, null));    // 7 × 0.5 → 3 (truncated)
+        // (damage, spec) → freeze ticks. ADR-0019: min(12, (int)(damage/3 + 6)), floor 1.
+        Assert.Equal(6, ServerSimulation.ComputeHitstopTicks(1, null));   // 6.33 → 6
+        Assert.Equal(7, ServerSimulation.ComputeHitstopTicks(4, null));   // 7.33 → 7
+        Assert.Equal(10, ServerSimulation.ComputeHitstopTicks(14, null)); // 10.67 → 10
+        Assert.Equal(11, ServerSimulation.ComputeHitstopTicks(16, null)); // 11.33 → 11 (kit max)
+        Assert.Equal(12, ServerSimulation.ComputeHitstopTicks(18, null)); // 12.00 → capped 12 (safety)
         // Per-ability override via spec.Params.
-        var capped = new AbilitySpec { Params = new() { ["hitstop_cap_ticks"] = 5f } };
-        Assert.Equal(5, ServerSimulation.ComputeHitstopTicks(14, false, capped));
+        var halved = new AbilitySpec { Params = new() { ["hitstop_multiplier"] = 0.5f } };
+        Assert.Equal(3, ServerSimulation.ComputeHitstopTicks(4, halved)); // 3.67 → 3
     }
 }

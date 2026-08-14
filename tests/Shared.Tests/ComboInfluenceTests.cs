@@ -12,8 +12,9 @@ public class ComboInfluenceTests
         state.DamagePercent = 50;
         Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 10f, 2f, 12f, 20, 100f);
 
-        // (10 + 2 * (0.5 + 1) + 12 * 0.1) * 200 / (100 + 100) = 14.2
-        Assert.Equal(14.2f, state.KVX, 3);
+        // Raw formula: (10 + 2 * (0.5 + 1) + 12 * 0.1) * 200 / (100 + 100) = 14.2.
+        // KbScaleFactor (0.3) scales launch velocity only; hitstun stays 0.5 * 14.2 = 7.
+        Assert.Equal(14.2f * Simulation.KbScaleFactor, state.KVX, 3);
         Assert.Equal((ushort)7, state.HitstunTicks);
     }
 

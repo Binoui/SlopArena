@@ -107,10 +107,10 @@ public sealed class NilusNetherGrasp : ServerAbility
         float angle = GetParam(attackerDef, "pull_angle", 8f);
         float stun = GetParam(attackerDef, "pull_stun_ticks", 20f);
 
-        // growthKB is 0: the yank is a fixed displacement, not a percent-scaling launch.
-        // A grab that reaches further the more damage the victim has taken would drag them
-        // clean past Nilus at high percent.
+        // The yank is a fixed displacement, not a percent-scaling launch: a grab that
+        // reaches further the more damage the victim has taken would drag them clean past
+        // Nilus at high percent. applyScale:false keeps it out of the hit-KB balance pass.
         Simulation.ApplyKnockback(ref target, dx / dist, dz / dist,
-            (sbyte)angle, force, 0f, damage, (ushort)stun, targetDef.Weight);
+            (sbyte)angle, force, 0f, damage, (ushort)stun, targetDef.Weight, applyScale: false);
     }
 }

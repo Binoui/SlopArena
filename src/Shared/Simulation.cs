@@ -46,6 +46,21 @@ namespace SlopArena.Shared
         /// Small so launches read as launches; the exponential decay does the braking.
         /// </summary>
         private const float KnockbackMinGravity = 2.0f;
+
+        // ADR-0019 §6 post-hitstun flight law (InPostHitstunFlight):
+        // flight gravity 14 m/s² (raised from 8 in the 2026-08-14 feel pass — launches
+        // dropped too slowly, felt floaty) + linear horizontal friction 10 m/s², applied
+        // while the victim is airborne from a launch until landing or any action.
+        // Hardcoded, not MovementStats — the balance pass can promote them. Public so
+        // tools/MoveDataReport prints the live values.
+        public const float FlightGravity = 14f;
+        public const float FlightFriction = 10f;
+
+        // ADR-0019 balance pass: velocity-only scale on the damage/weight formula.
+        // Hitstun is computed from the UNSCALED magnitude so combo timing (stun vs IASA,
+        // the combo matrix) is preserved while launch distance shrinks. Tune with
+        // tools/MoveDataReport: scripts/move-data.sh fightguy. 1.0 = raw formula.
+        public const float KbScaleFactor = 0.14f;
         private const byte MaxAirDodges = 1;
 
         /// <summary>
@@ -242,6 +257,7 @@ namespace SlopArena.Shared
                         s.DashDurationTicks = 0;
                         s.StateTicks = 0;
                         s.WasAirborneDuringKnockback = !s.IsGrounded;
+                        s.InPostHitstunFlight = false;
                     }
                     else if (s.QueuedKBResolvedForce)
                     {
@@ -392,13 +408,15 @@ namespace SlopArena.Shared
                 }
                 else
                 {
-                    // Double jump
+                    // Double jump — acting mid-tail ends the flight regime (ADR-0019 §6):
+                    // a jump after a launch is a normal jump, not a floaty one.
                     s.VY = stats.JumpForce * stats.AirJumpVMultiplier;
                     (float dirX, float dirZ) = GetInputDirection(input);
                     s.VX += dirX * stats.AirSpeedMax * stats.AirJumpHMultiplier;
                     s.VZ += dirZ * stats.AirSpeedMax * stats.AirJumpHMultiplier;
                     s.JumpsLeft--;
                     s.AirTimeTicks = stats.FloatWindowTicks;
+                    s.InPostHitstunFlight = false;
                 }
             }
 
@@ -655,13 +673,13 @@ namespace SlopArena.Shared
         /// </summary>
         private static void ProcessHitstun(ref CharacterState s, InputState input)
         {
-            // ADR-0019: constant knockback velocity during hitstun.
+            // ADR-0019: constant knockback velocity during hitstun. Position is NOT
+            // integrated here — the caller falls through to the generic position update
+            // (step 9) + ground collision (step 10), which run for Hitstun states. Early
+            // versions integrated here too, double-moving the victim by 2x KV*dt per tick.
             s.VX = s.KVX;
             s.VY = s.KVY;
             s.VZ = s.KVZ;
-            s.PX += s.VX * TickDt;
-            s.PY += s.VY * TickDt;
-            s.PZ += s.VZ * TickDt;
             if (s.VY > 0f) s.IsGrounded = false;
 
             // Post-hitstop input updates DI only. SDI is exclusively committed
@@ -686,6 +704,7 @@ namespace SlopArena.Shared
                 s.KVX = 0f;
                 s.KVY = 0f;
                 s.KVZ = 0f;
+                s.InPostHitstunFlight = true;
                 s.State = ActionState.Idle;
             }
         }
@@ -972,6 +991,7 @@ namespace SlopArena.Shared
             s.AirDodgesLeft = MaxAirDodges;
             s.JumpsLeft = stats.MaxJumps;
             s.IsGrounded = true;
+            s.InPostHitstunFlight = false;
             // Run/Idle are the locomotion states this method manages. Aiming (mobile aim,
             // e.g. Kistu E) also routes through here but must keep its own state.
             bool isLocomotion = s.State == ActionState.Idle || s.State == ActionState.Run;
@@ -1097,7 +1117,8 @@ namespace SlopArena.Shared
             }
             else
             {
-                float friction = stats.AirFriction * TickDt;
+                // ADR-0019 §6: post-hitstun flight uses the sharper 10 m/s² azimuth friction.
+                float friction = (s.InPostHitstunFlight ? FlightFriction : stats.AirFriction) * TickDt;
                 s.VX = MoveToward(s.VX, 0f, friction);
                 s.VZ = MoveToward(s.VZ, 0f, friction);
             }
@@ -1220,7 +1241,7 @@ namespace SlopArena.Shared
         /// </summary>
         public static void ApplyKnockback(ref CharacterState s, float dirX, float dirZ,
             sbyte angleDeg, float baseKB, float growthKB, float damage,
-            ushort stunTicks, float weight)
+            ushort stunTicks, float weight, bool applyScale = true)
         {
             s.LandingLagTicks = 0;
             float mass = MathF.Max(0.01f, weight + 100f);
@@ -1236,6 +1257,7 @@ namespace SlopArena.Shared
             if (s.KVY > 0f)
                 s.IsGrounded = false;
 
+            // Hitstun from the UNSCALED magnitude (KbScaleFactor below scales velocity only).
             float kbMagnitude = MathF.Sqrt(
                 (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
             if (stunTicks > 0 && kbMagnitude > 0f)
@@ -1250,6 +1272,15 @@ namespace SlopArena.Shared
                 s.HitstunTicks = 0;
                 s.HitstunLevel = 0;
                 s.State = ActionState.Idle;
+            }
+
+            // Velocity-only scale (KbScaleFactor) — launch distance, not hitstun.
+            // applyScale:false is for fixed tools (grabs) that opt out of the hit-KB balance.
+            if (applyScale)
+            {
+                s.KVX *= KbScaleFactor;
+                s.KVY *= KbScaleFactor;
+                s.KVZ *= KbScaleFactor;
             }
 
             s.AirTimeTicks = 0;
@@ -1387,11 +1418,15 @@ namespace SlopArena.Shared
                     return;
                 }
 
-                // Float-window-only gravity: reduced during the window, full afterwards
-                // (the FallRamp lerp is gone — ADR-0020).
-                float gravity = (s.AirTimeTicks < stats.FloatWindowTicks)
-                    ? stats.AirFloatGravity
-                    : stats.Gravity;
+                // Post-hitstun flight (ADR-0019 §6): flight gravity 8, no float window —
+                // the victim is still "in the launch" until they land or act.
+                float gravity = s.InPostHitstunFlight
+                    ? FlightGravity
+                    : // Float-window-only gravity: reduced during the window, full afterwards
+                      // (the FallRamp lerp is gone — ADR-0020).
+                      (s.AirTimeTicks < stats.FloatWindowTicks)
+                        ? stats.AirFloatGravity
+                        : stats.Gravity;
 
                 s.VY -= gravity * TickDt;
 

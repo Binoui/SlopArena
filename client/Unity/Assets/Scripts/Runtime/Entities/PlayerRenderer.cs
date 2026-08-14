@@ -790,7 +790,7 @@ namespace SlopArena.Client.Entities
 #if UNITY_EDITOR
             // UnityEditor.Handles is editor-only; the guard keeps the player
             // build compiling (release blocker found 2026-08-02).
-            UnityEditor.Handles.Label(labelPos, $"{_lastState.State}");
+            UnityEditor.Handles.Label(labelPos, $"{_lastState.DamagePercent} {_lastState.State}");
 #endif
 
             // ── State color indicator sphere (above label) ──

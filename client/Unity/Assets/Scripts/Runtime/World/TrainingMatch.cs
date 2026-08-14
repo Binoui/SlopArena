@@ -44,6 +44,13 @@ namespace SlopArena.Client.World
         protected override ISimulationBridge Bridge => _bridge;
 
         private uint _tick;
+#if UNITY_EDITOR
+        // Launch-contract sentinel: logs the applied launch once per hit so the game can
+        // be checked against tools/MoveDataReport (fightguy --parity). A mismatch here
+        // (e.g. the 2026-08-14 x87 float bug: every hit took the unscaled force path)
+        // means the game behaves differently from the report.
+        private float _lastContractDamage;
+#endif
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
@@ -220,6 +227,15 @@ namespace SlopArena.Client.World
             var hitState = _bridge.GetState(NpcEntityId);
             if (hitState.HitstunTicks > 0)
                 Debug.Log($"[Combat] NPC hit! damage={hitState.DamagePercent:F1} hitstun={hitState.HitstunTicks}");
+
+            // One line per hit: the launch the sim actually applied. Compare KV mag and
+            // hitstun with the report's trajectory rows (same %) to verify game parity.
+            if (hitState.HitstunTicks > 0 && _lastContractDamage != hitState.DamagePercent)
+            {
+                _lastContractDamage = hitState.DamagePercent;
+                float kvMag = Mathf.Sqrt(hitState.KVX * hitState.KVX + hitState.KVY * hitState.KVY + hitState.KVZ * hitState.KVZ);
+                Debug.Log($"[Launch] applied KV={kvMag:F2} hitstun={hitState.HitstunTicks} damage={hitState.DamagePercent:F1}");
+            }
 #endif
 
             // Apply states

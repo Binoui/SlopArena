@@ -42,6 +42,12 @@ namespace SlopArena.Shared
         public byte JumpHeldTicks;
         public bool IsGrounded;
         public bool WasAirborneDuringKnockback;
+
+        /// <summary>ADR-0019 §6: airborne from a launch, post-hitstun — flight gravity 8,
+        /// horizontal friction 10 until landing or any action (jump/ability). Server-local
+        /// state, never on the wire (CSP stays 113).</summary>
+        public bool InPostHitstunFlight;
+
         public byte Deaths;              // match death counter, server authority
 
         /// <summary>

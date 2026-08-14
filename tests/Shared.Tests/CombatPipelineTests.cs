@@ -536,7 +536,8 @@ public class CombatPipelineTests
         Assert.True(frozen.HitstopTicks > 0);
         Assert.Equal(ActionState.Run, frozen.State);
 
-        for (int i = 0; i < 4 && sim.GetState(100).HitstopTicks > 0; i++)
+        // 0-damage hit freezes 6 ticks under ADR-0019 (min(12, 0/3 + 6)) — was 2 under ADR-0012.
+        for (int i = 0; i < 12 && sim.GetState(100).HitstopTicks > 0; i++)
         {
             sim.Tick(new()
             {

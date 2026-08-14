@@ -34,34 +34,17 @@ namespace SlopArena.Shared
 		private const float WarpConeHalfAngleRad = 120f * MathF.PI / 180f / 2f; // 60° half-cone = 120° total facing cone
 
 		// ── Hitstop tuning (ADR-0012). Game-wide defaults; per-ability overrides via
-		// AbilitySpec.Params keys below. Tune from playtest. ──
-		private const float HitstopBaseTicks = 1f;
-		private const float HitstopPerDamageTicks = 1.5f;
-		private const float HitstopMaxTicks = 12f;
-		private const float HitstopLowDamageThreshold = 3f;
-		private const float HitstopLowDamageMult = 2f;
-		private const float HitstopMultihitMult = 0.5f;
-
-		/// <summary>Freeze ticks for a connecting hit (ADR-0012): 2 + 2·damage, cap 24;
-		/// damage under 3 ×2; hits beyond the first within an ability ×0.5 (applied after the cap,
-		/// floored at 1). Per-ability overrides via spec.Params keys:
-		/// hitstop_base_ticks, hitstop_per_damage_ticks, hitstop_cap_ticks,
-		/// hitstop_low_damage_threshold, hitstop_low_damage_multiplier, hitstop_multihit_multiplier.
+		/// <summary>Freeze ticks for a connecting hit (ADR-0019, issue #143):
+		/// min(12, (int)((damage/3 + 6) · multiplier)) — jabs ~7, mediums ~8, kills ~10.
+		/// Cap 12 is a never-biting safety (kit max 16 dmg → 11). The ADR-0012 extras
+		/// (low-damage ×2, beyond-first ×0.5) and the six hitstop_* param keys are dropped;
+		/// a single per-ability override remains: `hitstop_multiplier` (default 1.0).
 		/// Pass the ATTACKER's ability spec (the ability that lands the hit); null = defaults.</summary>
-		public static ushort ComputeHitstopTicks(float damage, bool beyondFirst, AbilitySpec? spec)
+		public static ushort ComputeHitstopTicks(float damage, AbilitySpec? spec)
 		{
-			float baseT = HitstopParam(spec, "hitstop_base_ticks", HitstopBaseTicks);
-			float perDmg = HitstopParam(spec, "hitstop_per_damage_ticks", HitstopPerDamageTicks);
-			float cap = HitstopParam(spec, "hitstop_cap_ticks", HitstopMaxTicks);
-			float lowThresh = HitstopParam(spec, "hitstop_low_damage_threshold", HitstopLowDamageThreshold);
-			float lowMult = HitstopParam(spec, "hitstop_low_damage_multiplier", HitstopLowDamageMult);
-			float multihitMult = HitstopParam(spec, "hitstop_multihit_multiplier", HitstopMultihitMult);
-
-			float raw = baseT + perDmg * damage;
-			if (damage < lowThresh) raw *= lowMult;
-			raw = Math.Min(raw, cap);
-			if (beyondFirst) raw *= multihitMult;
-			return (ushort)Math.Max(1f, raw);
+			float mul = HitstopParam(spec, "hitstop_multiplier", 1f);
+			float raw = (int)((damage / 3f + 6f) * mul);
+			return (ushort)Math.Max(1f, Math.Min(12f, raw));
 		}
 
 		private static float HitstopParam(AbilitySpec? spec, string key, float fallback)
@@ -125,6 +108,9 @@ namespace SlopArena.Shared
                 state.VX = 0f;
                 state.VZ = 0f;
             }
+			// ADR-0019 §6: acting ends the post-hitstun flight regime — an aerial out of
+			// the tail is a normal attack (its own FloatWindow hover applies), not a floaty one.
+			state.InPostHitstunFlight = false;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
 			state.AttackSlot = (byte)(slot + 1);
@@ -678,9 +664,10 @@ namespace SlopArena.Shared
 						// Small fixed shove, stun 0 → no hitstun, no punish. Interrupts a mid-attack
 						// attacker via ApplyKnockback's State=Idle → TickAbilities drops their ability
 						// (breaks the string — the point of the escape); they are free to act at once.
-                        Simulation.ApplyKnockback(ref attackerState, dx, dz,
-                            BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0f,
-                            0f, 0, _defs[attackerId].Weight);
+                        // Fixed defensive shove — NOT a damage launch: bypasses KbScaleFactor
+                        // (the escape tool must not shrink with the hit-knockback balance).
+                        Simulation.ApplyKnockbackForce(ref attackerState, dx, dz,
+                            BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0);
 
 						_states[attackerId] = attackerState;
 					}
@@ -1047,11 +1034,7 @@ namespace SlopArena.Shared
 				if (targetState.DamagePercent > 999) targetState.DamagePercent = 999;
 
 
-				// ── Hitstop (ADR-0012): freeze both (melee) or receiver only, defer the launch.
-				// 'Beyond first' = attacker or victim already frozen — covers melee multihits
-				// (attacker still frozen from the previous hit) and projectile/zone rehits
-				// (victim still frozen). Same-ability signal per ADR-0012.
-				bool beyondFirst = attackerState.HitstopTicks > 0 || targetState.HitstopTicks > 0;
+				// ── Hitstop (ADR-0019): freeze both (melee) or receiver only, defer the launch.
 				AbilitySpec? hitstopSpec = null;
 				if (attackerExists && attackerState.AttackSlot > 0
 				    && _defs.TryGetValue(hit.OwnerEntityId, out var hitOwnerDef))
@@ -1060,7 +1043,12 @@ namespace SlopArena.Shared
                 float kvBeforeOnHitX = targetState.KVX;
                 float kvBeforeOnHitY = targetState.KVY;
                 float kvBeforeOnHitZ = targetState.KVZ;
-                float kbForce = hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
+                // Capture the default once: the hook check must compare kbForce to this exact
+            // stored value — re-computing the expression at the check is NOT bit-identical
+            // (the editor JIT evaluates in 80-bit x87 precision, so round32(expr) !=
+            // expr80 — every normal hit wrongly took the force path, bypassing KbScaleFactor).
+            float kbForceDefault = hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
+            float kbForce = kbForceDefault;
                 bool hookSuppliedForce = false;
                 bool hookZeroForce = false;
                 if (attackerExists
@@ -1069,12 +1057,12 @@ namespace SlopArena.Shared
                 {
                     attackerAbility.OnHitEntity(ref attackerState, ref targetState,
                         attackerDef, _defs[hit.TargetEntityId], ref finalDamage, ref kbForce);
-                    hookSuppliedForce = kbForce != hit.BaseKnockback + hit.KnockbackGrowth * (targetState.DamagePercent * 0.01f);
+                    hookSuppliedForce = kbForce != kbForceDefault;
                     hookZeroForce = hookSuppliedForce && kbForce <= 0f;
                 }
                 float launchBase = hookSuppliedForce ? 0f : hit.BaseKnockback;
                 float launchGrowth = hookSuppliedForce ? 0f : hit.KnockbackGrowth;
-                freeze = ComputeHitstopTicks(finalDamage, beyondFirst, hitstopSpec);
+                freeze = ComputeHitstopTicks(finalDamage, hitstopSpec);
 				if (freeze > 0)
 				{
 					targetState.HitstopTicks = freeze;

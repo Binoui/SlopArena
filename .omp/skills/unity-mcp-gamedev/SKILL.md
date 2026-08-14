@@ -242,3 +242,50 @@ Installed via the AI Game Developer window → Extensions (OpenUPM, scope `com.i
 | AI Animation | `animation-*`, `animator-*` | Clip data, AnimatorController create/modify |
 | AI ParticleSystem | `particle-system-*` | Inspect/modify particle systems |
 | AI Cinemachine | `cinemachine-*` | NOT installed — add via the Extensions manager if needed |
+
+## Live-sim diagnostics (hard-won recipes, 2026-08-14)
+
+When the game and a .NET tool/tests disagree about simulation behavior, believe the
+game and instrument IT first — before theorizing about stale assemblies. One real
+case: an x87-vs-SSE float comparison bug made every hit take the unscaled force path
+in the editor while .NET tests were green for weeks.
+
+### Run a C# probe cleanly
+Use the file-based wrapper, NOT inline code (quoting/jq breaks):
+```
+scripts/mcp-script.sh /tmp/probe.cs          # file defines public class Script { public static string Main() {...} }
+scripts/mcp-script.sh -b /tmp/body.cs        # body-only mode
+scripts/mcp-run.sh <tool> '<json-args>'      # any tool, unwrapped result
+```
+- Full-compile mode REQUIRES the class to be named `Script`.
+- `MCP_TIMEOUT` env var controls the wait; a hang usually means the editor is
+  compiling/busy, not that the tool is broken.
+- The result unwrapper is `scripts/mcp-unwrap.py` (SSE → result.value).
+
+### Read the game's live sim state
+Play mode must be ON (`gameobject-find '{"name":"TrainingMatch"}'` non-empty).
+The TrainingMatch component holds `_bridge` (LocalSimulationBridge) — reflect it and
+call `GetState(1)` (player) / `GetState(100)` (NPC) for exact sim positions,
+`DamagePercent`, `HitstunTicks`, `KVX/KVY/KVZ`, `InPostHitstunFlight`.
+
+### Game-vs-tool parity
+- The game logs `[Launch] applied KV=... hitstun=...` once per hit (TrainingMatch
+  launch-contract sentinel) — compare KV mag + hitstun with `scripts/move-data.sh
+  <char> --parity` rows. Divergence = the game runs different physics than the tool.
+- `tools/MoveDataReport fightguy --parity` runs BOTH the direct formula and the full
+  pipeline (input → hitbox → ResolveHits → queued launch) and flags divergence.
+- `--dll <path>` loads a SlopArena.Shared.dll file in isolation and runs its
+  ApplyKnockback — proves what a FILE does regardless of what the editor loaded.
+
+### Gotchas
+- Namespace shadowing: in client code, `Simulation` resolves to the namespace
+  `SlopArena.Client.Simulation` — always write `SlopArena.Shared.Simulation`.
+- Reflection: `GetField/GetMethod` with `NonPublic` does NOT search base classes —
+  walk `t.BaseType` (e.g. `LoadBakedData` lives on a base of TrainingMatch).
+- Baked hitbox data: probes that must connect real hitboxes need
+  `BakedAnimationData.LoadFromBin(File.ReadAllBytes(def.BakedDataPath.Replace("res://","")))`.
+- Float comparisons: NEVER compare a stored float to a recomputed expression —
+  the editor JIT evaluates in 80-bit x87 precision, .NET in 32-bit; 1-ULP diffs
+  flip `!=`. Capture the value once, compare stored-to-stored.
+- `Console.WriteLine` in script-execute full mode returns the value; body mode is
+  void — use `Debug.Log` + `console-get-logs`.

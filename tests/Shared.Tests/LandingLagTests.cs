@@ -114,6 +114,59 @@ public class LandingLagTests : KitScenarioTests
     // ── Goldens: clean-land vs lag-land on the same aerial ──
 
     /// <summary>
+    /// FightGuy's air normals (AirSlot1-4) instantiate as AirLmbCombo (AbilityFactory), which
+    /// the landing-lag startedAirborne check already covers — so a mid-window landing must
+    /// apply the air spec's LandingLagTicks. This guards the factory mapping + the check.
+    /// </summary>
+    [Fact]
+    public void AirSlot1_LandingMidWindow_AppliesLandingLag()
+    {
+        var def = TestHelpers.CloneDef(TestHelpers.FightGuyDef);
+        def.AirSlot1 = new AbilitySpec
+        {
+            Name = "Test Aerial Slot1",
+            CooldownTicks = 0,
+            AnimationNames = new[] { "test_aerial" },
+            Stages = new[]
+            {
+                new AttackStage
+                {
+                    DurationTicks = AirLmbDuration,       // 40
+                    LandingLagTicks = AirLmbLag,          // 18
+                    AutoCancelBeforeTicks = AirLmbBefore, // 6
+                    AutoCancelAfterTicks = AirLmbAfter,   // 32
+                    LungeForce = 0f,
+                    HitboxEvents = Array.Empty<HitboxEvent>(),
+                },
+            },
+        };
+        def.Slot1 = new AbilitySpec
+        {
+            Name = "Test Ground Slot1",
+            CooldownTicks = 0,
+            AnimationNames = new[] { "test_ground" },
+            Stages = new[] { new AttackStage { DurationTicks = 1 } },
+        };
+
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, FallingStart(4.7f), TestHelpers.LoadBakedData(def));
+        var states = new List<CharacterState>();
+        for (int tick = 0; tick < 60; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState>
+                { { 1, tick == 0 ? new InputState { ActiveSlot = AbilitySlots.Slot1 } : default } });
+            states.Add(sim.GetState(1));
+        }
+
+        // 4.7 m start lands at stage-elapsed ~28 (mid window 6..32) → landing lag must apply.
+        bool appliedLag = false;
+        foreach (var s in states)
+            if (s.IsGrounded && s.LandingLagTicks > 0) { appliedLag = true; break; }
+        Assert.True(appliedLag,
+            "AirSlot1 (AirLmbCombo) should apply its air spec's landing lag on a mid-window landing");
+    }
+
+    /// <summary>
     /// Both goldens share physics and inputs (aerial at t0, jump press at t30 — 3 ticks
     /// after the t27 landing, snapshot at t33) — the only difference is the stage's declared
     /// auto-cancel window. Mid-window (6..32): the stage-elapsed-28 landing locks for 18
