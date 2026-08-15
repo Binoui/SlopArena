@@ -126,6 +126,7 @@ namespace SlopArena.Client.World
                 var def = CharacterRegistry.Get(opp.Class);
                 var baked = LoadBakedData(def);
                 def = ApplyHurtboxOverride(def, baked);
+                renderer.EntityId = opp.EntityId;
                 renderer.ModelYOffset = def.ModelYOffset;
                 renderer.CapsuleRadius = def.CapsuleRadius;
                 renderer.CapsuleHeight = def.CapsuleHeight;
@@ -154,6 +155,7 @@ namespace SlopArena.Client.World
                 }, baked);
             }
             _opponentArray = new List<PlayerRenderer>(_opponentRenderers.Values).ToArray();
+            SetupLockIndicator(_opponentArray);
 
             // Player spawns at its own roster spawn point (entityId 1..N ↔ spawnPoints[0..N-1]).
             _playerRenderer.transform.position = SpawnPosition(arena, PlayerEntityId);
@@ -242,6 +244,8 @@ namespace SlopArena.Client.World
             foreach (var kv in _opponentRenderers)
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
 
+            UpdateLockCamera();
+
             // Respawn/death feedback: flash + animation reset when the server Deaths
             // counter increments (issue #37, mirrors TrainingMatch NPC handling).
             byte playerDeaths = _bridge.GetState(PlayerEntityId).Deaths;
@@ -281,6 +285,26 @@ namespace SlopArena.Client.World
                           $"pos=({ps.PX:F1},{ps.PY:F2},{ps.PZ:F1}) serverTick={_networkClient.LastServerTick}");
             }
         }
+
+        /// <summary>
+        /// While target-locked (ADR-0018 / issue #127): move the Cinemachine follow
+        /// target to the player↔locked-enemy midpoint so both fighters stay framed.
+        /// Restores the player follow target when unlocked or the target renderer
+        /// is missing (dead — the sim re-picks next tick).
+        /// </summary>
+        private void UpdateLockCamera()
+        {
+            if (_cameraMount == null) return;
+            var local = _bridge.GetState(PlayerEntityId);
+            if (local.LockOn && local.TargetEntityId != 0
+                && _opponentRenderers.TryGetValue(local.TargetEntityId, out var target))
+            {
+                _cameraMount.SetLockFocus(_playerRenderer.transform, target.transform.position);
+                return;
+            }
+            _cameraMount.ClearLockFocus(_playerRenderer.transform);
+        }
+
 
         protected override void OnGUI()
         {

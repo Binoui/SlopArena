@@ -133,6 +133,59 @@ namespace SlopArena.Client.Camera
             };
         }
 
+        private Transform _lockFocus;
+
+        /// <summary>
+        /// While target-locked (ADR-0018 / issue #127): player-centered lock camera
+        /// (souls-like framing). The orbit stays on the PLAYER — mouse orbit, pitch
+        /// and scroll zoom are untouched; only the look aim changes. The camera
+        /// LOOKS at a point ~25% of the way from the player toward the target, so
+        /// the player sits near screen centre with the target beside them — both
+        /// fighters visible from any orbit angle. The look point lerps smoothly
+        /// (frame-rate independent). Call every FixedUpdate while locked.
+        /// </summary>
+        public void SetLockFocus(Transform player, Vector3 targetPos)
+        {
+            if (_cmCam == null || player == null) return;
+            if (_lockFocus == null)
+            {
+                var go = new GameObject("LockFocus");
+                // Root-level on purpose: the CinemachineCamera lives on this same
+                // object and the orbital rig MOVES it every frame. Parenting the
+                // focus under it would couple the focus's world position to the
+                // camera position (and vice versa) — a feedback loop that
+                // oscillates (visible camera shake while locked).
+                _lockFocus = go.transform;
+                _lockFocus.position = player.position;
+            }
+            Vector3 lookPoint = Vector3.Lerp(player.position, targetPos, 0.25f);
+            float k = 1f - Mathf.Exp(-10f * Time.deltaTime);
+            _lockFocus.position = Vector3.Lerp(_lockFocus.position, lookPoint, k);
+            SetTarget(player, _lockFocus);
+        }
+
+        /// <summary>
+        /// Restore the camera to follow and look at the player (unlocked).
+        /// Safe to call every tick.
+        /// </summary>
+        public void ClearLockFocus(Transform player)
+        {
+            if (player != null) SetTarget(player);
+        }
+
+        /// <summary>
+        /// Point the camera at a different look target while keeping the orbit on
+        /// the player — used by the target lock to frame both fighters.
+        /// </summary>
+        private void SetTarget(Transform tracking, Transform lookAt)
+        {
+            _cmCam.Target = new CameraTarget
+            {
+                TrackingTarget = tracking,
+                LookAtTarget = lookAt
+            };
+        }
+
         /// <summary>
         /// Snap orbit to face the target from behind at a comfortable angle.
         /// Call after SetTarget to avoid the camera starting at a random orientation.

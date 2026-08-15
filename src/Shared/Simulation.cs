@@ -1109,7 +1109,10 @@ namespace SlopArena.Shared
             ApplyVelocityDeadZone(ref s);
             s.LastDirX = dirX;
             s.LastDirZ = dirZ;
-            if (!s.LockOn) s.FacingYaw = MathF.Atan2(dirX, dirZ);
+            // Facing follows movement direction — even under target lock, which only
+            // steers facing during attacks (per-stage RotateTowardTarget, ADR-0018 /
+            // issue #127). Only reached with movement input (early-return above).
+            s.FacingYaw = MathF.Atan2(dirX, dirZ);
         }
 
         private static void ProcessAirMovement(

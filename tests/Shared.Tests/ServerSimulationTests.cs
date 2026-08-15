@@ -555,9 +555,10 @@ public class ServerSimulationTests
     // ── Target lock rotation (3-zone) ──
 
     [Fact]
-    public void Tick_TargetLock_FarAway_NoRotation()
+    public void Tick_TargetLock_FarAway_RotatesNoWarp()
     {
-        // Zone 1: dist > WarpRange → no rotation, no warp
+        // Zone 1: dist > WarpRange → NO warp, but facing still rotates toward the target
+        // (attack-range no longer gates facing — issue #127).
         var sim = TestHelpers.MakeSim(MakeTestArena());
         var def = TestHelpers.CombatDef;
         var player = MakeIdleState(1);
@@ -573,8 +574,10 @@ public class ServerSimulationTests
         sim.Tick(new() { { 1, input }, { 100, default } });
 
         var state = sim.GetState(1);
-        // FacingYaw should remain 0 — distance exceeds rotation range
-        TestHelpers.AssertNear(0f, state.FacingYaw, tolerance: 0.0001f);
+        // Unlocked attack: facing lerps toward the target yaw Atan2(5,15) at TrackingStrength
+        // 0.9 — one tick of the lerp (no range gate, issue #127).
+        float expected = MathF.Atan2(5f, 15f) * 0.9f / 60f;
+        TestHelpers.AssertNear(expected, state.FacingYaw, tolerance: 0.0001f);
         Assert.Equal(0f, state.WarpSpeed); // no warp (too far + ServerAbility)
     }
 

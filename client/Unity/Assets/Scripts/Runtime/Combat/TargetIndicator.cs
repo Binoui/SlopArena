@@ -1,3 +1,4 @@
+using System;
 using SlopArena.Shared;
 using SlopArena.Client.Entities;
 using UnityEngine;
@@ -5,21 +6,24 @@ using UnityEngine;
 namespace SlopArena.Client.Combat
 {
     /// <summary>
-    /// Shows a red ring under the currently targeted entity (soft-lock).
-    /// Reads TargetEntityId from the simulation each frame and positions
-    /// the ring at the corresponding renderer's feet.
+    /// Shows a red ring under the persistent target-lock target (ADR-0018 / issue #127).
+    /// Visible ONLY while the local player's sim state has LockOn set — the ring marks
+    /// the locked enemy (TargetEntityId, resolved by the sim every tick). Reads state
+    /// through a getState func (works for local sim and rollback bridge alike) and
+    /// positions the ring at the matching renderer's feet each frame. Hidden when
+    /// unlocked, no target resolved, or the target renderer is missing.
     /// </summary>
     public class TargetIndicator : MonoBehaviour
     {
         private PlayerRenderer[] _renderers;
-        private ServerSimulation _sim;
+        private Func<ulong, CharacterState> _getState;
         private ulong _localPlayerId;
         private Transform _ring;
 
-        public void Init(PlayerRenderer[] renderers, ServerSimulation sim, ulong localPlayerId)
+        public void Init(Func<ulong, CharacterState> getState, PlayerRenderer[] renderers, ulong localPlayerId)
         {
+            _getState = getState;
             _renderers = renderers;
-            _sim = sim;
             _localPlayerId = localPlayerId;
         }
 
@@ -43,20 +47,27 @@ namespace SlopArena.Client.Combat
 
         private void Update()
         {
-            if (_sim == null || _renderers == null || _renderers.Length == 0)
+            if (_getState == null || _renderers == null || _renderers.Length == 0)
             {
                 if (_ring != null) _ring.gameObject.SetActive(false);
                 return;
             }
 
-            ulong targetId = _sim.GetState(_localPlayerId).TargetEntityId;
+            var local = _getState(_localPlayerId);
+            if (!local.LockOn)
+            {
+                _ring.gameObject.SetActive(false);
+                return;
+            }
+
+            ulong targetId = local.TargetEntityId;
             if (targetId == 0)
             {
                 _ring.gameObject.SetActive(false);
                 return;
             }
 
-            // Find the target's renderer
+            // Find the locked target's renderer
             bool found = false;
             foreach (var renderer in _renderers)
             {

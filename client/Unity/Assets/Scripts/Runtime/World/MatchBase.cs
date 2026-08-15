@@ -79,6 +79,7 @@ namespace SlopArena.Client.World
 
         protected void SetupPlayerRenderer(CharacterDefinition def, BakedAnimationData? baked)
         {
+            _playerRenderer.EntityId = PlayerEntityId;
             _playerRenderer.ModelYOffset = def.ModelYOffset;
             _playerRenderer.CapsuleRadius = def.CapsuleRadius;
             _playerRenderer.CapsuleHeight = def.CapsuleHeight;
@@ -150,6 +151,19 @@ namespace SlopArena.Client.World
         {
             _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera,
                 _playerRenderer.transform, def.CapsuleHeight);
+        }
+
+        /// <summary>
+        /// Instantiate the persistent target-lock indicator (ADR-0018 / issue #127):
+        /// a ring under the locked enemy, visible only while the local player's sim
+        /// state has LockOn set. Pass every renderer that could be a lock target.
+        /// </summary>
+        protected void SetupLockIndicator(PlayerRenderer[] renderers)
+        {
+            var go = new GameObject("LockTargetIndicator");
+            go.transform.SetParent(transform, false);
+            var indicator = go.AddComponent<TargetIndicator>();
+            indicator.Init(Bridge.GetState, renderers, PlayerEntityId);
         }
 
         /// <summary>

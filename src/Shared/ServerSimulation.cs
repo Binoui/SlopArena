@@ -753,13 +753,6 @@ namespace SlopArena.Shared
 		private const float LockRangeMeters = 10f;
 
 		/// <summary>
-		/// Persistent-lock turn strength (ADR-0018 / issue #127): same lerp form as attack
-		/// stage TrackingStrength — FacingYaw += diff * strength * TickDt. 0.4 = gradual
-		/// (~90° over ~5s), deliberately not an instant pivot. Feel-critical; playtest-tune.
-		/// </summary>
-		private const float LockTurnStrength = 0.4f;
-
-		/// <summary>
 		/// Compute soft-lock target for every entity each tick.
 		/// Prefers client-provided target (from screen-center) when input.TargetEntityId > 0,
 		/// otherwise brute-force scans for nearest enemy within 20m.
@@ -767,7 +760,7 @@ namespace SlopArena.Shared
 		///
 		/// When the entity is attacking with UseTargetLock=true, also processes warp
 		/// (auto-dash toward target) and rotation (face toward target). When LockOn
-		/// (ADR-0018), also lerps facing toward the resolved target every tick.
+		/// (ADR-0018), also snaps facing toward the resolved target every tick.
 		/// </summary>
 		private void ProcessTargetLock(Dictionary<ulong, InputState> inputs)
 		{
@@ -804,13 +797,14 @@ namespace SlopArena.Shared
 
 				state.TargetEntityId = targetId;
 
-				// ── Persistent lock (ADR-0018 / issue #127): facing tracks the resolved
-				// target every tick — ground and air, outside attacks too (per-stage
-				// UseTargetLock becomes redundant while locked). Gradual turn, not instant:
-				// FacingYaw += diff * LockTurnStrength * TickDt. Disengages on toggle-off
-				// (above), no resolved target, or target beyond LockRangeMeters; a dead
-				// target is handled by the resolver re-picking (death re-target). The lerp
-				// pauses during the owner's own hitstop/hitstun — no mid-launch spinning.
+				// ── Persistent lock (ADR-0018 / issue #127): passive target tracking.
+				// Facing is NOT steered while locked — the fighter keeps normal movement
+				// facing (runs where it runs, sticky air facing); the lock only keeps the
+				// target resolved so attack stages auto-face it (per-stage UseTargetLock /
+				// RotateTowardTarget below) and the client can frame it (camera + indicator).
+				// Disengages on toggle-off (above), no resolved target, or target beyond
+				// LockRangeMeters; a dead target is handled by the resolver re-picking
+				// (death re-target).
 				if (state.LockOn)
 				{
 					if (targetId == 0)
@@ -826,15 +820,6 @@ namespace SlopArena.Shared
 						if (lockDistSq > LockRangeMeters * LockRangeMeters)
 						{
 							state.LockOn = false;
-						}
-						else if (state.HitstopTicks == 0 && state.State != ActionState.Hitstun
-						         && lockDistSq > 0.001f)
-						{
-							float targetYaw = MathF.Atan2(lockDx, lockDz);
-							float diff = targetYaw - state.FacingYaw;
-							while (diff > MathF.PI) diff -= 2f * MathF.PI;
-							while (diff < -MathF.PI) diff += 2f * MathF.PI;
-							state.FacingYaw += diff * LockTurnStrength * Simulation.TickDt;
 						}
 					}
 				}
@@ -854,15 +839,17 @@ namespace SlopArena.Shared
 							var target = _states[targetId];
 							float dx = target.PX - state.PX;
 							float dz = target.PZ - state.PZ;
-							float dist = MathF.Sqrt(dx * dx + dz * dz);
 
 							// ── Rotate toward target each tick ──
-							float rotRange = stage.WarpRange > 0f ? stage.WarpRange : stage.AttackRange;
-							if (stage.RotateTowardTarget && stage.TrackingStrength > 0f && dist <= rotRange)
+							// Not gated by attack range (a dead facing concept — issue #127):
+							// a locked warp snaps to the target, unlocked keeps the lerp.
+							if (stage.RotateTowardTarget && dx * dx + dz * dz > 0.001f)
 							{
-								if (dx * dx + dz * dz > 0.001f)
+								float targetYaw = MathF.Atan2(dx, dz);
+								if (state.LockOn)
+									state.FacingYaw = targetYaw;
+								else if (stage.TrackingStrength > 0f)
 								{
-									float targetYaw = MathF.Atan2(dx, dz);
 									float diff = targetYaw - state.FacingYaw;
 									while (diff > MathF.PI) diff -= 2f * MathF.PI;
 									while (diff < -MathF.PI) diff += 2f * MathF.PI;
@@ -933,12 +920,17 @@ namespace SlopArena.Shared
 				}
 
 				// ── Rotate toward target each tick ──
-				float attackRotRange = attackStage.WarpRange > 0f ? attackStage.WarpRange : attackStage.AttackRange;
-				if (attackStage.RotateTowardTarget && attackStage.TrackingStrength > 0f && attackDist <= attackRotRange)
+				// Not gated by attack range (a dead facing concept — issue #127): attacks
+				// auto-aim at the resolved target regardless of distance. Locked attacks
+				// SNAP (short windows; the lock's contract is attacks face the enemy),
+				// unlocked attacks keep the per-stage TrackingStrength lerp.
+				if (attackStage.RotateTowardTarget && attackDx * attackDx + attackDz * attackDz > 0.001f)
 				{
-					if (attackDx * attackDx + attackDz * attackDz > 0.001f)
+					float targetYaw = MathF.Atan2(attackDx, attackDz);
+					if (state.LockOn)
+						state.FacingYaw = targetYaw;
+					else if (attackStage.TrackingStrength > 0f)
 					{
-						float targetYaw = MathF.Atan2(attackDx, attackDz);
 						float diff = targetYaw - state.FacingYaw;
 						while (diff > MathF.PI) diff -= 2f * MathF.PI;
 						while (diff < -MathF.PI) diff += 2f * MathF.PI;

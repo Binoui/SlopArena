@@ -5,14 +5,17 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Persistent target lock (ADR-0018 / issue #127): RMB edge toggles sim-authoritative
-/// LockOn; while locked, facing lerps toward the resolved soft-lock target every tick
-/// (ground + air, outside attacks); the lock disengages on toggle-off, target beyond
-/// lock range (10m), or an accepted LMB facing snap, and the owner's LockOn resets on
-/// death (fresh respawn state). Target death re-targets through the resolver.
+/// LockOn. The lock is PASSIVE — it keeps the resolved target fresh (for attack-stage
+/// auto-face, the client lock camera + indicator) but does NOT steer facing while
+/// moving: the fighter keeps normal movement facing (runs where it runs, sticky air
+/// facing) and only turns toward the target during attacks (per-stage
+/// RotateTowardTarget). The lock disengages on toggle-off, target beyond lock range
+/// (10m), or an accepted LMB facing snap, and the owner's LockOn resets on death
+/// (fresh respawn state). Target death re-targets through the resolver.
 ///
-/// The four golden scenarios pin the lock lifecycle (LockOn, positions, deaths).
-/// Facing angles are deliberately excluded from the golden schema, so the turn is
-/// asserted behaviorally in companion tests.
+/// The golden scenarios pin the lock lifecycle (LockOn, positions, deaths). Facing
+/// angles are deliberately excluded from the golden schema, so steering is asserted
+/// behaviorally in companion tests.
 /// </summary>
 public class TargetLockTests : KitScenarioTests
 {
@@ -32,27 +35,6 @@ public class TargetLockTests : KitScenarioTests
     }
 
     // ────────────────────────── Golden scenarios ──────────────────────────
-
-    [Fact]
-    public void Golden_LockOn_TracksFacing()
-    {
-        // Player faces away from the NPC (PI vs target yaw 0); lock on at t0, nothing
-        // else. LockOn stays true through snap + final; positions untouched (movement
-        // stays camera-relative — only facing moves).
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Target Lock On Facing Tracking",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = MathF.PI },
-            Inputs = new InputSequence().Set(0, new InputState { ToggleLock = true }),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState(0f, 3f) with { PY = Gpy },
-            NpcAssert = _ => { },
-            NpcDef = Def,
-            SnapshotTick = 120,
-            TotalTicks = 200,
-        });
-    }
 
     [Fact]
     public void Golden_LockOn_Disengages_OutOfRange()
@@ -106,6 +88,8 @@ public class TargetLockTests : KitScenarioTests
         // the end of tick 0, respawns at the arena spawn (0,0) — still within lock range
         // of the player at (0,5) — and the lock re-targets the respawned enemy. Golden
         // pins: player LockOn true at snap+final, NPC Deaths=1, NPC back at spawn.
+        // NPC spawns at Z=-1 (off the heightmap grid): the below-floor force-snap only
+        // saves in-bounds spawns, so this one falls freely into the blast zone.
         AssertGoldenScenario(new KitScenario
         {
             Name = "Target Lock Death Re-target",
@@ -114,7 +98,7 @@ public class TargetLockTests : KitScenarioTests
             Setup = () => TestHelpers.PlayerState(0f, 5f) with { PY = Gpy, FacingYaw = 0f },
             Inputs = new InputSequence().Set(0, new InputState { ToggleLock = true }),
             Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState(0f, 0f) with { PY = -25f, IsGrounded = false },
+            NpcSetup = () => TestHelpers.NpcState(0f, -1f) with { PY = -25f, IsGrounded = false },
             NpcAssert = _ => { },
             NpcDef = Def,
             SnapshotTick = 60,
@@ -125,7 +109,7 @@ public class TargetLockTests : KitScenarioTests
     // ────────────────────────── Behavioral ──────────────────────────
 
     [Fact]
-    public void ToggleOn_LerpsFacingTowardTarget_ToggleOff_FreezesIt()
+    public void Lock_Idle_KeepsFacing_ToggleOff_FreezesIt()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -133,19 +117,19 @@ public class TargetLockTests : KitScenarioTests
         sim.RegisterEntity(1, Def, player);
         sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
 
-        // t0: toggle on → facing starts rotating away from PI toward 0 (target yaw)
+        // t0: toggle on → facing is NOT steered while idle (lock is passive); it stays PI
+        // even though the target sits at +Z (yaw 0).
         sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
         var locked = sim.GetState(1);
         Assert.True(locked.LockOn);
-        Assert.True(locked.FacingYaw < MathF.PI, $"facing should have turned toward target, was {locked.FacingYaw}");
+        TestHelpers.AssertNear(MathF.PI, locked.FacingYaw, 1e-4f);
 
-        // Hold the lock 29 more ticks: facing keeps rotating toward 0
-        float facingAt30;
+        // Hold the lock 29 more ticks: facing still untouched
         for (int i = 0; i < 29; i++) sim.Tick(new() { { 1, default } });
-        facingAt30 = sim.GetState(1).FacingYaw;
-        Assert.True(facingAt30 < locked.FacingYaw, "facing should keep rotating while locked");
+        float facingAt30 = sim.GetState(1).FacingYaw;
+        TestHelpers.AssertNear(MathF.PI, facingAt30, 1e-4f);
 
-        // t30: toggle off → facing freezes (no lock lerp, no movement input)
+        // t30: toggle off → facing unchanged (no movement input, no steering either way)
         sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
         Assert.False(sim.GetState(1).LockOn);
         for (int i = 0; i < 70; i++) sim.Tick(new() { { 1, default } });
@@ -153,7 +137,7 @@ public class TargetLockTests : KitScenarioTests
     }
 
     [Fact]
-    public void Lock_TracksTarget_InAir_OverridingStickyFacing()
+    public void Lock_Air_KeepsStickyFacing_NotSteeredToTarget()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -162,27 +146,25 @@ public class TargetLockTests : KitScenarioTests
         sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
 
         sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
-        // Assert while still airborne (falls to ground in ~4 ticks): the lock lerp must
-        // run against sticky air facing — facing turns from PI toward 0 in the air.
+        // Lock does NOT override sticky air facing: while airborne (falls in ~4 ticks)
+        // facing stays PI — the target sits at +Z (yaw 0) but the lock is passive.
         var airborne = sim.GetState(1);
         Assert.False(airborne.IsGrounded);
-        Assert.True(airborne.FacingYaw < MathF.PI - 1e-3f,
-            $"air facing should turn from PI toward target, was {airborne.FacingYaw}");
+        TestHelpers.AssertNear(MathF.PI, airborne.FacingYaw, 1e-4f);
 
         for (int i = 0; i < 100; i++) sim.Tick(new() { { 1, default } });
 
         var state = sim.GetState(1);
         Assert.True(state.LockOn, "air lock stays on (target alive, in range)");
-        Assert.True(state.FacingYaw < MathF.PI - 0.5f,
-            $"facing kept turning toward target after landing, was {state.FacingYaw}");
+        TestHelpers.AssertNear(MathF.PI, state.FacingYaw, 1e-4f);
     }
 
     [Fact]
-    public void Locked_GroundMovement_DoesNotReface_WhileLocked()
+    public void Locked_GroundMovement_RefacesToWalk()
     {
-        // Walking perpendicular (+X) while locked must NOT re-face the fighter to the
-        // walk direction (ADR-0018: movement stays camera-relative, only facing is
-        // locked to the target). Facing keeps pointing at the NPC (~0), not +X (PI/2).
+        // Walking perpendicular (+X) while locked re-faces the fighter to the walk
+        // direction (the lock is passive — it does NOT steer facing while moving).
+        // So facing points +X (PI/2), NOT at the NPC.
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
         var player = TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = 0f };
@@ -195,9 +177,34 @@ public class TargetLockTests : KitScenarioTests
 
         var state = sim.GetState(1);
         Assert.True(state.LockOn, "still in range (~6.7m separation)");
-        Assert.True(MathF.Abs(state.FacingYaw) < 1f,
-            $"locked ground facing must stay on the target, not follow the walk, was {state.FacingYaw}");
         Assert.True(state.PX > 5f, "player actually walked");
+        // Facing follows the walk direction (+X), not the target (yaw toward NPC ~0).
+        TestHelpers.AssertNear(MathF.PI / 2f, state.FacingYaw, 1e-3f);
+    }
+
+    [Fact]
+    public void Locked_Attack_SteersFacingToTarget()
+    {
+        // While locked, a grounded attack SNAPS facing to the resolved target regardless
+        // of distance — AttackRange no longer gates facing (issue #127). FightGuy's key-1
+        // normal (Slot1 "Low Kick") steers; the NPC sits 5m away (well past the 1.75m
+        // AttackRange) to prove the range gate is gone.
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var def = TestHelpers.FightGuyDef;
+        float gpy = TestHelpers.GroundPY(def);
+        var player = TestHelpers.PlayerState() with { PY = gpy, FacingYaw = MathF.PI };
+        sim.RegisterEntity(1, def, player);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 5f) with { PY = gpy });
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });               // lock on
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.Slot1 } } });  // key-1 normal
+        for (int i = 0; i < 20; i++) sim.Tick(new() { { 1, default } });               // let it snap
+
+        var state = sim.GetState(1);
+        Assert.True(state.LockOn);
+        // Facing snapped from PI to the target at (0,5) (yaw 0) during the attack.
+        TestHelpers.AssertNear(0f, state.FacingYaw, 1e-3f);
     }
 
     [Fact]
@@ -248,8 +255,12 @@ public class TargetLockTests : KitScenarioTests
     public void OwnerDeath_ResetsLockOn()
     {
         // LockOn resets on the OWNER's death: the respawned state is fresh (ADR-0018).
+        // Spawn the player at Z=-1 — just off the 200x200 heightmap grid (origin 0,0),
+        // so the below-floor force-snap doesn't rescue it: it falls freely into the
+        // void and dies (blast Deaths=1). In-bounds below-floor spawns snap to the
+        // floor instead (Simulation ground collision) and never reach the blast line.
         var sim = TestHelpers.MakeSim(DeathArena());
-        var player = TestHelpers.PlayerState() with { PY = -25f, IsGrounded = false, FacingYaw = 0f };
+        var player = TestHelpers.PlayerState(0f, -1f) with { PY = -25f, IsGrounded = false, FacingYaw = 0f };
         sim.RegisterEntity(1, Def, player);
         sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
 
@@ -265,11 +276,14 @@ public class TargetLockTests : KitScenarioTests
     public void TargetDeath_LockRetargetsRespawnedEnemy()
     {
         // Behavioral side of the death golden: after the NPC dies and respawns in range,
-        // the lock stays on and facing keeps rotating toward the (respawned) target.
+        // the lock stays on and the resolver re-targets the respawned enemy (facing is
+        // not steered while idle — only the target pointer updates).
+        // NPC spawns at (0,-1) — off the heightmap grid, so no below-floor force-snap;
+        // it falls through the void and dies end of tick 0.
         var sim = TestHelpers.MakeSim(DeathArena());
         var player = TestHelpers.PlayerState(0f, 5f) with { PY = Gpy, FacingYaw = 0f };
         sim.RegisterEntity(1, Def, player);
-        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 0f) with { PY = -25f, IsGrounded = false });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, -1f) with { PY = -25f, IsGrounded = false });
 
         sim.Tick(new() { { 1, new InputState { ToggleLock = true } } }); // t0: lock on; NPC dies end of tick
         for (int i = 0; i < 60; i++) sim.Tick(new() { { 1, default } });
@@ -279,8 +293,6 @@ public class TargetLockTests : KitScenarioTests
         Assert.Equal((byte)1, npc.Deaths);
         Assert.True(npc.IsGrounded, "NPC respawned at the arena spawn");
         Assert.True(playerState.LockOn, "lock survives target death when the respawn is in range");
-        Assert.True(playerState.FacingYaw > 0.5f,
-            $"facing keeps turning toward the respawned target (PI side), was {playerState.FacingYaw}");
         Assert.Equal(100UL, playerState.TargetEntityId);
     }
 }

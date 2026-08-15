@@ -104,6 +104,7 @@ namespace SlopArena.Client.World
             // NPC renderer
             if (_npcRenderer != null)
             {
+                _npcRenderer.EntityId = NpcEntityId;
                 _npcRenderer.ModelYOffset = npcDef.ModelYOffset;
                 _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
                 _npcRenderer.CapsuleHeight = npcDef.CapsuleHeight;
@@ -148,6 +149,7 @@ namespace SlopArena.Client.World
             // Shared camera + aim setup
             SetupCamera();
             SetupAimHandler(playerDef);
+            SetupLockIndicator(new[] { _playerRenderer, _npcRenderer });
         }
 
         private void Update()
@@ -242,6 +244,26 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_bridge.GetState(NpcEntityId));
+
+            UpdateLockCamera();
+        }
+
+        /// <summary>
+        /// While target-locked (ADR-0018 / issue #127): move the Cinemachine follow
+        /// target to the player↔NPC midpoint so both fighters stay framed. Restores
+        /// the player follow target when unlocked or the target renderer is missing.
+        /// </summary>
+        private void UpdateLockCamera()
+        {
+            if (_cameraMount == null) return;
+            var local = _bridge.GetState(PlayerEntityId);
+            if (local.LockOn && local.TargetEntityId != 0 && _npcRenderer != null
+                && _npcRenderer.EntityId == local.TargetEntityId)
+            {
+                _cameraMount.SetLockFocus(_playerRenderer.transform, _npcRenderer.transform.position);
+                return;
+            }
+            _cameraMount.ClearLockFocus(_playerRenderer.transform);
         }
 
         /// <summary>
