@@ -1,64 +1,64 @@
+/* ────────────────────────────────────────────────────────────────────────────
+   SlopArena combat HUD — UI Toolkit (spec §5).
+   Two layers: a full-screen overhead layer for screen-space-tracked per-player
+   panels, and a bottom-center action bar for the local player's cooldowns.
+   ──────────────────────────────────────────────────────────────────────────── */
+
 .hud-root {
     flex-grow: 1;
-    justify-content: flex-end;
+    /* The HUD never intercepts clicks/input. */
+    pointer-events: none;
+}
+
+/* ── Overhead layer: full-screen, top-left origin. Panels positioned in code. */
+.overhead-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.overhead-panel {
+    position: absolute;
     align-items: center;
-    padding-bottom: 40px;
-}
-
-.player-panels {
-    flex-direction: row;
-    justify-content: center;
-    margin-bottom: 12px;
-}
-
-.player-panel {
-    min-width: 140px;
-    margin: 4px;
-    padding: 8px 12px;
+    padding: 4px 10px;
     border-radius: 8px;
-    border-width: 2px;
-    border-color: rgba(255, 255, 255, 0.35);
     background-color: rgba(0, 0, 0, 0.5);
-    align-items: center;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Local player's panel is highlighted (issue #38) */
-.player-panel.local {
-    border-color: #ffd700;
-    background-color: rgba(40, 35, 0, 0.55);
-}
-
-/* Eliminated (0 stocks) — dimmed spectator */
-.player-panel.eliminated {
+.overhead-panel.eliminated {
     opacity: 0.45;
 }
 
-.player-name {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.85);
+.badge {
+    font-size: 14px;
     -unity-font-style: bold;
+    color: #000000;
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
-.player-panel.local .player-name {
-    color: #ffd700;
-}
-
-.player-damage {
-    font-size: 40px;
+.overhead-damage {
+    font-size: 34px;
+    -unity-font-style: bold;
     color: white;
-    -unity-font-style: bold;
+    transition-property: color;
+    transition-duration: 0.15s;
 }
 
 .stock-row {
     flex-direction: row;
-    margin-top: 6px;
+    margin-top: 4px;
 }
 
 .stock-icon {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     margin: 2px;
-    border-radius: 7px;
+    border-radius: 6px;
     background-color: white;
 }
 
@@ -67,47 +67,133 @@
 }
 
 .stock-count {
-    font-size: 18px;
+    font-size: 14px;
     color: white;
     -unity-font-style: bold;
 }
 
-.slot-row {
+/* ── Bottom action bar ─────────────────────────────────────────────────────── */
+.action-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 20px;
     flex-direction: row;
     justify-content: center;
-    height: 80px;
+    align-items: flex-end;
 }
 
-.slot-icon {
-    width: 64px;
-    height: 64px;
-    margin: 4px;
-    border-radius: 8px;
-    border-width: 2px;
-    border-color: white;
-    background-color: rgba(0, 0, 0, 0.5);
+.slot-group {
+    flex-direction: row;
+    margin: 0 6px;
+}
+
+.slot {
+    width: 48px;
+    height: 48px;
+    margin: 0 4px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: #475569;
+    background-color: #1e293b;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     position: relative;
+    /* Cooldown-ready pulse (1.15x over 0.15s, spec §3.2). */
+    transition-property: scale;
+    transition-duration: 0.15s;
 }
 
+.slot.ready-pulse {
+    scale: 1.15;
+}
+
+/* Non-FightGuy kits leave some of the 8 slots empty — dim + desaturate. */
+.slot.locked {
+    opacity: 0.4;
+}
+
+/* Placeholder icon tile; real icons drop in via code (Resources/Icons). */
+.slot-icon-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Ability-ready flash overlay (bright white, fades fast). */
+.slot-flash {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: white;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.15s;
+}
+
+.slot-flash.active {
+    opacity: 0.85;
+}
+
+/* Cooldown mask — fills from the bottom, shrinking as the cooldown expires. */
 .slot-cooldown {
     position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
     bottom: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 0, 0, 0.4);
+    background-color: rgba(0, 0, 0, 0.55);
     display: none;
-    scale: 1 1;
-    translate: 0 0;
     transform-origin: bottom center;
+    scale: 1 1;
+}
+
+.slot-timer {
+    font-size: 16px;
+    color: white;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 30%;
 }
 
 .slot-key-label {
-    font-size: 14px;
+    font-size: 12px;
     color: white;
     -unity-font-style: bold;
     position: absolute;
     bottom: 2px;
+    left: 0;
+    right: 0;
+    -unity-text-align: middle-center;
+}
+
+/* Dash — circular slot (spec §3.2: Dash is a circle/radial). */
+.dash-slot {
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
+    border-color: #64748b;
+}
+
+/* Burst — prominent wide slot. */
+.burst-slot {
+    width: 72px;
+    height: 56px;
+    border-width: 2px;
+    border-color: #f59e0b;
+}
+
+/* Burst available (cooldown 0) — persistent gold glow (spec §3.2). */
+.burst-slot.ready-glow {
+    border-color: #fbbf24;
+    background-color: rgba(251, 191, 36, 0.15);
 }
