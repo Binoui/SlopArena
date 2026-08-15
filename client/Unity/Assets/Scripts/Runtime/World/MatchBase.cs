@@ -144,14 +144,6 @@ namespace SlopArena.Client.World
             int maxStocks = MatchConfig.Mode == GameMode.PvP ? MatchConfig.MaxStocks : 0;
             _hudManager?.Initialize(Bridge.GetState, players, maxStocks);
             _hudManager?.SetCharacterDefinition(def);
-            for (int slot = 0; slot < 6; slot++)
-            {
-                var spec = def.GetSlotAbility(slot, airborne: false);
-                if (spec != null) _hudManager?.SetSlotMaxCooldown(slot, spec.CooldownTicks);
-                var specAir = def.GetSlotAbility(slot, airborne: true);
-                if (specAir != null && specAir.CooldownTicks > spec?.CooldownTicks)
-                    _hudManager?.SetSlotMaxCooldown(slot, specAir.CooldownTicks);
-            }
         }
 
         protected void SetupAimHandler(CharacterDefinition def)
