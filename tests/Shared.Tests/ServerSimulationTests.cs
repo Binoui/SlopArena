@@ -77,10 +77,11 @@ public class ServerSimulationTests
     [Fact]
     public void Tick_EntityBelowKillHeight_RespawnsWithDeathCount()
     {
-        var arena = MakeTestArena();
+        var arena = TestHelpers.TestArena();
         var sim = new ServerSimulation(arena);
         var state = MakeIdleState(1);
-        state.PY = -30f; // below KillHeight (-20)
+        state.PZ = -1f; // off the 200x200 heightmap grid → no floor → falls into the void
+        state.PY = -30f; // below KillHeight (-20); only dies because PZ=-1 keeps it off-floor
         sim.RegisterEntity(1, MakeTestDef(), state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
@@ -98,10 +99,11 @@ public class ServerSimulationTests
     {
         // Respawn honors the per-entity respawn position (MatchInstance distributes
         // spawn points) and grants brief invincibility (issue #37).
-        var arena = MakeTestArena();
+        var arena = TestHelpers.TestArena();
         var sim = new ServerSimulation(arena);
         var state = MakeIdleState(1);
-        state.PY = -30f; // below KillHeight (-20)
+        state.PZ = -1f; // off the 200x200 heightmap grid → no floor → falls into the void
+        state.PY = -30f; // below KillHeight (-20); only dies because PZ=-1 keeps it off-floor
         sim.RegisterEntity(1, MakeTestDef(), state);
         sim.SetRespawnPosition(1, 12f, 3f, -7f);
 
@@ -121,7 +123,7 @@ public class ServerSimulationTests
     {
         // Two spawn points: entity 2 dies → respawns at SpawnPoints[1], not
         // everyone stacking on SpawnPoints[0] (issue #37).
-        var arena = MakeTestArena();
+        var arena = TestHelpers.TestArena();
         arena.SpawnPoints = new[]
         {
             new SpawnPoint { X = 0, Y = 0, Z = 0, Yaw = 0 },
@@ -129,7 +131,8 @@ public class ServerSimulationTests
         };
         var sim = new ServerSimulation(arena);
         var state = MakeIdleState(2);
-        state.PY = -30f;
+        state.PZ = -1f; // off the heightmap grid → no floor → falls into the void
+        state.PY = -30f; // below KillHeight (-20)
         sim.RegisterEntity(2, MakeTestDef(), state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 2, default } });
@@ -145,11 +148,12 @@ public class ServerSimulationTests
     {
         // Losing the last stock eliminates the player: no respawn, frozen at the
         // spawn point, excluded from hurtboxes (untargetable) — issue #37.
-        var arena = MakeTestArena();
+        var arena = TestHelpers.TestArena();
         var sim = new ServerSimulation(arena, new StockMatchRule(3));
         var state = MakeIdleState(1);
         state.Deaths = 2; // on last stock
-        state.PY = -30f;
+        state.PZ = -1f; // off the heightmap grid → no floor → falls into the void
+        state.PY = -30f; // below KillHeight (-20)
         sim.RegisterEntity(1, MakeTestDef(), state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
@@ -179,17 +183,20 @@ public class ServerSimulationTests
     {
         // Training mode (NoWinMatchRule): deaths keep counting and the entity
         // keeps respawning — no freeze at any stock threshold (issue #37 follow-up).
-        var arena = MakeTestArena();
+        var arena = TestHelpers.TestArena();
         var sim = new ServerSimulation(arena, NoWinMatchRule.Instance);
         var state = MakeIdleState(1);
-        state.PY = -30f;
+        state.PZ = -1f; // off the heightmap grid → no floor → falls into the void
+        state.PY = -30f; // below KillHeight (-20)
         sim.RegisterEntity(1, MakeTestDef(), state);
 
         // Kill the entity 6 times — past the stock-mode threshold of 3.
+        // Each pass re-parks it off-grid (the respawn lands grounded on-stage), so it
+        // always falls into the void instead of being force-snapped back to the floor.
         for (int i = 0; i < 6; i++)
         {
             var s = sim.GetState(1);
-            s.PY = -30f;
+            s.PX = 0f; s.PZ = -1f; s.PY = -30f;
             sim.SetState(1, s);
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
         }

@@ -6,7 +6,7 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Behaviour tests for Kistu's kit. Standard slots (activation + damage) plus the novel
-/// infra: RMB charge tap-vs-hold, E dash self-movement, R rising launcher + charge-stock
+/// infra: E dash self-movement, R rising launcher + charge-stock
 /// (spend / block-when-empty / refund-on-hit), and Q counter (absorb + riposte-launch).
 /// </summary>
 public class KistuAbilityTests

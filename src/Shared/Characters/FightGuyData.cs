@@ -245,7 +245,7 @@ public static partial class CharacterRegistry
                     // Anti-air: single rising right-hand uppercut, sends upright. Low starting
                     // position, generous active window to catch a jumping opponent.
                     new() { DurationTicks = 39, IasaTicks = 36,
-                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 12, DurationTicks = 18, Radius = 0.35f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:RightHand", Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 70, BaseKnockback = 6f, KnockbackGrowth = 26f }, StunTicks = 16, Interruptible = true } },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 5, DurationTicks = 18, Radius = 0.35f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:RightHand", Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 70, BaseKnockback = 6f, KnockbackGrowth = 26f }, StunTicks = 16, Interruptible = true } },
                             AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },

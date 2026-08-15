@@ -160,4 +160,30 @@ public class MankiKitTests
         Assert.Equal((byte)0, after.ComboStage); // still the single move, never chained
         Assert.Equal(ActionState.Attacking, after.State);
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  RETIRED RMB (activeSlot=2) — target-lock toggle, no attack
+    //  ADR-0021/0018: AbilityFactory never dispatches slot 1 (RMB is the
+    //  lock toggle). An RMB attack press must be a no-op, not an attack —
+    //  pins the contract so retired RMB tests don't silently resurrect.
+    //  ══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void RMB_AttackSlot_IsRetired_NeverDispatches()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = Gpy;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        // RMB attack press + follow-up ticks: nothing may start an attack.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 2 } } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var s = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, s.State); // never entered an attack
+        Assert.Equal((byte)0, s.AttackSlot);
+        Assert.Equal((ushort)0, s.DamagePercent);
+    }
 }

@@ -47,47 +47,6 @@ public class MankiKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void RMB_UnchargedFlame_Deals8Damage()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Manki RMB Uncharged",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence()
-                .Set(0, new InputState { ActiveSlot = 2, IsAiming = true })
-                .Set(10, default),  // release after debounce
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 2f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 70,   // attack phase, flame hitbox active (trigger=8, dur=38)
-            TotalTicks = 120,
-        });
-    }
-
-    [Fact]
-    public void AirRMB_Spike_HitsNpcDownward()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Manki Air RMB Spike",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 2),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 0, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 24,   // tap hitbox active (release ~tick5, trigger=16, dur=8 → 21-28)
-            TotalTicks = 60,
-        });
-    }
-
-    [Fact]
     public void Overclock_Applies480TickBuff()
     {
         AssertGoldenScenario(new KitScenario

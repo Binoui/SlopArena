@@ -5,9 +5,9 @@ namespace SlopArena.Shared.Tests;
 
 /// Tests that every character's abilities properly transition back to idle
 /// after their attack duration expires.
-/// Covers all slots: LMB (LmbCombo), AirLMB (AirLmbCombo), RMB (MankiAerosolFlame/FightGuyUppercut),
-/// AirRMB (AirChargeAttack), Q (MankiRoundBomb/FightGuyKiShot), E (MankiGrapple/FightGuyCycloneKick),
-/// R (MankiBazooka/FightGuyDragonKick), F (MankiOverclock/FightGuyTempest).
+/// Covers all attack slots: LMB (LmbCombo), AirLMB (AirLmbCombo), Q (MankiRoundBomb/FightGuyKiShot),
+/// E (MankiGrapple/FightGuyCycloneKick), R (MankiBazooka/FightGuyDragonKick), F (MankiOverclock/FightGuyTempest).
+/// The RMB slot (slot 2) is retired — it is the target-lock toggle, ADR-0018, no attack.
 public class AttackToIdleTests
 {
     private static readonly CharacterDefinition MankiDef = TestHelpers.MankiDef;

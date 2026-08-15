@@ -48,7 +48,7 @@ MonoBehaviour:
     Clip: {fileID: 7400000, guid: 34fbf978157a3a889b7e7d58c95dc8d8, type: 2}
     Extrapolation: 2
   - Name: spell_g_3
-    Clip: {fileID: 7400000, guid: 620857fce10c658228bdf2f8afe03cf5, type: 2}
+    Clip: {fileID: 7400000, guid: 71f9d49b972b5c073817e8f4d12b4e9d, type: 2}
     Extrapolation: 0
   - Name: spell_a_3
     Clip: {fileID: 7400000, guid: 4e90ecac4c0d8c718aa349996204222e, type: 2}

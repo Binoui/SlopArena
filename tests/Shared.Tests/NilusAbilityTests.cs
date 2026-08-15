@@ -1018,9 +1018,12 @@ public class NilusAbilityTests
     /// pulling the target inward. Position over time is the assertion — the gap must close
     /// monotonically across the whole 60-tick window, never widen.
     ///
-    /// The pull is a plain VX/VZ write, which is only legal because the pulse carries no
-    /// knockback and no stun: nothing puts the target in hitstun, so ProcessHitstun never
-    /// runs and never overwrites VX/VZ from KVX/KVZ (Simulation.cs:468-471).
+    /// KNOWN DEBT — stale against the current hitstop/movement model: ADR-0019 applies
+    /// hitstop freeze on any damage hit (ComputeHitstopTicks(3) = 7 ticks/pulse), and a
+    /// hitstopped entity's VZ write never integrates; grounded braking also zeroes the
+    /// residue. The pull therefore no longer moves a grounded target (only the tick damage
+    /// lands). The "plain VX/VZ write is legal because the pulse carries no KB/stun" note
+    /// below predates hitstop-on-damage. Revisit with the Nilus pass.
     /// </summary>
     [Fact]
     public void F_DragClosesTheGapEveryPulse_AndStacksTickDamage()

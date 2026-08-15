@@ -290,7 +290,10 @@ public class AbilityLifecycleTests
         Assert.True(afterBuff.BuffRemainingTicks > 0,
             "Buff ticks should be > 0");
 
-        // Force below kill height, next tick kills them
+        // Force below kill height off the heightmap grid (PZ=-1 → no floor), next
+        // tick kills them — an in-bounds below-floor spawn would be force-snapped
+        // back to the stage instead of falling into the void.
+        afterBuff.PZ = -1f;
         afterBuff.PY = -30f;
         sim.SetState(1, afterBuff);
         sim.Tick(new() { { 1, default } });

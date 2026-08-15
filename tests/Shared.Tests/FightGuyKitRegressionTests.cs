@@ -8,46 +8,9 @@ public class FightGuyKitRegressionTests : KitScenarioTests
     private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
     private static float Gpy => FightGuyGpy;
 
-    [Fact]
-    public void LMB_Stage1_HitsNpcFor4Damage()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "FightGuy LMB Hit Confirm",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, 1),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,   // after hit connects
-            TotalTicks = 80,
-        });
-    }
-
-    [Fact]
-    public void AirLMB_RisingKick_HitsAirborneNpc()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "FightGuy Air LMB",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 1),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,   // stage 1, second hitbox active (trigger=13, dur=5)
-            TotalTicks = 80,
-        });
-    }
-
     // ── Normal tier 1-4 + air variants (melee frame-data pass, 2026-08-12) ──
+    // LMB/AirLMB attack specs are retired for FightGuy (LMB is no longer an attack input);
+    // pinned by LMB_AttackSlot_IsRetired_NeverDispatches in FightGuyAbilityTests.
 
     [Fact]
     public void Slot1_LowKick_HitsNpc()

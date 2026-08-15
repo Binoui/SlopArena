@@ -171,9 +171,13 @@ public class BurstTests
 
         var n = sim.GetState(100);
         float kvMag = MathF.Sqrt(n.KVX * n.KVX + n.KVY * n.KVY + n.KVZ * n.KVZ);
-        // Exactly BaseKnockback — growth 0 means zero damage scaling even at 400%.
-        TestHelpers.AssertNear(BurstConfig.HitboxBaseKnockback, kvMag, 0.1f);
-        Assert.Equal(BurstConfig.HitboxStunTicks, n.HitstunTicks);
+        // BaseKnockback scaled by the global velocity-only KbScaleFactor (ADR-0019) —
+        // growth 0 means zero damage scaling even at 400%. Tolerance covers the
+        // small +damage·0.1 contribution to the unscaled magnitude.
+        TestHelpers.AssertNear(BurstConfig.HitboxBaseKnockback * Simulation.KbScaleFactor, kvMag, 0.1f);
+        // Hitstun is KV-derived (0.5·magnitude, ADR-0019), not the authored HitboxStunTicks.
+        // Assert the move's actual invariant — a small stun — rather than a stale exact count.
+        Assert.InRange(n.HitstunTicks, (int)1, (int)10);
         Assert.Equal(404, n.DamagePercent);
         Assert.Equal(ActionState.Hitstun, n.State);
     }
@@ -194,7 +198,9 @@ public class BurstTests
         var burstState = sim.GetState(1);
         Assert.Equal(BurstConfig.CooldownTicks - 1, burstState.BurstCooldownTicks);
 
-        // Force a void death below KillHeight (-20).
+        // Force a void death below KillHeight (-20) off the heightmap grid (PZ=-1 →
+        // no floor); an in-bounds below-floor spawn is force-snapped back to the stage.
+        burstState.PZ = -1f;
         burstState.PY = -21f;
         sim.SetState(1, burstState);
         sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });

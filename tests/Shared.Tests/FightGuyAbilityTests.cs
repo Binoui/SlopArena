@@ -144,9 +144,12 @@ public class FightGuyAbilityTests
         Assert.True(npcAfter.DamagePercent > 0,
             $"NPC should take damage from Tornado Kick, got {npcAfter.DamagePercent}");
 
+        // KNOWN DEBT — stale against ADR-0019 §2: hitstun is now a pure function of KB
+        // (0.5·kbMag), authored StunTicks is only a zero-gate. CycloneKick has no knockback,
+        // so it ~flinches (1 tick) instead of the 20-tick pin this test was written for.
+        // Revisit with the specials pass: either give the kick KB (data) or accept the flinch.
         // Hitstop (ADR-0012): every connecting hit freezes first; the banded 20-tick stun
         // only starts once the freeze chain ends (the kick re-frozen the victim each contact).
-        // Find the first tick the stun lock is live — it must reach the band.
         int stunTick = -1;
         for (int i = 0; i < 120 && stunTick < 0; i++)
         {
@@ -155,9 +158,7 @@ public class FightGuyAbilityTests
             if (s.HitstopTicks == 0 && s.HitstunTicks > 0) stunTick = i;
         }
         Assert.True(stunTick >= 0, "the stun must eventually land after the freeze chain");
-        // Band check: the banded 20-tick stun must reach the 10-25 band. The kick's
-        // re-hit pattern shifts with momentum-preserve drift, so assert the band floor,
-        // not a brittle exact count.
+        // Band check (old model): the banded 20-tick stun must reach the 10-25 band.
         Assert.True(sim.GetState(100).HitstunTicks >= 10,
             $"Expected HitstunTicks in the 10-25 band, got {sim.GetState(100).HitstunTicks}");
     }
@@ -181,6 +182,7 @@ public class FightGuyAbilityTests
         sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
 
         // Activate E and tick through the dash, watching for each victim's stun lock.
+        // KNOWN DEBT — stale vs ADR-0019 §2 (hitstun = 0.5·kbMag; zero-KB kick ~flinches).
         // Hitstop (ADR-0015) freezes each freeze chain, then the banded StunTicks 20 applies.
         // The hits are staggered (NPC2 sits 4 m farther down the dash), so the 20-tick
         // windows don't overlap — check each NPC for its own window, and scan from the
@@ -438,5 +440,27 @@ public class FightGuyAbilityTests
         var npcAfter = sim.GetState(100);
         Assert.True(npcAfter.DamagePercent > 0,
             $"NPC should take damage from entity-offset hitbox, got {npcAfter.DamagePercent}");
+    }
+
+    // ── RETIRED LMB (activeSlot=1) — no longer an attack input for FightGuy ──
+    // LMB/AirLMB data specs were dropped; the normal tier (keys 1-4) carries the
+    // melee kit. Pins the contract so retired LMB golden tests don't resurrect.
+
+    [Fact]
+    public void LMB_AttackSlot_IsRetired_NeverDispatches()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPY;
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var s = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, s.State); // never entered an attack
+        Assert.Equal((byte)0, s.AttackSlot);
+        Assert.Equal((ushort)0, s.DamagePercent);
     }
 }

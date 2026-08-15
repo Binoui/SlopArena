@@ -5,7 +5,7 @@
     "State": 4,
     "PY": 0.85,
     "AttackSlot": 3,
-    "HitstopTicks": 5,
+    "HitstopTicks": 7,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -13,20 +13,23 @@
     "PY": 0.75,
     "PZ": 1,
     "DamagePercent": 4,
-    "HitstopTicks": 5,
+    "HitstopTicks": 7,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "PlayerFinal": {
     "PY": 0.85,
+    "AttackSlot": 3,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 0.75,
-    "PZ": 1.4222441,
+    "PY": 0.93759996,
+    "PZ": 2.0017462,
+    "VY": -2.436,
+    "VZ": 0.05533734,
     "DamagePercent": 4,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "AirTimeTicks": 18,
+    "JumpsLeft": 2
   }
 }
