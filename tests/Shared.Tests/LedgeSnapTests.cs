@@ -178,4 +178,52 @@ public class LedgeSnapTests
         Assert.NotEqual(ActionState.LedgeHang, e2.State);
         Assert.False(e2.IsGrounded);
     }
+
+    [Fact]
+    public void LedgeHang_NoInput_StaysHungIndefinitely()
+    {
+        // Regression: the hang is not stable — gravity was applied during LedgeHang, so once
+        // the 30-tick float window (AirFloatGravity=0) expired the character accelerated down
+        // through the 2.5m FindLedge tolerance and fell off on its own (~tick 53, no input).
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+        float rimY = TestHelpers.MankiGroundPY; // surface(0) + capsuleHalf
+
+        // Long enough to blow far past the 30-tick float window (was ~53 ticks to fall out).
+        var s = TestHelpers.TickDefault(sim, 300);
+        Assert.Equal(ActionState.LedgeHang, s.State);
+        Assert.False(s.IsGrounded);
+        TestHelpers.AssertNear(rimY, s.PY, 0.01f);
+        Assert.Equal(0f, s.VY);
+    }
+
+    [Fact]
+    public void LedgeHang_SDrop_StaysDroppedThroughLockExpiry()
+    {
+        // Regression: the S-drop inherited the float window (gravity 0), so it only fell
+        // ~1.5m inside the 30-tick regrab lock — still within the 2.5m grab tolerance → the
+        // ledge auto re-grabbed at lock expiry. Now the drop ends the float window and falls
+        // past the tolerance, so it must NOT re-grab even with no further input.
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, Def, TestHelpers.EdgeState(posX: 199.5f));
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+
+        // Away from the stage (MoveX=+1 at the +X edge) = S-drop.
+        var dropped = TestHelpers.TickN(sim, TestHelpers.Input(moveX: 1f), 1);
+        Assert.Equal(ActionState.Idle, dropped.State);
+        Assert.True(dropped.LedgeRegrabLockTicks > 0);
+
+        // 40 ticks: past the 30-tick lock expiry and deep past the 2.5m grab tolerance
+        // (rim 0.75 → PY≈-10 with Manki's 35 m/s² gravity), still falling — must NOT
+        // have re-grabbed. (Stops before the off-grid fall hits KillHeight=-20 / respawn.)
+        var s = TestHelpers.TickDefault(sim, 40);
+        Assert.True(
+            s.State != ActionState.LedgeHang && !s.IsGrounded && s.VY < 0f && s.PY < -5f,
+            $"after lock: st={s.State} grounded={s.IsGrounded} PY={s.PY:F3} VY={s.VY:F3} lock={s.LedgeRegrabLockTicks}");
+    }
 }

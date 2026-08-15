@@ -517,8 +517,10 @@ namespace SlopArena.Shared
                 }
             }
             
-            // 8. Gravity (skip during hitstun — ProcessHitstun handles KVY decay)
-            if (s.State != ActionState.Hitstun)
+            // 8. Gravity (skip during hitstun — ProcessHitstun handles KVY decay;
+            // skip during LedgeHang — a hang is a hang, no gravity, else the character
+            // slides down through the FindLedge tolerance window and falls off on its own)
+            if (s.State != ActionState.Hitstun && s.State != ActionState.LedgeHang)
                 ApplyGravity(ref s, stats, input);
             
             // 9. Position integration
@@ -833,14 +835,22 @@ namespace SlopArena.Shared
             }
             else if (toward < -0.5f)
             {
-                // S = drop
+                // S = drop. End the float window so full gravity applies on the way down —
+                // otherwise the drop rides AirFloatGravity (0) and only falls ~1.5m inside
+                // the 30-tick regrab lock, still within the 2.5m grab tolerance → auto re-grab.
                 s.State = ActionState.Idle;
                 s.IsGrounded = false;
                 s.VY = -LedgeDropSpeed;
+                s.AirTimeTicks = stats.FloatWindowTicks;
                 s.InvincibilityTicks = 0;
                 s.LedgeRegrabLockTicks = LedgeRegrabLockDurationTicks;
             }
-            // else: stay hanging (no-op)
+            else
+            {
+                // Stay hanging: hold the rim. Zero residual vertical velocity so a hang
+                // entered mid-slide never drifts out of the FindLedge window.
+                s.VY = 0f;
+            }
         }
 
         private static void ProcessKnockback(ref CharacterState s, ArenaDefinition arena, CharacterDefinition def)
