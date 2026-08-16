@@ -34,20 +34,31 @@ namespace SlopArena.Client
         }
 
         /// <summary>
-        /// First existing arena directory: the player build's StreamingAssets/arenas,
-        /// then the repo-root data/arenas (Editor/dev). Null if neither exists.
+        /// First arena directory that actually contains baked .arena files:
+        /// the player build's StreamingAssets/arenas, then the repo-root
+        /// data/arenas (Editor/dev). An existing-but-empty directory is skipped
+        /// (issue #77 / build-release.sh leaves an empty StreamingAssets/arenas
+        /// behind when the Editor is open), otherwise StageSelect would offer
+        /// zero stages. Null if neither directory has any .arena files.
         /// </summary>
         public static string? ArenaDirectory()
         {
             string inBuild = Path.Combine(Application.streamingAssetsPath, "arenas");
-            if (Directory.Exists(inBuild)) return inBuild;
+            if (HasArenas(inBuild)) return inBuild;
             string? repoRoot = RepoRoot();
             if (repoRoot != null)
             {
                 string inRepo = Path.GetFullPath(Path.Combine(repoRoot, "data", "arenas"));
-                if (Directory.Exists(inRepo)) return inRepo;
+                if (HasArenas(inRepo)) return inRepo;
             }
             return null;
+        }
+
+        /// <summary>True if <paramref name="dir"/> exists and contains at least one *.arena file.</summary>
+        private static bool HasArenas(string dir)
+        {
+            return Directory.Exists(dir) &&
+                   Directory.GetFiles(dir, "*.arena").Length > 0;
         }
 
         private static string? FirstExisting(string relative)
