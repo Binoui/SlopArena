@@ -1,18 +1,26 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using SlopArena.Shared;
 
 namespace SlopArena.MoveDataReport;
 
 /// <summary>
 /// Move data report: runs the real shared sim (ADR-0019 knockback + flight law)
-/// for each FightGuy normal hitbox at several victim damage percents, and prints
+/// for any character's normal hitboxes at several victim damage percents, and prints
 /// authored frame data + simulated trajectories + a derived true-combo matrix.
+/// Also emits a lossless JSON report and a self-contained HTML visual report
+/// (frame-adv heatmap, knockback-shape gallery, KO/blast-clearance).
 ///
 /// Usage: dotnet run --project tools/MoveDataReport -- [character] [--pcts 0,30,60] [--out path]
-/// Default character: fightguy. Default output: docs/generated/fightguy-move-data.md.
+///        [--json report.json] [--html report.html] [--combos]
+/// Character: fightguy (default) | manki | kistu | nilus.
+/// Default markdown output: docs/generated/{character}-move-data.md.
+/// Kill % / blast clearance: on a Crossroads-style 60x60 proxy (top +20, sides ±40, bottom -10).
 /// </summary>
 internal static class Program
 {
@@ -20,9 +28,25 @@ internal static class Program
 
     private readonly record struct SlotRef(bool Air, int Slot);
     private sealed record Route(string Label, SlotRef From, int FromHit, SlotRef To, int ToHit);
-    private sealed record HitSpec(SlotRef Slot, AbilitySpec Ability, AttackStage Stage, HitboxEvent Hit, int HitIndex);
+    private sealed record HitSpec(SlotRef Slot, AbilitySpec Ability, AttackStage Stage, HitboxEvent Hit, int HitIndex,
+        sbyte LaunchAngle, float BaseKb, float GrowthKb, bool Adaptive);
     private sealed record RunResult(float Kv, ushort Hitstop, ushort Stun, float Rise, float Drift,
         float Apex, int ActionableTick, int? LandedTick);
+
+    // ── JSON / HTML report model ────────────────────────────────────────────
+    private sealed record TrajPoint(int Tick, float Height, float Travel, float Vy, float Vx, char Phase);
+    private sealed record TrajectoryData(int Pct, float Kv, ushort Hitstop, ushort Stun, int Adv, int? AdvL,
+        float Rise, float Drift, float Apex, float MaxTravel, int ActionableTick, int? LandedTick, string? KillLine, TrajPoint[] Points);
+    private sealed record FrameDataData(int Trigger, int ActiveStart, int ActiveEnd, float Damage, int Angle,
+        float BaseKb, float Growth, ushort Stun, int Iasa, int LandingLag, int AcBefore, int AcAfter, int Duration,
+        string Profile, bool Adaptive);
+    private sealed record ClearanceData(float TopFrac, float SideFrac, string Nearest);
+    private sealed record MoveData(string Label, string Slot, int HitIndex, string Ability, FrameDataData Frame,
+        int? KillPct, string? KillLine, ClearanceData Clearance, TrajectoryData[] Trajectories);
+    private sealed record ArenaData(float? KillHeight, float? KillTop, float? KillMinX, float? KillMaxX,
+        float? KillMinZ, float? KillMaxZ, string Note);
+    private sealed record ReportData(string Character, string GeneratedAt, int[] Percents,
+        ArenaData ReportArena, ArenaData KillArena, MoveData[] Moves);
 
     private static readonly SlotRef G1 = new(false, 1), G2 = new(false, 2), G3 = new(false, 3), G4 = new(false, 4);
     private static readonly SlotRef A1 = new(true, 1), A2 = new(true, 2), A3 = new(true, 3), A4 = new(true, 4);
@@ -41,6 +65,28 @@ internal static class Program
         new("a2 Floating Kick -> land -> g1 jab",  A2, 1, G1, 0),
     };
 
+    /// <summary>Combo routes per character — authored designed juggle/kill links. Non-FightGuy
+    /// characters default to empty until their links are designed; the combo sections
+    /// auto-omit when a character has no routes.</summary>
+    private static Route[] RoutesFor(string which) => which.ToLowerInvariant() switch
+    {
+        "fightguy" => DefaultRoutes,
+        _ => Array.Empty<Route>(),
+    };
+
+    private static CharacterDefinition ResolveCharacter(string which)
+    {
+        return which.ToLowerInvariant() switch
+        {
+            "fightguy" => CharacterRegistry.Get(CharacterClass.FightGuy),
+            "manki"    => CharacterRegistry.Get(CharacterClass.Manki),
+            "kistu"    => CharacterRegistry.Get(CharacterClass.Kistu),
+            "nilus"    => CharacterRegistry.Get(CharacterClass.Nilus),
+            var c => throw new ArgumentException(
+                $"unknown character: {c} (expected one of: fightguy, manki, kistu, nilus)"),
+        };
+    }
+
     private static int Main(string[] args)
     {
         string which = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "fightguy";
@@ -50,15 +96,36 @@ internal static class Program
             : new[] { 0, 30, 60, 90, 120, 150 });
         string? outPath = ParseOut(args) ?? $"docs/generated/{which}-move-data.md";
 
-        var def = which.ToLowerInvariant() switch
-        {
-            "fightguy" => CharacterRegistry.Get(CharacterClass.FightGuy),
-            var c => throw new ArgumentException($"unknown character: {c}"),
-        };
+        var def = ResolveCharacter(which);
+        var routes = RoutesFor(which);
 
         var hits = CollectHits(def);
 
-        // --dll <path>: loads the given SlopArena.Shared.dll IN ISOLATION (own load
+        // --json / --html: lossless structured report + self-contained visual report.
+        // Both come from one richer collection (per-tick arcs + KO analysis); markdown path is untouched.
+        string? jsonPath = ParseArg(args, "--json");
+        string? htmlPath = ParseArg(args, "--html");
+        if (jsonPath != null || htmlPath != null)
+        {
+            var report = BuildReport(def, hits, pcts);
+            if (jsonPath != null)
+            {
+                var dir = Path.GetDirectoryName(jsonPath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(jsonPath, ToJson(report));
+                Console.Error.WriteLine($"wrote {jsonPath}");
+            }
+            if (htmlPath != null)
+            {
+                var dir = Path.GetDirectoryName(htmlPath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(htmlPath, ToHtml(report));
+                Console.Error.WriteLine($"wrote {htmlPath}");
+            }
+            return 0;
+        }
+
+        // --dll <path>: loads the given SlopArena.Shared.dll file IN ISOLATION (own load
         // context) and runs its Simulation.ApplyKnockback for the g2 formula. Verifies
         // that the DLL file on disk is the build we think it is — the editor can run a
         // stale in-memory copy while the file is fresh.
@@ -133,7 +200,7 @@ internal static class Program
         var probes = new Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)>();
         if (combos)
         {
-            probeRoutes = DefaultRoutes.Where(r => r.From != r.To).ToArray();
+            probeRoutes = routes.Where(r => r.From != r.To).ToArray();
             var starterSpawns = new Dictionary<SlotRef, (float AtkY, float NpcY, float NpcZ)>();
             foreach (var r in probeRoutes)
             {
@@ -154,7 +221,7 @@ internal static class Program
             }
         }
 
-        string md = BuildMarkdown(def, hits, runs, pcts, probeRoutes, probes, parity, which, combos);
+        string md = BuildMarkdown(def, hits, runs, pcts, routes, probeRoutes, probes, parity, which, combos);
         Console.WriteLine(md);
         if (outPath != null)
         {
@@ -182,7 +249,7 @@ internal static class Program
                 {
                     1 => def.Slot1, 2 => def.Slot2, 3 => def.Slot3, _ => def.Slot4,
                 };
-            if (ability.Stages.Length == 0) continue;
+            if (ability == null || ability.Stages.Length == 0) continue;
             var stage = ability.Stages[0];
             if (stage.HitboxEvents == null || stage.HitboxEvents.Length == 0)
             {
@@ -192,12 +259,22 @@ internal static class Program
             for (int i = 0; i < stage.HitboxEvents.Length; i++)
             {
                 var hit = stage.HitboxEvents[i];
-                if (hit.Knockback.Profile != KnockbackProfile.Custom)
+                // Every move is included regardless of knockback profile. Resolve the launch triple:
+                // Custom/Adaptive carry their own base/growth (and Adaptive's authored angle is used as
+                // a documented representative — see the report caveat); named profiles resolve from the
+                // profile table.
+                var kb = hit.Knockback;
+                bool adaptive = kb.Profile == KnockbackProfile.Adaptive;
+                sbyte angle; float baseKb, growthKb;
+                if (adaptive || kb.Profile == KnockbackProfile.Custom)
                 {
-                    Console.Error.WriteLine($"warn: {ability.Name} hit {i + 1} uses profile {hit.Knockback.Profile} — skipped (custom-only report)");
-                    continue;
+                    angle = kb.Angle; baseKb = kb.BaseKnockback; growthKb = kb.KnockbackGrowth;
                 }
-                hits.Add(new HitSpec(slot, ability, stage, hit, i));
+                else
+                {
+                    var r = kb.Resolve(); angle = r.angle; baseKb = r.baseKB; growthKb = r.growthKB;
+                }
+                hits.Add(new HitSpec(slot, ability, stage, hit, i, angle, baseKb, growthKb, adaptive));
             }
         }
         return hits;
@@ -219,8 +296,8 @@ internal static class Program
             PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
             State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)(pct + (int)h.Hit.Damage),
         };
-        Simulation.ApplyKnockback(ref state, 0f, 1f, (sbyte)h.Hit.Knockback.Angle,
-            h.Hit.Knockback.BaseKnockback, h.Hit.Knockback.KnockbackGrowth,
+        Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
+            h.BaseKb, h.GrowthKb,
             h.Hit.Damage, h.Hit.StunTicks, def.Weight);
         float kv = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
         ushort stun = state.HitstunTicks;
@@ -270,8 +347,8 @@ internal static class Program
                 PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
                 State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)pct,
             };
-            Simulation.ApplyKnockback(ref state, 0f, 1f, (sbyte)h.Hit.Knockback.Angle,
-                h.Hit.Knockback.BaseKnockback, h.Hit.Knockback.KnockbackGrowth,
+            Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
+                h.BaseKb, h.GrowthKb,
                 h.Hit.Damage, h.Hit.StunTicks, def.Weight);
             sim.RegisterEntity(1, def, state);
             var inputs = new Dictionary<ulong, InputState> { [1] = default };
@@ -320,8 +397,8 @@ internal static class Program
                 PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
                 State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)(pct + (int)h.Hit.Damage),
             };
-            Simulation.ApplyKnockback(ref state, 0f, 1f, (sbyte)h.Hit.Knockback.Angle,
-                h.Hit.Knockback.BaseKnockback, h.Hit.Knockback.KnockbackGrowth,
+            Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
+                h.BaseKb, h.GrowthKb,
                 h.Hit.Damage, h.Hit.StunTicks, def.Weight);
             float kv = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
             ushort stun = state.HitstunTicks;
@@ -373,7 +450,7 @@ internal static class Program
         Dictionary<(SlotRef, int, int), RunResult> runs, BakedAnimationData? baked)
     {
         var result = new List<ParityResult>();
-        foreach (var h in hits.Where(x => x.HitIndex == 0))
+        foreach (var h in hits.Where(x => x.HitIndex == 0 && !x.Adaptive))
         foreach (var pct in new[] { 0, pctsDefault[^1] })
         {
             var direct = runs[(h.Slot, 0, pct)];
@@ -760,7 +837,7 @@ internal static class Program
 
     private static string BuildMarkdown(CharacterDefinition def, List<HitSpec> hits,
         Dictionary<(SlotRef, int, int), RunResult> runs, int[] pcts,
-        Route[] probeRoutes, Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)> probes,
+        Route[] routes, Route[] probeRoutes, Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)> probes,
         List<ParityResult> parity, string which, bool combos)
     {
         var sb = new System.Text.StringBuilder();
@@ -785,9 +862,8 @@ internal static class Program
         sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
         foreach (var h in hits)
         {
-            var kb = h.Hit.Knockback;
-            sb.AppendLine($"| {Label(h)} | {h.HitIndex + 1} | {h.Hit.TriggerTick} | {h.Hit.TriggerTick}-{h.Hit.TriggerTick + h.Hit.DurationTicks - 1} | " +
-                          $"{h.Hit.Damage} | {kb.Angle} | {kb.BaseKnockback} | {kb.KnockbackGrowth} | {h.Hit.StunTicks} | " +
+            sb.AppendLine($"| {Label(h)}{(h.Adaptive ? " (adaptive)" : "")} | {h.HitIndex + 1} | {h.Hit.TriggerTick} | {h.Hit.TriggerTick}-{h.Hit.TriggerTick + h.Hit.DurationTicks - 1} | " +
+                          $"{h.Hit.Damage} | {h.LaunchAngle} | {h.BaseKb} | {h.GrowthKb} | {h.Hit.StunTicks} | " +
                           $"{h.Stage.IasaTicks} | {h.Stage.LandingLagTicks} | {h.Stage.AutoCancelBeforeTicks} | {h.Stage.AutoCancelAfterTicks} | {h.Stage.DurationTicks} |");
         }
         sb.AppendLine();
@@ -847,7 +923,7 @@ internal static class Program
             sb.AppendLine();
             sb.AppendLine("| route (TA ticks) | " + string.Join(" | ", pcts.Select(p => p.ToString())) + " |");
             sb.AppendLine("|---" + string.Join("", pcts.Select(_ => "|---")) + "|");
-            foreach (var r in DefaultRoutes)
+            foreach (var r in routes)
             {
                 int ta = AttackerBudget(def, hits, r);
                 string cells = string.Join(" | ", pcts.Select(p =>
@@ -929,6 +1005,322 @@ internal static class Program
 
     private static string Label(HitSpec h)
         => $"{(h.Slot.Air ? "a" : "g")}{h.Slot.Slot} {h.Ability.Name}";
+
+    // ── JSON / HTML report ──────────────────────────────────────────────────
+
+    private static string SlotName(SlotRef s) => $"{(s.Air ? "a" : "g")}{s.Slot}";
+
+    /// <summary>A spike (negative launch angle) sent from the ground lands instantly and shows no arc.
+    /// The report launches spike victims from this altitude (off-stage / airborne scenario) so the
+    /// downward send is visible. Kill-% analysis stays grounded (a grounded spike does not KO).</summary>
+    private const float SpikeLaunchAltitude = 3f;
+
+    /// <summary>Kill-% proxy arena: flat 60x60, KillHeight -10 (Crossroads-style). Sides auto-derive
+    /// from bounds &plusmn;10 &rarr; &plusmn;40; top auto = floor + 20 = +20.</summary>
+    private static ArenaDefinition BuildKillArena()
+    {
+        const int w = 60, h = 60;
+        var data = new float[w * h];
+        return new ArenaDefinition
+        {
+            Name = "kill-proxy",
+            DisplayName = "Kill Proxy (Crossroads-style 60x60)",
+            KillHeight = -10f,
+            MinX = -30f, MaxX = 30f, MinZ = -30f, MaxZ = 30f,
+            SpawnPoints = new[] { new SpawnPoint { X = 0, Y = 0, Z = 0, Yaw = 0 } },
+            Heightmap = new ArenaHeightmap { Data = data, Width = w, Height = h, CellSize = 1f, OriginX = 0f, OriginZ = 0f },
+        };
+    }
+
+    /// <summary>Clone an arena with blast lines pushed out so the sim never respawns — lets the run
+    /// detect a real blast-line crossing itself and keep recording the full arc.</summary>
+    private static ArenaDefinition NoRespawn(ArenaDefinition a)
+    {
+        a.KillHeight = -1e6f; a.KillTop = 1e6f;
+        a.KillMinX = -1e6f; a.KillMaxX = 1e6f; a.KillMinZ = -1e6f; a.KillMaxZ = 1e6f;
+        return a;
+    }
+
+    private static string? BlastLine(CharacterState s, in ArenaCollision.BlastLines b)
+    {
+        if (s.PY < b.KillHeight) return "bottom";
+        if (s.PY > b.KillTop) return "top";
+        if (s.PX < b.KillMinX || s.PX > b.KillMaxX) return "side";
+        if (s.PZ < b.KillMinZ || s.PZ > b.KillMaxZ) return "side";
+        return null;
+    }
+
+    private static TrajPoint PointAt(CharacterState s, int tick, float groundY)
+    {
+        float vy = s.HitstunTicks > 0 ? s.KVY : s.VY;
+        float vz = s.HitstunTicks > 0 ? s.KVZ : s.VZ;
+        char phase = s.IsGrounded ? 'G' : s.HitstunTicks > 0 ? 'H' : 'F';
+        return new TrajPoint(tick, s.PY - groundY, s.PZ, vy, vz, phase);
+    }
+
+    /// <summary>Launch a grounded victim with the hitbox's knockback, step the sim until it lands OR
+    /// crosses a real blast line, recording the per-tick arc. Runs on a no-respawn arena so the flight
+    /// is captured in full and the crossing is detected against <paramref name="detect"/>.</summary>
+    private static TrajectoryData RunTrajectoryFull(CharacterDefinition def, HitSpec h, int pct,
+        ArenaDefinition phys, in ArenaCollision.BlastLines detect)
+    {
+        var sim = new ServerSimulation(phys);
+        float groundY = def.CapsuleHeight * 0.5f;
+        bool spike = h.LaunchAngle < 0;
+        float startY = spike ? groundY + SpikeLaunchAltitude : groundY;
+        var state = new CharacterState
+        {
+            PX = 0f, PY = startY, PZ = 0f,
+            IsGrounded = !spike,
+            State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)(pct + (int)h.Hit.Damage),
+        };
+        Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
+            h.BaseKb, h.GrowthKb,
+            h.Hit.Damage, h.Hit.StunTicks, def.Weight);
+        float kv = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
+        ushort stun = state.HitstunTicks;
+        ushort hitstop = ServerSimulation.ComputeHitstopTicks(h.Hit.Damage, null);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+        float maxPy = state.PY;
+        float maxTravel = 0f;
+        int actionable = -1;
+        int? landed = null; string? killLine = null;
+        float rise = 0f, drift = 0f;
+        var pts = new List<TrajPoint>();
+        for (int t = 0; t < MaxTicks; t++)
+        {
+            sim.Tick(inputs);
+            var s = sim.GetState(1);
+            killLine = BlastLine(s, detect);
+            if (killLine != null) { pts.Add(PointAt(s, t + 1, groundY)); break; }
+            if (s.PY > maxPy) maxPy = s.PY;
+            if (s.PZ > maxTravel) maxTravel = s.PZ;
+            if (actionable < 0 && s.HitstunTicks == 0) { actionable = t + 1; rise = s.PY - groundY; drift = s.PZ; }
+            if (actionable >= 0 && s.IsGrounded) { pts.Add(PointAt(s, t + 1, groundY)); landed = t + 1; break; }
+            pts.Add(PointAt(s, t + 1, groundY));
+            if (pts.Count >= 1200) break; // safety cap
+        }
+        int unlock = h.Stage.IasaTicks > 0 ? h.Stage.IasaTicks : h.Stage.DurationTicks;
+        int adv = stun - Math.Max(0, unlock - h.Hit.TriggerTick);
+        int? advL = h.Slot.Air ? adv - h.Stage.LandingLagTicks : null;
+        return new TrajectoryData(pct, kv, hitstop, stun, adv, advL, rise, drift,
+            maxPy - groundY, maxTravel, actionable, landed, killLine, pts.ToArray());
+    }
+
+    private static (bool Killed, string Line) RunKillProbe(CharacterDefinition def, HitSpec h, int pct,
+        ArenaDefinition phys, in ArenaCollision.BlastLines detect)
+    {
+        var sim = new ServerSimulation(phys);
+        float groundY = def.CapsuleHeight * 0.5f;
+        var state = new CharacterState
+        {
+            PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
+            State = ActionState.Idle, FacingYaw = 0f, DamagePercent = (ushort)(pct + (int)h.Hit.Damage),
+        };
+        Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
+            h.BaseKb, h.GrowthKb,
+            h.Hit.Damage, h.Hit.StunTicks, def.Weight);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        for (int t = 0; t < MaxTicks; t++)
+        {
+            sim.Tick(inputs);
+            var s = sim.GetState(1);
+            string? line = BlastLine(s, detect);
+            if (line != null) return (true, line);
+            if (s.IsGrounded) return (false, "");
+        }
+        return (false, "");
+    }
+
+    /// <summary>Lowest victim % (pre-hit) at which the launch crosses a blast line before landing.
+    /// Binary search — knockback grows monotonically with damage. null = no KO by 250%.</summary>
+    private static (int Pct, string Line)? KillPctFor(CharacterDefinition def, HitSpec h,
+        ArenaDefinition phys, in ArenaCollision.BlastLines detect)
+    {
+        const int MAX = 250;
+        if (!RunKillProbe(def, h, MAX, phys, detect).Killed) return null;
+        int lo = 0, hi = MAX, found = MAX; string line = "";
+        while (lo <= hi)
+        {
+            int mid = (lo + hi) / 2;
+            var r = RunKillProbe(def, h, mid, phys, detect);
+            if (r.Killed) { found = mid; line = r.Line; hi = mid - 1; }
+            else lo = mid + 1;
+        }
+        return (found, line);
+    }
+
+    private static FrameDataData BuildFrameData(HitSpec h) => new(
+        h.Hit.TriggerTick, h.Hit.TriggerTick, h.Hit.TriggerTick + h.Hit.DurationTicks - 1,
+        h.Hit.Damage, h.LaunchAngle, h.BaseKb, h.GrowthKb,
+        h.Hit.StunTicks, h.Stage.IasaTicks, h.Stage.LandingLagTicks, h.Stage.AutoCancelBeforeTicks,
+        h.Stage.AutoCancelAfterTicks, h.Stage.DurationTicks,
+        h.Hit.Knockback.Profile.ToString(), h.Adaptive);
+
+    private static ReportData BuildReport(CharacterDefinition def, List<HitSpec> hits, int[] pcts)
+    {
+        var reportArena = BuildArena();
+        var reportDetect = ArenaCollision.ResolveBlastLines(in reportArena);
+        var reportPhys = NoRespawn(reportArena);
+
+        var killArena = BuildKillArena();
+        var killDetect = ArenaCollision.ResolveBlastLines(in killArena);
+        var killPhys = NoRespawn(killArena);
+
+        var moves = new List<MoveData>();
+        foreach (var h in hits)
+        {
+            var trajs = new List<TrajectoryData>();
+            foreach (var p in pcts)
+                trajs.Add(RunTrajectoryFull(def, h, p, reportPhys, reportDetect));
+            var kill = KillPctFor(def, h, killPhys, killDetect);
+            moves.Add(new MoveData(Label(h), SlotName(h.Slot), h.HitIndex, h.Ability.Name,
+                BuildFrameData(h), kill?.Pct, kill?.Line, ClearanceOf(def, trajs[^1], killDetect), trajs.ToArray()));
+        }
+        return new ReportData(def.DisplayName, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture),
+            pcts, ToArenaData(reportDetect, "trajectory / landing arena (flat 200x200)"),
+            ToArenaData(killDetect, "kill-% proxy (flat 60x60, Crossroads-style, -10)"), moves.ToArray());
+    }
+
+    /// <summary>How close the move gets to the top / side blast lines at the highest simulated % —
+    /// fraction of the way there (0..1). Always populated even when it never kills, so tuning can
+    /// see "up-slash apex is 47% of the way to top blast".</summary>
+    private static ClearanceData ClearanceOf(CharacterDefinition def, TrajectoryData tr, in ArenaCollision.BlastLines kill)
+    {
+        float groundY = def.CapsuleHeight * 0.5f;
+        float topFrac = kill.KillTop - groundY > 0.01f ? Math.Clamp(tr.Apex / (kill.KillTop - groundY), 0f, 1f) : 0f;
+        float sideFrac = kill.KillMaxZ - kill.KillMinZ > 0.01f ? Math.Clamp(tr.MaxTravel / kill.KillMaxZ, 0f, 1f) : 0f;
+        return new ClearanceData(topFrac, sideFrac, topFrac >= sideFrac ? "top" : "side");
+    }
+
+    private static ArenaData ToArenaData(in ArenaCollision.BlastLines b, string note)
+    {
+        static float? Inf(float v) => float.IsInfinity(v) ? null : v;
+        return new ArenaData(Inf(b.KillHeight), Inf(b.KillTop), Inf(b.KillMinX), Inf(b.KillMaxX),
+            Inf(b.KillMinZ), Inf(b.KillMaxZ), note);
+    }
+
+    private static string ToJson(ReportData r) => JsonSerializer.Serialize(r,
+        new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+    // ── HTML renderer (self-contained, no external deps) ────────────────────
+
+    private static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    private static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+    private static string Escape(string s) => System.Net.WebUtility.HtmlEncode(s);
+    private static string Blast(float? v) => v == null ? "&infin;" : F(v.Value);
+    private static string Bar(int pct) => $"<span class=\"barwrap\"><span class=\"barfill\" style=\"width:{pct}%\"></span></span>{pct}%";
+    private static string MoveTag(MoveData m) => m.Frame.Adaptive ? " <span class=\"tag\">adaptive</span>" : "";
+
+    private static string AdvColor(int adv)
+    {
+        int a = Math.Clamp(adv, -40, 40);
+        int m = (int)(Math.Abs(a) * 5.5f);
+        return a >= 0 ? $"rgb({255 - m},255,{255 - m})" : $"rgb(255,{255 - m},{255 - m})";
+    }
+
+    private static string ArcSvg(TrajectoryData tr, float maxTravel, float maxHeight)
+    {
+        const int W = 150, H = 110, PAD = 8;
+        float tw = maxTravel > 0.01f ? maxTravel : 1f;
+        float th = maxHeight > 0.01f ? maxHeight : 1f;
+        float sx = (W - 2 * PAD) / tw, sy = (H - 2 * PAD) / th;
+        var sb = new StringBuilder();
+        sb.Append($"<svg width=\"{W}\" height=\"{H}\" viewBox=\"0 0 {W} {H}\" class=\"arc\">");
+        sb.Append($"<line x1=\"{PAD}\" y1=\"{H - PAD}\" x2=\"{W - PAD}\" y2=\"{H - PAD}\" stroke=\"#888\" stroke-width=\"1\"/>");
+        sb.Append("<polyline fill=\"none\" stroke=\"#1a5fd0\" stroke-width=\"1.6\" points=\"");
+        foreach (var p in tr.Points)
+            sb.Append($"{Fi(PAD + p.Travel * sx)},{Fi(H - PAD - p.Height * sy)} ");
+        sb.Append("\"/>");
+        if (tr.Points.Length > 0)
+        {
+            var apex = tr.Points.OrderByDescending(p => p.Height).First();
+            sb.Append($"<circle cx=\"{Fi(PAD + apex.Travel * sx)}\" cy=\"{Fi(H - PAD - apex.Height * sy)}\" r=\"2.5\" fill=\"#d23\"/>");
+        }
+        if (tr.KillLine != null && tr.Points.Length > 0)
+        {
+            var last = tr.Points[tr.Points.Length - 1];
+            sb.Append($"<line x1=\"{Fi(PAD + last.Travel * sx)}\" y1=\"{PAD}\" x2=\"{Fi(PAD + last.Travel * sx)}\" y2=\"{H - PAD}\" stroke=\"#d23\" stroke-width=\"1\" stroke-dasharray=\"2,2\"/>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
+    private static string ToHtml(ReportData r)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+        sb.AppendLine($"<title>{Escape(r.Character)} move data</title><style>");
+        sb.AppendLine("body{font-family:system-ui,sans-serif;margin:24px;color:#1c1e21;}h1{font-size:22px;}h2{margin-top:32px;border-bottom:1px solid #ddd;padding-bottom:4px;}.meta{color:#666;font-size:13px;margin-bottom:16px;max-width:880px;line-height:1.4;}");
+        sb.AppendLine("table.heat{border-collapse:collapse;font-size:13px;}table.heat td,table.heat th{border:1px solid #ccc;padding:3px 7px;text-align:center;}table.heat td.move,table.heat th.move{text-align:left;white-space:nowrap;}table.heat th{cursor:pointer;user-select:none;background:#f2f3f5;}table.heat td.kill{min-width:56px;}");
+        sb.AppendLine(".legend{font-size:12px;color:#444;margin:6px 0 18px;max-width:880px;}.arcs{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 20px;}.move{margin-bottom:20px;}figure{margin:0;text-align:center;font-size:11px;color:#555;width:150px;}svg.arc{border:1px solid #eee;background:#fafbfc;display:block;}");
+        sb.AppendLine(".killbadge{font-size:11px;padding:1px 6px;border-radius:9px;background:#fdecea;color:#c0392b;white-space:nowrap;}");
+        sb.AppendLine(".barwrap{width:84px;background:#eee;border-radius:6px;height:10px;display:inline-block;vertical-align:middle;margin-right:5px;overflow:hidden;}.barfill{display:block;height:10px;border-radius:6px;background:#e74c3c;}td.clr{font-size:11px;color:#555;white-space:nowrap;}");
+        sb.AppendLine(".tag{font-size:10px;color:#8a6d1a;background:#fcf3d4;padding:0 5px;border-radius:8px;margin-left:5px;font-weight:normal;}.note{background:#fff7e6;border-left:3px solid #e6a23c;padding:6px 10px;font-size:12px;color:#6b5b1f;margin:8px 0 14px;max-width:880px;}");
+        sb.AppendLine("</style></head><body>");
+
+        sb.AppendLine($"<h1>{Escape(r.Character)} move data</h1>");
+        sb.AppendLine($"<div class=\"meta\">Generated {Escape(r.GeneratedAt)} &middot; real ServerSimulation (ADR-0019). " +
+            "No DI/SDI input, hitstop reported not simulated, hit connects on first active frame.<br>" +
+            $"Trajectories: {Escape(r.ReportArena.Note)}. " +
+            $"Kill %: {Escape(r.KillArena.Note)} &mdash; top {Blast(r.KillArena.KillTop)}, side &plusmn;{Blast(r.KillArena.KillMaxX)}, " +
+            $"bottom {Blast(r.KillArena.KillHeight)}. Center launch, victim passive.</div>");
+
+        // A — frame-advantage heatmap
+        sb.AppendLine("<h2>Frame advantage</h2>");
+        if (r.Moves.Any(m => m.Frame.Adaptive))
+            sb.AppendLine("<div class=\"note\">Moves tagged <b>adaptive</b> use the Melee-361 auto-angle (the real launch angle varies with hit position); their trajectory here uses the <b>authored angle as a representative</b>. Frame data (active / duration / IASA / stun) is exact regardless.</div>");
+        sb.AppendLine("<div class=\"legend\">Cells = on-hit frame advantage in ticks (stun &minus; recovery). Green = attacker acts first (+), red = victim recovers first (&minus;). Click a column header to sort; hover a cell for KV / stun / apex.</div>");
+        sb.AppendLine("<table id=\"adv\" class=\"heat\"><thead><tr><th class=\"move\" onclick=\"sortT(0,false)\">move</th>");
+        for (int i = 0; i < r.Percents.Length; i++) sb.AppendLine($"<th onclick=\"sortT({i + 1},true)\">{r.Percents[i]}%</th>");
+        sb.AppendLine($"<th class=\"kill\" onclick=\"sortT({r.Percents.Length + 1},true)\">kill%</th></tr></thead><tbody>");
+        foreach (var m in r.Moves)
+        {
+            sb.AppendLine($"<tr><td class=\"move\">{Escape(m.Label)}{MoveTag(m)}</td>");
+            foreach (var tr in m.Trajectories)
+                sb.AppendLine($"<td style=\"background:{AdvColor(tr.Adv)}\" title=\"KV {F(tr.Kv)} m/s &middot; stun {tr.Stun} &middot; apex {F(tr.Apex)} m &middot; hitstop {tr.Hitstop}\">{tr.Adv}</td>");
+            sb.AppendLine($"<td class=\"kill\">{(m.KillPct != null ? $"<span class=\"killbadge\">{m.KillPct}% {Escape(m.KillLine!)}</span>" : "&mdash;")}</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        // B — knockback shape gallery (COMMON scale across the whole character so absolute sizes compare)
+        float gMaxTravel = 1f, gMaxHeight = 1f;
+        foreach (var m in r.Moves)
+            foreach (var tr in m.Trajectories)
+            {
+                if (tr.MaxTravel > gMaxTravel) gMaxTravel = tr.MaxTravel;
+                if (tr.Apex > gMaxHeight) gMaxHeight = tr.Apex;
+            }
+        sb.AppendLine("<h2>Knockback shape</h2>");
+        sb.AppendLine($"<div class=\"legend\">Arc = height (m) vs horizontal travel (m). <b>Common scale across the character</b> — axes span {F(gMaxTravel)} m wide &times; {F(gMaxHeight)} m tall, so absolute size is comparable move-to-move. Red dot = apex; red dashed line = blast crossing (KO). <b>Spike moves (negative angle) launch from {F(SpikeLaunchAltitude)} m up</b> (off-stage scenario) so the downward send is visible.</div>");
+        foreach (var m in r.Moves)
+        {
+            sb.AppendLine($"<div class=\"move\"><strong>{Escape(m.Label)}{MoveTag(m)}</strong><div class=\"arcs\">");
+            foreach (var tr in m.Trajectories)
+                sb.AppendLine($"<figure>{ArcSvg(tr, gMaxTravel, gMaxHeight)}<figcaption>{tr.Pct}% &middot; KV {F(tr.Kv)} &middot; apex {F(tr.Apex)}m &middot; stun {tr.Stun}</figcaption></figure>");
+            sb.AppendLine("</div></div>");
+        }
+
+        // C — KO + blast clearance
+        sb.AppendLine("<h2>KO &amp; blast clearance</h2>");
+        sb.AppendLine("<div class=\"legend\">kill % = lowest victim % at which the launch crosses a blast line before landing (&mdash; = no KO by 250%). Clearance = fraction of the way to the top / side blast line at the highest simulated %, so a move that can't kill still shows how close it gets.</div>");
+        sb.AppendLine("<table class=\"heat\"><thead><tr><th class=\"move\">move</th><th>kill %</th><th>top</th><th>side</th></tr></thead><tbody>");
+        foreach (var m in r.Moves)
+        {
+            int tp = (int)Math.Round(m.Clearance.TopFrac * 100), sp = (int)Math.Round(m.Clearance.SideFrac * 100);
+            sb.AppendLine($"<tr><td class=\"move\">{Escape(m.Label)}{MoveTag(m)}</td>");
+            sb.AppendLine($"<td>{(m.KillPct != null ? $"{m.KillPct}% {Escape(m.KillLine!)}" : "&mdash;")}</td>");
+            sb.AppendLine($"<td class=\"clr\">{Bar(tp)}</td><td class=\"clr\">{Bar(sp)}</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        sb.AppendLine("<script>function sortT(n,nums){var tb=document.getElementById('adv').tBodies[0],rows=[].slice.call(tb.rows);rows.sort(function(a,b){var av=a.cells[n].textContent,bv=b.cells[n].textContent;if(nums){av=parseInt(av)||-9999;bv=parseInt(bv)||-9999;return av-bv;}return av.localeCompare(bv);});rows.forEach(function(r){tb.appendChild(r);});}</script>");
+        sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
 
     // ── CLI ──────────────────────────────────────────────────────────────────
 
