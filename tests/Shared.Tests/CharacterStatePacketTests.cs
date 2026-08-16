@@ -111,9 +111,9 @@ public class CharacterStatePacketTests
         // 63 bytes base (locked pre-rollback) + 28 bytes of D10 movement-resource fields
         // (ADR-0011; DirHoldTicks/IsSprinting dropped in ADR-0020, −3) + 2 hitstop (ADR-0012)
         // + 4 burst (ADR-0014) + 10 cooldown slots 6-10 + 1 JumpHeldTicks (ADR-0016)
-        // + 1 LockOn (ADR-0018) = 110.
+        // + 1 LockOn (ADR-0018) + 2 LedgeRegrabLockTicks (walk-off self-grab suppression) = 112.
         // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(110, CharacterStatePacket.Size);
+        Assert.Equal(112, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

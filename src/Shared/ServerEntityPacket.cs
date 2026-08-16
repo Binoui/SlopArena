@@ -31,16 +31,16 @@ namespace SlopArena.Shared
         /// <summary>The relayed input (meaningful iff <see cref="HasInput"/>).</summary>
         public InputState Input;
 
-        /// <summary>122 bytes — envelope without the relay section.</summary>
+        /// <summary>124 bytes — envelope without the relay section.</summary>
         public const int BaseSize = 8 + 4 + CharacterStatePacket.Size;
         /// <summary>21 bytes — hasInput flag + InputState.</summary>
         public const int RelaySize = 1 + InputState.Size;
-        /// <summary>143 bytes — full envelope with relayed input.</summary>
+        /// <summary>145 bytes — full envelope with relayed input.</summary>
         public const int MaxSize = BaseSize + RelaySize;
-        /// <summary>123 bytes — envelope with the no-input marker.</summary>
+        /// <summary>125 bytes — envelope with the no-input marker.</summary>
         public const int NoInputSize = BaseSize + 1;
 
-        /// <summary>Encoded length of this packet (123 or 143 bytes).</summary>
+        /// <summary>Encoded length of this packet (125 or 145 bytes).</summary>
         public int WireSize => HasInput ? MaxSize : NoInputSize;
 
         public void Serialize(Span<byte> buffer)

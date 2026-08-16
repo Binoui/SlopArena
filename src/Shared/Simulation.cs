@@ -272,9 +272,14 @@ namespace SlopArena.Shared
                     }
                     else
                     {
+                        // Zero-launch queue = the ATTACKER frozen by their own connecting hit
+                        // (they're not launched). Do NOT force Idle here — that cancelled the
+                        // attacker's remaining attack at freeze expiry, so the client's attack
+                        // animation stopped after hitstop. Leave the state untouched so the move
+                        // resumes when the freeze pops. (Prediction tracks with an unresolved hit
+                        // land here too; the next authoritative packet corrects them.)
                         s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
                         s.HitstunTicks = 0;
-                        s.State = ActionState.Idle;
                     }
                     ApplyDirectionalInfluence(ref s);
                     s.SdiApplied = false;
@@ -317,6 +322,16 @@ namespace SlopArena.Shared
                         s.IsGrounded = false;
                         s.State = ActionState.Idle;
                         s.AirTimeTicks = stats.FloatWindowTicks;
+                        // Jump carries at most RunSpeed horizontally. Burst tools (dash,
+                        // attack lunge) never catapult the jump — the sustained locomotion
+                        // speed is the ceiling. Net Melee behavior: dash ≈ run, so a
+                        // dash-jump ≈ run-jump; SlopArena's dash is 1.6-2.5× run, so without
+                        // this cap a dash-jump crosses most of the stage.
+                        float jumpCap = stats.RunSpeed;
+                        if (s.VX > jumpCap) s.VX = jumpCap;
+                        else if (s.VX < -jumpCap) s.VX = -jumpCap;
+                        if (s.VZ > jumpCap) s.VZ = jumpCap;
+                        else if (s.VZ < -jumpCap) s.VZ = -jumpCap;
                     }
                 }
                 // During squat: preserve horizontal momentum, no acceleration
@@ -581,6 +596,22 @@ namespace SlopArena.Shared
             else
             {
                 s.IsGrounded = false;
+            }
+
+            // Walk-off: running off a platform must start falling immediately, not ride
+            // the float window (AirFloatGravity = 0 for every class → a full
+            // FloatWindowTicks of zero gravity, ~0.5-0.67s of air-running off the ledge).
+            // Jumps already pre-set AirTimeTicks = FloatWindowTicks on activation, so only
+            // a grounded→airborne transition with no upward velocity and no launch force
+            // (knockback rides KVY + its own flight gravity) needs the nudge: leap the
+            // float window so full Gravity applies on the very next airborne tick. The
+            // same fall also makes VY < 0 within the ledge-grab range, so suppress the
+            // self-grab (mirrors the S-drop escape: running off must fall, not grab the
+            // ledge it just left — TryLedgeGrab honors LedgeRegrabLockTicks).
+            if (wasGrounded && !s.IsGrounded && s.VY <= 0f && !HasKnockback(s))
+            {
+                s.AirTimeTicks = stats.FloatWindowTicks;
+                s.LedgeRegrabLockTicks = LedgeRegrabLockDurationTicks;
             }
 
             // Landing resets to a fresh Rush window (ADR-0020): the first reversal after
@@ -922,14 +953,13 @@ namespace SlopArena.Shared
             }
             else
             {
-                // Dash expired (ADR-0020 v2). Grounded: hard stop — the burst is the move
-                // (wavedash), no coast. Airborne: preserve horizontal momentum so the dash
-                // remains an approach tool; air friction decays it from here.
-                if (s.IsGrounded)
-                {
-                    s.VX = 0f;
-                    s.VZ = 0f;
-                }
+                // Dash expired. Hard stop in both ground and air — the burst is the move
+                // (wavedash), no coast. An aerial dash is a clean 0.25s horizontal dodge
+                // that stops on the frame it expires, not a momentum boost that sails.
+                // Horizontal velocity is removed; vertical (fall/gravity) is left intact
+                // so an air dash ends in a normal fall, matching the grounded hard stop.
+                s.VX = 0f;
+                s.VZ = 0f;
                 s.State = ActionState.Idle;
             }
         }

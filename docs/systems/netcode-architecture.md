@@ -227,8 +227,9 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(112) + h
 | 106-107| ushort  | BurstRecoveryTicks  | Burst recovery lock (ADR-0014)     |
 | 108    | byte    | JumpHeldTicks       | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
 | 109    | byte    | LockOn              | Persistent target-lock flag (ADR-0018) |
+| 110-111| ushort  | LedgeRegrabLockTicks| Walk-off self-grab suppression — on-wire so the rollback opponent track reproduces a walk-off |
 
-Total: 122 bytes base (8 + 4 + 110), up to 143 with the relay section (123 no-input marker / 143 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + ADR-0016/0018 + the ADR-0020 repack)
+Total: 124 bytes base (8 + 4 + 112), up to 145 with the relay section (125 no-input marker / 145 relayed — issue #80, widened per D10/ADR-0011 + hitstop/ADR-0012 + burst/ADR-0014 + ADR-0016/0018 + LedgeRegrabLockTicks + the ADR-0020 repack)
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

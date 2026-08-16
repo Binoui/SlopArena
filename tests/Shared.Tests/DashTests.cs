@@ -270,7 +270,7 @@ public class DashTests
     }
 
     [Fact]
-    public void AerialDash_PreservesMomentum()
+    public void AerialDash_HardStopsAtExpiry()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState(50f, 50f);
@@ -280,13 +280,16 @@ public class DashTests
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(dash: true, moveX: 1f) } });
 
-        // Tick past the dash duration — still airborne, horizontal momentum preserved
-        // (no hard stop in the air; the dash remains an approach tool).
+        // Tick past the dash duration — still airborne, but the burst hard-stops on the
+        // expiry frame (same wavedash contract as grounded): the air dash is a clean
+        // 0.25s horizontal dodge, not a momentum boost that sails.
         for (int i = 0; i < 12; i++)
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default(InputState) } });
         var s = sim.GetState(1);
         Assert.False(s.IsGrounded, "should still be airborne");
-        Assert.True(s.VX > 0.5f, $"aerial dash should preserve momentum, got VX={s.VX:F3}");
+        float residual = System.MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
+        Assert.True(residual < 0.001f,
+            $"aerial dash should hard-stop at expiry (wavedash), got residual velocity {residual:F3}");
     }
 
     [Fact]

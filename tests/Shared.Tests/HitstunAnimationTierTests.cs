@@ -107,11 +107,11 @@ public class HitstunAnimationTierTests
     [Fact]
     public void CharacterStatePacket_Size_IncludesHitstunLevel()
     {
-        // Size should be 110 for the current packet layout (Deaths #37, damage + cooldowns #38,
+        // Size should be 112 for the current packet layout (Deaths #37, damage + cooldowns #38,
         // D10 movement-resource fields for PredictedTrack — ADR-0011, hitstop — ADR-0012,
         // burst cooldown/recovery — ADR-0014, cooldowns 6-10 + JumpHeldTicks — ADR-0016,
-        // LockOn — ADR-0018; DirHoldTicks/IsSprinting dropped — ADR-0020)
-        Assert.Equal(110, CharacterStatePacket.Size);
+        // LockOn — ADR-0018, LedgeRegrabLockTicks — walk-off; DirHoldTicks/IsSprinting dropped — ADR-0020)
+        Assert.Equal(112, CharacterStatePacket.Size);
     }
 
     // ═══════════════════════════════════════════════════════════════════

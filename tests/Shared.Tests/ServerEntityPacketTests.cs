@@ -179,14 +179,14 @@ public class ServerEntityPacketTests
     {
         // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10
         // + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10/JumpHeldTicks/ADR-0016
-        // + LockOn/ADR-0018): 122B base (8 entityId + 4 tick + 110 CharacterStatePacket)
-        // + 1B flag + 20B input.
+        // + LockOn/ADR-0018 + LedgeRegrabLockTicks/walk-off): 124B base (8 entityId + 4 tick
+        // + 112 CharacterStatePacket) + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(122, ServerEntityPacket.BaseSize);
+        Assert.Equal(124, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(143, ServerEntityPacket.MaxSize);
-        Assert.Equal(123, ServerEntityPacket.NoInputSize);
+        Assert.Equal(145, ServerEntityPacket.MaxSize);
+        Assert.Equal(125, ServerEntityPacket.NoInputSize);
         // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
         // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
         Assert.Equal(20, InputState.Size);

@@ -196,9 +196,10 @@ namespace SlopArena.Shared
         /// Turnaround).
         /// </summary>
         public ushort RushTicks;
-        /// <summary>Re-grab lockout after a voluntary ledge drop (off-wire, sim-internal).
-        /// Prevents an immediate re-grab so the S-drop escape actually falls. Snapped wire
-        /// corrections never overwrite it; it self-expires and only delays a re-grab.</summary>
+        /// <summary>Re-grab lockout after a voluntary ledge drop (S-drop) or a walk-off.
+        /// Prevents an immediate re-grab so those escapes actually fall. On-wire
+        /// (CharacterStatePacket) so the rollback opponent track reproduces it exactly.
+        /// Self-expires (TickTimers) and only delays a re-grab.</summary>
         public ushort LedgeRegrabLockTicks;
 
         /// <summary>

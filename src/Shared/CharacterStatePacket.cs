@@ -73,14 +73,19 @@ namespace SlopArena.Shared
         public ushort BurstCooldownTicks;
         /// <summary>Remaining Burst recovery lock ticks (ADR-0014) — opponent's punish window must be visible.</summary>
         public ushort BurstRecoveryTicks;
+        /// <summary>Ledge re-grab suppression (walk-off self-grab guard) — on-wire so the rollback
+        /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
+        public ushort LedgeRegrabLockTicks;
 
         /// <summary>110 bytes — 63 base + 11 cooldown slots (ADR-0016) + 28 D10 movement-resource
         /// fields (ADR-0011; −3 for the dropped DirHoldTicks/IsSprinting in ADR-0020) + 2 hitstop
-        /// (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018).</summary>
+        /// (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018)
+        /// + 2 LedgeRegrabLockTicks (walk-off self-grab suppression, on-wire so the rollback
+        /// opponent track reproduces it — off-wire it diverged on replay near a ledge).</summary>
         public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4   // tick + pos + vel (28)
             + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 2   // 23
             + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2   // cooldowns (22)
-            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1; // 37
+            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1 + 2; // 39
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -136,6 +141,7 @@ namespace SlopArena.Shared
                 HitstopTicks = s.HitstopTicks,
                 BurstCooldownTicks = s.BurstCooldownTicks,
                 BurstRecoveryTicks = s.BurstRecoveryTicks,
+                LedgeRegrabLockTicks = s.LedgeRegrabLockTicks,
             };
         }
 
@@ -191,6 +197,7 @@ namespace SlopArena.Shared
                 HitstopTicks = HitstopTicks,
                 BurstCooldownTicks = BurstCooldownTicks,
                 BurstRecoveryTicks = BurstRecoveryTicks,
+                LedgeRegrabLockTicks = LedgeRegrabLockTicks,
             };
         }
 
@@ -248,6 +255,7 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(106, 2), BurstRecoveryTicks);
             buffer[108] = JumpHeldTicks;
             buffer[109] = LockOn ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(110, 2), LedgeRegrabLockTicks);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -305,6 +313,7 @@ namespace SlopArena.Shared
             packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(106, 2));
             packet.JumpHeldTicks = buffer[108];
             packet.LockOn = buffer[109] != 0;
+            packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(110, 2));
             return packet;
         }
 
@@ -353,6 +362,7 @@ namespace SlopArena.Shared
             s.HitstopTicks = HitstopTicks;
             s.BurstCooldownTicks = BurstCooldownTicks;
             s.BurstRecoveryTicks = BurstRecoveryTicks;
+            s.LedgeRegrabLockTicks = LedgeRegrabLockTicks;
         }
     }
 }

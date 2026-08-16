@@ -1024,6 +1024,11 @@ namespace SlopArena.Shared
 					}
 				}
 
+				// Hit-reaction facing: the victim turns to face the hitbox/launch direction
+				// (away from the attacker — the direction the hit sends them). Persists through
+				// the hitstun flight; ProcessNormalMovement re-faces on the next input/land.
+				targetState.FacingYaw = MathF.Atan2(dirX, dirZ);
+
 				// Burst (ADR-0014): remember who hit us — consumed by the defensive shove.
 				// Placed after the invincibility/counter continues, so ignored hits never mark.
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
