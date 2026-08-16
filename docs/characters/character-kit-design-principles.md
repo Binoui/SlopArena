@@ -286,6 +286,7 @@ When designing a new character, start from one of the 4 archetypes defined above
 ---
 
 ## References
+- `docs/design/melee-feel-guidelines.md` — **numeric tuning rules: damage bands, commitment→damage tradeoff, launch angles, the Adaptive auto-angle.** Read this before tuning any move's damage/knockback/angle.
 - `docs/research/dko-character-kits.md` — raw DKO data (13 gods, full ability tables)
 - `docs/combat-systems.md` — universal combat mechanics: attack patterns, aerial rules, aiming types, hitbox philosophy, finisher design
 - Research sessions: Battlerite (6 abilities, all skillshots), Supervive (4 abilities + platform fighter movement), Fangs (2 abilities + ult), Rumble (pure movement, no abilities)

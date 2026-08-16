@@ -104,13 +104,16 @@ public static class HurtboxOverride
     }
 
     /// <summary>
-    /// True when the def list matches the baked bone array 1:1 (same count, same
-    /// names in the same order). The pose resolver indexes bones by position, so an
-    /// out-of-order override would silently attach hurtboxes to the wrong bones.
+    /// True when the def list matches the baked bone array's hurtbox bones: same
+    /// names in the same order for the first defs.Length entries. The bake may carry
+    /// MORE named points than hurtbox defs (e.g. the synthetic _weapon_tip appended
+    /// last by the baker) — hurtbox/pose indexing is by hurtbox-def index (0..N-1),
+    /// so extra trailing baked points are fine. An out-of-order override would
+    /// silently attach hurtboxes to the wrong bones, hence the prefix match.
     /// </summary>
     public static bool ValidateOrder(HurtboxBoneDef[] defs, BakedAnimationData baked)
     {
-        if (baked.BoneNames == null || defs.Length != baked.BoneNames.Length) return false;
+        if (baked.BoneNames == null || defs.Length > baked.BoneNames.Length) return false;
         for (int i = 0; i < defs.Length; i++)
         {
             if (!string.Equals(defs[i].BoneName, baked.BoneNames[i], StringComparison.Ordinal))

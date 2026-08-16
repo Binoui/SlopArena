@@ -20,6 +20,11 @@ namespace SlopArena.Shared
         /// <summary>If set, anchor the hitbox at this bone's world position (plus the
         /// OffX/Y/Z offset). Null = anchor at entity origin.</summary>
         public string? BoneName;
+        /// <summary>If set (with BoneName), the capsule's end anchors at this baked
+        /// point's world position (plus the EndOffX/Y/Z delta, default 0). Re-resolved
+        /// per tick like BoneName — lets a hitbox sweep from one baked point to
+        /// another (e.g. hand → weapon tip). Null = the EndOff* delta only.</summary>
+        public string? EndBoneName;
 
         public float Damage;
         /// <summary>Knockback profile + optional custom overrides. Resolved at spawn time.</summary>
