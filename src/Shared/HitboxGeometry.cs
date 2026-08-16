@@ -37,65 +37,28 @@ public static class HitboxGeometry
         float cos = MathF.Cos(s.FacingYaw);
         float sin = MathF.Sin(s.FacingYaw);
 
+        // Weapon-anchored hitboxes (a synthetic `_` baked point is involved — e.g.
+        // _weapon_tip, which is baked at VISUAL scale from the actual sword) must not
+        // be shrunk by HurtboxBoneScale: the blade capsule must span the exact visual
+        // hand→tip, or it starts short of the hand and ends short of the tip. Both
+        // endpoints of such a capsule resolve at scale 1.0.
+        bool weaponAnchored =
+            (evt.BoneName != null && evt.BoneName.StartsWith("_", StringComparison.Ordinal)) ||
+            (evt.EndBoneName != null && evt.EndBoneName.StartsWith("_", StringComparison.Ordinal));
+        float resolveScale = weaponAnchored ? 1f : (def?.HurtboxBoneScale ?? 1f);
+
         bool resolved = false;
         wx = wy = wz = 0f;
 
         // ── Bone-attached hitbox path (requires baked data) ──
-        if (evt.BoneName != null && baked != null)
+        if (evt.BoneName != null && baked != null &&
+            TryResolveBone(s, evt.BoneName, baked, def, animationNames, animIndex, slot, airborne, resolveScale,
+                out float bx, out float by, out float bz))
         {
-            // The bake holds exactly the bones the baker wrote (SlopArenaBaker's curated
-            // mixamorig list: head/spine2/hips/hands/feet/toes); GetBonePosition indexes
-            // BoneNames directly. HurtboxBoneDefs lookup is kept as a legacy fallback
-            // for defs whose bones aren't present in the bake.
-            int bi = -1;
-            if (baked.BoneNames != null)
-            {
-                for (int i = 0; i < baked.BoneNames.Length; i++)
-                {
-                    if (string.Equals(baked.BoneNames[i], evt.BoneName, StringComparison.Ordinal)) { bi = i; break; }
-                }
-            }
-            if (bi < 0 && def?.HurtboxBoneDefs != null)
-            {
-                for (int i = 0; i < def.HurtboxBoneDefs.Length; i++)
-                {
-                    if (def.HurtboxBoneDefs[i].BoneName == evt.BoneName) { bi = i; break; }
-                }
-            }
-
-            if (bi >= 0)
-            {
-                string targetAnim = animationNames != null && animationNames.Length > animIndex
-                    ? animationNames[animIndex] : "idle";
-                int animIdx = baked.FindAnimIndex(targetAnim);
-                if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
-
-                if (animIdx >= 0)
-                {
-                    int fc = baked.Animations[animIdx].FrameCount;
-                    var spec = def.GetSlotAbility(slot, airborne);
-                    int durationTicks = (spec != null && animIndex < spec.Stages.Length)
-                        ? spec.Stages[animIndex].DurationTicks
-                        : 60;
-                    int bakedFrame = durationTicks > 0
-                        ? Math.Min(s.AttackElapsedTicks * fc / durationTicks, fc - 1)
-                        : Math.Min(s.AttackElapsedTicks, fc - 1);
-                    if (bakedFrame >= fc) bakedFrame = fc - 1;
-
-                    if (baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz))
-                    {
-                        float scale = def.HurtboxBoneScale;
-                        bx *= scale; by *= scale; bz *= scale;
-                        wx = s.PX + ((bx * cos) + (bz * sin));
-                        wy = def.BoneYToWorldY(s.PY, by);
-                        wz = s.PZ + ((-bx * sin) + (bz * cos));
-                        wx += (evt.OffX * cos) + (evt.OffZ * sin);
-                        wy += evt.OffY;
-                        wz += (-evt.OffX * sin) + (evt.OffZ * cos);
-                        resolved = true;
-                    }
-                }
-            }
+            wx = bx + ((evt.OffX * cos) + (evt.OffZ * sin));
+            wy = by + evt.OffY;
+            wz = bz + ((-evt.OffX * sin) + (evt.OffZ * cos));
+            resolved = true;
         }
 
         // ── Fallback: entity-relative offset (standard path) ──
@@ -106,8 +69,89 @@ public static class HitboxGeometry
             wz = s.PZ + ((-evt.OffX * sin) + (evt.OffZ * cos));
         }
 
-        wex = wx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
-        wey = wy + evt.EndOffY;
-        wez = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
+        // ── Capsule end: second baked point when EndBoneName is set, else the EndOff
+        // delta (facing-rotated) from the start point, exactly as before. ──
+        if (evt.EndBoneName != null && baked != null &&
+            TryResolveBone(s, evt.EndBoneName, baked, def, animationNames, animIndex, slot, airborne, resolveScale,
+                out float ex, out float ey, out float ez))
+        {
+            wex = ex + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
+            wey = ey + evt.EndOffY;
+            wez = ez + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
+        }
+        else
+        {
+            wex = wx + ((evt.EndOffX * cos) + (evt.EndOffZ * sin));
+            wey = wy + evt.EndOffY;
+            wez = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
+        }
+    }
+
+    /// <summary>
+    /// Resolve a baked point's world position for a bone name: scan the bake's
+    /// BoneNames (HurtboxBoneDefs as a legacy fallback), project the current
+    /// AttackElapsedTicks to a baked frame via the stage duration, and transform
+    /// the baked Hips-relative position to world space (scale + facing yaw + Y remap).
+    /// <paramref name="scale"/> is HurtboxBoneScale for ordinary bone hitboxes, but 1.0
+    /// for weapon-anchored ones (synthetic `_` points are baked at visual scale).
+    /// Returns false (caller falls back) when the bone, animation, or def is missing.
+    /// </summary>
+    private static bool TryResolveBone(
+        in CharacterState s, string boneName,
+        BakedAnimationData? baked, CharacterDefinition? def,
+        string[]? animationNames, byte animIndex, byte slot, bool airborne, float scale,
+        out float x, out float y, out float z)
+    {
+        x = y = z = 0f;
+        if (baked == null || def == null) return false;
+
+        // The bake holds exactly the bones the baker wrote (SlopArenaBaker's curated
+        // mixamorig list: head/spine2/hips/hands/feet/toes, plus synthetic points
+        // like _weapon_tip); GetBonePosition indexes BoneNames directly.
+        // HurtboxBoneDefs lookup is kept as a legacy fallback for defs whose bones
+        // aren't present in the bake.
+        int bi = -1;
+        if (baked.BoneNames != null)
+        {
+            for (int i = 0; i < baked.BoneNames.Length; i++)
+            {
+                if (string.Equals(baked.BoneNames[i], boneName, StringComparison.Ordinal)) { bi = i; break; }
+            }
+        }
+        if (bi < 0 && def.HurtboxBoneDefs != null)
+        {
+            for (int i = 0; i < def.HurtboxBoneDefs.Length; i++)
+            {
+                if (def.HurtboxBoneDefs[i].BoneName == boneName) { bi = i; break; }
+            }
+        }
+        if (bi < 0) return false;
+
+        string targetAnim = animationNames != null && animationNames.Length > animIndex
+            ? animationNames[animIndex] : "idle";
+        int animIdx = baked.FindAnimIndex(targetAnim);
+        if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
+        if (animIdx < 0) return false;
+
+        int fc = baked.Animations[animIdx].FrameCount;
+        var spec = def.GetSlotAbility(slot, airborne);
+        int durationTicks = (spec != null && animIndex < spec.Stages.Length)
+            ? spec.Stages[animIndex].DurationTicks
+            : 60;
+        int bakedFrame = durationTicks > 0
+            ? Math.Min(s.AttackElapsedTicks * fc / durationTicks, fc - 1)
+            : Math.Min(s.AttackElapsedTicks, fc - 1);
+        if (bakedFrame >= fc) bakedFrame = fc - 1;
+
+        if (!baked.GetBonePosition(targetAnim, bakedFrame, bi, out float bx, out float by, out float bz))
+            return false;
+
+        bx *= scale; by *= scale; bz *= scale;
+        float cos = MathF.Cos(s.FacingYaw);
+        float sin = MathF.Sin(s.FacingYaw);
+        x = s.PX + ((bx * cos) + (bz * sin));
+        y = def.BoneYToWorldY(s.PY, by);
+        z = s.PZ + ((-bx * sin) + (bz * cos));
+        return true;
     }
 }

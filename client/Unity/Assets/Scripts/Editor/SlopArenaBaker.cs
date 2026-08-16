@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System;
 using System.Text;
 using SlopArena.Client.Animation;
+using SlopArena.Client.Entities;
 
 /// <summary>
 /// Bakes skeleton bone positions per animation frame into a .bin file.
@@ -29,6 +30,7 @@ public class SlopArenaBaker : EditorWindow
 {
     private GameObject _model;
     private CharacterAnimationConfig _animConfig;
+    private WeaponAttachConfig _weaponConfig;
     private string _outputPath = "data/";
     private float _sampleRate = 60f;
 
@@ -42,11 +44,12 @@ public class SlopArenaBaker : EditorWindow
     {
         _model = (GameObject)EditorGUILayout.ObjectField("Character Prefab", _model, typeof(GameObject), false);
         _animConfig = (CharacterAnimationConfig)EditorGUILayout.ObjectField("Anim Config", _animConfig, typeof(CharacterAnimationConfig), false);
+        _weaponConfig = (WeaponAttachConfig)EditorGUILayout.ObjectField("Weapon Config", _weaponConfig, typeof(WeaponAttachConfig), false);
         _outputPath = EditorGUILayout.TextField("Output Path", _outputPath);
         _sampleRate = EditorGUILayout.FloatField("Sample Rate (fps)", _sampleRate);
 
         if (GUILayout.Button("Bake") && _model != null && _animConfig != null)
-            BakeSkeleton(_model, _animConfig, _sampleRate, _outputPath);
+            BakeSkeleton(_model, _animConfig, _sampleRate, _outputPath, _weaponConfig);
         else if (GUILayout.Button("Bake") && (_model == null || _animConfig == null))
         {
             if (_model == null) Debug.LogError("Select a Character Prefab first");
@@ -54,7 +57,7 @@ public class SlopArenaBaker : EditorWindow
         }
     }
 
-    private void BakeSkeleton(GameObject model, CharacterAnimationConfig animConfig, float sampleRate = 60f, string outputPath = "data/")
+    private void BakeSkeleton(GameObject model, CharacterAnimationConfig animConfig, float sampleRate = 60f, string outputPath = "data/", WeaponAttachConfig? weaponConfig = null)
     {
         var animator = model.GetComponent<Animator>();
         if (animator == null)
@@ -134,6 +137,76 @@ public class SlopArenaBaker : EditorWindow
         }
         Debug.Log($"Found {transforms.Count} bones from humanoid avatar");
 
+        // ── Blade source (weapon characters only) ──
+        // Resolve the sword tip + hilt ONCE before the clip loop, EXACTLY from the weapon
+        // prefab's mesh vertices (prefab-local space; the prefab root = the hand grip):
+        // bladeAxis = the longest local-AABB span (the sword is straight), _weapon_tip =
+        // the vertex with max projection on that axis, _weapon_hilt = the vertex with min
+        // projection (the pommel). Both are hand-relative offsets transformed per frame by
+        // the hand's rotation (mirrors WeaponAttach.Update:
+        // go.transform.rotation = bone.rotation * Quaternion.Euler(RotationOffset)), so the
+        // baked points land EXACTLY on the visual blade — no rotated-AABB axis guesswork.
+        WeaponEntry? weaponEntry = null;
+        Quaternion rotOffset = Quaternion.identity;
+        Vector3 tipLocal = new Vector3(0f, 0f, 1.5f);
+        Vector3 hiltLocal = Vector3.zero;
+        bool bladeWarned = false;
+        if (weaponConfig != null && weaponConfig.Entries != null && weaponConfig.Entries.Length > 0)
+        {
+            weaponEntry = Array.Find(weaponConfig.Entries, e => e.BoneName == "mixamorig:RightHand");
+            if (weaponEntry == null) weaponEntry = weaponConfig.Entries[0];
+            rotOffset = Quaternion.Euler(weaponEntry.RotationOffset);
+
+            bool derived = false;
+            if (weaponEntry.Prefab != null)
+            {
+                var verts = new List<Vector3>();
+                foreach (var mf in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
+                {
+                    var mesh = mf.sharedMesh;
+                    if (mesh == null) continue;
+                    Matrix4x4 toPrefab = weaponEntry.Prefab.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                    var v = mesh.vertices;
+                    for (int i = 0; i < v.Length; i++)
+                        verts.Add(toPrefab.MultiplyPoint3x4(v[i]));
+                }
+                if (verts.Count > 0)
+                {
+                    Vector3 min = verts[0], max = verts[0];
+                    foreach (var p in verts) { min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
+                    Vector3 extent = max - min;
+                    float span = Mathf.Max(extent.x, Mathf.Max(extent.y, extent.z));
+                    if (span > 0.01f)
+                    {
+                        Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
+                            : extent.y >= extent.z ? Vector3.up : Vector3.forward;
+                        float tipProj = float.MinValue, hiltProj = float.MaxValue;
+                        foreach (var p in verts)
+                        {
+                            float pr = Vector3.Dot(p, axis);
+                            if (pr > tipProj) { tipProj = pr; tipLocal = p; }
+                            if (pr < hiltProj) { hiltProj = pr; hiltLocal = p; }
+                        }
+                        derived = true;
+                    }
+                }
+            }
+            if (!derived)
+            {
+                tipLocal = new Vector3(0f, 0f, 1.5f);
+                hiltLocal = Vector3.zero;
+                if (!bladeWarned)
+                {
+                    bladeWarned = true;
+                    Debug.LogWarning($"[SlopArenaBaker] Could not derive blade from weapon prefab mesh vertices " +
+                        $"({weaponEntry.Prefab?.name ?? "null"}) — falling back to tip (0,0,1.5) / hilt (0,0,0).");
+                }
+            }
+            // Synthetic points appended AFTER the real bones (order: tip, hilt).
+            boneNames.Add("_weapon_tip");
+            boneNames.Add("_weapon_hilt");
+        }
+
         // Create a copy to sample without affecting the original
         var tempGO = Instantiate(model);
         var tempAnimator = tempGO.GetComponent<Animator>();
@@ -152,6 +225,13 @@ public class SlopArenaBaker : EditorWindow
         if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
             Directory.CreateDirectory(outputDir);
 
+        void WriteVec(Stream s, Vector3 v)
+        {
+            s.Write(BitConverter.GetBytes(v.x), 0, 4);
+            s.Write(BitConverter.GetBytes(v.y), 0, 4);
+            s.Write(BitConverter.GetBytes(v.z), 0, 4);
+        }
+
         using (var stream = new FileStream(outputFile, FileMode.Create))
         {
             // Header: magic + version
@@ -159,7 +239,10 @@ public class SlopArenaBaker : EditorWindow
             stream.Write(BitConverter.GetBytes(1u), 0, 4);
 
             // Bone count + animation count (order MUST match BakedAnimationData.LoadFromBin)
-            stream.Write(BitConverter.GetBytes((uint)transforms.Count), 0, 4);
+            // Indices 0..transforms.Count-1 stay the real bones; the weapon synthetic points
+            // (_weapon_tip, _weapon_hilt — when present) are appended last. LoadFromBin is
+            // length-driven, so no version bump.
+            stream.Write(BitConverter.GetBytes((uint)(transforms.Count + (weaponEntry != null ? 2 : 0))), 0, 4);
             stream.Write(BitConverter.GetBytes((uint)clips.Count), 0, 4);
 
             // Bone names (length-prefixed)
@@ -208,6 +291,27 @@ public class SlopArenaBaker : EditorWindow
                         stream.Write(BitConverter.GetBytes(localPos.y), 0, 4);
                         stream.Write(BitConverter.GetBytes(localPos.z), 0, 4);
                     }
+
+                    // Weapon tip + hilt: same Hips-relative space as the real bones, computed
+                    // from RightHand + the config's rotation offset (WeaponAttach.Update
+                    // formula) so they track the visual blade exactly. Hand-relative offsets
+                    // (tipLocal/hiltLocal) are constant — only the hand's rotation varies.
+                    if (weaponEntry != null)
+                    {
+                        Transform rightHand = tempAnimator.GetBoneTransform(HumanBodyBones.RightHand);
+                        if (rightHand != null)
+                        {
+                            Quaternion bladeRot = rightHand.rotation * rotOffset;
+                            WriteVec(stream, rightHand.position + bladeRot * tipLocal - hipsPos);
+                            WriteVec(stream, rightHand.position + bladeRot * hiltLocal - hipsPos);
+                        }
+                        else
+                        {
+                            WriteVec(stream, Vector3.zero);
+                            WriteVec(stream, Vector3.zero);
+                            Debug.LogWarning("[SlopArenaBaker] No RightHand transform — baking degenerate weapon points (0,0,0).");
+                        }
+                    }
                 }
             }
 
@@ -227,7 +331,7 @@ public class SlopArenaBaker : EditorWindow
         }
 
         AssetDatabase.Refresh();
-        Debug.Log($"Baked {transforms.Count} bones x {clips.Count} clips -> {outputFile} ({new FileInfo(outputFile).Length} bytes)");
+        Debug.Log($"Baked {transforms.Count + (weaponEntry != null ? 2 : 0)} bones x {clips.Count} clips -> {outputFile} ({new FileInfo(outputFile).Length} bytes)");
     }
 
     private void MirrorToStreamingAssets(string sourceFile, string subDir)
@@ -298,7 +402,10 @@ public class SlopArenaBaker : EditorWindow
 
             Debug.Log($"[BakeAll] Baking {charName}...");
             var baker = CreateInstance<SlopArenaBaker>();
-            baker.BakeSkeleton(model, config, sampleRate);
+            // Optional weapon: characters with a WeaponConfigs/<name> asset get the
+            // synthetic _weapon_tip point baked (fist/staff characters have none).
+            var weapon = Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{charName}");
+            baker.BakeSkeleton(model, config, sampleRate, weaponConfig: weapon);
             baked++;
         }
         Debug.Log($"[BakeAll] Done — baked {baked} character(s)");

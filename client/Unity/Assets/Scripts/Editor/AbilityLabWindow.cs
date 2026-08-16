@@ -311,8 +311,33 @@ namespace SlopArena.EditorTools
                         _lab.SetWorkingEvent(i, n);
                     }
                     EditorGUILayout.EndHorizontal();
+                    // Bone dropdowns: "entity (origin)" + every baked skeleton bone.
+                    // Hoisted above the capsule block so both dropdowns share one list.
+                    string currentBone = evt.BoneName ?? "";
+                    string currentEndBone = evt.EndBoneName ?? "";
+                    string[] bakedBones = _lab.BakedBoneNames;
+                    var boneOptions = new System.Collections.Generic.List<string> { "entity (origin)" };
+                    boneOptions.AddRange(bakedBones);
+                    if (currentBone.Length > 0 && Array.IndexOf(bakedBones, currentBone) < 0)
+                        boneOptions.Insert(1, currentBone);
+                    if (currentEndBone.Length > 0 && Array.IndexOf(bakedBones, currentEndBone) < 0
+                        && boneOptions.IndexOf(currentEndBone) < 0)
+                        boneOptions.Insert(1, currentEndBone);
                     if (evt.Shape == HitboxShape.Capsule)
                     {
+                        // End Bone dropdown — anchors the capsule's end at a second baked
+                        // point (e.g. _weapon_tip). End X/Y/Z below are a facing-rotated
+                        // DELTA on top of that anchor (or on top of the start when no end
+                        // bone is set) — keep them editable so the capsule can be nudged
+                        // past/around the anchor.
+                        int endSel = Mathf.Max(0, currentEndBone.Length > 0 ? boneOptions.IndexOf(currentEndBone) : 0);
+                        int endPick = EditorGUILayout.Popup("End Bone", endSel, boneOptions.ToArray());
+                        string pickedEndBone = endPick == 0 ? null : boneOptions[endPick];
+                        if (pickedEndBone != evt.EndBoneName)
+                        {
+                            var n = evt; n.EndBoneName = pickedEndBone;
+                            _lab.SetWorkingEvent(i, n);
+                        }
                         EditorGUILayout.BeginHorizontal();
                         float ex = EditorGUILayout.FloatField("End X", evt.EndOffX);
                         float ey = EditorGUILayout.FloatField("Y", evt.EndOffY);
@@ -324,13 +349,6 @@ namespace SlopArena.EditorTools
                         }
                         EditorGUILayout.EndHorizontal();
                     }
-                    // Bone dropdown: "entity (origin)" + every baked skeleton bone.
-                    string currentBone = evt.BoneName ?? "";
-                    string[] bakedBones = _lab.BakedBoneNames;
-                    var boneOptions = new System.Collections.Generic.List<string> { "entity (origin)" };
-                    boneOptions.AddRange(bakedBones);
-                    if (currentBone.Length > 0 && Array.IndexOf(bakedBones, currentBone) < 0)
-                        boneOptions.Insert(1, currentBone);
                     int boneSel = Mathf.Max(0, currentBone.Length > 0 ? boneOptions.IndexOf(currentBone) : 0);
                     int bonePick = EditorGUILayout.Popup("Bone", boneSel, boneOptions.ToArray());
                     string pickedBone = bonePick == 0 ? null : boneOptions[bonePick];

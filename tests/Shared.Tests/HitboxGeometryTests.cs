@@ -210,6 +210,100 @@ public class HitboxGeometryTests
     }
 
     [Fact]
+    public void EndBoneName_AnchorsCapsuleEndAtSecondPoint()
+    {
+        // 1-frame bake: RightHand at (0, 0.9, 0.1), _weapon_tip at (0, 0.9, 1.6).
+        var baked = BakedAnimationData.LoadFromBin(BuildTestBin(
+            new[] { "mixamorig:RightHand", "mixamorig:Hips", "_weapon_tip" },
+            new[] { ("attack", 1) },
+            (f, bone, axis) => (bone, axis) switch
+            {
+                (0, 1) => 0.9f, (0, 2) => 0.1f,
+                (1, 1) => 0.4f,
+                (2, 1) => 0.9f, (2, 2) => 1.6f,
+                _ => 0f,
+            }));
+        var def = BoneDef(); // defs: Head, Hips only — both points resolve via the bake
+        var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f };
+        var evt = new HitboxEvent { BoneName = "mixamorig:RightHand", EndBoneName = "_weapon_tip" };
+
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
+            out float wx, out float wy, out float wz,
+            out float wex, out float wey, out float wez);
+
+        // Start anchors at RightHand, end anchors at the baked tip (NOT the EndOff
+        // delta — EndOff* defaults to 0 here).
+        // world Y = py - h/2 + HipHeight + by = 0.75 - 0.75 + 0.5 + 0.9 = 1.4
+        Assert.Equal(0f, wx, 5);
+        Assert.Equal(1.4f, wy, 5);
+        Assert.Equal(0.1f, wz, 5);
+        Assert.Equal(0f, wex, 5);
+        Assert.Equal(1.4f, wey, 5);
+        Assert.Equal(1.6f, wez, 5);
+    }
+
+    [Fact]
+    public void WeaponAnchoredCapsule_IgnoresHurtboxBoneScale()
+    {
+        // A weapon capsule (RightHand → _weapon_tip) must span the exact visual blade:
+        // the synthetic tip is baked at VISUAL scale, so HurtboxBoneScale must not shrink
+        // it (or the capsule starts short of the hand and ends short of the tip).
+        var baked = BakedAnimationData.LoadFromBin(BuildTestBin(
+            new[] { "mixamorig:RightHand", "mixamorig:Hips", "_weapon_tip" },
+            new[] { ("attack", 1) },
+            (f, bone, axis) => (bone, axis) switch
+            {
+                (0, 1) => 0.9f, (0, 2) => 0.1f,   // RightHand at (0, 0.9, 0.1)
+                (1, 1) => 0.4f,                    // Hips
+                (2, 1) => 0.9f, (2, 2) => 1.6f,   // _weapon_tip at (0, 0.9, 1.6)
+                _ => 0f,
+            }));
+        var def = BoneDef();
+        def.HurtboxBoneScale = 0.5f; // would shrink a real bone; weapon points must not
+        var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f };
+        var evt = new HitboxEvent { BoneName = "mixamorig:RightHand", EndBoneName = "_weapon_tip" };
+
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
+            out float wx, out float wy, out float wz,
+            out float wex, out float wey, out float wez);
+
+        // Full-scale: world Y = py - h/2 + HipHeight + by = 0.75 - 0.75 + 0.5 + 0.9 = 1.4.
+        // If HurtboxBoneScale (0.5) applied, the end would collapse to Z 0.8 / Y 0.95.
+        Assert.Equal(0f, wx, 5);
+        Assert.Equal(1.4f, wy, 5);
+        Assert.Equal(0.1f, wz, 5);
+        Assert.Equal(0f, wex, 5);
+        Assert.Equal(1.4f, wey, 5);
+        Assert.Equal(1.6f, wez, 5);
+    }
+
+    [Fact]
+    public void EndBoneNameNotInBake_FallsBackToEndOffDelta()
+    {
+        // EndBoneName missing from the bake → graceful fallback to the existing
+        // EndOff delta from the resolved start point.
+        var baked = BakedAnimationData.LoadFromBin(BuildTestBin(
+            new[] { "mixamorig:Head", "mixamorig:Hips" },
+            new[] { ("attack", 1) },
+            (f, bone, axis) => 0f));
+        var def = BoneDef();
+        var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f };
+        var evt = new HitboxEvent { BoneName = "mixamorig:Hips", EndBoneName = "_weapon_tip", EndOffZ = 1.2f };
+
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, false,
+            out float wx, out float wy, out float wz,
+            out float wex, out float wey, out float wez);
+
+        // Hips at (0,0,0) → start world (0, 0.5, 0); end = start + EndOffZ(1.2) facing.
+        Assert.Equal(0f, wx, 5);
+        Assert.Equal(0.5f, wy, 5);
+        Assert.Equal(0f, wz, 5);
+        Assert.Equal(0f, wex, 5);
+        Assert.Equal(0.5f, wey, 5);
+        Assert.Equal(1.2f, wez, 5);
+    }
+
+    [Fact]
     public void AirborneMove_UsesAirStageDurationForFrameProjection()
     {
         // 60-frame "attack": frame f puts Head at Y = 0.9 + f*0.01, X/Z = 0.

@@ -113,18 +113,21 @@ namespace SlopArena.Shared.Abilities
             var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
 
             // Bone-attached melee hitboxes re-resolve their bone position every tick
-            // (SpellResolver.UpdateBoneHitboxes) — the limb sweeps the hitbox.
-            bool tracksBone = evt.BoneName != null && BakedData != null;
+            // (SpellResolver.UpdateBoneHitboxes) — the limb sweeps the hitbox. A
+            // capsule with EndBoneName tracks its end point the same way.
+            bool tracksBone = (evt.BoneName != null || evt.EndBoneName != null) && BakedData != null;
 
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
                 // Tracked hitboxes are re-resolved to the bone's absolute world
                 // position each tick; velocity would double-apply the owner's
-                // translation on top of that.
-                VX = tracksBone ? 0f : (evt.BoneName != null ? s.VX : 0f),
-                VY = tracksBone ? 0f : (evt.BoneName != null ? s.VY : 0f),
-                VZ = tracksBone ? 0f : (evt.BoneName != null ? s.VZ : 0f),
+                // translation on top of that. Untracked bone-anchored hitboxes (no
+                // baked data) fall back to entity-relative and inherit the owner's
+                // velocity like any entity-anchored hitbox.
+                VX = tracksBone ? 0f : ((evt.BoneName != null || evt.EndBoneName != null) ? s.VX : 0f),
+                VY = tracksBone ? 0f : ((evt.BoneName != null || evt.EndBoneName != null) ? s.VY : 0f),
+                VZ = tracksBone ? 0f : ((evt.BoneName != null || evt.EndBoneName != null) ? s.VZ : 0f),
                 Radius = radius,
                 Shape = evt.Shape,
                 EndX = wex, EndY = wey, EndZ = wez,

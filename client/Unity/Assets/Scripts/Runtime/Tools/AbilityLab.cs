@@ -78,6 +78,8 @@ namespace SlopArena.Client.Tools
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
         private readonly List<(Vector3 pos, char phase)> _trajectory = new();
         private PlayerRenderer _dummyRenderer = null!;
+        private WeaponAttach _weaponAttach;
+        private WeaponAttach _dummyWeaponAttach;
         private float _playAccum;
         [SerializeField] private UnityEngine.Camera _camera = null!;
         private Vector2 _orbitAngles = new(25f, 0f);
@@ -256,20 +258,42 @@ namespace SlopArena.Client.Tools
 
         private void SpawnRenderer()
         {
-            if (Renderer != null) Destroy(Renderer.gameObject);
+            if (Renderer != null)
+            {
+                _weaponAttach?.Init(null, null); // free the previous character's weapon instances
+                Destroy(Renderer.gameObject);
+            }
             var go = new GameObject("LabCharacter");
             go.transform.SetParent(transform, false);
             Renderer = go.AddComponent<PlayerRenderer>();
             ConfigureRenderer(Renderer, DisplayDef, "LabCharacter");
             Renderer.transform.position = BasePosition();
+            if (Application.isPlaying) _weaponAttach = AttachWeapon(Renderer, DisplayDef);
 
-            if (_dummyRenderer != null) Destroy(_dummyRenderer.gameObject);
+            if (_dummyRenderer != null)
+            {
+                _dummyWeaponAttach?.Init(null, null);
+                Destroy(_dummyRenderer.gameObject);
+            }
             var dgo = new GameObject("LabDummy");
             dgo.transform.SetParent(transform, false);
             _dummyRenderer = dgo.AddComponent<PlayerRenderer>();
             ConfigureRenderer(_dummyRenderer, DisplayDef, "LabDummy");
             PositionDummy();
             _dummyRenderer.gameObject.SetActive(ShowDummy);
+            if (Application.isPlaying) _dummyWeaponAttach = AttachWeapon(_dummyRenderer, DisplayDef);
+        }
+
+        /// <summary>
+        /// Attach the character's weapon prop (Resources/WeaponConfigs/&lt;Class&gt;.asset) to the
+        /// preview model so blade reach is visible while tuning hitboxes. No-op without a config.
+        /// </summary>
+        private static WeaponAttach AttachWeapon(PlayerRenderer renderer, CharacterDefinition def)
+        {
+            var attach = renderer.GetComponent<WeaponAttach>();
+            if (attach == null) attach = renderer.gameObject.AddComponent<WeaponAttach>();
+            attach.Init(renderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}"));
+            return attach;
         }
 
         private static void ConfigureRenderer(PlayerRenderer renderer, CharacterDefinition def, string name)

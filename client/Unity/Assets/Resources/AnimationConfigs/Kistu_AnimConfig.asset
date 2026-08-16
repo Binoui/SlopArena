@@ -23,38 +23,29 @@ MonoBehaviour:
   HitHard: {fileID: -203655887218126122, guid: 05fa095eee4e8bb52a4c0c926592faff, type: 3}
   Death: {fileID: 8993902097722301239, guid: e2eb8871bf81bb449ab74e86581b3f3a, type: 3}
   AbilityClips:
-  - Name: spell_lmb_1
+  - Name: kistu_g_1
     Clip: {fileID: 7400000, guid: 4e19647e0b6f4a95a9c095972e17037c, type: 2}
     Extrapolation: 0
-  - Name: spell_lmb_2
-    Clip: {fileID: 7400000, guid: 652ab25a0d17a168fa945dec4a50d8ed, type: 2}
+  - Name: kistu_g_2
+    Clip: {fileID: 7400000, guid: c373f78fb169761e88123a7e4bb79e87, type: 2}
     Extrapolation: 0
-  - Name: spell_lmb_3
-    Clip: {fileID: 7400000, guid: 4508fb9ca4bf904f3a0d099eeccc8b77, type: 2}
+  - Name: kistu_g_3
+    Clip: {fileID: 7400000, guid: 4cca1ea500278a6ebafdc0912dbef47b, type: 2}
     Extrapolation: 0
-  - Name: spell_lmb_4
-    Clip: {fileID: 7400000, guid: 52ae916ef398578af92fc587cc799a48, type: 2}
+  - Name: kistu_g_4
+    Clip: {fileID: 7400000, guid: 3244bf07d135262598e18cb08d499786, type: 2}
     Extrapolation: 0
-  - Name: spell_lmb_air_1
-    Clip: {fileID: 1827226128182048838, guid: 1226167aff4dc601ebee2f0407a4ae7b, type: 3}
+  - Name: kistu_a_1
+    Clip: {fileID: 7400000, guid: 43a6eb59e651238c19b81cd42115426f, type: 3}
     Extrapolation: 0
-  - Name: spell_lmb_air_2
-    Clip: {fileID: 1827226128182048838, guid: 834cc9d916c1ebe4bb99ee31684b235d, type: 3}
+  - Name: kistu_a_2
+    Clip: {fileID: 1827226128182048838, guid: 51d235237d7dfe04183d966dd22e2418, type: 3}
     Extrapolation: 0
-  - Name: spell_rmb_loop
-    Clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
-    Extrapolation: 1
-  - Name: spell_rmb_attack
-    Clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
+  - Name: kistu_a_3
+    Clip: {fileID: 7400000, guid: 7dfa09206a30e2456a951e8afa182157, type: 2}
     Extrapolation: 0
-  - Name: spell_air_rmb
-    Clip: {fileID: 1827226128182048838, guid: 4ed380032ff8b3ca08279551dc70f183, type: 3}
-    Extrapolation: 0
-  - Name: spell_q_parry
-    Clip: {fileID: 0}
-    Extrapolation: 0
-  - Name: spell_q_riposte
-    Clip: {fileID: 0}
+  - Name: kistu_a_4
+    Clip: {fileID: 7400000, guid: cec8fbbf21b5d59e18bea1b429dbade5, type: 2}
     Extrapolation: 0
   - Name: spell_e
     Clip: {fileID: 7400000, guid: 2c240d0aa8bf456f4b34bb2728f62aff, type: 2}
@@ -64,7 +55,4 @@ MonoBehaviour:
     Extrapolation: 0
   - Name: spell_f
     Clip: {fileID: -203655887218126122, guid: d3c32a81f3abaf985a22e03e3968fd01, type: 3}
-    Extrapolation: 0
-  - Name: spell_e
-    Clip: {fileID: 7400000, guid: af9973c936e7ae75a8fb52cf0b9405af, type: 2}
     Extrapolation: 0
