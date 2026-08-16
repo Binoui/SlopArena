@@ -26,40 +26,169 @@ public class KistuKitRegressionTests : KitScenarioTests
     }
 
     [Fact]
-    public void LMB_Stage1_HitsNpcFor3Damage()
+    public void G1_QuickSlash_HitsNpc()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Kistu LMB Hit Confirm",
+            Name = "Kistu G1 Quick Slash",
             Def = Def,
             Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, 1),
+            Inputs = new InputSequence().Press(0, 3),
+            Assert = _ => { },
+            // PZ 0.6, not the usual 1.5: g_1's slash is a HIGH, close-range sweep — the
+            // hand starts behind center and the blade stays at chest/head height (Y ~1.5-1.8),
+            // so it clips an opponent only within ~0.6 m (the old entity capsule reached
+            // 1.8 m). PZ 0.6 pins the blade connection at the sweep's apex (tick 11);
+            // reach tuning is an Ability Lab item, the mechanism is the deliverable.
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 0.6f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 11,   // stage hitbox active (trigger=9, dur=5)
+            TotalTicks = 60,
+        });
+    }
+
+    [Fact]
+    public void G2_DoubleSlash_SecondHitConnects()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu G2 Double Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 7),
+            Assert = _ => { },
+            // PZ 0.7, not 1.5: hit 2's blade is forward only at tick 25 (reach ~1.2 m;
+            // the old entity capsule reached 1.9 m), and hit 1's knockback drifts the
+            // NPC ~0.4 m by then — starting at 1.5 puts it out of hit 2's reach.
+            // PZ 0.7 keeps both hits connecting (pins 3+6=9).
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 0.7f, PY = TestHelpers.CombatGroundPY },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 32,   // hit 2 connects at tick 31 (3rd pulse; blade forward at elapsed 25) — pins 3+6=9
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void G3_UpSlash_HitsNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu G3 Up Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 8),
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
                 with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 10,   // stage 1 hitbox active (trigger=6, dur=5)
-            TotalTicks = 80,
+            SnapshotTick = 9,    // stage hitbox active (trigger=6, dur=7)
+            TotalTicks = 60,
         });
     }
 
     [Fact]
-    public void AirLMB_AirSlash_HitsAirborneNpc()
+    public void G4_HeavyDownSlash_HitsNpc()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Kistu Air LMB",
+            Name = "Kistu G4 Heavy Down Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
+            Inputs = new InputSequence().Press(0, 9),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
+            // SnapshotTick 27, not 24: g_4's blade slams forward at the END of the
+            // window (tip reaches Z 1.52 at tick 26) — the tip sweetspot connects at
+            // tick 26 with its higher 14 dmg, proving the opt-in sweetspot mechanism.
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 27,   // sweetspot connects at tick 26 (window 21-26)
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void A1_AirSlash_HitsAirborneNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu A1 Air Slash",
             Def = Def,
             Setup = () => TestHelpers.PlayerState()
                 with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
-            Inputs = new InputSequence().Press(0, 1),
+            Inputs = new InputSequence().Press(0, 3),
             Assert = _ => { },
             NpcSetup = () => TestHelpers.NpcState()
                 with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
             NpcAssert = _ => { },
             NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 8,   // stage 1 sweep hitbox active (trigger=5, dur=5)
+            SnapshotTick = 8,    // stage hitbox active (trigger=6, dur=5)
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void A2_ReverseSlash_HitsAirborneNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu A2 Reverse Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
+            Inputs = new InputSequence().Press(0, 7),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 6,    // stage hitbox active (trigger=4, dur=5)
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void A3_AirUpSlash_HitsAirborneNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu A3 Air Up Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
+            Inputs = new InputSequence().Press(0, 8),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 5,    // stage hitbox active (trigger=3, dur=6)
+            TotalTicks = 70,
+        });
+    }
+
+    [Fact]
+    public void A4_AirHeavyDownSlash_SpikesNpc()
+    {
+        AssertGoldenScenario(new KitScenario
+        {
+            Name = "Kistu A4 Air Heavy Down Slash",
+            Def = Def,
+            Setup = () => TestHelpers.PlayerState()
+                with { PX = 0, PZ = 0, PY = 2f, IsGrounded = false, JumpsLeft = 0 },
+            Inputs = new InputSequence().Press(0, 9),
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState()
+                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY + 2f, IsGrounded = false },
+            NpcAssert = _ => { },
+            NpcDef = TestHelpers.CombatDef,
+            SnapshotTick = 15,   // stage hitbox active (trigger=12, dur=7)
             TotalTicks = 80,
         });
     }

@@ -5,9 +5,9 @@ using SlopArena.Shared.Abilities;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Behaviour tests for Kistu's kit. Standard slots (activation + damage) plus the novel
-/// infra: E dash self-movement, R rising launcher + charge-stock
-/// (spend / block-when-empty / refund-on-hit), and Q counter (absorb + riposte-launch).
+/// Behaviour tests for Kistu's kit. Normal tier (keys 1-4, ground + air) activation and
+/// damage, plus the specials: E dash self-movement and R rising launcher + charge-stock
+/// (spend / block-when-empty / refund-on-hit).
 /// </summary>
 public class KistuAbilityTests
 {
@@ -19,18 +19,22 @@ public class KistuAbilityTests
         var sim = TestHelpers.MakeSim();
         player = TestHelpers.PlayerState();
         player.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, player);
+        // Baked data required: Kistu's normals are blade-anchored (RightHand→_weapon_tip),
+        // which resolves against the bake like the real game (MatchInstance.LoadBakedData).
+        sim.RegisterEntity(1, Def, player, TestHelpers.LoadBakedData(Def));
         return sim;
     }
 
     // ── Activation of every slot ──
 
     [Theory]
-    [InlineData((byte)1)] // LMB
-    [InlineData((byte)3)] // Q
-    [InlineData((byte)4)] // E
-    [InlineData((byte)5)] // R
-    [InlineData((byte)6)] // F
+    [InlineData((byte)3)] // key "1" — Quick Slash (normal)
+    [InlineData((byte)7)] // key "2" — Double Slash (normal)
+    [InlineData((byte)8)] // key "3" — Up Slash (normal)
+    [InlineData((byte)9)] // key "4" — Heavy Down Slash (normal)
+    [InlineData((byte)4)] // E — Dash Slash
+    [InlineData((byte)5)] // R — Rising Slash
+    [InlineData((byte)6)] // F — Blade Flurry
     public void GroundSlot_Activates(byte slot)
     {
         var sim = SimWithPlayer(out _);
@@ -42,7 +46,10 @@ public class KistuAbilityTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // AirLMB
+    [InlineData((byte)3)] // key "1" air — Air Slash
+    [InlineData((byte)7)] // key "2" air — Reverse Slash
+    [InlineData((byte)8)] // key "3" air — Air Up Slash
+    [InlineData((byte)9)] // key "4" air — Air Heavy Down Slash
     public void AirSlot_Activates(byte slot)
     {
         var sim = TestHelpers.MakeSim();
@@ -55,20 +62,28 @@ public class KistuAbilityTests
         Assert.Equal(slot, t0.AttackSlot);
     }
 
-    // ── LMB: damage + reach ──
+    // ── Normal tier: each ground normal damages an enemy in reach ──
 
-    [Fact]
-    public void Lmb_DamagesEnemyInReach()
+    [Theory]
+    [InlineData((byte)3)] // g_1 Quick Slash — active 9-13
+    [InlineData((byte)7)] // g_2 Double Slash — active 6-11 / 22-27
+    [InlineData((byte)8)] // g_3 Up Slash — active 6-12
+    [InlineData((byte)9)] // g_4 Heavy Down Slash — active 21-26
+    public void GroundNormal_DamagesEnemyInReach(byte slot)
     {
         var sim = SimWithPlayer(out _);
-        var npc = TestHelpers.NpcState(0f, 1.5f);
+        // PZ 0.6, not 1.5: the blade-anchored normals sweep at chest/head height with a
+        // short forward reach (g_1's clip ~0.6 m at the apex; the old entity capsule
+        // reached 1.8 m). 0.6 is inside every normal's blade reach.
+        var npc = TestHelpers.NpcState(0f, 0.6f);
         npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
+        sim.RegisterEntity(100, Def, npc, TestHelpers.LoadBakedData(Def));
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: slot) }, { 100, default } });
+        // Enough ticks for the slowest normal (g_4 hitbox at trigger 21) to land.
+        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
-        Assert.True(sim.GetState(100).DamagePercent > 0);
+        Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }
 
     // ── E: directional dash — tap and hold both travel the same set distance (no charge) ──
@@ -176,55 +191,6 @@ public class KistuAbilityTests
         Assert.Equal((byte)0, s.ChargeStockSpent);
         // Timer must be cleared (not a stale partial countdown) so the next spend gets a full period.
         Assert.Equal((ushort)0, s.ChargeStockRegenTicks);
-    }
-
-    // ── Q counter: absorbs a hit in the window and launches the attacker ──
-
-    [Fact]
-    public void Q_CounterAbsorbsAndRipostes()
-    {
-        var sim = TestHelpers.MakeSim();
-        var kistu = TestHelpers.PlayerState(0f, 0f);
-        kistu.PY = GroundPY;
-        kistu.FacingYaw = 0f; // facing +Z toward the attacker
-        TestHelpers.RegisterPlayer(sim, Def, kistu);
-
-        var attacker = TestHelpers.NpcState(0f, 1.0f);
-        attacker.PY = GroundPY;
-        attacker.FacingYaw = MathF.PI; // facing -Z toward Kistu
-        TestHelpers.RegisterNpc(sim, Def, attacker);
-
-        // Both act on tick 0: Kistu parries, attacker swings LMB (hitbox lands ~tick 6, inside window).
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 3) }, { 100, TestHelpers.Input(activeSlot: 1) } });
-        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var kistuAfter = sim.GetState(1);
-        var attackerAfter = sim.GetState(100);
-        Assert.Equal((ushort)0, kistuAfter.DamagePercent); // hit absorbed
-        Assert.True(attackerAfter.DamagePercent > 0, "attacker should take riposte damage");
-        Assert.True(attackerAfter.HitstunTicks > 0, "attacker should be launched into hitstun");
-    }
-
-    // ── Q counter negative: without an active parry, the hit lands normally ──
-
-    [Fact]
-    public void Q_NoCounterWhenInactive_TakesDamage()
-    {
-        var sim = TestHelpers.MakeSim();
-        var kistu = TestHelpers.PlayerState(0f, 0f);
-        kistu.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, kistu);
-
-        var attacker = TestHelpers.NpcState(0f, 1.0f);
-        attacker.PY = GroundPY;
-        attacker.FacingYaw = MathF.PI;
-        TestHelpers.RegisterNpc(sim, Def, attacker);
-
-        // Kistu does nothing; attacker swings.
-        sim.Tick(new() { { 1, default }, { 100, TestHelpers.Input(activeSlot: 1) } });
-        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-
-        Assert.True(sim.GetState(1).DamagePercent > 0, "Kistu should take damage with no active counter");
     }
 
     // ── F: blade flurry deals damage ──

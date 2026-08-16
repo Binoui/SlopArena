@@ -1,34 +1,27 @@
 {
-  "Scenario": "Kistu LMB Hit Confirm",
-  "TickCount": 80,
+  "Scenario": "Kistu G3 Up Slash",
+  "TickCount": 60,
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "PZ": 0.6000001,
-    "VZ": 6,
-    "AttackSlot": 1,
+    "AttackSlot": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "State": 2,
     "PY": 0.75,
     "PZ": 1.5,
-    "DamagePercent": 3,
-    "HitstunTicks": 16,
-    "JumpsLeft": 2
+    "JumpsLeft": 2,
+    "IsGrounded": true
   },
   "PlayerFinal": {
-    "FacingYaw": 0.4177322,
     "PY": 0.85,
-    "PZ": 3.1742406,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 1.957713,
-    "DamagePercent": 3,
+    "PZ": 1.5,
     "JumpsLeft": 2,
     "IsGrounded": true
   }

@@ -2,6 +2,7 @@
   "Scenario": "FightGuy Slot3 Double Uppercut",
   "TickCount": 60,
   "PlayerSnap": {
+    "State": 4,
     "PY": 0.85,
     "AttackSlot": 8,
     "JumpsLeft": 2,
@@ -17,7 +18,6 @@
   },
   "PlayerFinal": {
     "PY": 0.85,
-    "AttackSlot": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

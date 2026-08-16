@@ -1,19 +1,19 @@
 {
-  "Scenario": "FightGuy Slot2 Roundhouse",
-  "TickCount": 50,
+  "Scenario": "Kistu G4 Heavy Down Slash",
+  "TickCount": 70,
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "AttackSlot": 7,
-    "HitstopTicks": 6,
+    "AttackSlot": 9,
+    "HitstopTicks": 9,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
     "PY": 0.75,
-    "PZ": 1.2,
-    "DamagePercent": 8,
-    "HitstopTicks": 6,
+    "PZ": 1.5,
+    "DamagePercent": 12,
+    "HitstopTicks": 9,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -23,12 +23,12 @@
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 1.8237765,
-    "PZ": 3.7638178,
-    "VY": -0.78157187,
-    "VZ": 2.6126196,
-    "DamagePercent": 8,
-    "AirTimeTicks": 15,
+    "PY": 2.180706,
+    "PZ": 4.286778,
+    "VY": 0.3527999,
+    "VZ": 3.4608107,
+    "DamagePercent": 12,
+    "AirTimeTicks": 12,
     "JumpsLeft": 2
   }
 }

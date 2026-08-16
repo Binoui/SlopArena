@@ -37,7 +37,7 @@ public static partial class CharacterRegistry
                 RunSpeed = 13f,
                 RunAccelerationA = 20f,
                 RunAccelerationB = 12f,
-                DashSpeed = 32f,
+                DashSpeed = 21f,
                 AirSpeedMax = 7.0f,
                 AirAccelStick = 17f,
                 AirAccelBase = 3.4f,

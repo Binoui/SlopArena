@@ -6,9 +6,16 @@ namespace SlopArena.Shared;
 /// ═══════════════════════════════════════
 /// In-your-face spacing duelist: disjointed blade reach in neutral, launch -> air-juggle payoff.
 /// Signature R (Rising Slash) is a homing launcher on a refundable charge pool.
-/// Placeholder art: reuses the FightGuy prefab + empty baked data (capsule hurtboxes) so the
-/// kit is fully playable in sim before its own model/animation assets exist.
-/// Numbers are first-pass placeholders — tune against character-kit-design-principles.md.
+///
+/// Melee conversion (2026-08-16): LMB/AirLMB and the Q Counter are retired. The normal
+/// tier is now keys 1-4 — kistu_g_1..4 grounded, kistu_a_1..4 air variants (FightGuy
+/// template). E (Dash Slash), R (Rising Slash), F (Blade Flurry) unchanged.
+///
+/// Hitboxes are blade-anchored capsules from the baked _weapon_hilt (pommel) to the baked
+/// _weapon_tip point (both synthetic points baked into kistu_skeleton.bin from the sword's
+/// actual mesh — the tip is the real visual tip, the hilt the pommel). The tip sweetspot on
+/// g_4 is opt-in per move — proof of the hilt→tip tracking mechanism. Numbers are
+/// first-pass placeholders — tune against character-kit-design-principles.md.
 /// </summary>
 public static partial class CharacterRegistry
 {
@@ -27,7 +34,7 @@ public static partial class CharacterRegistry
                 RunSpeed = 15f,
                 RunAccelerationA = 20f,
                 RunAccelerationB = 12f,
-                DashSpeed = 34f,
+                DashSpeed = 24f,
                 AirSpeedMax = 8.5f,
                 AirAccelStick = 18f,
                 AirAccelBase = 3.6f,
@@ -68,71 +75,159 @@ public static partial class CharacterRegistry
             ModelResourcePath = "Characters/Kistu", // Updated to actual prefab path
             BakedDataPath = "res://data/kistu_skeleton.bin",
 
-            // ═══ ABILITIES ═══
+            // ═══ NORMAL TIER (keys 1-4) — Melee conversion, FightGuy template ═══
+            // Hitboxes are blade-anchored capsules sweeping the baked _weapon_hilt (pommel)
+            // → _weapon_tip (the exact sword tip, baked from the weapon mesh). Active
+            // windows from the anim authoring: g_1 9-13, g_2 6-11 + 22-27, g_3 6-12, g_4 21-26.
 
-            // LMB — Light Slash (single move, reach-y capsule slash)
-            LMB = new AbilitySpec
-            {
-                Name = "Light Slash",
-                Description = "Fast katana slash — a single committed move (no auto-combo)",
-                IconName = "lmb",
-                CooldownTicks = 0,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 30, IasaTicks = 26, LungeForce = 6f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 6, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
-                                    OffX = 0, OffY = 0.7f, OffZ = 0.7f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.8f,
-                                    Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f },
-                },
-                AnimationNames = new[] { "spell_lmb_1" },
-                Params = new() { ["lunge_duration"] = 6f },
-            },
-
-            // AirLMB — Air Slash (single aerial slash, juggle sustain, near-neutral/up KB)
-            AirLMB = new AbilitySpec
-            {
-                Name = "Air Slash",
-                Description = "Aerial slash. Low commit; keeps enemies airborne for juggles.",
-                CooldownTicks = 0,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 24, IasaTicks = 20, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 16, LungeForce = 3f,
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.4f,
-                                    OffX = 0, OffY = 0.8f, OffZ = 0.6f, EndOffX = 0, EndOffY = 0.8f, EndOffZ = 1.6f,
-                                    Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 14, Interruptible = true } },
-                            AttackRange = 2f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f },
-                },
-                AnimationNames = new[] { "spell_lmb_air_1" },
-            },
-
-            // Q — Counter (parry window → launch riposte)
             Slot1 = new AbilitySpec
             {
-                Name = "Counter",
-                Description = "Parry stance. If struck during the window, riposte-launches the attacker.",
-                IconName = "q",
-                CooldownTicks = 150,
-                Behavior = AbilityBehavior.MeleeCombo,
-                AimMode = AimMode.None,
+                Name = "Quick Slash",
+                Description = "Fast right-hand sword slash — quick poke, not a combo starter (normal tier, key 1)",
+                IconName = "1",
+                CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 40, HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                            AttackRange = 0f, WarpRange = 0f },
+                    // Jab: 5-frame startup, 9-frame active, ~24 total. Flat-ish send that
+                    // resets neutral — too much KB at low % to link into a combo.
+                    new() { DurationTicks = 24, IasaTicks = 21,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 9, DurationTicks = 10, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip",Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Adaptive, Angle = 30, BaseKnockback = 4f, KnockbackGrowth = 20f }, StunTicks = 14, Interruptible = true } },
+                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
                 },
-                AnimationNames = new[] { "spell_q_parry", "spell_q_riposte" },
-                Params = new()
-                {
-                    ["duration"] = 40f,
-                    ["window_start"] = 4f,
-                    ["window_end"] = 18f,
-                    ["riposte_damage"] = 12f,
-                    ["riposte_base"] = 12f,
-                    ["riposte_growth"] = 6f,
-                    ["riposte_angle"] = 25f,
-                    ["riposte_stun"] = 22f,
-                },
+                AnimationNames = new[] { "kistu_g_1" },
             },
+
+            AirSlot1 = new AbilitySpec
+            {
+                Name = "Air Slash",
+                Description = "Quick right-hand sword slash in the air — juggle sustain (air variant, key 1)",
+                IconName = "1",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Nair: 6-frame startup, 5-frame active, ~26 total. Slight upward send
+                    // keeps enemies airborne for the juggle without popping them out.
+                    new() { DurationTicks = 26, IasaTicks = 22, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 15,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 6, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 5f, Knockback = new() { Profile = KnockbackProfile.Adaptive, Angle = 30, BaseKnockback = 4f, KnockbackGrowth = 20f }, StunTicks = 14, Interruptible = true } },
+                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_a_1" },
+            },
+
+            Slot2 = new AbilitySpec
+            {
+                Name = "Double Slash",
+                Description = "Two forward slashes — first hit pops, second hit sends farther (normal tier, key 2)",
+                IconName = "2",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // ftilt: two-hit sword slash. Hit 1 (6-11) is a soft pop, hit 2 (18-23)
+                    // sends out — a combo tool that starts neutral and finishes a string.
+                    new() { DurationTicks = 34, IasaTicks = 30,
+                            HitboxEvents = new HitboxEvent[]
+                            {
+                                new() { TriggerTick = 6, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 25, BaseKnockback = 3f, KnockbackGrowth = 16f }, StunTicks = 10, Interruptible = true },
+                                new() { TriggerTick = 18, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 5f, KnockbackGrowth = 26f }, StunTicks = 16, Interruptible = true },
+                            },
+                            AttackRange = 2.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_g_2" },
+            },
+
+            AirSlot2 = new AbilitySpec
+            {
+                Name = "Reverse Slash",
+                Description = "Reverse sword slash in the air — fast, sends out (air variant, key 2)",
+                IconName = "2",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Fair: very fast startup (4-8), sends out — spacing aerial, whiffs are cheap.
+                    new() { DurationTicks = 24, IasaTicks = 20, LandingLagTicks = 9, AutoCancelBeforeTicks = 4, AutoCancelAfterTicks = 14,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 4, DurationTicks = 5, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Adaptive, Angle = 40, BaseKnockback = 5f, KnockbackGrowth = 24f }, StunTicks = 16, Interruptible = true } },
+                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_a_2" },
+            },
+
+            Slot3 = new AbilitySpec
+            {
+                Name = "Up Slash",
+                Description = "Quick upwards slash — anti-air / juggle starter (normal tier, key 3)",
+                IconName = "3",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Anti-air: single rising slash, sends upright. Fast startup (6-12) to
+                    // catch a jumping opponent.
+                    new() { DurationTicks = 32, IasaTicks = 28,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 6, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 80, BaseKnockback = 6f, KnockbackGrowth = 24f }, StunTicks = 18, Interruptible = true } },
+                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_g_3" },
+            },
+
+            AirSlot3 = new AbilitySpec
+            {
+                Name = "Air Up Slash",
+                Description = "Quick upwards slash — aerial version of grounded 3, juggle payoff (air variant, key 3)",
+                IconName = "3",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Uair: fastest startup of the air tier (3-8), sends upright — re-launches
+                    // juggled enemies. Hard to hit, precise timing is the goal.
+                    new() { DurationTicks = 26, IasaTicks = 22, LandingLagTicks = 9, AutoCancelBeforeTicks = 3, AutoCancelAfterTicks = 14,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 3, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 78, BaseKnockback = 5f, KnockbackGrowth = 22f }, StunTicks = 16, Interruptible = true } },
+                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_a_3" },
+            },
+
+            Slot4 = new AbilitySpec
+            {
+                Name = "Heavy Down Slash",
+                Description = "Heavy double-handed downwards slash — ground kill normal (normal tier, key 4)",
+                IconName = "4",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // dtilt/smash-style: telegraphed startup (14-27 active), big damage +
+                    // high growth — the grounded kill move. Whiffs are punished.
+                    new() { DurationTicks = 44, IasaTicks = 39,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 14, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 8, BaseKnockback = 8f, KnockbackGrowth = 32f }, StunTicks = 22, Interruptible = true } },
+                            AttackRange = 2.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_g_4" },
+            },
+
+            AirSlot4 = new AbilitySpec
+            {
+                Name = "Air Heavy Down Slash",
+                Description = "Heavy double-handed downwards slash — spike, edgeguard finisher (air variant, key 4)",
+                IconName = "4",
+                CooldownTicks = 0,
+                Stages = new AttackStage[]
+                {
+                    // Dair: slow telegraphed startup (12-18 active), strong DOWNWARD send —
+                    // the off-stage kill, deliberately the opposite of the juggle.
+                    new() { DurationTicks = 34, IasaTicks = 29, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 22,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 8, DurationTicks = 7, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 10f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = -65, BaseKnockback = 6f, KnockbackGrowth = 26f }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "kistu_a_4" },
+            },
+
+            // ═══ SPECIALS (unchanged from the pre-rework kit) ═══
 
             // E — Dash Slash (aim the direction on the ground, release to dash a set distance)
             E = new AbilitySpec
@@ -148,7 +243,7 @@ public static partial class CharacterRegistry
                     // Dash stage: the ability spawns a fresh hitbox at the character's position
                     // every dash tick (per-tick sweep along the aim axis, radius covers her sides).
                     // DurationTicks also drives the dash clip playback speed (frameCount / DurationTicks).
-                    new() { DurationTicks = 16, 
+                    new() { DurationTicks = 16,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 1, Shape = HitboxShape.Capsule, Radius = 0.5f,
                                     OffX = 0, OffY = 0.7f, OffZ = 0.5f, EndOffX = 0, EndOffY = 0.7f, EndOffZ = 1.3f,
                                     Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Medium }, StunTicks = 16, Interruptible = true } },
@@ -174,7 +269,7 @@ public static partial class CharacterRegistry
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 24, 
+                    new() { DurationTicks = 24,
                             HitboxEvents = new[] { new HitboxEvent { TriggerTick = 5, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.9f,
                                     OffX = 0, OffY = 1.0f, OffZ = 0.6f,
                                     Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 7, KnockbackGrowth = 5 },
@@ -204,7 +299,7 @@ public static partial class CharacterRegistry
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 64, 
+                    new() { DurationTicks = 64,
                             HitboxEvents = new HitboxEvent[]
                             {
                                 new() { TriggerTick = 8, DurationTicks = 4, Shape = HitboxShape.Capsule, Radius = 0.5f,
@@ -237,11 +332,11 @@ public static partial class CharacterRegistry
 
         };
 
-        // ── Air variants (issue #117 migration — preserve air use of ability slots) ──
-        def.AirSlot1 = def.Slot1;
-        def.AirE = def.E;
-        def.AirR = def.R;
-        def.AirF = def.F;
+        // ── Air variants (issue #117) — ability slots shared, normals have distinct air specs ──
+        // Normal tier air variants (AirSlot1-4) are declared inline above (keys 1-4 air pass).
+        def.AirE = def.E;   // Dash Slash: same move in the air — aim + dash unchanged
+        def.AirR = def.R;   // Rising Slash: works identically in the air
+        def.AirF = def.F;   // Blade Flurry: works identically in the air
         return def;
     }
 }

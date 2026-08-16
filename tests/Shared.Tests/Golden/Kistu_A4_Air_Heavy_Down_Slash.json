@@ -1,0 +1,31 @@
+{
+  "Scenario": "Kistu A4 Air Heavy Down Slash",
+  "TickCount": 80,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 9,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 14
+  },
+  "NpcSnap": {
+    "PY": 2.65,
+    "PZ": 1.5,
+    "DamagePercent": 10,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 14,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 2.406111,
+    "DamagePercent": 10,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "Scenario": "Kistu A2 Reverse Slash",
+  "TickCount": 70,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 7,
+    "AirTimeTicks": 7
+  },
+  "NpcSnap": {
+    "PY": 2.65,
+    "PZ": 1.5,
+    "AirTimeTicks": 7,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "PY": 0.75,
+    "PZ": 1.5,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

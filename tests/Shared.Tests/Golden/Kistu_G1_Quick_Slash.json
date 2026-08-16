@@ -1,35 +1,27 @@
 {
-  "Scenario": "Kistu E Dash Slash",
+  "Scenario": "Kistu G1 Quick Slash",
   "TickCount": 60,
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
-    "PZ": 0.9374999,
-    "VZ": 18.749998,
-    "AttackSlot": 4,
-    "HitstopTicks": 4,
+    "AttackSlot": 3,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
     "PY": 0.75,
-    "PZ": 2.5,
-    "DamagePercent": 9,
-    "HitstopTicks": 4,
+    "PZ": 0.6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "PlayerFinal": {
     "PY": 0.85,
-    "PZ": 4.6874995,
-    "Cooldown3": 59,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 2.7527485,
-    "DamagePercent": 9,
+    "PZ": 0.6,
     "JumpsLeft": 2,
     "IsGrounded": true
   }

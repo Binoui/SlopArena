@@ -623,14 +623,19 @@ public class NilusAbilityTests
         var arrived = sim.GetState(1);
         TestHelpers.AssertNear(201f, arrived.PZ, 0.01f);
         Assert.False(arrived.IsGrounded, "off the heightmap he must be airborne");
+        // Walk-off fix: leaving the grid (blink past the map edge into void) must fall
+        // immediately — the float window is leaped so gravity pulls from the first airborne
+        // tick, no 40-tick hover (that hover was the delayed-fall bug). This is the
+        // designed recovery risk of blinking off the stage.
+        Assert.True(arrived.VY < 0f, $"must be falling immediately off the grid; VY={arrived.VY:F3}");
+        Assert.True(arrived.AirTimeTicks >= Def.Movement.FloatWindowTicks, "walk-off must leap the float window");
 
-        // Past Nilus' 40-tick zero-gravity float window, gravity has to be pulling him down.
-        for (int i = 0; i < 60; i++) sim.Tick(new() { { 1, default } });
+        // Keep accelerating downward shortly after clearing the edge (still falling, not landed).
+        for (int i = 0; i < 10; i++) sim.Tick(new() { { 1, default } });
 
         var later = sim.GetState(1);
         Assert.False(later.IsGrounded);
-        Assert.True(later.VY < 0f, $"must be falling; VY={later.VY:F3}");
-        Assert.True(later.PY < GroundPY - 1f, $"must have lost height; PY={later.PY:F3}");
+        Assert.True(later.VY < arrived.VY, "must keep accelerating downward");
         Assert.Equal((byte)0, later.Deaths);
     }
 

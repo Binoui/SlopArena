@@ -18,7 +18,6 @@
   },
   "PlayerFinal": {
     "PY": 0.85,
-    "AttackSlot": 8,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

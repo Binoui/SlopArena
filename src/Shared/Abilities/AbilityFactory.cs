@@ -59,13 +59,20 @@ public static class AbilityFactory
 
     private static ServerAbility? CreateKistuAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
-        (0, false) => new LmbCombo(),          // LMB ground — light slash combo
-        (0, true) => new AirLmbCombo(),        // AirLMB — air slash combo
+        (0, false) => new LmbCombo(),          // LMB ground (no spec — rejected before factory)
+        (0, true) => new AirLmbCombo(),        // AirLMB (no spec — rejected before factory)
 
-        (2, _) => new KistuCounter(),          // Slot1 (key "1") — counter/parry
+        (2, false) => new LmbCombo(),          // key "1" — Quick Slash (normal)
+        (2, true) => new AirLmbCombo(),        // key "1" air — Air Slash
         (3, _) => new KistuDashSlash(),        // E — directional dash slash (aim + release)
         (4, _) => new KistuRisingSlash(),      // R — rising slash (signature)
         (5, _) => new KistuUltFlurry(),        // F — blade flurry ult
+        (6, false) => new LmbCombo(),          // key "2" — Double Slash (normal)
+        (6, true) => new AirLmbCombo(),        // key "2" air — Reverse Slash
+        (7, false) => new LmbCombo(),          // key "3" — Up Slash (normal)
+        (7, true) => new AirLmbCombo(),        // key "3" air — Air Up Slash
+        (8, false) => new LmbCombo(),          // key "4" — Heavy Down Slash (normal)
+        (8, true) => new AirLmbCombo(),        // key "4" air — Air Heavy Down Slash
         _ => null,
     };
 
