@@ -81,6 +81,9 @@ namespace SlopArena.Client.Entities
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
 
+        /// <summary>Character definition (capsule geometry, weight, baked bones) — set at spawn.</summary>
+        public CharacterDefinition? CharacterDef => _charDef;
+
         /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
         public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
         private StatusBillboard _billboard;
@@ -790,7 +793,7 @@ namespace SlopArena.Client.Entities
 #if UNITY_EDITOR
             // UnityEditor.Handles is editor-only; the guard keeps the player
             // build compiling (release blocker found 2026-08-02).
-            UnityEditor.Handles.Label(labelPos, $"{_lastState.DamagePercent} {_lastState.State}");
+            UnityEditor.Handles.Label(labelPos, $"{_lastState.State}");
 #endif
 
             // ── State color indicator sphere (above label) ──

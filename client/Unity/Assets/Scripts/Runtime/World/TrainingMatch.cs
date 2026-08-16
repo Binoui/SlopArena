@@ -97,9 +97,14 @@ namespace SlopArena.Client.World
             var npcBaked = LoadBakedData(npcDef);
             npcDef = ApplyHurtboxOverride(npcDef, npcBaked);
  
-            // Shared player renderer + HUD setup
+            // Shared player renderer + HUD setup. The training NPC is not in
+            // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
+            // explicitly — otherwise its damage % has no overhead panel.
             SetupPlayerRenderer(playerDef, playerBaked);
-            SetupHUD(playerDef);
+            SetupHUD(playerDef, new[]
+            {
+                new HUDManager.HudPlayer(NpcEntityId, "P2", isLocal: false),
+            });
 
             // NPC renderer
             if (_npcRenderer != null)
@@ -149,7 +154,7 @@ namespace SlopArena.Client.World
             // Shared camera + aim setup
             SetupCamera();
             SetupAimHandler(playerDef);
-            SetupLockIndicator(new[] { _playerRenderer, _npcRenderer });
+            SetupLockIndicator(new[] { _playerRenderer, _npcRenderer }, arena);
         }
 
         private void Update()

@@ -128,16 +128,21 @@ namespace SlopArena.Client.World
             visual.transform.localRotation = Quaternion.identity;
         }
 
-        protected void SetupHUD(CharacterDefinition def)
+        protected void SetupHUD(CharacterDefinition def, IReadOnlyList<HUDManager.HudPlayer>? extraPlayers = null)
         {
             // One panel per player (local + opponents), sorted by entity ID so
             // panels read P1..PN left to right regardless of who is local (issue #38).
-            var players = new List<HUDManager.HudPlayer>(MatchConfig.Opponents.Count + 1)
+            // extraPlayers: training NPCs (not in MatchConfig.Opponents — that is a
+            // PvP-only roster) get a panel the same way, so their damage % shows.
+            var players = new List<HUDManager.HudPlayer>(
+                MatchConfig.Opponents.Count + 1 + (extraPlayers?.Count ?? 0))
             {
                 new(PlayerEntityId, $"P{PlayerEntityId}", isLocal: true)
             };
             foreach (var opp in MatchConfig.Opponents)
                 players.Add(new HUDManager.HudPlayer(opp.EntityId, $"P{opp.EntityId}", isLocal: false));
+            if (extraPlayers != null)
+                players.AddRange(extraPlayers);
             players.Sort((a, b) => a.EntityId.CompareTo(b.EntityId));
 
             // Stocks only in PvP (the game server's StockMatchRule); training has
@@ -154,16 +159,16 @@ namespace SlopArena.Client.World
         }
 
         /// <summary>
-        /// Instantiate the persistent target-lock indicator (ADR-0018 / issue #127):
-        /// a ring under the locked enemy, visible only while the local player's sim
-        /// state has LockOn set. Pass every renderer that could be a lock target.
+        /// Instantiate the global ground-shadow indicator (ADR-0018 / issue #127):
+        /// one white ring pinned to the arena floor under every renderer, turning red
+        /// under the local player's lock target. Pass every renderer to mark.
         /// </summary>
-        protected void SetupLockIndicator(PlayerRenderer[] renderers)
+        protected void SetupLockIndicator(PlayerRenderer[] renderers, ArenaDefinition arena)
         {
             var go = new GameObject("LockTargetIndicator");
             go.transform.SetParent(transform, false);
             var indicator = go.AddComponent<TargetIndicator>();
-            indicator.Init(Bridge.GetState, renderers, PlayerEntityId);
+            indicator.Init(Bridge.GetState, renderers, PlayerEntityId, arena);
         }
 
         /// <summary>
