@@ -24,9 +24,7 @@
     align-items: center;
     padding: 4px 10px;
     border-radius: 8px;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-width: 2px;
-    border-color: rgba(255, 255, 255, 0.25);
+    background-color: rgba(0, 0, 0, 0);
 }
 
 .overhead-panel.eliminated {
@@ -72,6 +70,32 @@
     -unity-font-style: bold;
 }
 
+/* ── Bottom player scoreboard: static billboards above the action bar ───────── */
+.player-billboard {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 96px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+/* Billboard entries reuse .overhead-panel but sit as inline row flex children
+   (not absolutely positioned), badge beside damage, over a translucent card. */
+.player-billboard .overhead-panel {
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    margin: 0 10px;
+    padding: 4px 12px;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.player-billboard .overhead-damage {
+    font-size: 24px;
+}
+
 /* ── Bottom action bar ─────────────────────────────────────────────────────── */
 .action-bar {
     position: absolute;
@@ -107,6 +131,12 @@
 
 .slot.ready-pulse {
     scale: 1.15;
+}
+
+/* Slot consumed (ability/dash/burst just fired) — quick shrink, reads as "spent".
+   Opposite of the ready pulse: scale dips to 0.9 and springs back. */
+.slot.used-pulse {
+    scale: 0.9;
 }
 
 /* Non-FightGuy kits leave some of the 8 slots empty — dim + desaturate. */
@@ -170,7 +200,9 @@
     color: white;
     -unity-font-style: bold;
     position: absolute;
-    bottom: 2px;
+    /* Top of the box: the cooldown mask fills from the bottom, so a bottom key
+       label sits inside the darkened region while on cooldown. */
+    top: 2px;
     left: 0;
     right: 0;
     -unity-text-align: middle-center;

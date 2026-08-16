@@ -6,6 +6,10 @@
              player's simulation position (spec §3.1). -->
         <ui:VisualElement name="overhead-layer" class="overhead-layer" />
 
+        <!-- Bottom scoreboard: one static billboard per player (P# + damage%), laid
+             out above the action bar. Built by HUDManager from the roster. -->
+        <ui:VisualElement name="player-billboard" class="player-billboard" />
+
         <!-- Bottom action bar (local player only) -->
         <ui:VisualElement name="action-bar" class="action-bar">
 

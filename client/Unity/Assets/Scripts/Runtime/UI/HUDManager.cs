@@ -68,6 +68,7 @@ namespace SlopArena.Client.UI
             public ushort MaxCooldown;
             public ushort PrevCooldown;
             public float PulseTimer;
+            public float UsedTimer;
             public float FlashTimer;
             public bool Locked;
 
@@ -116,8 +117,9 @@ namespace SlopArena.Client.UI
         // Stock icons beyond this many become a "×N" count label instead (MaxStocks ≤ 99).
         private const int MaxStockIcons = 8;
 
-        /// <summary>Height above the character's feet the overhead panel hovers at (spec §3.1).</summary>
-        private const float OverheadHeightOffset = 2.2f;
+        /// <summary>Fixed screen-space gap (px) above the character's projected center the
+        /// overhead panel hangs at — camera-pitch independent (spec §3.1).</summary>
+        private const float OverheadScreenOffsetPx = 45f;
         private const float TrackLerpSpeed = 25f;
         private const float JuiceDuration = 0.15f;
 
@@ -144,15 +146,26 @@ namespace SlopArena.Client.UI
         private int _maxStocks;
         private CharacterDefinition _charDef;
         private InputBindings _bindings;
-        private Camera _camera;
+        private UnityEngine.Camera _camera;
 
         private VisualElement _overheadLayer;
+        private VisualElement _billboardLayer;
         private VisualElement _actionBar;
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
+        private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
         private ActionSlot _dashSlot;
         private ActionSlot _burstSlot;
         private ActionSlot[] _abilitySlots = Array.Empty<ActionSlot>();
+
+        // Consumed-feedback detection state. AttackSlot (1-based ActiveSlot) is the
+        // authoritative "just cast" signal for abilities — it fires on press for every
+        // slot including 0-cooldown normals (1-4), unlike the cooldown fill which only
+        // moves at ability end. Dash/burst never touch AttackSlot, so they are detected
+        // by their own immediate cooldown-start instead.
+        private byte _prevAttackSlot;
+        private ushort _prevDashCd;
+        private ushort _prevBurstCd;
 
         /// <summary>
         /// Initialize the HUD.
@@ -177,18 +190,35 @@ namespace SlopArena.Client.UI
 
             var root = _uiDocument.rootVisualElement;
             _overheadLayer = root.Q<VisualElement>("overhead-layer");
+            _billboardLayer = root.Q<VisualElement>("player-billboard");
             _actionBar = root.Q<VisualElement>("action-bar");
 
             // Rebuild player panels from the roster (badge color by roster position).
             _overheadLayer?.Clear();
             _panels.Clear();
+            _billboardLayer?.Clear();
+            _billboardPanels.Clear();
             for (int i = 0; i < players.Count; i++)
             {
                 var p = players[i];
-                var panel = BuildOverheadPanel(p, i);
-                _panels[p.EntityId] = panel;
-                _overheadLayer?.Add(panel.Root);
-                if (p.IsLocal) _localEntityId = p.EntityId;
+
+                // Floating overhead panel — opponents only. The local player has no
+                // label over their own head; their roster info lives in the scoreboard.
+                if (!p.IsLocal)
+                {
+                    var panel = BuildOverheadPanel(p, i);
+                    _panels[p.EntityId] = panel;
+                    _overheadLayer?.Add(panel.Root);
+                }
+                else
+                {
+                    _localEntityId = p.EntityId;
+                }
+
+                // Bottom scoreboard — one static billboard entry per player (incl. self).
+                var billboard = BuildOverheadPanel(p, i);
+                _billboardPanels[p.EntityId] = billboard;
+                _billboardLayer?.Add(billboard.Root);
             }
 
             SetupActionBar();
@@ -309,6 +339,31 @@ namespace SlopArena.Client.UI
             // No icon art yet — the USS .slot-icon-inner placeholder remains. Silent on purpose.
         }
 
+        /// <summary>Apply damage % + stocks to one panel (overhead or scoreboard).</summary>
+        private void UpdatePanel(OverheadPanel panel, CharacterState state)
+        {
+            int dmg = (int)state.DamagePercent;
+            panel.TierColor = DamageColor(dmg);
+            panel.Damage.text = $"{dmg}%";
+            if (dmg > panel.PrevDamage) panel.HitFlashTimer = JuiceDuration;
+            panel.PrevDamage = (ushort)dmg;
+
+            if (_maxStocks > 0)
+            {
+                int left = Mathf.Max(0, _maxStocks - state.Deaths);
+                if (panel.StockIcons.Length > 0)
+                {
+                    for (int i = 0; i < panel.StockIcons.Length; i++)
+                        panel.StockIcons[i].EnableInClassList("lost", i >= left);
+                }
+                else if (panel.StockCountLabel != null)
+                {
+                    panel.StockCountLabel.text = $"×{left}";
+                }
+                panel.Root.EnableInClassList("eliminated", left <= 0);
+            }
+        }
+
         /// <summary>
         /// Refresh all HUD data from the simulation. Called by the owning MatchBase
         /// each fixed tick. Overhead panel screen positions are smoothed in LateUpdate.
@@ -317,33 +372,11 @@ namespace SlopArena.Client.UI
         {
             if (_getState == null || _uiDocument == null) return;
 
-            // Player panels: damage % + stocks for everyone.
+            // Floating overhead panels (opponents) + bottom scoreboard (everyone).
             foreach (var kv in _panels)
-            {
-                var state = _getState(kv.Key);
-                var panel = kv.Value;
-
-                int dmg = (int)state.DamagePercent;
-                panel.TierColor = DamageColor(dmg);
-                panel.Damage.text = $"{dmg}%";
-                if (dmg > panel.PrevDamage) panel.HitFlashTimer = JuiceDuration;
-                panel.PrevDamage = (ushort)dmg;
-
-                if (_maxStocks > 0)
-                {
-                    int left = Mathf.Max(0, _maxStocks - state.Deaths);
-                    if (panel.StockIcons.Length > 0)
-                    {
-                        for (int i = 0; i < panel.StockIcons.Length; i++)
-                            panel.StockIcons[i].EnableInClassList("lost", i >= left);
-                    }
-                    else if (panel.StockCountLabel != null)
-                    {
-                        panel.StockCountLabel.text = $"×{left}";
-                    }
-                    panel.Root.EnableInClassList("eliminated", left <= 0);
-                }
-            }
+                UpdatePanel(kv.Value, _getState(kv.Key));
+            foreach (var kv in _billboardPanels)
+                UpdatePanel(kv.Value, _getState(kv.Key));
 
             // Action bar — local player only.
             if (_localEntityId != 0)
@@ -362,7 +395,39 @@ namespace SlopArena.Client.UI
                     if (slot.Locked) continue;
                     UpdateCooldownSlot(slot, state.GetCooldown((byte)(AbilitySlotDefs[i].SlotIndex + 1)));
                 }
+
+                // Consumed feedback: pulse the slot the instant its action starts.
+                // Abilities pulse on the AttackSlot transition (0→cast — fires at press
+                // for 0-cooldown normals too); dash/burst pulse on their immediate
+                // cooldown start (they never set AttackSlot).
+                byte castSlot = state.AttackSlot;
+                if (castSlot != _prevAttackSlot)
+                {
+                    if (castSlot != 0)
+                    {
+                        for (int i = 0; i < _abilitySlots.Length; i++)
+                        {
+                            if (AbilitySlotDefs[i].SlotIndex + 1 == castSlot)
+                            {
+                                PulseConsumed(_abilitySlots[i]);
+                                break;
+                            }
+                        }
+                    }
+                    _prevAttackSlot = castSlot;
+                }
+                if (state.DashCooldownTicks > 0 && _prevDashCd == 0) PulseConsumed(_dashSlot);
+                _prevDashCd = state.DashCooldownTicks;
+                if (state.BurstCooldownTicks > 0 && _prevBurstCd == 0) PulseConsumed(_burstSlot);
+                _prevBurstCd = state.BurstCooldownTicks;
             }
+        }
+
+        /// <summary>Quick shrink-and-spring pulse — visual "spent" feedback for a used action.</summary>
+        private void PulseConsumed(ActionSlot s)
+        {
+            s.UsedTimer = JuiceDuration;
+            s.Root.EnableInClassList("used-pulse", true);
         }
 
         private void UpdateCooldownSlot(ActionSlot s, ushort cooldown)
@@ -389,6 +454,9 @@ namespace SlopArena.Client.UI
                 s.Root.EnableInClassList("ready-pulse", true);
                 s.Flash.EnableInClassList("active", true);
             }
+            // NOTE: no "consumed" pulse here — cooldown only moves at ability END, not
+            // press, so this would fire ~1 move later. Press feedback is driven from the
+            // AttackSlot transition in Refresh (see PulseConsumed).
             s.PrevCooldown = cooldown;
         }
 
@@ -416,6 +484,11 @@ namespace SlopArena.Client.UI
                 s.PulseTimer -= dt;
                 s.Root.EnableInClassList("ready-pulse", s.PulseTimer > 0f);
             }
+            if (s.UsedTimer > 0f)
+            {
+                s.UsedTimer -= dt;
+                s.Root.EnableInClassList("used-pulse", s.UsedTimer > 0f);
+            }
             if (s.FlashTimer > 0f)
             {
                 s.FlashTimer -= dt;
@@ -424,13 +497,28 @@ namespace SlopArena.Client.UI
         }
 
         /// <summary>Track overhead panels to player sim positions (after the camera moves).</summary>
+        /// <summary>
+        /// Resolve the render camera for screen→panel projection. Camera.main only works when
+        /// the match camera is tagged MainCamera; the Cinemachine-driven CameraMount camera is
+        /// not, so fall back to any enabled, active camera (the one real Unity camera in a match).
+        /// </summary>
+        private static UnityEngine.Camera FindRenderCamera()
+        {
+            var main = UnityEngine.Camera.main;
+            if (main != null) return main;
+            foreach (var c in UnityEngine.Camera.allCameras)
+                if (c != null && c.enabled && c.gameObject.activeInHierarchy)
+                    return c;
+            return null;
+        }
+
         private void LateUpdate()
         {
             if (_panels.Count == 0 || _uiDocument == null) return;
-            _camera ??= Camera.main;
+            _camera ??= FindRenderCamera();
             if (_camera == null) return;
 
-            if (_uiDocument.rootVisualElement.panel is not RuntimePanel runtimePanel) return;
+            if (_uiDocument.rootVisualElement.panel is not UnityEngine.UIElements.IPanel runtimePanel) return;
 
             float dt = Time.deltaTime;
             foreach (var kv in _panels)
@@ -438,13 +526,18 @@ namespace SlopArena.Client.UI
                 var state = _getState(kv.Key);
                 var panel = kv.Value;
 
-                Vector3 world = new(state.PX, state.PY, state.PZ) + Vector3.up * OverheadHeightOffset;
+                // Project the character CENTER, then hang the panel at a fixed screen-space
+                // gap above it — camera-pitch independent, so it stays over the head.
+                Vector3 world = new UnityEngine.Vector3(state.PX, state.PY, state.PZ);
                 Vector3 screenPoint = _camera.WorldToScreenPoint(world);
                 bool visible = screenPoint.z > 0;
 
                 if (visible)
                 {
                     Vector2 target = RuntimePanelUtils.ScreenToPanel(runtimePanel, new Vector2(screenPoint.x, screenPoint.y));
+                    // ScreenToPanel passes the screen Y through (bottom-left origin), but
+                    // style.top is measured from the top: flip, then lift above the head.
+                    target.y = runtimePanel.visualTree.layout.height - target.y - OverheadScreenOffsetPx;
                     panel.SmoothPos = Vector2.Lerp(panel.SmoothPos, target, dt * TrackLerpSpeed);
                     panel.Root.style.left = panel.SmoothPos.x;
                     panel.Root.style.top = panel.SmoothPos.y;
