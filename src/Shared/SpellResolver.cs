@@ -268,12 +268,24 @@ namespace SlopArena.Shared
                             float dirXNorm = dist > 0.001f ? (dx / dist) : 0f;
                             float dirZNorm = dist > 0.001f ? (dz / dist) : 0f;
 
+                            // Adaptive auto-angle: derive the launch pitch from the hitbox→victim
+                            // displacement instead of a fixed constant. dx/dz are the horizontal
+                            // hitbox→victim vector; the vertical reference is the victim's hurtbox
+                            // CENTER (midpoint of its capsule), matching Melee's 361° auto-angle —
+                            // a grounded victim sends flat, an airborne one pops.
+                            sbyte launchAngle = hb.KnockbackAngle;
+                            if (launchAngle == KnockbackData.AdaptiveAngle)
+                            {
+                                float refY = (entity.PosY + entity.EndY) * 0.5f;
+                                launchAngle = ComputeAdaptiveAngle(dx, refY - hb.Y, dz);
+                            }
+
                             results.Add(new HitResult
                             {
                                 TargetEntityId = entity.Id,
                                 OwnerEntityId = hb.OwnerId,
                                 Damage = hb.Damage,
-                                KnockbackAngle = hb.KnockbackAngle,
+                                KnockbackAngle = launchAngle,
                                 DirZ = dirZNorm,
                                 BaseKnockback = hb.BaseKnockback,
                                 KnockbackGrowth = hb.KnockbackGrowth,
@@ -318,6 +330,23 @@ namespace SlopArena.Shared
         /// Capsule vs Entity collision (handles all shape combos).
         /// Capsule = segment from (X,Y,Z) to (EndX,EndY,EndZ) with radius.
         /// Returns true if collision, with distance and direction vector.
+        /// <summary>
+        /// Adaptive auto-angle (Melee's 361°): derive a launch pitch from the
+        /// hitbox→victim displacement instead of a fixed constant. The victim's height
+        /// relative to the hitbox (dy) decides the send — an airborne victim above pops
+        /// up (juggle), a level/grounded victim goes flat (clean neutral reset). The
+        /// lower bound is clamped to 0 so a Adaptive move never buries a grounded
+        /// opponent; full upward range is allowed for juggles. Spikes are authored
+        /// separately with the fixed <see cref="KnockbackProfile.Spike"/> profile.
+        /// Returns degrees, clamped to [0, 90].
+        /// </summary>
+        public static sbyte ComputeAdaptiveAngle(float dx, float dy, float dz)
+        {
+            float horiz = MathF.Sqrt((dx * dx) + (dz * dz));
+            float deg = MathF.Atan2(dy, horiz) * (180f / MathF.PI);
+            return (sbyte)Math.Clamp((int)MathF.Round(deg), 0, 90);
+        }
+
         /// </summary>
         private static bool CapsuleCollision(Hitbox hb, EntityData entity,
             out float dist, out float dx, out float dy, out float dz)

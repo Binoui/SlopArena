@@ -12,6 +12,9 @@ public enum KnockbackProfile : byte
     Kill     = 3,  // 20°, base=18, growth=10   — blast zone send
     Spike    = 4,  // -45°,base=12, growth=4    — downward
     Custom   = 5,  // uses Angle/BaseKnockback/KnockbackGrowth overrides
+    Adaptive  = 6,  // auto-angle (Melee 361): pitch derived at HIT time from the
+                   // hitbox→victim displacement, not a fixed constant. Uses the
+                   // struct's own BaseKnockback/KnockbackGrowth; Angle is ignored.
 }
 
 /// <summary>
@@ -21,18 +24,27 @@ public enum KnockbackProfile : byte
 /// </summary>
 public struct KnockbackData
 {
+    /// <summary>
+    /// Sentinel angle returned by Resolve() for <see cref="KnockbackProfile.Adaptive"/>.
+    /// -128 is outside the valid -90..90 pitch range; SpellResolver detects it at hit
+    /// time and replaces it with the position-derived auto-angle.
+    /// </summary>
+    public const sbyte AdaptiveAngle = sbyte.MinValue;
+
     public KnockbackProfile Profile;
-    /// <summary>Only used when Profile == Custom. Degrees, -90 to 90.</summary>
+    /// <summary>Only used when Profile == Custom or Adaptive. Degrees, -90 to 90 (ignored for Adaptive).</summary>
     public sbyte Angle;
-    /// <summary>Only used when Profile == Custom.</summary>
+    /// <summary>Only used when Profile == Custom or Adaptive.</summary>
     public float BaseKnockback;
-    /// <summary>Only used when Profile == Custom.</summary>
+    /// <summary>Only used when Profile == Custom or Adaptive.</summary>
     public float KnockbackGrowth;
 
     public readonly (sbyte angle, float baseKB, float growthKB) Resolve()
     {
         if (Profile == KnockbackProfile.Custom)
             return (Angle, BaseKnockback, KnockbackGrowth);
+        if (Profile == KnockbackProfile.Adaptive)
+            return (AdaptiveAngle, BaseKnockback, KnockbackGrowth);
 
         var p = ProfileTable[(int)Profile];
         return (p.angle, p.baseKB, p.growthKB);

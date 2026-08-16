@@ -220,7 +220,9 @@ namespace SlopArena.Shared
 
         private static void AppendKnockback(StringBuilder sb, in KnockbackData kb)
         {
-            bool custom = kb.Profile == KnockbackProfile.Custom;
+            // Custom and Adaptive carry their own Base/Growth on the struct (Adaptive's
+            // Angle is authored as documentation; Resolve() ignores it at runtime).
+            bool custom = kb.Profile is KnockbackProfile.Custom or KnockbackProfile.Adaptive;
             sb.Append("Knockback = new() { Profile = KnockbackProfile.").Append(kb.Profile);
             // Keep Custom's fields even when zeroed (Nilus' deliberately INERT hitbox
             // must not be silently converted into a Live profile).
