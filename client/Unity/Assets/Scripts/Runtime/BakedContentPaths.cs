@@ -69,7 +69,14 @@ namespace SlopArena.Client
             string? repoRoot = RepoRoot();
             if (repoRoot != null)
             {
-                string inRepo = Path.GetFullPath(Path.Combine(repoRoot, relative));
+                // Repo nests all baked content under <repo>/data/. StreamingAssets
+                // flattens differently (arenas at StreamingAssets/arenas, bins at
+                // StreamingAssets/data), so strip a leading "data/" segment before
+                // joining onto the repo's data root.
+                string repoRelative = relative.StartsWith("data/")
+                    ? relative.Substring("data/".Length)
+                    : relative;
+                string inRepo = Path.GetFullPath(Path.Combine(repoRoot, "data", repoRelative));
                 if (File.Exists(inRepo)) return inRepo;
             }
             return null;
