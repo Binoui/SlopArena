@@ -42,22 +42,22 @@ MonoBehaviour:
     Clip: {fileID: 7400000, guid: ef68c8deeec6feeb7be8cdd4f6263483, type: 2}
     Extrapolation: 0
   - Name: spell_g_2
-    Clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
+    Clip: {fileID: 7400000, guid: 2abcbbc86b240cfa4a3850e8922b0298, type: 2}
     Extrapolation: 0
   - Name: spell_a_2
     Clip: {fileID: 7400000, guid: 34fbf978157a3a889b7e7d58c95dc8d8, type: 2}
     Extrapolation: 2
   - Name: spell_g_3
-    Clip: {fileID: 7400000, guid: 71f9d49b972b5c073817e8f4d12b4e9d, type: 2}
+    Clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
     Extrapolation: 0
   - Name: spell_a_3
     Clip: {fileID: 7400000, guid: 4e90ecac4c0d8c718aa349996204222e, type: 2}
     Extrapolation: 0
   - Name: spell_g_4
-    Clip: {fileID: 7400000, guid: 9cbe6f9b5899e5b8c9e88098f6c21f47, type: 2}
+    Clip: {fileID: 7400000, guid: e9165de70bb6b826b99b10f936b4f473, type: 2}
     Extrapolation: 0
   - Name: spell_a_4
-    Clip: {fileID: 7400000, guid: 4f310a06569ec0eea85b7f11a292e401, type: 2}
+    Clip: {fileID: 7400000, guid: 5a508ebe2c74b524d8e9b5f6459036d8, type: 2}
     Extrapolation: 0
   - Name: spell_air_1
     Clip: {fileID: 7400000, guid: 4ada0a01199bdd0c99902bc886c34f37, type: 2}

@@ -236,18 +236,18 @@ public static partial class CharacterRegistry
 
             Slot3 = new AbilitySpec
             {
-                Name = "Uppercut",
-                Description = "Low-starting anti-air uppercut — launches straight up (normal tier, key 3)",
-                IconName = "3",
+                Name = "Roundhouse",
+                Description = "Roundhouse kick — mid-range combo finisher, kills at high % (normal tier, key 2)",
+                IconName = "2",
                 CooldownTicks = 0,
                 Stages = new AttackStage[]
                 {
-                    // Anti-air: single rising right-hand uppercut, sends upright. Low starting
-                    // position, generous active window to catch a jumping opponent.
-                    new() { DurationTicks = 39, IasaTicks = 36,
-                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 5, DurationTicks = 18, Radius = 0.35f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:RightHand", Damage = 9f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 80, BaseKnockback = 6f, KnockbackGrowth = 26f }, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                    // ftilt: 7-frame startup, 6-frame active, ~29 total. High growth — a decent
+                    // combo finisher that kills late; too slow to open a combo.
+                    new() { DurationTicks = 29, IasaTicks = 27,
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 7, DurationTicks = 6, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0.21f, BoneName = "mixamorig:RightFoot", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 22, BaseKnockback = 6f, KnockbackGrowth = 32f }, StunTicks = 20, Interruptible = true } },
+                            AttackRange = 2.25f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:LeftFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
                 AnimationNames = new[] { "spell_g_3" },
             },
@@ -281,12 +281,7 @@ public static partial class CharacterRegistry
                     // Get-off-me: real startup, then one strong 360° ring moment (14-21). High
                     // base / low growth — shoves hard even at 0%, but does not scale into a kill.
                     new() { DurationTicks = 49, IasaTicks = 46,
-                               HitboxEvents = new HitboxEvent[]
-                            {
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:LeftFoot", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 4f, KnockbackGrowth = 22f }, StunTicks = 16, Interruptible = true },
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = 0f, OffY = 0.21f, OffZ = 0f, BoneName = "mixamorig:Hips", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 4f, KnockbackGrowth = 22f }, StunTicks = 16, Interruptible = true },
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = -0.17f, OffY = -0.4f, OffZ = -0.09f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 2f, KnockbackGrowth = 12f }, StunTicks = 12, Interruptible = true },
-                            },
+                               HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 8, DurationTicks = 7, Radius = 0.5f, OffX = 0.05f, OffY = 0f, OffZ = 0.19f, BoneName = "mixamorig:LeftFoot", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 40, BaseKnockback = 4f, KnockbackGrowth = 22f }, StunTicks = 16, Interruptible = true } },
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
                 },
@@ -304,12 +299,7 @@ public static partial class CharacterRegistry
                     // Air tatsu: faster spin than ground, juggle send instead of shove — a combo
                     // starter off a jump + fast-fall. Hard to land (precise timing is the goal).
                     new() { DurationTicks = 49, IasaTicks = 46, LandingLagTicks = 9, AutoCancelBeforeTicks = 5, AutoCancelAfterTicks = 34,
-                            HitboxEvents = new HitboxEvent[]
-                            {
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:LeftFoot", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 35, BaseKnockback = 4f, KnockbackGrowth = 24f }, StunTicks = 16, Interruptible = true },
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = 0f, OffY = 0.21f, OffZ = 0f, BoneName = "mixamorig:Hips", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 35, BaseKnockback = 4f, KnockbackGrowth = 24f }, StunTicks = 16, Interruptible = true },
-                                new() { TriggerTick = 8, DurationTicks = 35, Radius = 0.4f, OffX = -0.17f, OffY = -0.4f, OffZ = -0.09f, Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 25, BaseKnockback = 4f, KnockbackGrowth = 20f }, StunTicks = 12, Interruptible = true },
-                            },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 18, DurationTicks = 7, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "mixamorig:RightHand", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 35, BaseKnockback = 4f, KnockbackGrowth = 24f }, StunTicks = 16, Interruptible = true } },
 
                             AttackRange = 2f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },

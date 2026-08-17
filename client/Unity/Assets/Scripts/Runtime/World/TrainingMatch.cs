@@ -4,6 +4,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using SlopArena.Shared;
+using SlopArena.Shared.AI;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
@@ -15,6 +16,7 @@ namespace SlopArena.Client.World
     public enum NpcAiMode
     {
         Attack,
+        Heuristic,
         Idle
     }
     
@@ -44,6 +46,12 @@ namespace SlopArena.Client.World
         protected override ISimulationBridge Bridge => _bridge;
 
         private uint _tick;
+        // Heuristic-bot state (issue #148): persistent policy memory + a per-match random seed
+        // so every training fight differs. The NPC's def is needed for ForwardReach/cooldown lookups.
+        private readonly BotMemory _npcMemory = new();
+        private readonly HeuristicBotPolicy _npcPolicy = new(); // stateless; state lives in _npcMemory + _npcRng
+        private System.Random _npcRng;   // System.Random (UnityEngine.Random shadows the bare name)
+        private CharacterDefinition _npcDef;
 #if UNITY_EDITOR
         // Launch-contract sentinel: logs the applied launch once per hit so the game can
         // be checked against tools/MoveDataReport (fightguy --parity). A mismatch here
@@ -96,6 +104,10 @@ namespace SlopArena.Client.World
             var npcDef = CharacterRegistry.Get(_npcClass);
             var npcBaked = LoadBakedData(npcDef);
             npcDef = ApplyHurtboxOverride(npcDef, npcBaked);
+            // Heuristic bot: keep the NPC def, re-seed per match, reset policy memory.
+            _npcDef = npcDef;
+            _npcRng = new System.Random();
+            _npcMemory.Reset();
  
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
@@ -281,8 +293,22 @@ namespace SlopArena.Client.World
             return _npcAiMode switch
             {
                 NpcAiMode.Idle => BuildIdleInput(),
+                NpcAiMode.Heuristic => BuildHeuristicInput(npcState, playerState),
                 _ => BuildAttackInput(npcState, playerState, tick),
             };
+        }
+
+        /// <summary>
+        /// Drive the NPC with the same deterministic heuristic policy the self-play telemetry
+        /// uses (issue #148). Returns an <see cref="InputState"/> like the legacy AI, so all the
+        /// existing input-injection / rendering / respawn plumbing applies unchanged. Seeded
+        /// randomly per match; idle until the match has initialized the NPC def.
+        /// </summary>
+        private InputState BuildHeuristicInput(CharacterState npcState, CharacterState playerState)
+        {
+            if (_npcDef == null) return BuildIdleInput();
+            _npcRng ??= new System.Random();
+            return _npcPolicy.Decide(in npcState, in playerState, _npcDef, _npcRng, _npcMemory);
         }
 
         private static InputState BuildIdleInput()
