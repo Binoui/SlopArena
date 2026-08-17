@@ -154,7 +154,7 @@ public class HitstunAnimationTierTests
 
         var afterLaunch = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, afterLaunch.State);
-        Assert.Equal((ushort)1, afterLaunch.HitstunTicks);
+        Assert.Equal((ushort)16, afterLaunch.HitstunTicks); // Light mag 3.9 → 0.7·(3.9+20)
     }
 
     [Fact]

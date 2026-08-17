@@ -865,15 +865,14 @@ public class NilusAbilityTests
         }
 
         float dragged = startZ - prevZ;
-        // Exponential knockback decay (λ=1.8) shortened the yank: ~2.6 m over the
-        // 45-tick window vs 3-5 m on the old constant-velocity curve. The invariant
-        // this test guards (knockback survives hitstun and keeps closing) is unchanged;
-        // to restore the old reach, bump the NilusData "pull_force" param.
-        // The post-stun coast brakes (GroundStopFriction) instead of a rush stop-dead:
-        // the rush-release stop is gated on the Run state (Simulation.cs), so a target
-        // that lands from a yank in Idle coasts to rest — ~3.4 m total vs ~3.1 with
-        // the old accidental dead-stop.
-        Assert.InRange(dragged, 2.9f, 3.9f);
+        // Fixed-tool stun (0.7·force, no +20 launch floor — the floor would over-pull the
+        // reel and carry the victim through Nilus) puts the yank at the spec'd ~4 m
+        // (~3.9 m over the 45-tick window). The invariant this test guards (knockback
+        // survives hitstun and keeps closing) is unchanged; to retune the reach, bump the
+        // NilusData "pull_force" param. The post-stun coast brakes (GroundStopFriction)
+        // instead of a rush stop-dead: the rush-release stop is gated on the Run state
+        // (Simulation.cs), so a target that lands from a yank in Idle coasts to rest.
+        Assert.InRange(dragged, 3.0f, 4.5f);
         Assert.True(prevZ > nilusZ && prevZ < startZ,
             $"the target must end between Nilus and where it stood, not through him: " +
             $"PZ={prevZ:F3}, Nilus {nilusZ:F3}, start {startZ:F3}");
@@ -1138,7 +1137,7 @@ public class NilusAbilityTests
 
         var hit = sim.GetState(100);
         Assert.Equal(ActionState.Hitstun, hit.State);
-        Assert.Equal((ushort)24, hit.HitstunTicks);
+        Assert.Equal((ushort)35, hit.HitstunTicks); // detonation force 50 × 0.7 stun coefficient (fixed-force path, no +20 floor)
         Assert.True(hit.KVZ > 1f,
             $"the blast must throw the target OUTWARD (+Z, away from Nilus), got KVZ={hit.KVZ:F2} — " +
             "a drag pulse resolving after the detonation would zero this");

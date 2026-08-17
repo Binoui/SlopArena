@@ -108,12 +108,13 @@ public class CombatPipelineTests
         float kbMag = MathF.Sqrt(afterLaunch.KVX * afterLaunch.KVX
                                  + afterLaunch.KVY * afterLaunch.KVY
                                  + afterLaunch.KVZ * afterLaunch.KVZ);
-        Assert.True(kbMag > 0.5f,
-            $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}");
+        Assert.True(kbMag > 0.4f,
+            $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.11 ≈ 0.43
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // ADR-0019 derives this from the resulting launch magnitude.
-        Assert.Equal(1, (int)afterLaunch.HitstunTicks);
+        // Manki LMB = Light profile: mag 3.9 → stun 0.7·(3.9+20) = 16.
+        Assert.Equal(16, (int)afterLaunch.HitstunTicks);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -448,7 +449,9 @@ public class CombatPipelineTests
         Simulation.ApplyKnockback(ref state, dirX: 1f, dirZ: 0f,
             angleDeg: 15, baseKB: 8f, growthKB: 5f, damage: 0f, stunTicks: 20, weight: 100f);
 
-        Assert.True(state.KVY > 0.5f,
+        // KVY = 15.5 · sin15° · KbScaleFactor(0.11) ≈ 0.44 — the 0.11 velocity scale
+        // lowered the launch; assert the vertical component survives, not the old 0.5.
+        Assert.True(state.KVY > 0.4f,
             $"Medium profile (15°) should produce noticeable vertical knockback, got KVY={state.KVY:F4}");
     }
 

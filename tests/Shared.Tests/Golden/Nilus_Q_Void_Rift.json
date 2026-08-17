@@ -10,9 +10,9 @@
   },
   "NpcSnap": {
     "PY": 0.75,
-    "PZ": 4.5011616,
+    "PZ": 4.1839967,
     "DamagePercent": 9,
-    "HitstopTicks": 5,
+    "HitstopTicks": 7,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -25,7 +25,7 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 6.0986714,
+    "PZ": 4.756395,
     "DamagePercent": 24,
     "JumpsLeft": 2,
     "IsGrounded": true

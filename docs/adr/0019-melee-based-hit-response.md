@@ -29,12 +29,36 @@ mag = (base + growth·(P/100 + 1.0) + Damage·0.1) · 200/(W + 100)
 ### 2. Hitstun shape (pure function, [#131])
 
 ```
-hitstun = max(1, (int)(0.5 · kbMag))   // k = 0.5 provisional
+hitstun = max(1, (int)(k · (kbMag + floorMag)))   // k = 0.7, floorMag = +20 (balance pass, below)
 ```
 
 - **`StunTicks` survives only as the gate**: `0` → no lock for BOTH zero-KB hitboxes and KB-bearing moves (the burst shove stays lock-free). This is the one deviation from Melee's min-1.
 - Cap / floor-8 / ceiling-60 all dropped.
-- k = 0.5 provisional; a vertical-KB lean (steeper angles + magnitude compensation) is the user-flagged compensation direction → balance pass.
+- k = 0.5 provisional → **landed as 0.7 with a +20 magnitude floor** (2026-08-17 balance pass, see "Balance pass — melee-shape adoption" below).
+
+### 2a. Balance pass — melee-shape adoption (2026-08-17)
+
+Landed via the move-data tool's true-combo matrix (issue #147): the provisional 0.5 / KV×0.14 curve produced **zero true combos** on both characters at 0–150%. The matrix (real-sim verdicts, greedy chase) isolated the cause — stun and travel both derive from the same magnitude while travel ∝ KV² outruns stun ∝ KV — and validated the adoption:
+
+```
+k         = 0.7   (was 0.5)   — stun per unit launch
+floorMag  = +20   (was 0)     — Melee-style "+18" damage-independent floor: real low-% stun
+KbScaleFactor = 0.11 (was 0.14) — velocity-only scale; stun still derives from the UNSCALED mag
+```
+
+Matrix result (true links per %, both characters, real sim):
+
+| char | 0% | 30% | 60% | 90% | 120% | 150% |
+|---|---|---|---|---|---|---|
+| FightGuy (old) | 0 | 0 | 0 | 0 | 0 | 0 |
+| FightGuy (new) | **6** | **4** | **3** | **1** | 0 | 0 |
+| Kistu (new) | **16** | **12** | **6** | **7** | **6** | — |
+
+g1 Low Kick is FightGuy's combo hub (jab-jab, anti-air conversions, aerial links); Kistu's profile stays hot at high % — a per-character growth nudge is the follow-up if it feels wrong.
+
+**Fixed tools excluded from the floor**: `ApplyKnockback(applyScale:false)`, `ApplyKnockbackForce`, and the `QueuedKVOverride` (OnHitEntity) path take `k·magnitude` WITHOUT `floorMag` — grabs/yanks are Melee's `weight_set_knockback` analog, and the floor made Nilus's yank over-pull (drag outliving the reel, carrying the victim through the caster).
+
+The tuning knobs live as statics (`Simulation.HitstunStunCoefficient`, `HitstunMagBonus`, `KbScaleFactor`) and are swept by the tool: `scripts/move-data.sh fightguy --truecombos --kbm <model>` (`base|old|stunx18|kv70|stun16kv11|floor30`).
 
 ### 3. Hitstop (Melee hitlag, pure shape, [#143])
 

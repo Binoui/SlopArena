@@ -7,6 +7,11 @@ triggers:
   - frame advantage
   - knockback shape
   - record frame data
+  - true combo
+  - combo graph
+  - combo density
+  - DI escape
+  - directional influence
 ---
 
 # SlopArena Move Data Report
@@ -21,16 +26,34 @@ golden file — pure telemetry for a human to read. Reference: `docs/systems/mov
 ```bash
 scripts/move-data.sh <char> [--pcts 0,30,60,90,120,150] [--out docs/generated/<char>-move-data.md]
 scripts/move-data.sh <char> --json report.json --html report.html   # visual report
+scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
 ```
 
 - `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports — they are not
   Melee-converted to Custom-knockback normals yet (see caveats).
 - Default markdown output: `docs/generated/<char>-move-data.md`.
 
+### Analysis modes (issue #147)
+
+- `--truecombos` — freeform true-combo reachability graph: for each normal × hit state (grounded/airborne)
+  × %, the real sim runs the starter and attempts every follow-up (greedy chase, IASA early-out press).
+  **T** = follow-up landed while the victim was still in hitstun, **F** = landed after stun expired,
+  `-` = never. Per-edge window tightness (`sim stun − recovery − follow-up trigger`) + per-% combo density.
+  **Finding (2026-08-17): both characters currently have zero true combos** — the sim derives hitstun from
+  launch speed (`0.5 ×` unscaled KV; authored `StunTicks` is a zero/nonzero gate) and `KbScaleFactor 0.14`
+  carries the victim out of reach before any follow-up can activate. Combos are reads/movement, by construction.
+- `--di` — DI escape-space: each trajectory re-run with the victim holding each stick direction through
+  hitstun (`in`/`away` = MoveY ∓/±1 along the launch axis, `up`/`down` = MoveX ±1 perpendicular), rotated by
+  the sim's real `ApplyDirectionalInfluence` (18° cap, Melee sin² curve). Max launch-vector deviation =
+  escape magnitude — low = DI-resistant (reliable kill tool), high = DI-bendable (escapable). Overlaid on
+  the knockback-shape gallery.
+
 ## Visual report (`--json` / `--html`)
 
-The tool also emits a **lossless JSON** report and a **self-contained HTML** visual report (no external deps,
-commit under `docs/generated/`). One richer collection feeds both; the markdown path is unchanged.
+The tool also emits a **lossless JSON** report and a **self-contained HTML** visual report (no external
+deps). The JSON is a per-tick dump (100s of KB-low MB) — **gitignored**, regenerate on demand; only the
+`.html`/`.md` renderings commit under `docs/generated/`. One richer collection feeds both; the markdown
+path is unchanged.
 
 - `--json <path>` — structured: per-move frame data, per-tick trajectory arcs, adv per move×%, kill% + blast clearance.
 - `--html <path>` — three human-readable sections:

@@ -5,7 +5,7 @@
     "State": 4,
     "PY": 0.825,
     "AttackSlot": 5,
-    "HitstopTicks": 8,
+    "HitstopTicks": 4,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -14,19 +14,19 @@
     "PY": 0.75,
     "PZ": 6,
     "DamagePercent": 8,
-    "HitstunTicks": 12,
-    "HitstopTicks": 8,
+    "HitstunTicks": 7,
+    "HitstopTicks": 4,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
     "PY": 0.825,
-    "Cooldown4": 405,
+    "Cooldown4": 401,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 3.15666,
+    "PZ": 2.0973525,
     "DamagePercent": 8,
     "JumpsLeft": 2,
     "IsGrounded": true

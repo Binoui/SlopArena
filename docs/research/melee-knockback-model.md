@@ -264,14 +264,24 @@ velocity*: `KVX += DIX · 0.30 · launchMag` (horizontal only). Different timing
 
 1. **Flight model** (§3, Option A): constant KV during hitstun + linear horizontal
    friction after, gravity does vertical work. Biggest single feel change.
+   **→ LANDED (ADR-0019 §6).**
 2. **Hitstun shape** (§2): pure KB function, min 1, drop floor 8; decide on
    `StunTicks` cap (keep as valve or remove).
+   **→ LANDED with the melee-shape balance pass (ADR-0019 §2a): k = 0.7, +20
+   magnitude floor, KV×0.11 velocity scale — matrix-validated on both characters
+   (issue #147). Fixed tools (yanks/grabs) exclude the floor.**
 3. **KB formula** (§1): weight divisor + move-damage term, keep profile system.
+   **→ PARTIALLY LANDED (ADR-0019 §1): weight divisor `200/(W+100)` + damage term
+   `Damage·0.1` live; profiles still exist (KnockbackProfile Light/Medium/Kill in
+   use — the custom-only migration was deferred).**
 4. **DI at connect + SDI** (§4): rotate-launch DI during hitstop, position-shift
-   SDI per hitstop tick.
+   SDI per hitstop tick. → ADR-0019 §4-5.
 5. **Weight stat** (§5): `CharacterDefinition.Weight` + normalization.
+   → ADR-0019 §1 (weight 100 default, per-char values pending).
 6. (deferred) IASA / landing lag / auto-cancel — already tracked in
    `melee-frame-analysis.md` §7 as the other half of Melee feel.
+   → IASA + landing-lag + AC now authored per stage (FightGuy/Kistu tables);
+   early-out press semantics verified by the combo matrix.
 
 Each delta is pure sim-side (`src/Shared/`), no netcode or wire-format change
 except `CharacterState` additions (SDI window timer, weight is static data).
