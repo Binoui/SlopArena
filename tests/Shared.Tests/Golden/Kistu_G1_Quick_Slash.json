@@ -5,12 +5,15 @@
     "State": 4,
     "PY": 0.85,
     "AttackSlot": 3,
+    "HitstopTicks": 6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
     "PY": 0.75,
     "PZ": 0.6,
+    "DamagePercent": 4,
+    "HitstopTicks": 6,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -21,7 +24,8 @@
   },
   "NpcFinal": {
     "PY": 0.75,
-    "PZ": 0.6,
+    "PZ": 2.0708008,
+    "DamagePercent": 4,
     "JumpsLeft": 2,
     "IsGrounded": true
   }

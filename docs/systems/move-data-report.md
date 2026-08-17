@@ -15,6 +15,8 @@ combo matrix/probes are experimental diagnostics, deliberately separated from th
 
 ```bash
 scripts/move-data.sh <char> [--pcts 0,30,60,90,120,150] [--out docs/generated/<char>-move-data.md]
+scripts/move-data.sh <char> --json report.json --html report.html   # visual report
+scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
 ```
 
 - `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports until their
@@ -27,9 +29,10 @@ scripts/move-data.sh <char> [--pcts 0,30,60,90,120,150] [--out docs/generated/<c
 
 ## Visual report (`--json` / `--html`)
 
-The tool also emits a **lossless JSON** report and a **self-contained HTML** visual report (no external deps,
-commit under `docs/generated/`). One richer collection (per-tick arcs + KO analysis) feeds both; the markdown
-path is unchanged.
+The tool also emits a **lossless JSON** report and a **self-contained HTML** visual report (no external
+deps). The JSON is a per-tick dump (100s of KB–low MB) — **gitignored**, regenerate on demand rather than
+committing; the `.html` and `.md` renderings of the same data are small enough to commit under
+`docs/generated/`.
 
 ```bash
 scripts/move-data.sh kistu --json docs/generated/kistu-move-data.json --html docs/generated/kistu-move-data.html
@@ -56,6 +59,46 @@ is labelled in the JSON/HTML so the assumption is explicit.
 side travel ≤ ~19 m at 250%) are small vs the blast-zone distances. That is a design signal (these are combo
 moves, not finishers, and/or blast zones are deep). Use **blast clearance** to read how close each move gets:
 e.g. Kistu g3 Up Slash apex = 43% of the way to top blast.
+
+## True-combo reachability (`--truecombos`)
+
+Freeform true-combo graph — no scripted strings, pure reachability. For every normal × hit state
+(grounded / airborne victim) × victim %, the tool runs the **real sim**: the starter connects through the
+actual hitbox path (auto-calibrated placement), then a greedy chase presses each follow-up at the earliest
+legal frame (the sim's IASA early-out, plus in-reach prediction). An edge is **true** iff the follow-up's
+damage lands while the victim is still in hitstun; `false` = it landed after stun expired (opponent
+actionable); `-` = never connected within 2400 ticks.
+
+- **Window tightness** per edge per %: `sim stun − (recovery + landing lag + jump squat + follow-up
+  trigger)`. Positive = frame-true on paper; travel + hitstop make reality ≤ paper.
+- **Combo density**: total true links per character per % (all starters × follow-ups × hit states) — the
+  tuning target for "too many true combos" vs "too few".
+- **Hitstun reality (important):** the sim derives hitstun from launch speed — `0.5 ×` the unscaled KB
+  magnitude (`Simulation.ApplyKnockback`); the authored `StunTicks` is a zero/nonzero gate only. With
+  `KbScaleFactor = 0.14`, any launch that stuns past the attacker's recovery+startup carries the victim
+  beyond hitbox reach (~1.3 m) before a follow-up can activate. **Finding (2026-08-17): both FightGuy and
+  Kistu currently have zero true combos at 0–150%** — the only paper-true edge (g1 → g1, +1 at 0%) is
+  killed by travel. This is the current tuning's answer to "are there too many true combos?": none are
+  structurally possible; combos are reads/movement, by construction.
+- The greedy chase is a heuristic — `false` vs `-` granularity can miss a human's chase, but a `true`
+  verdict is solid (it requires a real in-stun connect).
+
+Output: JSON/HTML sections (per-starter reachability tables + density summary), plus a markdown section on
+the default path. Flags compose with `--json`/`--html`.
+
+## DI escape-space (`--di`)
+
+How much a victim can bend each send with DI. Each trajectory is re-run with the victim holding each of
+the four stick directions during hitstun — `in` (MoveY −1, toward the attacker / opposite the launch
+axis), `away` (MoveY +1), `up` (MoveX +1), `down` (MoveX −1), the sim's DIX/DIY convention. The launch is
+rotated by the sim's real `Simulation.ApplyDirectionalInfluence` (18° cap, Melee sin² curve — perpendicular
+holds bend most; along-axis holds only give the expiry ASDI push) and the stick stays held through stun.
+
+- **Escape magnitude** = max launch-vector deviation across the four holds (degrees). Low = DI-resistant
+  (reliable combo/kill tool); high = DI-bendable (escapable). The deviation follows the sim curve: for a
+  horizontal launch it is `18° × cos(elevation)` (e.g. 16.7° at a 22° launch).
+- Output: the four variant arcs overlaid on the knockback-shape gallery (thin colored arcs, baseline stays
+  solid blue), per-figure max deviation, and a markdown table on the default path.
 
 ## Report sections
 

@@ -112,13 +112,15 @@ public class KnockbackPhysicsDataTests
             // KbScaleFactor scales launch velocity only; hitstun derives from the raw magnitude.
             TestHelpers.AssertNear(rawMag * Simulation.KbScaleFactor, f.LaunchSpeed, 0.01f);
 
-            // Hitstun = trunc(0.5 * 3D magnitude), same float path as Simulation.ApplyKnockback
-            // (magnitude * cos/sin, then sqrt) — replicating it reproduces boundary truncation
-            // exactly: (int)(0.5 * sqrt(2 * (16*cos45)^2)) is 7, not 8.
+            // Hitstun = trunc(StunCoefficient · (3D magnitude + MagBonus)), same float path as
+            // Simulation.ApplyKnockback (magnitude * cos/sin, then sqrt) — replicating it
+            // reproduces boundary truncation exactly. Knobs read from the sim so the table
+            // tracks the shipped curve (melee-shape: 0.7, +20, KV×0.11).
             float rad = f.Angle * MathF.PI / 180f;
             float mag3 = MathF.Sqrt(MathF.Pow(rawMag * MathF.Cos(rad), 2f)
                 + MathF.Pow(rawMag * MathF.Sin(rad), 2f));
-            int expectedHitstun = Math.Clamp((int)(mag3 * 0.5f), 1, ushort.MaxValue);
+            int expectedHitstun = Math.Clamp(
+                (int)(Simulation.HitstunStunCoefficient * (mag3 + Simulation.HitstunMagBonus)), 1, ushort.MaxValue);
             Assert.Equal(expectedHitstun, f.HitstunTicks);
 
             Assert.True(f.TotalDistance >= f.DistanceAtHitstunEnd - 0.01f,

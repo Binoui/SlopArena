@@ -92,11 +92,11 @@ public class HitstopTests
         var atLaunch = sim.GetState(100);
         Assert.Equal((ushort)0, atLaunch.HitstopTicks);
         Assert.Equal(ActionState.Hitstun, atLaunch.State);
-        Assert.Equal((ushort)1, atLaunch.HitstunTicks);   // ADR-0019 derives stun from applied knockback
+        Assert.Equal((ushort)16, atLaunch.HitstunTicks);   // ADR-0019: 0.7·(Light mag 3.9 + 20)
         float kbMag = MathF.Sqrt(atLaunch.KVX * atLaunch.KVX
                                  + atLaunch.KVY * atLaunch.KVY
                                  + atLaunch.KVZ * atLaunch.KVZ);
-        Assert.True(kbMag > 0.5f, $"launch applied at freeze expiry, magnitude={kbMag:F3}");
+        Assert.True(kbMag > 0.4f, $"launch applied at freeze expiry, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.11 ≈ 0.43
         Assert.True(atLaunch.PX == frozenPos.px && atLaunch.PY == frozenPos.py && atLaunch.PZ == frozenPos.pz,
             "launch tick itself must not move the victim (gate returns before physics)");
 

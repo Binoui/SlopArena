@@ -56,11 +56,21 @@ namespace SlopArena.Shared
         public const float FlightGravity = 14f;
         public const float FlightFriction = 10f;
 
-        // ADR-0019 balance pass: velocity-only scale on the damage/weight formula.
-        // Hitstun is computed from the UNSCALED magnitude so combo timing (stun vs IASA,
-        // the combo matrix) is preserved while launch distance shrinks. Tune with
-        // tools/MoveDataReport: scripts/move-data.sh fightguy. 1.0 = raw formula.
-        public const float KbScaleFactor = 0.14f;
+        // ADR-0019 balance pass (2026-08-17, melee-shape adoption): velocity-only scale on
+        // the damage/weight formula. Hitstun is computed from the UNSCALED magnitude so combo
+        // timing (stun vs IASA, the combo matrix) is preserved while launch distance shrinks.
+        // Tune with tools/MoveDataReport: scripts/move-data.sh fightguy (or --kbm model presets).
+        // 1.0 = raw formula.
+        // Shipped values = the Melee-shaped curve (matrix-validated: zero true combos at the
+        // old 0.5/0.14/0, real freeform links at 0.7/0.11/+20 — see docs/adr/0019).
+        public static float KbScaleFactor = 0.11f;
+
+        // KB-tuning lab knobs (read by the move-data tool's --kbm presets). Hitstun ticks =
+        // StunCoefficient × (raw magnitude + MagBonus), min 1 — MagBonus is the Melee-style
+        // "+18 floor" lever (damage-independent stun at low %), StunCoefficient the
+        // stun-per-launch ratio.
+        public static float HitstunStunCoefficient = 0.7f;
+        public static float HitstunMagBonus = 20f;
         private const byte MaxAirDodges = 1;
 
         /// <summary>
@@ -242,7 +252,11 @@ namespace SlopArena.Shared
                             (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
                         if (s.QueuedKBStun > 0 && kvMag > 0f)
                         {
-                            s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * kvMag), 1, ushort.MaxValue);
+                            // OnHitEntity rewrote the launch (NetherGrasp yank — a fixed
+                            // tool): like applyScale:false, it takes the stun coefficient
+                            // but NOT the +MagBonus launch floor, so yanks don't over-pull.
+                            s.HitstunTicks = (ushort)Math.Clamp(
+                                (int)(HitstunStunCoefficient * kvMag), 1, ushort.MaxValue);
                             s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 :
                                 s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
                             s.State = ActionState.Hitstun;
@@ -1315,7 +1329,13 @@ namespace SlopArena.Shared
                 (s.KVX * s.KVX) + (s.KVY * s.KVY) + (s.KVZ * s.KVZ));
             if (stunTicks > 0 && kbMagnitude > 0f)
             {
-                s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * kbMagnitude), 1, ushort.MaxValue);
+                // applyScale:false = fixed tools (grabs/yanks — Melee's weight_set_knockback
+                // analog): they take the stun coefficient but NOT the +MagBonus launch floor,
+                // so yanks don't over-pull (drag outlasting the reel). Damage launches (scaled)
+                // carry the floor — that's the Melee "+18" combo lever.
+                float stunMag = applyScale ? kbMagnitude + HitstunMagBonus : kbMagnitude;
+                s.HitstunTicks = (ushort)Math.Clamp(
+                    (int)(HitstunStunCoefficient * stunMag), 1, ushort.MaxValue);
                 s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 :
                     s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
                 s.State = ActionState.Hitstun;
@@ -1357,7 +1377,12 @@ namespace SlopArena.Shared
             float magnitude = MathF.Sqrt(s.KVX * s.KVX + s.KVY * s.KVY + s.KVZ * s.KVZ);
             if (stunTicks > 0 && magnitude > 0f)
             {
-                s.HitstunTicks = (ushort)Math.Clamp((int)(0.5f * magnitude), 1, ushort.MaxValue);
+                // Fixed-force tools (grabs/yanks — Melee's weight_set_knockback analog) take the
+                // stun coefficient but NOT the +MagBonus launch floor: the floor is the Melee
+                // "+18" damage-launch lever, and applying it to pulls made yanks over-pull
+                // (drag outlasting the reel and carrying the victim through the caster).
+                s.HitstunTicks = (ushort)Math.Clamp(
+                    (int)(HitstunStunCoefficient * magnitude), 1, ushort.MaxValue);
                 s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 : s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
                 s.State = ActionState.Hitstun;
             }

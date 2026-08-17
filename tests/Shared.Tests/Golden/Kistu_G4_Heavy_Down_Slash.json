@@ -23,12 +23,13 @@
     "IsGrounded": true
   },
   "NpcFinal": {
-    "PY": 2.180706,
-    "PZ": 4.286778,
-    "VY": 0.3527999,
-    "VZ": 3.4608107,
+    "State": 2,
+    "PY": 1.1292365,
+    "PZ": 4.198401,
+    "VY": 0.6895192,
+    "VZ": 4.906184,
     "DamagePercent": 12,
-    "AirTimeTicks": 12,
+    "HitstunTicks": 12,
     "JumpsLeft": 2
   }
 }

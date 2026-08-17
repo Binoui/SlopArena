@@ -185,6 +185,11 @@ client/Unity/Assets/Prefabs/Arena_*.prefab.meta
 client/Unity/Assets/Prefabs/Bridge_*.prefab
 client/Unity/Assets/Prefabs/Bridge_*.prefab.meta
 
+# Move-data report JSON: lossless per-tick dump (10s-1000s of KB), regenerate via
+# scripts/move-data.sh --json instead of committing (docs/systems/move-data-report.md).
+# The .html/.md renderings of the same data stay committed.
+docs/generated/*-move-data.json
+
 # Prevent Unity .meta file leaks into pure .NET Shared directory
 src/Shared/**/*.meta
 
@@ -211,3 +216,4 @@ TESTING-UNITY.md
 
 # Staged by scripts/build-release.sh (bundled server + arenas for player build)
 /client/Unity/Assets/StreamingAssets/
+.entire/

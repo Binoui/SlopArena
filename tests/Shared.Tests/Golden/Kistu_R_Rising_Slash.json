@@ -22,15 +22,17 @@
   },
   "PlayerFinal": {
     "PY": 1.9166666,
-    "PZ": 1.1666666,
+    "PZ": 1.3333333,
     "AirTimeTicks": 32,
     "JumpsLeft": 2
   },
   "NpcFinal": {
-    "PY": 0.75,
-    "PZ": 1.1726308,
+    "PY": 1.0146537,
+    "PZ": 1.5177639,
+    "VY": -0.44891673,
+    "VZ": 0.4098462,
     "DamagePercent": 7,
-    "JumpsLeft": 2,
-    "IsGrounded": true
+    "AirTimeTicks": 5,
+    "JumpsLeft": 2
   }
 }

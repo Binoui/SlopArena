@@ -151,7 +151,7 @@ public class BurstTests
     }
 
     [Fact]
-    public void OffensiveBurst_Hitbox_FixedKnockback_NoDamageScaling_SmallStun()
+    public void OffensiveBurst_Hitbox_FixedKnockback_NoDamageScaling_DerivedStun()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var p = TestHelpers.PlayerState();
@@ -175,9 +175,9 @@ public class BurstTests
         // growth 0 means zero damage scaling even at 400%. Tolerance covers the
         // small +damage·0.1 contribution to the unscaled magnitude.
         TestHelpers.AssertNear(BurstConfig.HitboxBaseKnockback * Simulation.KbScaleFactor, kvMag, 0.1f);
-        // Hitstun is KV-derived (0.5·magnitude, ADR-0019), not the authored HitboxStunTicks.
-        // Assert the move's actual invariant — a small stun — rather than a stale exact count.
-        Assert.InRange(n.HitstunTicks, (int)1, (int)10);
+        // Hitstun is KV-derived (0.7·(mag+20), ADR-0019 melee-shape), not the authored
+        // HitboxStunTicks: burst base 10 + dmg·0.1 → mag 10.4 → stun 0.7·30.4 ≈ 21.
+        Assert.InRange(n.HitstunTicks, (int)20, (int)22);
         Assert.Equal(404, n.DamagePercent);
         Assert.Equal(ActionState.Hitstun, n.State);
     }
