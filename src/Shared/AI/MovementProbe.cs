@@ -33,13 +33,15 @@ namespace SlopArena.Shared
 
         public sealed record FallMetrics(float MaxFallSpeed, int TimeToMaxFallTicks, int DescentTicks,
             MovementSample[] NaturalCurve, float FastFallSpeed, int FastFallReachTicks, int FastFallDescentTicks,
-            MovementSample[] FastFallCurve);
+            MovementSample[] FastFallCurve, int FastFallFromJumpTicks);
 
         public sealed record StopMetrics(int StopTicks, float StopDistance, MovementSample[] Curve);
 
+        public sealed record ReversalMetrics(int ReversalTicks, float Displacement, MovementSample[] Curve);
+
         public sealed record CharacterMovement(string Character, MovementStats Authored, RunMetrics Run,
             DashMetrics Dash, JumpMetrics Jump, JumpMetrics RunningJump, JumpMetrics DoubleJump,
-            FallMetrics Fall, StopMetrics Stop);
+            JumpMetrics ShortHop, FallMetrics Fall, StopMetrics Stop, ReversalMetrics Reversal);
 
         // ── Scenarios ──────────────────────────────────────────────────────────
 
@@ -123,26 +125,56 @@ namespace SlopArena.Shared
             int timeToMaxFall = First(natural, s => s.Vy <= -m.MaxFallSpeed * 0.999f, natural.Count - 1);
             int naturalLanding = FirstLanding(natural, 0);
             int fastLanding = FirstLanding(fast, 0);
+            // Fast fall from the straight jump's apex — the landing-mixup number (a 50 m
+            // drop's descent doesn't represent jump play).
+            var jumpFast = RunSim(def, arena, groundY,
+                t => t == straightApex ? Input(down: true) : t < straightApex ? JumpHold(right: false)(t) : Input(down: true),
+                300);
+            int jumpFastLanding = FirstLanding(jumpFast, straightTakeoff);
             var fallMetrics = new FallMetrics(maxFall, timeToMaxFall, naturalLanding,
                 natural.ToArray(), -Min(fast, s => s.Vy),
                 First(fast, s => s.Vy <= -m.FastFallSpeed * 0.999f, fast.Count - 1),
-                fastLanding, fast.ToArray());
+                fastLanding, fast.ToArray(), jumpFastLanding - straightApex);
+
+            // Short hop: press + release inside the short-hop window (tick-0 press only,
+            // no JumpHeld sustain) — squat expiry applies ShortHopForce.
+            var shortHop = RunSim(def, arena, groundY,
+                t => t == 0 ? Input(right: true, jump: true, jumpHeld: true) : Input(right: true), 200);
+            int shTakeoff = First(shortHop, s => !s.IsGrounded, 0);
+            int shLanding = FirstLanding(shortHop, shTakeoff);
+            int shApex = ArgMax(shortHop, s => s.PosY);
+            float shDrift = 0f;
+            for (int i = shTakeoff; i < shLanding; i++)
+                if (shortHop[i].Speed > shDrift) shDrift = shortHop[i].Speed;
+            var shortHopMetrics = new JumpMetrics(
+                shortHop[shApex].PosY - groundY, shApex - shTakeoff, shLanding - shTakeoff,
+                shortHop[shLanding].PosX - shortHop[shTakeoff].PosX, shDrift, shortHop.ToArray());
 
             // Stop: cruise 30 ticks, release everything.
             var stop = RunSim(def, arena, groundY, t => t < 30 ? Input(right: true) : default, 90);
             int stopTick = First(stop, s => s.Tick >= 30 && s.Speed < 0.01f, 30);
             var stopMetrics = new StopMetrics(stopTick - 30, stop[stopTick].PosX - stop[30].PosX, stop.ToArray());
 
+            // Reversal: cruise right 30 ticks, then full opposite input. A 180° flip does
+            // NOT refresh the rush window (that only fires on perpendicular redirects,
+            // |dirChangeDot| < 0.5) — so a reversal is the pivot skid through zero
+            // (TurnaroundFriction) followed by the soft-start re-accel
+            // (RunAccelerationA + B). This is the accel curve's only real context.
+            var rev = RunSim(def, arena, groundY, t => t < 30 ? Input(right: true) : Input(left: true), 90);
+            int revDone = First(rev, s => s.Tick > 30 && s.Speed >= m.RunSpeed * 0.99f, 89);
+            var reversalMetrics = new ReversalMetrics(revDone - 30, Math.Abs(rev[revDone].PosX - rev[30].PosX),
+                rev.ToArray());
+
             return new CharacterMovement(def.DisplayName, m, runMetrics, dashMetrics, jumpMetrics,
-                runningJump, doubleJump, fallMetrics, stopMetrics);
+                runningJump, doubleJump, shortHopMetrics, fallMetrics, stopMetrics, reversalMetrics);
         }
 
         // ── Sim driving ────────────────────────────────────────────────────────
 
-        private static InputState Input(bool right = false, bool jump = false, bool jumpHeld = false,
-            bool dash = false, bool down = false) => new()
+        private static InputState Input(bool right = false, bool left = false, bool jump = false,
+            bool jumpHeld = false, bool dash = false, bool down = false) => new()
         {
-            MoveX = right ? 1f : 0f,
+            MoveX = right ? 1f : left ? -1f : 0f,
             Jump = jump,
             JumpHeld = jumpHeld,
             Dash = dash,

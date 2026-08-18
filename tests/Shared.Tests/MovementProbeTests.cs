@@ -72,6 +72,10 @@ public class MovementProbeTests
         Assert.True(fall.FastFallReachTicks <= 3, $"took {fall.FastFallReachTicks} ticks to reach FF");
         Assert.True(fall.FastFallDescentTicks < fall.DescentTicks,
             "fast fall should descend faster than natural fall");
+        // From a real full-jump apex the fast-fall descent is under a quarter second —
+        // the landing-mixup window (natural ~0.3s → fast-fall ~0.03s).
+        Assert.True(fall.FastFallFromJumpTicks < 15,
+            $"jump fast-fall descent {fall.FastFallFromJumpTicks} ticks");
     }
 
     [Fact]
@@ -88,6 +92,32 @@ public class MovementProbeTests
         var stop = Measured().Stop;
         Assert.True(stop.StopTicks <= 30, $"stop took {stop.StopTicks} ticks");
         Assert.True(stop.StopDistance <= 4f, $"stop distance {stop.StopDistance:F2}m");
+    }
+
+    [Fact]
+    public void ShortHop_Apex_RespectsShortHopForce()
+    {
+        var sh = Measured().ShortHop;
+        float expected = (M.ShortHopForce * M.ShortHopForce) / (2f * M.Gravity);
+        // Sample quantization lands up to ~10% below the theoretical peak (short hops are
+        // short — the discrete max sits one tick off the true apex).
+        Assert.True(Math.Abs(sh.ApexHeight - expected) <= expected * 0.12f,
+            $"short-hop apex {sh.ApexHeight:F2} vs {expected:F2}");
+        // A short hop is shorter AND faster than the full hop.
+        Assert.True(sh.ApexHeight < Measured().Jump.ApexHeight, "short hop taller than full hop");
+        Assert.True(sh.AirtimeTicks < Measured().Jump.AirtimeTicks, "short hop slower than full hop");
+    }
+
+    [Fact]
+    public void Reversal_FromCruise_IsPivotSkidThenReaccel()
+    {
+        var rev = Measured().Reversal;
+        // A 180° flip does NOT refresh the rush window (perpendicular redirects only), so
+        // reversal = skid through zero + soft-start re-accel. It must take longer than a
+        // single tick (no instant flip) and complete within a sane window.
+        Assert.True(rev.ReversalTicks > 5, $"reversal suspiciously instant ({rev.ReversalTicks} ticks)");
+        Assert.True(rev.ReversalTicks <= 60, $"reversal too slow ({rev.ReversalTicks} ticks)");
+        Assert.True(rev.Displacement > 1f, $"reversal displacement {rev.Displacement:F2}m");
     }
 
     [Fact]
