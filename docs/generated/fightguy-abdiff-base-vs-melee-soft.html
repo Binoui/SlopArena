@@ -1,0 +1,1115 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>FightGuy tuning A/B diff</title><style>
+body{font-family:system-ui,sans-serif;margin:24px;color:#1c1e21;}h1{font-size:22px;}h2{margin-top:32px;border-bottom:1px solid #ddd;padding-bottom:4px;}h3{margin-top:20px;font-size:15px;}.meta{color:#666;font-size:13px;margin-bottom:16px;max-width:900px;line-height:1.5;}
+table.heat{border-collapse:collapse;font-size:13px;margin:6px 0 14px;}table.heat td,table.heat th{border:1px solid #ccc;padding:3px 8px;text-align:center;white-space:nowrap;}table.heat td.move,table.heat th.move{text-align:left;}table.heat th{background:#f2f3f5;}
+.legend{font-size:12px;color:#444;margin:6px 0 16px;max-width:900px;line-height:1.5;}
+.d{font-weight:600;}.dpos{color:#1a7f37;}.dneg{color:#c0392b;}.dzero{color:#999;}
+.gained{background:#d9f2d9;font-weight:600;}.lost{background:#fdecea;font-weight:600;}.shift{background:#fcf3d4;}.none{color:#999;}
+.summary td{padding:4px 14px 4px 0;font-size:13px;}.big{font-size:17px;font-weight:600;}.badge{font-size:11px;padding:1px 6px;border-radius:9px;margin-left:6px;}.badge.g{background:#d9f2d9;color:#1a7f37;}.badge.r{background:#fdecea;color:#c0392b;}
+</style></head><body>
+<h1>FightGuy — tuning A/B diff</h1>
+<div class="meta">Tool 1.0.0 &middot; generated 2026-08-18 15:56 UTC UTC &middot; commit <code>fd927fc8b16e41030ecbc8eb5d4da01ccdfe099c</code> &middot; seed 20260817 (same on both sides, so match variance cancels) &middot; 10 self-play matches &middot; percents 0, 30, 60, 90, 120, 150.<br>Baseline: <b>base</b> — base — shipped — stun 0.7×(mag+20), KV×0.11 &middot; Candidate: <b>melee-soft</b> — melee-soft — Melee shape, softer — stun 0.45×mag, KV×0.17. Both runs use the real ServerSimulation; the diff walks the structured JSON (no physics re-run).</div>
+<h2>Summary</h2>
+<table class="summary"><tbody>
+<tr><td>move data</td><td class="big">11/11</td><td>moves changed (KV / stun / adv / apex / kill%)</td></tr>
+<tr><td>combo links</td><td class="big"><span class="badge g">+0 gained</span><span class="badge r">-8 lost</span></td><td>true-combo links across all starters &times; hit states &times; percents</td></tr>
+<tr><td>telemetry</td><td class="big">10/15</td><td>stats moved (hit rate, combos, damage, wins, duration)</td></tr>
+</tbody></table>
+<h2>Move-data diff</h2>
+<div class="legend">Per move &times; victim %: base &rarr; candidate for knockback velocity (KV, m/s), hitstun (ticks), frame advantage (ticks) and apex (m); kill% at move level (lowest % at which the launch crosses a blast line). Cell shows <code>base &rarr; cand</code> with the delta colored: green = higher in candidate, red = lower. Gray = unchanged.</div>
+<h3>g1 Low Kick</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>2.77 &rarr; 4.28 <span class="d dpos">(+1.51)</span></td><td>31 &rarr; 11 <span class="d dneg">(-20)</span></td><td>22 &rarr; 2 <span class="d dneg">(-20)</span></td><td>0.2 &rarr; 0.11 <span class="d dneg">(-0.09)</span></td></tr>
+<tr><td class="move">30%</td><td>3.43 &rarr; 5.3 <span class="d dpos">(+1.87)</span></td><td>35 &rarr; 14 <span class="d dneg">(-21)</span></td><td>26 &rarr; 5 <span class="d dneg">(-21)</span></td><td>0.27 &rarr; 0.17 <span class="d dneg">(-0.1)</span></td></tr>
+<tr><td class="move">60%</td><td>4.09 &rarr; 6.32 <span class="d dpos">(+2.23)</span></td><td>40 &rarr; 16 <span class="d dneg">(-24)</span></td><td>31 &rarr; 7 <span class="d dneg">(-24)</span></td><td>0.38 &rarr; 0.24 <span class="d dneg">(-0.14)</span></td></tr>
+<tr><td class="move">90%</td><td>4.75 &rarr; 7.34 <span class="d dpos">(+2.59)</span></td><td>44 &rarr; 19 <span class="d dneg">(-25)</span></td><td>35 &rarr; 10 <span class="d dneg">(-25)</span></td><td>0.48 &rarr; 0.34 <span class="d dneg">(-0.15)</span></td></tr>
+<tr><td class="move">120%</td><td>5.41 &rarr; 8.36 <span class="d dpos">(+2.95)</span></td><td>48 &rarr; 22 <span class="d dneg">(-26)</span></td><td>39 &rarr; 13 <span class="d dneg">(-26)</span></td><td>0.6 &rarr; 0.45 <span class="d dneg">(-0.16)</span></td></tr>
+<tr><td class="move">150%</td><td>6.07 &rarr; 9.38 <span class="d dpos">(+3.31)</span></td><td>52 &rarr; 24 <span class="d dneg">(-28)</span></td><td>43 &rarr; 15 <span class="d dneg">(-28)</span></td><td>0.74 &rarr; 0.55 <span class="d dneg">(-0.19)</span></td></tr>
+</tbody></table>
+<h3>g2 Roundhouse</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>4.55 &rarr; 7.03 <span class="d dpos">(+2.48)</span></td><td>42 &rarr; 18 <span class="d dneg">(-24)</span></td><td>22 &rarr; -2 <span class="d dneg">(-24)</span></td><td>1.25 &rarr; 0.97 <span class="d dneg">(-0.28)</span></td></tr>
+<tr><td class="move">30%</td><td>5.61 &rarr; 8.66 <span class="d dpos">(+3.06)</span></td><td>49 &rarr; 22 <span class="d dneg">(-27)</span></td><td>29 &rarr; 2 <span class="d dneg">(-27)</span></td><td>1.82 &rarr; 1.49 <span class="d dneg">(-0.33)</span></td></tr>
+<tr><td class="move">60%</td><td>6.66 &rarr; 10.3 <span class="d dpos">(+3.63)</span></td><td>56 &rarr; 27 <span class="d dneg">(-29)</span></td><td>36 &rarr; 7 <span class="d dneg">(-29)</span></td><td>2.49 &rarr; 2.17 <span class="d dneg">(-0.32)</span></td></tr>
+<tr><td class="move">90%</td><td>7.72 &rarr; 11.93 <span class="d dpos">(+4.21)</span></td><td>63 &rarr; 31 <span class="d dneg">(-32)</span></td><td>43 &rarr; 11 <span class="d dneg">(-32)</span></td><td>3.26 &rarr; 2.91 <span class="d dneg">(-0.35)</span></td></tr>
+<tr><td class="move">120%</td><td>8.77 &rarr; 13.56 <span class="d dpos">(+4.79)</span></td><td>69 &rarr; 35 <span class="d dneg">(-34)</span></td><td>49 &rarr; 15 <span class="d dneg">(-34)</span></td><td>4.08 &rarr; 3.76 <span class="d dneg">(-0.33)</span></td></tr>
+<tr><td class="move">150%</td><td>9.83 &rarr; 15.19 <span class="d dpos">(+5.36)</span></td><td>76 &rarr; 40 <span class="d dneg">(-36)</span></td><td>56 &rarr; 20 <span class="d dneg">(-36)</span></td><td>5.06 &rarr; 4.81 <span class="d dneg">(-0.25)</span></td></tr>
+</tbody></table>
+<h3>g3 Roundhouse</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>4.55 &rarr; 7.03 <span class="d dpos">(+2.48)</span></td><td>42 &rarr; 18 <span class="d dneg">(-24)</span></td><td>22 &rarr; -2 <span class="d dneg">(-24)</span></td><td>1.25 &rarr; 0.97 <span class="d dneg">(-0.28)</span></td></tr>
+<tr><td class="move">30%</td><td>5.61 &rarr; 8.66 <span class="d dpos">(+3.06)</span></td><td>49 &rarr; 22 <span class="d dneg">(-27)</span></td><td>29 &rarr; 2 <span class="d dneg">(-27)</span></td><td>1.82 &rarr; 1.49 <span class="d dneg">(-0.33)</span></td></tr>
+<tr><td class="move">60%</td><td>6.66 &rarr; 10.3 <span class="d dpos">(+3.63)</span></td><td>56 &rarr; 27 <span class="d dneg">(-29)</span></td><td>36 &rarr; 7 <span class="d dneg">(-29)</span></td><td>2.49 &rarr; 2.17 <span class="d dneg">(-0.32)</span></td></tr>
+<tr><td class="move">90%</td><td>7.72 &rarr; 11.93 <span class="d dpos">(+4.21)</span></td><td>63 &rarr; 31 <span class="d dneg">(-32)</span></td><td>43 &rarr; 11 <span class="d dneg">(-32)</span></td><td>3.26 &rarr; 2.91 <span class="d dneg">(-0.35)</span></td></tr>
+<tr><td class="move">120%</td><td>8.77 &rarr; 13.56 <span class="d dpos">(+4.79)</span></td><td>69 &rarr; 35 <span class="d dneg">(-34)</span></td><td>49 &rarr; 15 <span class="d dneg">(-34)</span></td><td>4.08 &rarr; 3.76 <span class="d dneg">(-0.33)</span></td></tr>
+<tr><td class="move">150%</td><td>9.83 &rarr; 15.19 <span class="d dpos">(+5.36)</span></td><td>76 &rarr; 40 <span class="d dneg">(-36)</span></td><td>56 &rarr; 20 <span class="d dneg">(-36)</span></td><td>5.06 &rarr; 4.81 <span class="d dneg">(-0.25)</span></td></tr>
+</tbody></table>
+<h3>g4 Tornado Kick</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>3.14 &rarr; 4.86 <span class="d dpos">(+1.71)</span></td><td>33 &rarr; 12 <span class="d dneg">(-21)</span></td><td>-5 &rarr; -26 <span class="d dneg">(-21)</span></td><td>1.21 &rarr; 0.89 <span class="d dneg">(-0.31)</span></td></tr>
+<tr><td class="move">30%</td><td>3.87 &rarr; 5.98 <span class="d dpos">(+2.11)</span></td><td>38 &rarr; 15 <span class="d dneg">(-23)</span></td><td>0 &rarr; -23 <span class="d dneg">(-23)</span></td><td>1.73 &rarr; 1.39 <span class="d dneg">(-0.34)</span></td></tr>
+<tr><td class="move">60%</td><td>4.59 &rarr; 7.1 <span class="d dpos">(+2.51)</span></td><td>43 &rarr; 18 <span class="d dneg">(-25)</span></td><td>5 &rarr; -20 <span class="d dneg">(-25)</span></td><td>2.35 &rarr; 2 <span class="d dneg">(-0.36)</span></td></tr>
+<tr><td class="move">90%</td><td>5.32 &rarr; 8.22 <span class="d dpos">(+2.9)</span></td><td>47 &rarr; 21 <span class="d dneg">(-26)</span></td><td>9 &rarr; -17 <span class="d dneg">(-26)</span></td><td>3.01 &rarr; 2.72 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">120%</td><td>6.05 &rarr; 9.34 <span class="d dpos">(+3.3)</span></td><td>52 &rarr; 24 <span class="d dneg">(-28)</span></td><td>14 &rarr; -14 <span class="d dneg">(-28)</span></td><td>3.81 &rarr; 3.54 <span class="d dneg">(-0.27)</span></td></tr>
+<tr><td class="move">150%</td><td>6.77 &rarr; 10.47 <span class="d dpos">(+3.69)</span></td><td>57 &rarr; 27 <span class="d dneg">(-30)</span></td><td>19 &rarr; -11 <span class="d dneg">(-30)</span></td><td>4.7 &rarr; 4.48 <span class="d dneg">(-0.23)</span></td></tr>
+</tbody></table>
+<h3>a1 Double Punch</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>3.3 &rarr; 5.1 <span class="d dpos">(+1.8)</span></td><td>35 &rarr; 13 <span class="d dneg">(-22)</span></td><td>12 &rarr; -10 <span class="d dneg">(-22)</span></td><td>1.77 &rarr; 1.43 <span class="d dneg">(-0.35)</span></td></tr>
+<tr><td class="move">30%</td><td>4.09 &rarr; 6.33 <span class="d dpos">(+2.23)</span></td><td>40 &rarr; 16 <span class="d dneg">(-24)</span></td><td>17 &rarr; -7 <span class="d dneg">(-24)</span></td><td>2.55 &rarr; 2.21 <span class="d dneg">(-0.34)</span></td></tr>
+<tr><td class="move">60%</td><td>4.89 &rarr; 7.55 <span class="d dpos">(+2.67)</span></td><td>45 &rarr; 19 <span class="d dneg">(-26)</span></td><td>22 &rarr; -4 <span class="d dneg">(-26)</span></td><td>3.47 &rarr; 3.17 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">90%</td><td>5.68 &rarr; 8.78 <span class="d dpos">(+3.1)</span></td><td>50 &rarr; 23 <span class="d dneg">(-27)</span></td><td>27 &rarr; 0 <span class="d dneg">(-27)</span></td><td>4.53 &rarr; 4.42 <span class="d dneg">(-0.11)</span></td></tr>
+<tr><td class="move">120%</td><td>6.47 &rarr; 10 <span class="d dpos">(+3.53)</span></td><td>55 &rarr; 26 <span class="d dneg">(-29)</span></td><td>32 &rarr; 3 <span class="d dneg">(-29)</span></td><td>5.73 &rarr; 5.74 <span class="d dpos">(+0.01)</span></td></tr>
+<tr><td class="move">150%</td><td>7.26 &rarr; 11.22 <span class="d dpos">(+3.96)</span></td><td>60 &rarr; 29 <span class="d dneg">(-31)</span></td><td>37 &rarr; 6 <span class="d dneg">(-31)</span></td><td>7.06 &rarr; 7.23 <span class="d dpos">(+0.17)</span></td></tr>
+</tbody></table>
+<h3>a1 Double Punch (hit 2)</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>4.29 &rarr; 6.63 <span class="d dpos">(+2.34)</span></td><td>41 &rarr; 17 <span class="d dneg">(-24)</span></td><td>28 &rarr; 4 <span class="d dneg">(-24)</span></td><td>2.33 &rarr; 2 <span class="d dneg">(-0.33)</span></td></tr>
+<tr><td class="move">30%</td><td>5.28 &rarr; 8.16 <span class="d dpos">(+2.88)</span></td><td>47 &rarr; 21 <span class="d dneg">(-26)</span></td><td>34 &rarr; 8 <span class="d dneg">(-26)</span></td><td>3.33 &rarr; 3.06 <span class="d dneg">(-0.26)</span></td></tr>
+<tr><td class="move">60%</td><td>6.27 &rarr; 9.69 <span class="d dpos">(+3.42)</span></td><td>53 &rarr; 25 <span class="d dneg">(-28)</span></td><td>40 &rarr; 12 <span class="d dneg">(-28)</span></td><td>4.51 &rarr; 4.36 <span class="d dneg">(-0.15)</span></td></tr>
+<tr><td class="move">90%</td><td>7.26 &rarr; 11.22 <span class="d dpos">(+3.96)</span></td><td>60 &rarr; 29 <span class="d dneg">(-31)</span></td><td>47 &rarr; 16 <span class="d dneg">(-31)</span></td><td>5.95 &rarr; 5.88 <span class="d dneg">(-0.06)</span></td></tr>
+<tr><td class="move">120%</td><td>8.25 &rarr; 12.75 <span class="d dpos">(+4.5)</span></td><td>66 &rarr; 33 <span class="d dneg">(-33)</span></td><td>53 &rarr; 20 <span class="d dneg">(-33)</span></td><td>7.49 &rarr; 7.64 <span class="d dpos">(+0.15)</span></td></tr>
+<tr><td class="move">150%</td><td>9.24 &rarr; 14.28 <span class="d dpos">(+5.04)</span></td><td>72 &rarr; 37 <span class="d dneg">(-35)</span></td><td>59 &rarr; 24 <span class="d dneg">(-35)</span></td><td>9.2 &rarr; 9.62 <span class="d dpos">(+0.41)</span></td></tr>
+</tbody></table>
+<h3>a2 Floating Kick</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>5.19 &rarr; 8.01 <span class="d dpos">(+2.83)</span></td><td>46 &rarr; 21 <span class="d dneg">(-25)</span></td><td>17 &rarr; -8 <span class="d dneg">(-25)</span></td><td>1.06 &rarr; 0.83 <span class="d dneg">(-0.23)</span></td></tr>
+<tr><td class="move">30%</td><td>6.37 &rarr; 9.85 <span class="d dpos">(+3.48)</span></td><td>54 &rarr; 26 <span class="d dneg">(-28)</span></td><td>25 &rarr; -3 <span class="d dneg">(-28)</span></td><td>1.54 &rarr; 1.27 <span class="d dneg">(-0.27)</span></td></tr>
+<tr><td class="move">60%</td><td>7.56 &rarr; 11.69 <span class="d dpos">(+4.12)</span></td><td>62 &rarr; 30 <span class="d dneg">(-32)</span></td><td>33 &rarr; 1 <span class="d dneg">(-32)</span></td><td>2.11 &rarr; 1.76 <span class="d dneg">(-0.35)</span></td></tr>
+<tr><td class="move">90%</td><td>8.75 &rarr; 13.52 <span class="d dpos">(+4.77)</span></td><td>69 &rarr; 35 <span class="d dneg">(-34)</span></td><td>40 &rarr; 6 <span class="d dneg">(-34)</span></td><td>2.73 &rarr; 2.39 <span class="d dneg">(-0.34)</span></td></tr>
+<tr><td class="move">120%</td><td>9.94 &rarr; 15.36 <span class="d dpos">(+5.42)</span></td><td>77 &rarr; 40 <span class="d dneg">(-37)</span></td><td>48 &rarr; 11 <span class="d dneg">(-37)</span></td><td>3.47 &rarr; 3.11 <span class="d dneg">(-0.36)</span></td></tr>
+<tr><td class="move">150%</td><td>11.13 &rarr; 17.19 <span class="d dpos">(+6.07)</span></td><td>84 &rarr; 45 <span class="d dneg">(-39)</span></td><td>55 &rarr; 16 <span class="d dneg">(-39)</span></td><td>4.26 &rarr; 3.93 <span class="d dneg">(-0.32)</span></td></tr>
+</tbody></table>
+<div class="legend">kill%: 231 &rarr; 231 <span class="d dzero">(0)</span></div>
+<h3>a2 Floating Kick (hit 2)</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>2.85 &rarr; 4.41 <span class="d dpos">(+1.56)</span></td><td>32 &rarr; 11 <span class="d dneg">(-21)</span></td><td>8 &rarr; -13 <span class="d dneg">(-21)</span></td><td>0.39 &rarr; 0.23 <span class="d dneg">(-0.17)</span></td></tr>
+<tr><td class="move">30%</td><td>3.58 &rarr; 5.53 <span class="d dpos">(+1.95)</span></td><td>36 &rarr; 14 <span class="d dneg">(-22)</span></td><td>12 &rarr; -10 <span class="d dneg">(-22)</span></td><td>0.56 &rarr; 0.37 <span class="d dneg">(-0.19)</span></td></tr>
+<tr><td class="move">60%</td><td>4.3 &rarr; 6.65 <span class="d dpos">(+2.35)</span></td><td>41 &rarr; 17 <span class="d dneg">(-24)</span></td><td>17 &rarr; -7 <span class="d dneg">(-24)</span></td><td>0.78 &rarr; 0.55 <span class="d dneg">(-0.23)</span></td></tr>
+<tr><td class="move">90%</td><td>5.03 &rarr; 7.77 <span class="d dpos">(+2.74)</span></td><td>46 &rarr; 20 <span class="d dneg">(-26)</span></td><td>22 &rarr; -4 <span class="d dneg">(-26)</span></td><td>1.03 &rarr; 0.77 <span class="d dneg">(-0.26)</span></td></tr>
+<tr><td class="move">120%</td><td>5.76 &rarr; 8.89 <span class="d dpos">(+3.14)</span></td><td>50 &rarr; 23 <span class="d dneg">(-27)</span></td><td>26 &rarr; -1 <span class="d dneg">(-27)</span></td><td>1.28 &rarr; 1.01 <span class="d dneg">(-0.27)</span></td></tr>
+<tr><td class="move">150%</td><td>6.48 &rarr; 10.02 <span class="d dpos">(+3.54)</span></td><td>55 &rarr; 26 <span class="d dneg">(-29)</span></td><td>31 &rarr; 2 <span class="d dneg">(-29)</span></td><td>1.6 &rarr; 1.3 <span class="d dneg">(-0.3)</span></td></tr>
+</tbody></table>
+<h3>a2 Floating Kick (hit 3)</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>2.85 &rarr; 4.41 <span class="d dpos">(+1.56)</span></td><td>32 &rarr; 11 <span class="d dneg">(-21)</span></td><td>2 &rarr; -19 <span class="d dneg">(-21)</span></td><td>0.39 &rarr; 0.23 <span class="d dneg">(-0.17)</span></td></tr>
+<tr><td class="move">30%</td><td>3.58 &rarr; 5.53 <span class="d dpos">(+1.95)</span></td><td>36 &rarr; 14 <span class="d dneg">(-22)</span></td><td>6 &rarr; -16 <span class="d dneg">(-22)</span></td><td>0.56 &rarr; 0.37 <span class="d dneg">(-0.19)</span></td></tr>
+<tr><td class="move">60%</td><td>4.3 &rarr; 6.65 <span class="d dpos">(+2.35)</span></td><td>41 &rarr; 17 <span class="d dneg">(-24)</span></td><td>11 &rarr; -13 <span class="d dneg">(-24)</span></td><td>0.78 &rarr; 0.55 <span class="d dneg">(-0.23)</span></td></tr>
+<tr><td class="move">90%</td><td>5.03 &rarr; 7.77 <span class="d dpos">(+2.74)</span></td><td>46 &rarr; 20 <span class="d dneg">(-26)</span></td><td>16 &rarr; -10 <span class="d dneg">(-26)</span></td><td>1.03 &rarr; 0.77 <span class="d dneg">(-0.26)</span></td></tr>
+<tr><td class="move">120%</td><td>5.76 &rarr; 8.89 <span class="d dpos">(+3.14)</span></td><td>50 &rarr; 23 <span class="d dneg">(-27)</span></td><td>20 &rarr; -7 <span class="d dneg">(-27)</span></td><td>1.28 &rarr; 1.01 <span class="d dneg">(-0.27)</span></td></tr>
+<tr><td class="move">150%</td><td>6.48 &rarr; 10.02 <span class="d dpos">(+3.54)</span></td><td>55 &rarr; 26 <span class="d dneg">(-29)</span></td><td>25 &rarr; -4 <span class="d dneg">(-29)</span></td><td>1.6 &rarr; 1.3 <span class="d dneg">(-0.3)</span></td></tr>
+</tbody></table>
+<h3>a3 High Kick</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>5.34 &rarr; 8.25 <span class="d dpos">(+2.91)</span></td><td>47 &rarr; 21 <span class="d dneg">(-26)</span></td><td>19 &rarr; -7 <span class="d dneg">(-26)</span></td><td>0.89 &rarr; 0.66 <span class="d dneg">(-0.22)</span></td></tr>
+<tr><td class="move">30%</td><td>6.53 &rarr; 10.08 <span class="d dpos">(+3.56)</span></td><td>55 &rarr; 26 <span class="d dneg">(-29)</span></td><td>27 &rarr; -2 <span class="d dneg">(-29)</span></td><td>1.28 &rarr; 1.01 <span class="d dneg">(-0.26)</span></td></tr>
+<tr><td class="move">60%</td><td>7.71 &rarr; 11.92 <span class="d dpos">(+4.21)</span></td><td>63 &rarr; 31 <span class="d dneg">(-32)</span></td><td>35 &rarr; 3 <span class="d dneg">(-32)</span></td><td>1.74 &rarr; 1.44 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">90%</td><td>8.9 &rarr; 13.76 <span class="d dpos">(+4.86)</span></td><td>70 &rarr; 36 <span class="d dneg">(-34)</span></td><td>42 &rarr; 8 <span class="d dneg">(-34)</span></td><td>2.24 &rarr; 1.94 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">120%</td><td>10.09 &rarr; 15.59 <span class="d dpos">(+5.5)</span></td><td>78 &rarr; 41 <span class="d dneg">(-37)</span></td><td>50 &rarr; 13 <span class="d dneg">(-37)</span></td><td>2.83 &rarr; 2.51 <span class="d dneg">(-0.32)</span></td></tr>
+<tr><td class="move">150%</td><td>11.28 &rarr; 17.43 <span class="d dpos">(+6.15)</span></td><td>85 &rarr; 46 <span class="d dneg">(-39)</span></td><td>57 &rarr; 18 <span class="d dneg">(-39)</span></td><td>3.46 &rarr; 3.16 <span class="d dneg">(-0.3)</span></td></tr>
+</tbody></table>
+<div class="legend">kill%: 232 &rarr; 232 <span class="d dzero">(0)</span></div>
+<h3>a4 Air Tornado</h3>
+<table class="heat"><thead><tr><th class="move">%</th><th>KV</th><th>stun</th><th>adv</th><th>apex</th></tr></thead><tbody>
+<tr><td class="move">0%</td><td>3.38 &rarr; 5.22 <span class="d dpos">(+1.84)</span></td><td>35 &rarr; 13 <span class="d dneg">(-22)</span></td><td>7 &rarr; -15 <span class="d dneg">(-22)</span></td><td>1.22 &rarr; 0.89 <span class="d dneg">(-0.32)</span></td></tr>
+<tr><td class="move">30%</td><td>4.17 &rarr; 6.45 <span class="d dpos">(+2.28)</span></td><td>40 &rarr; 17 <span class="d dneg">(-23)</span></td><td>12 &rarr; -11 <span class="d dneg">(-23)</span></td><td>1.74 &rarr; 1.44 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">60%</td><td>4.96 &rarr; 7.67 <span class="d dpos">(+2.71)</span></td><td>45 &rarr; 20 <span class="d dneg">(-25)</span></td><td>17 &rarr; -8 <span class="d dneg">(-25)</span></td><td>2.35 &rarr; 2.05 <span class="d dneg">(-0.31)</span></td></tr>
+<tr><td class="move">90%</td><td>5.76 &rarr; 8.89 <span class="d dpos">(+3.14)</span></td><td>50 &rarr; 23 <span class="d dneg">(-27)</span></td><td>22 &rarr; -5 <span class="d dneg">(-27)</span></td><td>3.06 &rarr; 2.76 <span class="d dneg">(-0.3)</span></td></tr>
+<tr><td class="move">120%</td><td>6.55 &rarr; 10.12 <span class="d dpos">(+3.57)</span></td><td>55 &rarr; 26 <span class="d dneg">(-29)</span></td><td>27 &rarr; -2 <span class="d dneg">(-29)</span></td><td>3.85 &rarr; 3.57 <span class="d dneg">(-0.28)</span></td></tr>
+<tr><td class="move">150%</td><td>7.34 &rarr; 11.34 <span class="d dpos">(+4)</span></td><td>60 &rarr; 30 <span class="d dneg">(-30)</span></td><td>32 &rarr; 2 <span class="d dneg">(-30)</span></td><td>4.74 &rarr; 4.6 <span class="d dneg">(-0.14)</span></td></tr>
+</tbody></table>
+<h2>True-combo graph diff</h2>
+<div class="legend">Verdict transitions per starter &times; follow-up &times; victim %: <span class="gained">T gained</span> (was not a true combo, now lands in hitstun), <span class="lost">T lost</span> (was true, now doesn't), <span class="shift">F/T shift</span> (landed-after-stun &harr; never, or true &harr; landed-after-stun), plain = verdict unchanged. Tightness = window in ticks (stun &minus; attacker budget); <code>b &rarr; c</code> shows the shift when both sides were true.</div>
+<h3>g1 Low Kick — grounded hit <span class="badge g">+0</span><span class="badge r">-8</span></h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td class="lost" title="tight 18 &rarr; -2">T &rarr; F</td>
+<td class="lost" title="tight 22 &rarr; 1">T &rarr; F</td>
+<td title="tight 27 &rarr; 3">F &rarr; F</td>
+<td class="shift" title="tight 31 &rarr; 6">F &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 9">F &rarr; -</td>
+<td class="shift" title="tight 39 &rarr; 11">F &rarr; -</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 15 &rarr; -5">- &rarr; -</td>
+<td title="tight 19 &rarr; -2">- &rarr; -</td>
+<td title="tight 24 &rarr; 0">- &rarr; -</td>
+<td title="tight 28 &rarr; 3">- &rarr; -</td>
+<td title="tight 32 &rarr; 6">- &rarr; -</td>
+<td title="tight 36 &rarr; 8">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 15 &rarr; -5">F &rarr; F</td>
+<td title="tight 19 &rarr; -2">F &rarr; F</td>
+<td title="tight 24 &rarr; 0">F &rarr; F</td>
+<td class="shift" title="tight 28 &rarr; 3">F &rarr; -</td>
+<td class="shift" title="tight 32 &rarr; 6">F &rarr; -</td>
+<td class="shift" title="tight 36 &rarr; 8">F &rarr; -</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight 14 &rarr; -6">F &rarr; F</td>
+<td title="tight 18 &rarr; -3">F &rarr; F</td>
+<td title="tight 23 &rarr; -1">F &rarr; F</td>
+<td class="shift" title="tight 27 &rarr; 2">F &rarr; -</td>
+<td class="shift" title="tight 31 &rarr; 5">F &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 7">F &rarr; -</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td class="lost" title="tight 12 &rarr; -8">T &rarr; F</td>
+<td class="lost" title="tight 16 &rarr; -5">T &rarr; F</td>
+<td class="lost" title="tight 21 &rarr; -3">T &rarr; F</td>
+<td class="lost" title="tight 25 &rarr; 0">T &rarr; F</td>
+<td title="tight 29 &rarr; 3">F &rarr; F</td>
+<td class="lost" title="tight 33 &rarr; 5">T &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 11 &rarr; -9">F &rarr; -</td>
+<td class="shift" title="tight 15 &rarr; -6">F &rarr; -</td>
+<td class="shift" title="tight 20 &rarr; -4">F &rarr; -</td>
+<td class="shift" title="tight 24 &rarr; -1">- &rarr; F</td>
+<td class="shift" title="tight 28 &rarr; 2">- &rarr; F</td>
+<td class="shift" title="tight 32 &rarr; 4">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td class="lost" title="tight 5 &rarr; -15">T &rarr; F</td>
+<td title="tight 9 &rarr; -12">F &rarr; F</td>
+<td title="tight 14 &rarr; -10">F &rarr; F</td>
+<td title="tight 18 &rarr; -7">F &rarr; F</td>
+<td title="tight 22 &rarr; -4">F &rarr; F</td>
+<td title="tight 26 &rarr; -2">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 0 &rarr; -20">F &rarr; F</td>
+<td title="tight 4 &rarr; -17">F &rarr; F</td>
+<td title="tight 9 &rarr; -15">F &rarr; F</td>
+<td title="tight 13 &rarr; -12">F &rarr; F</td>
+<td title="tight 17 &rarr; -9">F &rarr; F</td>
+<td title="tight 21 &rarr; -7">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>g3 Roundhouse — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight 18 &rarr; -6">F &rarr; F</td>
+<td class="shift" title="tight 25 &rarr; -2">F &rarr; -</td>
+<td class="shift" title="tight 32 &rarr; 3">F &rarr; -</td>
+<td class="shift" title="tight 39 &rarr; 7">F &rarr; -</td>
+<td class="shift" title="tight 45 &rarr; 11">F &rarr; -</td>
+<td class="shift" title="tight 52 &rarr; 16">F &rarr; -</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td class="shift" title="tight 15 &rarr; -9">- &rarr; F</td>
+<td title="tight 22 &rarr; -5">- &rarr; -</td>
+<td title="tight 29 &rarr; 0">- &rarr; -</td>
+<td title="tight 36 &rarr; 4">- &rarr; -</td>
+<td title="tight 42 &rarr; 8">- &rarr; -</td>
+<td title="tight 49 &rarr; 13">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 15 &rarr; -9">F &rarr; F</td>
+<td class="shift" title="tight 22 &rarr; -5">F &rarr; -</td>
+<td class="shift" title="tight 29 &rarr; 0">F &rarr; -</td>
+<td class="shift" title="tight 36 &rarr; 4">F &rarr; -</td>
+<td class="shift" title="tight 42 &rarr; 8">F &rarr; -</td>
+<td class="shift" title="tight 49 &rarr; 13">F &rarr; -</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td class="shift" title="tight 14 &rarr; -10">F &rarr; -</td>
+<td class="shift" title="tight 21 &rarr; -6">F &rarr; -</td>
+<td class="shift" title="tight 28 &rarr; -1">F &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 3">F &rarr; -</td>
+<td class="shift" title="tight 41 &rarr; 7">F &rarr; -</td>
+<td class="shift" title="tight 48 &rarr; 12">F &rarr; -</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 12 &rarr; -12">F &rarr; F</td>
+<td title="tight 19 &rarr; -8">F &rarr; F</td>
+<td title="tight 26 &rarr; -3">F &rarr; F</td>
+<td title="tight 33 &rarr; 1">F &rarr; F</td>
+<td title="tight 39 &rarr; 5">F &rarr; F</td>
+<td title="tight 46 &rarr; 10">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td title="tight 11 &rarr; -13">F &rarr; F</td>
+<td title="tight 18 &rarr; -9">F &rarr; F</td>
+<td title="tight 25 &rarr; -4">F &rarr; F</td>
+<td class="shift" title="tight 32 &rarr; 0">F &rarr; -</td>
+<td title="tight 38 &rarr; 4">- &rarr; -</td>
+<td class="shift" title="tight 45 &rarr; 9">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 5 &rarr; -19">F &rarr; F</td>
+<td title="tight 12 &rarr; -15">F &rarr; F</td>
+<td title="tight 19 &rarr; -10">F &rarr; F</td>
+<td title="tight 26 &rarr; -6">F &rarr; F</td>
+<td title="tight 32 &rarr; -2">F &rarr; F</td>
+<td title="tight 39 &rarr; 3">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 0 &rarr; -24">F &rarr; F</td>
+<td class="shift" title="tight 7 &rarr; -20">F &rarr; -</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 21 &rarr; -11">F &rarr; F</td>
+<td title="tight 27 &rarr; -7">F &rarr; F</td>
+<td title="tight 34 &rarr; -2">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>g3 Roundhouse — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight 18 &rarr; -6">F &rarr; F</td>
+<td class="shift" title="tight 25 &rarr; -2">F &rarr; -</td>
+<td class="shift" title="tight 32 &rarr; 3">F &rarr; -</td>
+<td class="shift" title="tight 39 &rarr; 7">F &rarr; -</td>
+<td class="shift" title="tight 45 &rarr; 11">F &rarr; -</td>
+<td class="shift" title="tight 52 &rarr; 16">F &rarr; -</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td class="shift" title="tight 15 &rarr; -9">- &rarr; F</td>
+<td title="tight 22 &rarr; -5">- &rarr; -</td>
+<td title="tight 29 &rarr; 0">- &rarr; -</td>
+<td title="tight 36 &rarr; 4">- &rarr; -</td>
+<td title="tight 42 &rarr; 8">- &rarr; -</td>
+<td title="tight 49 &rarr; 13">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 15 &rarr; -9">F &rarr; F</td>
+<td class="shift" title="tight 22 &rarr; -5">F &rarr; -</td>
+<td class="shift" title="tight 29 &rarr; 0">F &rarr; -</td>
+<td class="shift" title="tight 36 &rarr; 4">F &rarr; -</td>
+<td class="shift" title="tight 42 &rarr; 8">F &rarr; -</td>
+<td class="shift" title="tight 49 &rarr; 13">F &rarr; -</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td class="shift" title="tight 14 &rarr; -10">F &rarr; -</td>
+<td class="shift" title="tight 21 &rarr; -6">F &rarr; -</td>
+<td class="shift" title="tight 28 &rarr; -1">F &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 3">F &rarr; -</td>
+<td class="shift" title="tight 41 &rarr; 7">F &rarr; -</td>
+<td class="shift" title="tight 48 &rarr; 12">F &rarr; -</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 12 &rarr; -12">F &rarr; F</td>
+<td title="tight 19 &rarr; -8">F &rarr; F</td>
+<td title="tight 26 &rarr; -3">F &rarr; F</td>
+<td title="tight 33 &rarr; 1">F &rarr; F</td>
+<td title="tight 39 &rarr; 5">F &rarr; F</td>
+<td title="tight 46 &rarr; 10">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 11 &rarr; -13">F &rarr; -</td>
+<td title="tight 18 &rarr; -9">- &rarr; -</td>
+<td class="shift" title="tight 25 &rarr; -4">F &rarr; -</td>
+<td title="tight 32 &rarr; 0">- &rarr; -</td>
+<td title="tight 38 &rarr; 4">- &rarr; -</td>
+<td title="tight 45 &rarr; 9">- &rarr; -</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 5 &rarr; -19">F &rarr; F</td>
+<td title="tight 12 &rarr; -15">F &rarr; F</td>
+<td title="tight 19 &rarr; -10">F &rarr; F</td>
+<td title="tight 26 &rarr; -6">F &rarr; F</td>
+<td title="tight 32 &rarr; -2">F &rarr; F</td>
+<td title="tight 39 &rarr; 3">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 0 &rarr; -24">F &rarr; F</td>
+<td title="tight 7 &rarr; -20">F &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 21 &rarr; -11">F &rarr; F</td>
+<td title="tight 27 &rarr; -7">F &rarr; F</td>
+<td title="tight 34 &rarr; -2">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>g4 Tornado Kick — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight -9 &rarr; -30">F &rarr; F</td>
+<td title="tight -4 &rarr; -27">F &rarr; F</td>
+<td title="tight 1 &rarr; -24">F &rarr; F</td>
+<td title="tight 5 &rarr; -21">F &rarr; F</td>
+<td title="tight 10 &rarr; -18">F &rarr; F</td>
+<td class="shift" title="tight 15 &rarr; -15">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight -12 &rarr; -33">- &rarr; -</td>
+<td title="tight -7 &rarr; -30">- &rarr; -</td>
+<td title="tight -2 &rarr; -27">- &rarr; -</td>
+<td title="tight 2 &rarr; -24">- &rarr; -</td>
+<td title="tight 7 &rarr; -21">- &rarr; -</td>
+<td title="tight 12 &rarr; -18">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight -12 &rarr; -33">F &rarr; F</td>
+<td title="tight -7 &rarr; -30">F &rarr; F</td>
+<td title="tight -2 &rarr; -27">F &rarr; F</td>
+<td title="tight 2 &rarr; -24">F &rarr; F</td>
+<td title="tight 7 &rarr; -21">F &rarr; F</td>
+<td class="shift" title="tight 12 &rarr; -18">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -13 &rarr; -34">F &rarr; F</td>
+<td title="tight -8 &rarr; -31">F &rarr; F</td>
+<td title="tight -3 &rarr; -28">F &rarr; F</td>
+<td title="tight 1 &rarr; -25">F &rarr; F</td>
+<td class="shift" title="tight 6 &rarr; -22">- &rarr; F</td>
+<td class="shift" title="tight 11 &rarr; -19">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight -15 &rarr; -36">F &rarr; F</td>
+<td title="tight -10 &rarr; -33">F &rarr; F</td>
+<td title="tight -5 &rarr; -30">F &rarr; F</td>
+<td title="tight -1 &rarr; -27">F &rarr; F</td>
+<td title="tight 4 &rarr; -24">F &rarr; F</td>
+<td title="tight 9 &rarr; -21">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight -16 &rarr; -37">F &rarr; -</td>
+<td class="shift" title="tight -11 &rarr; -34">- &rarr; F</td>
+<td title="tight -6 &rarr; -31">- &rarr; -</td>
+<td title="tight -2 &rarr; -28">F &rarr; F</td>
+<td title="tight 3 &rarr; -25">F &rarr; F</td>
+<td class="shift" title="tight 8 &rarr; -22">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight -22 &rarr; -43">F &rarr; F</td>
+<td title="tight -17 &rarr; -40">F &rarr; F</td>
+<td title="tight -12 &rarr; -37">F &rarr; F</td>
+<td title="tight -8 &rarr; -34">F &rarr; F</td>
+<td title="tight -3 &rarr; -31">F &rarr; F</td>
+<td title="tight 2 &rarr; -28">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -27 &rarr; -48">F &rarr; F</td>
+<td title="tight -22 &rarr; -45">F &rarr; F</td>
+<td title="tight -17 &rarr; -42">F &rarr; F</td>
+<td title="tight -13 &rarr; -39">F &rarr; F</td>
+<td title="tight -8 &rarr; -36">F &rarr; F</td>
+<td title="tight -3 &rarr; -33">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>g4 Tornado Kick — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight -9 &rarr; -30">F &rarr; F</td>
+<td title="tight -4 &rarr; -27">F &rarr; F</td>
+<td title="tight 1 &rarr; -24">F &rarr; F</td>
+<td title="tight 5 &rarr; -21">F &rarr; F</td>
+<td title="tight 10 &rarr; -18">F &rarr; F</td>
+<td class="shift" title="tight 15 &rarr; -15">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight -12 &rarr; -33">- &rarr; -</td>
+<td title="tight -7 &rarr; -30">- &rarr; -</td>
+<td title="tight -2 &rarr; -27">- &rarr; -</td>
+<td title="tight 2 &rarr; -24">- &rarr; -</td>
+<td title="tight 7 &rarr; -21">- &rarr; -</td>
+<td title="tight 12 &rarr; -18">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight -12 &rarr; -33">F &rarr; F</td>
+<td title="tight -7 &rarr; -30">F &rarr; F</td>
+<td title="tight -2 &rarr; -27">F &rarr; F</td>
+<td title="tight 2 &rarr; -24">F &rarr; F</td>
+<td title="tight 7 &rarr; -21">F &rarr; F</td>
+<td class="shift" title="tight 12 &rarr; -18">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -13 &rarr; -34">F &rarr; F</td>
+<td title="tight -8 &rarr; -31">F &rarr; F</td>
+<td title="tight -3 &rarr; -28">F &rarr; F</td>
+<td title="tight 1 &rarr; -25">F &rarr; F</td>
+<td class="shift" title="tight 6 &rarr; -22">- &rarr; F</td>
+<td class="shift" title="tight 11 &rarr; -19">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight -15 &rarr; -36">F &rarr; F</td>
+<td title="tight -10 &rarr; -33">F &rarr; F</td>
+<td title="tight -5 &rarr; -30">F &rarr; F</td>
+<td title="tight -1 &rarr; -27">F &rarr; F</td>
+<td title="tight 4 &rarr; -24">F &rarr; F</td>
+<td title="tight 9 &rarr; -21">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight -16 &rarr; -37">F &rarr; -</td>
+<td class="shift" title="tight -11 &rarr; -34">- &rarr; F</td>
+<td title="tight -6 &rarr; -31">- &rarr; -</td>
+<td title="tight -2 &rarr; -28">F &rarr; F</td>
+<td title="tight 3 &rarr; -25">F &rarr; F</td>
+<td class="shift" title="tight 8 &rarr; -22">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight -22 &rarr; -43">F &rarr; F</td>
+<td title="tight -17 &rarr; -40">F &rarr; F</td>
+<td title="tight -12 &rarr; -37">F &rarr; F</td>
+<td title="tight -8 &rarr; -34">F &rarr; F</td>
+<td title="tight -3 &rarr; -31">F &rarr; F</td>
+<td title="tight 2 &rarr; -28">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -27 &rarr; -48">F &rarr; F</td>
+<td class="shift" title="tight -22 &rarr; -45">F &rarr; -</td>
+<td title="tight -17 &rarr; -42">F &rarr; F</td>
+<td title="tight -13 &rarr; -39">F &rarr; F</td>
+<td title="tight -8 &rarr; -36">F &rarr; F</td>
+<td title="tight -3 &rarr; -33">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a1 Double Punch — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight 9 &rarr; -13">F &rarr; F</td>
+<td title="tight 14 &rarr; -10">F &rarr; F</td>
+<td title="tight 19 &rarr; -7">F &rarr; F</td>
+<td title="tight 24 &rarr; -3">F &rarr; F</td>
+<td title="tight 29 &rarr; 0">F &rarr; F</td>
+<td class="shift" title="tight 34 &rarr; 3">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 6 &rarr; -16">- &rarr; -</td>
+<td title="tight 11 &rarr; -13">- &rarr; -</td>
+<td title="tight 16 &rarr; -10">- &rarr; -</td>
+<td title="tight 21 &rarr; -6">- &rarr; -</td>
+<td title="tight 26 &rarr; -3">- &rarr; -</td>
+<td title="tight 31 &rarr; 0">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 6 &rarr; -16">F &rarr; F</td>
+<td title="tight 11 &rarr; -13">F &rarr; F</td>
+<td title="tight 16 &rarr; -10">F &rarr; F</td>
+<td title="tight 21 &rarr; -6">F &rarr; F</td>
+<td title="tight 26 &rarr; -3">F &rarr; F</td>
+<td class="shift" title="tight 31 &rarr; 0">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight 5 &rarr; -17">F &rarr; F</td>
+<td title="tight 10 &rarr; -14">F &rarr; F</td>
+<td title="tight 15 &rarr; -11">F &rarr; F</td>
+<td title="tight 20 &rarr; -7">F &rarr; F</td>
+<td title="tight 25 &rarr; -4">F &rarr; F</td>
+<td class="shift" title="tight 30 &rarr; -1">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 16 &rarr; -6">F &rarr; F</td>
+<td title="tight 21 &rarr; -3">F &rarr; F</td>
+<td title="tight 26 &rarr; 0">F &rarr; F</td>
+<td title="tight 31 &rarr; 4">F &rarr; F</td>
+<td class="shift" title="tight 36 &rarr; 7">- &rarr; F</td>
+<td title="tight 41 &rarr; 10">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td title="tight 15 &rarr; -7">F &rarr; F</td>
+<td class="shift" title="tight 20 &rarr; -4">- &rarr; F</td>
+<td title="tight 25 &rarr; -1">F &rarr; F</td>
+<td title="tight 30 &rarr; 3">- &rarr; -</td>
+<td title="tight 35 &rarr; 6">- &rarr; -</td>
+<td class="shift" title="tight 40 &rarr; 9">F &rarr; -</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 9 &rarr; -13">F &rarr; F</td>
+<td title="tight 14 &rarr; -10">F &rarr; F</td>
+<td title="tight 19 &rarr; -7">F &rarr; F</td>
+<td title="tight 24 &rarr; -3">F &rarr; F</td>
+<td class="shift" title="tight 29 &rarr; 0">- &rarr; F</td>
+<td title="tight 34 &rarr; 3">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 4 &rarr; -18">F &rarr; F</td>
+<td title="tight 9 &rarr; -15">F &rarr; F</td>
+<td title="tight 14 &rarr; -12">F &rarr; F</td>
+<td title="tight 19 &rarr; -8">F &rarr; F</td>
+<td class="shift" title="tight 24 &rarr; -5">- &rarr; F</td>
+<td title="tight 29 &rarr; -2">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a1 Double Punch — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td class="shift" title="tight 9 &rarr; -13">F &rarr; -</td>
+<td title="tight 14 &rarr; -10">F &rarr; F</td>
+<td title="tight 19 &rarr; -7">F &rarr; F</td>
+<td title="tight 24 &rarr; -3">F &rarr; F</td>
+<td title="tight 29 &rarr; 0">F &rarr; F</td>
+<td class="shift" title="tight 34 &rarr; 3">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 6 &rarr; -16">- &rarr; -</td>
+<td title="tight 11 &rarr; -13">- &rarr; -</td>
+<td title="tight 16 &rarr; -10">- &rarr; -</td>
+<td title="tight 21 &rarr; -6">- &rarr; -</td>
+<td title="tight 26 &rarr; -3">- &rarr; -</td>
+<td title="tight 31 &rarr; 0">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td class="shift" title="tight 6 &rarr; -16">F &rarr; -</td>
+<td title="tight 11 &rarr; -13">F &rarr; F</td>
+<td title="tight 16 &rarr; -10">F &rarr; F</td>
+<td title="tight 21 &rarr; -6">F &rarr; F</td>
+<td title="tight 26 &rarr; -3">F &rarr; F</td>
+<td class="shift" title="tight 31 &rarr; 0">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td class="shift" title="tight 5 &rarr; -17">F &rarr; -</td>
+<td title="tight 10 &rarr; -14">F &rarr; F</td>
+<td title="tight 15 &rarr; -11">F &rarr; F</td>
+<td title="tight 20 &rarr; -7">F &rarr; F</td>
+<td title="tight 25 &rarr; -4">F &rarr; F</td>
+<td class="shift" title="tight 30 &rarr; -1">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 16 &rarr; -6">F &rarr; F</td>
+<td title="tight 21 &rarr; -3">F &rarr; F</td>
+<td title="tight 26 &rarr; 0">F &rarr; F</td>
+<td class="shift" title="tight 31 &rarr; 4">- &rarr; F</td>
+<td title="tight 36 &rarr; 7">- &rarr; -</td>
+<td title="tight 41 &rarr; 10">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 15 &rarr; -7">F &rarr; -</td>
+<td title="tight 20 &rarr; -4">- &rarr; -</td>
+<td class="shift" title="tight 25 &rarr; -1">- &rarr; F</td>
+<td class="shift" title="tight 30 &rarr; 3">- &rarr; F</td>
+<td title="tight 35 &rarr; 6">- &rarr; -</td>
+<td title="tight 40 &rarr; 9">F &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 9 &rarr; -13">F &rarr; F</td>
+<td title="tight 14 &rarr; -10">F &rarr; F</td>
+<td title="tight 19 &rarr; -7">F &rarr; F</td>
+<td class="shift" title="tight 24 &rarr; -3">- &rarr; F</td>
+<td title="tight 29 &rarr; 0">- &rarr; -</td>
+<td title="tight 34 &rarr; 3">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 4 &rarr; -18">F &rarr; F</td>
+<td title="tight 9 &rarr; -15">F &rarr; F</td>
+<td title="tight 14 &rarr; -12">F &rarr; F</td>
+<td class="shift" title="tight 19 &rarr; -8">- &rarr; F</td>
+<td title="tight 24 &rarr; -5">- &rarr; -</td>
+<td title="tight 29 &rarr; -2">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a2 Floating Kick — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight 3 &rarr; -22">F &rarr; F</td>
+<td title="tight 11 &rarr; -17">F &rarr; F</td>
+<td title="tight 19 &rarr; -13">F &rarr; F</td>
+<td class="shift" title="tight 26 &rarr; -8">- &rarr; F</td>
+<td class="shift" title="tight 34 &rarr; -3">- &rarr; F</td>
+<td class="shift" title="tight 41 &rarr; 2">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 0 &rarr; -25">- &rarr; -</td>
+<td title="tight 8 &rarr; -20">- &rarr; -</td>
+<td class="shift" title="tight 16 &rarr; -16">F &rarr; -</td>
+<td title="tight 23 &rarr; -11">- &rarr; -</td>
+<td title="tight 31 &rarr; -6">- &rarr; -</td>
+<td title="tight 38 &rarr; -1">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 0 &rarr; -25">F &rarr; F</td>
+<td title="tight 8 &rarr; -20">F &rarr; F</td>
+<td title="tight 16 &rarr; -16">F &rarr; F</td>
+<td class="shift" title="tight 23 &rarr; -11">- &rarr; F</td>
+<td class="shift" title="tight 31 &rarr; -6">- &rarr; F</td>
+<td class="shift" title="tight 38 &rarr; -1">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -1 &rarr; -26">F &rarr; F</td>
+<td title="tight 7 &rarr; -21">F &rarr; F</td>
+<td class="shift" title="tight 15 &rarr; -17">- &rarr; F</td>
+<td class="shift" title="tight 22 &rarr; -12">- &rarr; F</td>
+<td class="shift" title="tight 30 &rarr; -7">- &rarr; F</td>
+<td class="shift" title="tight 37 &rarr; -2">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 10 &rarr; -15">F &rarr; F</td>
+<td title="tight 18 &rarr; -10">F &rarr; F</td>
+<td title="tight 26 &rarr; -6">F &rarr; F</td>
+<td title="tight 33 &rarr; -1">F &rarr; F</td>
+<td title="tight 41 &rarr; 4">F &rarr; F</td>
+<td title="tight 48 &rarr; 9">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 9 &rarr; -16">F &rarr; -</td>
+<td class="shift" title="tight 17 &rarr; -11">F &rarr; -</td>
+<td title="tight 25 &rarr; -7">F &rarr; F</td>
+<td title="tight 32 &rarr; -2">- &rarr; -</td>
+<td title="tight 40 &rarr; 3">F &rarr; F</td>
+<td title="tight 47 &rarr; 8">F &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 3 &rarr; -22">F &rarr; F</td>
+<td title="tight 11 &rarr; -17">F &rarr; F</td>
+<td title="tight 19 &rarr; -13">F &rarr; F</td>
+<td title="tight 26 &rarr; -8">F &rarr; F</td>
+<td title="tight 34 &rarr; -3">F &rarr; F</td>
+<td title="tight 41 &rarr; 2">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -2 &rarr; -27">F &rarr; F</td>
+<td title="tight 6 &rarr; -22">F &rarr; F</td>
+<td title="tight 14 &rarr; -18">F &rarr; F</td>
+<td title="tight 21 &rarr; -13">F &rarr; F</td>
+<td title="tight 29 &rarr; -8">F &rarr; F</td>
+<td title="tight 36 &rarr; -3">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a2 Floating Kick — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight 3 &rarr; -22">F &rarr; F</td>
+<td title="tight 11 &rarr; -17">F &rarr; F</td>
+<td title="tight 19 &rarr; -13">F &rarr; F</td>
+<td title="tight 26 &rarr; -8">F &rarr; F</td>
+<td title="tight 34 &rarr; -3">F &rarr; F</td>
+<td title="tight 41 &rarr; 2">F &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 0 &rarr; -25">- &rarr; -</td>
+<td title="tight 8 &rarr; -20">- &rarr; -</td>
+<td title="tight 16 &rarr; -16">- &rarr; -</td>
+<td title="tight 23 &rarr; -11">- &rarr; -</td>
+<td class="shift" title="tight 31 &rarr; -6">F &rarr; -</td>
+<td title="tight 38 &rarr; -1">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight 0 &rarr; -25">F &rarr; F</td>
+<td title="tight 8 &rarr; -20">F &rarr; F</td>
+<td title="tight 16 &rarr; -16">F &rarr; F</td>
+<td title="tight 23 &rarr; -11">F &rarr; F</td>
+<td title="tight 31 &rarr; -6">F &rarr; F</td>
+<td title="tight 38 &rarr; -1">F &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -1 &rarr; -26">F &rarr; F</td>
+<td title="tight 7 &rarr; -21">F &rarr; F</td>
+<td title="tight 15 &rarr; -17">F &rarr; F</td>
+<td title="tight 22 &rarr; -12">F &rarr; F</td>
+<td class="shift" title="tight 30 &rarr; -7">- &rarr; F</td>
+<td class="shift" title="tight 37 &rarr; -2">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 10 &rarr; -15">F &rarr; F</td>
+<td title="tight 18 &rarr; -10">F &rarr; F</td>
+<td title="tight 26 &rarr; -6">F &rarr; F</td>
+<td title="tight 33 &rarr; -1">F &rarr; F</td>
+<td title="tight 41 &rarr; 4">F &rarr; F</td>
+<td title="tight 48 &rarr; 9">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td title="tight 9 &rarr; -16">- &rarr; -</td>
+<td class="shift" title="tight 17 &rarr; -11">- &rarr; F</td>
+<td title="tight 25 &rarr; -7">- &rarr; -</td>
+<td class="shift" title="tight 32 &rarr; -2">F &rarr; -</td>
+<td title="tight 40 &rarr; 3">F &rarr; F</td>
+<td title="tight 47 &rarr; 8">F &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 3 &rarr; -22">F &rarr; F</td>
+<td title="tight 11 &rarr; -17">F &rarr; F</td>
+<td title="tight 19 &rarr; -13">F &rarr; F</td>
+<td title="tight 26 &rarr; -8">F &rarr; F</td>
+<td title="tight 34 &rarr; -3">F &rarr; F</td>
+<td title="tight 41 &rarr; 2">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -2 &rarr; -27">F &rarr; F</td>
+<td title="tight 6 &rarr; -22">F &rarr; F</td>
+<td title="tight 14 &rarr; -18">F &rarr; F</td>
+<td title="tight 21 &rarr; -13">F &rarr; F</td>
+<td title="tight 29 &rarr; -8">F &rarr; F</td>
+<td title="tight 36 &rarr; -3">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a3 High Kick — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td class="shift" title="tight 6 &rarr; -20">- &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 22 &rarr; -10">F &rarr; F</td>
+<td title="tight 29 &rarr; -5">F &rarr; F</td>
+<td title="tight 37 &rarr; 0">F &rarr; F</td>
+<td class="shift" title="tight 44 &rarr; 5">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 3 &rarr; -23">- &rarr; -</td>
+<td title="tight 11 &rarr; -18">- &rarr; -</td>
+<td title="tight 19 &rarr; -13">- &rarr; -</td>
+<td title="tight 26 &rarr; -8">- &rarr; -</td>
+<td title="tight 34 &rarr; -3">- &rarr; -</td>
+<td title="tight 41 &rarr; 2">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td class="shift" title="tight 3 &rarr; -23">- &rarr; F</td>
+<td title="tight 11 &rarr; -18">F &rarr; F</td>
+<td title="tight 19 &rarr; -13">F &rarr; F</td>
+<td title="tight 26 &rarr; -8">F &rarr; F</td>
+<td title="tight 34 &rarr; -3">F &rarr; F</td>
+<td class="shift" title="tight 41 &rarr; 2">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td class="shift" title="tight 2 &rarr; -24">- &rarr; F</td>
+<td title="tight 10 &rarr; -19">F &rarr; F</td>
+<td title="tight 18 &rarr; -14">F &rarr; F</td>
+<td title="tight 25 &rarr; -9">F &rarr; F</td>
+<td title="tight 33 &rarr; -4">F &rarr; F</td>
+<td class="shift" title="tight 40 &rarr; 1">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 13 &rarr; -13">F &rarr; F</td>
+<td title="tight 21 &rarr; -8">F &rarr; F</td>
+<td title="tight 29 &rarr; -3">F &rarr; F</td>
+<td title="tight 36 &rarr; 2">F &rarr; F</td>
+<td title="tight 44 &rarr; 7">F &rarr; F</td>
+<td title="tight 51 &rarr; 12">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 12 &rarr; -14">F &rarr; -</td>
+<td title="tight 20 &rarr; -9">- &rarr; -</td>
+<td title="tight 28 &rarr; -4">- &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 1">F &rarr; -</td>
+<td title="tight 43 &rarr; 6">- &rarr; -</td>
+<td class="shift" title="tight 50 &rarr; 11">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 6 &rarr; -20">F &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 22 &rarr; -10">F &rarr; F</td>
+<td title="tight 29 &rarr; -5">F &rarr; F</td>
+<td title="tight 37 &rarr; 0">F &rarr; F</td>
+<td title="tight 44 &rarr; 5">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 1 &rarr; -25">F &rarr; F</td>
+<td title="tight 9 &rarr; -20">F &rarr; F</td>
+<td title="tight 17 &rarr; -15">F &rarr; F</td>
+<td title="tight 24 &rarr; -10">F &rarr; F</td>
+<td title="tight 32 &rarr; -5">F &rarr; F</td>
+<td title="tight 39 &rarr; 0">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a3 High Kick — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td class="shift" title="tight 6 &rarr; -20">- &rarr; F</td>
+<td class="shift" title="tight 14 &rarr; -15">- &rarr; F</td>
+<td class="shift" title="tight 22 &rarr; -10">- &rarr; F</td>
+<td class="shift" title="tight 29 &rarr; -5">- &rarr; F</td>
+<td class="shift" title="tight 37 &rarr; 0">- &rarr; F</td>
+<td class="shift" title="tight 44 &rarr; 5">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight 3 &rarr; -23">- &rarr; -</td>
+<td title="tight 11 &rarr; -18">- &rarr; -</td>
+<td title="tight 19 &rarr; -13">- &rarr; -</td>
+<td title="tight 26 &rarr; -8">- &rarr; -</td>
+<td title="tight 34 &rarr; -3">- &rarr; -</td>
+<td title="tight 41 &rarr; 2">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td class="shift" title="tight 3 &rarr; -23">- &rarr; F</td>
+<td class="shift" title="tight 11 &rarr; -18">- &rarr; F</td>
+<td class="shift" title="tight 19 &rarr; -13">- &rarr; F</td>
+<td class="shift" title="tight 26 &rarr; -8">- &rarr; F</td>
+<td class="shift" title="tight 34 &rarr; -3">- &rarr; F</td>
+<td class="shift" title="tight 41 &rarr; 2">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td class="shift" title="tight 2 &rarr; -24">- &rarr; F</td>
+<td class="shift" title="tight 10 &rarr; -19">- &rarr; F</td>
+<td class="shift" title="tight 18 &rarr; -14">- &rarr; F</td>
+<td class="shift" title="tight 25 &rarr; -9">- &rarr; F</td>
+<td class="shift" title="tight 33 &rarr; -4">- &rarr; F</td>
+<td class="shift" title="tight 40 &rarr; 1">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 13 &rarr; -13">F &rarr; F</td>
+<td title="tight 21 &rarr; -8">F &rarr; F</td>
+<td title="tight 29 &rarr; -3">F &rarr; F</td>
+<td title="tight 36 &rarr; 2">F &rarr; F</td>
+<td title="tight 44 &rarr; 7">F &rarr; F</td>
+<td title="tight 51 &rarr; 12">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td title="tight 12 &rarr; -14">- &rarr; -</td>
+<td title="tight 20 &rarr; -9">F &rarr; F</td>
+<td title="tight 28 &rarr; -4">- &rarr; -</td>
+<td class="shift" title="tight 35 &rarr; 1">- &rarr; F</td>
+<td class="shift" title="tight 43 &rarr; 6">F &rarr; -</td>
+<td class="shift" title="tight 50 &rarr; 11">F &rarr; -</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight 6 &rarr; -20">F &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 22 &rarr; -10">F &rarr; F</td>
+<td title="tight 29 &rarr; -5">F &rarr; F</td>
+<td title="tight 37 &rarr; 0">F &rarr; F</td>
+<td title="tight 44 &rarr; 5">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight 1 &rarr; -25">F &rarr; F</td>
+<td title="tight 9 &rarr; -20">F &rarr; F</td>
+<td title="tight 17 &rarr; -15">F &rarr; F</td>
+<td title="tight 24 &rarr; -10">F &rarr; F</td>
+<td title="tight 32 &rarr; -5">F &rarr; F</td>
+<td title="tight 39 &rarr; 0">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a4 Air Tornado — grounded hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight -6 &rarr; -28">F &rarr; F</td>
+<td title="tight -1 &rarr; -24">F &rarr; F</td>
+<td title="tight 4 &rarr; -21">F &rarr; F</td>
+<td title="tight 9 &rarr; -18">- &rarr; -</td>
+<td class="shift" title="tight 14 &rarr; -15">F &rarr; -</td>
+<td class="shift" title="tight 19 &rarr; -11">F &rarr; -</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight -9 &rarr; -31">- &rarr; -</td>
+<td title="tight -4 &rarr; -27">- &rarr; -</td>
+<td title="tight 1 &rarr; -24">- &rarr; -</td>
+<td title="tight 6 &rarr; -21">- &rarr; -</td>
+<td title="tight 11 &rarr; -18">- &rarr; -</td>
+<td title="tight 16 &rarr; -14">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight -9 &rarr; -31">F &rarr; F</td>
+<td title="tight -4 &rarr; -27">F &rarr; F</td>
+<td title="tight 1 &rarr; -24">F &rarr; F</td>
+<td title="tight 6 &rarr; -21">- &rarr; -</td>
+<td class="shift" title="tight 11 &rarr; -18">F &rarr; -</td>
+<td class="shift" title="tight 16 &rarr; -14">F &rarr; -</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -10 &rarr; -32">F &rarr; F</td>
+<td title="tight -5 &rarr; -28">F &rarr; F</td>
+<td class="shift" title="tight 0 &rarr; -25">F &rarr; -</td>
+<td title="tight 5 &rarr; -22">- &rarr; -</td>
+<td class="shift" title="tight 10 &rarr; -19">F &rarr; -</td>
+<td class="shift" title="tight 15 &rarr; -15">F &rarr; -</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 1 &rarr; -21">F &rarr; F</td>
+<td title="tight 6 &rarr; -17">F &rarr; F</td>
+<td title="tight 11 &rarr; -14">F &rarr; F</td>
+<td title="tight 16 &rarr; -11">F &rarr; F</td>
+<td title="tight 21 &rarr; -8">F &rarr; F</td>
+<td title="tight 26 &rarr; -4">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td title="tight 0 &rarr; -22">- &rarr; -</td>
+<td class="shift" title="tight 5 &rarr; -18">- &rarr; F</td>
+<td title="tight 10 &rarr; -15">- &rarr; -</td>
+<td title="tight 15 &rarr; -12">F &rarr; F</td>
+<td title="tight 20 &rarr; -9">F &rarr; F</td>
+<td class="shift" title="tight 25 &rarr; -5">- &rarr; F</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight -6 &rarr; -28">F &rarr; F</td>
+<td title="tight -1 &rarr; -24">F &rarr; F</td>
+<td title="tight 4 &rarr; -21">F &rarr; F</td>
+<td title="tight 9 &rarr; -18">F &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 19 &rarr; -11">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -11 &rarr; -33">F &rarr; F</td>
+<td class="shift" title="tight -6 &rarr; -29">F &rarr; -</td>
+<td title="tight -1 &rarr; -26">F &rarr; F</td>
+<td title="tight 4 &rarr; -23">F &rarr; F</td>
+<td title="tight 9 &rarr; -20">F &rarr; F</td>
+<td title="tight 14 &rarr; -16">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h3>a4 Air Tornado — airborne hit</h3>
+<table class="heat"><thead><tr><th class="move">follow-up</th>
+<th>0%</th>
+<th>30%</th>
+<th>60%</th>
+<th>90%</th>
+<th>120%</th>
+<th>150%</th>
+</tr></thead><tbody>
+<tr><td class="move">g1 Low Kick</td>
+<td title="tight -6 &rarr; -28">F &rarr; F</td>
+<td title="tight -1 &rarr; -24">F &rarr; F</td>
+<td class="shift" title="tight 4 &rarr; -21">- &rarr; F</td>
+<td class="shift" title="tight 9 &rarr; -18">- &rarr; F</td>
+<td class="shift" title="tight 14 &rarr; -15">- &rarr; F</td>
+<td class="shift" title="tight 19 &rarr; -11">- &rarr; F</td>
+</tr>
+<tr><td class="move">g2 Roundhouse</td>
+<td title="tight -9 &rarr; -31">- &rarr; -</td>
+<td title="tight -4 &rarr; -27">- &rarr; -</td>
+<td title="tight 1 &rarr; -24">- &rarr; -</td>
+<td title="tight 6 &rarr; -21">- &rarr; -</td>
+<td title="tight 11 &rarr; -18">- &rarr; -</td>
+<td title="tight 16 &rarr; -14">- &rarr; -</td>
+</tr>
+<tr><td class="move">g3 Roundhouse</td>
+<td title="tight -9 &rarr; -31">F &rarr; F</td>
+<td title="tight -4 &rarr; -27">F &rarr; F</td>
+<td class="shift" title="tight 1 &rarr; -24">- &rarr; F</td>
+<td class="shift" title="tight 6 &rarr; -21">- &rarr; F</td>
+<td class="shift" title="tight 11 &rarr; -18">- &rarr; F</td>
+<td class="shift" title="tight 16 &rarr; -14">- &rarr; F</td>
+</tr>
+<tr><td class="move">g4 Tornado Kick</td>
+<td title="tight -10 &rarr; -32">F &rarr; F</td>
+<td title="tight -5 &rarr; -28">F &rarr; F</td>
+<td class="shift" title="tight 0 &rarr; -25">- &rarr; F</td>
+<td class="shift" title="tight 5 &rarr; -22">- &rarr; F</td>
+<td class="shift" title="tight 10 &rarr; -19">- &rarr; F</td>
+<td class="shift" title="tight 15 &rarr; -15">- &rarr; F</td>
+</tr>
+<tr><td class="move">a1 Double Punch</td>
+<td title="tight 1 &rarr; -21">F &rarr; F</td>
+<td title="tight 6 &rarr; -17">F &rarr; F</td>
+<td title="tight 11 &rarr; -14">F &rarr; F</td>
+<td title="tight 16 &rarr; -11">F &rarr; F</td>
+<td title="tight 21 &rarr; -8">F &rarr; F</td>
+<td title="tight 26 &rarr; -4">F &rarr; F</td>
+</tr>
+<tr><td class="move">a2 Floating Kick</td>
+<td class="shift" title="tight 0 &rarr; -22">- &rarr; F</td>
+<td title="tight 5 &rarr; -18">- &rarr; -</td>
+<td class="shift" title="tight 10 &rarr; -15">- &rarr; F</td>
+<td title="tight 15 &rarr; -12">- &rarr; -</td>
+<td title="tight 20 &rarr; -9">F &rarr; F</td>
+<td class="shift" title="tight 25 &rarr; -5">F &rarr; -</td>
+</tr>
+<tr><td class="move">a3 High Kick</td>
+<td title="tight -6 &rarr; -28">F &rarr; F</td>
+<td title="tight -1 &rarr; -24">F &rarr; F</td>
+<td title="tight 4 &rarr; -21">F &rarr; F</td>
+<td title="tight 9 &rarr; -18">F &rarr; F</td>
+<td title="tight 14 &rarr; -15">F &rarr; F</td>
+<td title="tight 19 &rarr; -11">F &rarr; F</td>
+</tr>
+<tr><td class="move">a4 Air Tornado</td>
+<td title="tight -11 &rarr; -33">F &rarr; F</td>
+<td title="tight -6 &rarr; -29">F &rarr; F</td>
+<td title="tight -1 &rarr; -26">F &rarr; F</td>
+<td title="tight 4 &rarr; -23">F &rarr; F</td>
+<td title="tight 9 &rarr; -20">F &rarr; F</td>
+<td title="tight 14 &rarr; -16">F &rarr; F</td>
+</tr>
+</tbody></table>
+<h2>Self-play telemetry diff</h2>
+<div class="legend">Same seed on both sides &rarr; the delta is the tuning effect, not match variance. Green = candidate higher, red = lower. Hit rate / whiff rate are percentages; combos in hits; damage per match and per stock.</div>
+<table class="heat"><thead><tr><th class="move">stat</th><th>base</th><th>candidate</th><th>&Delta;</th></tr></thead><tbody>
+<tr><td class="move">hit rate</td><td>49.4%</td><td>50.2%</td><td class="d dpos">+0.85pp</td></tr>
+<tr><td class="move">whiff rate</td><td>50.6%</td><td>49.8%</td><td class="d dneg">-0.85pp</td></tr>
+<tr><td class="move">avg combo length</td><td>2.13</td><td>2.15</td><td class="d dpos">+0.02</td></tr>
+<tr><td class="move">max combo length</td><td>4</td><td>4</td><td class="none">0</td></tr>
+<tr><td class="move">damage / match</td><td>369.8</td><td>256</td><td class="d dneg">-113.8</td></tr>
+<tr><td class="move">damage / stock</td><td>61.63</td><td>42.67</td><td class="d dneg">-18.97</td></tr>
+<tr><td class="move">wins (bot A)</td><td>1</td><td>1</td><td class="none">0</td></tr>
+<tr><td class="move">wins (bot B)</td><td>0</td><td>0</td><td class="none">0</td></tr>
+<tr><td class="move">draws</td><td>9</td><td>9</td><td class="none">0</td></tr>
+<tr><td class="move">avg match duration (s)</td><td>10750</td><td>10359</td><td class="d dneg">-391</td></tr>
+<tr><td class="move">max match duration (s)</td><td>10800</td><td>10800</td><td class="none">0</td></tr>
+<tr><td class="move">total swings</td><td>1999</td><td>2039</td><td class="d dpos">+40</td></tr>
+<tr><td class="move">total hits</td><td>987</td><td>1024</td><td class="d dpos">+37</td></tr>
+<tr><td class="move">total whiffs</td><td>1012</td><td>1015</td><td class="d dpos">+3</td></tr>
+<tr><td class="move">total damage</td><td>6709</td><td>7166</td><td class="d dpos">+457</td></tr>
+</tbody></table>
+<h3>Per-move usage</h3>
+<table class="heat"><thead><tr><th class="move">move</th><th>swings b &rarr; c</th><th>hits b &rarr; c</th><th>whiffs b &rarr; c</th><th>hit% b &rarr; c</th></tr></thead><tbody>
+<tr><td class="move">a1 Double Punch</td><td>164 &rarr; 183 <span class="d dpos">(+19)</span></td><td>4 &rarr; 3 <span class="d dneg">(-1)</span></td><td>160 &rarr; 180 <span class="d dpos">(+20)</span></td><td>2.44 &rarr; 1.64 <span class="d dneg">(-0.8)</span></td></tr>
+<tr><td class="move">a2 Floating Kick</td><td>190 &rarr; 177 <span class="d dneg">(-13)</span></td><td>47 &rarr; 42 <span class="d dneg">(-5)</span></td><td>143 &rarr; 135 <span class="d dneg">(-8)</span></td><td>24.74 &rarr; 23.73 <span class="d dneg">(-1.01)</span></td></tr>
+<tr><td class="move">a3 High Kick</td><td>59 &rarr; 68 <span class="d dpos">(+9)</span></td><td>0</td><td>59 &rarr; 68 <span class="d dpos">(+9)</span></td><td>0</td></tr>
+<tr><td class="move">a4 Air Tornado</td><td>212 &rarr; 162 <span class="d dneg">(-50)</span></td><td>0</td><td>212 &rarr; 162 <span class="d dneg">(-50)</span></td><td>0</td></tr>
+<tr><td class="move">g1 Low Kick</td><td>286 &rarr; 249 <span class="d dneg">(-37)</span></td><td>277 &rarr; 242 <span class="d dneg">(-35)</span></td><td>9 &rarr; 7 <span class="d dneg">(-2)</span></td><td>96.85 &rarr; 97.19 <span class="d dpos">(+0.34)</span></td></tr>
+<tr><td class="move">g2 Roundhouse</td><td>289 &rarr; 292 <span class="d dpos">(+3)</span></td><td>42 &rarr; 34 <span class="d dneg">(-8)</span></td><td>247 &rarr; 258 <span class="d dpos">(+11)</span></td><td>14.53 &rarr; 11.64 <span class="d dneg">(-2.89)</span></td></tr>
+<tr><td class="move">g3 Roundhouse</td><td>287 &rarr; 312 <span class="d dpos">(+25)</span></td><td>211 &rarr; 225 <span class="d dpos">(+14)</span></td><td>76 &rarr; 87 <span class="d dpos">(+11)</span></td><td>73.52 &rarr; 72.12 <span class="d dneg">(-1.4)</span></td></tr>
+<tr><td class="move">g4 Tornado Kick</td><td>512 &rarr; 596 <span class="d dpos">(+84)</span></td><td>406 &rarr; 478 <span class="d dpos">(+72)</span></td><td>106 &rarr; 118 <span class="d dpos">(+12)</span></td><td>79.3 &rarr; 80.2 <span class="d dpos">(+0.9)</span></td></tr>
+</tbody></table>
+</body></html>

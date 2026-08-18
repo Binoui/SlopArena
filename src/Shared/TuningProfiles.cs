@@ -24,6 +24,12 @@ public static class TuningProfiles
         new("kv70",       "travel −50% — stun 0.5×mag, KV×0.10",         0.5f, 0.10f, 0f),
         new("stun16kv11", "Melee-ish ratio — stun 0.8×mag, KV×0.11",     0.8f, 0.11f, 0f),
         new("floor30",    "Melee +30 floor — stun 0.5×(mag+30), KV×0.14", 0.5f, 0.14f, 30f),
+        // Melee-shaped family (feel pass 2026-08-18): hitstun = 0.4×mag (Melee coefficient,
+        // no floor) so 0% hits barely stun (no true combos at 0%) and combos emerge with %;
+        // KV raised ~1.7× so launches read as a pop (≈ run-speed order) instead of a glide.
+        new("melee",      "Melee shape — stun 0.4×mag, KV×0.19",        0.4f, 0.19f, 0f),
+        new("melee-hot",  "Melee shape, hotter — stun 0.4×mag, KV×0.22", 0.4f, 0.22f, 0f),
+        new("melee-soft", "Melee shape, softer — stun 0.45×mag, KV×0.17", 0.45f, 0.17f, 0f),
     };
 
     /// <summary>Apply a profile by name (case-insensitive). False when unknown — nothing is mutated.</summary>

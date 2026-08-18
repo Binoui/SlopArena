@@ -26,7 +26,8 @@ namespace SlopArena.AbDiffReport;
 /// Usage: dotnet run --project tools/AbDiffReport -- --char fightguy --cand stun16kv11
 ///        [--base base] [--pcts 0,30,60,90,120,150] [--matches 20] [--seed 20260817]
 ///        [--di] [--no-graph] [--json ab.json] [--html ab.html] [--out report.md]
-/// Profiles: base | old | stunx18 | kv70 | stun16kv11 | floor30 (see Shared TuningProfiles).
+/// Profiles: base | old | stunx18 | kv70 | stun16kv11 | floor30 | melee | melee-hot | melee-soft
+/// (see Shared TuningProfiles).
 /// </summary>
 internal static class Program
 {
@@ -214,7 +215,9 @@ internal static class Program
             TuningDiffKind.Added => candidate ? (el.NewValue as JsonObject)?[field] : null,
             TuningDiffKind.Removed => candidate ? null : (el.OldValue as JsonObject)?[field],
             TuningDiffKind.Unchanged => ((el.NewValue ?? el.OldValue) as JsonObject)?[field],
-            _ => el[field]?.OldValue ?? el[field]?.NewValue,
+            _ => el[field] is { } child
+                ? candidate ? child.NewValue ?? child.OldValue : child.OldValue ?? child.NewValue
+                : null,
         };
         return n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
     }

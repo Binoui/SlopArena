@@ -161,6 +161,9 @@ internal static class Program
         //   kv70       — travel −50% (KV×0.71), stun unchanged      (scale 0.10)
         //   stun16kv11 — Melee-ish ratio: stun ×1.6 + KV×0.79      (0.8 / 0.11)
         //   floor30    — Melee "+18"-style floor: stun from mag+30  (0.5 / 0.14 / +30)
+        //   melee      — Melee shape: stun 0.4×mag, KV×0.19         (0.4 / 0.19 / 0)
+        //   melee-hot  — hotter: stun 0.4×mag, KV×0.22              (0.4 / 0.22 / 0)
+        //   melee-soft — softer: stun 0.45×mag, KV×0.17             (0.45 / 0.17 / 0)
         // Profile table lives in Shared (TuningProfiles) — shared with AbDiffReport + tests.
         string kbm = ParseArg(args, "--kbm") ?? "base";
         if (!TuningProfiles.TryApply(kbm))
