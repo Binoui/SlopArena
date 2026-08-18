@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>SlopArena.AbDiffReport</RootNamespace>
+    <AssemblyName>SlopArena.AbDiffReport</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Shared/SlopArena.Shared.csproj" />
+    <!-- Issue #149: reuse the two analysis engines via InternalsVisibleTo instead of
+         duplicating ~800 lines of simulation/report code. Referencing an Exe project
+         as a library is supported; their entry points are ignored here. -->
+    <ProjectReference Include="../MoveDataReport/MoveDataReport.csproj" />
+    <ProjectReference Include="../SelfPlayReport/SelfPlayReport.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -8,6 +8,10 @@ using System.Text.Json;
 using SlopArena.Shared;
 using SlopArena.Shared.AI;
 
+// Issue #149: the tuning A/B diff tool (SlopArena.AbDiffReport) reuses this tool's self-play
+// aggregation (Aggregate / SampleEnvelope / whiff accumulation) without duplicating it.
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SlopArena.AbDiffReport")]
+
 namespace SlopArena.SelfPlayReport;
 
 /// <summary>
@@ -22,21 +26,21 @@ namespace SlopArena.SelfPlayReport;
 /// </summary>
 internal static class Program
 {
-    private const int GridCell = 25; // 0.25 m per cell (in cm to stay int)
+    internal const int GridCell = 25; // 0.25 m per cell (in cm to stay int)
     // Forward axis includes a BEHIND-the-attacker band (negative forward) — whiffs cluster at
     // point-blank (-1..+0.25 m), so forward 0 must sit inside the view with left space, not at
     // the drawing's left edge. Range is narrow (not -4..16) so the melee data fills the graph.
-    private const float GridFwdMin = -2f, GridFwdMax = 6f;    // forward axis (facing-frame +Z)
-    private const float GridHtMin = -1f, GridHtMax = 8f;      // height axis
-    private const int GridFwdCells = (int)((GridFwdMax - GridFwdMin) * 4) + 1; // 33
-    private const int GridHtCells = (int)((GridHtMax - GridHtMin) * 4) + 1;    // 37
+    internal const float GridFwdMin = -2f, GridFwdMax = 6f;    // forward axis (facing-frame +Z)
+    internal const float GridHtMin = -1f, GridHtMax = 8f;      // height axis
+    internal const int GridFwdCells = (int)((GridFwdMax - GridFwdMin) * 4) + 1; // 33
+    internal const int GridHtCells = (int)((GridHtMax - GridHtMin) * 4) + 1;    // 37
 
     // ── Report model ───────────────────────────────────────────────────────
-    private sealed record EnvDisc(float RelZ, float RelY, float Radius);
-    private sealed record MoveEnvelope(string Label, string Ability, int Slot, bool Air, float Reach, EnvDisc[] Discs);
-    private sealed record MoveStats(string Label, string Ability, int Swings, int Hits, int Whiffs, int Damage);
-    private sealed record WhiffCell(int Gx, int Gy, int Count);
-    private sealed record ReportData(string Character, string GeneratedAt, int Matches, int Seed,
+    internal sealed record EnvDisc(float RelZ, float RelY, float Radius);
+    internal sealed record MoveEnvelope(string Label, string Ability, int Slot, bool Air, float Reach, EnvDisc[] Discs);
+    internal sealed record MoveStats(string Label, string Ability, int Swings, int Hits, int Whiffs, int Damage);
+    internal sealed record WhiffCell(int Gx, int Gy, int Count);
+    internal sealed record ReportData(string Character, string GeneratedAt, int Matches, int Seed,
         int AvgDurationTicks, int MaxDurationTicks,
         float HitRate, float WhiffRate, float AvgComboLen, int MaxComboLen,
         float DamagePerMatch, float DamagePerStock,
@@ -45,9 +49,9 @@ internal static class Program
         float EnvelopeMaxReach, float EnvelopeMaxHeight, float[] Silhouette,
         int TotalSwings, int TotalHits, int TotalWhiffs, int TotalDamage);
 
-    private static readonly byte[] SlotBytes = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
+    internal static readonly byte[] SlotBytes = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
 
-    private static int Main(string[] args)
+    internal static int Main(string[] args)
     {
         int matches = ParseInt(args, "--matches", 20);
         int seed = ParseInt(args, "--seed", 20260817);
@@ -106,7 +110,7 @@ internal static class Program
 
     // ── Aggregation ─────────────────────────────────────────────────────────
 
-    private static ReportData Aggregate(CharacterDefinition def, List<MatchRecord> records, int seed)
+    internal static ReportData Aggregate(CharacterDefinition def, List<MatchRecord> records, int seed)
     {
         var perMove = new Dictionary<string, MoveStats>();
         string Key(bool air, byte slotByte) => $"{(air ? "a" : "g")}{SlotOf(slotByte)}";
@@ -179,10 +183,10 @@ internal static class Program
             totalSwings, totalHits, totalWhiffs, totalDamage);
     }
 
-    private static string AbilityName(CharacterDefinition def, byte activeSlot, bool air)
+    internal static string AbilityName(CharacterDefinition def, byte activeSlot, bool air)
         => def.GetSlotAbility(activeSlot - 1, air)?.Name ?? "-";
 
-    private static int SlotOf(byte activeSlot) => activeSlot switch
+    internal static int SlotOf(byte activeSlot) => activeSlot switch
     {
         AbilitySlots.Slot1 => 1, AbilitySlots.Slot2 => 2, AbilitySlots.Slot3 => 3, AbilitySlots.Slot4 => 4,
         _ => 0,
@@ -193,7 +197,7 @@ internal static class Program
     /// <summary>Sample each normal's active hitboxes from a real sim run (attacker at origin,
     /// facing +Z, no opponent) so the envelope captures lunge, bones, capsules — the actual
     /// threat zone the game produces. Facing +Z ⇒ world == facing frame.</summary>
-    private static MoveEnvelope[] SampleEnvelope(CharacterDefinition def)
+    internal static MoveEnvelope[] SampleEnvelope(CharacterDefinition def)
     {
         var result = new List<MoveEnvelope>();
         var baked = LoadBakedData(def);
@@ -240,7 +244,7 @@ internal static class Program
     /// <summary>Accumulate whiff swings onto a side-view (forward × height) grid, normalized to the
     /// attacker's facing frame. Also returns the threat-zone silhouette (per height band, the max
     /// forward reach among the envelope discs) so "whiffed past reach" vs "inside reach" separate.</summary>
-    private static (WhiffCell[] Grid, float[] Silhouette) AccumulateWhiffs(List<MatchRecord> records, MoveEnvelope[] envelope)
+    internal static (WhiffCell[] Grid, float[] Silhouette) AccumulateWhiffs(List<MatchRecord> records, MoveEnvelope[] envelope)
     {
         var counts = new int[GridFwdCells * GridHtCells];
         foreach (var r in records)
@@ -273,7 +277,7 @@ internal static class Program
 
     // ── Markdown ───────────────────────────────────────────────────────────
 
-    private static string BuildMarkdown(ReportData r)
+    internal static string BuildMarkdown(ReportData r)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"# {r.Character} — self-play telemetry");
@@ -307,7 +311,7 @@ internal static class Program
 
     // ── HTML ───────────────────────────────────────────────────────────────
 
-    private static string BuildHtml(ReportData r)
+    internal static string BuildHtml(ReportData r)
     {
         const int W = 760, H = 420, PAD = 34;
         var sb = new StringBuilder();
@@ -357,7 +361,7 @@ internal static class Program
         return sb.ToString();
     }
 
-    private static string EnvFigure(MoveEnvelope e, ReportData r)
+    internal static string EnvFigure(MoveEnvelope e, ReportData r)
     {
         const int W = 200, H = 150, PAD = 20;
         // Forward axis spans a BEHIND band (origin + negative-RelZ side hits) out to the max
@@ -392,7 +396,7 @@ internal static class Program
         return sb.ToString();
     }
 
-    private static string WhiffSvg(ReportData r)
+    internal static string WhiffSvg(ReportData r)
     {
         const int W = 760, H = 420, PAD = 36;
         // Map the grid RANGE (not absolute forward/height) onto the drawing so forward 0 sits
@@ -448,7 +452,7 @@ internal static class Program
 
     /// <summary>Crossroads-style 60×60 flat proxy (top +20, sides ±40, bottom −10) so KOs
     /// actually end matches. Deterministic, self-contained (no stage data dependency).</summary>
-    private static ArenaDefinition BuildKillArena()
+    internal static ArenaDefinition BuildKillArena()
     {
         const int w = 60, h = 60;
         var data = new float[w * h];
@@ -466,11 +470,13 @@ internal static class Program
         };
     }
 
-    private static BakedAnimationData? LoadBakedData(CharacterDefinition def)
+    internal static BakedAnimationData? LoadBakedData(CharacterDefinition def)
     {
         if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-        string relative = def.BakedDataPath.Replace("res://", "");
-        string path = Path.Combine("data", relative);
+        // "res://data/fightguy_skeleton.bin" → "data/fightguy_skeleton.bin", repo-root relative
+        // (same resolution as MoveDataReport + TestHelpers). A previous "data" prefix here made
+        // the path "data/data/…", silently disabling bone hitboxes in self-play (issue #149).
+        string path = def.BakedDataPath.Replace("res://", "");
         if (!File.Exists(path)) return null;
         try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
         catch { return null; }
@@ -478,21 +484,21 @@ internal static class Program
 
     // ── CLI helpers ────────────────────────────────────────────────────────
 
-    private static string? ParseArg(string[] args, string key)
+    internal static string? ParseArg(string[] args, string key)
     {
         int i = Array.IndexOf(args, key);
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }
 
-    private static int ParseInt(string[] args, string key, int fallback)
+    internal static int ParseInt(string[] args, string key, int fallback)
     {
         var s = ParseArg(args, key);
         return s != null && int.TryParse(s, out int v) ? v : fallback;
     }
 
-    private static string Escape(string s) =>
+    internal static string Escape(string s) =>
         s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
 
-    private static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
-    private static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+    internal static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    internal static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
 }

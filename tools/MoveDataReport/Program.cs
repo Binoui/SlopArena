@@ -7,6 +7,10 @@ using System.Text;
 using System.Text.Json;
 using SlopArena.Shared;
 
+// Issue #149: the tuning A/B diff tool (SlopArena.AbDiffReport) reuses this tool's analysis
+// engine (BuildReport / true-combo graph / DI escape) without duplicating it.
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SlopArena.AbDiffReport")]
+
 namespace SlopArena.MoveDataReport;
 
 /// <summary>
@@ -24,28 +28,28 @@ namespace SlopArena.MoveDataReport;
 /// </summary>
 internal static class Program
 {
-    private const int MaxTicks = 2400;
+    internal const int MaxTicks = 2400;
 
-    private readonly record struct SlotRef(bool Air, int Slot);
-    private sealed record Route(string Label, SlotRef From, int FromHit, SlotRef To, int ToHit);
-    private sealed record HitSpec(SlotRef Slot, AbilitySpec Ability, AttackStage Stage, HitboxEvent Hit, int HitIndex,
+    internal readonly record struct SlotRef(bool Air, int Slot);
+    internal sealed record Route(string Label, SlotRef From, int FromHit, SlotRef To, int ToHit);
+    internal sealed record HitSpec(SlotRef Slot, AbilitySpec Ability, AttackStage Stage, HitboxEvent Hit, int HitIndex,
         sbyte LaunchAngle, float BaseKb, float GrowthKb, bool Adaptive);
-    private sealed record RunResult(float Kv, ushort Hitstop, ushort Stun, float Rise, float Drift,
+    internal sealed record RunResult(float Kv, ushort Hitstop, ushort Stun, float Rise, float Drift,
         float Apex, int ActionableTick, int? LandedTick);
 
     // ── JSON / HTML report model ────────────────────────────────────────────
-    private sealed record TrajPoint(int Tick, float Height, float Travel, float Vy, float Vx, char Phase);
-    private sealed record TrajectoryData(int Pct, float Kv, ushort Hitstop, ushort Stun, int Adv, int? AdvL,
+    internal sealed record TrajPoint(int Tick, float Height, float Travel, float Vy, float Vx, char Phase);
+    internal sealed record TrajectoryData(int Pct, float Kv, ushort Hitstop, ushort Stun, int Adv, int? AdvL,
         float Rise, float Drift, float Apex, float MaxTravel, int ActionableTick, int? LandedTick, string? KillLine, TrajPoint[] Points);
-    private sealed record FrameDataData(int Trigger, int ActiveStart, int ActiveEnd, float Damage, int Angle,
+    internal sealed record FrameDataData(int Trigger, int ActiveStart, int ActiveEnd, float Damage, int Angle,
         float BaseKb, float Growth, ushort Stun, int Iasa, int LandingLag, int AcBefore, int AcAfter, int Duration,
         string Profile, bool Adaptive);
-    private sealed record ClearanceData(float TopFrac, float SideFrac, string Nearest);
-    private sealed record MoveData(string Label, string Slot, int HitIndex, string Ability, FrameDataData Frame,
+    internal sealed record ClearanceData(float TopFrac, float SideFrac, string Nearest);
+    internal sealed record MoveData(string Label, string Slot, int HitIndex, string Ability, FrameDataData Frame,
         int? KillPct, string? KillLine, ClearanceData Clearance, TrajectoryData[] Trajectories, DiEscapeData[] DiEscape);
-    private sealed record ArenaData(float? KillHeight, float? KillTop, float? KillMinX, float? KillMaxX,
+    internal sealed record ArenaData(float? KillHeight, float? KillTop, float? KillMinX, float? KillMaxX,
         float? KillMinZ, float? KillMaxZ, string Note);
-    private sealed record ReportData(string Character, string GeneratedAt, int[] Percents,
+    internal sealed record ReportData(string Character, string GeneratedAt, int[] Percents,
         ArenaData ReportArena, ArenaData KillArena, MoveData[] Moves,
         ComboStarterData[] TrueCombos, ComboDensityData[] ComboDensity);
 
@@ -54,19 +58,19 @@ internal static class Program
     /// while the victim was still in hitstun (real sim); "false" = it landed after stun expired (opponent
     /// actionable); "never" = no connect within the cap. Tightness = stun − attacker budget to the
     /// follow-up's first active tick (positive = frame-true by that many ticks, before travel reality).</summary>
-    private sealed record ComboEdgeData(string FollowUp, int Tightness, int Pct, string Verdict, int ConnectTick, int StunLeft);
-    private sealed record ComboStarterData(string Move, string State, ComboEdgeData[] Edges);
-    private sealed record ComboDensityData(int Pct, int Grounded, int Airborne, int Total);
+    internal sealed record ComboEdgeData(string FollowUp, int Tightness, int Pct, string Verdict, int ConnectTick, int StunLeft);
+    internal sealed record ComboStarterData(string Move, string State, ComboEdgeData[] Edges);
+    internal sealed record ComboDensityData(int Pct, int Grounded, int Airborne, int Total);
 
     // ── DI escape-space model ────────────────────────────────────────────────
-    private sealed record DiVariantData(string Direction, float DevDeg, float MaxTravel, float Apex, TrajPoint[] Points);
-    private sealed record DiEscapeData(int Pct, float MaxDevDeg, DiVariantData[] Variants);
+    internal sealed record DiVariantData(string Direction, float DevDeg, float MaxTravel, float Apex, TrajPoint[] Points);
+    internal sealed record DiEscapeData(int Pct, float MaxDevDeg, DiVariantData[] Variants);
 
-    private static readonly SlotRef G1 = new(false, 1), G2 = new(false, 2), G3 = new(false, 3), G4 = new(false, 4);
-    private static readonly SlotRef A1 = new(true, 1), A2 = new(true, 2), A3 = new(true, 3), A4 = new(true, 4);
+    internal static readonly SlotRef G1 = new(false, 1), G2 = new(false, 2), G3 = new(false, 3), G4 = new(false, 4);
+    internal static readonly SlotRef A1 = new(true, 1), A2 = new(true, 2), A3 = new(true, 3), A4 = new(true, 4);
 
     /// <summary>Default combo routes — the designed FightGuy juggle/kill links.</summary>
-    private static readonly Route[] DefaultRoutes =
+    internal static readonly Route[] DefaultRoutes =
     {
         new("g3 Uppercut -> a1 Double Punch",      G3, 0, A1, 0),
         new("g3 Uppercut -> a2 Floating Kick",     G3, 0, A2, 0),
@@ -82,13 +86,13 @@ internal static class Program
     /// <summary>Combo routes per character — authored designed juggle/kill links. Non-FightGuy
     /// characters default to empty until their links are designed; the combo sections
     /// auto-omit when a character has no routes.</summary>
-    private static Route[] RoutesFor(string which) => which.ToLowerInvariant() switch
+    internal static Route[] RoutesFor(string which) => which.ToLowerInvariant() switch
     {
         "fightguy" => DefaultRoutes,
         _ => Array.Empty<Route>(),
     };
 
-    private static CharacterDefinition ResolveCharacter(string which)
+    internal static CharacterDefinition ResolveCharacter(string which)
     {
         return which.ToLowerInvariant() switch
         {
@@ -101,7 +105,7 @@ internal static class Program
         };
     }
 
-    private static int Main(string[] args)
+    internal static int Main(string[] args)
     {
         string which = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "fightguy";
         int? trajSlot = ParseTraj(args);
@@ -138,18 +142,13 @@ internal static class Program
         //   kv70       — travel −50% (KV×0.71), stun unchanged      (scale 0.10)
         //   stun16kv11 — Melee-ish ratio: stun ×1.6 + KV×0.79      (0.8 / 0.11)
         //   floor30    — Melee "+18"-style floor: stun from mag+30  (0.5 / 0.14 / +30)
+        // Profile table lives in Shared (TuningProfiles) — shared with AbDiffReport + tests.
         string kbm = ParseArg(args, "--kbm") ?? "base";
-        switch (kbm)
+        if (!TuningProfiles.TryApply(kbm))
         {
-            case "old":        Simulation.HitstunStunCoefficient = 0.5f; Simulation.KbScaleFactor = 0.14f; Simulation.HitstunMagBonus = 0f; break;
-            case "stunx18":    Simulation.HitstunStunCoefficient = 0.9f; Simulation.KbScaleFactor = 0.14f; Simulation.HitstunMagBonus = 0f; break;
-            case "kv70":       Simulation.HitstunStunCoefficient = 0.5f; Simulation.KbScaleFactor = 0.10f; Simulation.HitstunMagBonus = 0f; break;
-            case "stun16kv11": Simulation.HitstunStunCoefficient = 0.8f; Simulation.KbScaleFactor = 0.11f; Simulation.HitstunMagBonus = 0f; break;
-            case "floor30":    Simulation.HitstunStunCoefficient = 0.5f; Simulation.KbScaleFactor = 0.14f; Simulation.HitstunMagBonus = 30f; break;
-            default:
-                if (kbm != "base")
-                    Console.Error.WriteLine($"warn: unknown --kbm '{kbm}' (base|old|stunx18|kv70|stun16kv11|floor30) — using base");
-                Simulation.HitstunStunCoefficient = 0.7f; Simulation.KbScaleFactor = 0.11f; Simulation.HitstunMagBonus = 20f; break;
+            if (kbm != "base")
+                Console.Error.WriteLine($"warn: unknown --kbm '{kbm}' (base|old|stunx18|kv70|stun16kv11|floor30) — using base");
+            TuningProfiles.Apply("base");
         }
         if (kbm != "base")
             Console.Error.WriteLine($"kbm={kbm}: stun={Simulation.HitstunStunCoefficient:0.0}×(mag+{Simulation.HitstunMagBonus:0}), KV×{Simulation.KbScaleFactor:0.00}");
@@ -287,7 +286,7 @@ internal static class Program
 
     // ── Data collection ──────────────────────────────────────────────────────
 
-    private static List<HitSpec> CollectHits(CharacterDefinition def)
+    internal static List<HitSpec> CollectHits(CharacterDefinition def)
     {
         var hits = new List<HitSpec>();
         foreach (var (slot, air) in new[] { (G1, false), (G2, false), (G3, false), (G4, false),
@@ -340,7 +339,7 @@ internal static class Program
     /// first, so the queued launch sees the post-hit percent (verified by the pipeline
     /// parity section). No DI/SDI input; hitstop is reported but not simulated.
     /// </summary>
-    private static RunResult RunTrajectory(CharacterDefinition def, HitSpec h, int pct)
+    internal static RunResult RunTrajectory(CharacterDefinition def, HitSpec h, int pct)
     {
         var sim = new ServerSimulation(BuildArena());
         float groundY = def.CapsuleHeight * 0.5f;
@@ -389,7 +388,7 @@ internal static class Program
     /// vertical velocity, horizontal velocity, phase flag (H=hitstun, F=flight,
     /// A=apex tick, G=landed).
     /// </summary>
-    private static void DumpTrajectory(CharacterDefinition def, HitSpec h, int[] pcts)
+    internal static void DumpTrajectory(CharacterDefinition def, HitSpec h, int[] pcts)
     {
         foreach (var pct in pcts)
         {
@@ -438,7 +437,7 @@ internal static class Program
     /// 0.2s). Uses the post-hit % (pct + damage) so rows match the Per-hit trajectories.
     /// This is the combo-free view: how far, how high, and at what angle each hit sends.
     /// </summary>
-    private static void DumpShapes(CharacterDefinition def, List<HitSpec> hits, int[] pcts, int step)
+    internal static void DumpShapes(CharacterDefinition def, List<HitSpec> hits, int[] pcts, int step)
     {
         foreach (var h in hits)
         foreach (var pct in pcts)
@@ -491,7 +490,7 @@ internal static class Program
         }
     }
 
-    private sealed record ParityResult(string Label, int Pct, float DirectKv, float PipeKv,
+    internal sealed record ParityResult(string Label, int Pct, float DirectKv, float PipeKv,
         int DirectStun, int PipeStun, float DirectApex, float PipeApex, bool Ok);
     /// <summary>
     /// Runs the REAL launch path (input → hitbox → ResolveHits → freeze queue → queued
@@ -499,7 +498,7 @@ internal static class Program
     /// the applied launch against the direct-ApplyKnockback trajectory rows. The game
     /// must match the tool here; divergence means the report doesn't describe the game.
     /// </summary>
-    private static List<ParityResult> ComputeParity(CharacterDefinition def, List<HitSpec> hits,
+    internal static List<ParityResult> ComputeParity(CharacterDefinition def, List<HitSpec> hits,
         Dictionary<(SlotRef, int, int), RunResult> runs, BakedAnimationData? baked)
     {
         var result = new List<ParityResult>();
@@ -528,7 +527,7 @@ internal static class Program
         return result;
     }
 
-    private static void PrintParity(List<ParityResult> parity)
+    internal static void PrintParity(List<ParityResult> parity)
     {
         Console.WriteLine("pipeline parity (real hit path vs direct formula):");
         foreach (var p in parity)
@@ -541,7 +540,7 @@ internal static class Program
     /// (inputs + baked bones → ResolveHits → hitstop queue → queued launch). Returns the
     /// applied KV magnitude, hitstun, hitstop and apex, or null when the starter whiffs.
     /// </summary>
-    private static (float KvMag, int Hitstun, int Hitstop, float Apex)? RunPipelineLaunch(
+    internal static (float KvMag, int Hitstun, int Hitstop, float Apex)? RunPipelineLaunch(
         CharacterDefinition def, SlotRef slot, int pct, BakedAnimationData? baked, (float AtkY, float NpcY, float NpcZ) spawn)
     {
         var sim = new ServerSimulation(BuildArena());
@@ -582,9 +581,9 @@ internal static class Program
         return null;
     }
 
-    private static readonly int[] pctsDefault = { 0, 30, 60, 90, 120, 150 };
+    internal static readonly int[] pctsDefault = { 0, 30, 60, 90, 120, 150 };
 
-    private static string? ParseArg(string[] args, string name)
+    internal static string? ParseArg(string[] args, string name)
     {
         int i = Array.IndexOf(args, name);
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
@@ -596,7 +595,7 @@ internal static class Program
     /// angle 28, stun 20, weight 100, 0%). Prints the KV + hitstun the FILE produces —
     /// independent of whatever the Unity editor has loaded.
     /// </summary>
-    private static void ProbeDll(string dllPath)
+    internal static void ProbeDll(string dllPath)
     {
         var alc = new System.Runtime.Loader.AssemblyLoadContext("probe", isCollectible: true);
         try
@@ -630,19 +629,19 @@ internal static class Program
         finally { alc.Unload(); }
     }
 
-    private static void Set(Type t, object o, string name, object value)
+    internal static void Set(Type t, object o, string name, object value)
         => t.GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!.SetValue(o, value);
-    private static object? Get(Type t, object o, string name)
+    internal static object? Get(Type t, object o, string name)
         => t.GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!.GetValue(o);
 
-    private static int? ParseTraj(string[] args)
+    internal static int? ParseTraj(string[] args)
     {
         int i = Array.IndexOf(args, "--traj");
         return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int slot) ? slot : null;
     }
 
     /// <summary>Kit slot 1-4 → ActiveSlot byte (factory indices: key1=3, key2=7, key3=8, key4=9).</summary>
-    private static byte SlotByte(int slot) => (byte)(slot switch { 1 => 3, 2 => 7, 3 => 8, _ => 9 });
+    internal static byte SlotByte(int slot) => (byte)(slot switch { 1 => 3, 2 => 7, 3 => 8, _ => 9 });
 
     /// <summary>
     /// Full-pipeline launch: the g2 starter connects through the REAL hitbox path
@@ -650,7 +649,7 @@ internal static class Program
     /// victim's applied KV + hitstun + travel to landing — the number the GAME produces,
     /// vs the direct-ApplyKnockback trajectory rows.
     /// </summary>
-    private static void PipeLaunch(CharacterDefinition def)
+    internal static void PipeLaunch(CharacterDefinition def)
     {
         BakedAnimationData? baked = null;
         string bakedPath = def.BakedDataPath.Replace("res://", "");
@@ -705,7 +704,7 @@ internal static class Program
     /// radius reach varies per move and changes with retunes — don't trust stale test
     /// positions). Tries a small grid, returns the first working (attackerY, victimY, victimZ).
     /// </summary>
-    private static (float AtkY, float NpcY, float NpcZ)? CalibrateStarter(CharacterDefinition def, SlotRef from, BakedAnimationData? baked)
+    internal static (float AtkY, float NpcY, float NpcZ)? CalibrateStarter(CharacterDefinition def, SlotRef from, BakedAnimationData? baked)
     {
         float gpy = def.CapsuleHeight * 0.5f;
         var candidates = new List<(float, float, float)>();
@@ -725,7 +724,7 @@ internal static class Program
         return null;
     }
 
-    private static bool StarterConnects(CharacterDefinition def, byte slotByte,
+    internal static bool StarterConnects(CharacterDefinition def, byte slotByte,
         (float AtkY, float NpcY, float NpcZ) p, BakedAnimationData? baked, bool attackerAir, bool victimAir)
     {
         var sim = new ServerSimulation(BuildArena());
@@ -757,7 +756,7 @@ internal static class Program
     /// scenario and returns the first working placement, or null when the move can't reach
     /// that hit state at all.
     /// </summary>
-    private static ProbeSetup? CalibrateScenario(CharacterDefinition def, HitSpec h, bool victimAir, BakedAnimationData? baked)
+    internal static ProbeSetup? CalibrateScenario(CharacterDefinition def, HitSpec h, bool victimAir, BakedAnimationData? baked)
     {
         float gpy = def.CapsuleHeight * 0.5f;
         bool attackerAir = h.Slot.Air;
@@ -804,13 +803,13 @@ internal static class Program
     /// <summary>Probe verdict: Airborne = follow-up connected while the victim was in flight
     /// (a real juggle); Grounded = connected only after the victim landed (neutral hit on a
     /// passive target — opponent is fully actionable); None = never connected.</summary>
-    private enum ProbeVerdict { None, Airborne, Grounded }
+    internal enum ProbeVerdict { None, Airborne, Grounded }
 
     /// <summary>Placement + air state for one starter scenario (auto-calibrated).</summary>
-    private readonly record struct ProbeSetup(float AtkY, float NpcY, float NpcZ, bool AttackerAir, bool VictimAir);
+    internal readonly record struct ProbeSetup(float AtkY, float NpcY, float NpcZ, bool AttackerAir, bool VictimAir);
 
     /// <summary>Raw outcome of one starter→follow-up attempt in the real sim.</summary>
-    private sealed record ProbeOutcome(bool Connected, int ConnectTick, bool VictimAirborne, int VictimStunAtConnect);
+    internal sealed record ProbeOutcome(bool Connected, int ConnectTick, bool VictimAirborne, int VictimStunAtConnect);
 
     /// <summary>
     /// Shared follow-up chase core: the attacker performs the starter with real inputs (hit must
@@ -819,7 +818,7 @@ internal static class Program
     /// in range. Victim is passive (no DI/SDI). Returns the raw outcome; callers map it to their
     /// own verdict (juggle vs ground hit vs combo-true vs combo-false).
     /// </summary>
-    private static ProbeOutcome RunFollowUpSim(CharacterDefinition def, SlotRef from, SlotRef to, int toTriggerTicks,
+    internal static ProbeOutcome RunFollowUpSim(CharacterDefinition def, SlotRef from, SlotRef to, int toTriggerTicks,
         int starterIasaTicks, float followUpLunge, int pct, BakedAnimationData? baked, in ProbeSetup setup)
     {
         var sim = new ServerSimulation(BuildArena());
@@ -935,7 +934,7 @@ internal static class Program
     /// juggle); Grounded = connected only after the victim landed (neutral hit on a passive
     /// target — opponent is fully actionable); None = never connected.
     /// </summary>
-    private static (ProbeVerdict Verdict, int ConnectTick) RunProbe(CharacterDefinition def, Route r, int pct, BakedAnimationData? baked,
+    internal static (ProbeVerdict Verdict, int ConnectTick) RunProbe(CharacterDefinition def, Route r, int pct, BakedAnimationData? baked,
         (float AtkY, float NpcY, float NpcZ) spawn)
     {
         int toTriggerTicks = def.GetSlotAbility(SlotByte(r.To.Slot) - 1, r.To.Air)?.Stages[0]
@@ -949,7 +948,7 @@ internal static class Program
             : (ProbeVerdict.None, -1);
     }
 
-    private static ArenaDefinition BuildArena()
+    internal static ArenaDefinition BuildArena()
     {
         const int w = 200, h = 200;
         var data = new float[w * h];
@@ -968,7 +967,7 @@ internal static class Program
 
     // ── Report ───────────────────────────────────────────────────────────────
 
-    private static string BuildMarkdown(CharacterDefinition def, List<HitSpec> hits,
+    internal static string BuildMarkdown(CharacterDefinition def, List<HitSpec> hits,
         Dictionary<(SlotRef, int, int), RunResult> runs, int[] pcts,
         Route[] routes, Route[] probeRoutes, Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)> probes,
         List<ParityResult> parity, string which, bool combos,
@@ -1200,14 +1199,14 @@ internal static class Program
     }
 
     /// <summary>Attacker time from hit-1 connect to hit-2 connect, in state-machine ticks (shared hitstop cancels).</summary>
-    private static int AttackerBudget(CharacterDefinition def, List<HitSpec> hits, Route r)
+    internal static int AttackerBudget(CharacterDefinition def, List<HitSpec> hits, Route r)
     {
         var from = hits.First(h => h.Slot == r.From && h.HitIndex == r.FromHit);
         var to = hits.First(h => h.Slot == r.To && h.HitIndex == r.ToHit);
         return AttackerBudget(def, from, to);
     }
 
-    private static int AttackerBudget(CharacterDefinition def, HitSpec from, HitSpec to)
+    internal static int AttackerBudget(CharacterDefinition def, HitSpec from, HitSpec to)
     {
         if (from.Slot == to.Slot && from.HitIndex < to.HitIndex)
             return to.Hit.TriggerTick - from.Hit.TriggerTick; // same-press chain: no recovery between hitboxes
@@ -1221,7 +1220,7 @@ internal static class Program
     /// <summary>Hitstun the sim actually applies for this hit at this victim %: 0.5 × the unscaled
     /// KB magnitude. The authored <c>StunTicks</c> is a zero/nonzero gate only (Simulation.cs
     /// "Hitstun from the UNSCALED magnitude") — the real window scales with launch speed.</summary>
-    private static int SimStun(CharacterDefinition def, HitSpec h, int pct)
+    internal static int SimStun(CharacterDefinition def, HitSpec h, int pct)
     {
         var s = new CharacterState { DamagePercent = (ushort)(pct + (int)h.Hit.Damage) };
         Simulation.ApplyKnockback(ref s, 0f, 1f, h.LaunchAngle, h.BaseKb, h.GrowthKb,
@@ -1235,7 +1234,7 @@ internal static class Program
     /// effective send — it re-launches the victim, so its stun/trigger define the window. Positive =
     /// the follow-up's hitbox is active before stun ends on paper; the sim verdict in the graph shows
     /// whether travel/range make it real.</summary>
-    private static int TightnessOf(CharacterDefinition def, HitSpec starter, HitSpec followUp, int pct)
+    internal static int TightnessOf(CharacterDefinition def, HitSpec starter, HitSpec followUp, int pct)
     {
         var send = starter.Stage.HitboxEvents[^1];
         int unlock = starter.Stage.IasaTicks > 0 ? starter.Stage.IasaTicks : starter.Stage.DurationTicks;
@@ -1252,7 +1251,7 @@ internal static class Program
     /// An edge is TRUE iff the follow-up's damage lands while the victim is still in hitstun.
     /// Also aggregates combo density (true links per character per %).
     /// </summary>
-    private static (ComboStarterData[] Starters, ComboDensityData[] Density) ComputeTrueComboGraph(
+    internal static (ComboStarterData[] Starters, ComboDensityData[] Density) ComputeTrueComboGraph(
         CharacterDefinition def, List<HitSpec> hits, int[] pcts, BakedAnimationData? baked)
     {
         var normals = hits.Where(x => x.HitIndex == 0).ToList();
@@ -1290,21 +1289,21 @@ internal static class Program
         return (starters.ToArray(), density);
     }
 
-    private static string Label(HitSpec h)
+    internal static string Label(HitSpec h)
         => $"{(h.Slot.Air ? "a" : "g")}{h.Slot.Slot} {h.Ability.Name}";
 
     // ── JSON / HTML report ──────────────────────────────────────────────────
 
-    private static string SlotName(SlotRef s) => $"{(s.Air ? "a" : "g")}{s.Slot}";
+    internal static string SlotName(SlotRef s) => $"{(s.Air ? "a" : "g")}{s.Slot}";
 
     /// <summary>A spike (negative launch angle) sent from the ground lands instantly and shows no arc.
     /// The report launches spike victims from this altitude (off-stage / airborne scenario) so the
     /// downward send is visible. Kill-% analysis stays grounded (a grounded spike does not KO).</summary>
-    private const float SpikeLaunchAltitude = 3f;
+    internal const float SpikeLaunchAltitude = 3f;
 
     /// <summary>Kill-% proxy arena: flat 60x60, KillHeight -10 (Crossroads-style). Sides auto-derive
     /// from bounds &plusmn;10 &rarr; &plusmn;40; top auto = floor + 20 = +20.</summary>
-    private static ArenaDefinition BuildKillArena()
+    internal static ArenaDefinition BuildKillArena()
     {
         const int w = 60, h = 60;
         var data = new float[w * h];
@@ -1321,14 +1320,14 @@ internal static class Program
 
     /// <summary>Clone an arena with blast lines pushed out so the sim never respawns — lets the run
     /// detect a real blast-line crossing itself and keep recording the full arc.</summary>
-    private static ArenaDefinition NoRespawn(ArenaDefinition a)
+    internal static ArenaDefinition NoRespawn(ArenaDefinition a)
     {
         a.KillHeight = -1e6f; a.KillTop = 1e6f;
         a.KillMinX = -1e6f; a.KillMaxX = 1e6f; a.KillMinZ = -1e6f; a.KillMaxZ = 1e6f;
         return a;
     }
 
-    private static string? BlastLine(CharacterState s, in ArenaCollision.BlastLines b)
+    internal static string? BlastLine(CharacterState s, in ArenaCollision.BlastLines b)
     {
         if (s.PY < b.KillHeight) return "bottom";
         if (s.PY > b.KillTop) return "top";
@@ -1337,7 +1336,7 @@ internal static class Program
         return null;
     }
 
-    private static TrajPoint PointAt(CharacterState s, int tick, float groundY)
+    internal static TrajPoint PointAt(CharacterState s, int tick, float groundY)
     {
         float vy = s.HitstunTicks > 0 ? s.KVY : s.VY;
         float vz = s.HitstunTicks > 0 ? s.KVZ : s.VZ;
@@ -1348,7 +1347,7 @@ internal static class Program
     /// <summary>Launch a grounded victim with the hitbox's knockback, step the sim until it lands OR
     /// crosses a real blast line, recording the per-tick arc. Runs on a no-respawn arena so the flight
     /// is captured in full and the crossing is detected against <paramref name="detect"/>.</summary>
-    private static TrajectoryData RunTrajectoryFull(CharacterDefinition def, HitSpec h, int pct,
+    internal static TrajectoryData RunTrajectoryFull(CharacterDefinition def, HitSpec h, int pct,
         ArenaDefinition phys, in ArenaCollision.BlastLines detect)
     {
         var sim = new ServerSimulation(phys);
@@ -1397,7 +1396,7 @@ internal static class Program
     }
 
     /// <summary>3D angle between two vectors, in degrees.</summary>
-    private static float AngleBetween(float ax, float ay, float az, float bx, float by, float bz)
+    internal static float AngleBetween(float ax, float ay, float az, float bx, float by, float bz)
     {
         float ma = MathF.Sqrt(ax * ax + ay * ay + az * az);
         float mb = MathF.Sqrt(bx * bx + by * by + bz * bz);
@@ -1409,7 +1408,7 @@ internal static class Program
     /// (in) / with it (away), and the two perpendicular bends (up/down). MoveX/MoveY = the sim's
     /// DI coordinate convention (DIX/DIY, camera-relative). The sim's sin² curve makes the
     /// perpendicular holds bend most; along-axis holds only give the expiry ASDI push.</summary>
-    private static readonly (string Name, float Dx, float Dy)[] DiDirections =
+    internal static readonly (string Name, float Dx, float Dy)[] DiDirections =
     {
         ("in", 0f, -1f),
         ("away", 0f, 1f),
@@ -1425,7 +1424,7 @@ internal static class Program
     /// through stun (so the expiry ASDI push applies too, like holding in-game). Returns the
     /// arc plus the angular deviation of the launch vector from baseline.
     /// </summary>
-    private static DiVariantData RunTrajectoryWithDi(CharacterDefinition def, HitSpec h, int pct,
+    internal static DiVariantData RunTrajectoryWithDi(CharacterDefinition def, HitSpec h, int pct,
         ArenaDefinition phys, in ArenaCollision.BlastLines detect, string dir, float dx, float dy)
     {
         var sim = new ServerSimulation(phys);
@@ -1471,7 +1470,7 @@ internal static class Program
     /// <summary>DI escape-space for every move × %: the baseline arc plus the four DI-variant arcs,
     /// with the max launch-vector deviation as the escape magnitude. Per-move results align with
     /// the move's Trajectories array by pct index.</summary>
-    private static DiEscapeData[] ComputeDiEscapeFor(CharacterDefinition def, HitSpec h, int[] pcts,
+    internal static DiEscapeData[] ComputeDiEscapeFor(CharacterDefinition def, HitSpec h, int[] pcts,
         ArenaDefinition phys, in ArenaCollision.BlastLines detect)
     {
         var result = new List<DiEscapeData>();
@@ -1485,14 +1484,14 @@ internal static class Program
         return result.ToArray();
     }
 
-    private static Dictionary<(SlotRef, int), DiEscapeData[]> ComputeDiEscape(CharacterDefinition def,
+    internal static Dictionary<(SlotRef, int), DiEscapeData[]> ComputeDiEscape(CharacterDefinition def,
         List<HitSpec> hits, int[] pcts, ArenaDefinition phys)
     {
         var detect = ArenaCollision.ResolveBlastLines(in phys);
         return hits.ToDictionary(h => (h.Slot, h.HitIndex), h => ComputeDiEscapeFor(def, h, pcts, phys, detect));
     }
 
-    private static (bool Killed, string Line) RunKillProbe(CharacterDefinition def, HitSpec h, int pct,
+    internal static (bool Killed, string Line) RunKillProbe(CharacterDefinition def, HitSpec h, int pct,
         ArenaDefinition phys, in ArenaCollision.BlastLines detect)
     {
         var sim = new ServerSimulation(phys);
@@ -1520,7 +1519,7 @@ internal static class Program
 
     /// <summary>Lowest victim % (pre-hit) at which the launch crosses a blast line before landing.
     /// Binary search — knockback grows monotonically with damage. null = no KO by 250%.</summary>
-    private static (int Pct, string Line)? KillPctFor(CharacterDefinition def, HitSpec h,
+    internal static (int Pct, string Line)? KillPctFor(CharacterDefinition def, HitSpec h,
         ArenaDefinition phys, in ArenaCollision.BlastLines detect)
     {
         const int MAX = 250;
@@ -1536,14 +1535,14 @@ internal static class Program
         return (found, line);
     }
 
-    private static FrameDataData BuildFrameData(HitSpec h) => new(
+    internal static FrameDataData BuildFrameData(HitSpec h) => new(
         h.Hit.TriggerTick, h.Hit.TriggerTick, h.Hit.TriggerTick + h.Hit.DurationTicks - 1,
         h.Hit.Damage, h.LaunchAngle, h.BaseKb, h.GrowthKb,
         h.Hit.StunTicks, h.Stage.IasaTicks, h.Stage.LandingLagTicks, h.Stage.AutoCancelBeforeTicks,
         h.Stage.AutoCancelAfterTicks, h.Stage.DurationTicks,
         h.Hit.Knockback.Profile.ToString(), h.Adaptive);
 
-    private static ReportData BuildReport(CharacterDefinition def, List<HitSpec> hits, int[] pcts,
+    internal static ReportData BuildReport(CharacterDefinition def, List<HitSpec> hits, int[] pcts,
         BakedAnimationData? baked, bool trueCombos, bool di)
     {
         var reportArena = BuildArena();
@@ -1579,7 +1578,7 @@ internal static class Program
     /// <summary>How close the move gets to the top / side blast lines at the highest simulated % —
     /// fraction of the way there (0..1). Always populated even when it never kills, so tuning can
     /// see "up-slash apex is 47% of the way to top blast".</summary>
-    private static ClearanceData ClearanceOf(CharacterDefinition def, TrajectoryData tr, in ArenaCollision.BlastLines kill)
+    internal static ClearanceData ClearanceOf(CharacterDefinition def, TrajectoryData tr, in ArenaCollision.BlastLines kill)
     {
         float groundY = def.CapsuleHeight * 0.5f;
         float topFrac = kill.KillTop - groundY > 0.01f ? Math.Clamp(tr.Apex / (kill.KillTop - groundY), 0f, 1f) : 0f;
@@ -1587,40 +1586,40 @@ internal static class Program
         return new ClearanceData(topFrac, sideFrac, topFrac >= sideFrac ? "top" : "side");
     }
 
-    private static ArenaData ToArenaData(in ArenaCollision.BlastLines b, string note)
+    internal static ArenaData ToArenaData(in ArenaCollision.BlastLines b, string note)
     {
         static float? Inf(float v) => float.IsInfinity(v) ? null : v;
         return new ArenaData(Inf(b.KillHeight), Inf(b.KillTop), Inf(b.KillMinX), Inf(b.KillMaxX),
             Inf(b.KillMinZ), Inf(b.KillMaxZ), note);
     }
 
-    private static string ToJson(ReportData r) => JsonSerializer.Serialize(r,
+    internal static string ToJson(ReportData r) => JsonSerializer.Serialize(r,
         new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
     // ── HTML renderer (self-contained, no external deps) ────────────────────
 
-    private static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
-    private static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
-    private static string Escape(string s) => System.Net.WebUtility.HtmlEncode(s);
-    private static string Blast(float? v) => v == null ? "&infin;" : F(v.Value);
-    private static string Bar(int pct) => $"<span class=\"barwrap\"><span class=\"barfill\" style=\"width:{pct}%\"></span></span>{pct}%";
-    private static string MoveTag(MoveData m) => m.Frame.Adaptive ? " <span class=\"tag\">adaptive</span>" : "";
-    private static string DisplayLabel(MoveData m, ReportData r) =>
+    internal static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    internal static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+    internal static string Escape(string s) => System.Net.WebUtility.HtmlEncode(s);
+    internal static string Blast(float? v) => v == null ? "&infin;" : F(v.Value);
+    internal static string Bar(int pct) => $"<span class=\"barwrap\"><span class=\"barfill\" style=\"width:{pct}%\"></span></span>{pct}%";
+    internal static string MoveTag(MoveData m) => m.Frame.Adaptive ? " <span class=\"tag\">adaptive</span>" : "";
+    internal static string DisplayLabel(MoveData m, ReportData r) =>
         r.Moves.Count(x => x.Label == m.Label) > 1 ? $"{m.Label} (hit {m.HitIndex + 1})" : m.Label;
 
-    private static string AdvColor(int adv)
+    internal static string AdvColor(int adv)
     {
         int a = Math.Clamp(adv, -40, 40);
         int m = (int)(Math.Abs(a) * 5.5f);
         return a >= 0 ? $"rgb({255 - m},255,{255 - m})" : $"rgb(255,{255 - m},{255 - m})";
     }
 
-    private static readonly (string Name, string Color)[] DiArcColors =
+    internal static readonly (string Name, string Color)[] DiArcColors =
     {
         ("in", "#2ecc71"), ("away", "#e74c3c"), ("up", "#f39c12"), ("down", "#9b59b6"),
     };
 
-    private static string ArcSvg(TrajectoryData tr, float maxTravel, float maxHeight)
+    internal static string ArcSvg(TrajectoryData tr, float maxTravel, float maxHeight)
     {
         const int W = 150, H = 110, PAD = 8;
         float tw = maxTravel > 0.01f ? maxTravel : 1f;
@@ -1650,7 +1649,7 @@ internal static class Program
     /// <summary>Large per-move DI figure: one SVG with a % grid and the baseline + four DI-variant arcs
     /// stacked as per-% groups; a global selector toggles which group is visible. Common character
     /// scale (maxTravel/maxHeight) so all %s share one coordinate system.</summary>
-    private static string DiFigure(MoveData m, ReportData r, float maxTravel, float maxHeight)
+    internal static string DiFigure(MoveData m, ReportData r, float maxTravel, float maxHeight)
     {
         const int W = 640, H = 400, PAD = 26;
         float tw = maxTravel > 0.01f ? maxTravel : 1f;
@@ -1720,7 +1719,7 @@ internal static class Program
         return sb.ToString();
     }
 
-    private static string ToHtml(ReportData r)
+    internal static string ToHtml(ReportData r)
     {
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
@@ -1857,14 +1856,14 @@ internal static class Program
 
     // ── CLI ──────────────────────────────────────────────────────────────────
 
-    private static int[]? ParsePcts(string[] args)
+    internal static int[]? ParsePcts(string[] args)
     {
         int i = Array.IndexOf(args, "--pcts");
         if (i < 0 || i + 1 >= args.Length) return null;
         return args[i + 1].Split(',').Select(int.Parse).ToArray();
     }
 
-    private static string? ParseOut(string[] args)
+    internal static string? ParseOut(string[] args)
     {
         int i = Array.IndexOf(args, "--out");
         if (i < 0 || i + 1 >= args.Length) return null;
