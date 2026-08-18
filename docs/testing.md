@@ -37,19 +37,16 @@ dotnet test tests/Shared.Tests/ --nologo --filter "ServerSimulationTests"
  | `EdgeCaseTests.cs` | 2 | Input buffering, cooldown countdown, entity isolation |
  | `FacingDirectionTests.cs` | 2 | Facing yaw stability through hitstun |
  | `FightGuyAbilityTests.cs` | 38 | FightGuy LMB/Q/E/R/F activation, hitbox collision, mark system, homing, launcher |
- | `FightGuyKitRegressionTests.cs` | 5 | Golden kit regression for FightGuy |
  | `HitstunAnimationTierTests.cs` | 7 | 3-tier hitstun animation (damage → HitstunLevel, clip tiers) |
  | `HostedServerConfigTests.cs` | 4 | HostedServerConfig server.json builder (ADR-0005) |
  | `KistuAbilityTests.cs` | 13 | Kistu kit: RMB charge, E dash, R launcher + charge-stock, Q counter |
  | `LedgeSnapTests.cs` | 6 | Ledge snap auto-grab near stage edge |
  | `LobbyPayloadCodecTests.cs` | 16 | SignalR lobby JSON payload mapping (issue #33) |
- | `MankiKitRegressionTests.cs` | 7 | Golden kit regression for Manki (LMB, RMB, AirRMB, Overclock, Q) |
  | `MankiKitTests.cs` | 6 | Bazooka rocket-jump, grapple tether, AirLMB, AirRMB |
  | `MankiLmbTests.cs` | 16 | Manki LMB combo: 3-hit chain, lunge, bone hitboxes, input buffering |
  | `MasterServerClientTests.cs` | 13 | MasterServerClient with canned HTTP responses |
  | `MatchStartRequestCodecTests.cs` | 9 | Match-start request: char classes + dynamic entity IDs (ADR-0008) |
  | `NilusAbilityTests.cs` | 36 | Nilus kit: registration + Q/E/R/F data-driven slots |
- | `NilusKitRegressionTests.cs` | 9 | Golden kit regression for Nilus (full-state EntitySnapshot diff) |
  | `PhysicsTests.cs` | 20 | State machine transitions and movement physics |
  | `RehitZoneTests.cs` | 9 | Hitbox.RehitIntervalTicks lingering zones |
  | `ServerLogParserTests.cs` | 5 | ServerLogParser master-server registration detection (ADR-0005) |

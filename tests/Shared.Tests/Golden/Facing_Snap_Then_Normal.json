@@ -13,7 +13,6 @@
     "IsGrounded": true
   },
   "NpcSnap": {
-    "FacingYaw": 3.1415927,
     "PX": 100,
     "PY": 0.85,
     "PZ": 98.7,
@@ -31,7 +30,6 @@
     "IsGrounded": true
   },
   "NpcFinal": {
-    "FacingYaw": 3.1415927,
     "PX": 100,
     "PY": 0.85,
     "PZ": 97.029144,

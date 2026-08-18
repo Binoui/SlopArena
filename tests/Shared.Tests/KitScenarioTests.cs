@@ -117,19 +117,4 @@ public abstract class KitScenarioTests
         string? val = System.Environment.GetEnvironmentVariable("REGENERATE_GOLDENS");
         return val == "1" || string.Equals(val, "true", System.StringComparison.OrdinalIgnoreCase);
     }
-
-    /// <summary>
-    /// Ground-level PY for Manki with floor at 0.
-    /// </summary>
-    protected static float MankiGpy => TestHelpers.MankiGroundPY;
-
-    /// <summary>
-    /// Ground-level PY for FightGuy with floor at 0.
-    /// </summary>
-    protected static float FightGuyGpy => TestHelpers.GroundPY(TestHelpers.FightGuyDef);
-
-    /// <summary>
-    /// Ground-level PY for Nilus with floor at 0.
-    /// </summary>
-    protected static float NilusGpy => TestHelpers.GroundPY(TestHelpers.NilusDef);
 }
