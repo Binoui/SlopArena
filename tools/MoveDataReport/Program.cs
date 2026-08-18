@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SlopArena.Shared;
 
 // Issue #149: the tuning A/B diff tool (SlopArena.AbDiffReport) reuses this tool's analysis
@@ -51,7 +52,8 @@ internal static class Program
         float? KillMinZ, float? KillMaxZ, string Note);
     internal sealed record ReportData(string Character, string GeneratedAt, int[] Percents,
         ArenaData ReportArena, ArenaData KillArena, MoveData[] Moves,
-        ComboStarterData[] TrueCombos, ComboDensityData[] ComboDensity);
+        ComboStarterData[] TrueCombos, ComboDensityData[] ComboDensity,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReachData? Reach);
 
     // ── True-combo graph model ───────────────────────────────────────────────
     /// <summary>One starter→follow-up edge at one victim %. Verdict: "true" = the follow-up's damage landed
@@ -65,6 +67,19 @@ internal static class Program
     // ── DI escape-space model ────────────────────────────────────────────────
     internal sealed record DiVariantData(string Direction, float DevDeg, float MaxTravel, float Apex, TrajPoint[] Points);
     internal sealed record DiEscapeData(int Pct, float MaxDevDeg, DiVariantData[] Variants);
+
+    // ── Reach chart model (issue #151) ───────────────────────────────────────
+    /// <summary>One world-space capsule sample: the hitbox's start/end endpoints at one active tick, plus radius.</summary>
+    internal sealed record ReachCapsuleData(int Tick, float X0, float Y0, float Z0, float X1, float Y1, float Z1, float Radius);
+    /// <summary>Forward extent across one height band. MinZ/MaxZ null = the band is unreached.</summary>
+    internal sealed record ReachBandData(string Name, float YMin, float YMax, float? MinZ, float? MaxZ);
+    /// <summary>One hit's reach summary: per-band extent + per-tick capsules. Reach = max MaxZ over bands, null if all null.</summary>
+    internal sealed record ReachHitData(string Label, string Slot, int HitIndex, string Ability,
+        float? Reach, ReachBandData[] Bands, ReachCapsuleData[] Capsules);
+    /// <summary>A whiff zone: within one height band, nothing covers From–To forward (below the kit's max reach at that height).</summary>
+    internal sealed record ReachGapData(string Band, float From, float To, float HMin, float HMax);
+    internal sealed record ReachData(float CharHeight, float CapsuleRadius, float CellSize, float GapStep, float ZMin, float ZMax,
+        ReachHitData[] Hits, ReachGapData[] Gaps, string[] UncoveredBands); // ZMin/ZMax = common overlay range
 
     internal static readonly SlotRef G1 = new(false, 1), G2 = new(false, 2), G3 = new(false, 3), G4 = new(false, 4);
     internal static readonly SlotRef A1 = new(true, 1), A2 = new(true, 2), A3 = new(true, 3), A4 = new(true, 4);
@@ -132,6 +147,10 @@ internal static class Program
         // during hitstun (Simulation.ApplyDirectionalInfluence, 18° cap), with angular deviation.
         bool trueCombos = args.Contains("--truecombos");
         bool di = args.Contains("--di");
+        // --reach: authored hitbox reach chart (issue #151) — per-move side-view overlays,
+        // per-height-band range ladder, coverage gaps + uncovered bands. Composes with
+        // --json/--html and appends a markdown section on the default path.
+        bool reach = args.Contains("--reach");
 
         // --kbm <model>: knockback-tuning lab. Overrides the sim's global KB knobs
         // (Simulation.KbScaleFactor / HitstunStunCoefficient / HitstunMagBonus) so the
@@ -159,7 +178,7 @@ internal static class Program
         string? htmlPath = ParseArg(args, "--html");
         if (jsonPath != null || htmlPath != null)
         {
-            var report = BuildReport(def, hits, pcts, baked, trueCombos, di);
+            var report = BuildReport(def, hits, pcts, baked, trueCombos, di, reach);
             if (jsonPath != null)
             {
                 var dir = Path.GetDirectoryName(jsonPath);
@@ -273,7 +292,7 @@ internal static class Program
         if (trueCombos) comboGraph = ComputeTrueComboGraph(def, hits, pcts, baked);
         Dictionary<(SlotRef, int), DiEscapeData[]>? diData = di ? ComputeDiEscape(def, hits, pcts, NoRespawn(BuildArena())) : null;
         string md = BuildMarkdown(def, hits, runs, pcts, routes, probeRoutes, probes, parity, which, combos,
-            comboGraph, diData);
+            comboGraph, diData, reach ? BuildReach(def, hits, baked) : null);
         Console.WriteLine(md);
         if (outPath != null)
         {
@@ -331,6 +350,143 @@ internal static class Program
         }
         return hits;
     }
+
+    // ── Reach chart collection (issue #151) ──────────────────────────────────
+
+    /// <summary>Vertical sampling step for the gap scan, metres.</summary>
+    internal const float ReachGapStep = 0.1f;
+    /// <summary>Gaps narrower than this are below-cell noise and dropped, metres.</summary>
+    internal const float ReachMinGapWidth = 0.05f;
+
+    /// <summary>Tool SlotRef (g1–g4 / a1–a4) → GetSlotAbility slot index (Slot1=2, Slot2=6,
+    /// Slot3=7, Slot4=8; same indices airborne → AirSlotN), matching CollectHits.</summary>
+    internal static byte SlotIndex(SlotRef s) => (byte)(s.Slot switch { 1 => 2, 2 => 6, 3 => 7, _ => 8 });
+
+    /// <summary>Reach height bands: thirds of CapsuleHeight from the feet — low [0, H/3),
+    /// mid [H/3, 2H/3), high [2H/3, H + 0.5] (0.5 m headroom so above-head coverage counts as high).</summary>
+    internal static (string Name, float YMin, float YMax)[] ReachBandsFor(CharacterDefinition def)
+    {
+        float h = def.CapsuleHeight;
+        return new[] { ("low", 0f, h / 3f), ("mid", h / 3f, 2f * h / 3f), ("high", 2f * h / 3f, h + 0.5f) };
+    }
+
+    /// <summary>
+    /// Deterministic authored-hitbox reach chart: every collected normal's capsule union per
+    /// height band (via <see cref="MoveReach"/> over <see cref="HitboxGeometry.ResolvePositions"/>),
+    /// the common overlay range, the kit's whiff zones (per band, per height row: holes in
+    /// [0, maxReachAtY] across move envelopes, merged over consecutive rows), and bands no
+    /// normal reaches at all.
+    /// </summary>
+    internal static ReachData BuildReach(CharacterDefinition def, List<HitSpec> hits, BakedAnimationData? baked)
+    {
+        var sampleCache = new Dictionary<(SlotRef, int), MoveReach.CapsuleSample[]>();
+        foreach (var h in hits)
+            sampleCache[(h.Slot, h.HitIndex)] = MoveReach.SampleHit(def, h.Hit, SlotIndex(h.Slot), h.Slot.Air,
+                h.Ability.AnimationNames, 0, baked);
+
+        // Common overlay range: min/max endpoint Z over all samples, widened to at least [-1, 3].
+        float zMin = float.PositiveInfinity, zMax = float.NegativeInfinity;
+        foreach (var samples in sampleCache.Values)
+        foreach (var c in samples)
+        {
+            float lo = MathF.Min(c.Z0, c.Z1), hi = MathF.Max(c.Z0, c.Z1);
+            if (lo < zMin) zMin = lo;
+            if (hi > zMax) zMax = hi;
+        }
+        zMin = MathF.Min(zMin - 0.2f, -1.0f);
+        zMax = MathF.Max(zMax + 0.2f, 3.0f);
+
+        var bands = ReachBandsFor(def);
+        var hitData = new List<ReachHitData>();
+        foreach (var h in hits)
+        {
+            var samples = sampleCache[(h.Slot, h.HitIndex)];
+            var hitBands = new ReachBandData[bands.Length];
+            float? reach = null;
+            for (int i = 0; i < bands.Length; i++)
+            {
+                var ext = MoveReach.BandExtent(samples, bands[i].YMin, bands[i].YMax);
+                hitBands[i] = new ReachBandData(bands[i].Name, bands[i].YMin, bands[i].YMax, ext?.MinZ, ext?.MaxZ);
+                if (ext != null && (reach == null || ext.Value.MaxZ > reach)) reach = ext.Value.MaxZ;
+            }
+            hitData.Add(new ReachHitData(Label(h), SlotName(h.Slot), h.HitIndex, h.Ability.Name, reach, hitBands,
+                samples.Select(c => new ReachCapsuleData(c.Tick, c.X0, c.Y0, c.Z0, c.X1, c.Y1, c.Z1, c.Radius)).ToArray()));
+        }
+
+        // Per-move envelopes: group hit samples by slot (concatenated — ExtentAt unions them).
+        var moveUnions = new Dictionary<SlotRef, MoveReach.CapsuleSample[]>();
+        foreach (var grp in hits.GroupBy(h => h.Slot))
+            moveUnions[grp.Key] = grp.SelectMany(h => sampleCache[(h.Slot, h.HitIndex)]).ToArray();
+
+        // Whiff zones: per band, per y-row, covered intervals across moves clamp to
+        // [0, maxReachAtY]; holes in that range are gaps (narrower than ReachMinGapWidth
+        // dropped). Consecutive rows whose (From, To) agree within ReachMinGapWidth merge
+        // into one gap spanning HMin–HMax.
+        var gaps = new List<ReachGapData>();
+        var uncovered = new List<string>();
+        foreach (var band in bands)
+        {
+            var rows = new List<(float Y, float From, float To)>();
+            bool anyCoverage = false;
+            int n = (int)Math.Ceiling((band.YMax - band.YMin) / ReachGapStep);
+            for (int i = 0; i <= n; i++)
+            {
+                float y = MathF.Min(band.YMin + i * ReachGapStep, band.YMax);
+                var intervals = new List<(float Min, float Max)>();
+                float maxReach = 0f;
+                foreach (var union in moveUnions.Values)
+                {
+                    var ext = MoveReach.ExtentAt(union, y);
+                    if (ext != null)
+                    {
+                        intervals.Add((ext.Value.MinZ, ext.Value.MaxZ));
+                        if (ext.Value.MaxZ > maxReach) maxReach = ext.Value.MaxZ;
+                    }
+                }
+                if (maxReach <= 0f) continue;
+                anyCoverage = true;
+                for (int k = 0; k < intervals.Count; k++)
+                {
+                    var iv = intervals[k];
+                    intervals[k] = (Math.Clamp(iv.Min, 0f, maxReach), Math.Clamp(iv.Max, 0f, maxReach));
+                }
+                intervals.Sort((a, b) => a.Min.CompareTo(b.Min));
+                var merged = new List<(float Min, float Max)>();
+                foreach (var iv in intervals)
+                {
+                    if (merged.Count > 0 && iv.Min <= merged[^1].Max + 1e-4f)
+                        merged[^1] = (merged[^1].Min, MathF.Max(merged[^1].Max, iv.Max));
+                    else merged.Add(iv);
+                }
+                float cursor = 0f;
+                foreach (var iv in merged)
+                {
+                    if (iv.Min > cursor + ReachMinGapWidth) rows.Add((y, cursor, iv.Min));
+                    if (iv.Max > cursor) cursor = iv.Max;
+                }
+                if (cursor < maxReach - ReachMinGapWidth) rows.Add((y, cursor, maxReach));
+            }
+            if (!anyCoverage) { uncovered.Add(band.Name); continue; }
+            int ri = 0;
+            while (ri < rows.Count)
+            {
+                int rj = ri;
+                while (rj + 1 < rows.Count
+                    && MathF.Abs(rows[rj + 1].From - rows[rj].From) <= ReachMinGapWidth
+                    && MathF.Abs(rows[rj + 1].To - rows[rj].To) <= ReachMinGapWidth)
+                    rj++;
+                var first = rows[ri]; var last = rows[rj];
+                gaps.Add(new ReachGapData(band.Name, first.From, first.To, first.Y, last.Y + ReachGapStep));
+                ri = rj + 1;
+            }
+        }
+        return new ReachData(def.CapsuleHeight, def.CapsuleRadius, MoveReach.CellSize, ReachGapStep,
+            zMin, zMax, hitData.ToArray(), gaps.ToArray(), uncovered.ToArray());
+    }
+
+    /// <summary>Ladder cell: "0.56" or the null marker ("—" markdown / "&amp;mdash;" HTML) when unreached.</summary>
+    internal static string ReachCell(float? v, string nullMark = "—")
+        => v == null ? nullMark : F(v.Value);
 
     /// <summary>
     /// Launch a fresh grounded victim with the hitbox's authored knockback, then step
@@ -972,7 +1128,8 @@ internal static class Program
         Route[] routes, Route[] probeRoutes, Dictionary<(SlotRef, SlotRef, int), (ProbeVerdict Verdict, int ConnectTick)> probes,
         List<ParityResult> parity, string which, bool combos,
         (ComboStarterData[] Starters, ComboDensityData[] Density)? trueCombos,
-        Dictionary<(SlotRef, int), DiEscapeData[]>? diEscape)
+        Dictionary<(SlotRef, int), DiEscapeData[]>? diEscape,
+        ReachData? reach = null)
     {
         var sb = new System.Text.StringBuilder();
         string charName = def.DisplayName;
@@ -1190,6 +1347,36 @@ internal static class Program
                     sb.AppendLine($"| {Label(h)} | {d.Pct} | {d.Variants[0].DevDeg:0.0}° | {d.Variants[1].DevDeg:0.0}° | " +
                                   $"{d.Variants[2].DevDeg:0.0}° | {d.Variants[3].DevDeg:0.0}° | **{d.MaxDevDeg:0.0}°** |");
                 }
+            }
+            sb.AppendLine();
+        }
+
+        if (reach != null)
+        {
+            sb.AppendLine("## Hitbox reach (authored)");
+            sb.AppendLine();
+            sb.AppendLine("> Method: geometry = `HitboxGeometry.ResolvePositions` per active tick at the grounded origin frame");
+            sb.AppendLine("> (character at origin, yaw 0 → forward is +Z); bands = thirds of `CapsuleHeight` from the feet");
+            sb.AppendLine("> (high band +0.5 m headroom); reach = forward (Z) extent of the side-view envelope (X flattened);");
+            sb.AppendLine("> baked skeleton used when present, entity-relative fallback otherwise. Authored geometry only");
+            sb.AppendLine("> — no buff bonuses. Reach = max forward extent over the bands.");
+            sb.AppendLine();
+            sb.AppendLine("| move | hit | low m | mid m | high m | reach m |");
+            sb.AppendLine("|---|---|---|---|---|---|");
+            foreach (var hh in reach.Hits.OrderByDescending(x => x.Reach ?? float.NegativeInfinity))
+            {
+                string label = hits.Count(x => Label(x) == hh.Label) > 1 ? $"{hh.Label} (hit {hh.HitIndex + 1})" : hh.Label;
+                sb.AppendLine($"| {label} | {hh.HitIndex + 1} | {ReachCell(hh.Bands[0].MaxZ)} | {ReachCell(hh.Bands[1].MaxZ)} | " +
+                              $"{ReachCell(hh.Bands[2].MaxZ)} | **{ReachCell(hh.Reach)}** |");
+            }
+            sb.AppendLine();
+            var bandDefs = ReachBandsFor(def);
+            foreach (var g in reach.Gaps)
+                sb.AppendLine($"- {g.Band} @ {g.HMin:0.0}–{g.HMax:0.0} m: nothing covers {g.From:0.0}–{g.To:0.0} m");
+            foreach (var name in reach.UncoveredBands)
+            {
+                var b = bandDefs.FirstOrDefault(x => x.Name == name);
+                sb.AppendLine($"- {name}: no normal reaches {b.YMin:0.0}–{b.YMax:0.0} m");
             }
             sb.AppendLine();
         }
@@ -1543,7 +1730,7 @@ internal static class Program
         h.Hit.Knockback.Profile.ToString(), h.Adaptive);
 
     internal static ReportData BuildReport(CharacterDefinition def, List<HitSpec> hits, int[] pcts,
-        BakedAnimationData? baked, bool trueCombos, bool di)
+        BakedAnimationData? baked, bool trueCombos, bool di, bool reach = false)
     {
         var reportArena = BuildArena();
         var reportDetect = ArenaCollision.ResolveBlastLines(in reportArena);
@@ -1554,6 +1741,7 @@ internal static class Program
         var killPhys = NoRespawn(killArena);
 
         var diEscape = di ? ComputeDiEscape(def, hits, pcts, reportPhys) : null;
+        var reachData = reach ? BuildReach(def, hits, baked) : null;
         var (graph, density) = trueCombos
             ? ComputeTrueComboGraph(def, hits, pcts, baked)
             : (Array.Empty<ComboStarterData>(), Array.Empty<ComboDensityData>());
@@ -1572,7 +1760,7 @@ internal static class Program
         return new ReportData(def.DisplayName, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture),
             pcts, ToArenaData(reportDetect, "trajectory / landing arena (flat 200x200)"),
             ToArenaData(killDetect, "kill-% proxy (flat 60x60, Crossroads-style, -10)"), moves.ToArray(),
-            graph, density);
+            graph, density, reachData);
     }
 
     /// <summary>How close the move gets to the top / side blast lines at the highest simulated % —
@@ -1617,6 +1805,12 @@ internal static class Program
     internal static readonly (string Name, string Color)[] DiArcColors =
     {
         ("in", "#2ecc71"), ("away", "#e74c3c"), ("up", "#f39c12"), ("down", "#9b59b6"),
+    };
+
+    /// <summary>Reach-chart hit colors: one per HitboxEvent within a move (hit 1..5).</summary>
+    internal static readonly (string Name, string Color)[] HitColors =
+    {
+        ("hit 1", "#1a5fd0"), ("hit 2", "#e74c3c"), ("hit 3", "#27ae60"), ("hit 4", "#8e44ad"), ("hit 5", "#e67e22"),
     };
 
     internal static string ArcSvg(TrajectoryData tr, float maxTravel, float maxHeight)
@@ -1719,6 +1913,42 @@ internal static class Program
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Side-view reach overlay for one hit: the character silhouette at the origin plus every
+    /// active-tick capsule drawn as a thick round-cap line (opacity 0.18 — overlap darkens, so
+    /// the union reads). Common character scale: width/height from the reach ZMin/ZMax and
+    /// CharHeight + 0.6 at 60 px/m; grid every 0.5 m.
+    /// </summary>
+    internal static string ReachSvg(ReachData reach, ReachHitData hit)
+    {
+        const float PxPerM = 60f;
+        float w = (reach.ZMax - reach.ZMin) * PxPerM;
+        float h = (reach.CharHeight + 0.6f) * PxPerM;
+        float top = reach.CharHeight + 0.6f;
+        var sb = new StringBuilder();
+        sb.Append($"<svg width=\"{Fi(w)}\" height=\"{Fi(h)}\" viewBox=\"0 0 {Fi(w)} {Fi(h)}\" class=\"reach\">");
+        for (float z = MathF.Ceiling(reach.ZMin / 0.5f) * 0.5f; z <= reach.ZMax + 0.001f; z += 0.5f)
+            sb.Append($"<line x1=\"{Fi((z - reach.ZMin) * PxPerM)}\" y1=\"0\" x2=\"{Fi((z - reach.ZMin) * PxPerM)}\" y2=\"{Fi(h)}\" stroke=\"#e3e6ea\" stroke-width=\"1\"/>");
+        for (float y = 0f; y <= top + 0.001f; y += 0.5f)
+            sb.Append($"<line x1=\"0\" y1=\"{Fi((top - y) * PxPerM)}\" x2=\"{Fi(w)}\" y2=\"{Fi((top - y) * PxPerM)}\" stroke=\"#e3e6ea\" stroke-width=\"1\"/>");
+        // Character silhouette: capsule-width rounded rect from feet (y=0) to head (y=CharHeight), centered at z=0.
+        float cr = reach.CapsuleRadius * PxPerM;
+        float cx = (0f - reach.ZMin) * PxPerM;
+        float feetY = top * PxPerM;
+        sb.Append($"<rect x=\"{Fi(cx - cr)}\" y=\"{Fi(feetY - reach.CharHeight * PxPerM)}\" width=\"{Fi(2 * cr)}\" " +
+                  $"height=\"{Fi(reach.CharHeight * PxPerM)}\" rx=\"{Fi(cr)}\" fill=\"none\" stroke=\"#999\" stroke-width=\"1.2\"/>");
+        string color = HitColors[hit.HitIndex % HitColors.Length].Color;
+        foreach (var c in hit.Capsules)
+        {
+            float x0 = (c.Z0 - reach.ZMin) * PxPerM, y0 = (top - c.Y0) * PxPerM;
+            float x1 = (c.Z1 - reach.ZMin) * PxPerM, y1 = (top - c.Y1) * PxPerM;
+            sb.Append($"<line x1=\"{Fi(x0)}\" y1=\"{Fi(y0)}\" x2=\"{Fi(x1)}\" y2=\"{Fi(y1)}\" stroke=\"{color}\" " +
+                      $"stroke-width=\"{Fi(c.Radius * 2f * PxPerM)}\" stroke-linecap=\"round\" opacity=\"0.18\"/>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
     internal static string ToHtml(ReportData r)
     {
         var sb = new StringBuilder();
@@ -1813,6 +2043,48 @@ internal static class Program
             sb.AppendLine($"<td class=\"clr\">{Bar(tp)}</td><td class=\"clr\">{Bar(sp)}</td></tr>");
         }
         sb.AppendLine("</tbody></table>");
+
+        // C2 — authored hitbox reach (issue #151): side-view overlays + range ladder + gaps
+        if (r.Reach != null)
+        {
+            sb.AppendLine("<h2>Authored hitbox reach</h2>");
+            sb.AppendLine("<div class=\"legend\">Side-view overlay of the authored hitbox volumes across the active frames, resolved with the real <code>HitboxGeometry.ResolvePositions</code> at the grounded origin frame (yaw 0 &rarr; forward = +Z). Character silhouette = capsule (2&times; radius wide). Colored capsule lines per hit, one per active tick (opacity 0.18 &mdash; overlap darkens, so the union reads). Bands = thirds of capsule height from the feet (high +0.5 m headroom); <b>reach = max forward (Z) extent over the bands</b>. Gaps = per-height whiff zones below the kit's max reach at that height; uncovered bands = no normal reaches them.</div>");
+            sb.AppendLine("<div class=\"legend\">" + string.Join("", HitColors.Select(c =>
+                $"<span class=\"swatch\" style=\"background:{c.Color}\"></span>{c.Name} ")) + "</div>");
+            // Band definitions (thirds of capsule height) are identical across hits — take them from the first.
+            var bandDefs = r.Reach.Hits.FirstOrDefault()?.Bands
+                .Select(b => (b.Name, b.YMin, b.YMax)).ToArray() ?? Array.Empty<(string, float, float)>();
+            for (int i = 0; i < r.Moves.Length && i < r.Reach.Hits.Length; i++)
+            {
+                var m = r.Moves[i];
+                var rh = r.Reach.Hits[i];
+                string label = r.Moves.Count(x => x.Label == rh.Label) > 1 ? $"{rh.Label} (hit {rh.HitIndex + 1})" : rh.Label;
+                sb.AppendLine($"<h3>{Escape(label)}{MoveTag(m)}</h3>");
+                sb.AppendLine(ReachSvg(r.Reach, rh));
+                sb.AppendLine($"<div class=\"legend\">reach {(rh.Reach != null ? $"{F(rh.Reach.Value)} m" : "no band coverage")}</div>");
+            }
+            sb.AppendLine("<h3>Range ladder</h3>");
+            sb.AppendLine("<table class=\"heat\"><thead><tr><th class=\"move\">move</th><th>hit</th><th>low m</th><th>mid m</th><th>high m</th><th>reach m</th></tr></thead><tbody>");
+            foreach (var rh in r.Reach.Hits.OrderByDescending(x => x.Reach ?? float.NegativeInfinity))
+            {
+                string label = r.Moves.Count(x => x.Label == rh.Label) > 1 ? $"{rh.Label} (hit {rh.HitIndex + 1})" : rh.Label;
+                sb.AppendLine($"<tr><td class=\"move\">{Escape(label)}</td><td>{rh.HitIndex + 1}</td>" +
+                    $"<td>{ReachCell(rh.Bands[0].MaxZ, "&mdash;")}</td><td>{ReachCell(rh.Bands[1].MaxZ, "&mdash;")}</td>" +
+                    $"<td>{ReachCell(rh.Bands[2].MaxZ, "&mdash;")}</td><td><b>{ReachCell(rh.Reach, "&mdash;")}</b></td></tr>");
+            }
+            sb.AppendLine("</tbody></table>");
+            sb.AppendLine("<div class=\"legend\"><b>Coverage gaps</b></div>");
+            sb.AppendLine("<ul>");
+            foreach (var g in r.Reach.Gaps)
+                sb.AppendLine($"<li>{Escape(g.Band)} @ {g.HMin:0.0}&ndash;{g.HMax:0.0} m: nothing covers {g.From:0.0}&ndash;{g.To:0.0} m</li>");
+            foreach (var name in r.Reach.UncoveredBands)
+            {
+                var b = bandDefs.FirstOrDefault(x => x.Name == name);
+                sb.AppendLine($"<li>no normal reaches the {Escape(name)} band" +
+                    (b.Name != null ? $" ({b.YMin:0.00}&ndash;{b.YMax:0.00} m)" : "") + "</li>");
+            }
+            sb.AppendLine("</ul>");
+        }
 
         // D — true-combo reachability (real sim) + combo density
         if (r.TrueCombos.Length > 0)

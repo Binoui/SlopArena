@@ -17,6 +17,7 @@ combo matrix/probes are experimental diagnostics, deliberately separated from th
 scripts/move-data.sh <char> [--pcts 0,30,60,90,120,150] [--out docs/generated/<char>-move-data.md]
 scripts/move-data.sh <char> --json report.json --html report.html   # visual report
 scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
+scripts/move-data.sh <char> --reach --html report.html              # + authored hitbox reach chart
 ```
 
 - `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports until their
@@ -99,6 +100,38 @@ holds bend most; along-axis holds only give the expiry ASDI push) and the stick 
   horizontal launch it is `18° × cos(elevation)` (e.g. 16.7° at a 22° launch).
 - Output: the four variant arcs overlaid on the knockback-shape gallery (thin colored arcs, baseline stays
   solid blue), per-figure max deviation, and a markdown table on the default path.
+
+## Authored hitbox reach (`--reach`)
+
+Deterministic, per-move answer to "what does this move cover, and where are the gaps in the kit?" — the
+authored complement to the empirical heat spots. For every collected normal (slots g1–g4, a1–a4, first
+stage, every `HitboxEvent`), the tool resolves the **real sim hitbox volumes** over the active frames and
+renders a side-view overlay per move, a range ladder, coverage gaps (whiff zones between moves), and
+uncovered height bands.
+
+- **Geometry**: `HitboxGeometry.ResolvePositions` per active tick (`AttackElapsedTicks = trigger + t`,
+  `t ∈ [0, duration)`) at the grounded origin frame — character at `(0, CapsuleHeight/2, 0)`, yaw 0, so
+  feet are at y=0 and forward is +Z. Same function `ServerAbility.SpawnHitbox` uses; baked skeleton used
+  when present, entity-relative fallback otherwise. Authored geometry only — no buff bonuses.
+- **Bands**: thirds of `CapsuleHeight` from the feet — low `[0, H/3)`, mid `[H/3, 2H/3)`, high
+  `[2H/3, H + 0.5]` (0.5 m headroom so above-head coverage counts as high). **Reach** = max forward (Z)
+  extent of the side-view envelope (X flattened) over the bands.
+- **Gaps**: per band, per 0.1 m height row, the covered intervals across moves clamp to `[0, maxReachAtY]`
+  (the kit's max reach at that height); holes are whiff zones. Consecutive rows whose extent agrees merge
+  into one gap. **Uncovered bands** = height bands no normal reaches at all.
+- Output: lossless JSON (`reach` node: per-hit capsules with per-tick endpoints/radius, band extents,
+  gaps, uncovered bands) + a self-contained HTML section (side-view SVGs, range ladder, gap list), plus a
+  markdown section on the default path. Flags compose with `--json`/`--html`.
+
+```bash
+scripts/move-data.sh kistu --reach --html docs/generated/kistu-move-data.html
+```
+
+**Reading the ladder**: reach sorts the kit's normals by how far forward they extend — the answer to
+"my move whiffs at this spacing" and "what do I use to poke at 1.2 m vs 1.5 m". Multi-hit moves get one
+row per hit (their capsules differ). A `—` band cell = the move never covers that height; a gap line
+like `- high @ 2.1–2.3 m: nothing covers 0.0–0.8 m` means the kit's high-band coverage starts late
+(above-head hits only connect close-in) — reads as an anti-air weakness at range.
 
 ## Report sections
 
