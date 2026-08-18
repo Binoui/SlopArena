@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SlopArena SpectateView</title>
+<style>
+  body{background:#101418;color:#d7dde3;font:13px/1.45 system-ui,sans-serif;margin:14px}
+  .hud{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  button,select{background:#262c34;color:#d7dde3;border:1px solid #3a434e;border-radius:4px;padding:3px 12px;cursor:pointer}
+  button:hover{background:#2f3740}
+  input[type=range]{width:340px;accent-color:#4dd8ff}
+  canvas{background:#171c22;border:1px solid #2a323c;border-radius:4px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+  .moves{flex:1;min-width:320px;background:#171c22;border:1px solid #2a323c;border-radius:4px;padding:8px 12px;line-height:1.7}
+  .a{color:#4dd8ff}.b{color:#ff6b6b}.dim{color:#5c6a78}
+  #tick{color:#9fb2c2}
+</style>
+</head>
+<body>
+<div class="hud">
+  <button onclick="document.getElementById('file').click()">Load JSON</button>
+  <input type="file" id="file" hidden onchange="openFile(event)">
+  <button onclick="togglePlay()" id="play">&#9654; Play</button>
+  <label>speed <select id="speed" onchange="speed=+this.value">
+    <option>1</option><option>2</option><option>4</option><option selected>8</option><option>16</option><option>32</option>
+  </select></label>
+  <span id="tick" class="dim">load a match dump: dotnet run --project tools/SpectateView -- --json match.json --speed 0</span>
+  <span id="score"></span>
+  <input type="range" id="seek" min="0" max="0" value="0" oninput="seekTo(+this.value)">
+</div>
+<div class="row">
+  <canvas id="top" width="520" height="520"></canvas>
+  <canvas id="side" width="520" height="340"></canvas>
+</div>
+<div class="row">
+  <div class="moves" id="mA"><b class="a">A moves</b> <span class="dim">—</span></div>
+  <div class="moves" id="mB"><b class="b">B moves</b> <span class="dim">—</span></div>
+</div>
+<script>
+'use strict';
+let D = null, tick = 0, playing = false, speed = 8, last = 0;
+const $ = id => document.getElementById(id);
+const topC = $('top').getContext('2d'), sideC = $('side').getContext('2d');
+const COL = ['#4dd8ff', '#ff6b6b'];
+const topW = $('top').width, topH = $('top').height, sideW = $('side').width, sideH = $('side').height;
+
+function openFile(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => init(JSON.parse(r.result));
+  r.readAsText(f);
+}
+function init(d) {
+  D = d; tick = 0; playing = true; last = performance.now();
+  $('seek').max = D.frames.length - 1; $('seek').value = 0;
+  render();
+}
+function togglePlay() { playing = !playing; last = performance.now(); $('play').innerHTML = playing ? '\u23F8 Pause' : '\u25B6 Play'; }
+function seekTo(t) { tick = Math.max(0, Math.min(D.frames.length - 1, t)); playing = false; render(); }
+
+function loop(ts) {
+  if (D && playing) {
+    if (ts - last > 16) { tick += speed * Math.round((ts - last) / 16); last = ts; }
+    if (tick >= D.frames.length) { tick = D.frames.length - 1; playing = false; $('play').innerHTML = '\u25B6 Play'; }
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+function frame() { return D.frames[Math.min(tick, D.frames.length - 1)]; }
+function flashes(f) { return D.hits.filter(h => h.t > f.t - 12 && h.t <= f.t); }
+function moveLabel(m) { return D.moves[m].label; }
+
+function render() {
+  const f = frame(); if (!f) return;
+  $('seek').value = tick;
+  $('tick').textContent = `tick ${f.t} (${(f.t / 60).toFixed(1)}s)  ${D.charA} vs ${D.charB}  seed ${D.seed}`;
+  const A = f.e[0], B = f.e[1];
+  $('score').innerHTML = `<span class="a">A ${Math.max(0, D.stocks - A.deaths)} stk ${A.dmg}%</span>`
+    + ` &nbsp; <span class="b">B ${Math.max(0, D.stocks - B.deaths)} stk ${B.dmg}%</span>`;
+  drawTop(f);
+  drawSide(f);
+  drawMoves(f.t);
+}
+
+// ── Top-down (XZ) ──────────────────────────────────────────────────────────
+function drawTop(f) {
+  const a = D.arena;
+  const sx = topW / (a.MaxX - a.MinX), sy = topH / (a.MaxZ - a.MinZ);
+  topC.fillStyle = '#1c232c'; topC.fillRect(0, 0, topW, topH);
+  // blast zone frame
+  topC.strokeStyle = 'rgba(255,90,90,.45)'; topC.setLineDash([5, 5]);
+  topC.strokeRect((a.KillMinX - a.MinX) * sx, (a.KillMinZ - a.MinZ) * sy,
+    (a.KillMaxX - a.KillMinX) * sx, (a.KillMaxZ - a.KillMinZ) * sy);
+  topC.setLineDash([]);
+  // stage floor rect (kill proxy = full bounds)
+  topC.fillStyle = '#2a323c'; topC.fillRect(0, 0, topW, topH);
+  f.e.forEach((e, i) => {
+    const cx = (e.x - a.MinX) * sx, cy = (e.z - a.MinZ) * sy, r = Math.max(4, sx * 0.55);
+    topC.fillStyle = COL[i]; topC.beginPath(); topC.arc(cx, cy, r, 0, 7); topC.fill();
+    topC.strokeStyle = '#0a0d10'; topC.lineWidth = 1.5; topC.stroke();
+    // facing tick
+    const dx = Math.sin(e.fy), dz = Math.cos(e.fy);
+    topC.strokeStyle = '#fff'; topC.beginPath();
+    topC.moveTo(cx, cy); topC.lineTo(cx + dx * r * 1.8, cy + dz * r * 1.8); topC.stroke();
+    topC.fillStyle = COL[i]; topC.font = '11px system-ui';
+    topC.fillText(`${e.dmg}%`, cx - 8, cy - r - 4);
+  });
+  for (const h of flashes(f)) {
+    const e = f.e[h.e], cx = (e.x - a.MinX) * sx, cy = (e.z - a.MinZ) * sy;
+    topC.strokeStyle = '#fff'; topC.beginPath();
+    topC.arc(cx, cy, 8 + (f.t - h.t) * 2.2, 0, 7); topC.stroke();
+  }
+}
+
+// ── Side (XY) ──────────────────────────────────────────────────────────────
+function drawSide(f) {
+  const a = D.arena;
+  const minX = Math.min(a.MinX, a.KillMinX), maxX = Math.max(a.MaxX, a.KillMaxX);
+  const minY = Math.min(a.KillHeight - 2, 0), maxY = Math.max(a.KillTop, a.FloorY + 12);
+  const sx = sideW / (maxX - minX), sy = sideH / (maxY - minY);
+  sideC.fillStyle = '#1c232c'; sideC.fillRect(0, 0, sideW, sideH);
+  // below-floor volume
+  sideC.fillStyle = '#232a33';
+  sideC.fillRect(0, (maxY - a.FloorY) * sy, sideW, (maxY - minY - a.FloorY) * sy);
+  // ground line
+  sideC.strokeStyle = '#5d7a5d'; sideC.beginPath();
+  sideC.moveTo(0, (maxY - a.FloorY) * sy); sideC.lineTo(sideW, (maxY - a.FloorY) * sy); sideC.stroke();
+  // blast zone frame
+  sideC.strokeStyle = 'rgba(255,90,90,.45)'; sideC.setLineDash([5, 5]);
+  sideC.strokeRect((a.KillMinX - minX) * sx, (maxY - a.KillTop) * sy,
+    (a.KillMaxX - a.KillMinX) * sx, (a.KillTop - a.KillHeight) * sy);
+  sideC.setLineDash([]);
+  f.e.forEach((e, i) => {
+    const cx = (e.x - minX) * sx, cy = (maxY - e.y) * sy, r = Math.max(4, sy * 0.5);
+    sideC.fillStyle = COL[i]; sideC.beginPath(); sideC.arc(cx, cy, r, 0, 7); sideC.fill();
+    sideC.strokeStyle = '#0a0d10'; sideC.lineWidth = 1.5; sideC.stroke();
+    // facing tick (X component of yaw)
+    const dx = Math.sin(e.fy);
+    sideC.strokeStyle = '#fff'; sideC.beginPath();
+    sideC.moveTo(cx - dx * r * 1.8, cy); sideC.lineTo(cx + dx * r * 1.8, cy); sideC.stroke();
+    sideC.fillStyle = COL[i]; sideC.font = '10px system-ui';
+    sideC.fillText(e.g ? e.st : 'air ' + e.st, cx + 6, cy - r - 2);
+  });
+  for (const h of flashes(f)) {
+    const e = f.e[h.e], cx = (e.x - minX) * sx, cy = (maxY - e.y) * sy;
+    sideC.strokeStyle = '#fff'; sideC.beginPath();
+    sideC.arc(cx, cy, 8 + (f.t - h.t) * 2.2, 0, 7); sideC.stroke();
+  }
+}
+
+// ── Move usage panel ───────────────────────────────────────────────────────
+function drawMoves(t) {
+  [0, 1].forEach(i => {
+    const cnt = {}, hit = {};
+    for (const sw of D.swings)
+      if (sw.e === i && sw.t <= t) { cnt[sw.m] = (cnt[sw.m] || 0) + 1; if (sw.hit) hit[sw.m] = (hit[sw.m] || 0) + 1; }
+    let dmg = 0;
+    for (const h of D.hits) if (h.e === i && h.t <= t) dmg += h.dmg;
+    const items = Object.entries(cnt).sort((x, y) => y[1] - x[1]).slice(0, 8)
+      .map(([m, n]) => `${moveLabel(+m)} ${n}\u00D7${hit[m] ? ` (${hit[m]} hit)` : ''}`).join(' \u00B7 ') || '\u2014';
+    $('m' + (i ? 'B' : 'A')).innerHTML =
+      `<b class="${i ? 'b' : 'a'}">${i ? 'B' : 'A'} moves</b> ${items} <span class="dim">— dealt ${dmg.toFixed(0)}%</span>`;
+  });
+}
+
+document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); togglePlay(); } });
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

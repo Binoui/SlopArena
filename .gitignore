@@ -190,6 +190,11 @@ client/Unity/Assets/Prefabs/Bridge_*.prefab.meta
 # The .html/.md renderings of the same data stay committed.
 docs/generated/*-move-data.json
 
+# SpectateView match dumps (lossless per-tick JSON, regenerable in ~1s):
+#   dotnet run --project tools/SpectateView -- --json match.json --speed 0
+/match.json
+/tools/SpectateView/demo-match.json
+
 # Prevent Unity .meta file leaks into pure .NET Shared directory
 src/Shared/**/*.meta
 
