@@ -59,6 +59,19 @@ namespace SlopArena.Client.Entities
             { ActionState.Run,        new Color(0f, 1f, 1f, 0.8f) },       // cyan
             { ActionState.LedgeHang,  new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
         };
+        private static readonly AnimationCurve AttackAccentWidth = new(
+            new Keyframe(0f, 0f),
+            new Keyframe(0.28f, 1f),
+            new Keyframe(0.72f, 0.72f),
+            new Keyframe(1f, 0f));
+
+        private sealed class AttackAccentTrail
+        {
+            public GameObject Root;
+            public TrailRenderer Primary;
+            public TrailRenderer Secondary;
+        }
+
 
         [Header("Visual Offset")]
         [SerializeField] private float _modelYOffset;
@@ -66,7 +79,7 @@ namespace SlopArena.Client.Entities
         [Header("Bone Trail VFX")]
         [SerializeField] private GameObject _boneTrailPrefab;
         private Dictionary<string, ParticleSystem> _activeTrails = new();
-        private Dictionary<string, ParticleSystem> _attackAccentParticles = new();
+        private Dictionary<string, AttackAccentTrail> _attackAccentTrails = new();
 
         /// <summary>
         /// Y offset to align the visual model's feet with the collision capsule bottom.
@@ -224,6 +237,7 @@ namespace SlopArena.Client.Entities
         private bool _wasAttacking;
         private bool _attackAccentsEnabled;
         private bool _attackStartedGrounded;
+        private ulong _activeAccentWindowSignature;
         private ClipExtrapolator? _activeExtrapolator;
         private ExtrapolationMode _currentExtrapolationMode;
         private AnimancerState? _currentAnimState;
@@ -679,14 +693,17 @@ namespace SlopArena.Client.Entities
             bool isAttacking = state.State == ActionState.Attacking;
             bool slotChanged = isAttacking && _lastAttackSlot != state.AttackSlot;
             bool stageChanged = isAttacking && prevComboStage != state.ComboStage;
-            if (isAttacking && (!_wasAttacking || slotChanged))
+            bool attackStarted = isAttacking
+                && (_lastState.State != ActionState.Attacking
+                    || slotChanged
+                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks);
+            if (attackStarted)
                 _attackStartedGrounded = state.IsGrounded;
 
-            bool isFightGuyPrototype = isAttacking
+            bool isFightGuyNormal = isAttacking
                 && _charDef?.Class == CharacterClass.FightGuy
-                && _attackStartedGrounded
-                && (state.AttackSlot == 1 || state.AttackSlot == 4);
-            if (!isFightGuyPrototype)
+                && IsNormalAttackSlot(state.AttackSlot);
+            if (!isFightGuyNormal)
             {
                 if (_attackAccentsEnabled)
                     DisableAttackAccents();
@@ -695,7 +712,7 @@ namespace SlopArena.Client.Entities
             }
 
             byte slot = (byte)(state.AttackSlot - 1);
-            var spec = _charDef.GetSlotAbility(slot, airborne: false);
+            var spec = _charDef.GetSlotAbility(slot, airborne: !_attackStartedGrounded);
             if (spec?.Stages == null || spec.Stages.Length == 0)
             {
                 DisableAttackAccents();
@@ -705,8 +722,9 @@ namespace SlopArena.Client.Entities
             int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
             var stage = spec.Stages[stageIdx];
             var trails = stage.BoneTrails ?? spec.BoneTrails;
-            bool active = IsInAuthoredActiveWindow(state.AttackElapsedTicks, stage.HitboxEvents);
-            if (!active || trails == null || trails.Length == 0)
+            ulong activeWindowSignature = GetActiveWindowSignature(
+                state.AttackElapsedTicks, stage.HitboxEvents);
+            if (activeWindowSignature == 0 || trails == null || trails.Length == 0)
             {
                 if (_attackAccentsEnabled)
                     DisableAttackAccents();
@@ -715,23 +733,35 @@ namespace SlopArena.Client.Entities
                 return;
             }
 
-            if (_attackAccentsEnabled && !slotChanged && !stageChanged)
+            if (_attackAccentsEnabled
+                && _activeAccentWindowSignature == activeWindowSignature
+                && !slotChanged
+                && !stageChanged
+                && !attackStarted)
                 return;
             if (_attackAccentsEnabled)
                 DisableAttackAccents();
             DisableAllTrails();
 
-            bool heavy = state.AttackSlot == 4;
+            float activeDamage = GetMaxActiveDamage(
+                state.AttackElapsedTicks, stage.HitboxEvents);
+            bool heavy = activeDamage >= 12f;
+            bool secondaryAssigned = false;
             foreach (var trailDef in trails)
             {
-                var ps = GetOrCreateAttackAccent(trailDef.BoneName);
-                if (ps == null) continue;
+                if (!IsTrailActive(
+                    trailDef.BoneName, state.AttackElapsedTicks, stage.HitboxEvents))
+                    continue;
 
-                ConfigureAttackAccent(ps, trailDef, heavy);
-                var emission = ps.emission;
-                emission.enabled = true;
+                var accent = GetOrCreateAttackAccent(trailDef.BoneName);
+                if (accent == null) continue;
+
+                bool emitSecondary = heavy && !secondaryAssigned;
+                ConfigureAttackAccent(accent, trailDef, activeDamage, emitSecondary);
+                secondaryAssigned |= emitSecondary;
                 _attackAccentsEnabled = true;
             }
+            _activeAccentWindowSignature = activeWindowSignature;
         }
 
         private void UpdateLegacyBoneTrails(CharacterState state, bool slotChanged, bool stageChanged)
@@ -768,47 +798,141 @@ namespace SlopArena.Client.Entities
                 DisableAllTrails();
             }
         }
+        private static bool IsNormalAttackSlot(byte attackSlot)
+            => attackSlot == AbilitySlots.Slot1
+                || attackSlot == AbilitySlots.Slot2
+                || attackSlot == AbilitySlots.Slot3
+                || attackSlot == AbilitySlots.Slot4;
 
-        private static bool IsInAuthoredActiveWindow(ushort elapsedTicks, HitboxEvent[] events)
+
+        private static ulong GetActiveWindowSignature(
+            ushort elapsedTicks, HitboxEvent[] events)
+        {
+            if (events == null) return 0;
+            ulong signature = 0;
+            for (int i = 0; i < events.Length; i++)
+            {
+                if (!IsHitboxActive(elapsedTicks, events[i])) continue;
+                signature |= 1UL << (i & 63);
+            }
+            return signature;
+        }
+
+        private static float GetMaxActiveDamage(
+            ushort elapsedTicks, HitboxEvent[] events)
+        {
+            float maxDamage = 0f;
+            if (events == null) return maxDamage;
+            foreach (var hitbox in events)
+            {
+                if (IsHitboxActive(elapsedTicks, hitbox))
+                    maxDamage = Math.Max(maxDamage, hitbox.Damage);
+            }
+            return maxDamage;
+        }
+
+        private static bool IsTrailActive(
+            string boneName, ushort elapsedTicks, HitboxEvent[] events)
         {
             if (events == null) return false;
             foreach (var hitbox in events)
             {
-                int endExclusive = hitbox.TriggerTick + hitbox.DurationTicks;
-                if (elapsedTicks >= hitbox.TriggerTick && elapsedTicks < endExclusive)
+                if (!IsHitboxActive(elapsedTicks, hitbox)) continue;
+                if (string.IsNullOrEmpty(hitbox.BoneName)
+                    || hitbox.BoneName == boneName
+                    || hitbox.EndBoneName == boneName)
                     return true;
             }
             return false;
         }
 
-
-        private static void ConfigureAttackAccent(ParticleSystem ps, BoneTrailDef def, bool heavy)
+        private static bool IsHitboxActive(ushort elapsedTicks, HitboxEvent hitbox)
         {
-            var main = ps.main;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.startColor = new Color(def.R, def.G, def.B, def.A);
-            main.startSize = def.Width * (heavy ? 1.8f : 0.75f);
-            main.startLifetime = heavy ? 0.16f : 0.08f;
-
-            var emission = ps.emission;
-            emission.rateOverTime = heavy ? 150f : 90f;
+            int endExclusive = hitbox.TriggerTick + hitbox.DurationTicks;
+            return elapsedTicks >= hitbox.TriggerTick && elapsedTicks < endExclusive;
         }
 
-        private ParticleSystem GetOrCreateAttackAccent(string boneName)
+
+        private static void ConfigureAttackAccent(
+            AttackAccentTrail accent,
+            BoneTrailDef def,
+            float damage,
+            bool emitSecondary)
         {
-            if (_attackAccentParticles.TryGetValue(boneName, out var existing))
+            bool heavy = damage >= 12f;
+            bool medium = !heavy && damage >= 7f;
+            float widthScale = heavy ? 1.8f : medium ? 1.25f : 0.75f;
+            float lifetime = heavy ? 0.16f : medium ? 0.12f : 0.08f;
+            var color = new Color(def.R, def.G, def.B, def.A);
+
+            accent.Primary.widthMultiplier = def.Width * widthScale;
+            accent.Primary.time = lifetime;
+            accent.Primary.startColor = new Color(color.r, color.g, color.b, color.a * 0.08f);
+            accent.Primary.endColor = new Color(color.r, color.g, color.b, color.a * 0.9f);
+            accent.Primary.Clear();
+            accent.Primary.emitting = true;
+
+            accent.Secondary.emitting = false;
+            accent.Secondary.Clear();
+            if (!emitSecondary) return;
+
+            accent.Secondary.transform.localPosition =
+                new Vector3(def.Width * 0.45f, 0f, 0f);
+            accent.Secondary.widthMultiplier = def.Width * widthScale * 0.38f;
+            accent.Secondary.time = lifetime * 0.7f;
+            accent.Secondary.startColor =
+                new Color(color.r, color.g, color.b, color.a * 0.03f);
+            accent.Secondary.endColor =
+                new Color(color.r, color.g, color.b, color.a * 0.45f);
+            accent.Secondary.emitting = true;
+        }
+
+        private AttackAccentTrail GetOrCreateAttackAccent(string boneName)
+        {
+            if (_attackAccentTrails.TryGetValue(boneName, out var existing))
                 return existing;
             var bone = FindBone(boneName);
             if (_boneTrailPrefab == null || bone == null) return null;
+            var sourceRenderer = _boneTrailPrefab.GetComponent<ParticleSystemRenderer>();
+            if (sourceRenderer == null || sourceRenderer.sharedMaterial == null) return null;
 
-            var accent = UnityEngine.Object.Instantiate(_boneTrailPrefab, bone).GetComponent<ParticleSystem>();
-            accent.transform.localPosition = Vector3.zero;
-            accent.transform.localRotation = Quaternion.identity;
-            accent.Play();
-            var emission = accent.emission;
-            emission.enabled = false;
-            _attackAccentParticles[boneName] = accent;
+            var root = new GameObject($"AttackAccent_{boneName}");
+            root.transform.SetParent(bone, false);
+            var primary = CreateAttackAccentTrail(
+                root, sourceRenderer.sharedMaterial);
+
+            var secondaryObject = new GameObject("HeavyFragment");
+            secondaryObject.transform.SetParent(root.transform, false);
+            var secondary = CreateAttackAccentTrail(
+                secondaryObject, sourceRenderer.sharedMaterial);
+
+            var accent = new AttackAccentTrail
+            {
+                Root = root,
+                Primary = primary,
+                Secondary = secondary,
+            };
+            _attackAccentTrails[boneName] = accent;
             return accent;
+        }
+
+        private static TrailRenderer CreateAttackAccentTrail(
+            GameObject owner, Material material)
+        {
+            var trail = owner.AddComponent<TrailRenderer>();
+            trail.sharedMaterial = material;
+            trail.alignment = LineAlignment.View;
+            trail.textureMode = LineTextureMode.Stretch;
+            trail.widthCurve = AttackAccentWidth;
+            trail.minVertexDistance = 0.025f;
+            trail.numCornerVertices = 3;
+            trail.numCapVertices = 2;
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+            trail.generateLightingData = false;
+            trail.autodestruct = false;
+            trail.emitting = false;
+            return trail;
         }
 
         private ParticleSystem GetOrCreateBoneTrail(string boneName)
@@ -841,13 +965,15 @@ namespace SlopArena.Client.Entities
 
         private void DisableAttackAccents()
         {
-            foreach (var kvp in _attackAccentParticles)
+            foreach (var kvp in _attackAccentTrails)
             {
-                var emission = kvp.Value.emission;
-                emission.enabled = false;
-                kvp.Value.Clear();
+                kvp.Value.Primary.emitting = false;
+                kvp.Value.Primary.Clear();
+                kvp.Value.Secondary.emitting = false;
+                kvp.Value.Secondary.Clear();
             }
             _attackAccentsEnabled = false;
+            _activeAccentWindowSignature = 0;
         }
 
 
@@ -880,15 +1006,14 @@ namespace SlopArena.Client.Entities
                 else
                     UnityEngine.Object.DestroyImmediate(go);
             }
-            foreach (var kvp in _attackAccentParticles)
+            foreach (var kvp in _attackAccentTrails)
             {
-                var go = kvp.Value.gameObject;
                 if (Application.isPlaying)
-                    UnityEngine.Object.Destroy(go);
+                    UnityEngine.Object.Destroy(kvp.Value.Root);
                 else
-                    UnityEngine.Object.DestroyImmediate(go);
+                    UnityEngine.Object.DestroyImmediate(kvp.Value.Root);
             }
-            _attackAccentParticles.Clear();
+            _attackAccentTrails.Clear();
             _activeTrails.Clear();
         }
 
