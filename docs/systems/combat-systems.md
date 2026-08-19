@@ -282,11 +282,13 @@ Deserialize is backward-compatible: checks `buf.Length >= 17` before reading off
 
 ## 10. Combat VFX
 
-Hits produce a visual spark burst at the target's position via `CombatFeedback.cs`:
+Accepted simulation hits produce a pooled, directional impact shape at the resolved
+shape-contact point:
 
 | Component | File | Behavior |
 |-----------|------|----------|
-| CombatFeedback | `Combat/CombatFeedback.cs` | Reads `ServerSimulation.LastTickHits` each FixedUpdate, spawns `_hitSparkPrefab` at target position, dedup per entity per tick, auto-destroys after `_sparkLifetime` (1s) |
-| HitSpark.prefab | `Prefabs/VFX/HitSpark.prefab` | 35-particle burst, 90° cone, gold→orange→transparent gradient, additive material |
+| CombatFeedback | `Combat/CombatFeedback.cs` | Reads `ISimulationBridge.LastTickHits` after each tick and classifies light, medium, heavy, or launch presentation from final damage and launch force. Used by Training and PvP. |
+| GraphicHitEffect | `Combat/GraphicHitEffect.cs` | Renders each tier as one pooled dynamic mesh with one shared material. Contact position, knockback direction, and hitstop duration come from the accepted `HitResult`. |
 
-Full particle system reference: [`vfx-particles.md`](vfx-particles.md)
+Character-specific particles and sounds should layer over this shared strength grammar.
+Full VFX reference: [`vfx-particles.md`](vfx-particles.md).

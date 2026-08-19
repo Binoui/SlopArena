@@ -1,0 +1,35 @@
+{
+  "Scenario": "FightGuy A3 High Kick Hit Confirm",
+  "TickCount": 90,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 8,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 15,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "FacingYaw": -3.1415927,
+    "PY": 3,
+    "PZ": 0.8,
+    "DamagePercent": 8,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 15,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "FacingYaw": -3.1415927,
+    "PY": 3.2639644,
+    "PZ": 1.6442528,
+    "VY": -7.146701,
+    "DamagePercent": 8,
+    "AirTimeTicks": 53,
+    "JumpsLeft": 2
+  }
+}

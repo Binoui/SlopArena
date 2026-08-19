@@ -1,0 +1,36 @@
+{
+  "Scenario": "FightGuy A4 Air Smash Hit Confirm",
+  "TickCount": 100,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 9,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "FacingYaw": -3.1415927,
+    "PY": 3,
+    "PZ": 0.8,
+    "DamagePercent": 13,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.85,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "FacingYaw": -3.1415927,
+    "PY": 3.5536942,
+    "PZ": 7.999892,
+    "VY": -6.655409,
+    "VZ": 1.07848,
+    "DamagePercent": 13,
+    "AirTimeTicks": 46,
+    "JumpsLeft": 2
+  }
+}

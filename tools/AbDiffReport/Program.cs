@@ -143,6 +143,7 @@ internal static class Program
         var comboRows = graph ? CollectComboRows(moveDiff["trueCombos"], pcts) : new List<ComboRow>();
         var stats = CollectStats(telDiff);
         var usage = CollectUsage(telDiff["perMove"]);
+        var curves = CollectCurves(baseTree, candTree, pcts); // per-move flight arcs, both sides
 
         if (jsonPath != null)
         {
@@ -154,7 +155,7 @@ internal static class Program
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(htmlPath))!);
             File.WriteAllText(htmlPath, BuildHtml(def.DisplayName, baseProfile, candProfile, commit, seed, matches,
-                pcts, moveRows, comboRows, stats, usage));
+                pcts, moveRows, comboRows, stats, usage, curves));
             Console.Error.WriteLine($"wrote {htmlPath}");
         }
         if (outPath != null)
@@ -334,11 +335,98 @@ internal static class Program
         return list;
     }
 
+    // ── Knockback-shape curves (base vs candidate arc overlay) ───────────────
+
+    private sealed record ArcPoint(double Travel, double Height);
+    private sealed record MoveCurves(string Label, int HitIndex, int Pct, double? KvB, double? KvC,
+        ArcPoint[] Base, ArcPoint[] Cand);
+
+    /// <summary>Walk both full MoveData reports (already embedded in the diff JSON) and pair up each
+    /// move &times; %'s flight-arc points so the HTML can overlay base vs candidate knockback shapes.
+    /// The per-tick points (height vs horizontal travel) are what make the launch feel visible.</summary>
+    private static List<MoveCurves> CollectCurves(JsonNode? baseMove, JsonNode? candMove, int[] pcts)
+    {
+        var result = new List<MoveCurves>();
+        if (baseMove?["moves"] is not JsonArray bArr || candMove?["moves"] is not JsonArray cArr) return result;
+        int n = Math.Min(bArr.Count, cArr.Count);
+        for (int i = 0; i < n; i++)
+        {
+            if (bArr[i] is not JsonObject bm || cArr[i] is not JsonObject cm) continue;
+            string label = Str(bm["label"]) ?? "?";
+            int hitIndex = (int)Math.Round(Num(bm["hitIndex"]) ?? 0);
+            if (bm["trajectories"] is not JsonArray bt || cm["trajectories"] is not JsonArray ct) continue;
+            foreach (var btj in bt)
+            {
+                if (btj is not JsonObject btr) continue;
+                int pct = (int)Math.Round(Num(btr["pct"]) ?? -1);
+                if (Array.IndexOf(pcts, pct) < 0) continue;
+                JsonObject? ctr = null;
+                foreach (var ctj in ct)
+                    if (ctj is JsonObject o && (int)Math.Round(Num(o["pct"]) ?? -1) == pct) { ctr = o; break; }
+                var bpts = ReadArc(btr["points"]);
+                var cpts = ReadArc(ctr?["points"]);
+                if (bpts.Length == 0 && cpts.Length == 0) continue;
+                result.Add(new MoveCurves(label, hitIndex, pct, Num(btr["kv"]), Num(ctr?["kv"]), bpts, cpts));
+            }
+        }
+        return result;
+    }
+
+    private static ArcPoint[] ReadArc(JsonNode? arr)
+    {
+        if (arr is not JsonArray a || a.Count == 0) return Array.Empty<ArcPoint>();
+        var list = new List<ArcPoint>(a.Count);
+        foreach (var e in a)
+            if (e is JsonObject o)
+                list.Add(new ArcPoint(Num(o["travel"]) ?? 0, Num(o["height"]) ?? 0));
+        return list.ToArray();
+    }
+
+    private static double? Num(JsonNode? n) => n is JsonValue v && v.TryGetValue<double>(out var d) ? d : null;
+    private static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+
+    /// <summary>Side-by-side knockback arc: base (solid blue) vs candidate (dashed orange), common scale,
+    /// apex dots. Height vs horizontal travel — reads the launch feel (pop vs glide, off-stage send).</summary>
+    private static string ArcOverlaySvg(ArcPoint[] b, ArcPoint[] c, double maxTravel, double maxHeight)
+    {
+        const int W = 150, H = 110, PAD = 8;
+        double tw = maxTravel > 0.01 ? maxTravel : 1, th = maxHeight > 0.01 ? maxHeight : 1;
+        double sx = (W - 2 * PAD) / tw, sy = (H - 2 * PAD) / th;
+        var sb = new StringBuilder();
+        sb.Append($"<svg width=\"{W}\" height=\"{H}\" viewBox=\"0 0 {W} {H}\" class=\"arc\">");
+        sb.Append($"<line x1=\"{PAD}\" y1=\"{H - PAD}\" x2=\"{W - PAD}\" y2=\"{H - PAD}\" stroke=\"#888\" stroke-width=\"1\"/>");
+        sb.Append(Poly(c, sx, sy, "#e07b3a", "1.4", "3,2")); // candidate: dashed orange (drawn first, under base)
+        sb.Append(Poly(b, sx, sy, "#1a5fd0", "1.6", null));  // base: solid blue
+        sb.Append(Dot(b, sx, sy, "#d23"));
+        sb.Append(Dot(c, sx, sy, "#e07b3a"));
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+
+    private static string Poly(ArcPoint[] pts, double sx, double sy, string color, string width, string? dash)
+    {
+        if (pts.Length == 0) return "";
+        const int H = 110, PAD = 8;
+        var sb = new StringBuilder();
+        sb.Append($"<polyline fill=\"none\" stroke=\"{color}\" stroke-width=\"{width}\"{(dash != null ? $" stroke-dasharray=\"{dash}\"" : "")} points=\"");
+        foreach (var p in pts) sb.Append($"{F(PAD + p.Travel * sx)},{F(H - PAD - p.Height * sy)} ");
+        sb.Append("\"/>");
+        return sb.ToString();
+    }
+
+    private static string Dot(ArcPoint[] pts, double sx, double sy, string color)
+    {
+        if (pts.Length == 0) return "";
+        const int H = 110, PAD = 8;
+        var apex = pts.OrderByDescending(p => p.Height).First();
+        return $"<circle cx=\"{F(PAD + apex.Travel * sx)}\" cy=\"{F(H - PAD - apex.Height * sy)}\" r=\"2.5\" fill=\"{color}\"/>";
+    }
+
     // ── HTML report ──────────────────────────────────────────────────────────
 
     private static string BuildHtml(string character, string baseProfile, string candProfile, string commit,
         int seed, int matches, int[] pcts, List<MoveRow> moves, List<ComboRow> combos,
-        List<StatRow> stats, List<UsageRow> usage)
+        List<StatRow> stats, List<UsageRow> usage, List<MoveCurves> curves)
     {
         int linksGained = combos.Sum(c => c.Gained), linksLost = combos.Sum(c => c.Lost);
         int movesChanged = moves.Count(m => m.AnyChange);
@@ -351,6 +439,7 @@ internal static class Program
         sb.AppendLine(".d{font-weight:600;}.dpos{color:#1a7f37;}.dneg{color:#c0392b;}.dzero{color:#999;}");
         sb.AppendLine(".gained{background:#d9f2d9;font-weight:600;}.lost{background:#fdecea;font-weight:600;}.shift{background:#fcf3d4;}.none{color:#999;}");
         sb.AppendLine(".summary td{padding:4px 14px 4px 0;font-size:13px;}.big{font-size:17px;font-weight:600;}.badge{font-size:11px;padding:1px 6px;border-radius:9px;margin-left:6px;}.badge.g{background:#d9f2d9;color:#1a7f37;}.badge.r{background:#fdecea;color:#c0392b;}");
+        sb.AppendLine(".arcs{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 20px;}.move{margin-bottom:22px;}figure{margin:0;text-align:center;font-size:11px;color:#555;width:150px;}svg.arc{border:1px solid #eee;background:#fafbfc;display:block;}");
         sb.AppendLine("</style></head><body>");
 
         sb.AppendLine($"<h1>{Escape(character)} — tuning A/B diff</h1>");
@@ -395,6 +484,30 @@ internal static class Program
                 string kc = m.KillC == null ? "&mdash;" : F(m.KillC.Value);
                 string kd = m.KillB != null && m.KillC != null ? $" <span class=\"d {DeltaClass(m.KillC.Value - m.KillB.Value)}\">({Sign(m.KillC.Value - m.KillB.Value)})</span>" : "";
                 sb.AppendLine($"<div class=\"legend\">kill%: {kb} &rarr; {kc}{kd}</div>");
+            }
+        }
+
+        // A2 — knockback shape overlay (base vs candidate arcs)
+        if (curves.Count > 0)
+        {
+            sb.AppendLine("<h2>Knockback shape — base vs candidate</h2>");
+            sb.AppendLine("<div class=\"legend\">Flight arc (height vs horizontal travel) at each victim %. " +
+                "Base = <span style=\"color:#1a5fd0\">solid blue</span>, candidate = <span style=\"color:#e07b3a\">dashed orange</span>, dots = apex. " +
+                "Common scale per move so the two curves compare directly — this is the launch feel: pop vs glide, how far it sends, how long it stays air.</div>");
+            foreach (var grp in curves.GroupBy(c => (c.Label, c.HitIndex)))
+            {
+                var row = grp.ToList();
+                var all = row.SelectMany(r => r.Base.Concat(r.Cand)).ToList();
+                if (all.Count == 0) continue;
+                double mt = all.Max(p => p.Travel), mh = all.Max(p => p.Height);
+                string label = grp.Key.HitIndex > 0 ? $"{grp.Key.Label} (hit {grp.Key.HitIndex + 1})" : grp.Key.Label;
+                sb.AppendLine($"<div class=\"move\"><strong>{Escape(label)}</strong><div class=\"arcs\">");
+                foreach (var cv in row.OrderBy(r => Array.IndexOf(pcts, r.Pct)))
+                {
+                    string kv = cv.KvB != null && cv.KvC != null ? $" &middot; KV {F(cv.KvB.Value)}&rarr;{F(cv.KvC.Value)}" : "";
+                    sb.AppendLine($"<figure>{ArcOverlaySvg(cv.Base, cv.Cand, mt, mh)}<figcaption>{cv.Pct}%{kv}</figcaption></figure>");
+                }
+                sb.AppendLine("</div></div>");
             }
         }
 

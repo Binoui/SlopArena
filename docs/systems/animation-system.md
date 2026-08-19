@@ -66,6 +66,35 @@ When a clip reaches its end and Extrapolation = Continuous:
 This replaces separate "loop" clips for continuous motion (hover, drift, aura).
 **Rotation holds the last keyframe** (v1 — position curves only from baked data).
 
+## Humanoid weapon attachment
+
+Weapon props are configured by `WeaponAttachConfig` and follow a named renderer bone.
+`WeaponEntry.PositionOffset` and `RotationOffset` are expressed in that bone's **destination
+bind space**. `WeaponAttach` uses them for the visible prop; `SlopArenaBaker` must use the
+same values when baking synthetic `_weapon_hilt` and `_weapon_tip` points. This shared
+transform is the visual/server-alignment invariant.
+
+Do not copy a source rig helper's local transform directly onto a humanoid-retargeted
+destination hand. Bone-local axes can differ even when both bones represent the right hand.
+Convert the helper through the source-to-destination bind-pose basis:
+
+```text
+basis          = inverse(destinationHandBindRotation) * sourceHandBindRotation
+PositionOffset = basis * sourceHelperLocalPosition
+RotationOffset = basis * sourceHelperLocalRotation
+```
+
+This is one attachment transform for the weapon and applies across animation clips.
+Per-animation pose tracks are not the default fix for a retargeting mismatch: they copy
+source world-space motion, duplicate animation data, and partially defeat humanoid
+retargeting. Use per-animation weapon motion only when the weapon intentionally moves
+independently of the destination hand.
+
+Kistu is the reference implementation. Its Grruzam katana uses `hand_r/ik_hand_gun` on the
+source rig and `mixamorig:RightHand` on Kistu. The converted values live in
+`Resources/WeaponConfigs/kistu.asset`; see
+`docs/handoffs/kistu-sword-orientation.md` for the diagnosis and verification.
+
 ## Pitfalls
 
 - **AnimancerComponent** is added at runtime by `PlayerRenderer.LoadModel()`.

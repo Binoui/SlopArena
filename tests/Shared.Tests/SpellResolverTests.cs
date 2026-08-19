@@ -52,6 +52,10 @@ public class SpellResolverTests
         Assert.Equal(2UL, hits[0].TargetEntityId);
         Assert.Equal(1UL, hits[0].OwnerEntityId);
         Assert.Equal(10, hits[0].Damage);
+        Assert.Equal(1f, hits[0].DirX, 4);
+        Assert.Equal(0.5f, hits[0].HitX, 4);
+        Assert.Equal(0f, hits[0].HitY, 4);
+        Assert.Equal(0f, hits[0].HitZ, 4);
     }
 
     [Fact]
@@ -85,6 +89,10 @@ public class SpellResolverTests
 
         Assert.Single(hits);
         Assert.Equal(2UL, hits[0].TargetEntityId);
+        Assert.Equal(1f, hits[0].DirZ, 4);
+        Assert.Equal(1f, hits[0].HitX, 4);
+        Assert.Equal(0f, hits[0].HitY, 4);
+        Assert.Equal(0.3f, hits[0].HitZ, 4);
     }
 
     // ── CanHitOwner ──

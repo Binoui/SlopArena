@@ -1,5 +1,5 @@
 using System;
-
+using System.Collections.Generic;
 namespace SlopArena.Shared.Abilities
 {
     /// <summary>
@@ -17,6 +17,9 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public abstract class ServerAbility
     {
+        // Lazily allocated only for multi-event moves that deliberately share a hit identity
+        // (for example an early sweetspot handing off to a late sourspot).
+        private Dictionary<byte, HashSet<ulong>>? _hitGroups;
         // ── Lifecycle (implement in subclasses) ──
 
         /// <summary>Called once when the ability activates.</summary>
@@ -55,6 +58,15 @@ namespace SlopArena.Shared.Abilities
         public byte Slot { get; set; }
         /// <summary>Cooldown in ticks. Applied by EndAbility on natural completion.</summary>
         public ushort Cooldown { get; set; }
+
+        /// <summary>
+        /// Whether this ability instance was STARTED while airborne (set by the simulation
+        /// at activation from the owner's grounded state). Landing-lag termination
+        /// (ADR-0021 §3 / drift fix) uses this, not the grounded state at landing time: an
+        /// air move that lands mid-flight ends on the landing frame; a ground move keeps its
+        /// ground behavior even if launched and landed mid-move.
+        /// </summary>
+        public bool AirborneAtStart { get; set; }
 
         // ── Animation (set during Tick, synced to client via CharacterState.AnimIndex) ──
 
@@ -117,6 +129,17 @@ namespace SlopArena.Shared.Abilities
             // capsule with EndBoneName tracks its end point the same way.
             bool tracksBone = (evt.BoneName != null || evt.EndBoneName != null) && BakedData != null;
 
+            HashSet<ulong>? sharedHitEntities = null;
+            if (evt.HitGroup != 0)
+            {
+                _hitGroups ??= new Dictionary<byte, HashSet<ulong>>();
+                if (!_hitGroups.TryGetValue(evt.HitGroup, out sharedHitEntities))
+                {
+                    sharedHitEntities = new HashSet<ulong>();
+                    _hitGroups.Add(evt.HitGroup, sharedHitEntities);
+                }
+            }
+
             Resolver.Spawn(new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
@@ -140,6 +163,7 @@ namespace SlopArena.Shared.Abilities
                 OwnerId = s.EntityId,
                 FreezesOwner = true,
                 HitsMultipleOpponents = true,
+                HitEntities = sharedHitEntities,
                 TracksBone = tracksBone,
                 SourceEvent = evt,
                 Baked = BakedData,

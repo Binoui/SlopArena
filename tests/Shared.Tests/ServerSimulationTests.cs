@@ -230,14 +230,20 @@ public class ServerSimulationTests
         sim.RegisterEntity(100, def, npc);
 
         // Manki LMB stage 1 hitbox triggers ~tick 12 (see HitstunAnimationTierTests).
+        bool emittedHitEvent = false;
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+        emittedHitEvent |= sim.LastTickHits.Count > 0;
         for (int i = 0; i < 15; i++)
+        {
             sim.Tick(new() { { 1, default }, { 100, default } });
+            emittedHitEvent |= sim.LastTickHits.Count > 0;
+        }
 
         var after = sim.GetState(100);
         Assert.Equal(0u, after.DamagePercent); // hit fully ignored
         Assert.Equal(0, after.HitstunTicks);
         Assert.NotEqual(ActionState.Hitstun, after.State);
+        Assert.False(emittedHitEvent, "ignored contact must not produce presentation/telemetry hits");
     }
 
     [Fact]

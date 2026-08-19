@@ -1,6 +1,6 @@
 # FightGuy — tuning A/B diff: base vs melee-hot
 
-Tool 1.0.0 · commit `fd927fc8b16e41030ecbc8eb5d4da01ccdfe099c` · seed 20260817 (same both sides) · 10 matches · percents 0, 30, 60, 90, 120, 150.
+Tool 1.0.0 · commit `73d1fe9fcd7cb41326e31d84f2b5ff21413fd089` · seed 20260817 (same both sides) · 20 matches · percents 0, 30, 60, 90, 120, 150.
 Baseline **base**: base — shipped — stun 0.7×(mag+20), KV×0.11. Candidate **melee-hot**: melee-hot — Melee shape, hotter — stun 0.4×mag, KV×0.22.
 
 - **Move data**: 11/11 moves changed.
@@ -255,30 +255,30 @@ Verdict per starter × follow-up × %: `-` never connected, `F` landed after stu
 
 | stat | base | candidate | Δ |
 |---|---|---|---|
-| hit rate | 49.4% | 50.1% | +0.7pp |
-| whiff rate | 50.6% | 49.9% | -0.7pp |
-| avg combo length | 2.13 | 2.2 | +0.07 |
+| hit rate | 48.7% | 50.6% | +1.92pp |
+| whiff rate | 51.3% | 49.4% | -1.92pp |
+| avg combo length | 2.14 | 2.18 | +0.04 |
 | max combo length | 4 | 4 | 0 |
-| damage / match | 369.8 | 207.6 | -162.2 |
-| damage / stock | 61.63 | 34.6 | -27.03 |
+| damage / match | 363.85 | 210.3 | -153.55 |
+| damage / stock | 60.64 | 35.05 | -25.59 |
 | wins (bot A) | 1 | 0 | -1 |
-| wins (bot B) | 0 | 3 | +3 |
-| draws | 9 | 7 | -2 |
-| avg match duration (s) | 10750 | 10406 | -344 |
+| wins (bot B) | 0 | 4 | +4 |
+| draws | 19 | 16 | -3 |
+| avg match duration (s) | 10775 | 10244 | -531 |
 | max match duration (s) | 10800 | 10800 | 0 |
-| total swings | 1999 | 1987 | -12 |
-| total hits | 987 | 995 | +8 |
-| total whiffs | 1012 | 992 | -20 |
-| total damage | 6709 | 6976 | +267 |
+| total swings | 3877 | 3896 | +19 |
+| total hits | 1888 | 1972 | +84 |
+| total whiffs | 1989 | 1924 | -65 |
+| total damage | 13026 | 13901 | +875 |
 
 | move | swings b→c | hits b→c | whiffs b→c | hit% b→c |
 |---|---|---|---|---|
-| a1 Double Punch | 164→186 | 4→2 | 160→184 | 2.44→1.08 |
-| a2 Floating Kick | 190→157 | 47→31 | 143→126 | 24.74→19.75 |
-| a3 High Kick | 59→54 | 0 | 59→54 | 0 |
-| a4 Air Tornado | 212→161 | 0 | 212→161 | 0 |
-| g1 Low Kick | 286→238 | 277→230 | 9→8 | 96.85→96.64 |
-| g2 Roundhouse | 289→302 | 42→30 | 247→272 | 14.53→9.93 |
-| g3 Roundhouse | 287→343 | 211→267 | 76 | 73.52→77.84 |
-| g4 Tornado Kick | 512→546 | 406→435 | 106→111 | 79.3→79.67 |
+| a1 Double Punch | 370→338 | 5→2 | 365→336 | 1.35→0.59 |
+| a2 Floating Kick | 372→343 | 106→70 | 266→273 | 28.49→20.41 |
+| a3 High Kick | 115→109 | 0 | 115→109 | 0 |
+| a4 Air Tornado | 402→308 | 0 | 402→308 | 0 |
+| g1 Low Kick | 495→455 | 481→440 | 14→15 | 97.17→96.7 |
+| g2 Roundhouse | 562→587 | 79→68 | 483→519 | 14.06→11.58 |
+| g3 Roundhouse | 567→621 | 423→486 | 144→135 | 74.6→78.26 |
+| g4 Tornado Kick | 994→1135 | 794→906 | 200→229 | 79.88→79.82 |
 

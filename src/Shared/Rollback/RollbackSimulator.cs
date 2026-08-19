@@ -96,5 +96,6 @@ namespace SlopArena.Shared.Rollback
         }
 
         public SpellResolver? Resolver => _local.Resolver;
+        public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _local.LastTickHits;
     }
 }

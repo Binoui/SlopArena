@@ -59,8 +59,15 @@ public class ArenaShippingTests
     {
         ArenaRegistry.LoadFromDirectory(Path.Combine(RepoRoot(), "data", "arenas"));
         Assert.Null(ArenaRegistry.Get("no-such-arena-xyz"));
-        Assert.True(ArenaRegistry.Get("colosseum").HasValue);
+        Assert.True(ArenaRegistry.Get("slop_court").HasValue);
+        Assert.True(ArenaRegistry.Get("splash_deck").HasValue);
+        Assert.True(ArenaRegistry.Get("after_hours").HasValue);
+        Assert.True(ArenaRegistry.Get("rec_center_roof").HasValue);
+        Assert.True(ArenaRegistry.Get("picnic_panic").HasValue);
         Assert.True(ArenaRegistry.Get("training").HasValue);
+        Assert.Null(ArenaRegistry.Get("square"));
+        Assert.Null(ArenaRegistry.Get("steps"));
+        Assert.Null(ArenaRegistry.Get("colosseum"));
     }
 
     [Theory]

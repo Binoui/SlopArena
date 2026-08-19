@@ -16,7 +16,7 @@ MonoBehaviour:
   Run: {fileID: 7400000, guid: f460b4e334f59bc9ab8b8bcc12743b75, type: 3}
   JumpUp: {fileID: 1827226128182048838, guid: 5cfebe60ac2cf1354b9275f716e2ac9c, type: 3}
   JumpDown: {fileID: 1827226128182048838, guid: eb9bbcbe807ad2b0abfb258a8aec0d23, type: 3}
-  Fall: {fileID: -203655887218126122, guid: f5d91b50068e35631a0b4064627bee6f, type: 3}
+  Fall: {fileID: 1827226128182048838, guid: 3fd85fce516651489a02bfbb8456ffdf, type: 3}
   Dash: {fileID: 7400000, guid: 05261071379df35278f910e44d9c5b8d, type: 2}
   HitSmall: {fileID: -203655887218126122, guid: 0d47f09b34f2f647daeadc3ed46404cc, type: 3}
   HitMedium: {fileID: -203655887218126122, guid: 99faf08884a12b982950b36229ad6965, type: 3}

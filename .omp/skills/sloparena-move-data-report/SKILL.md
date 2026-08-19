@@ -1,6 +1,6 @@
 ---
 name: sloparena-move-data-report
-description: Record and report a character's move data — authored frame data (trigger/active/duration/IASA/landing lag), simulated per-hit trajectories with frame advantage, and knockback shape — via scripts/move-data.sh → tools/MoveDataReport. Use when the user wants attack duration, active frames, frame advantage, knockback trajectory/shape, or a move-data table pinned for a character.
+description: Record and report a character's move data — authored frame data (trigger/active/duration/IASA/landing lag), simulated per-hit trajectories with frame advantage, knockback shape, or a full eight-normal animation/hurtbox/role audit — via scripts/move-data.sh → tools/MoveDataReport.
 triggers:
   - frame data
   - move data
@@ -12,6 +12,11 @@ triggers:
   - combo density
   - DI escape
   - directional influence
+  - normal audit
+  - character normal audit
+  - kit audit
+  - animation hitbox audit
+  - hurtbox timing
 ---
 
 # SlopArena Move Data Report
@@ -118,6 +123,123 @@ scaled nothing while .NET tests were green.
 - After a balance/timing change to a character's normals — regenerate and read the diff as the changelog.
 - If a report disagrees with in-game feel, run `--parity` and compare with the game's launch-contract
   sentinel (see `unity-mcp-gamedev` skill).
+
+## Character normal audit — all eight normals
+
+Use this workflow when the request is to assess a character's ground and air normals as a
+kit: whether the animated contact matches its hitbox/hurtbox timing, and whether damage,
+knockback, timing, and role form a coherent Melee-inspired normal tier.
+
+The deliverable is an **evidence-backed role proposal**, not a report dump and not an
+animation-only opinion. Complete the evidence pass before proposing data changes; in the
+interactive main session, explain the proposal and wait for approval before editing.
+
+### Applicability and source of truth
+
+- Audit the full normal tier: g1–g4 and a1–a4. Treat each `HitboxEvent` as an independently
+  authored contact, not merely each button as one move.
+- Server simulation is authoritative. Read `src/Shared/Characters/<Character>Data.cs`; use
+  `HitboxGeometry.ResolvePositions` / `ServerSimulation.BuildEntitiesFromState` geometry and
+  `ServerSimulation` outcomes. Never infer gameplay behavior solely from a client animation.
+- Ability Lab is the visual truth surface: it scrubs the same sim-tick pose, green hurtboxes,
+  and orange hitboxes that the server resolves. See `docs/systems/ability-lab.md`.
+- The report requires usable normal data. Kistu's Adaptive moves are representative-angle
+  trajectories; Manki/Nilus currently produce empty reports until their normals are
+  Melee-converted. Record that as a prerequisite, not as a balance verdict.
+
+### Evidence pass
+
+1. **Inventory authored data.** For every ground/air normal, record name, animation, trigger,
+   active range, duration, IASA, landing lag/auto-cancel, shape, radius, bone/end bone,
+   damage, angle, base KB, and growth.
+2. **Build and record the real sim.** Run markdown and HTML separately so both committed
+   renderings are refreshed:
+
+   ```bash
+   dotnet build src/Shared/ --nologo
+   scripts/move-data.sh <char> --pcts 0,30,60,90,120,150 --truecombos --di --reach \
+     --out docs/generated/<char>-move-data.md
+   scripts/move-data.sh <char> --pcts 0,30,60,90,120,150 --truecombos --di --reach \
+     --html docs/generated/<char>-move-data.html
+   ```
+
+   Read frame data, trajectory rows, pipeline parity, true-combo reachability, DI
+   escape-space, and the reach ladder. A `DIVERGE` parity row blocks conclusions until
+   resolved.
+3. **Scrub contact geometry in Ability Lab.** Select each ground and air slot, jump to every
+   hitbox trigger, then scrub through `trigger + duration - 1`. Check the animated limb/capsule
+   against the green attacker hurtboxes, orange hitbox, and an optional red dummy at intended
+   spacing. Repeat for early/late events and all multi-hit contacts.
+4. **Audit overlap semantics.** Adjacent sweetspot/sourspot or body-covering events that are
+   meant to produce one hit must share a nonzero `HitGroup`; verify a stationary target does
+   not take both hits. Intentional separate contacts must retain distinct hit identities.
+5. **Interpret the real outcome.** Do not treat authored `StunTicks` as actual hitstun:
+   under ADR-0019 it is a zero/nonzero gate, while launch speed determines actual stun.
+   A move is a true combo starter only when the real-sim graph reports **T**; **F** and `-`
+   are not combo claims.
+
+### Role decision
+
+Give each normal one primary job. Common roles are quick low poke, forward spacing/check,
+cross-up/side check, vertical anti-air, body-covering linger, aerial two-hit check, grounded
+kill read, and forward-air kill read. Roles may share a secondary use, but two moves must not
+silently become the same tool.
+
+Judge a proposed role from all four evidence sources:
+
+| Evidence | Decision it supports |
+|---|---|
+| Active tick + IASA / landing lag | commitment, whiff cost, and whether the move is fast or deliberate |
+| Baked pose + hitbox/hurtbox geometry | whether the contact is visually honest and covers its intended space |
+| Real launch, stun, DI, and blast clearance | poke, anti-air, launcher, or kill-read reward |
+| True-combo graph + reach ladder | whether a claimed route exists and which spacing/height gap the move fills |
+
+### Audit record template
+
+Write one compact card per normal in the review or character documentation:
+
+```text
+<slot> <move>
+Role: <one primary role>
+Animation contact: <limb/capsule and active ticks>
+Hit model: <shape, anchors, radius, HitGroup behavior>
+Reward: <damage, angle, KB; real 0% and high-% outcome>
+Cost: <startup, total, IASA, landing lag>
+Evidence: <reach / DI / parity / combo verdict>
+Decision: <keep or exact change and reason>
+```
+
+### FightGuy worked example — 2026-08-19
+
+The completed FightGuy pass is the reference shape:
+
+| Normal | Final primary role |
+|---|---|
+| g1 Low Kick | quick low neutral poke |
+| g2 Straight Punch | fast mid-range forward check |
+| g3 Sweeping Kick | lateral/cross-up check that lifts upward |
+| g4 Double Kick | slow grounded horizontal kill read |
+| a1 Double Punch | two-contact airborne poke |
+| a2 Floating Kick | body-covering sex kick; strong early, weak late, one hit total |
+| a3 High Kick | high-angle aerial anti-air |
+| a4 Air Smash | late committed horizontal aerial kill read |
+
+The evidence artifact is `docs/generated/fightguy-move-data.md`; the pose check used Ability
+Lab; `tests/Shared.Tests/FightGuyNormalTuningTests.cs` pins the revised timing, geometry,
+damage, and launch contracts. Its report found no true normal links at 0–150%, so the final
+roles deliberately do not promise automatic combos.
+
+### Preserve and verify an approved retune
+
+1. Update the ability specs and role names/descriptions together; migrate factory comments,
+   character documentation, and tests so old role names cannot mislead later tuning.
+2. Add focused `KitScenario`/golden coverage at an active contact tick. Pin hit confirmation,
+   damage, single-hit grouping, and a representative launch; use the
+   `sloparena-kit-regression-testing` workflow for scoped golden generation and review.
+3. Rebuild Shared, regenerate both report renderings, and run affected regression tests.
+4. Request a Unity recompilation check. For Unity-facing behavior, add a short manual
+   Training/Ability-Lab checklist to `TESTING-UNITY.md`: contact alignment, coverage,
+   one-hit semantics, reward, commitment, and target-lock/manual-aim behavior.
 
 ## Verify / flow
 

@@ -296,6 +296,14 @@ internal static class Program
         Dictionary<(SlotRef, int), DiEscapeData[]>? diData = di ? ComputeDiEscape(def, hits, pcts, NoRespawn(BuildArena())) : null;
         string md = BuildMarkdown(def, hits, runs, pcts, routes, probeRoutes, probes, parity, which, combos,
             comboGraph, diData, reach ? BuildReach(def, hits, baked) : null);
+        // Isolated recovery-move record (FightGuy E) — attacker self-motion + victim launch,
+        // outside the normals machinery (no parity / reach / combo pollution).
+        if (RunRecoveryTrace(def) is { } recovery)
+        {
+            var launchSpec = RecoveryHitSpec(def);
+            var launches = pcts.Select(p => (Pct: p, R: RunTrajectory(def, launchSpec, p))).ToList();
+            md += BuildRecoveryMarkdown(recovery, launches);
+        }
         Console.WriteLine(md);
         if (outPath != null)
         {
@@ -352,6 +360,125 @@ internal static class Program
             }
         }
         return hits;
+    }
+
+    // ── Recovery-move record (FightGuy E — Melee up-B analog) ─────────────────
+
+    internal sealed record RecoveryData(string Name, ushort DurationTicks, ushort TriggerTick, ushort ActiveUntilTick,
+        float Damage, sbyte Angle, float BaseKb, float GrowthKb, ushort StunTicks, ushort CooldownTicks,
+        float RiseSpeed, ushort RiseTicks, ushort RiseDelay,
+        float RiseHeight, float ApexGain, float PeakVY, int RiseWindowTicks, int ActionableTick, int DurationObserved);
+
+    /// <summary>
+    /// Records a recovery-designated move (FightGuy E, IsRecoveryMove) through the REAL sim: activates
+    /// the slot on a grounded entity and traces the ATTACKER's own rise — the Melee up-B recovery
+    /// contract (SET velocity + sustained rise window, then gravity). This self-motion is the one thing
+    /// a victim-knockback report can't show, so it lives in an isolated section, NOT in the normal-tier
+    /// `hits` list — no parity / reach / combo pollution. Returns null when the kit has no recovery move.
+    /// </summary>
+    internal static RecoveryData? RunRecoveryTrace(CharacterDefinition def)
+    {
+        var spec = def.E;
+        if (spec == null || !spec.IsRecoveryMove) return null;
+
+        // E = factory slot 3 → ActiveSlot byte 4 (grounded and air share the spec; see AbilityFactory).
+        const byte activeSlot = 4;
+
+        var sim = new ServerSimulation(BuildArena());
+        float groundY = def.CapsuleHeight * 0.5f;
+        var state = new CharacterState
+        {
+            PX = 0f, PY = groundY, PZ = 0f, IsGrounded = true,
+            State = ActionState.Idle, FacingYaw = 0f,
+        };
+        sim.RegisterEntity(1, def, state);
+
+        float riseSpeed = spec.Params != null && spec.Params.TryGetValue("rise_speed", out var rs) ? rs : 11f;
+        ushort riseTicks = spec.Params != null && spec.Params.TryGetValue("rise_ticks", out var rt) ? (ushort)rt : (ushort)12;
+        ushort riseDelay = spec.Params != null && spec.Params.TryGetValue("rise_delay", out var rd) ? (ushort)rd : (ushort)8;
+
+        float startPy = groundY, maxPy = groundY, peakVY = 0f;
+        int riseWindow = 0, actionableTick = -1, durationObserved = 0;
+        bool wasAttacking = false;
+        for (int t = 0; t < MaxTicks; t++)
+        {
+            // Press E on tick 0, then release.
+            sim.Tick(t == 0 ? new Dictionary<ulong, InputState> { [1] = new() { ActiveSlot = activeSlot } }
+                            : new Dictionary<ulong, InputState> { [1] = default });
+            var s = sim.GetState(1);
+            if (s.PY > maxPy) maxPy = s.PY;
+            if (s.VY > peakVY) peakVY = s.VY;
+            if (s.State == ActionState.Attacking)
+            {
+                wasAttacking = true;
+                durationObserved++;
+                // The sustained-rise window: VY held at (or above) rise_speed while locked.
+                if (s.VY >= riseSpeed * 0.99f) riseWindow++;
+            }
+            else if (wasAttacking && actionableTick < 0)
+            {
+                actionableTick = t; // ability ended → control returned on this tick
+            }
+        }
+
+        ushort trigger = spec.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
+            ? spec.Stages[0].HitboxEvents[0].TriggerTick : (ushort)0;
+        var hit = spec.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
+            ? spec.Stages[0].HitboxEvents[0] : default;
+        ushort duration = spec.Stages is { Length: > 0 } ? spec.Stages[0].DurationTicks : (ushort)0;
+
+        return new RecoveryData(
+            spec.Name, duration, trigger, (ushort)(trigger + hit.DurationTicks),
+            hit.Damage, hit.Knockback.Angle, hit.Knockback.BaseKnockback, hit.Knockback.KnockbackGrowth,
+            hit.StunTicks, spec.CooldownTicks,
+            riseSpeed, riseTicks, riseDelay,
+            maxPy - startPy, maxPy - startPy, peakVY, riseWindow, actionableTick, durationObserved);
+    }
+
+    /// <summary>
+    /// E's first hitbox as a synthetic HitSpec so the recovery section can reuse the normal
+    /// RunTrajectory machinery (real ApplyKnockback + sim) for the VICTIM launch. Custom
+    /// profile → authored angle/base/growth. All three E hitboxes share the same KB data.
+    /// SlotRef slot 100 keeps it clear of the normal-tier 1-4 numbering.
+    /// </summary>
+    internal static HitSpec RecoveryHitSpec(CharacterDefinition def)
+    {
+        var spec = def.E!;
+        var stage = spec.Stages![0];
+        var evt = stage.HitboxEvents![0];
+        return new HitSpec(new SlotRef(false, 100), spec, stage, evt, 0,
+            evt.Knockback.Angle, evt.Knockback.BaseKnockback, evt.Knockback.KnockbackGrowth, false);
+    }
+
+    internal static string BuildRecoveryMarkdown(RecoveryData r, List<(int Pct, RunResult R)> launches)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("## Recovery move — " + r.Name + " (E)");
+        sb.AppendLine();
+        sb.AppendLine("The attacker's own rise through the REAL sim (grounded cast) — the Melee up-B recovery");
+        sb.AppendLine("contract: VY SET to rise_speed, held for rise_ticks after a grounded rise_delay");
+        sb.AppendLine("windup (air cast rises immediately), then gravity bounds the arc.");
+        sb.AppendLine();
+        sb.AppendLine("| rise_speed m/s | rise_ticks | rise_delay | rise height m | apex gain m | peak VY m/s | rise window ticks | actionable tick | duration observed |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|---|");
+        sb.AppendLine($"| {r.RiseSpeed:F0} | {r.RiseTicks} | {r.RiseDelay} | {r.RiseHeight:F2} | {r.ApexGain:F2} | {r.PeakVY:F2} | {r.RiseWindowTicks} | {r.ActionableTick} | {r.DurationObserved} |");
+        sb.AppendLine();
+        sb.AppendLine("Authored (spec):");
+        sb.AppendLine();
+        sb.AppendLine("| trigger | active | damage | angle | base KB | growth | stun | duration | cooldown |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|---|");
+        sb.AppendLine($"| {r.TriggerTick} | {r.TriggerTick}-{r.ActiveUntilTick - 1} | {r.Damage:F0} | {r.Angle} | {r.BaseKb:F0} | {r.GrowthKb:F0} | {r.StunTicks} | {r.DurationTicks} | {r.CooldownTicks} |");
+        sb.AppendLine();
+        sb.AppendLine("Victim launch (real sim, no DI, post-hit %):");
+        sb.AppendLine();
+        sb.AppendLine("| victim % | KV m/s | hitstop | stun | adv | rise@stun m | drift@stun m | apex m | actionable | landed |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|");
+        int advDenominator = r.DurationTicks - r.TriggerTick; // attacker locked until duration ends
+        foreach (var (pct, R) in launches)
+            sb.AppendLine($"| {pct} | {R.Kv:F1} | {R.Hitstop} | {R.Stun} | {R.Stun - advDenominator} | {R.Rise:F2} | {R.Drift:F2} | {R.Apex:F2} | {R.ActionableTick} | {R.LandedTick?.ToString() ?? "—"} |");
+        sb.AppendLine();
+        return sb.ToString();
     }
 
     // ── Reach chart collection (issue #151) ──────────────────────────────────

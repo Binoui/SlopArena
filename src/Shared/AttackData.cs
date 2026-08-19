@@ -32,6 +32,13 @@ namespace SlopArena.Shared
         public ushort StunTicks;
         /// <summary>If false: persists even if attacker is hit during startup.</summary>
         public bool Interruptible;
+
+        /// <summary>
+        /// Cross-event hit identity within one ability activation. 0 = this event has its own
+        /// one-hit-per-opponent set. Matching non-zero values share a set, so a sweetspot can
+        /// hand off to a sourspot without hitting the same opponent twice.
+        /// </summary>
+        public byte HitGroup;
     }
 
     /// <summary>

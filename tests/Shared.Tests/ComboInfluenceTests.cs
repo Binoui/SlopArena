@@ -13,9 +13,9 @@ public class ComboInfluenceTests
         Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 10f, 2f, 12f, 20, 100f);
 
         // Raw formula: (10 + 2 * (0.5 + 1) + 12 * 0.1) * 200 / (100 + 100) = 14.2.
-        // KbScaleFactor (0.11) scales launch velocity only; hitstun stays 0.7 * (14.2 + 20) = 23.
+        // KbScaleFactor (0.17) scales launch velocity only; hitstun stays 0.45 * 14.2 = 6 (melee-soft).
         Assert.Equal(14.2f * Simulation.KbScaleFactor, state.KVX, 3);
-        Assert.Equal((ushort)23, state.HitstunTicks);
+        Assert.Equal((ushort)6, state.HitstunTicks);
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public class ComboInfluenceTests
         var state = TestHelpers.PlayerState();
         Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 20f, 0f, 0f, 60, 100f);
 
-        Assert.Equal((ushort)28, state.HitstunTicks); // 0.7 * (20 + 20)
+        Assert.Equal((ushort)9, state.HitstunTicks); // 0.45 * 20 (melee-soft)
         Assert.Equal(ActionState.Hitstun, state.State);
     }
 

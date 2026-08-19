@@ -135,32 +135,27 @@ public class FightGuyAbilityTests
         npc.DamagePercent = 0;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
-        // Press E and tick past hitbox trigger (tick 10, after windup)
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
-        for (int i = 0; i < 24; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-        var npcAfter = sim.GetState(100);
-
-        Assert.True(npcAfter.DamagePercent > 0,
-            $"NPC should take damage from Tornado Kick, got {npcAfter.DamagePercent}");
-
-        // KNOWN DEBT — stale against ADR-0019 §2: hitstun is now a pure function of KB
-        // (0.5·kbMag), authored StunTicks is only a zero-gate. CycloneKick has no knockback,
-        // so it ~flinches (1 tick) instead of the 20-tick pin this test was written for.
-        // Revisit with the specials pass: either give the kick KB (data) or accept the flinch.
-        // Hitstop (ADR-0012): every connecting hit freezes first; the banded 20-tick stun
-        // only starts once the freeze chain ends (the kick re-frozen the victim each contact).
-        int stunTick = -1;
-        for (int i = 0; i < 120 && stunTick < 0; i++)
+        // Tick 0: press E (windup; hitbox triggers after ~6 ticks, re-hits every tick of the
+        // spin). Scan from the kick capturing the PEAK hitstun the kick inflicts — the repeated
+        // contacts re-freeze the victim, so "stun outside hitstop" is unreliable; the peak is not.
+        ushort maxStun = 0;
+        for (int i = 0; i < 60; i++)
         {
-            sim.Tick(new() { { 1, default }, { 100, default } });
-            var s = sim.GetState(100);
-            if (s.HitstopTicks == 0 && s.HitstunTicks > 0) stunTick = i;
+            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default }, { 100, default } });
+            ushort stun = sim.GetState(100).HitstunTicks;
+            if (stun > maxStun) maxStun = stun;
         }
-        Assert.True(stunTick >= 0, "the stun must eventually land after the freeze chain");
-        // Band check (old model): the banded 20-tick stun must reach the 10-25 band.
-        Assert.True(sim.GetState(100).HitstunTicks >= 10,
-            $"Expected HitstunTicks in the 10-25 band, got {sim.GetState(100).HitstunTicks}");
+
+        Assert.True(sim.GetState(100).DamagePercent > 0,
+            "NPC should take damage from Cyclone Kick");
+
+        // KNOWN DEBT (accepted 2026-08-19): CycloneKick has NO knockback, so the no-floor
+        // melee-soft tuning (issue #149) derives ~1-tick hitstun (min clamp) — a flinch, not
+        // the 20-tick pin this test was originally written for. The authored 96-tick stun is
+        // only a zero-gate under ADR-0019. Revisit with the specials pass: give the kick KB
+        // (data) or accept the flinch.
+        Assert.True(maxStun > 0, "the kick must flinch the NPC");
+        Assert.True(maxStun <= 2, $"expected a ~1-tick flinch under melee-soft, got max stun {maxStun}");
     }
 
     [Fact]
@@ -181,25 +176,22 @@ public class FightGuyAbilityTests
         npc2.PY = GroundPY;
         sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
 
-        // Activate E and tick through the dash, watching for each victim's stun lock.
-        // KNOWN DEBT — stale vs ADR-0019 §2 (hitstun = 0.5·kbMag; zero-KB kick ~flinches).
-        // Hitstop (ADR-0015) freezes each freeze chain, then the banded StunTicks 20 applies.
-        // The hits are staggered (NPC2 sits 4 m farther down the dash), so the 20-tick
-        // windows don't overlap — check each NPC for its own window, and scan from the
-        // first tick: NPC1's window (t20-30) closes before NPC2's even opens (t39+).
-        bool n1Stunned = false, n2Stunned = false;
-        for (int i = 0; i < 150 && !(n1Stunned && n2Stunned); i++)
+        // Activate E and tick through the dash, watching for each victim's flinch.
+        // KNOWN DEBT (accepted 2026-08-19): zero-KB kick ~flinches (1 tick) under the no-floor
+        // melee-soft tuning — detect the PEAK hitstun per victim (re-hits re-freeze, so stun
+        // outside hitstop is unreliable). The hits are staggered (NPC2 sits 4 m farther down
+        // the dash), so each victim peaks on its own contact.
+        ushort n1Max = 0, n2Max = 0;
+        for (int i = 0; i < 150; i++)
         {
             sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default }, { 100, default }, { 101, default } });
-            if (i < 5) continue; // windup — no hits yet
-            var a = sim.GetState(100);
-            var b = sim.GetState(101);
-            if (a.HitstopTicks == 0 && a.HitstunTicks >= 10) n1Stunned = true;
-            if (b.HitstopTicks == 0 && b.HitstunTicks >= 10) n2Stunned = true;
+            ushort a = sim.GetState(100).HitstunTicks, b = sim.GetState(101).HitstunTicks;
+            if (a > n1Max) n1Max = a;
+            if (b > n2Max) n2Max = b;
         }
         Assert.True(sim.GetState(100).DamagePercent > 0, "NPC1 should take damage");
         Assert.True(sim.GetState(101).DamagePercent > 0, "NPC2 should take damage");
-        Assert.True(n1Stunned && n2Stunned, "both NPCs must be stunned after their freeze chains");
+        Assert.True(n1Max > 0 && n2Max > 0, $"both NPCs must flinch, peaks N1={n1Max} N2={n2Max}");
     }
 
     // ── F (FightGuyTempest) ──

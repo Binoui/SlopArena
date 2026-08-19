@@ -30,7 +30,7 @@ public class TuningDiffTests
     {
         const string tree = """
             {"character":"FightGuy","percents":[0,30,60],"moves":[
-                {"label":"g2 Roundhouse","hitIndex":0,"frame":{"damage":8},"trajectories":[
+                {"label":"g2 Straight Punch","hitIndex":0,"frame":{"damage":8},"trajectories":[
                     {"pct":0,"kv":12.34,"stun":20,"points":[{"tick":1,"h":0.5}]}]}]}
             """;
         var diff = Diff(tree, tree);
@@ -53,11 +53,11 @@ public class TuningDiffTests
     [Fact]
     public void StringChange_NoDelta()
     {
-        var diff = Diff("""{"label":"g2 Roundhouse"}""", """{"label":"g3 Uppercut"}""");
+        var diff = Diff("""{"label":"g2 Straight Punch"}""", """{"label":"g3 Sweeping Kick"}""");
         var label = diff["label"]!;
         Assert.Equal(TuningDiffKind.Changed, label.Kind);
         Assert.Null(label.Delta);
-        Assert.Equal("\"g3 Uppercut\"", label.NewValue!.ToJsonString());
+        Assert.Equal("\"g3 Sweeping Kick\"", label.NewValue!.ToJsonString());
     }
 
     [Fact]
@@ -66,29 +66,29 @@ public class TuningDiffTests
         const string a = """
             {"moves":[
                 {"label":"g1 Low Kick","hitIndex":0,"kv":8.0},
-                {"label":"g2 Roundhouse","hitIndex":0,"kv":12.0},
-                {"label":"g3 Uppercut","hitIndex":0,"kv":15.0}]}
+                {"label":"g2 Straight Punch","hitIndex":0,"kv":12.0},
+                {"label":"g3 Sweeping Kick","hitIndex":0,"kv":15.0}]}
             """;
         // Candidate: g2's kv changed, g3 removed, g4 added. With index matching every row
         // would shift; keyed matching must leave g1 Unchanged and report the rest exactly.
         const string b = """
             {"moves":[
                 {"label":"g1 Low Kick","hitIndex":0,"kv":8.0},
-                {"label":"g2 Roundhouse","hitIndex":0,"kv":13.5},
-                {"label":"g4 Tornado","hitIndex":0,"kv":9.0}]}
+                {"label":"g2 Straight Punch","hitIndex":0,"kv":13.5},
+                {"label":"g4 Double Kick","hitIndex":0,"kv":9.0}]}
             """;
         var moves = Diff(a, b)["moves"]!;
         Assert.Equal(TuningDiffKind.Array, moves.Kind);
 
         var g1 = FindByLabel(moves, "g1 Low Kick");
         Assert.Equal(TuningDiffKind.Unchanged, g1.Kind); // untouched element stays put
-        var g2 = FindByLabel(moves, "g2 Roundhouse");
+        var g2 = FindByLabel(moves, "g2 Straight Punch");
         Assert.Equal(TuningDiffKind.Changed, g2["kv"]!.Kind);
         Assert.Equal(1.5, g2["kv"]!.Delta);
-        var g3 = FindByLabel(moves, "g3 Uppercut");
+        var g3 = FindByLabel(moves, "g3 Sweeping Kick");
         Assert.Equal(TuningDiffKind.Removed, g3.Kind);
-        Assert.Equal("\"g3 Uppercut\"", g3.OldValue!["label"]!.ToJsonString());
-        var g4 = FindByLabel(moves, "g4 Tornado");
+        Assert.Equal("\"g3 Sweeping Kick\"", g3.OldValue!["label"]!.ToJsonString());
+        var g4 = FindByLabel(moves, "g4 Double Kick");
         Assert.Equal(TuningDiffKind.Added, g4.Kind);
     }
 
@@ -117,11 +117,11 @@ public class TuningDiffTests
     public void NestedIdentityPath_TrajectoriesKeyedByPct()
     {
         const string a = """
-            {"moves":[{"label":"g2 Roundhouse","hitIndex":0,"trajectories":[
+            {"moves":[{"label":"g2 Straight Punch","hitIndex":0,"trajectories":[
                 {"pct":0,"kv":12.0},{"pct":30,"kv":18.0}]}]}
             """;
         const string b = """
-            {"moves":[{"label":"g2 Roundhouse","hitIndex":0,"trajectories":[
+            {"moves":[{"label":"g2 Straight Punch","hitIndex":0,"trajectories":[
                 {"pct":0,"kv":12.0},{"pct":30,"kv":19.5},{"pct":60,"kv":25.0}]}]}
             """;
         var moveEl = Diff(a, b)["moves"]!.Children!.Single().Value; // one move in this fixture
@@ -164,8 +164,8 @@ public class TuningDiffTests
     [Fact]
     public void SameInputs_ByteIdenticalSerialization()
     {
-        const string a = """{"moves":[{"label":"g1 Low Kick","kv":8.0},{"label":"g2 Roundhouse","kv":12.0}]}""";
-        const string b = """{"moves":[{"label":"g1 Low Kick","kv":8.5},{"label":"g2 Roundhouse","kv":12.0}]}""";
+        const string a = """{"moves":[{"label":"g1 Low Kick","kv":8.0},{"label":"g2 Straight Punch","kv":12.0}]}""";
+        const string b = """{"moves":[{"label":"g1 Low Kick","kv":8.5},{"label":"g2 Straight Punch","kv":12.0}]}""";
         var opts = new JsonSerializerOptions { WriteIndented = true };
         var first = JsonSerializer.Serialize(Diff(a, b), opts);
         var second = JsonSerializer.Serialize(Diff(a, b), opts);

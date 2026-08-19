@@ -47,6 +47,12 @@ namespace SlopArena.Shared
             public ushort StunTicks;
             /// <summary>If true, the hit freezes the owner too (melee contact, ADR-0012).</summary>
             public bool FreezesOwner;
+            /// <summary>World-space contact point resolved from the colliding shapes.</summary>
+            public float HitX, HitY, HitZ;
+            /// <summary>Final launch magnitude resolved by ServerSimulation after ability hooks.</summary>
+            public float ImpactForce;
+            /// <summary>Hitstop applied to this accepted hit.</summary>
+            public ushort HitstopTicks;
         }
 
         /// <summary>
@@ -76,7 +82,7 @@ namespace SlopArena.Shared
         {
             hb.Active = true;
             hb.AgeTicks = 0;
-            if (hb.HitsMultipleOpponents)
+            if (hb.HitsMultipleOpponents && hb.HitEntities == null)
                 hb.HitEntities = new HashSet<ulong>();
             _hitboxes.Add(hb);
         }
@@ -238,10 +244,12 @@ namespace SlopArena.Shared
 
                         bool hit = false;
                         float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
+                        float hitX = 0f, hitY = 0f, hitZ = 0f;
 
                         if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
                         {
-                            hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz);
+                            hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz,
+                                out hitX, out hitY, out hitZ);
                         }
                         else
                         {
@@ -255,6 +263,19 @@ namespace SlopArena.Shared
                             {
                                 dist = MathF.Sqrt(distSq);
                                 hit = true;
+                                if (dist > 0.001f)
+                                {
+                                    float invDist = 1f / dist;
+                                    hitX = hb.X + dx * invDist * hb.Radius;
+                                    hitY = hb.Y + dy * invDist * hb.Radius;
+                                    hitZ = hb.Z + dz * invDist * hb.Radius;
+                                }
+                                else
+                                {
+                                    hitX = hb.X;
+                                    hitY = hb.Y;
+                                    hitZ = hb.Z;
+                                }
                             }
                         }
 
@@ -285,12 +306,16 @@ namespace SlopArena.Shared
                                 TargetEntityId = entity.Id,
                                 OwnerEntityId = hb.OwnerId,
                                 Damage = hb.Damage,
+                                DirX = dirXNorm,
                                 KnockbackAngle = launchAngle,
                                 DirZ = dirZNorm,
                                 BaseKnockback = hb.BaseKnockback,
                                 KnockbackGrowth = hb.KnockbackGrowth,
                                 StunTicks = hb.StunTicks,
                                 FreezesOwner = hb.FreezesOwner,
+                                HitX = hitX,
+                                HitY = hitY,
+                                HitZ = hitZ,
                             });
 
                             hitThisTick.Add(entity.Id);
@@ -349,7 +374,8 @@ namespace SlopArena.Shared
 
         /// </summary>
         private static bool CapsuleCollision(Hitbox hb, EntityData entity,
-            out float dist, out float dx, out float dy, out float dz)
+            out float dist, out float dx, out float dy, out float dz,
+            out float hitX, out float hitY, out float hitZ)
         {
             // Get capsule endpoints for hitbox
             float hbStartX = hb.X, hbStartY = hb.Y, hbStartZ = hb.Z;
@@ -379,14 +405,24 @@ namespace SlopArena.Shared
             if (distSq <= combinedRadius * combinedRadius)
             {
                 dist = MathF.Sqrt(distSq);
-                // Direction: from hitbox toward entity
-                dx = entity.PosX - hb.X;
-                dy = entity.PosY - hb.Y;
-                dz = entity.PosZ - hb.Z;
+                if (dist > 0.001f)
+                {
+                    float invDist = 1f / dist;
+                    hitX = cx1 + dx * invDist * hb.Radius;
+                    hitY = cy1 + dy * invDist * hb.Radius;
+                    hitZ = cz1 + dz * invDist * hb.Radius;
+                }
+                else
+                {
+                    hitX = cx1;
+                    hitY = cy1;
+                    hitZ = cz1;
+                }
                 return true;
             }
 
             dist = 0f;
+            hitX = hitY = hitZ = 0f;
             return false;
         }
 

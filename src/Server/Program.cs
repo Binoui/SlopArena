@@ -34,7 +34,7 @@ namespace SlopArena.Server
             // HTTP control endpoint for master server match-start commands
             // (issue #35). Listens on the registered base TCP port; UDP matches
             // bind port+offset, so the two coexist on the same number.
-            using var control = new MatchControlServer(orchestrator, config.Port, defaultArena: "training");
+            using var control = new MatchControlServer(orchestrator, config.Port, defaultArena: "slop_court");
             control.Start();
 
             // Handle Ctrl+C for graceful shutdown

@@ -33,9 +33,9 @@ public class Kit117SlotSemanticsTests
         // Normals 1-4 (slot indices 2, 6, 7, 8) each declare a DISTINCT air spec —
         // AirSlot1-4 are separate objects, not aliases of the ground spec.
         Assert.NotNull(Def.GetSlotAbility(2, true));   // Low Kick → Double Punch
-        Assert.NotNull(Def.GetSlotAbility(6, true));   // Roundhouse → Floating Kick
-        Assert.NotNull(Def.GetSlotAbility(7, true));   // Double Uppercut → High Kick
-        Assert.NotNull(Def.GetSlotAbility(8, true));   // Tornado Kick → Air Tornado
+        Assert.NotNull(Def.GetSlotAbility(6, true));   // Straight Punch → Floating Kick
+        Assert.NotNull(Def.GetSlotAbility(7, true));   // Sweeping Kick → High Kick
+        Assert.NotNull(Def.GetSlotAbility(8, true));   // Double Kick → Air Smash
         Assert.NotSame(Def.GetSlotAbility(2, false), Def.GetSlotAbility(2, true));
         Assert.NotSame(Def.GetSlotAbility(6, false), Def.GetSlotAbility(6, true));
         Assert.NotSame(Def.GetSlotAbility(7, false), Def.GetSlotAbility(7, true));
@@ -119,18 +119,24 @@ public class Kit117SlotSemanticsTests
     // ── E-slot Rising Dragon ──
 
     [Fact]
-    public void RisingDragon_Ground_LaunchesUpward()
+    public void RisingDragon_Ground_WindupThenLaunches()
     {
+        // Grounded cast = anti-air launcher: an 8-tick windup (rise_delay) keeps the body low
+        // so the tick-6/10 hitboxes connect on grounded opponents, THEN the burst launches.
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPy;
         state.VY = 0f;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.True(t0.VY > 10f, $"expected upward burst (VY>10), got VY={t0.VY:F3}");
-        Assert.True(t0.AnimLockTicks > 0);
+        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 1);
+        Assert.Equal(ActionState.Attacking, t1.State);
+        Assert.True(t1.AnimLockTicks > 0);
+        Assert.Equal(0f, t1.VY); // windup — still planted
+
+        // Past the 8-tick windup the sustained rise holds VY at rise_speed (11).
+        var t12 = TestHelpers.TickN(sim, TestHelpers.Input(), 11);
+        Assert.True(t12.VY > 10f, $"expected upward burst after the windup, got VY={t12.VY:F3}");
     }
 
     [Fact]
@@ -162,6 +168,131 @@ public class Kit117SlotSemanticsTests
         // Reset at activation (100 → 0), then the air-time counter +1s during the same tick.
         Assert.True(t0.AirTimeTicks < 2, $"expected FloatWindow reset, got AirTimeTicks={t0.AirTimeTicks}");
         Assert.True(t0.VY > 0f, $"expected upward burst in the air, got VY={t0.VY:F3}");
+    }
+    [Fact]
+    public void RisingDragon_CommitsToCameraFacing_NotTargetLock()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = GroundPy;
+        state.FacingYaw = 0f;       // target is in front of the old facing
+        state.AimYaw = MathF.PI;    // camera points behind the fighter
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var target = TestHelpers.NpcState(0f, 1f);
+        target.PY = GroundPy;
+        sim.RegisterEntity(100, Def, target);
+
+        var input = new InputState
+        {
+            ActiveSlot = 4,
+            AimYaw = 18000,          // camera direction: π radians
+            TargetEntityId = 100,    // prove target lock cannot override E
+        };
+        var afterStart = TestHelpers.TickN(sim, input, 1);
+
+        Assert.InRange(MathF.Abs(afterStart.FacingYaw - MathF.PI), 0f, 0.001f);
+        Assert.Equal(ActionState.Attacking, afterStart.State);
+    }
+
+
+    // ── Rising Dragon connect envelope (baked bones — the in-game path) ──
+    // User report (2026-08-19): hard to hit in-game despite an OffZ push. E's hitboxes are
+    // bone-anchored (RightHand/Head) and the attacker rises at rise_speed from tick 1, so the
+    // connect range depends on where the bake puts the hand/head at the spell_e frames AND how
+    // high the attacker already is at trigger tick 6. These sweep the grounded-victim distance
+    // to find the real envelope instead of trusting the authored OffZ.
+
+    [Theory]
+    [InlineData(0.5f)]
+    [InlineData(0.7f)]
+    [InlineData(1.0f)]
+    public void RisingDragon_Ground_ConnectsAtRange(float distance)
+    {
+        var baked = TestHelpers.LoadBakedData(Def);
+        Assert.NotNull(baked); // data/fightguy_skeleton.bin must be present (committed)
+
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPy;
+        player.FacingYaw = 0f; // facing +Z
+        sim.RegisterEntity(1, Def, player, baked);
+
+        var npc = TestHelpers.NpcState(0f, distance);
+        npc.PY = GroundPy;
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, Def, npc, baked);
+
+        // E press on tick 0; hitboxes trigger at tick 6, active through tick 30.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var npcAfter = sim.GetState(100);
+        Assert.True(npcAfter.DamagePercent > 0,
+            $"Rising Dragon should connect on a grounded victim at {distance}m, got {npcAfter.DamagePercent}");
+    }
+
+    [Theory]
+    [InlineData(1.5f)]
+    [InlineData(2.0f)]
+    public void RisingDragon_Ground_WhiffsBeyondReach(float distance)
+    {
+        // The connect envelope: the baked hitboxes reach ~1.4 m — past that the rising kick
+        // whiffs (no warp; AttackRange only drives target-lock rotation). Pins the reach so a
+        // future hitbox/offset change shows up as a failing test instead of a silent feel shift.
+        var baked = TestHelpers.LoadBakedData(Def);
+        Assert.NotNull(baked);
+
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPy;
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, Def, player, baked);
+
+        var npc = TestHelpers.NpcState(0f, distance);
+        npc.PY = GroundPy;
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, Def, npc, baked);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        Assert.Equal((ushort)0, sim.GetState(100).DamagePercent);
+    }
+
+    [Theory]
+    [InlineData(0.5f, 1.0f)]
+    [InlineData(0.7f, 1.5f)]
+    [InlineData(1.0f, 2.0f)]
+    public void RisingDragon_AirborneVictim_Connects(float distance, float height)
+    {
+        // The designed anti-air case: victim airborne at close range — the hitbox rides the
+        // attacker's rise, so it should catch a mid-air opponent the grounded one misses.
+        var baked = TestHelpers.LoadBakedData(Def);
+        Assert.NotNull(baked);
+
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPy;
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, Def, player, baked);
+
+        var npc = TestHelpers.NpcState(0f, distance);
+        npc.PY = GroundPy + height;
+        npc.IsGrounded = false;
+        npc.AirTimeTicks = 100;
+        npc.DamagePercent = 0;
+        sim.RegisterEntity(100, Def, npc, baked);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var npcAfter = sim.GetState(100);
+        Assert.True(npcAfter.DamagePercent > 0,
+            $"Rising Dragon should connect on an airborne victim at {distance}m/{height}m, got {npcAfter.DamagePercent}");
     }
 
     // ── Cooldowns on slots 6-11 (TickTimers fix) ──

@@ -91,7 +91,7 @@ public static partial class CharacterRegistry
                     // Jab: 5-frame startup, 9-frame active, ~24 total. Flat-ish send that
                     // resets neutral — too much KB at low % to link into a combo.
                     new() { DurationTicks = 24, IasaTicks = 21,
-                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 9, DurationTicks = 10, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip",Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Adaptive, Angle = 30, BaseKnockback = 4f, KnockbackGrowth = 20f }, StunTicks = 14, Interruptible = true } },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 6, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", Damage = 4f, Knockback = new() { Profile = KnockbackProfile.Adaptive, Angle = 30, BaseKnockback = 4f, KnockbackGrowth = 20f }, StunTicks = 14, Interruptible = true } },
                             AttackRange = 2.5f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
                 },
@@ -202,7 +202,7 @@ public static partial class CharacterRegistry
                     // dtilt/smash-style: telegraphed startup (14-27 active), big damage +
                     // high growth — the grounded kill move. Whiffs are punished.
                     new() { DurationTicks = 44, IasaTicks = 39,
-                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 14, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 8, BaseKnockback = 8f, KnockbackGrowth = 32f }, StunTicks = 22, Interruptible = true } },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 14, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 8, BaseKnockback = 8f, KnockbackGrowth = 32f }, StunTicks = 22, Interruptible = true } },
                             AttackRange = 2.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
                 },

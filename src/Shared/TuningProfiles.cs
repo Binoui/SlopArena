@@ -18,7 +18,7 @@ public static class TuningProfiles
 
     public static readonly Profile[] Profiles =
     {
-        new("base",       "shipped — stun 0.7×(mag+20), KV×0.11",       0.7f, 0.11f, 20f),
+        new("base",       "shipped (melee-soft, #149) — stun 0.45×mag, KV×0.17", 0.45f, 0.17f, 0f),
         new("old",        "pre-adoption — stun 0.5×mag, KV×0.14",        0.5f, 0.14f, 0f),
         new("stunx18",    "hitstun ×1.8 — stun 0.9×mag, KV×0.14",        0.9f, 0.14f, 0f),
         new("kv70",       "travel −50% — stun 0.5×mag, KV×0.10",         0.5f, 0.10f, 0f),

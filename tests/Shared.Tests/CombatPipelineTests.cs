@@ -109,12 +109,12 @@ public class CombatPipelineTests
                                  + afterLaunch.KVY * afterLaunch.KVY
                                  + afterLaunch.KVZ * afterLaunch.KVZ);
         Assert.True(kbMag > 0.4f,
-            $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.11 ≈ 0.43
+            $"NPC should have knockback from LMB hit, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.17 ≈ 0.66
 
         // HitstunTicks is forced by ResolveHits from the HitboxEvent,
         // ADR-0019 derives this from the resulting launch magnitude.
-        // Manki LMB = Light profile: mag 3.9 → stun 0.7·(3.9+20) = 16.
-        Assert.Equal(16, (int)afterLaunch.HitstunTicks);
+        // Manki LMB = Light profile: mag 3.9 → stun 0.45·3.9 = 1 (melee-soft, no floor).
+        Assert.Equal(1, (int)afterLaunch.HitstunTicks);
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -97,17 +97,19 @@ public class MoveDataAnalysisTests
 
     // ── DI trajectory delta (real sim: held DI through hitstun bends the flight) ──
 
-    /// <summary>Launch the victim with g2 Roundhouse's authored knockback, apply the given DI hold at
+    /// <summary>Launch the victim with g2 Straight Punch's authored knockback, apply the given DI hold at
     /// launch (via the sim's real ApplyDirectionalInfluence), hold the stick through hitstun, and
     /// return the landing point.</summary>
     private static (float PX, float PZ) FlightLanding(float diX, float diY)
     {
         var def = TestHelpers.FightGuyDef;
+        var hit = def.Slot2!.Stages[0].HitboxEvents[0];
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
-        state.DamagePercent = 8; // post-hit: 0% + g2 damage 8
-        Simulation.ApplyKnockback(ref state, 0f, 1f, 22, 6f, 32f, 8f, 20, def.Weight);
+        state.DamagePercent = (ushort)hit.Damage;
+        Simulation.ApplyKnockback(ref state, 0f, 1f, hit.Knockback.Angle, hit.Knockback.BaseKnockback,
+            hit.Knockback.KnockbackGrowth, hit.Damage, hit.StunTicks, def.Weight);
         state.DIX = diX; state.DIY = diY;
         Simulation.ApplyDirectionalInfluence(ref state);
         sim.RegisterEntity(1, def, state);
@@ -262,14 +264,15 @@ public class MoveDataAnalysisTests
     }
 
     [Fact]
-    public void TrueCombo_RoundhouseToLowKick_IsTrue_UnderMeleeShape()
+    public void TrueCombo_StraightPunchToLowKick_IsNotTrueAtZero_UnderMeleeSoft()
     {
-        // g2 Roundhouse → g1: pre-adoption it was frame-false (recovery 20 + trigger 4 = 24
-        // > stun) and out of reach. Under the melee shape g2's 0% stun is 0.7·(38.8+20) = 41
-        // ticks vs the 24-tick budget — the strong starter is now a real combo opener.
-        var result = ScriptedFollowUp(TestHelpers.FightGuyDef, 7 /* key 2 = slot 2 */, starterIasaTicks: 27, victimZ: 1.0f);
+        // g2 Straight Punch → g1: under the shipped melee-soft tuning (issue #149), there are
+        // no free true combos at 0%. Its hitstun cannot cover the actual 22-tick IASA plus
+        // g1's trigger budget, so the follow-up lands after stun. Combos are meant to emerge
+        // with damage %; this asserts the free-combo removal, not a bug.
+        var result = ScriptedFollowUp(TestHelpers.FightGuyDef, 7 /* key 2 = slot 2 */, starterIasaTicks: 22, victimZ: 1.0f);
 
-        Assert.True(result is { StunLeft: > 0 },
-            "g2→g1 must connect while the victim is in hitstun under the melee-shape curve");
+        Assert.False(result is { StunLeft: > 0 },
+            "g2→g1 must NOT be a true combo at 0% under melee-soft (free combos are removed)");
     }
 }

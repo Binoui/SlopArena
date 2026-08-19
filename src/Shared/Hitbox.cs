@@ -87,7 +87,7 @@ namespace SlopArena.Shared
         /// HitsMultipleOpponents; allocated at spawn. A reference field on a struct — the
         /// set is shared across the struct copies SpellResolver makes.
         /// </summary>
-        public HashSet<ulong> HitEntities;
+        public HashSet<ulong>? HitEntities;
 
         /// <summary>
         /// If true this hitbox never scans bodies: no HitResult, no damage, no knockback, and

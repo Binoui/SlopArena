@@ -61,16 +61,18 @@ namespace SlopArena.Shared
         // timing (stun vs IASA, the combo matrix) is preserved while launch distance shrinks.
         // Tune with tools/MoveDataReport: scripts/move-data.sh fightguy (or --kbm model presets).
         // 1.0 = raw formula.
-        // Shipped values = the Melee-shaped curve (matrix-validated: zero true combos at the
-        // old 0.5/0.14/0, real freeform links at 0.7/0.11/+20 — see docs/adr/0019).
-        public static float KbScaleFactor = 0.11f;
+        // Shipped values = the melee-soft profile (issue #149, 2026-08-18): stun 0.45×mag, no
+        // floor — 0% hits barely stun (no free true combos; combos emerge with damage %) — and
+        // KV ×0.17 (launch reads as a pop, not a glide). A/B-validated vs melee/melee-hot: all
+        // free true-combo edges removed at a slightly softer launch than the raw melee shape.
+        public static float KbScaleFactor = 0.17f;
 
         // KB-tuning lab knobs (read by the move-data tool's --kbm presets). Hitstun ticks =
         // StunCoefficient × (raw magnitude + MagBonus), min 1 — MagBonus is the Melee-style
         // "+18 floor" lever (damage-independent stun at low %), StunCoefficient the
         // stun-per-launch ratio.
-        public static float HitstunStunCoefficient = 0.7f;
-        public static float HitstunMagBonus = 20f;
+        public static float HitstunStunCoefficient = 0.45f;
+        public static float HitstunMagBonus = 0f;
         private const byte MaxAirDodges = 1;
 
         /// <summary>

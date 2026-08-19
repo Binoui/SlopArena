@@ -99,6 +99,7 @@ namespace SlopArena.Shared
 			ability.CharacterDef = def;
 			ability.Arena = _arena;
 			ability.Slot = slot;
+			ability.AirborneAtStart = !state.IsGrounded;
             var spec = def.GetSlotAbility(slot, !state.IsGrounded);
             // ADR-0015 §2 refinement (2026-08-12): momentum-preserve is an AERIAL property —
             // air attacks ride their trajectory. A GROUNDED activation stops the incoming
@@ -365,23 +366,24 @@ namespace SlopArena.Shared
         }
 
 		/// <summary>
-		/// Landing lag (issue #125 / ADR-0021 §3): when the character lands this tick while
-		/// an air-started ability whose stage declares <c>LandingLagTicks</c> is still active,
-		/// the aerial ENDS on the landing frame and the lock applies — no input, no movement —
-		/// unless the landing fell in an auto-cancel window (stage-elapsed <c>&lt;=
-		/// AutoCancelBeforeTicks</c> or <c>&gt;= AutoCancelAfterTicks</c>), in which case the
-		/// aerial ENDS with no lock at all (Melee's AC: no landing commitment). The landing lag
-		/// is the only cost — it no longer rides on top of the stage's remaining recovery + IASA.
-		/// All-zero fields = current behavior, landing never locks.
+		/// Landing lag (issue #125 / ADR-0021 §3) + aerial landing termination (drift fix):
+		/// when an AIR-STARTED ability (<see cref="ServerAbility.AirborneAtStart"/>) is still
+		/// active when the character lands, the aerial ENDS on the landing frame and — unless
+		/// the landing fell in an auto-cancel window — a no-input/no-movement lock applies for
+		/// the stage's <c>LandingLagTicks</c>. The termination is unconditional for aerials
+		/// (LandingLagTicks == 0 still ENDS the move, just with no lock): otherwise a grounded
+		/// aerial keeps the character in Attacking on the floor, which skips
+		/// ProcessNormalMovement's friction and lets a lunge move (Cyclone) drive the
+		/// character across the stage with only dash to stop it.
 		///
 		/// Detection: airborne at tick start + grounded after SimulateTick = a landing.
 		/// A ledge snap also flips IsGrounded but boosts VY (LedgeSnapUpwardBoost) — that is
 		/// not a landing, so the <c>VY &lt;= 0</c> guard excludes it. The spec is resolved with
-		/// the SAME airborne flag the move started with: only genuinely air-started moves
-		/// (<c>AirLmbCombo</c>, <c>AirChargeAttack</c>) read their airborne variant's landing
-		/// lag. A ground move that is launched and lands mid-move (e.g. a mutual LMB trade)
-		/// keeps its GROUND spec — its landing carries no lag, because the ground spec declares
-		/// none (ADR-0021 §3: landing lag belongs to aerials, not to ground normals).
+		/// the SAME airborne flag the move started with (<c>AirborneAtStart</c>): only
+		/// genuinely air-started moves read their airborne variant's landing lag. A ground move
+		/// that is launched and lands mid-move (e.g. a mutual LMB trade) keeps its GROUND
+		/// spec — its landing carries no lag, because the ground spec declares none
+		/// (ADR-0021 §3: landing lag belongs to aerials, not to ground normals).
 		///
 		/// Landing frame is pre-lock for committal escapes — by design (ADR-0021 §3): the
 		/// input gates (burst especially) run inside SimulateTick BEFORE this applies the lock,
@@ -390,46 +392,35 @@ namespace SlopArena.Shared
 		/// (costs a double jump) cancel on the landing frame; dash and abilities stay blocked
 		/// by their own gates, so there is no free cancel. Every later locked tick is fully gated.
 		/// </summary>
-		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded, bool startedAirborne)
+		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded, ServerAbility? activeAbility)
 		{
 			if (wasGrounded || !state.IsGrounded) return; // no landing this tick
 			if (state.VY > 0f) return;                    // ledge snap boost, not a landing
 			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming) return;
 			if (state.AttackSlot == 0 || state.LandingLagTicks > 0) return;
+			// Only AIR-started moves terminate on landing (drift fix). A ground move launched
+			// and landed mid-move keeps its ground behavior — no termination.
+			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
 
-			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: startedAirborne);
+			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
 			if (spec?.Stages is not { Length: > 0 }) return;
 			var stage = Simulation.ResolveStage(spec, state);
-			if (stage.LandingLagTicks == 0) return;
 
 			int elapsed = Simulation.ElapsedInStage(state, spec);
 			bool autoCancel = (stage.AutoCancelBeforeTicks > 0 && elapsed <= stage.AutoCancelBeforeTicks)
 				|| (stage.AutoCancelAfterTicks > 0 && elapsed >= stage.AutoCancelAfterTicks);
-			if (autoCancel)
-			{
-				// Auto-cancel landing: the move ends here — the player acts immediately
-				// instead of riding out the move's ground recovery. Same interrupt semantics
-				// as dash/IASA cancels: dropped without OnEnd, cooldown still applies
-				// (TickAbilities' cleanup), stale buffer cleared.
-				state.State = ActionState.Idle;
-				state.AttackSlot = 0;
-				state.ComboStage = 0;
-				state.AttackElapsedTicks = 0;
-				state.AnimLockTicks = 0;
-				state.BufferedSlot = 0;
-				return;
-			}
 
-			// Lag-zone landing (ADR-0021 §3): the aerial ENDS here — the same interrupt
-			// semantics as the auto-cancel branch (dropped without OnEnd, cooldown still
-			// applies via TickAbilities) — then the hard lock applies. The landing lag is the
-			// ONLY cost: no riding out the stage's remaining recovery + IASA.
+			// The aerial always ENDS on landing. Auto-cancel: end with no lock at all (Melee's
+			// AC: no landing commitment). Otherwise the landing lag (possibly 0) is the ONLY
+			// cost — no riding out the stage's remaining recovery + IASA.
 			state.State = ActionState.Idle;
 			state.AttackSlot = 0;
 			state.ComboStage = 0;
 			state.AttackElapsedTicks = 0;
 			state.AnimLockTicks = 0;
 			state.BufferedSlot = 0;
+			if (autoCancel)
+				return;
 			state.LandingLagTicks = stage.LandingLagTicks;
         }
 
@@ -648,7 +639,7 @@ namespace SlopArena.Shared
 				// landing frame falls in an auto-cancel window. Only air-started moves resolve
 				// their airborne variant's landing lag (ground moves keep their ground spec).
 				_activeAbilities.TryGetValue(id, out var activeAbility);
-				ApplyLandingLag(ref state, def, wasGrounded, activeAbility is AirLmbCombo or AirChargeAttack);
+				ApplyLandingLag(ref state, def, wasGrounded, activeAbility);
 				_states[id] = state;
 			}
 
@@ -982,7 +973,6 @@ namespace SlopArena.Shared
 			// ── Step 3: Resolve hitboxes ──
 			var hits = _spellResolver.Tick(entityList);
 			LastTickHits.Clear();
-			LastTickHits.AddRange(hits);
 			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
@@ -1146,7 +1136,36 @@ namespace SlopArena.Shared
 					targetState.QueuedKVZ = targetState.KVZ;
 					targetState.QueuedKBStun = targetState.HitstunTicks;
 				}
+
+				float impactForce;
+				if (targetState.QueuedKVOverride)
+				{
+					impactForce = MathF.Sqrt(
+						targetState.QueuedKVX * targetState.QueuedKVX
+						+ targetState.QueuedKVY * targetState.QueuedKVY
+						+ targetState.QueuedKVZ * targetState.QueuedKVZ);
+				}
+				else if (hookSuppliedForce)
+				{
+					impactForce = MathF.Max(0f, kbForce);
+				}
+				else
+				{
+					float mass = MathF.Max(0.01f, _defs[hit.TargetEntityId].Weight + 100f);
+					impactForce = (launchBase
+						+ launchGrowth * (targetState.DamagePercent * 0.01f + 1f)
+						+ finalDamage * 0.1f) * 200f / mass * Simulation.KbScaleFactor;
+				}
+
+				var resolvedHit = hit;
+				resolvedHit.Damage = finalDamage;
+				resolvedHit.DirX = dirX;
+				resolvedHit.DirZ = dirZ;
+				resolvedHit.ImpactForce = impactForce;
+				resolvedHit.HitstopTicks = freeze;
+
 				_states[hit.TargetEntityId] = targetState;
+				LastTickHits.Add(resolvedHit);
 			}
 		}
 

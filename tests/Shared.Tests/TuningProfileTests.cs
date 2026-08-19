@@ -46,10 +46,11 @@ public class TuningProfileTests
     [Fact]
     public void ApplyBase_SetsShippedDefaults()
     {
+        // Shipped tuning is now the melee-soft profile (issue #149): stun 0.45×mag, KV×0.17, no floor.
         TuningProfiles.Apply("base");
-        Assert.Equal(0.7f, Simulation.HitstunStunCoefficient);
-        Assert.Equal(0.11f, Simulation.KbScaleFactor);
-        Assert.Equal(20f, Simulation.HitstunMagBonus);
+        Assert.Equal(0.45f, Simulation.HitstunStunCoefficient);
+        Assert.Equal(0.17f, Simulation.KbScaleFactor);
+        Assert.Equal(0f, Simulation.HitstunMagBonus);
     }
 
     [Fact]
@@ -73,7 +74,9 @@ public class TuningProfileTests
             Assert.Equal(0.14f, Simulation.KbScaleFactor);
             Assert.Equal(30f, Simulation.HitstunMagBonus);
         });
-        Assert.Equal(0.7f, Simulation.HitstunStunCoefficient); // restored
+        Assert.Equal(0.45f, Simulation.HitstunStunCoefficient); // restored to shipped (melee-soft)
+        Assert.Equal(0.17f, Simulation.KbScaleFactor);
+        Assert.Equal(0f, Simulation.HitstunMagBonus);
     }
 
     [Fact]
@@ -81,7 +84,7 @@ public class TuningProfileTests
     {
         TuningProfiles.Apply("base");
         Assert.False(TuningProfiles.TryApply("nope"));
-        Assert.Equal(0.7f, Simulation.HitstunStunCoefficient); // untouched
+        Assert.Equal(0.45f, Simulation.HitstunStunCoefficient); // untouched
         Assert.Throws<ArgumentException>(() => TuningProfiles.Apply("nope"));
     }
 

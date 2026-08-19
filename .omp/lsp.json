@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "omnisharp": {
+      "command": "/home/binoui/.dotnet/tools/omnisharp",
+      "args": ["-lsp"],
+      "fileTypes": [".cs"],
+      "languageId": "csharp",
+      "rootMarkers": [".git", ".omp", "Assets"]
+    }
+  }
+}

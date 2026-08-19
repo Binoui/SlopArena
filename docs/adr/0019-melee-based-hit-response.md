@@ -60,6 +60,25 @@ g1 Low Kick is FightGuy's combo hub (jab-jab, anti-air conversions, aerial links
 
 The tuning knobs live as statics (`Simulation.HitstunStunCoefficient`, `HitstunMagBonus`, `KbScaleFactor`) and are swept by the tool: `scripts/move-data.sh fightguy --truecombos --kbm <model>` (`base|old|stunx18|kv70|stun16kv11|floor30`).
 
+### 2b. Balance re-landing — melee-soft (2026-08-19, issue #149)
+
+The +20 floor delivered free true combos at 0% — against the intended "combos are earned with
+damage %". A/B'd three melee-family candidates (`melee` 0.4/0.19, `melee-hot` 0.4/0.22,
+`melee-soft` 0.45/0.17 — all floorMag 0) against the 0.7/+20/0.11 shipped via `AbDiffReport`.
+Adopted **melee-soft**:
+
+```
+k         = 0.45  (was 0.7)   — stun per unit launch, no floor
+floorMag  = 0     (was +20)   — no damage-independent floor: 0% hits barely stun
+KbScaleFactor = 0.17 (was 0.11) — launch reads as a pop, not a glide
+```
+
+Effect: **all 8 FightGuy free true-combo edges at 0% are gone** (combo graph `T→F`); combos
+emerge only as damage builds. `AbDiffReport` self-play telemetry shows damage/match dropping
+under the candidate — but the heuristic bot does not chase combos, so that delta is a bot-
+behavior artifact, not the tuning's truth (the combo-graph section is the honest read). Fixed
+tools keep the no-floor rule from §2a (grabs/yanks are `weight_set_knockback` analog).
+
 ### 3. Hitstop (Melee hitlag, pure shape, [#143])
 
 ```

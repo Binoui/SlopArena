@@ -23,30 +23,28 @@ public class ReachEnvelopeTests
     }
 
     [Fact]
-    public void ForwardReach_G2Roundhouse_MatchesHitboxExtent()
+    public void ForwardReach_G2StraightPunch_MatchesHitboxExtent()
     {
-        // g2 Roundhouse: OffZ=0.21, Radius=0.4 → reach = 0.61.
+        // g2 Straight Punch: OffZ=0.21, Radius=0.4 → reach = 0.61.
         float reach = HeuristicBotPolicy.ForwardReach(Def, AbilitySlots.Slot2, airborne: false);
         TestHelpers.AssertNear(0.61f, reach, 0.001f);
     }
 
     [Fact]
-    public void ForwardReach_A3HighKick_UsesForwardAxisNotSideways()
+    public void ForwardReach_A3HighKick_UsesForwardAxis()
     {
-        // a3 High Kick is a SIDE kick: OffX=0.43, OffZ=-0.16, Radius=0.4. The forward reach is
-        // OffZ+Radius = -0.16+0.4 = 0.24 — NOT hypot(0.43,0.16)+0.4 = 0.859 (sideways extent).
-        // This regression guards the over-pick that made the bot whiff a3 97% of the time.
+        // a3 High Kick: the authored forward offset is 0.14 with Radius=0.35, so the policy
+        // sees 0.49m of forward reach; animated side motion must not inflate that estimate.
         float reach = HeuristicBotPolicy.ForwardReach(Def, AbilitySlots.Slot3, airborne: true);
-        TestHelpers.AssertNear(0.24f, reach, 0.001f);
+        TestHelpers.AssertNear(0.49f, reach, 0.001f);
     }
 
     [Fact]
-    public void ForwardReach_A4AirTornado_IsNotTheSideHitbox()
+    public void ForwardReach_A4AirSmash_MatchesHitboxExtent()
     {
-        // a4 has one sideways/behind hitbox (OffX=-0.17, OffZ=-0.09, r=0.4) that must NOT inflate
-        // the reach: the forward extent from the OffZ=0 hitboxes is 0.4, not hypot+0.4 = 0.592.
+        // a4 Air Smash: OffZ=0.24, Radius=0.4 → reach = 0.64.
         float reach = HeuristicBotPolicy.ForwardReach(Def, AbilitySlots.Slot4, airborne: true);
-        TestHelpers.AssertNear(0.40f, reach, 0.001f);
+        TestHelpers.AssertNear(0.64f, reach, 0.001f);
     }
 
     [Fact]

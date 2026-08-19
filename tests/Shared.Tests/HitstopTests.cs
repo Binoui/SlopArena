@@ -75,6 +75,13 @@ public class HitstopTests
         Assert.Equal((ushort)0, atConnect.HitstunTicks);   // launch deferred
         Assert.Equal(0, (int)atConnect.HitstunLevel);      // tier still set at connect (stun 20 → light)
         Assert.Equal((ushort)4, atConnect.DamagePercent);
+        var impact = Assert.Single(sim.LastTickHits);
+        Assert.Equal((ushort)LmbFreeze, impact.HitstopTicks);
+        Assert.True(impact.ImpactForce > 0f);
+        Assert.Equal(1f, impact.DirZ, 4);
+        Assert.True(float.IsFinite(impact.HitX)
+            && float.IsFinite(impact.HitY)
+            && float.IsFinite(impact.HitZ));
         (float px, float py, float pz) frozenPos = (atConnect.PX, atConnect.PY, atConnect.PZ);
 
         // Ticks 12..21: frozen — position strictly unchanged, freeze countdown runs.
@@ -92,11 +99,11 @@ public class HitstopTests
         var atLaunch = sim.GetState(100);
         Assert.Equal((ushort)0, atLaunch.HitstopTicks);
         Assert.Equal(ActionState.Hitstun, atLaunch.State);
-        Assert.Equal((ushort)16, atLaunch.HitstunTicks);   // ADR-0019: 0.7·(Light mag 3.9 + 20)
+        Assert.Equal((ushort)1, atLaunch.HitstunTicks);   // ADR-0019: 0.45·(Light mag 3.9), melee-soft
         float kbMag = MathF.Sqrt(atLaunch.KVX * atLaunch.KVX
                                  + atLaunch.KVY * atLaunch.KVY
                                  + atLaunch.KVZ * atLaunch.KVZ);
-        Assert.True(kbMag > 0.4f, $"launch applied at freeze expiry, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.11 ≈ 0.43
+        Assert.True(kbMag > 0.4f, $"launch applied at freeze expiry, magnitude={kbMag:F3}"); // Light mag 3.9 × KV scale 0.17 ≈ 0.66
         Assert.True(atLaunch.PX == frozenPos.px && atLaunch.PY == frozenPos.py && atLaunch.PZ == frozenPos.pz,
             "launch tick itself must not move the victim (gate returns before physics)");
 

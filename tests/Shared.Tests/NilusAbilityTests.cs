@@ -865,14 +865,13 @@ public class NilusAbilityTests
         }
 
         float dragged = startZ - prevZ;
-        // Fixed-tool stun (0.7·force, no +20 launch floor — the floor would over-pull the
-        // reel and carry the victim through Nilus) puts the yank at the spec'd ~4 m
-        // (~3.9 m over the 45-tick window). The invariant this test guards (knockback
-        // survives hitstun and keeps closing) is unchanged; to retune the reach, bump the
-        // NilusData "pull_force" param. The post-stun coast brakes (GroundStopFriction)
-        // instead of a rush stop-dead: the rush-release stop is gated on the Run state
-        // (Simulation.cs), so a target that lands from a yank in Idle coasts to rest.
-        Assert.InRange(dragged, 3.0f, 4.5f);
+        // Fixed-tool stun (0.45·force, no +20 launch floor — melee-soft, #149) puts the yank
+        // at ~2 m over the 45-tick window (was ~4 m under the 0.7 coefficient). The invariant
+        // this test guards (knockback survives hitstun and keeps closing) is unchanged; to
+        // restore the reach, bump the NilusData "pull_force" param. The post-stun coast brakes
+        // (GroundStopFriction) instead of a rush stop-dead: the rush-release stop is gated on
+        // the Run state (Simulation.cs), so a target that lands from a yank in Idle coasts to rest.
+        Assert.InRange(dragged, 1.5f, 2.5f);
         Assert.True(prevZ > nilusZ && prevZ < startZ,
             $"the target must end between Nilus and where it stood, not through him: " +
             $"PZ={prevZ:F3}, Nilus {nilusZ:F3}, start {startZ:F3}");

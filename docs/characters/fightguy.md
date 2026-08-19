@@ -42,14 +42,14 @@ Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 | **AirLMB** | LMB (air) | Rising Kick | `spell_lmb_3` | Rising two-hit airborne uppercut | launcher into air combos |
 | **RMB** | RMB | Uppercut | `spell_rmb` | Charged uppercut — hold to charge, release to strike | more charge = more damage/stun, launcher |
 | **AirRMB** | RMB (air) | Helicopter | `spell_rmb_air` | Hold to charge aerial spinning heel drop; tap = quick spike, charged = heavy spike | spikes downward |
-| **Slot1** | 1 | Low Kick | `spell_g_1` | Fast low right-foot kick — jab-class poke | startup 2, ~17 total, IASA 13 |
+| **Slot1** | 1 | Low Kick | `spell_g_1` | Fast low right-foot kick — jab-class poke | startup 4, active 4–8, 17 total, IASA 13 |
 | **AirSlot1** | 1 (air) | Double Punch | `spell_a_1` | Left then right punch — fast air poke | two hitboxes (trig 6/16), ~33 total, IASA 29 |
-| **Slot2** | 2 | Roundhouse | `spell_g_2` | Roundhouse left kick — mid-range spacing normal | startup 8, ~29 total |
-| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Long static kick — nair-style lingering air hitbox | strong 7-11 + weak trailing 12-31/6-40, ~42 total, IASA 36 |
-| **Slot3** | 3 | Double Uppercut | `spell_g_3` | Low right-hand starter + rising right uppercut — anti-air launcher | hits at 12/20, ~39 total |
-| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High-reaching left-foot kick — aerial kill move | startup 13, ~44 total, IASA 41 |
-| **Slot4** | 4 | Tornado Kick | `spell_g_4` | Spinning right-foot tornado — 360° get-off-me | startup 18, 10-tick ring, ~49 total |
-| **AirSlot4** | 4 (air) | Air Tornado | `spell_a_4` | Tatsu-style spin — air combo starter; final hit launches out | distinct KB from ground: rakes 35°/24g, ender 25°/20g; ~49 total, IASA 46 |
+| **Slot2** | 2 | Straight Punch | `spell_g_2` | Fast right-hand forward check | startup 5, active 5–9, 25 total, IASA 22 |
+| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Body-to-left-foot sex kick — early sweetspot, late sourspot | sweet 7–11 + shared-hit sourspot 12–31, 42 total, IASA 36 |
+| **Slot3** | 3 | Sweeping Kick | `spell_g_3` | Wide right-foot side check that lifts rather than sends far | startup 7, active 7–12, 29 total, IASA 25 |
+| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High right-foot anti-air — sends up, not out | startup 14, active 14–19, 44 total, IASA 41 |
+| **Slot4** | 4 | Double Kick | `spell_g_4` | Two-foot heavy forward strike — grounded kill read | startup 10, active 10–16, 60 total, IASA 56 |
+| **AirSlot4** | 4 (air) | Air Smash | `spell_a_4` | Late right-hand forward aerial — horizontal kill read | startup 20, active 20–26, 54 total, IASA 50, landing lag 12 |
 | **Q** | Q | Ki Shot | `spell_q` | Aimed ki projectile; marks target 5s on hit | on the Q key (slot 11); AZERTY physical-A |
 | **E** | E | Rising Dragon | `spell_r_loop` | Upward mobility — rising kick: anti-air on ground, recovery burst in air (FloatWindow reset) | the up-B analog, `IsRecoveryMove`, ~4s CD |
 | **R** | R | Cyclone Kick | `spell_e` | Forward spinning kick ~10m; stuns enemies passed through | engage, moved from E |
@@ -80,7 +80,7 @@ Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 ## Gameplay
 
 ### Strengths
-- **Complete normal tier** — jab (LMB), spacing (1), anti-air (2), punish (3), get-off-me (4)
+- **Complete normal tier** — low poke (1), forward check (2), side-lift (3), and a slow grounded kill read (4), with distinct aerial roles
 - **Projectile pressure** — Ki Shot (Q) zones and marks; camera-aimed
 - **Strong engage** — Cyclone Kick (R) stun-lunges into follow-ups
 - **Excellent air game** — Rising Kick (AirLMB) launches, Helicopter (AirRMB) spikes
@@ -90,15 +90,15 @@ Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 - **Commit-heavy** — Cyclone (R) and Tempest (F) are all-in; whiffs are punished
 - **No zoning outside Ki Shot** — the normal tier is melee
 - **Recovery is one-shot** — Rising Dragon (E) has a long cooldown; off-stage mistakes cost the stock
-- **No defensive/armor tier in demo** — Tornado Kick (4) is the only escape, and it's a normal, not a save
+- **No defensive/armor tier in demo** — no panic normal; Double Kick and Air Smash are committed kill reads, not escapes
 
-### Combos
-1. Cyclone Kick (R) stun → jab (LMB) → Low Kick (1) — close-range burst
-2. Double Uppercut (3) launch → Rising Kick (AirLMB) or High Kick (air 3) — air combo
-3. Roundhouse (2) spacing → whiff punish on the recovery
-4. Tornado Kick (4) / Air Tornado (air 4) — get-off-me reset when pressured
-5. Ki Shot (Q) marks — setup hook for future execute synergy
-6. Tempest (F) → hold enemies in AoE → all abilities off cooldown
+### Normal roles
+1. **Low Kick (1)** — fast low poke; resets neutral rather than starting a guaranteed combo.
+2. **Straight Punch (2)** — brief forward check for an opponent approaching FightGuy's front.
+3. **Sweeping Kick (3)** — lateral/cross-up check that lifts the opponent for vertical pressure.
+4. **Double Kick (4)** — slow grounded horizontal kill read; both feet share one heavy hit.
+5. **Floating Kick (air 2)** — long body-covering aerial with a single strong early hit and weak late coverage.
+6. **High Kick (air 3) / Air Smash (air 4)** — high-angle anti-air versus a late, committed horizontal aerial kill read.
 
 ## Unity Pipeline Notes
 

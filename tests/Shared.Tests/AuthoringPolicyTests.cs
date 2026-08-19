@@ -66,7 +66,7 @@ public class AuthoringPolicyTests
         AssertAirNormal(def.AirSlot1!, "AirSlot1 (Double Punch)");
         AssertAirNormal(def.AirSlot2!, "AirSlot2 (Floating Kick)");
         AssertAirNormal(def.AirSlot3!, "AirSlot3 (High Kick)");
-        AssertAirNormal(def.AirSlot4!, "AirSlot4 (Air Tornado)");
+        AssertAirNormal(def.AirSlot4!, "AirSlot4 (Air Smash)");
     }
 
     private static void AssertAirNormal(AbilitySpec spec, string label)
