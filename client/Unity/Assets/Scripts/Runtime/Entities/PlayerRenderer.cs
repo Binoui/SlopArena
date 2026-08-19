@@ -221,6 +221,7 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public byte CurrentAttackSlot => _lastAttackSlot;
 
+
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
         public Animator Animator => _animancer != null ? _animancer.Animator : null;
 

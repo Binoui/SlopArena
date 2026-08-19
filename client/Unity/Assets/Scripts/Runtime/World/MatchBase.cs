@@ -56,6 +56,7 @@ namespace SlopArena.Client.World
             _pauseMenu = gameObject.AddComponent<MatchPauseMenu>();
             _pauseMenu.Init(_cameraMount, _inputController, LeaveMatch);
             OnMatchStart();
+            gameObject.AddComponent<MatchVisualStyle>().Apply();
         }
         private void FixedUpdate() => OnMatchFixedUpdate();
 

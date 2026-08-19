@@ -58,12 +58,13 @@ namespace SlopArena.Client.UI
             string? arenaDir = BakedContentPaths.ArenaDirectory();
             if (arenaDir != null) ArenaRegistry.LoadFromDirectory(arenaDir);
 
-            // Build stage cards from the loaded registry — a stage is offered iff
-            // its baked .arena parses with real collision AND a visual prefab exists
-            // (Resources/Stages/<name>.prefab); otherwise the player would fall
-            // through the floor or fight an invisible stage.
+            // Build player-facing stage cards from the loaded registry. The dedicated
+            // training laboratory remains loadable by development scenes but is not a
+            // selectable match arena. Every offered stage must also have real collision
+            // and a matching Resources/Stages prefab.
             foreach (var arena in ArenaRegistry.All)
             {
+                if (arena.Name == "training") continue;
                 string? baked = BakedContentPaths.ResolveArena(arena.Name);
                 if (baked == null) continue;
                 var arenaOpt = ArenaBinaryFormat.LoadFromFile(baked);

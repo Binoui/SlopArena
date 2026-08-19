@@ -668,8 +668,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a5c7f960d67611a7b5d3b2c502d1e9f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _hitSparkPrefab: {fileID: 7319708159770229219, guid: a2847fd8610022df6b5eeeda80b12862, type: 3}
-  _sparkLifetime: 1
 --- !u!1 &1386413332
 GameObject:
   m_ObjectHideFlags: 0
@@ -1250,7 +1248,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _npcAiMode
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _aimHandler

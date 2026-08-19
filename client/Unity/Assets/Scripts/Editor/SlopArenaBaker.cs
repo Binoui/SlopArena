@@ -143,11 +143,9 @@ public class SlopArenaBaker : EditorWindow
         // bladeAxis = the longest local-AABB span (the sword is straight), _weapon_tip =
         // the vertex with max projection on that axis, _weapon_hilt = the vertex with min
         // projection (the pommel). Both are hand-relative offsets transformed per frame by
-        // the hand's rotation (mirrors WeaponAttach.Update:
-        // go.transform.rotation = bone.rotation * Quaternion.Euler(RotationOffset)), so the
-        // baked points land EXACTLY on the visual blade — no rotated-AABB axis guesswork.
+        // the same WeaponEntry pose used by WeaponAttach.Update, so server hit geometry and
+        // the rendered blade share one animation-specific attachment track.
         WeaponEntry? weaponEntry = null;
-        Quaternion rotOffset = Quaternion.identity;
         Vector3 tipLocal = new Vector3(0f, 0f, 1.5f);
         Vector3 hiltLocal = Vector3.zero;
         bool bladeWarned = false;
@@ -155,7 +153,6 @@ public class SlopArenaBaker : EditorWindow
         {
             weaponEntry = Array.Find(weaponConfig.Entries, e => e.BoneName == "mixamorig:RightHand");
             if (weaponEntry == null) weaponEntry = weaponConfig.Entries[0];
-            rotOffset = Quaternion.Euler(weaponEntry.RotationOffset);
 
             bool derived = false;
             if (weaponEntry.Prefab != null)
@@ -292,18 +289,18 @@ public class SlopArenaBaker : EditorWindow
                         stream.Write(BitConverter.GetBytes(localPos.z), 0, 4);
                     }
 
-                    // Weapon tip + hilt: same Hips-relative space as the real bones, computed
-                    // from RightHand + the config's rotation offset (WeaponAttach.Update
-                    // formula) so they track the visual blade exactly. Hand-relative offsets
-                    // (tipLocal/hiltLocal) are constant — only the hand's rotation varies.
+                    // Weapon tip + hilt: same Hips-relative space as the real bones, using
+                    // the same bind-space attachment transform as WeaponAttach.Update.
                     if (weaponEntry != null)
                     {
                         Transform rightHand = tempAnimator.GetBoneTransform(HumanBodyBones.RightHand);
                         if (rightHand != null)
                         {
-                            Quaternion bladeRot = rightHand.rotation * rotOffset;
-                            WriteVec(stream, rightHand.position + bladeRot * tipLocal - hipsPos);
-                            WriteVec(stream, rightHand.position + bladeRot * hiltLocal - hipsPos);
+                            Vector3 bladePosition = rightHand.TransformPoint(weaponEntry.PositionOffset);
+                            Quaternion bladeRotation = rightHand.rotation
+                                * Quaternion.Euler(weaponEntry.RotationOffset);
+                            WriteVec(stream, bladePosition + bladeRotation * tipLocal - hipsPos);
+                            WriteVec(stream, bladePosition + bladeRotation * hiltLocal - hipsPos);
                         }
                         else
                         {

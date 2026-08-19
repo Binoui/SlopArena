@@ -9,7 +9,7 @@ namespace SlopArena.Client.UI
         public static GameMode Mode = GameMode.Training;
         public static SlopArena.Shared.CharacterClass PlayerClass
             = SlopArena.Shared.CharacterClass.FightGuy;
-        public static string ArenaName = "training";
+        public static string ArenaName = "slop_court";
         public static bool IsHost = true;
         public static string ServerIP = "127.0.0.1";
         public static int ServerPort = 9876;
@@ -44,7 +44,7 @@ namespace SlopArena.Client.UI
         {
             Mode = GameMode.Training;
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
-            ArenaName = "training";
+            ArenaName = "slop_court";
             IsHost = true;
             ServerIP = "127.0.0.1";
             ServerPort = 9876;

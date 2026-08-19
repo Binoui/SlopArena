@@ -17,6 +17,7 @@ namespace SlopArena.Client.Simulation
         private readonly NetworkClient _client;
         private readonly ulong _selfId;
         private uint _tick;
+        private readonly List<SpellResolver.HitResult> _lastTickHits = new();
 
         public RollbackSimulationBridge(ArenaDefinition arena, NetworkClient client, ulong selfEntityId, IMatchRule? rule = null)
         {
@@ -39,6 +40,8 @@ namespace SlopArena.Client.Simulation
             _tick++;
 
             _core.Tick(inputs);
+            _lastTickHits.Clear();
+            _lastTickHits.AddRange(_core.LastTickHits);
 
             var packets = _client.ReceiveEntityPackets();
             if (packets.Count == 0) return;
@@ -58,5 +61,6 @@ namespace SlopArena.Client.Simulation
         public CharacterState GetState(ulong id) => _core.GetState(id);
         public Dictionary<ulong, CharacterState> GetAllStates() => _core.GetAllStates();
         public SpellResolver? Resolver => _core.Resolver;
+        public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _lastTickHits;
     }
 }

@@ -1,42 +1,46 @@
-using System.Collections.Generic;
-
+using SlopArena.Client.Simulation;
 using SlopArena.Shared;
 using UnityEngine;
 
 namespace SlopArena.Client.Combat
 {
     /// <summary>
-    /// Reads hit results from ServerSimulation.LastTickHits after each tick
-    /// and triggers client-side combat feedback (VFX, etc.).
+    /// Converts accepted simulation hits into the shared light/medium/heavy/launch grammar.
+    /// Character-specific particles layer over this component rather than redefining strength.
     /// </summary>
-    public class CombatFeedback : MonoBehaviour
+    public sealed class CombatFeedback : MonoBehaviour
     {
-        [Header("VFX")]
-        [SerializeField] private GameObject _hitSparkPrefab;
-        [SerializeField] private float _sparkLifetime = 1f;
-        private readonly HashSet<ulong> _alreadyTriggered = new(); // per-tick dedup
-        private ServerSimulation _sim;
+        private const float MediumDamage = 6f;
+        private const float HeavyDamage = 11f;
+        private const float LaunchForce = 12f;
 
-        public void SetSimulation(ServerSimulation sim) => _sim = sim;
+        private ISimulationBridge _bridge;
 
-        /// <summary>Call after _localSim.Tick() each FixedUpdate.</summary>
+        public void SetSimulation(ISimulationBridge bridge)
+        {
+            _bridge = bridge;
+            GraphicHitEffect.Prewarm();
+        }
+
+        /// <summary>Call once after the bridge advances its simulation tick.</summary>
         public void OnTick()
         {
-            if (_sim == null) return;
-            _alreadyTriggered.Clear();
+            if (_bridge == null)
+                return;
 
-            foreach (var hit in _sim.LastTickHits)
-            {
-                if (!_alreadyTriggered.Add(hit.TargetEntityId)) continue; // one VFX per entity per tick
+            foreach (var hit in _bridge.LastTickHits)
+                GraphicHitEffect.Spawn(in hit, Classify(in hit));
+        }
 
-                if (_hitSparkPrefab != null)
-                {
-                    var targetState = _sim.GetState(hit.TargetEntityId);
-                    var sparkPos = new Vector3(targetState.PX, targetState.PY, targetState.PZ);
-                    var spark = Instantiate(_hitSparkPrefab, sparkPos, Quaternion.identity);
-                    Destroy(spark, _sparkLifetime);
-                }
-            }
+        public static ImpactTier Classify(in SpellResolver.HitResult hit)
+        {
+            if (hit.ImpactForce >= LaunchForce)
+                return ImpactTier.Launch;
+            if (hit.Damage >= HeavyDamage)
+                return ImpactTier.Heavy;
+            if (hit.Damage >= MediumDamage)
+                return ImpactTier.Medium;
+            return ImpactTier.Light;
         }
     }
 }

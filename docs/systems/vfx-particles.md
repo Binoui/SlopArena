@@ -1,32 +1,37 @@
-# VFX — Particle Systems
+# VFX — Combat Presentation
 
-> Client-side visual feedback for combat events. All VFX are Unity built-in Particle Systems
-> (Shuriken) spawned from prefabs. No VFX Graph (Phase 2+).
+> Client-side presentation driven by accepted server-simulation events. Shared impact
+> meshes communicate gameplay strength; particle trails and future character effects add flavor.
 
 ---
 
 ## Architecture
 
-### Hit Sparks
+### Shared impact grammar
 
 ```
 ServerSimulation.LastTickHits
+         │ accepted hits: contact, direction, damage, force, hitstop
+         ▼
+ISimulationBridge.LastTickHits
          │
          ▼
-  CombatFeedback.OnTick()    ← called each FixedUpdate after _localSim.Tick()
-         │
-         ├─ reads hit results (TargetEntityId, position)
-         ├─ deduplicates per tick (HashSet<ulong> _alreadyTriggered)
-         └─ Instantiate(_hitSparkPrefab, targetPos, identity) → Destroy(spark, lifetime)
+CombatFeedback.OnTick()
+         │ classify Light / Medium / Heavy / Launch
+         ▼
+GraphicHitEffect.Spawn()
+         └─ pooled GameObject + one dynamic mesh + one shared material
 ```
 
-**Key file:** `client/Unity/Assets/Scripts/Runtime/Combat/CombatFeedback.cs`
+**Key files:**
 
-- Single MonoBehaviour attached to the `TrainingMatch` GameObject
-- `SetSimulation(sim)` called on match start
-- Spawns the prefab at the target's world position on each hit
-- Prefab auto-destroys after `_sparkLifetime` (default 1s)
-- No object pooling (not needed at training-match scale)
+- `client/Unity/Assets/Scripts/Runtime/Combat/CombatFeedback.cs`
+- `client/Unity/Assets/Scripts/Runtime/Combat/GraphicHitEffect.cs`
+- `src/Shared/SpellResolver.cs`
+
+Training and PvP call the same `CombatFeedback` path after advancing their simulation bridge.
+The rollback bridge snapshots current-tick hits before reconciliation can replay local history.
+Ignored invincibility contacts and countered contacts are not emitted as accepted hit events.
 
 ### Bone Trail VFX
 
@@ -55,45 +60,26 @@ AbilitySpec.BoneTrails[]    ← per-ability data (BoneTrailDef struct)
 
 ---
 
-## HitSpark Prefab
+## Shared Impact Tiers
 
-**Path:** `Assets/Prefabs/VFX/HitSpark.prefab`
-**Material:** `Assets/Art/Materials/HitSpark.mat` (URP Particles/Unlit, Additive blending)
+| Tier | Classification | Shape |
+|------|----------------|-------|
+| Light | Damage below 6 and launch force below 12 | Compact ring, four short rays, small incoming stroke |
+| Medium | Damage 6–10 and launch force below 12 | Larger ring, six rays, directional wedge |
+| Heavy | Damage 11+ and launch force below 12 | Double core, nine rays, thick directional stroke |
+| Launch | Final launch force 12+ | Double ring, eleven rays, long launch-direction streaks |
 
-### Particle Module Configuration
+`SpellResolver.HitResult` carries the collision point. `ServerSimulation` adds the final
+attacker-to-target direction, post-hook damage, launch magnitude, and applied hitstop only
+after the hit passes invincibility and counter interception.
 
-| Module | Property | Value |
-|--------|----------|-------|
-| **Main** | Duration | 0.5s |
-| | Start Lifetime | 0.4s (constant) |
-| | Start Speed | Random 2-7 |
-| | Start Size | 0.3 (constant) |
-| | Max Particles | 50 |
-| | Looping | false |
-| | Play On Awake | true |
-| **Emission** | Rate over Time | 0 |
-| | Burst | 1 burst, 35 particles, 0s delay |
-| **Shape** | Type | Cone |
-| | Angle | 90° |
-| | Radius | 0.1 |
-| | Emit from | Volume |
-| **Size over Lifetime** | Enabled | true |
-| | Curve | 1.0 @ birth → 0.9 @ 10% life → 0.3 @ 40% → 0.05 @ death |
-| **Color over Lifetime** | Enabled | true |
-| | Gradient | #FFD700 (gold) → #FF4500 (orange) → #8B0000 (dark red), alpha 1→0 |
-| **Renderer** | Render Mode | Billboard |
-| | Material | HitSpark (URP Particles/Unlit) |
-| | Sort Mode | None |
+`GraphicHitEffect` prewarms 16 instances. Every active impact uses one `MeshRenderer`, one
+reused `Mesh`, and the same material. Vertex geometry and colors are rebuilt in cached lists;
+no child strokes or per-hit materials are allocated. The effect holds through hitstop, then
+expands and fades using unscaled time.
 
-### Behavior
-
-- Spawned at the **hit entity's world position** (from `CharacterState.PX/PY/PZ`)
-- Particles burst outward in a hemisphere-like cone (90° angle)
-- Gold flash that fades to orange then transparent with size shrinking
-- Additive blending makes sparks glow against dark/dim backgrounds
-- One VFX instance per hit entity per tick (dedup by `TargetEntityId`)
-
----
+The shared tier is deliberately character-neutral. Manki smoke/fire, Kistu blade fragments,
+FightGuy ki, and Nilus void effects must layer over it without changing its gameplay meaning.
 
 ## BoneTrail Prefab
 
@@ -154,50 +140,51 @@ No code changes needed — PlayerRenderer picks it up automatically.
 
 ---
 
-## Adding a New Particle VFX
+## Adding Character-Specific VFX
 
-1. **Create the prefab:** Build a ParticleSystem in the scene → configure modules → save as prefab
-2. **Wire combat feedback:** Assign prefab reference to CombatFeedback's serialized field (hit sparks)
-3. **Or wire bone trail:** Add `BoneTrails` data to the ability spec in the character's data file
-4. **Create material:** Save in `Assets/Art/Materials/` using URP Particles/Unlit with Additive blending
-5. **Commit:** Prefab + material + code changes
+1. Keep `CombatFeedback` tier classification unchanged.
+2. Add a character/move presentation layer driven by the accepted hit owner and active slot.
+3. Pool reusable effects and share materials.
+4. Align directional effects to `HitResult.DirX`, `DirZ`, and `KnockbackAngle`.
+5. Keep ordinary effects inside the shared tier's screen coverage; major launch and KO effects
+   may briefly exceed it.
 
 ---
 
 ## Current VFX State
 
-### Hit Sparks
-
 | VFX | Status | File |
 |-----|--------|------|
-| Hit sparks | ✅ Done | `HitSpark.prefab` + `CombatFeedback.cs` |
+| Shared impact tiers | Implemented | `GraphicHitEffect.cs` + `CombatFeedback.cs` |
+| Bone trails | Implemented | `BoneTrail.prefab` + `PlayerRenderer.cs` |
+| Character-specific hit layers | Not implemented | — |
 
-### Bone Trails (Active Abilities)
+### Authored bone trails
 
 | Character | Ability | Bone | Color | Status |
 |-----------|---------|------|-------|--------|
-| FightGuy | LMB / AirLMB | `mixamorig:RightHand` | Blue (0.3,0.6,1.0) | ✅ Done |
-| Manki | LMB / AirLMB | `mixamorig:RightHand` | Orange (1.0,0.6,0.0) | ✅ Done |
+| FightGuy | Authored attack stages | Stage-defined | Blue | Implemented |
+| Manki | Authored attack stages | Stage-defined | Orange | Implemented |
 
 ### Future
 
-| VFX | Status | Notes |
-|-----|--------|-------|
-| Dash trail | ❌ TODO | — |
-| Landing dust | ❌ TODO | — |
-| Manki flamethrower | ❌ TODO | SpellVFXManager |
-| Manki bomb explosion | ❌ TODO | SpellVFXManager |
-| Manki aerosol flame | ❌ TODO | SpellVFXManager |
-| FightGuy spell VFX | ❌ TODO | SpellVFXManager |
+| VFX | Status |
+|-----|--------|
+| Dash start and trail | Not implemented |
+| Jump and landing dust | Not implemented |
+| Manki flame and explosions | Not implemented |
+| Kistu blade fragments and glints | Not implemented |
+| FightGuy ki layer | Not implemented |
+| Nilus void layer | Not implemented |
+| KO and respawn presentation | Not implemented |
 
 ---
 
 ## References
 
 - `CombatFeedback.cs` — `client/Unity/Assets/Scripts/Runtime/Combat/CombatFeedback.cs`
+- `GraphicHitEffect.cs` — `client/Unity/Assets/Scripts/Runtime/Combat/GraphicHitEffect.cs`
 - `PlayerRenderer.cs` — `client/Unity/Assets/Scripts/Runtime/Entities/PlayerRenderer.cs`
-- HitSpark material — `Assets/Art/Materials/HitSpark.mat`
-- HitSpark prefab — `Assets/Prefabs/VFX/HitSpark.prefab`
-- BoneTrail prefab — `Assets/Resources/Prefabs/VFX/BoneTrail.prefab`
-- `BoneTrailDef` struct — `src/Shared/AbilitySpec.cs`
-- Design spec — `docs/superpowers/specs/2026-07-19-hit-spark-vfx-design.md`
+- BoneTrail prefab — `Assets/Resources/VFX/BoneTrail.prefab`
+- `BoneTrailDef` struct — `src/Shared/AttackData.cs`
+- Historical prototype spec — `docs/superpowers/specs/2026-07-19-hit-spark-vfx-design.md`

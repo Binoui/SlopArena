@@ -23,6 +23,7 @@ namespace SlopArena.Client.Simulation
         public CharacterState GetState(ulong id) => _server.GetState(id);
         public Dictionary<ulong, CharacterState> GetAllStates() => _server.GetAllStates();
         public SpellResolver? Resolver => _server.Resolver;
+        public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _server.LastTickHits;
         public ServerSimulation InternalSim => _server;
         public void SetRespawnPosition(ulong id, float x, float y, float z, float yaw = 0f)
             => _server.SetRespawnPosition(id, x, y, z, yaw);

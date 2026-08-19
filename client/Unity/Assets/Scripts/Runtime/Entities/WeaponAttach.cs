@@ -84,7 +84,7 @@ namespace SlopArena.Client.Entities
 
                 if (visible && _bones[i] != null)
                 {
-                    go.transform.position = _bones[i].position;
+                    go.transform.position = _bones[i].TransformPoint(_entries[i].PositionOffset);
                     go.transform.rotation = _bones[i].rotation
                         * Quaternion.Euler(_entries[i].RotationOffset);
                 }

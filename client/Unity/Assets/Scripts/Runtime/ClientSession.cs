@@ -108,7 +108,7 @@ namespace SlopArena.Client
             }
 
             UI.MatchConfig.Mode = UI.GameMode.PvP;
-            UI.MatchConfig.ArenaName = string.IsNullOrEmpty(config.ArenaName) ? "training" : config.ArenaName;
+            UI.MatchConfig.ArenaName = string.IsNullOrEmpty(config.ArenaName) ? "slop_court" : config.ArenaName;
             UI.MatchConfig.ServerPort = config.MatchPort > 0 ? config.MatchPort : UI.MatchConfig.ServerPort;
             // ServerIP is already set (host: localhost, joiner: server browser IP).
             UI.MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, Shared.CharacterClass.Manki);

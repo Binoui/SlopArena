@@ -7,6 +7,7 @@ using SlopArena.Shared;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
 using SlopArena.Client.Camera;
+using SlopArena.Client.Combat;
 using SlopArena.Client.UI;
 using SlopArena.Client.Network;
 using SlopArena.Client.Simulation;
@@ -25,6 +26,9 @@ namespace SlopArena.Client.World
 
         [Header("Network")]
         [SerializeField] private NetworkClient _networkClient;
+        [Header("Combat")]
+        [SerializeField] private CombatFeedback _combatFeedback;
+
 
         private readonly Dictionary<ulong, PlayerRenderer> _opponentRenderers = new();
         private PlayerRenderer[] _opponentArray = System.Array.Empty<PlayerRenderer>();
@@ -88,6 +92,11 @@ namespace SlopArena.Client.World
             _bridge = new RollbackSimulationBridge(arena, _networkClient, PlayerEntityId);
             _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
             SpawnStageVisual(arena);
+            if (_combatFeedback == null)
+                _combatFeedback = FindFirstObjectByType<CombatFeedback>();
+            if (_combatFeedback == null)
+                _combatFeedback = gameObject.AddComponent<CombatFeedback>();
+            _combatFeedback.SetSimulation(_bridge);
 
             // Character definitions
             var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
@@ -241,6 +250,7 @@ namespace SlopArena.Client.World
             {
                 { PlayerEntityId, input }
             });
+            _combatFeedback?.OnTick();
 
             _hudManager?.Refresh();
 

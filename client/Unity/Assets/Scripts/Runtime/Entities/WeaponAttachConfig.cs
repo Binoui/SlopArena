@@ -4,8 +4,9 @@ namespace SlopArena.Client.Entities
 {
     /// <summary>
     /// One weapon entry: which attack slot triggers it, which bone it follows,
-    /// which prefab to spawn (Resources-relative path), and an optional rotation offset.
+    /// which prefab to spawn, and its bind-space attachment transform.
     /// </summary>
+
     [System.Serializable]
     public class WeaponEntry
     {
@@ -18,8 +19,12 @@ namespace SlopArena.Client.Entities
         [Tooltip("Weapon prefab. Drag from Project view.")]
         public GameObject Prefab;
 
-        [Tooltip("Local rotation offset applied on top of the bone's rotation.")]
+        [Tooltip("Position in the attached bone's local bind space.")]
+        public Vector3 PositionOffset;
+
+        [Tooltip("Rotation in the attached bone's local bind space.")]
         public Vector3 RotationOffset;
+
     }
 
     /// <summary>

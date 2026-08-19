@@ -11,5 +11,6 @@ namespace SlopArena.Client.Simulation
         CharacterState GetState(ulong id);
         Dictionary<ulong, CharacterState> GetAllStates();
         SpellResolver? Resolver { get; }
+        IReadOnlyList<SpellResolver.HitResult> LastTickHits { get; }
     }
 }

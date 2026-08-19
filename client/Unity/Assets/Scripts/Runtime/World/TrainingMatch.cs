@@ -62,6 +62,17 @@ namespace SlopArena.Client.World
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
         private byte _npcLastDeaths;
+
+        // Presentation-only input seam used by VisualBaselineCaptureController. The
+        // normal training path leaves this null and continues to consume player input.
+        private InputState? _captureInputOverride;
+
+        public CharacterState GetCaptureState(ulong entityId) => _bridge.GetState(entityId);
+        public void SetCaptureState(ulong entityId, CharacterState state) =>
+            _bridge.InternalSim.SetState(entityId, state);
+        public IReadOnlyList<SpellResolver.HitResult> CaptureLastTickHits => _bridge.LastTickHits;
+        public void SetCaptureInput(InputState input) => _captureInputOverride = input;
+        public void ClearCaptureInput() => _captureInputOverride = null;
         protected override void OnMatchStart()
         {
             string arenaName = string.IsNullOrEmpty(_arenaNameOverride) ? MatchConfig.ArenaName : _arenaNameOverride;
@@ -92,7 +103,7 @@ namespace SlopArena.Client.World
             // Bridge (local). NoWinMatchRule: training never eliminates or ends —
             // the only way out is the Esc exit below (issue #37 follow-up).
             _bridge = new LocalSimulationBridge(arena, NoWinMatchRule.Instance);
-            _combatFeedback.SetSimulation(_bridge.InternalSim);
+            _combatFeedback.SetSimulation(_bridge);
             if (_projectileVFX == null)
                 _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
             _projectileVFX.SetSimulation(_bridge.InternalSim);
@@ -210,6 +221,8 @@ namespace SlopArena.Client.World
                 aimCtx: aimCtx,
                 canMove: null,
                 targetEntityId: targetEntityId);
+            if (_captureInputOverride.HasValue)
+                input = _captureInputOverride.Value;
 
             // NPC AI
             var npcState = _bridge.GetState(NpcEntityId);
