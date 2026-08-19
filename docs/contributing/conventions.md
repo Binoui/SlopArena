@@ -210,6 +210,25 @@ docs/
 If you clone fresh, you need access to `/mnt/storage` or re-import from the original
 `.unitypackage`. This keeps the repo under 50MB while the full project with assets is ~5GB.
 
+### Cartoon FX movement feedback
+
+`Cartoon FX Remaster Free` is an optional local Asset Store dependency. Its source files
+and SlopArena's derived prefab variants are not committed because this repository is
+public and the Standard Unity Asset Store EULA permits distribution only inside a built
+product.
+
+To enable movement feedback in a fresh checkout:
+
+1. Acquire and import `Cartoon FX Remaster Free` through the Unity Asset Store.
+2. Keep its source under an ignored third-party asset directory such as
+   `Assets/~AnimationPacks/`.
+3. Run **Tools > SlopArena > Setup Cartoon Movement VFX**.
+
+The setup command disables the package's incompatible Unity 6 soft-particle path,
+reimports its shaders for the active pipeline, and generates the ignored prefabs under
+`Assets/Resources/VFX/SlopArena/`. Without the dependency, the project still compiles and
+movement VFX loading is a no-op.
+
 ---
 
 ## 6. Character Kit Design Rules

@@ -238,6 +238,8 @@ namespace SlopArena.Client.Entities
         private bool _wasAttacking;
         private bool _attackAccentsEnabled;
         private bool _attackStartedGrounded;
+        private bool _hasAppliedState;
+        private MovementFeedbackEffect _dashTrail;
         private ulong _activeAccentWindowSignature;
         private ClipExtrapolator? _activeExtrapolator;
         private ExtrapolationMode _currentExtrapolationMode;
@@ -285,6 +287,15 @@ namespace SlopArena.Client.Entities
         {
             if (_animancer == null)
                 _animancer = GetComponent<AnimancerComponent>();
+            MovementFeedbackEffect.Prewarm();
+        }
+
+        private void OnDisable()
+        {
+            if (_dashTrail == null)
+                return;
+            _dashTrail.EndDashTrail();
+            _dashTrail = null;
         }
         private void Start()
         {
@@ -318,6 +329,8 @@ namespace SlopArena.Client.Entities
                 // Normal movement: snap directly (60Hz is fast enough)
                 transform.position = targetPos;
             }
+            UpdateDashFeedback(state, targetPos);
+            EmitMovementFeedback(state, targetPos);
 
             transform.rotation = Quaternion.Euler(0f, state.FacingYaw * Mathf.Rad2Deg, 0f);
             // Death flash blink
@@ -344,6 +357,79 @@ namespace SlopArena.Client.Entities
             UpdateAnimationState(state);
 
             _lastState = state;
+        }
+
+        private void UpdateDashFeedback(CharacterState state, Vector3 position)
+        {
+            if (state.State != ActionState.Dashing)
+            {
+                if (_dashTrail != null)
+                {
+                    _dashTrail.EndDashTrail();
+                    _dashTrail = null;
+                }
+                return;
+            }
+
+            Vector3 dashDirection = new(state.DashDirX, 0f, state.DashDirZ);
+            if (dashDirection.sqrMagnitude < 0.001f)
+                dashDirection = new Vector3(state.VX, 0f, state.VZ);
+            Vector3 trailDirection = -dashDirection;
+            if (_dashTrail == null)
+                _dashTrail = MovementFeedbackEffect.BeginDashTrail(position, trailDirection);
+            else
+                _dashTrail.FollowDashTrail(position, trailDirection);
+        }
+
+        private void EmitMovementFeedback(CharacterState state, Vector3 position)
+        {
+            if (!_hasAppliedState)
+            {
+                _hasAppliedState = true;
+                return;
+            }
+
+
+
+            bool tookOff = _lastState.IsGrounded && !state.IsGrounded;
+            bool doubleJumped = !_lastState.IsGrounded
+                && !state.IsGrounded
+                && state.JumpsLeft < _lastState.JumpsLeft;
+            if (doubleJumped)
+            {
+                MovementFeedbackEffect.Spawn(position, Vector3.down, MovementFeedbackKind.DoubleJump);
+            }
+            else if (tookOff && state.HitstunTicks == 0)
+            {
+                MovementFeedbackEffect.Spawn(position, Vector3.down, MovementFeedbackKind.Jump);
+            }
+
+            if (!_lastState.IsGrounded && state.IsGrounded)
+            {
+                float landingSpeed = Mathf.Max(0f, -_lastState.VY);
+                MovementFeedbackKind kind = landingSpeed >= 24f
+                    ? MovementFeedbackKind.HeavyLanding
+                    : MovementFeedbackKind.Landing;
+                MovementFeedbackEffect.Spawn(position, Vector3.up, kind);
+            }
+
+            if (_charDef != null && !state.IsGrounded && state.VY < 0f)
+            {
+                float fastFallSpeed = _charDef.Movement.FastFallSpeed;
+                bool isFastFall = Mathf.Abs(state.VY + fastFallSpeed) <= 0.25f;
+                bool wasFastFall = Mathf.Abs(_lastState.VY + fastFallSpeed) <= 0.25f;
+                if (isFastFall && !wasFastFall)
+                    MovementFeedbackEffect.Spawn(position, Vector3.up, MovementFeedbackKind.FastFall);
+            }
+
+            Vector3 knockback = new(state.KVX, state.KVY, state.KVZ);
+            Vector3 previousKnockback = new(_lastState.KVX, _lastState.KVY, _lastState.KVZ);
+            const float launchSpeed = 12f;
+            if (knockback.sqrMagnitude >= launchSpeed * launchSpeed
+                && previousKnockback.sqrMagnitude < launchSpeed * launchSpeed)
+            {
+                MovementFeedbackEffect.Spawn(position, -knockback, MovementFeedbackKind.Launch);
+            }
         }
 
         // ── Animancer-driven animation ──

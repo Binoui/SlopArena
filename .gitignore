@@ -129,6 +129,10 @@ client/Unity/Assets/~AnimationPacks.meta
 client/Unity/Assets/AnimationPacks/
 client/Unity/Assets/AnimationPacks.meta
 
+# Locally generated Cartoon FX variants (Asset Store source dependency)
+client/Unity/Assets/Resources/VFX/SlopArena/
+client/Unity/Assets/Resources/VFX/SlopArena.meta
+
 # Character art (models, textures, materials — non-redistributable)
 client/Unity/Assets/Art/
 client/Unity/Assets/Art.meta

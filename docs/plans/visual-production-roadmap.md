@@ -49,7 +49,6 @@ The target is not a collection of individually impressive assets. It is one cohe
 - Lighting, character materials, and rim treatment are not yet a locked style.
 - Existing bone ribbons look generic and overstate normal attacks.
 - No deliberate movement-start, jump, landing, fast-fall, launch-dust, KO, or respawn grammar.
-- No strength-tiered camera response.
 - Character-specific hit layers are mostly absent.
 - Functional HUD, menus, transitions, and results remain visually basic.
 - Combat audio has not received the same strength-tiered presentation pass.
@@ -77,33 +76,27 @@ Working contract:
   - Kistu: narrow blade arcs and glints.
   - Nilus: thin unstable void tears.
 
-**Gate:** Project-owner gameplay-camera approval replaces mandatory capture artifacts.
+**Gate:** Project-owner approval in the normal gameplay camera.
 FightGuy's full grounded/aerial normal set was approved on 2026-08-19: paths remain
 legible at gameplay zoom, effects clear before neutral, and normals remain visually
 distinct from specials. Character-specific rollout beyond FightGuy remains pending.
 
-### 1.2 Add restrained camera response
 
-- No shake for weak multihits.
-- Small, short impulse for medium hits.
-- Stronger but brief directional impulse for heavy hits.
-- Short FOV impulse or emphasis for launch and KO only.
-- Preserve stable framing and opponent visibility.
-- Presentation remains local and never affects simulation or aim.
+### 1.2 Add movement and environment feedback — first pass approved
 
-**Gate:** A blind review can distinguish medium, heavy, and launch contacts from camera plus impact presentation, while neutral movement remains stable.
+- Dash uses continuous world-space speed residue for the full authoritative dash state.
+- Jump and landing use smoke-only puffs; double jump and heavy landing add horizontal rings.
+- Fast fall and launch use short directional streaks.
+- `PlayerRenderer` derives every trigger from successive authoritative `CharacterState`
+  snapshots; presentation never changes movement or packets.
+- Repeated effects use per-kind pools with one lifecycle owner.
+- Cartoon FX Remaster Free supplies optional local source art; generated SlopArena variants
+  remain ignored under the Asset Store license. See `docs/contributing/conventions.md`.
 
-### 1.3 Add movement and environment feedback
+**Gate:** First gameplay-camera pass approved by the project owner on 2026-08-20. Bright/dark
+arena and PvP parity checks remain in `TESTING-UNITY.md`.
 
-- Dash-start accent and restrained speed residue.
-- Jump puff, double-jump accent, landing compression, and fast-fall streak.
-- Weight-scaled landing dust and launch dust.
-- Surface palette comes from the stage; timing comes from movement state transitions.
-- Pool all repeated effects.
-
-**Gate:** Run, dash, jump, double jump, fast fall, and landing are identifiable in a muted gameplay clip without debug UI.
-
-### 1.4 Add KO and respawn presentation
+### 1.3 Add KO and respawn presentation
 
 - Directional KO streak or boundary response.
 - Stock-loss emphasis without hiding remaining fighters.
@@ -112,7 +105,7 @@ distinct from specials. Character-specific rollout beyond FightGuy remains pendi
 
 **Gate:** A spectator can identify who was eliminated, from which direction, and when the fighter becomes controllable again.
 
-### 1.5 Establish combat-audio tiers
+### 1.4 Establish combat-audio tiers
 
 - Shared light, medium, heavy, launch, shield/defense, and KO categories.
 - Character layers supplement shared transient and low-end weight.
@@ -228,26 +221,26 @@ Apply the same system to:
 - Match loading and countdown.
 - Fight callout, stock loss, match end, results, and return to lobby.
 
-**Milestone gate:** A recorded flow from menu to results contains no visually unrelated screen, placeholder debug styling, or unexplained instantaneous transition.
+**Milestone gate:** Project-owner approval that a live flow from menu to results contains no visually unrelated screen, placeholder debug styling, or unexplained instantaneous transition.
 
-## Milestone 6 — Flagship proof
+## Milestone 6 — Flagship validation
 
-**Outcome:** Produce the artifact that demonstrates the game's promise to players and contributors.
+**Outcome:** Demonstrate the game's promise to players and contributors as one coherent live sequence.
 
-Use FightGuy plus the signature arena to capture a controlled 30-second sequence:
+Use FightGuy plus the signature arena to play a controlled sequence:
 
-1. Arena establishing shot.
+1. Arena introduction.
 2. Neutral movement.
 3. Dash, jump, and landing.
 4. Light and medium contacts.
 5. Character-flavored attack.
-6. Heavy launch with restrained camera response.
+6. Heavy launch.
 7. KO and respawn or match end.
 8. HUD and results presentation.
 
-Review the moving sequence, not selected frames. Fix discontinuities between systems before adding more assets.
+Review the sequence in motion at the normal gameplay camera. Fix discontinuities between systems before adding more assets.
 
-**Release gate:** The clip looks coherent in motion, communicates every major gameplay event without debug UI, and contains no effect or screen that clearly belongs to a different visual language.
+**Release gate:** Project-owner approval that the sequence looks coherent in motion, communicates every major gameplay event without debug UI, and contains no effect or screen that clearly belongs to a different visual language.
 
 ## Milestone 7 — Contributor launch
 
@@ -268,16 +261,13 @@ Do not begin with unrestricted “make a character” requests. Curated small wo
 
 The immediate queue is:
 
-1. Replace normal bone ribbons with restrained attack accents.
-2. Add strength-tiered camera response.
-3. Add movement and landing feedback.
-4. Validate and lock lighting plus the character-material family.
-5. Select and build the signature arena.
-6. Add KO/respawn and combat-audio tiers.
-7. Build FightGuy's complete presentation pass.
-8. Restyle HUD, match flow, and results.
-9. Capture the flagship proof.
-10. Package contributor guidance and starter tasks.
+1. Validate and lock lighting plus the character-material family.
+2. Select and build the signature arena.
+3. Add KO/respawn and combat-audio tiers.
+4. Build FightGuy's complete presentation pass.
+5. Restyle HUD, match flow, and results.
+6. Validate the flagship sequence.
+7. Package contributor guidance and starter tasks.
 
 Character ability completion remains the gameplay priority. Visual work should proceed as bounded slices that finish cleanly and do not create a parallel rewrite of combat, netcode, or stage collision.
 
@@ -290,7 +280,7 @@ A slice is complete only when:
 - Simulation state and packet formats remain unchanged unless separately designed and approved.
 - Repeated effects are pooled or otherwise allocation-safe.
 - Bright and dark stage readability is checked.
-- A before/after capture demonstrates the intended improvement.
+- The project owner approves the result in-game at the normal gameplay camera.
 - `TESTING-UNITY.md` contains the remaining human playtest checks.
 - Unity script compilation is clean.
 - Relevant system documentation describes the final contract.

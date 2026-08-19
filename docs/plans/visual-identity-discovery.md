@@ -47,7 +47,7 @@ Use him to validate shared systems:
 - Fighter/background separation.
 - Universal light, heavy, launch, and KO effects.
 - Movement dust and trails.
-- Camera feedback and HUD presentation.
+- HUD presentation.
 
 ### Kistu
 
@@ -99,15 +99,14 @@ For any eventual official asset, retain author, source, license, editable source
 
 Judge every result in the real gameplay camera:
 
-1. Neutral gameplay and representative arena captures — completed for the generated roster.
+1. Neutral gameplay and representative arenas — reviewed in the normal gameplay camera.
 2. Deliberate lighting and color treatment — first prototype implemented; not locked.
 3. Reusable graphic character material — first prototype implemented; not locked.
 4. Universal light, medium, heavy, and launch impact shapes — implemented.
 5. Normal-attack accents — FightGuy rollout approved in the gameplay camera; other
-   characters pending. Movement and landing feedback — next.
-6. Restrained strength-tiered camera feedback — pending.
-7. Before/after gameplay footage — optional evidence by explicit request; project-owner
-   gameplay-camera approval is the default visual gate.
-8. Store, generated, or commissioned assets — select only after the prototype demonstrates a specific gap.
+   characters pending. Movement and landing feedback — first pass approved; optional
+   Cartoon FX source setup documented for fresh checkouts.
+6. Project-owner in-game approval is the visual gate.
+7. Store, generated, or commissioned assets — select only after the prototype demonstrates a specific gap.
 
 Success is a coherent moving sequence, not an isolated promotional screenshot.
