@@ -1,12 +1,32 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen" style="background-image: none;">
-        <ui:Label name="title" text="SERVER BROWSER" class="title" />
-        <ui:VisualElement name="server-list" class="server-list" />
-        <ui:Label name="lbl-status" text="Loading..." class="subtitle" />
-        <ui:Button name="btn-refresh" text="REFRESH" class="btn-primary" />
-        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
-        <ui:VisualElement name="global-chat" class="global-chat">
+    <ui:VisualElement name="root" class="screen server-browser-screen">
+        <ui:VisualElement class="server-browser-backdrop">
+            <ui:VisualElement class="backdrop-grid" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--orange" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--yellow" />
+            <ui:Label text="FIND A CREW. START A MESS." class="backdrop-note backdrop-note--right" />
+        </ui:VisualElement>
+
+        <ui:Button name="btn-back" text="← BACK" class="btn-back server-browser-back" />
+        <ui:Label text="ONLINE // SERVER BROWSER" class="server-browser-eyebrow" />
+        <ui:Label name="title" text="SERVER BROWSER" class="server-browser-title" />
+        <ui:Label text="FIND A MATCH WORTH JOINING" class="server-browser-subtitle" />
+
+        <ui:VisualElement name="browser-panel" class="browser-panel">
+            <ui:VisualElement class="browser-panel__header">
+                <ui:Label text="ACTIVE ARENAS" class="browser-panel__eyebrow" />
+                <ui:Label text="PUBLIC ROOMS" class="browser-panel__capacity" />
+            </ui:VisualElement>
+            <ui:VisualElement name="server-list" class="server-list" />
+            <ui:Label name="lbl-status" text="Loading..." class="browser-status" />
+            <ui:VisualElement class="browser-panel__footer">
+                <ui:Label text="REFRESH THE LIST TO SCAN AGAIN" class="browser-hint" />
+                <ui:Button name="btn-refresh" text="REFRESH" class="btn-primary browser-refresh" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="global-chat" class="global-chat browser-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
                 <ui:Label text="1,204 ONLINE" class="global-chat__online" />

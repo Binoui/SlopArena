@@ -158,8 +158,9 @@ namespace SlopArena.Client.UI
             host.RegistrationFailed += onRegFailed;
             host.Crashed            += onCrashed;
 
-            // Spawn the server subprocess now that listeners are wired.
-            string hostIp = _hostIpField.value.Trim();
+            // The host address is optional for LAN/local hosting. Keep this
+            // null-safe so a stale UI asset cannot crash the async flow.
+            string hostIp = _hostIpField?.value?.Trim() ?? string.Empty;
             host.StartHosting(GenerateServerName(), string.IsNullOrEmpty(hostIp) ? null : hostIp);
 
             // Wait for registration, crash, or a 15s timeout. Pump() runs in

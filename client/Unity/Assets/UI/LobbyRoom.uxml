@@ -1,10 +1,32 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <ui:Style src="SlopArena.uss" />
-    <ui:VisualElement name="root" class="screen lobby-room">
-        <ui:Label name="title" text="LOBBY ROOM" class="title" />
-        <ui:Label name="lbl-server" text="" class="subtitle" />
-        <ui:VisualElement name="player-list" class="player-list lobby-list" />
-        <ui:VisualElement name="global-chat" class="global-chat">
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
+    <ui:VisualElement name="root" class="screen lobby-room-screen">
+        <ui:VisualElement class="lobby-backdrop">
+            <ui:VisualElement class="backdrop-grid" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--orange" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--yellow" />
+            <ui:Label text="SQUAD UP. PICK A FIGHT." class="backdrop-note backdrop-note--right" />
+        </ui:VisualElement>
+        <ui:Button name="btn-back" text="← BACK" class="btn-back lobby-back" />
+        <ui:Label text="MATCH SETUP // LOBBY ROOM" class="lobby-eyebrow" />
+        <ui:Label name="title" text="LOBBY ROOM" class="lobby-title" />
+        <ui:Label name="lbl-server" class="lobby-server" />
+        <ui:Label text="WAITING FOR THE CREW" class="lobby-subtitle" />
+        <ui:VisualElement name="lobby-panel" class="lobby-panel" style="position: relative; right: 413px; top: 276px; justify-content: center; align-self: center;">
+            <ui:VisualElement class="lobby-panel__header">
+                <ui:Label text="PLAYER ROSTER" class="lobby-panel__eyebrow" />
+                <ui:Label text="2–4 PLAYERS" class="lobby-panel__capacity" />
+            </ui:VisualElement>
+            <ui:VisualElement name="player-list" class="player-list lobby-list" />
+            <ui:VisualElement class="lobby-panel__footer">
+                <ui:Label name="lbl-status" text="Connecting..." class="lobby-status" />
+                <ui:VisualElement name="button-row" class="lobby-buttons">
+                    <ui:Button name="btn-leave" text="LEAVE" class="btn-secondary lobby-action lobby-action--leave" />
+                    <ui:Button name="btn-start" text="START MATCH" class="btn-primary lobby-action lobby-action--start" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="global-chat" class="global-chat lobby-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
                 <ui:Label text="1,204 ONLINE" class="global-chat__online" />
@@ -19,11 +41,5 @@
                 <ui:Button name="chat-send" text="➜" class="global-chat__send" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="button-row" class="lobby-buttons">
-            <ui:Button name="btn-leave" text="LEAVE" class="btn-secondary" />
-            <ui:Button name="btn-start" text="START" class="btn-primary" />
-        </ui:VisualElement>
-        <ui:Label name="lbl-status" text="Connecting..." class="subtitle" />
-        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
     </ui:VisualElement>
 </ui:UXML>

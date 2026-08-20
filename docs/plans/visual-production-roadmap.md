@@ -237,9 +237,12 @@ Propagate the approved HUD language through the playable loop in this order:
    supplies the dynamic cards.
 4. **Match bridge** — loading, countdown, `FIGHT`, stock loss/KO, match end, results,
    rematch/return actions.
-5. **Functional screens by reuse** — server browser, lobby, settings, and pause menu.
-   **Stage Select presentation pass complete:** shared poster shell, top-left back
-   action, global chat, host/waiting state, stage cards, and bottom player roster.
+5. **Functional screens by reuse — presentation pass complete:** Server Browser and
+   Lobby Room now use the poster shell, shared chat, roster/panel treatment, and
+   consistent action hierarchy. Hosting retains the Direct Connect modal and its
+   existing flow.
+   **Stage Select presentation pass complete:** shared poster shell, top-left
+   back action, global chat, host/waiting state, stage cards, and bottom player roster.
    Do not redesign these screens independently.
 
 
@@ -298,9 +301,12 @@ The immediate queue is:
    Training `P1`/bot cards, and shared chat shell.
 4. **Stage Select — presentation complete:** poster shell, shared chat, top-left
    back action, stage cards, host/waiting state, and bottom player roster.
-5. Complete loading/countdown, fight, KO, match-end, and results presentation.
-6. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
-7. After the demo gameplay gate, resume remaining arena, character-presentation,
+5. **Server Browser and Lobby Room — presentation complete:** poster-shell
+   compositions, active-server/player panels, shared chat, and consistent actions.
+   The Main Menu host/direct-connect contract is preserved.
+6. Complete loading/countdown, fight, KO, match-end, and results presentation.
+7. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
+8. After the demo gameplay gate, resume remaining arena, character-presentation,
    flagship, and contributor-launch milestones.
 
 Character ability completion remains the demo blocker and gameplay priority. Menu work is

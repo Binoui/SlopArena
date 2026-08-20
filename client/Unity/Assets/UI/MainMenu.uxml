@@ -74,8 +74,8 @@
             <ui:VisualElement name="submenu" class="menu-submenu">
                 <ui:Button name="btn-serverbrowser" text="SERVER BROWSER" class="menu-action menu-action--small menu-action--primary" />
                 <ui:Button name="btn-host" text="HOST A MATCH" class="menu-action menu-action--hot menu-action--small" />
-                <ui:VisualElement name="host-row" class="menu-input-row" />
                 <ui:Button name="btn-direct-connect" text="DIRECT CONNECT" class="menu-action menu-action--secondary menu-action--small" />
+                <ui:VisualElement name="host-row" class="menu-input-row" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="direct-connect-modal" class="direct-connect-modal" style="display: none;">
