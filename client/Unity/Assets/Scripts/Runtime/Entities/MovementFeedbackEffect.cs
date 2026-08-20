@@ -1,5 +1,7 @@
+#nullable enable
 using System.Collections.Generic;
 using UnityEngine;
+
 
 namespace SlopArena.Client.Entities
 {
@@ -12,6 +14,9 @@ namespace SlopArena.Client.Entities
         HeavyLanding,
         FastFall,
         Launch,
+        Knockout,
+        Respawn,
+        Invincibility,
         AirRing,
         GroundRing,
     }
@@ -71,21 +76,35 @@ namespace SlopArena.Client.Entities
                 SpawnOne(position, direction, MovementFeedbackKind.GroundRing);
                 return;
             }
-
+            if (kind == MovementFeedbackKind.Respawn)
+            {
+                SpawnRespawn(position, direction, Color.white);
+                return;
+            }
+            if (kind == MovementFeedbackKind.Knockout)
+            {
+                SpawnOne(position, direction, MovementFeedbackKind.Knockout);
+                return;
+            }
 
             SpawnOne(position, direction, kind);
         }
+        public static void SpawnRespawn(
+            Vector3 position, Vector3 direction, Color tint)
+        {
+            Prewarm();
+            SpawnOne(position, direction, MovementFeedbackKind.Respawn, tint);
+            SpawnOne(position, direction, MovementFeedbackKind.AirRing);
+        }
+
         public static MovementFeedbackEffect BeginDashTrail(Vector3 position, Vector3 direction)
         {
             Prewarm();
             GameObject prefab = LoadPrefab(MovementFeedbackKind.Dash);
             if (prefab == null)
                 return null;
-
             Stack<MovementFeedbackEffect> pool = PoolFor(MovementFeedbackKind.Dash);
-            MovementFeedbackEffect effect = null;
-            while (pool.Count > 0 && effect == null)
-                effect = pool.Pop();
+            MovementFeedbackEffect effect = PopReusable(pool);
             effect ??= CreateInstance(MovementFeedbackKind.Dash, prefab);
             effect.ShowContinuousDash(position, direction);
             return effect;
@@ -104,24 +123,65 @@ namespace SlopArena.Client.Entities
             if (!_continuous)
                 return;
             _continuous = false;
-            foreach (ParticleSystem particle in _particles)
-                particle.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            StopParticles(false);
             _releaseAt = Time.unscaledTime + 0.55f;
+        }
+        public static MovementFeedbackEffect BeginInvincibility(
+            Vector3 position, Color tint)
+        {
+            Prewarm();
+            GameObject prefab = LoadPrefab(MovementFeedbackKind.Invincibility);
+            if (prefab == null)
+                return null;
+            Stack<MovementFeedbackEffect> pool = PoolFor(MovementFeedbackKind.Invincibility);
+            MovementFeedbackEffect effect = PopReusable(pool);
+            effect ??= CreateInstance(MovementFeedbackKind.Invincibility, prefab);
+            effect.ShowContinuousInvincibility(position, tint);
+            return effect;
+        }
+
+        public void FollowInvincibility(Vector3 position)
+        {
+            if (!_continuous)
+                return;
+            transform.position = position;
+        }
+
+        public void EndInvincibility()
+        {
+            if (!_continuous)
+                return;
+            _continuous = false;
+            StopParticles(false);
+            _releaseAt = Time.unscaledTime + 0.35f;
         }
 
 
-        private static void SpawnOne(Vector3 position, Vector3 direction, MovementFeedbackKind kind)
+        private static void SpawnOne(
+            Vector3 position, Vector3 direction, MovementFeedbackKind kind, Color? tint = null)
         {
             GameObject prefab = LoadPrefab(kind);
             if (prefab == null)
                 return;
 
             Stack<MovementFeedbackEffect> pool = PoolFor(kind);
-            MovementFeedbackEffect effect = null;
-            while (pool.Count > 0 && effect == null)
-                effect = pool.Pop();
+            MovementFeedbackEffect effect = PopReusable(pool);
             effect ??= CreateInstance(kind, prefab);
-            effect.Show(position, direction);
+            effect.Show(position, direction, tint);
+        }
+        private static MovementFeedbackEffect PopReusable(
+            Stack<MovementFeedbackEffect> pool)
+        {
+            while (pool.Count > 0)
+            {
+                MovementFeedbackEffect effect = pool.Pop();
+                if (effect == null)
+                    continue;
+                if (effect.HasLiveParticles)
+                    return effect;
+                Destroy(effect.gameObject);
+            }
+            return null;
         }
 
         private static MovementFeedbackEffect CreateInstance(MovementFeedbackKind kind, GameObject prefab)
@@ -135,6 +195,11 @@ namespace SlopArena.Client.Entities
             GameObject visual = Instantiate(prefab, root.transform);
             visual.name = prefab.name;
             visual.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            foreach (MonoBehaviour behaviour in visual.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (behaviour.GetType().Name == "CFXR_Effect")
+                    behaviour.enabled = false;
+            }
 
             MovementFeedbackEffect effect = root.AddComponent<MovementFeedbackEffect>();
             effect._kind = kind;
@@ -148,14 +213,49 @@ namespace SlopArena.Client.Entities
             foreach (ParticleSystem particle in _particles)
             {
                 var main = particle.main;
-                main.loop = false;
-                if (_kind is MovementFeedbackKind.Dash or MovementFeedbackKind.FastFall or MovementFeedbackKind.Launch)
-                    main.duration = Mathf.Min(main.duration, 0.18f);
                 main.stopAction = ParticleSystemStopAction.None;
+                main.loop = false;
+                if (_kind is MovementFeedbackKind.Dash or MovementFeedbackKind.FastFall
+                    or MovementFeedbackKind.Launch)
+                    main.duration = Mathf.Min(main.duration, 0.18f);
+                if (_kind == MovementFeedbackKind.Knockout)
+                    main.duration = Mathf.Min(main.duration, 1.1f);
             }
         }
 
-        private void Show(Vector3 position, Vector3 direction)
+        private bool HasLiveParticles
+        {
+            get
+            {
+                if (_particles == null || _particles.Length == 0)
+                    return false;
+                foreach (ParticleSystem particle in _particles)
+                {
+                    if (particle == null)
+                        return false;
+                }
+                return true;
+            }
+        }
+
+        private void StopParticles(bool clear)
+        {
+            if (_particles == null)
+                return;
+            foreach (ParticleSystem particle in _particles)
+            {
+                if (particle == null)
+                    continue;
+                particle.Stop(
+                    true,
+                    clear
+                        ? ParticleSystemStopBehavior.StopEmittingAndClear
+                        : ParticleSystemStopBehavior.StopEmitting);
+            }
+        }
+
+        private void Show(
+            Vector3 position, Vector3 direction, Color? tint = null)
         {
             gameObject.SetActive(true);
             transform.position = position;
@@ -166,11 +266,43 @@ namespace SlopArena.Client.Entities
             {
                 particle.gameObject.SetActive(true);
                 particle.Clear(true);
+                if (tint.HasValue)
+                {
+                    var main = particle.main;
+                    main.startColor = new ParticleSystem.MinMaxGradient(tint.Value);
+                }
                 particle.Play(true);
             }
 
             _active = true;
             _releaseAt = Time.unscaledTime + LifetimeFor(_kind);
+        }
+        private void ShowContinuousInvincibility(Vector3 position, Color tint)
+        {
+            gameObject.SetActive(true);
+            transform.position = position;
+            transform.rotation = Quaternion.identity;
+            transform.localScale = Vector3.one * ScaleFor(MovementFeedbackKind.Invincibility);
+
+            foreach (ParticleSystem particle in _particles)
+            {
+                particle.gameObject.SetActive(true);
+                particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                particle.Clear(true);
+                var main = particle.main;
+                main.loop = true;
+                main.duration = 1f;
+                main.simulationSpace = ParticleSystemSimulationSpace.World;
+                main.startColor = new ParticleSystem.MinMaxGradient(tint);
+                main.maxParticles = 32;
+                var emission = particle.emission;
+                emission.rateOverTime = 5f;
+                particle.Play(true);
+            }
+
+            _active = true;
+            _continuous = true;
+            _releaseAt = float.PositiveInfinity;
         }
 
         private void ShowContinuousDash(Vector3 position, Vector3 direction)
@@ -183,6 +315,7 @@ namespace SlopArena.Client.Entities
             foreach (ParticleSystem particle in _particles)
             {
                 particle.gameObject.SetActive(true);
+                particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 particle.Clear(true);
                 var main = particle.main;
                 main.loop = true;
@@ -213,8 +346,7 @@ namespace SlopArena.Client.Entities
             if (!_active || _continuous || Time.unscaledTime < _releaseAt)
                 return;
 
-            foreach (ParticleSystem particle in _particles)
-                particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            StopParticles(true);
 
             _active = false;
             gameObject.SetActive(false);
@@ -245,6 +377,9 @@ namespace SlopArena.Client.Entities
             MovementFeedbackKind.HeavyLanding => 0.54f,
             MovementFeedbackKind.FastFall => 0.55f,
             MovementFeedbackKind.Launch => 0.65f,
+            MovementFeedbackKind.Knockout => 1.45f,
+            MovementFeedbackKind.Respawn => 0.95f,
+            MovementFeedbackKind.Invincibility => 0.62f,
             _ => 0.5f,
         };
 
@@ -254,17 +389,24 @@ namespace SlopArena.Client.Entities
             MovementFeedbackKind.AirRing => 0.8f,
             MovementFeedbackKind.GroundRing => 0.55f,
             MovementFeedbackKind.Launch => 0.65f,
+            MovementFeedbackKind.Knockout => 1.1f,
+            MovementFeedbackKind.Respawn => 1.0f,
             _ => 1.1f,
         };
 
         private static string ResourcePath(MovementFeedbackKind kind) => kind switch
         {
-            MovementFeedbackKind.Dash or MovementFeedbackKind.FastFall or MovementFeedbackKind.Launch
+            MovementFeedbackKind.Knockout
+                => "VFX/SlopArena/CFXR4 Wave Explosion Purple",
+            MovementFeedbackKind.Dash or MovementFeedbackKind.FastFall
+                or MovementFeedbackKind.Launch
                 => "VFX/SlopArena/MovementWindTrails",
             MovementFeedbackKind.Jump or MovementFeedbackKind.DoubleJump
                 or MovementFeedbackKind.Landing or MovementFeedbackKind.HeavyLanding
+                or MovementFeedbackKind.Respawn
                 => "VFX/SlopArena/MovementMagicPoof",
-            MovementFeedbackKind.AirRing => "VFX/SlopArena/MovementAirRing",
+            MovementFeedbackKind.Invincibility or MovementFeedbackKind.AirRing
+                => "VFX/SlopArena/MovementAirRing",
             MovementFeedbackKind.GroundRing => "VFX/SlopArena/MovementGroundHit",
             _ => null,
         };
@@ -296,6 +438,9 @@ namespace SlopArena.Client.Entities
             MovementFeedbackKind.HeavyLanding,
             MovementFeedbackKind.FastFall,
             MovementFeedbackKind.Launch,
+            MovementFeedbackKind.Knockout,
+            MovementFeedbackKind.Respawn,
+            MovementFeedbackKind.Invincibility,
             MovementFeedbackKind.AirRing,
             MovementFeedbackKind.GroundRing,
         };

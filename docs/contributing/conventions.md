@@ -226,8 +226,10 @@ To enable movement feedback in a fresh checkout:
 
 The setup command disables the package's incompatible Unity 6 soft-particle path,
 reimports its shaders for the active pipeline, and generates the ignored prefabs under
-`Assets/Resources/VFX/SlopArena/`. Without the dependency, the project still compiles and
-movement VFX loading is a no-op.
+`Assets/Resources/VFX/SlopArena/`. KO presentation uses the generated
+`CFXR4 Wave Explosion Purple` prefab at the resolved arena blast boundary; pooled
+instances disable `CFXR_Effect` self-destruction before playback. Without the dependency,
+the project still compiles and movement VFX loading is a no-op.
 
 ---
 

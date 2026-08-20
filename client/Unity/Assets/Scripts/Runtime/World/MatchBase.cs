@@ -78,13 +78,15 @@ namespace SlopArena.Client.World
 
         // ── Shared setup helpers ────────────────────────────────────────────
 
-        protected void SetupPlayerRenderer(CharacterDefinition def, BakedAnimationData? baked)
+        protected void SetupPlayerRenderer(
+            CharacterDefinition def, BakedAnimationData? baked, ArenaDefinition arena)
         {
             _playerRenderer.EntityId = PlayerEntityId;
             _playerRenderer.ModelYOffset = def.ModelYOffset;
             _playerRenderer.CapsuleRadius = def.CapsuleRadius;
             _playerRenderer.CapsuleHeight = def.CapsuleHeight;
             _playerRenderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
+            _playerRenderer.SetBlastLines(arena);
             _playerRenderer.SetBakedData(baked);
             _playerRenderer.SetCharacterDefinition(def);
 

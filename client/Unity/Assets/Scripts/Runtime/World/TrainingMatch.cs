@@ -62,7 +62,6 @@ namespace SlopArena.Client.World
 #endif
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
-        private byte _npcLastDeaths;
 
         // Presentation-only input seam used by VisualBaselineCaptureController. The
         // normal training path leaves this null and continues to consume player input.
@@ -125,7 +124,7 @@ namespace SlopArena.Client.World
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
             // explicitly — otherwise its damage % has no overhead panel.
-            SetupPlayerRenderer(playerDef, playerBaked);
+            SetupPlayerRenderer(playerDef, playerBaked, arena);
             SetupHUD(playerDef, new[]
             {
                 new HUDManager.HudPlayer(NpcEntityId, "P2", _npcClass, isLocal: false),
@@ -139,6 +138,7 @@ namespace SlopArena.Client.World
                 _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
                 _npcRenderer.CapsuleHeight = npcDef.CapsuleHeight;
                 _npcRenderer.HurtboxBoneDefs = npcDef.HurtboxBoneDefs;
+                _npcRenderer.SetBlastLines(arena);
                 _npcRenderer.SetBakedData(npcBaked);
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
@@ -170,8 +170,6 @@ namespace SlopArena.Client.World
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
             if (_npcRenderer != null)
                 _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
-            _npcLastDeaths = 0;
-
             // Set NPC respawn position (yaw preserves the old SpawnPoints[0] facing)
             _bridge.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ,
                 arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0].Yaw : 0f);
@@ -250,14 +248,6 @@ namespace SlopArena.Client.World
             }
             _npcMemory.LastTargetWasAttacking = IsThreatening(playerState);
 
-            // Track NPC death for visual feedback
-            var npcStateAfter = _bridge.GetState(NpcEntityId);
-            if (npcStateAfter.Deaths != _npcLastDeaths)
-            {
-                _npcLastDeaths = npcStateAfter.Deaths;
-                if (_npcRenderer != null)
-                    _npcRenderer.OnDeath();
-            }
             _projectileVFX?.OnTick();
             _combatFeedback.OnTick();
             _hudManager?.Refresh();

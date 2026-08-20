@@ -94,6 +94,35 @@ namespace SlopArena.Client.Entities
         private GameObject _modelInstance;
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
+        private ArenaCollision.BlastLines _blastLines;
+        private bool _hasBlastLines;
+
+        public void SetBlastLines(ArenaDefinition arena)
+        {
+            _blastLines = ArenaCollision.ResolveBlastLines(in arena);
+            _hasBlastLines = true;
+        }
+
+        private Vector3 KnockoutLimitPosition(CharacterState state)
+        {
+            Vector3 position = new(state.PX, state.PY + _modelYOffset, state.PZ);
+            if (!_hasBlastLines)
+                return position;
+
+            if (position.x < _blastLines.KillMinX)
+                position.x = _blastLines.KillMinX;
+            else if (position.x > _blastLines.KillMaxX)
+                position.x = _blastLines.KillMaxX;
+            if (position.z < _blastLines.KillMinZ)
+                position.z = _blastLines.KillMinZ;
+            else if (position.z > _blastLines.KillMaxZ)
+                position.z = _blastLines.KillMaxZ;
+            if (position.y < _blastLines.KillHeight + _modelYOffset)
+                position.y = _blastLines.KillHeight + _modelYOffset;
+            else if (position.y > _blastLines.KillTop + _modelYOffset)
+                position.y = _blastLines.KillTop + _modelYOffset;
+            return position;
+        }
 
         /// <summary>Character definition (capsule geometry, weight, baked bones) — set at spawn.</summary>
         public CharacterDefinition? CharacterDef => _charDef;
@@ -239,7 +268,11 @@ namespace SlopArena.Client.Entities
         private bool _attackAccentsEnabled;
         private bool _attackStartedGrounded;
         private bool _hasAppliedState;
+        private byte _lastPresentedDeaths;
+        private bool _hasPresentedDeaths;
         private MovementFeedbackEffect _dashTrail;
+        private MovementFeedbackEffect _respawnInvincibilityEffect;
+        private bool _respawnInvincibilityActive;
         private ulong _activeAccentWindowSignature;
         private ClipExtrapolator? _activeExtrapolator;
         private ExtrapolationMode _currentExtrapolationMode;
@@ -292,10 +325,17 @@ namespace SlopArena.Client.Entities
 
         private void OnDisable()
         {
-            if (_dashTrail == null)
-                return;
-            _dashTrail.EndDashTrail();
-            _dashTrail = null;
+            if (_dashTrail != null)
+            {
+                _dashTrail.EndDashTrail();
+                _dashTrail = null;
+            }
+            if (_respawnInvincibilityEffect != null)
+            {
+                _respawnInvincibilityEffect.EndInvincibility();
+                _respawnInvincibilityEffect = null;
+            }
+            _respawnInvincibilityActive = false;
         }
         private void Start()
         {
@@ -319,6 +359,16 @@ namespace SlopArena.Client.Entities
         {
             Vector3 targetPos = new Vector3(state.PX, state.PY + _modelYOffset, state.PZ);
 
+            bool stockTransition = _hasAppliedState
+                && state.Deaths != _lastState.Deaths
+                && (!_hasPresentedDeaths || state.Deaths != _lastPresentedDeaths);
+            if (stockTransition)
+            {
+                PresentStockTransition(_lastState, state, targetPos);
+                _lastPresentedDeaths = state.Deaths;
+                _hasPresentedDeaths = true;
+            }
+
             if (state.HitstunTicks > 0)
             {
                 // Smooth knockback: lerp toward server position
@@ -330,7 +380,9 @@ namespace SlopArena.Client.Entities
                 transform.position = targetPos;
             }
             UpdateDashFeedback(state, targetPos);
-            EmitMovementFeedback(state, targetPos);
+            if (!stockTransition)
+                EmitMovementFeedback(state, targetPos);
+            UpdateRespawnInvincibility(state, targetPos);
 
             transform.rotation = Quaternion.Euler(0f, state.FacingYaw * Mathf.Rad2Deg, 0f);
             // Death flash blink
@@ -357,7 +409,60 @@ namespace SlopArena.Client.Entities
             UpdateAnimationState(state);
 
             _lastState = state;
+            _hasAppliedState = true;
+            if (!_hasPresentedDeaths)
+            {
+                _lastPresentedDeaths = state.Deaths;
+                _hasPresentedDeaths = true;
+            }
         }
+
+        private void PresentStockTransition(
+            CharacterState previous, CharacterState respawned, Vector3 respawnPosition)
+        {
+            Vector3 deathDirection = new(previous.KVX, previous.KVY, previous.KVZ);
+            if (deathDirection.sqrMagnitude < 0.01f)
+                deathDirection = new(previous.VX, previous.VY, previous.VZ);
+            if (deathDirection.sqrMagnitude < 0.01f)
+                deathDirection = Vector3.up;
+
+            MovementFeedbackEffect.Spawn(
+                KnockoutLimitPosition(previous), deathDirection, MovementFeedbackKind.Knockout);
+            OnDeath();
+
+            if (respawned.InvincibilityTicks == 0)
+                return;
+
+            MovementFeedbackEffect.SpawnRespawn(
+                respawnPosition, Vector3.up, RespawnColor());
+            _respawnInvincibilityEffect?.EndInvincibility();
+            _respawnInvincibilityEffect = MovementFeedbackEffect.BeginInvincibility(
+                respawnPosition, RespawnColor());
+            _respawnInvincibilityActive = _respawnInvincibilityEffect != null;
+        }
+
+        private void UpdateRespawnInvincibility(CharacterState state, Vector3 position)
+        {
+            if (!_respawnInvincibilityActive)
+                return;
+            if (state.InvincibilityTicks == 0)
+            {
+                _respawnInvincibilityEffect?.EndInvincibility();
+                _respawnInvincibilityEffect = null;
+                _respawnInvincibilityActive = false;
+                return;
+            }
+            _respawnInvincibilityEffect?.FollowInvincibility(position);
+        }
+
+        private Color RespawnColor() => _charDef?.Class switch
+        {
+            CharacterClass.Manki => new Color(1f, 0.36f, 0.08f, 0.95f),
+            CharacterClass.FightGuy => new Color(0.28f, 0.72f, 1f, 0.95f),
+            CharacterClass.Kistu => new Color(0.76f, 0.9f, 1f, 0.95f),
+            CharacterClass.Nilus => new Color(0.72f, 0.36f, 1f, 0.95f),
+            _ => Color.white,
+        };
 
         private void UpdateDashFeedback(CharacterState state, Vector3 position)
         {
@@ -1071,7 +1176,6 @@ namespace SlopArena.Client.Entities
         {
             _animancer.Stop();
             _wasGrounded = true;
-            _lastState = default;
             _lastAnimState = default;
             _lastAttackSlot = 0;
             _lastComboStage = 0;
