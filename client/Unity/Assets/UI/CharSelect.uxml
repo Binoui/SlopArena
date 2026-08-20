@@ -53,5 +53,20 @@
         </ui:VisualElement>
         <ui:Button name="btn-select" text="SELECT" class="btn-primary" />
         <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+        <ui:VisualElement name="global-chat" class="global-chat">
+            <ui:VisualElement class="global-chat__header">
+                <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
+                <ui:Label text="1,204 ONLINE" class="global-chat__online" />
+            </ui:VisualElement>
+            <ui:VisualElement name="chat-feed" class="global-chat__feed">
+                <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="global-chat__message" />
+                <ui:Label text="slopqueen: pick your fighter" class="global-chat__message global-chat__message--accent" />
+                <ui:Label text="dude420: host is up, join fast" class="global-chat__message global-chat__message--hot" />
+            </ui:VisualElement>
+            <ui:VisualElement class="global-chat__input-row">
+                <ui:TextField name="chat-input" placeholdertext="type here…" class="global-chat__input" />
+                <ui:Button name="chat-send" text="➜" class="global-chat__send" />
+            </ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

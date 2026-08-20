@@ -1,6 +1,6 @@
 # SlopArena Visual Production Roadmap
 
-**Status:** Active execution roadmap — 2026-08-19  
+**Status:** Active execution roadmap — 2026-08-20
 **Direction source:** [`visual-identity-discovery.md`](visual-identity-discovery.md)  
 **Goal:** Make the mechanically complete demo look intentional, readable, and inviting enough to attract players and future contributors.
 
@@ -202,26 +202,48 @@ For each character:
 
 **Outcome:** The match no longer jumps between polished combat and prototype menus.
 
-### 5.1 Match HUD
+### 5.1 Match HUD — implementation complete, final visual check pending
 
-- Consistent typography and spacing.
-- Player-color system and portraits.
-- Readable damage escalation and stocks.
-- Clear target/lock state without debug-looking indicators.
-- Shared panel, icon, and accent-shape language.
+The match HUD now establishes the shell language:
 
-### 5.2 Frontend and transitions
+- Top-left vertical roster with player-color identity, portraits, damage, and stocks.
+- Percentage-only spatial markers using the same player colors.
+- Icon-first local ability rail with cooldown and press feedback.
+- Shared ink-black, dirty off-white, hard-accent, and slightly misregistered poster treatment.
+- Browser preview at `tools/hud-preview/` loads the real `Assets/UI/HUD.uss` through a
+  small USS-to-browser adapter for fast iteration. Unity remains the final renderer check.
 
-Apply the same system to:
+Close this slice with one bounded in-game review: `0%` through `999%` alignment,
+four-player spacing, and overhead-marker readability on bright and dark geometry.
 
-- Main menu.
-- Server browser.
-- Lobby and character select.
-- Stage select.
-- Match loading and countdown.
-- Fight callout, stock loss, match end, results, and return to lobby.
+### 5.2 Bounded frontend sprint
 
-**Milestone gate:** Project-owner approval that a live flow from menu to results contains no visually unrelated screen, placeholder debug styling, or unexplained instantaneous transition.
+Propagate the approved HUD language through the playable loop in this order:
+
+1. **Main menu — implementation complete.** The reference composition now uses the
+   underground fight-poster broadcast identity: title treatment, roster cards,
+   poster-strip actions, focus states, connection/version footer, and a direct
+   connect modal.
+2. **Shared global chat shell — presentation pass complete.** Main Menu, Lobby,
+   Lobby Room, Server Browser, Character Select, Stage Select, and Results now
+   use the same compact SC2/WoW-style chat panel. It remains presentation-only
+   until the master-server chat contract exists.
+3. **Character select** — player number/color ownership, portrait or splash treatment,
+   selected character, concise role phrase, and ready state.
+4. **Match bridge** — loading, countdown, `FIGHT`, stock loss/KO, match end, results,
+   rematch/return actions.
+5. **Functional screens by reuse** — server browser, lobby, stage select, settings, and
+   pause menu. Do not redesign these independently.
+
+Keep the sprint presentation-only. Reuse existing flow, state, and controls; do not build
+a new menu architecture, navigation system, or generalized design-system framework.
+
+**Stop condition:** once main menu → character select → fight → results reads as one
+coherent product, stop shell work and return to FightGuy-first character ability completion.
+
+
+**Milestone gate:** Project-owner approval that a live flow from menu to results contains
+no visually unrelated screen, placeholder debug styling, or unexplained instantaneous transition.
 
 ## Milestone 6 — Flagship validation
 
@@ -261,15 +283,19 @@ Do not begin with unrestricted “make a character” requests. Curated small wo
 
 The immediate queue is:
 
-1. Validate and lock lighting plus the character-material family.
-2. Select and build the signature arena.
-3. Add KO/respawn and combat-audio tiers.
-4. Build FightGuy's complete presentation pass.
-5. Restyle HUD, match flow, and results.
-6. Validate the flagship sequence.
-7. Package contributor guidance and starter tasks.
+1. Close the HUD with one final Unity visual check; avoid further open-ended polishing.
+2. **Main menu — complete:** underground fight-poster composition, shared chat shell,
+   and Direct Connect modal.
+3. Apply the approved composition and shared chat shell to character select.
+4. Complete loading/countdown, fight, KO, match-end, and results presentation.
+5. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
+6. After the demo gameplay gate, resume remaining arena, character-presentation, flagship,
+   and contributor-launch milestones.
 
-Character ability completion remains the gameplay priority. Visual work should proceed as bounded slices that finish cleanly and do not create a parallel rewrite of combat, netcode, or stage collision.
+Character ability completion remains the demo blocker and gameplay priority. Menu work is
+a short product-coherence pass, not a reason to defer the roster. Visual work must remain
+in bounded slices that do not create parallel rewrites of combat, netcode, navigation, or
+stage collision.
 
 ## Definition of done for every visual slice
 

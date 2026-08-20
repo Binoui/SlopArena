@@ -22,16 +22,20 @@ namespace SlopArena.Client.UI
             MatchConfig.Reset();
             var root = _uiDocument.rootVisualElement;
 
-            var submenu          = root.Q<VisualElement>("submenu");
-            var btnTraining      = root.Q<Button>("btn-training");
-            var btnMultiplayer   = root.Q<Button>("btn-multiplayer");
-            var btnHost          = root.Q<Button>("btn-host");
-            var btnJoin          = root.Q<Button>("btn-join");
-            var ipField          = root.Q<TextField>("ip-field");
-            var hostIpField      = root.Q<TextField>("host-ip-field");
-            _hostIpField        = hostIpField;
-            var btnServerBrowser = root.Q<Button>("btn-serverbrowser");
-            _lblHostStatus       = root.Q<Label>("lbl-host-status");
+            var submenu             = root.Q<VisualElement>("submenu");
+            var directConnectModal  = root.Q<VisualElement>("direct-connect-modal");
+            var btnTraining         = root.Q<Button>("btn-training");
+            var btnMultiplayer      = root.Q<Button>("btn-multiplayer");
+            var btnHost             = root.Q<Button>("btn-host");
+            var btnServerBrowser    = root.Q<Button>("btn-serverbrowser");
+            var btnDirectConnect    = root.Q<Button>("btn-direct-connect");
+            var btnModalClose       = root.Q<Button>("btn-modal-close");
+            var btnJoin             = root.Q<Button>("btn-join");
+            var ipField             = root.Q<TextField>("ip-field");
+            var hostIpField         = root.Q<TextField>("host-ip-field");
+            var directConnectStatus = root.Q<Label>("direct-connect-status");
+            _hostIpField            = hostIpField;
+            _lblHostStatus          = root.Q<Label>("lbl-host-status");
 
             btnTraining.clicked += () =>
             {
@@ -45,6 +49,20 @@ namespace SlopArena.Client.UI
                 bool visible = submenu.style.display == DisplayStyle.Flex;
                 submenu.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
             };
+            btnDirectConnect.clicked += () =>
+            {
+                directConnectModal.style.display = DisplayStyle.Flex;
+                directConnectStatus.text = string.Empty;
+                directConnectStatus.RemoveFromClassList("error");
+                directConnectStatus.RemoveFromClassList("success");
+                ipField.Focus();
+            };
+
+            btnModalClose.clicked += () =>
+            {
+                directConnectModal.style.display = DisplayStyle.None;
+            };
+
 
             // Embedded host-and-play (ADR-0005, issue #39): start the game
             // server as a subprocess, guest-auth with the master server, wait
@@ -59,7 +77,19 @@ namespace SlopArena.Client.UI
             btnJoin.clicked += () =>
             {
                 string ip = ipField.value.Trim();
-                if (string.IsNullOrEmpty(ip)) ip = "127.0.0.1";
+                directConnectStatus.RemoveFromClassList("error");
+                directConnectStatus.RemoveFromClassList("success");
+
+                if (string.IsNullOrEmpty(ip))
+                {
+                    directConnectStatus.text = "Enter an IP address or hostname.";
+                    directConnectStatus.AddToClassList("error");
+                    ipField.Focus();
+                    return;
+                }
+
+                directConnectStatus.text = "Joining " + ip + "...";
+                directConnectStatus.AddToClassList("success");
                 MatchConfig.Mode     = GameMode.PvP;
                 MatchConfig.IsHost   = false;
                 MatchConfig.ServerIP = ip;

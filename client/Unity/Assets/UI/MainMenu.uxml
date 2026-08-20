@@ -1,29 +1,95 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen" style="background-image: none;">
-        <ui:VisualElement name="center" class="center-col" />
-        <ui:VisualElement name="chat-panel" class="chat-panel" style="width: 511px; height: 238px;">
-            <ui:VisualElement class="chat-header">
-                <ui:Label text="# GLOBAL CHAT" class="chat-title" />
-                <ui:Label name="chat-online" text="1,204 online" class="chat-online" />
+    <ui:VisualElement name="root" class="screen menu-screen">
+        <ui:VisualElement name="backdrop" class="menu-backdrop">
+            <ui:VisualElement class="backdrop-grid" style="top: -460px; bottom: -252px; right: -455px; left: -123px;" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--orange" style="top: 82px; right: 32px;" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--yellow" />
+            <ui:Label text="NO CLEAN ROUNDS" class="backdrop-note backdrop-note--left" style="bottom: 818px; left: 836px;" />
+            <ui:Label text="PRESS START, CAUSE PROBLEMS" class="backdrop-note backdrop-note--right" style="bottom: 173px; right: 266px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="header" class="menu-header">
+            <ui:VisualElement name="title-wrap" class="menu-title-wrap">
+                <ui:Label text="UNDERGROUND BROADCAST // 01" class="menu-kicker" />
+                <ui:Label text="SLOP" class="menu-title menu-title--shadow" />
+                <ui:Label text="ARENA" class="menu-title menu-title--shadow menu-title--arena-shadow" />
+                <ui:VisualElement class="menu-title-face">
+                    <ui:Label name="title" text="SLOP" class="menu-title" />
+                    <ui:Label text="ARENA" class="menu-title menu-title--arena" />
+                </ui:VisualElement>
+                <ui:VisualElement class="menu-title-rule" />
+                <ui:Label text="WEIRDASS FIGHTERS. &#10;QUESTIONNABLE IDEAS." class="menu-tagline" />
             </ui:VisualElement>
-            <ui:VisualElement name="chat-feed" class="chat-feed" />
-            <ui:VisualElement class="chat-input-row">
-                <ui:TextField name="chat-input" placeholdertext="type here…" class="ip-input" />
-                <ui:Button name="chat-send" text="➜" class="chat-send" />
+            <ui:VisualElement name="status-area" class="menu-status">
+                <ui:Label name="online-count" text="4 CHARACTERS" class="menu-status-pill menu-status-pill--online" />
+                <ui:Label name="lbl-host-status" class="menu-status-pill menu-status-pill--host" style="display: none;" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement class="mp-panel" style="bottom: 322px; right: 562px;">
-            <ui:Button name="btn-training" text="Training" class="mp-header" style="height: 36px; margin-bottom: 4px; margin-top: 4px;" />
-            <ui:Button name="btn-multiplayer" text="MULTIPLAYER" class="mp-header" style="margin-top: 4px; margin-bottom: 4px;" />
-            <ui:VisualElement name="submenu" class="mp-body">
-                <ui:Button name="btn-serverbrowser" text="BROWSE SERVERS" class="menu-item" />
-                <ui:Button name="btn-host" text="HOST GAME" class="menu-item" />
-                <ui:VisualElement name="join-row" class="join-row">
-                    <ui:Button name="btn-join" text="JOIN GAME" class="menu-item menu-item--join" />
+        <ui:VisualElement name="center" class="menu-hero" />
+        <ui:VisualElement name="roster-panel" class="menu-roster">
+            <ui:Label text="LIVE ROSTER // 4 CHARACTERS" enable-rich-text="false" class="menu-roster-header" />
+            <ui:VisualElement class="menu-roster-card menu-roster-card--orange">
+                <ui:VisualElement class="menu-portrait menu-portrait--fightguy" />
+                <ui:VisualElement class="menu-roster-copy">
+                    <ui:Label text="FIGHTGUY" class="menu-fighter-name" />
+                    <ui:Label text="DISCIPLINE / BLUE-WHITE KI" class="menu-fighter-role" />
+                </ui:VisualElement>
+                <ui:Label text="P1" class="menu-player-badge" />
+            </ui:VisualElement>
+            <ui:VisualElement class="menu-roster-card menu-roster-card--blue">
+                <ui:VisualElement class="menu-portrait menu-portrait--manki" />
+                <ui:VisualElement class="menu-roster-copy">
+                    <ui:Label text="MANKI" class="menu-fighter-name" />
+                    <ui:Label text="MISCHIEF / EXPLOSIVES" class="menu-fighter-role" />
+                </ui:VisualElement>
+                <ui:Label text="P2" class="menu-player-badge" />
+            </ui:VisualElement>
+            <ui:VisualElement class="menu-roster-card menu-roster-card--green">
+                <ui:VisualElement class="menu-portrait menu-portrait--kistu" />
+                <ui:VisualElement class="menu-roster-copy">
+                    <ui:Label text="KISTU" class="menu-fighter-name" />
+                    <ui:Label text="BLADE / PRECISION" class="menu-fighter-role" />
+                </ui:VisualElement>
+                <ui:Label text="P3" class="menu-player-badge" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="global-chat" class="global-chat">
+            <ui:VisualElement class="global-chat__header">
+                <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
+                <ui:Label text="1,204 ONLINE" class="global-chat__online" />
+            </ui:VisualElement>
+            <ui:VisualElement name="chat-feed" class="global-chat__feed">
+                <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="global-chat__message" />
+                <ui:Label text="slopqueen: ranked when??" class="global-chat__message global-chat__message--accent" />
+                <ui:Label text="dude420: host is up, join fast" class="global-chat__message global-chat__message--hot" />
+            </ui:VisualElement>
+            <ui:VisualElement class="global-chat__input-row">
+                <ui:TextField name="chat-input" placeholdertext="type here…" class="global-chat__input" />
+                <ui:Button name="chat-send" text="➜" class="global-chat__send" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="menu-actions" style="bottom: 219px; left: 534px;">
+            <ui:Button name="btn-training" text="TRAINING" class="menu-action menu-action--primary" />
+            <ui:Button name="btn-multiplayer" text="JOIN A FIGHT" class="menu-action menu-action--secondary" />
+            <ui:VisualElement name="submenu" class="menu-submenu">
+                <ui:Button name="btn-serverbrowser" text="SERVER BROWSER" class="menu-action menu-action--small menu-action--primary" />
+                <ui:Button name="btn-host" text="HOST A MATCH" class="menu-action menu-action--hot menu-action--small" />
+                <ui:VisualElement name="host-row" class="menu-input-row" />
+                <ui:Button name="btn-direct-connect" text="DIRECT CONNECT" class="menu-action menu-action--secondary menu-action--small" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="direct-connect-modal" class="direct-connect-modal" style="display: none;">
+            <ui:VisualElement class="direct-connect-card">
+                <ui:Label text="DIRECT CONNECT" class="direct-connect-title" />
+                <ui:Label text="Enter a server address to join the fight." class="direct-connect-copy" />
+                <ui:TextField name="ip-field" value="127.0.0.1" placeholdertext="IP address or hostname" class="direct-connect-input" />
+                <ui:Label name="direct-connect-status" class="direct-connect-status" />
+                <ui:VisualElement class="direct-connect-actions">
+                    <ui:Button name="btn-modal-close" text="CANCEL" class="menu-action menu-action--secondary menu-action--small" />
+                    <ui:Button name="btn-join" text="JOIN FIGHT" class="menu-action menu-action--hot menu-action--small" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:Label text="v0.1 DEMO" class="version-pill" />
+        <ui:Label text="v0.2.0 DEMO // BUILD 03" class="menu-version" />
     </ui:VisualElement>
 </ui:UXML>
