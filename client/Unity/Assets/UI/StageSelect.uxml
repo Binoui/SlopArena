@@ -1,11 +1,29 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen" style="background-image: none; background-color: rgb(40, 42, 96);">
-        <ui:Label name="title" text="SELECT STAGE" class="title" />
+    <ui:VisualElement name="root" class="screen stage-select-screen">
+        <ui:VisualElement class="stage-backdrop">
+            <ui:VisualElement class="backdrop-grid" />
+            <ui:VisualElement class="backdrop-burst backdrop-burst--orange" />
+            <ui:Label text="PICK THE PLACE. CAUSE PROBLEMS." class="backdrop-note backdrop-note--right" />
+        </ui:VisualElement>
+
+        <ui:Button name="btn-back" text="← BACK" class="btn-back stage-back" />
+        <ui:Label name="eyebrow" text="MATCH SETUP // STAGE SELECT" class="stage-eyebrow" />
+        <ui:Label name="title" text="SELECT STAGE" class="stage-title" />
+        <ui:Label name="subtitle" text="CHOOSE THE BATTLEGROUND" class="stage-subtitle" />
+        <ui:Label name="lbl-host" text="HOST PICKS THE BATTLEGROUND" class="stage-host-status" />
+
         <ui:VisualElement name="stage-grid" class="stage-grid" />
-        <ui:Button name="btn-confirm" text="START MATCH" class="btn-primary" style="display: none;" />
-        <ui:Label name="lbl-waiting" text="Waiting for host to select stage..." class="subtitle" style="display: none;" />
-        <ui:Button name="btn-back" text="← BACK" class="btn-back" />
+
+        <ui:VisualElement name="bottom-panel" class="stage-bottom-panel">
+            <ui:VisualElement name="player-cards-area" class="stage-player-cards" />
+            <ui:VisualElement name="stage-action-area" class="stage-action-area">
+                <ui:Label name="lbl-selected-stage" text="NO STAGE SELECTED" class="stage-selected-label" />
+                <ui:Label name="lbl-waiting" text="WAITING FOR HOST" class="stage-waiting" style="display: none;" />
+                <ui:Button name="btn-confirm" text="START MATCH" class="btn-primary stage-confirm" style="display: none;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
         <ui:VisualElement name="global-chat" class="global-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />

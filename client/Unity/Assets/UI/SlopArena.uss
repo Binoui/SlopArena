@@ -1020,46 +1020,131 @@
     bottom: 8px;
 }
 
+.stage-select-screen {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(20, 17, 24);
+}
+
+.stage-backdrop {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+}
+
+.stage-backdrop .backdrop-grid {
+    top: -260px;
+    right: -180px;
+    bottom: -180px;
+    left: 410px;
+}
+
+.stage-backdrop .backdrop-burst {
+    top: 82px;
+    right: 72px;
+}
+
+.stage-eyebrow {
+    position: absolute;
+    left: 48px;
+    top: 38px;
+    color: rgb(255, 198, 35);
+    font-size: 10px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+}
+
+.stage-title {
+    position: absolute;
+    left: 48px;
+    top: 66px;
+    color: rgb(240, 238, 232);
+    font-size: 28px;
+    letter-spacing: 5px;
+    -unity-font-style: bold;
+}
+
+.stage-subtitle {
+    position: absolute;
+    left: 52px;
+    top: 105px;
+    color: rgb(122, 122, 153);
+    font-size: 10px;
+    letter-spacing: 2px;
+}
+
+.stage-host-status {
+    position: absolute;
+    right: 48px;
+    top: 48px;
+    color: rgb(240, 238, 232);
+    font-size: 10px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+}
+
+.stage-back {
+    position: absolute;
+    left: 32px;
+    top: 142px;
+    right: auto;
+    bottom: auto;
+}
+
 .stage-grid {
+    position: absolute;
+    left: 330px;
+    right: 48px;
+    top: 142px;
+    bottom: 235px;
     flex-direction: row;
     flex-wrap: wrap;
+    align-content: center;
     justify-content: center;
-    width: 100%;
-    max-width: 700px;
-    margin-bottom: 20px;
+    align-items: center;
 }
 
 .stage-card {
-    width: 180px;
-    height: 120px;
-    margin: 8px;
-    border-radius: 4px;
-    background-color: rgb(30, 30, 54);
+    width: 205px;
+    height: 122px;
+    margin: 7px;
+    border-radius: 0;
+    background-color: rgb(30, 27, 36);
     border-width: 1px;
-    border-color: rgb(46, 46, 80);
+    border-color: rgb(62, 57, 70);
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
     padding-bottom: 12px;
     overflow: hidden;
-    transition-duration: 0.1s;
-    transition-property: border-color, background-color;
+    transition-duration: 0.12s;
+    transition-property: translate, border-color, background-color;
 }
 
 .stage-card:hover {
+    translate: 0 -4px;
     border-color: rgb(224, 92, 42);
-    background-color: rgb(42, 42, 70);
+    background-color: rgb(42, 37, 46);
 }
 
 .stage-card--selected {
-    border-color: rgb(224, 92, 42);
+    translate: 0 -6px;
+    border-color: rgb(255, 198, 35);
     border-width: 2px;
-    background-color: rgb(42, 42, 70);
+    background-color: rgb(42, 37, 46);
 }
 
 .stage-card .stage-name {
-    font-size: 13px;
+    z-index: 1;
+    width: 100%;
+    padding: 8px 10px 0;
     color: rgb(240, 238, 232);
+    background-color: rgba(20, 17, 24, 0.82);
+    font-size: 12px;
     -unity-font-style: bold;
     letter-spacing: 2px;
     -unity-text-align: middle-center;
@@ -1068,10 +1153,56 @@
 .stage-swatch {
     position: absolute;
     top: 0;
-    left: 0;
     right: 0;
-    bottom: 32px;
-    opacity: 0.35;
+    bottom: 30px;
+    left: 0;
+    opacity: 0.52;
+}
+
+.stage-bottom-panel {
+    position: absolute;
+    right: 48px;
+    bottom: 24px;
+    left: 370px;
+    min-height: 132px;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.stage-player-cards {
+    flex-grow: 1;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+.stage-player-cards .player-card {
+    width: 142px;
+    height: 112px;
+    margin-right: 7px;
+}
+
+.stage-action-area {
+    width: 190px;
+    margin-left: 8px;
+    align-items: flex-end;
+}
+
+.stage-selected-label,
+.stage-waiting {
+    margin-bottom: 8px;
+    color: rgb(122, 122, 153);
+    font-size: 10px;
+    letter-spacing: 1px;
+    -unity-text-align: middle-right;
+}
+
+.stage-confirm {
+    width: 180px;
+    height: 40px;
+    border-radius: 0;
+    font-size: 11px;
 }
 
 .server-list {

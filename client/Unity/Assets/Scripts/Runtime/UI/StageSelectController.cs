@@ -4,25 +4,12 @@ using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Client;
 using SlopArena.Client.Network;
-using SlopArena.Client.UI;
 
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Stage select screen. Two modes:
-    /// <list type="bullet">
-    /// <item><b>Training</b> — pick a stage, click CONFIRM STAGE, go to Arena_Offline.</item>
-    /// <item><b>PvP</b> — reached from CharSelect once all players locked in
-    /// (the host's SELECT STAGE button broadcasts <c>StageSelect</c>). The host
-    /// picks the stage; non-hosts see a waiting label with disabled cards. The
-    /// host's CONFIRM STAGE calls <c>StartMatch(arena)</c> on the master server,
-    /// which launches the game server and broadcasts <c>MatchStarted</c>; every
-    /// client then loads Arena_PvP via <see cref="ClientSession.ApplyMatchStarted"/>.</item>
-    /// </list>
-    /// The registry is file-driven (loaded from the arena directory on enable);
-    /// a stage is offered iff its baked .arena parses with real collision AND a
-    /// visual prefab exists at Resources/Stages/&lt;name&gt;.prefab (issue #77:
-    /// hardcoded arenas carried no collision data and players fell through).
+    /// Stage select for Training and PvP. The stage registry remains file-driven;
+    /// this screen owns only presentation and the existing start-match flow.
     /// </summary>
     public class StageSelectController : MonoBehaviour
     {
@@ -30,38 +17,33 @@ namespace SlopArena.Client.UI
 
         private string _selectedArena = "";
         private Button _btnConfirm;
+        private Label _lblSelectedStage;
+        private Label _lblWaiting;
+        private VisualElement _playerCards;
         private LobbyClient _lobby;
 
         private void OnEnable()
         {
-            var root       = _uiDocument.rootVisualElement;
-            var grid       = root.Q<VisualElement>("stage-grid");
-            _btnConfirm    = root.Q<Button>("btn-confirm");
-            var lblWaiting = root.Q<Label>("lbl-waiting");
-            var btnBack    = root.Q<Button>("btn-back");
+            var root = _uiDocument.rootVisualElement;
+            var grid = root.Q<VisualElement>("stage-grid");
+            _btnConfirm = root.Q<Button>("btn-confirm");
+            _lblSelectedStage = root.Q<Label>("lbl-selected-stage");
+            _lblWaiting = root.Q<Label>("lbl-waiting");
+            _playerCards = root.Q<VisualElement>("player-cards-area");
+            var btnBack = root.Q<Button>("btn-back");
 
-            // Roster-based host check: MatchConfig.IsHost is false for every
-            // client on a dedicated server (alfred) — players join via the
-            // server browser — but the master still promotes the first joiner
-            // to lobby host. CharSelectController stashed the roster-based
-            // answer in ClientSession.IsLobbyHost.
             bool isHost = MatchConfig.Mode == GameMode.Training || ClientSession.IsLobbyHost;
-
-            Debug.Log($"[StageSelect] mode={MatchConfig.Mode} isHost={isHost} (lobbyHost={ClientSession.IsLobbyHost})");
-
-            // Host: confirm button hidden until a card is selected; client: show waiting label
             _btnConfirm.style.display = DisplayStyle.None;
-            lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
+            _lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
+            root.Q<Label>("lbl-host").text = isHost
+                ? "HOST PICKS THE BATTLEGROUND"
+                : "WAITING FOR HOST";
+            RenderPlayerCards();
 
-            // File-driven registry: load the baked arenas from disk (issue #77 —
-            // the old hardcoded ArenaRegistry list carried no collision data).
             string? arenaDir = BakedContentPaths.ArenaDirectory();
-            if (arenaDir != null) ArenaRegistry.LoadFromDirectory(arenaDir);
+            if (arenaDir != null)
+                ArenaRegistry.LoadFromDirectory(arenaDir);
 
-            // Build player-facing stage cards from the loaded registry. The dedicated
-            // training laboratory remains loadable by development scenes but is not a
-            // selectable match arena. Every offered stage must also have real collision
-            // and a matching Resources/Stages prefab.
             foreach (var arena in ArenaRegistry.All)
             {
                 if (arena.Name == "training") continue;
@@ -79,7 +61,6 @@ namespace SlopArena.Client.UI
                 };
                 card.AddToClassList("stage-card");
 
-                // Color swatch placeholder thumbnail
                 var swatch = new VisualElement();
                 swatch.AddToClassList("stage-swatch");
                 if (!string.IsNullOrEmpty(arena.PreviewColor) &&
@@ -88,27 +69,99 @@ namespace SlopArena.Client.UI
 
                 var label = new Label(arena.DisplayName ?? arena.Name.ToUpper());
                 label.AddToClassList("stage-name");
-
                 card.Add(swatch);
                 card.Add(label);
                 card.SetEnabled(isHost);
                 grid.Add(card);
             }
 
-            // PvP: the match starts over the lobby connection once the host
-            // confirms a stage. Keep the connection alive through the scene
-            // transition (issue #34); MatchStarted arrives here while everyone
-            // is still on this screen.
-            bool isPvP = MatchConfig.Mode == GameMode.PvP;
-            _lobby = isPvP ? ClientSession.ActiveLobby : null;
+            _lobby = MatchConfig.Mode == GameMode.PvP ? ClientSession.ActiveLobby : null;
             if (_lobby != null)
             {
                 _lobby.MatchStarted += OnMatchStarted;
-                _lobby.Error        += OnError;
+                _lobby.Error += OnError;
             }
 
             _btnConfirm.clicked += OnConfirmClicked;
             btnBack.clicked += () => SceneManager.LoadScene("CharSelect");
+        }
+
+        private void RenderPlayerCards()
+        {
+            if (_playerCards == null) return;
+            _playerCards.Clear();
+
+            if (MatchConfig.Mode == GameMode.Training)
+            {
+                _playerCards.Add(BuildPlayerCard("P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
+                _playerCards.Add(BuildPlayerCard("P2", "TRAINING BOT", CharacterClass.FightGuy, "BOT", false, false));
+                return;
+            }
+
+            var players = ClientSession.LobbyRoster?.Players;
+            if (players == null) return;
+            for (int i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                CharacterClass selectedClass;
+                bool hasCharacter = System.Enum.TryParse(player.CharacterSelection, true, out selectedClass);
+                _playerCards.Add(BuildPlayerCard(
+                    $"P{i + 1}",
+                    player.Name,
+                    hasCharacter ? selectedClass : (CharacterClass?)null,
+                    hasCharacter && player.LockedIn ? "LOCKED" : "WAITING",
+                    player.SteamId == ClientSession.SteamId,
+                    player.IsHost));
+            }
+        }
+
+        private VisualElement BuildPlayerCard(
+            string playerNumber,
+            string playerName,
+            CharacterClass? selectedClass,
+            string statusText,
+            bool local,
+            bool host)
+        {
+            var card = new VisualElement();
+            card.AddToClassList("player-card");
+            if (local) card.AddToClassList("player-card--local");
+
+            var identity = new VisualElement();
+            identity.AddToClassList("player-card__identity");
+            var number = new Label(playerNumber);
+            number.AddToClassList("player-card__number");
+            identity.Add(number);
+            var role = new Label(host ? "HOST" : "PLAYER");
+            role.AddToClassList("player-card__host");
+            identity.Add(role);
+            card.Add(identity);
+
+            var name = new Label(playerName);
+            name.AddToClassList("player-card__name");
+            card.Add(name);
+
+            if (selectedClass.HasValue)
+            {
+                var portrait = new VisualElement();
+                portrait.AddToClassList("player-card__portrait");
+                var texture = Resources.Load<Texture2D>($"UI/Portraits/{selectedClass.Value}");
+                if (texture != null)
+                    portrait.style.backgroundImage = new StyleBackground(texture);
+                card.Add(portrait);
+
+                var character = new Label(selectedClass.Value.ToString().ToUpper());
+                character.AddToClassList("player-card__character");
+                card.Add(character);
+            }
+
+            var status = new Label(statusText);
+            status.AddToClassList("player-card__status");
+            status.AddToClassList(statusText == "LOCKED" || statusText == "BOT" || statusText == "READY"
+                ? "player-card__status--locked"
+                : "player-card__status--picking");
+            card.Add(status);
+            return card;
         }
 
         private void OnConfirmClicked()
@@ -122,8 +175,6 @@ namespace SlopArena.Client.UI
                 return;
             }
 
-            // PvP: the host confirms the stage -> master launches the match
-            // with it and broadcasts MatchStarted (port + arena) to everyone.
             _btnConfirm.SetEnabled(false);
             if (_lobby == null)
             {
@@ -140,7 +191,7 @@ namespace SlopArena.Client.UI
             if (_lobby != null)
             {
                 _lobby.MatchStarted -= OnMatchStarted;
-                _lobby.Error        -= OnError;
+                _lobby.Error -= OnError;
             }
             ClientSession.ApplyMatchStarted(config);
         }
@@ -151,25 +202,20 @@ namespace SlopArena.Client.UI
             Debug.LogWarning($"[StageSelect] PvP error: {message}");
         }
 
-        private void Update()
-        {
-            // Marshals hub events onto the main thread (PvP mode only).
-            _lobby?.Pump();
-        }
+        private void Update() => _lobby?.Pump();
 
         private void OnDisable()
         {
             if (_lobby != null)
             {
                 _lobby.MatchStarted -= OnMatchStarted;
-                _lobby.Error        -= OnError;
+                _lobby.Error -= OnError;
             }
         }
 
         private void SelectStage(string name, VisualElement root)
         {
             _selectedArena = name;
-
             foreach (var card in root.Q<VisualElement>("stage-grid").Children())
             {
                 card.RemoveFromClassList("stage-card--selected");
@@ -177,6 +223,8 @@ namespace SlopArena.Client.UI
                     card.AddToClassList("stage-card--selected");
             }
 
+            _lblSelectedStage.text = $"STAGE: {name.Replace('_', ' ').ToUpperInvariant()}";
+            _lblWaiting.style.display = DisplayStyle.None;
             _btnConfirm.style.display = DisplayStyle.Flex;
         }
     }

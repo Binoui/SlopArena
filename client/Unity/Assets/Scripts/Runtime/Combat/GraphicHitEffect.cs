@@ -51,7 +51,8 @@ namespace SlopArena.Client.Combat
             GraphicHitEffect effect = null;
             while (Pool.Count > 0 && effect == null)
                 effect = Pool.Pop();
-            effect ??= CreateInstance();
+            if (effect == null)
+                effect = CreateInstance();
             effect.Show(in hit, tier);
         }
 
@@ -87,8 +88,10 @@ namespace SlopArena.Client.Combat
 
         private void Show(in SpellResolver.HitResult hit, ImpactTier tier)
         {
-            _renderCamera ??= UnityEngine.Camera.main;
-            _renderCamera ??= Object.FindFirstObjectByType<UnityEngine.Camera>();
+            if (_renderCamera == null)
+                _renderCamera = UnityEngine.Camera.main;
+            if (_renderCamera == null)
+                _renderCamera = Object.FindFirstObjectByType<UnityEngine.Camera>();
 
             transform.position = new Vector3(hit.HitX, hit.HitY, hit.HitZ);
             transform.rotation = _renderCamera != null ? _renderCamera.transform.rotation : Quaternion.identity;

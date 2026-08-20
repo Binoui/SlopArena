@@ -237,8 +237,11 @@ Propagate the approved HUD language through the playable loop in this order:
    supplies the dynamic cards.
 4. **Match bridge** — loading, countdown, `FIGHT`, stock loss/KO, match end, results,
    rematch/return actions.
-5. **Functional screens by reuse** — server browser, lobby, stage select, settings, and
-   pause menu. Do not redesign these independently.
+5. **Functional screens by reuse** — server browser, lobby, settings, and pause menu.
+   **Stage Select presentation pass complete:** shared poster shell, top-left back
+   action, global chat, host/waiting state, stage cards, and bottom player roster.
+   Do not redesign these screens independently.
+
 
 Keep the sprint presentation-only. Reuse existing flow, state, and controls; do not build
 a new menu architecture, navigation system, or generalized design-system framework.
@@ -293,10 +296,12 @@ The immediate queue is:
    and Direct Connect modal.
 3. **Character select — complete:** portrait roster, bottom lobby player cards,
    Training `P1`/bot cards, and shared chat shell.
-4. Complete loading/countdown, fight, KO, match-end, and results presentation.
-5. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
-6. After the demo gameplay gate, resume remaining arena, character-presentation, flagship,
-   and contributor-launch milestones.
+4. **Stage Select — presentation complete:** poster shell, shared chat, top-left
+   back action, stage cards, host/waiting state, and bottom player roster.
+5. Complete loading/countdown, fight, KO, match-end, and results presentation.
+6. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
+7. After the demo gameplay gate, resume remaining arena, character-presentation,
+   flagship, and contributor-launch milestones.
 
 Character ability completion remains the demo blocker and gameplay priority. Menu work is
 a short product-coherence pass, not a reason to defer the roster. Visual work must remain
