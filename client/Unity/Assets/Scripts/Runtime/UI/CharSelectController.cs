@@ -22,14 +22,8 @@ namespace SlopArena.Client.UI
     {
         [SerializeField] private UIDocument _uiDocument;
 
-        // Off-screen camera + model for 3D preview
-        [SerializeField] private UnityEngine.Camera _previewCamera;
-        [SerializeField] private RenderTexture _previewRenderTexture;
-        [SerializeField] private Transform _previewModelRoot;
-
         private CharacterClass _selected = CharacterClass.Manki;
         private readonly List<Button> _gridButtons = new();
-        private GameObject _currentModel;
 
         // PvP state
         private LobbyClient _lobby;
@@ -51,17 +45,13 @@ namespace SlopArena.Client.UI
             return playable.ToArray();
         }
 
-        // Ability card slot indices per class (issue #117): FightGuy rekeyed — Ki Shot on the
-        // Q slot (10); other kits still host their Q-tier ability on key "1" (slot 2) until
-        // their kit passes land. Matches GetSlotAbility indices, not key positions.
-        private static readonly int[] LegacyAbilityCardSlots = { 2, 3, 4, 5 };
-        private static readonly System.Collections.Generic.Dictionary<CharacterClass, int[]>
-            AbilityCardSlotsByClass = new()
-            {
-                { CharacterClass.FightGuy, new[] { 10, 3, 4, 5 } },
-            };
-        private static readonly string[] AbilitySlots =
-            { "ability-q", "ability-e", "ability-r", "ability-f" };
+        private static readonly System.Collections.Generic.Dictionary<CharacterClass, string> RolePhrases = new()
+        {
+            { CharacterClass.FightGuy, "DISCIPLINE / BLUE-WHITE KI" },
+            { CharacterClass.Manki, "MISCHIEF / EXPLOSIVES" },
+            { CharacterClass.Kistu, "BLADE / PRECISION" },
+            { CharacterClass.Nilus, "NATURE / CONTROL" },
+        };
 
         private void OnEnable()
         {
@@ -70,25 +60,32 @@ namespace SlopArena.Client.UI
             var grid = root.Q<VisualElement>("char-grid");
             grid.Clear();
 
-            // Build portrait buttons for each known character class
+            // Build large portrait cards from the playable character roster.
             foreach (var cls in Classes)
             {
                 var capturedCls = cls;
                 var btn = new Button(() => SelectCharacter(capturedCls, root))
                 {
-                    text = cls.ToString().ToUpper(),
                     name = $"char-{cls}"
                 };
                 btn.AddToClassList("char-card");
+
+                var portrait = new VisualElement { name = "char-portrait" };
+                portrait.AddToClassList("char-portrait");
+                var texture = Resources.Load<Texture2D>($"UI/Portraits/{cls}");
+                if (texture != null)
+                    portrait.style.backgroundImage = new StyleBackground(texture);
+
+                var name = new Label(cls.ToString().ToUpper()) { name = "char-card-name" };
+                name.AddToClassList("char-card-name");
+                var markers = new VisualElement { name = "char-markers" };
+                markers.AddToClassList("char-markers");
+
+                btn.Add(portrait);
+                btn.Add(name);
+                btn.Add(markers);
                 grid.Add(btn);
                 _gridButtons.Add(btn);
-            }
-
-            // Wire preview camera render texture to model-image element
-            if (_previewRenderTexture != null)
-            {
-                var modelImage = root.Q<VisualElement>("model-image");
-                modelImage.style.backgroundImage = Background.FromRenderTexture(_previewRenderTexture);
             }
 
             SelectCharacter(_selected, root);
@@ -96,14 +93,20 @@ namespace SlopArena.Client.UI
             if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(root);
             else
+            {
+                AddTrainingMarker();
                 InitTraining(root);
+            }
         }
-
-        // ── Training (single-player, unchanged) ──
-
         private void InitTraining(VisualElement root)
         {
-            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.None;
+            root.Q<Label>("roster-meta").text = $"{Classes.Length} FIGHTERS // TRAINING";
+            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
+            root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
+            root.Q<Button>("btn-select").style.display = DisplayStyle.Flex;
+
+            _rosterPanel = root.Q<VisualElement>("roster-panel");
+            RenderTrainingRoster();
 
             root.Q<Button>("btn-select").clicked += () =>
             {
@@ -118,18 +121,15 @@ namespace SlopArena.Client.UI
             };
         }
 
-        // ── PvP (multiplayer, issue #34) ──
-
         private void InitPvP(VisualElement root)
         {
             // Hide single-player SELECT button; show the PvP panel.
             root.Q<Button>("btn-select").style.display = DisplayStyle.None;
             root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
 
-            // Seed the roster from the stashed snapshot so the host check and
-            // roster render work before the first LobbyUpdated push arrives.
             _snapshot = ClientSession.LobbyRoster;
-
+            root.Q<Label>("roster-meta").text =
+                $"{Classes.Length} FIGHTERS // {_snapshot?.Players.Count ?? 0} PLAYERS";
             _rosterPanel   = root.Q<VisualElement>("roster-panel");
             _btnLockIn     = root.Q<Button>("btn-lockin");
             _btnStartMatch = root.Q<Button>("btn-start-match");
@@ -178,6 +178,7 @@ namespace SlopArena.Client.UI
             RenderRoster();
             UpdateStartMatchButton();
 
+            RenderCardMarkers();
             Debug.Log($"[CharSelect] InitPvP: isHost={isHost}, snapshot={_snapshot?.Players.Count ?? 0} players, " +
                 $"steamId={ClientSession.SteamId}");
         }
@@ -222,6 +223,7 @@ namespace SlopArena.Client.UI
             RenderRoster();
             UpdateStartMatchButton();
 
+            RenderCardMarkers();
             Debug.Log($"[CharSelect] LobbyUpdated: {DescribePlayers(snapshot)}");
         }
 
@@ -231,6 +233,7 @@ namespace SlopArena.Client.UI
             RenderRoster();
             UpdateStartMatchButton();
 
+            RenderCardMarkers();
             Debug.Log($"[CharSelect] CharacterSelected: {player.Name} locked={player.LockedIn} char={player.CharacterSelection} host={player.IsHost}");
         }
 
@@ -284,45 +287,91 @@ namespace SlopArena.Client.UI
             SceneManager.LoadScene("LobbyRoom");
         }
 
+        private void RenderTrainingRoster()
+        {
+            if (_rosterPanel == null) return;
+            _rosterPanel.Clear();
+            _rosterPanel.Add(BuildPlayerCard(
+                "P1", "YOU", _selected, "SELECTED", local: true, host: true));
+            _rosterPanel.Add(BuildPlayerCard(
+                "P2", "TRAINING BOT", CharacterClass.FightGuy, "BOT", local: false, host: false));
+        }
+
         private void RenderRoster()
         {
             if (_rosterPanel == null) return;
             _rosterPanel.Clear();
 
             var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
-
-            foreach (var p in players)
+            for (int i = 0; i < players.Count; i++)
             {
-                var row = new VisualElement();
-                row.AddToClassList("roster-row");
-
-                var name = new Label(p.Name) { name = "roster-name" };
-                name.AddToClassList("roster-name");
-
-                if (p.IsHost)
-                {
-                    var badge = new Label("HOST") { name = "roster-host" };
-                    badge.AddToClassList("roster-host");
-                    row.Add(badge);
-                }
-
-                row.Add(name);
-
-                var charLabel = new Label(p.CharacterSelection ?? "—") { name = "roster-char" };
-                charLabel.AddToClassList("roster-char");
-                if (!string.IsNullOrEmpty(p.CharacterSelection))
-                    charLabel.AddToClassList("roster-char--picked");
-
-                row.Add(charLabel);
-
-                var lockBadge = new Label(p.LockedIn ? "LOCKED" : "PICKING")
-                    { name = "roster-lock" };
-                lockBadge.AddToClassList("roster-lock");
-                lockBadge.AddToClassList(p.LockedIn ? "roster-lock--locked" : "roster-lock--picking");
-                row.Add(lockBadge);
-
-                _rosterPanel.Add(row);
+                var player = players[i];
+                CharacterClass selectedClass = CharacterClass.None;
+                bool hasCharacter = System.Enum.TryParse(
+                    player.CharacterSelection, true, out selectedClass);
+                _rosterPanel.Add(BuildPlayerCard(
+                    $"P{i + 1}",
+                    player.Name,
+                    hasCharacter ? selectedClass : (CharacterClass?)null,
+                    hasCharacter ? (player.LockedIn ? "LOCKED" : "PICKING") : "WAITING",
+                    player.SteamId == ClientSession.SteamId,
+                    player.IsHost));
             }
+        }
+
+        private VisualElement BuildPlayerCard(
+            string playerNumber,
+            string playerName,
+            CharacterClass? selectedClass,
+            string statusText,
+            bool local,
+            bool host)
+        {
+            var card = new VisualElement();
+            card.AddToClassList("player-card");
+            if (local) card.AddToClassList("player-card--local");
+
+            var identity = new VisualElement();
+            identity.AddToClassList("player-card__identity");
+            var number = new Label(playerNumber);
+            number.AddToClassList("player-card__number");
+            identity.Add(number);
+            var role = new Label(host ? "HOST" : "PLAYER");
+            role.AddToClassList("player-card__host");
+            identity.Add(role);
+            card.Add(identity);
+
+            var name = new Label(playerName);
+            name.AddToClassList("player-card__name");
+            card.Add(name);
+
+            if (selectedClass.HasValue)
+            {
+                var portrait = new VisualElement();
+                portrait.AddToClassList("player-card__portrait");
+                var texture = Resources.Load<Texture2D>($"UI/Portraits/{selectedClass.Value}");
+                if (texture != null)
+                    portrait.style.backgroundImage = new StyleBackground(texture);
+                card.Add(portrait);
+
+                var character = new Label(selectedClass.Value.ToString().ToUpper());
+                character.AddToClassList("player-card__character");
+                card.Add(character);
+            }
+            else
+            {
+                var waiting = new Label("WAITING FOR PLAYER");
+                waiting.AddToClassList("player-card__waiting");
+                card.Add(waiting);
+            }
+
+            var status = new Label(statusText);
+            status.AddToClassList("player-card__status");
+            status.AddToClassList(statusText == "LOCKED" || statusText == "BOT"
+                ? "player-card__status--locked"
+                : "player-card__status--picking");
+            card.Add(status);
+            return card;
         }
 
         private void UpdateStartMatchButton()
@@ -358,12 +407,24 @@ namespace SlopArena.Client.UI
         }
 
         // ── Shared ──
+        private void AddTrainingMarker()
+        {
+            var card = _uiDocument.rootVisualElement.Q<Button>($"char-{_selected}");
+            var markers = card?.Q<VisualElement>("char-markers");
+            if (markers == null) return;
+
+            var marker = new Label("P1 SELECTING");
+            marker.AddToClassList("char-marker");
+            marker.AddToClassList("char-marker--selecting");
+            markers.Add(marker);
+        }
+
+
 
         private void SelectCharacter(CharacterClass cls, VisualElement root)
         {
             _selected = cls;
 
-            // Highlight selected grid button
             foreach (var btn in _gridButtons)
             {
                 btn.RemoveFromClassList("char-card--selected");
@@ -371,50 +432,36 @@ namespace SlopArena.Client.UI
                     btn.AddToClassList("char-card--selected");
             }
 
-            // Update name
             root.Q<Label>("char-name").text = cls.ToString().ToUpper();
-
-            // Load ability data (per-class card slots — issue #117)
-            var def = CharacterRegistry.Get(cls);
-            var cardSlots = AbilityCardSlotsByClass.TryGetValue(cls, out var mapped)
-                ? mapped
-                : LegacyAbilityCardSlots;
-            for (int i = 0; i < AbilitySlots.Length; i++)
-            {
-                var spec = def.GetSlotAbility(cardSlots[i], airborne: false);
-                var card = root.Q<VisualElement>(AbilitySlots[i]);
-                if (card == null) continue;
-                card.Q<Label>($"{AbilitySlots[i]}-name").text = spec?.Name ?? "—";
-                card.Q<Label>($"{AbilitySlots[i]}-desc").text = spec?.Description ?? "";
-            }
-
-            SwapPreviewModel(def);
+            root.Q<Label>("char-role").text =
+                RolePhrases.TryGetValue(cls, out var role) ? role : "FIGHTER / UNKNOWN";
+            if (MatchConfig.Mode == GameMode.Training && _rosterPanel != null)
+                RenderTrainingRoster();
         }
 
-        private void SwapPreviewModel(CharacterDefinition def)
+        private void RenderCardMarkers()
         {
-            if (_previewModelRoot == null) return;
-            if (_currentModel != null) Destroy(_currentModel);
+            foreach (var btn in _gridButtons)
+                btn.Q<VisualElement>("char-markers")?.Clear();
 
-            var prefab = Resources.Load<GameObject>(def.ModelResourcePath);
-            if (prefab != null)
+            var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
+            for (int i = 0; i < players.Count; i++)
             {
-                _currentModel = Instantiate(prefab, _previewModelRoot);
-                _currentModel.transform.localPosition = Vector3.zero;
-                _currentModel.transform.localRotation = Quaternion.identity;
-            }
-            else
-            {
-                _currentModel = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                _currentModel.transform.SetParent(_previewModelRoot, false);
-                _currentModel.transform.localPosition = Vector3.zero;
-            }
+                var player = players[i];
+                if (!System.Enum.TryParse<CharacterClass>(player.CharacterSelection, true, out var cls))
+                    continue;
 
-            // Isolate to CharPreview layer so this model only appears in the preview camera
-            int layer = LayerMask.NameToLayer("CharPreview");
-            if (layer >= 0)
-                foreach (var t in _currentModel.GetComponentsInChildren<Transform>(true))
-                    t.gameObject.layer = layer;
+                var card = _uiDocument.rootVisualElement.Q<Button>($"char-{cls}");
+                var markers = card?.Q<VisualElement>("char-markers");
+                if (markers == null) continue;
+
+                var marker = new Label($"P{i + 1} {(player.LockedIn ? "READY" : "SELECTING")}");
+                marker.AddToClassList("char-marker");
+                marker.AddToClassList(player.LockedIn
+                    ? "char-marker--ready"
+                    : "char-marker--selecting");
+                markers.Add(marker);
+            }
         }
 
         private void Update()
@@ -425,8 +472,6 @@ namespace SlopArena.Client.UI
 
         private void OnDisable()
         {
-            if (_currentModel != null) Destroy(_currentModel);
-
             if (_lobby != null)
             {
                 _lobby.LobbyUpdated    -= OnLobbyUpdated;
@@ -436,5 +481,6 @@ namespace SlopArena.Client.UI
                 _lobby.Error            -= OnPvPError;
             }
         }
+
     }
 }

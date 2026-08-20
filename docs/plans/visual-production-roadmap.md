@@ -228,8 +228,13 @@ Propagate the approved HUD language through the playable loop in this order:
    Lobby Room, Server Browser, Character Select, Stage Select, and Results now
    use the same compact SC2/WoW-style chat panel. It remains presentation-only
    until the master-server chat contract exists.
-3. **Character select** — player number/color ownership, portrait or splash treatment,
-   selected character, concise role phrase, and ready state.
+3. **Character select — presentation pass complete.** The screen now uses a
+   portrait-first fighter roster with a selected-character role line, persistent
+   global chat, and bottom lobby player cards. PvP cards show each lobby player's
+   portrait, character, host/player identity, and `WAITING`, `PICKING`, or `LOCKED`
+   state. Training shows `P1 YOU` plus the configured `P2 TRAINING BOT` using the same
+   card layout. The player-card region is authored in UXML/UI Toolkit; C# only
+   supplies the dynamic cards.
 4. **Match bridge** — loading, countdown, `FIGHT`, stock loss/KO, match end, results,
    rematch/return actions.
 5. **Functional screens by reuse** — server browser, lobby, stage select, settings, and
@@ -286,7 +291,8 @@ The immediate queue is:
 1. Close the HUD with one final Unity visual check; avoid further open-ended polishing.
 2. **Main menu — complete:** underground fight-poster composition, shared chat shell,
    and Direct Connect modal.
-3. Apply the approved composition and shared chat shell to character select.
+3. **Character select — complete:** portrait roster, bottom lobby player cards,
+   Training `P1`/bot cards, and shared chat shell.
 4. Complete loading/countdown, fight, KO, match-end, and results presentation.
 5. Stop the bounded UI sprint and return to FightGuy-first character ability completion.
 6. After the demo gameplay gate, resume remaining arena, character-presentation, flagship,
