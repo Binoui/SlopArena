@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SlopArena USS HUD Preview</title>
+  <link rel="stylesheet" href="hud-preview.css">
+  <script src="uss-adapter.js"></script>
+</head>
+<body>
+  <main class="preview-shell" data-theme="bright">
+    <section class="game-frame" data-players="4" aria-label="HUD preview">
+      <div class="arena-backdrop" aria-hidden="true">
+        <div class="arena-sign">SLOP COURT</div>
+        <div class="arena-platform"></div>
+        <div class="fighter fighter-local"></div>
+        <div class="fighter fighter-opponent"></div>
+      </div>
+
+      <div id="hud-root" class="hud-root">
+        <div id="overhead-layer" class="overhead-layer">
+          <div id="overhead-100" class="overhead-panel marker-p2" data-player="2">
+            <span class="overhead-damage-outline">47%</span><span class="overhead-damage">47%</span>
+          </div>
+          <div id="overhead-101" class="overhead-panel marker-p3" data-player="3">
+            <span class="overhead-damage-outline">82%</span><span class="overhead-damage">82%</span>
+          </div>
+          <div id="overhead-102" class="overhead-panel marker-p4" data-player="4">
+            <span class="overhead-damage-outline">126%</span><span class="overhead-damage">126%</span>
+          </div>
+        </div>
+
+        <div id="player-billboard" class="player-billboard">
+          <article id="billboard-1" class="billboard-card billboard-left local-player player-1" data-player="1">
+            <div class="portrait-frame"><div class="fighter-portrait" style="background-image:url('/client/Unity/Assets/Resources/UI/Portraits/Manki.png')"></div></div>
+            <div class="fighter-copy">
+              <div class="fighter-details">
+                <div class="fighter-tape"><span class="badge">P1</span></div>
+                <span class="fighter-name">MANKI</span>
+                <span class="stock-row"><i class="stock-icon"></i><i class="stock-icon"></i><i class="stock-icon"></i></span>
+              </div>
+              <span class="overhead-damage">18%</span>
+            </div>
+          </article>
+          <article id="billboard-100" class="billboard-card billboard-left player-2" data-player="2">
+            <div class="portrait-frame"><div class="fighter-portrait" style="background-image:url('/client/Unity/Assets/Resources/UI/Portraits/FightGuy.png')"></div></div>
+            <div class="fighter-copy">
+              <div class="fighter-details">
+                <div class="fighter-tape"><span class="badge">P2</span></div>
+                <span class="fighter-name">FIGHTGUY</span>
+                <span class="stock-row"><i class="stock-icon"></i><i class="stock-icon"></i><i class="stock-icon lost"></i></span>
+              </div>
+              <span class="overhead-damage">47%</span>
+            </div>
+          </article>
+          <article id="billboard-101" class="billboard-card billboard-left player-3" data-player="3">
+            <div class="portrait-frame portrait-placeholder">K</div>
+            <div class="fighter-copy">
+              <div class="fighter-details">
+                <div class="fighter-tape"><span class="badge">P3</span></div>
+                <span class="fighter-name">KISTU</span>
+                <span class="stock-row"><i class="stock-icon"></i><i class="stock-icon"></i><i class="stock-icon"></i></span>
+              </div>
+              <span class="overhead-damage">82%</span>
+            </div>
+          </article>
+          <article id="billboard-102" class="billboard-card billboard-left player-4" data-player="4">
+            <div class="portrait-frame portrait-placeholder">N</div>
+            <div class="fighter-copy">
+              <div class="fighter-details">
+                <div class="fighter-tape"><span class="badge">P4</span></div>
+                <span class="fighter-name">NILUS</span>
+                <span class="stock-row"><i class="stock-icon"></i><i class="stock-icon lost"></i><i class="stock-icon lost"></i></span>
+              </div>
+              <span class="overhead-damage">126%</span>
+            </div>
+          </article>
+        </div>
+
+        <div id="action-bar" class="action-bar">
+          <div id="dash-slot" class="slot dash-slot"><div class="slot-icon-inner fallback-icon">DASH</div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">SHIFT</span></div>
+          <div id="ability-group-1-4" class="slot-group">
+            <div id="ab-1" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/1.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">1</span></div>
+            <div id="ab-2" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/2.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">2</span></div>
+            <div id="ab-3" class="slot ability-slot cooldown-demo"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/3.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer">3.2</span><span class="slot-key-label">3</span></div>
+            <div id="ab-4" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/4.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">4</span></div>
+          </div>
+          <div id="ability-group-a-f" class="slot-group">
+            <div id="ab-a" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/q.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">A</span></div>
+            <div id="ab-e" class="slot ability-slot cooldown-demo"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/e.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer">1.8</span><span class="slot-key-label">E</span></div>
+            <div id="ab-r" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/r.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">R</span></div>
+            <div id="ab-f" class="slot ability-slot"><div class="slot-icon-inner" style="background-image:url('/client/Unity/Assets/Resources/Icons/FightGuy/f.png')"></div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">F</span></div>
+          </div>
+          <div id="burst-slot" class="slot burst-slot ready-glow"><div class="slot-icon-inner fallback-icon">BURST</div><div class="slot-flash"></div><div class="slot-cooldown"></div><span class="slot-timer"></span><span class="slot-key-label">C</span></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="controls" aria-label="Preview controls">
+      <header><div><strong>USS HUD PREVIEW</strong><small>HUD elements load directly from <code>client/Unity/Assets/UI/HUD.uss</code>.</small><small>Edit that file, then refresh. Launch: <code>python -m http.server 8000</code></small></div><button id="theme-toggle" type="button">DARK ARENA</button></header>
+      <div id="uss-status" class="uss-status">Loading HUD.uss…</div>
+      <div class="control-grid">
+        <label>Players<select id="player-count"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
+        <label>HUD scale<input id="hud-scale" type="range" min="70" max="140" value="100"><output id="hud-scale-output">100%</output></label>
+        <label>P1 damage<input class="damage-input" data-player="1" type="number" min="0" max="999" value="18"></label>
+        <label>P2 damage<input class="damage-input" data-player="2" type="number" min="0" max="999" value="47"></label>
+        <label>P3 damage<input class="damage-input" data-player="3" type="number" min="0" max="999" value="82"></label>
+        <label>P4 damage<input class="damage-input" data-player="4" type="number" min="0" max="999" value="126"></label>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const shell = document.querySelector('.preview-shell');
+    const frame = document.querySelector('.game-frame');
+    document.querySelector('#theme-toggle').addEventListener('click', event => {
+      const dark = shell.dataset.theme !== 'dark'; shell.dataset.theme = dark ? 'dark' : 'bright'; event.currentTarget.textContent = dark ? 'BRIGHT ARENA' : 'DARK ARENA';
+    });
+    document.querySelector('#player-count').addEventListener('change', event => { frame.dataset.players = event.target.value; });
+    document.querySelector('#hud-scale').addEventListener('input', event => { const value = Number(event.target.value); frame.style.setProperty('--preview-hud-scale', value / 100); document.querySelector('#hud-scale-output').value = `${value}%`; });
+    document.querySelectorAll('.damage-input').forEach(input => input.addEventListener('input', () => {
+      const player = input.dataset.player; const value = Math.max(0, Math.min(999, Number(input.value) || 0));
+      const damage = document.querySelector(`.billboard-card[data-player="${player}"] .overhead-damage`); damage.textContent = `${value}%`; damage.style.color = value < 40 ? '#f0eee8' : value < 90 ? '#f97316' : '#ef4444';
+      document.querySelectorAll(`.overhead-panel[data-player="${player}"] > span`).forEach(label => label.textContent = `${value}%`);
+    }));
+  </script>
+</body>
+</html>

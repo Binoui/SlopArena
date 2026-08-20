@@ -128,7 +128,7 @@ namespace SlopArena.Client.World
             SetupPlayerRenderer(playerDef, playerBaked);
             SetupHUD(playerDef, new[]
             {
-                new HUDManager.HudPlayer(NpcEntityId, "P2", isLocal: false),
+                new HUDManager.HudPlayer(NpcEntityId, "P2", _npcClass, isLocal: false),
             });
 
             // NPC renderer

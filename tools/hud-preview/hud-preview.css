@@ -1,0 +1,55 @@
+/* Browser shell only. HUD visuals come from client/Unity/Assets/UI/HUD.uss via uss-adapter.js. */
+:root {
+  --shell-ink: #0d0d14;
+  --shell-paper: #f0eee8;
+  --shell-accent: #ffc821;
+}
+
+* { box-sizing: border-box; }
+html, body { min-width: 900px; min-height: 100%; margin: 0; background: #09090d; color: var(--shell-paper); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body { padding: 18px; }
+.preview-shell { width: min(1280px, calc(100vw - 36px)); margin: 0 auto; }
+.game-frame { --preview-hud-scale: 1; position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 2px solid #262633; background: #74b8e3; box-shadow: 0 18px 60px #000a; }
+
+/* UIDocument supplies this containing rectangle in Unity. */
+.game-frame > .hud-root { position: absolute; inset: 0; width: 100%; height: 100%; zoom: var(--preview-hud-scale); }
+
+.arena-backdrop { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(168deg, transparent 0 58%, #d9ba23 58.2% 59%, transparent 59.2%), linear-gradient(#77bde9 0 52%, #55a7b7 52% 100%); transition: filter 160ms, background 160ms; }
+[data-theme="dark"] .arena-backdrop { background: radial-gradient(circle at 55% 34%, #804c6b 0 5%, transparent 5.4%), linear-gradient(168deg, transparent 0 58%, #7f5e1d 58.2% 59%, transparent 59.2%), linear-gradient(#1d2745 0 52%, #253f4b 52% 100%); filter: saturate(.82); }
+.arena-sign { position: absolute; top: 10%; left: 52%; width: 260px; height: 92px; padding-top: 22px; rotate: 1deg; border: 12px solid #142331; background: #71413f; color: #142331; text-align: center; font-size: 27px; font-weight: 1000; letter-spacing: 4px; }
+.arena-platform { position: absolute; left: 18%; right: 10%; bottom: 17%; height: 30%; border-top: 7px solid #d8c331; background: repeating-linear-gradient(78deg, #55a7b7 0 90px, #f4f3e9 92px 96px); transform: perspective(500px) rotateX(58deg); transform-origin: bottom; }
+.fighter { position: absolute; bottom: 31%; width: 24px; height: 72px; border-radius: 45% 45% 25% 25%; background: #231b20; box-shadow: 0 8px 0 -5px #0008; }
+.fighter::before { content: ""; position: absolute; left: 3px; top: -15px; width: 18px; height: 18px; border-radius: 50%; background: inherit; }
+.fighter-local { left: 54%; }
+.fighter-opponent { right: 22%; bottom: 42%; rotate: 18deg; }
+
+/* Runtime-only values normally assigned by HUDManager rather than HUD.uss. */
+.marker-p2 { left: 66%; top: 31%; rotate: 1deg; }
+.marker-p3 { left: 45%; top: 43%; rotate: -2deg; }
+.marker-p4 { left: 76%; top: 49%; rotate: 2deg; }
+.portrait-placeholder { align-items: center; justify-content: center; color: rgb(13 13 20 / 55%); font-size: 46px; font-weight: 1000; }
+.fallback-icon { align-items: center; justify-content: center; color: #83828f; font-size: 7px; font-weight: 900; letter-spacing: 1px; }
+.cooldown-demo .slot-cooldown { height: 65%; }
+
+.game-frame[data-players="2"] .player-3,
+.game-frame[data-players="2"] .player-4,
+.game-frame[data-players="2"] .marker-p3,
+.game-frame[data-players="2"] .marker-p4,
+.game-frame[data-players="3"] .player-4,
+.game-frame[data-players="3"] .marker-p4 { display: none; }
+
+.controls { margin-top: 14px; border: 1px solid #2e2e3c; background: #121219; color: #e8e6e0; }
+.controls header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #2e2e3c; }
+.controls header strong { display: block; letter-spacing: 2px; }
+.controls header small { display: block; margin-top: 3px; color: #8d8b98; }
+.controls code { color: #f6c62d; }
+.controls button, .controls select, .controls input { border: 1px solid #484758; border-radius: 2px; background: #20202b; color: #f0eee8; }
+.controls button { padding: 8px 12px; cursor: pointer; font-weight: 800; }
+.uss-status { padding: 8px 14px; border-bottom: 1px solid #2e2e3c; color: #aaa8b4; font: 11px ui-monospace, monospace; }
+.uss-status.loaded { color: #63d58b; }
+.uss-status.failed { color: #ef6262; }
+.control-grid { display: grid; grid-template-columns: repeat(6, minmax(115px, 1fr)); gap: 10px; padding: 12px 14px 14px; }
+.control-grid label { color: #a5a3af; font-size: 11px; letter-spacing: .5px; }
+.control-grid input, .control-grid select { display: block; width: 100%; margin-top: 5px; padding: 5px; }
+.control-grid output { display: block; margin-top: 2px; color: var(--shell-accent); font-size: 10px; }
+@media (max-width: 1050px) { .control-grid { grid-template-columns: repeat(3, 1fr); } }

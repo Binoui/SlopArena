@@ -1,16 +1,11 @@
-/* ────────────────────────────────────────────────────────────────────────────
-   SlopArena combat HUD — UI Toolkit (spec §5).
-   Two layers: a full-screen overhead layer for screen-space-tracked per-player
-   panels, and a bottom-center action bar for the local player's cooldowns.
-   ──────────────────────────────────────────────────────────────────────────── */
+/* SlopArena broadcast HUD — underground fight-poster prototype.
+   Match state owns the lower third; the local kit is a separate utility strip. */
 
 .hud-root {
     flex-grow: 1;
-    /* The HUD never intercepts clicks/input. */
     pointer-events: none;
 }
 
-/* ── Overhead layer: full-screen, top-left origin. Panels positioned in code. */
 .overhead-layer {
     position: absolute;
     left: 0;
@@ -19,89 +14,213 @@
     bottom: 0;
 }
 
+/* Spatial readout: percentage only; roster color supplies identity. */
 .overhead-panel {
     position: absolute;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 8px;
+    width: 84px;
+    height: 42px;
     background-color: rgba(0, 0, 0, 0);
 }
 
 .overhead-panel.eliminated {
-    opacity: 0.45;
+    opacity: 0.28;
 }
 
-.badge {
-    font-size: 14px;
-    -unity-font-style: bold;
-    color: #000000;
-    padding: 2px 8px;
-    border-radius: 4px;
-}
-
-.overhead-damage {
-    font-size: 34px;
-    -unity-font-style: bold;
-    color: white;
-    transition-property: color;
-    transition-duration: 0.15s;
-}
-
-.stock-row {
-    flex-direction: row;
-    margin-top: 4px;
-}
-
-.stock-icon {
-    width: 12px;
-    height: 12px;
-    margin: 2px;
-    border-radius: 6px;
-    background-color: white;
-}
-
-.stock-icon.lost {
-    background-color: rgba(255, 255, 255, 0.15);
-}
-
-.stock-count {
-    font-size: 14px;
-    color: white;
-    -unity-font-style: bold;
-}
-
-/* ── Bottom player scoreboard: static billboards above the action bar ───────── */
-.player-billboard {
+.overhead-panel .overhead-damage,
+.overhead-panel .overhead-damage-outline {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 96px;
-    flex-direction: row;
-    justify-content: center;
-    align-items: flex-end;
+    top: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 28px;
+    letter-spacing: -1px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
 }
 
-/* Billboard entries reuse .overhead-panel but sit as inline row flex children
-   (not absolutely positioned), badge beside damage, over a translucent card. */
-.player-billboard .overhead-panel {
+.overhead-panel .overhead-damage-outline {
+    color: #0d0d14;
+    -unity-text-outline-width: 4px;
+    -unity-text-outline-color: rgba(13, 13, 20, 0.95);
+}
+
+.overhead-panel .overhead-damage {
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgba(255, 252, 238, 0.96);
+    transition-property: color, translate;
+    transition-duration: 0.12s;
+}
+
+/* Multiplayer-safe left stack: one stable row per roster member. */
+.player-billboard {
+    position: absolute;
+    left: 18px;
+    right: auto;
+    top: 18px;
+    bottom: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.billboard-card {
     position: relative;
+    width: 232px;
+    height: 72px;
+    margin: 0;
+    margin-bottom: 14px;
+    overflow: visible;
+    flex-direction: row;
+    align-items: stretch;
+    background-color: rgba(13, 13, 20, 0.93);
+    border-bottom-width: 5px;
+    border-bottom-color: #e05c2a;
+    transition-property: opacity, translate;
+    transition-duration: 0.15s;
+}
+
+.billboard-left {
+    rotate: -0.6deg;
+    padding-left: 66px;
+    border-right-width: 2px;
+    border-right-color: #f0eee8;
+}
+
+
+.billboard-card.eliminated {
+    opacity: 0.3;
+}
+
+
+.portrait-frame {
+    position: absolute;
+    width: 78px;
+    height: 82px;
+    bottom: -3px;
+    overflow: hidden;
+    background-color: #e05c2a;
+}
+
+.billboard-left .portrait-frame {
+    left: -10px;
+    rotate: -2deg;
+}
+
+
+.portrait-missing {
+    opacity: 0.2;
+}
+
+.fighter-portrait {
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    top: -3px;
+    bottom: -3px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.fighter-copy {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: stretch;
+    padding: 3px 5px 3px 7px;
+}
+
+.fighter-details {
+    width: 58px;
+    flex-shrink: 0;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+
+.fighter-tape {
     flex-direction: row;
     align-items: center;
-    margin: 0 10px;
-    padding: 4px 12px;
-    background-color: rgba(0, 0, 0, 0.4);
+    align-self: flex-start;
+    margin-bottom: -1px;
+    background-color: #f0eee8;
+    rotate: -0.5deg;
 }
 
-.player-billboard .overhead-damage {
-    font-size: 24px;
+
+.billboard-card .badge {
+    min-width: 34px;
+    height: 20px;
+    padding: 1px 5px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: #19131b;
 }
 
-/* ── Bottom action bar ─────────────────────────────────────────────────────── */
+
+.fighter-name {
+    margin-top: 1px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    color: rgba(240, 238, 232, 0.76);
+}
+
+
+
+
+.billboard-card .overhead-damage {
+    flex-grow: 1;
+    min-width: 0;
+    height: 100%;
+    font-size: 36px;
+    white-space: nowrap;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: #19131b;
+    color: #f0eee8;
+    transition-property: color, translate;
+    transition-duration: 0.12s;
+}
+
+
+.stock-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 3px 0 0 1px;
+}
+
+
+.stock-icon {
+    width: 11px;
+    height: 7px;
+    margin: 0 1px;
+    rotate: -8deg;
+    background-color: #ffc821;
+    border-bottom-width: 2px;
+    border-bottom-color: #e05c2a;
+}
+
+.stock-icon.lost {
+    opacity: 0.16;
+}
+
+.stock-count {
+    font-size: 11px;
+    color: #f0eee8;
+    -unity-font-style: bold;
+}
+
+/* Icon-first local kit. Keys are reminders; art and cooldown state own the tile. */
 .action-bar {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 20px;
+    bottom: 9px;
+    height: 48px;
     flex-direction: row;
     justify-content: center;
     align-items: flex-end;
@@ -109,123 +228,122 @@
 
 .slot-group {
     flex-direction: row;
-    margin: 0 6px;
+    padding: 2px;
+    margin: 0 5px;
+    background-color: rgba(13, 13, 20, 0.84);
 }
 
 .slot {
-    width: 48px;
-    height: 48px;
-    margin: 0 4px;
-    border-radius: 6px;
-    border-width: 1px;
-    border-color: #475569;
-    background-color: #1e293b;
+    position: relative;
+    width: 44px;
+    height: 44px;
+    margin: 0 1px;
+    overflow: hidden;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-    position: relative;
-    /* Cooldown-ready pulse (1.15x over 0.15s, spec §3.2). */
-    transition-property: scale;
-    transition-duration: 0.15s;
+    background-color: #24202b;
+    border-bottom-width: 3px;
+    border-bottom-color: #625c6b;
+    transition-property: scale, translate;
+    transition-duration: 0.12s;
 }
 
 .slot.ready-pulse {
-    scale: 1.15;
+    scale: 1.1;
+    translate: 0 -2px;
 }
 
-/* Slot consumed (ability/dash/burst just fired) — quick shrink, reads as "spent".
-   Opposite of the ready pulse: scale dips to 0.9 and springs back. */
 .slot.used-pulse {
-    scale: 0.9;
+    scale: 0.86;
+    translate: 0 2px;
 }
 
-/* Non-FightGuy kits leave some of the 8 slots empty — dim + desaturate. */
 .slot.locked {
-    opacity: 0.4;
+    opacity: 0.2;
 }
 
-/* Placeholder icon tile; real icons drop in via code (Resources/Icons). */
 .slot-icon-inner {
     position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(255, 255, 255, 0.06);
+    left: 1px;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-color: rgba(240, 238, 232, 0.05);
 }
 
-/* Ability-ready flash overlay (bright white, fades fast). */
 .slot-flash {
     position: absolute;
     left: 0;
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: white;
+    background-color: #f0eee8;
     opacity: 0;
     transition-property: opacity;
-    transition-duration: 0.15s;
+    transition-duration: 0.1s;
 }
 
 .slot-flash.active {
-    opacity: 0.85;
+    opacity: 0.72;
 }
 
-/* Cooldown mask — fills from the bottom, shrinking as the cooldown expires. */
 .slot-cooldown {
     position: absolute;
     left: 0;
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.55);
     display: none;
     transform-origin: bottom center;
     scale: 1 1;
+    background-color: rgba(6, 5, 9, 0.82);
 }
 
 .slot-timer {
-    font-size: 16px;
-    color: white;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
     position: absolute;
     left: 0;
     right: 0;
     top: 30%;
+    font-size: 13px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: #19131b;
+    color: #f0eee8;
 }
 
 .slot-key-label {
-    font-size: 12px;
-    color: white;
-    -unity-font-style: bold;
     position: absolute;
-    /* Top of the box: the cooldown mask fills from the bottom, so a bottom key
-       label sits inside the darkened region while on cooldown. */
-    top: 2px;
-    left: 0;
-    right: 0;
+    left: 2px;
+    bottom: 2px;
+    min-width: 10px;
+    height: 10px;
+    padding: 0 1px;
+    font-size: 6px;
+    -unity-font-style: bold;
     -unity-text-align: middle-center;
+    color: #19131b;
+    background-color: rgba(240, 238, 232, 0.88);
 }
 
-/* Dash — circular slot (spec §3.2: Dash is a circle/radial). */
 .dash-slot {
-    width: 56px;
-    height: 56px;
-    border-radius: 28px;
-    border-color: #64748b;
+    width: 46px;
+    height: 46px;
+    margin-right: 3px;
+    rotate: -1deg;
+    border-bottom-color: #2f6bff;
 }
 
-/* Burst — prominent wide slot. */
 .burst-slot {
-    width: 72px;
-    height: 56px;
-    border-width: 2px;
-    border-color: #f59e0b;
+    width: 50px;
+    height: 46px;
+    margin-left: 3px;
+    rotate: 1deg;
+    border-bottom-color: #e05c2a;
 }
 
-/* Burst available (cooldown 0) — persistent gold glow (spec §3.2). */
 .burst-slot.ready-glow {
-    border-color: #fbbf24;
-    background-color: rgba(251, 191, 36, 0.15);
+    background-color: #4b231e;
+    border-bottom-color: #ffc821;
 }

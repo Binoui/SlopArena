@@ -1,19 +1,9 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
-    <ui:Style src="HUD.uss" />
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/HUD.uss?fileID=7433441132597879392&amp;guid=82c4820ef1cdb99f79947584a2b83902&amp;type=3#HUD" />
     <ui:VisualElement name="hud-root" class="hud-root">
-        <!-- Overhead layer: full-screen, top-left origin. Per-player panels are
-             created and positioned here by HUDManager, screen-space tracked to each
-             player's simulation position (spec §3.1). -->
         <ui:VisualElement name="overhead-layer" class="overhead-layer" />
-
-        <!-- Bottom scoreboard: one static billboard per player (P# + damage%), laid
-             out above the action bar. Built by HUDManager from the roster. -->
         <ui:VisualElement name="player-billboard" class="player-billboard" />
-
-        <!-- Bottom action bar (local player only) -->
         <ui:VisualElement name="action-bar" class="action-bar">
-
-            <!-- Dash (key: Shift) -->
             <ui:VisualElement name="dash-slot" class="slot dash-slot">
                 <ui:VisualElement name="dash-icon" class="slot-icon-inner" />
                 <ui:VisualElement name="dash-flash" class="slot-flash" />
@@ -21,8 +11,6 @@
                 <ui:Label name="dash-timer" class="slot-timer" />
                 <ui:Label name="dash-key" class="slot-key-label" />
             </ui:VisualElement>
-
-            <!-- Abilities 1-4 (spec §2 AbilityGroup_1_4) -->
             <ui:VisualElement name="ability-group-1-4" class="slot-group">
                 <ui:VisualElement name="ab-1" class="slot ability-slot">
                     <ui:VisualElement name="ab-1-icon" class="slot-icon-inner" />
@@ -53,8 +41,6 @@
                     <ui:Label name="ab-4-key" class="slot-key-label" />
                 </ui:VisualElement>
             </ui:VisualElement>
-
-            <!-- Abilities A E R F (spec §2 AbilityGroup_A_F) -->
             <ui:VisualElement name="ability-group-a-f" class="slot-group">
                 <ui:VisualElement name="ab-a" class="slot ability-slot">
                     <ui:VisualElement name="ab-a-icon" class="slot-icon-inner" />
@@ -85,8 +71,6 @@
                     <ui:Label name="ab-f-key" class="slot-key-label" />
                 </ui:VisualElement>
             </ui:VisualElement>
-
-            <!-- Burst (key: C) — prominent slot -->
             <ui:VisualElement name="burst-slot" class="slot burst-slot">
                 <ui:VisualElement name="burst-icon" class="slot-icon-inner" />
                 <ui:VisualElement name="burst-flash" class="slot-flash" />

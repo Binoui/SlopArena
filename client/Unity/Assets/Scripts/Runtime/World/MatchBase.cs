@@ -138,10 +138,10 @@ namespace SlopArena.Client.World
             var players = new List<HUDManager.HudPlayer>(
                 MatchConfig.Opponents.Count + 1 + (extraPlayers?.Count ?? 0))
             {
-                new(PlayerEntityId, $"P{PlayerEntityId}", isLocal: true)
+                new(PlayerEntityId, $"P{PlayerEntityId}", def.Class, isLocal: true)
             };
             foreach (var opp in MatchConfig.Opponents)
-                players.Add(new HUDManager.HudPlayer(opp.EntityId, $"P{opp.EntityId}", isLocal: false));
+                players.Add(new HUDManager.HudPlayer(opp.EntityId, $"P{opp.EntityId}", opp.Class, isLocal: false));
             if (extraPlayers != null)
                 players.AddRange(extraPlayers);
             players.Sort((a, b) => a.EntityId.CompareTo(b.EntityId));

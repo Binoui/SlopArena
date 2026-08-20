@@ -30,17 +30,19 @@ namespace SlopArena.Client.UI
     {
         [SerializeField] private UIDocument _uiDocument;
 
-        /// <summary>One HUD panel's backing data: entity id, label, local flag.</summary>
+        /// <summary>Identity required by both the tracked readout and broadcast card.</summary>
         public readonly struct HudPlayer
         {
             public readonly ulong EntityId;
             public readonly string Label;
+            public readonly CharacterClass Class;
             public readonly bool IsLocal;
 
-            public HudPlayer(ulong entityId, string label, bool isLocal)
+            public HudPlayer(ulong entityId, string label, CharacterClass @class, bool isLocal)
             {
                 EntityId = entityId;
                 Label = label;
+                Class = @class;
                 IsLocal = isLocal;
             }
         }
@@ -48,10 +50,12 @@ namespace SlopArena.Client.UI
         private sealed class OverheadPanel
         {
             public VisualElement Root = null!;
-            public Label Badge = null!;
             public Label Damage = null!;
+            public Label DamageOutline = null!;
             public VisualElement[] StockIcons = Array.Empty<VisualElement>();
             public Label StockCountLabel = null!;
+            public Color IdentityColor = Color.white;
+            public bool UseIdentityColor;
             public Color TierColor = Color.white;
             public Vector2 SmoothPos;
             public ushort PrevDamage;
@@ -202,8 +206,6 @@ namespace SlopArena.Client.UI
             {
                 var p = players[i];
 
-                // Floating overhead panel — opponents only. The local player has no
-                // label over their own head; their roster info lives in the scoreboard.
                 if (!p.IsLocal)
                 {
                     var panel = BuildOverheadPanel(p, i);
@@ -215,8 +217,7 @@ namespace SlopArena.Client.UI
                     _localEntityId = p.EntityId;
                 }
 
-                // Bottom scoreboard — one static billboard entry per player (incl. self).
-                var billboard = BuildOverheadPanel(p, i);
+                var billboard = BuildBillboardPanel(p, i);
                 _billboardPanels[p.EntityId] = billboard;
                 _billboardLayer?.Add(billboard.Root);
             }
@@ -253,48 +254,106 @@ namespace SlopArena.Client.UI
 
         private OverheadPanel BuildOverheadPanel(HudPlayer p, int colorIndex)
         {
-            var root = new VisualElement();
-            root.name = $"overhead-{p.EntityId}";
+            var root = new VisualElement { name = $"overhead-{p.EntityId}" };
             root.AddToClassList("overhead-panel");
 
-            var badge = new Label(p.Label);
-            badge.AddToClassList("badge");
-            badge.style.backgroundColor = BadgeColors[colorIndex % BadgeColors.Length];
-            root.Add(badge);
+            var identityColor = BadgeColors[colorIndex % BadgeColors.Length];
+            var damageOutline = new Label("0%");
+            damageOutline.AddToClassList("overhead-damage-outline");
+            root.Add(damageOutline);
 
             var damage = new Label("0%");
             damage.AddToClassList("overhead-damage");
+            damage.style.color = identityColor;
             root.Add(damage);
 
-            var panel = new OverheadPanel { Root = root, Badge = badge, Damage = damage };
-
-            if (_maxStocks > 0)
+            return new OverheadPanel
             {
-                var stockRow = new VisualElement();
-                stockRow.AddToClassList("stock-row");
-                root.Add(stockRow);
+                Root = root,
+                DamageOutline = damageOutline,
+                Damage = damage,
+                IdentityColor = identityColor,
+                UseIdentityColor = true,
+            };
+        }
 
-                if (_maxStocks <= MaxStockIcons)
+        private OverheadPanel BuildBillboardPanel(HudPlayer p, int colorIndex)
+        {
+            var identityColor = BadgeColors[colorIndex % BadgeColors.Length];
+            var root = new VisualElement { name = $"billboard-{p.EntityId}" };
+            root.AddToClassList("billboard-card");
+            root.AddToClassList("billboard-left");
+            root.EnableInClassList("local-player", p.IsLocal);
+            root.style.borderBottomColor = identityColor;
+
+            var portraitFrame = new VisualElement();
+            portraitFrame.AddToClassList("portrait-frame");
+            portraitFrame.style.backgroundColor = identityColor;
+            var portrait = new VisualElement();
+            portrait.AddToClassList("fighter-portrait");
+            var portraitTexture = Resources.Load<Texture2D>($"UI/Portraits/{p.Class}");
+            if (portraitTexture != null)
+                portrait.style.backgroundImage = new StyleBackground(portraitTexture);
+            else
+                portraitFrame.AddToClassList("portrait-missing");
+            portraitFrame.Add(portrait);
+            root.Add(portraitFrame);
+
+            var copy = new VisualElement();
+            copy.AddToClassList("fighter-copy");
+
+            var details = new VisualElement();
+            details.AddToClassList("fighter-details");
+
+            var tape = new VisualElement();
+            tape.AddToClassList("fighter-tape");
+            var badge = new Label(p.Label);
+            badge.AddToClassList("badge");
+            badge.style.backgroundColor = identityColor;
+            tape.Add(badge);
+            details.Add(tape);
+
+            var fighterName = new Label(p.Class.ToString().ToUpperInvariant());
+            fighterName.AddToClassList("fighter-name");
+            details.Add(fighterName);
+
+            var damage = new Label("0%");
+            damage.AddToClassList("overhead-damage");
+
+            var panel = new OverheadPanel { Root = root, Damage = damage };
+            AddStocks(panel, details);
+            copy.Add(details);
+            copy.Add(damage);
+            root.Add(copy);
+            return panel;
+        }
+
+        private void AddStocks(OverheadPanel panel, VisualElement parent)
+        {
+            if (_maxStocks <= 0) return;
+
+            var stockRow = new VisualElement();
+            stockRow.AddToClassList("stock-row");
+            parent.Add(stockRow);
+
+            if (_maxStocks <= MaxStockIcons)
+            {
+                panel.StockIcons = new VisualElement[_maxStocks];
+                for (int i = 0; i < _maxStocks; i++)
                 {
-                    panel.StockIcons = new VisualElement[_maxStocks];
-                    for (int i = 0; i < _maxStocks; i++)
-                    {
-                        var icon = new VisualElement();
-                        icon.AddToClassList("stock-icon");
-                        stockRow.Add(icon);
-                        panel.StockIcons[i] = icon;
-                    }
-                }
-                else
-                {
-                    var count = new Label($"×{_maxStocks}");
-                    count.AddToClassList("stock-count");
-                    stockRow.Add(count);
-                    panel.StockCountLabel = count;
+                    var icon = new VisualElement();
+                    icon.AddToClassList("stock-icon");
+                    stockRow.Add(icon);
+                    panel.StockIcons[i] = icon;
                 }
             }
-
-            return panel;
+            else
+            {
+                var count = new Label($"×{_maxStocks}");
+                count.AddToClassList("stock-count");
+                stockRow.Add(count);
+                panel.StockCountLabel = count;
+            }
         }
 
         /// <summary>
@@ -343,8 +402,9 @@ namespace SlopArena.Client.UI
         private void UpdatePanel(OverheadPanel panel, CharacterState state)
         {
             int dmg = (int)state.DamagePercent;
-            panel.TierColor = DamageColor(dmg);
+            panel.TierColor = panel.UseIdentityColor ? panel.IdentityColor : DamageColor(dmg);
             panel.Damage.text = $"{dmg}%";
+            if (panel.DamageOutline != null) panel.DamageOutline.text = panel.Damage.text;
             if (dmg > panel.PrevDamage) panel.HitFlashTimer = JuiceDuration;
             panel.PrevDamage = (ushort)dmg;
 
@@ -470,11 +530,16 @@ namespace SlopArena.Client.UI
             for (int i = 0; i < _abilitySlots.Length; i++) TickSlotJuice(_abilitySlots[i], dt);
 
             foreach (var panel in _panels.Values)
-            {
-                bool flashing = panel.HitFlashTimer > 0f;
-                if (flashing) panel.HitFlashTimer -= dt;
-                panel.Damage.style.color = flashing ? Color.white : panel.TierColor;
-            }
+                TickPanelJuice(panel, dt);
+            foreach (var panel in _billboardPanels.Values)
+                TickPanelJuice(panel, dt);
+        }
+
+        private static void TickPanelJuice(OverheadPanel panel, float dt)
+        {
+            bool flashing = panel.HitFlashTimer > 0f;
+            if (flashing) panel.HitFlashTimer -= dt;
+            panel.Damage.style.color = flashing ? Color.white : panel.TierColor;
         }
 
         private static void TickSlotJuice(ActionSlot s, float dt)
