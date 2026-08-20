@@ -34,106 +34,167 @@ public sealed class HeuristicBotPolicy : IBotPolicy
     /// <summary>Jump toward an airborne opponent once they are this far above the bot (metres).</summary>
     private const float JumpGap = 0.6f;
 
-    /// <summary>Ticks to wait after an attack press before considering the next (anti-buffer spam).</summary>
-    private const int PressCooldown = 6;
-
-    /// <summary>Ticks the bot backs off after each swing — the disengage that keeps fights mobile.</summary>
-    private const int PostAttackBackoff = 14;
-
-    /// <summary>Ticks the bot backs off after being hit (longer — reset neutral after taking a trade).</summary>
-    private const int HitBackoff = 26;
-
-    /// <summary>Victim hurtbox radius added to the hitbox reach to get the connect distance. Empirically
-    /// ~0.2 m for the FightGuy hurtboxes (g1/g2/g4 connect at 0.7 m, ForwardReach 0.56–0.61).</summary>
+    /// <summary>Victim hurtbox radius added to the hitbox reach to get the connect distance.</summary>
     private const float VictimRadiusMargin = 0.2f;
 
-    /// <summary>Perceived-range jitter band: the bot attacks when dist ≤ base × (MinJitter..MaxJitter),
-    /// so it sometimes commits slightly out of reach (whiff) and sometimes cleanly.</summary>
-    private const float RangeJitterMin = 1.0f;
-    private const float RangeJitterMax = 1.6f;
-
-    /// <summary>Choose a slot only if its connect reach is at least this fraction of the distance —
-    /// looser than exact, so near-misses (whiffs) are possible.</summary>
+    /// <summary>
+    /// Choose a slot only if its perceived connect reach is at least this fraction of the
+    /// distance. The profile's range error intentionally permits early and late commitments.
+    /// </summary>
     private const float SlotReachTolerance = 0.85f;
 
     public InputState Decide(in CharacterState self, in CharacterState target,
         CharacterDefinition def, Random rng, BotMemory memory)
     {
+        var profile = BotDifficultyProfile.ForLevel(memory.DifficultyLevel);
+        if (memory.DecisionTicksRemaining > 0) memory.DecisionTicksRemaining--;
+        if (memory.ReactionTicksRemaining > 0) memory.ReactionTicksRemaining--;
+
+        bool movementAllowed = self.HitstunTicks == 0
+            && self.HitstopTicks == 0
+            && self.BurstRecoveryTicks == 0
+            && self.LandingLagTicks == 0;
+        bool actionable = movementAllowed
+            && self.AnimLockTicks == 0
+            && (self.State == ActionState.Idle || self.State == ActionState.Run);
+
         var input = new InputState();
-        if (memory.PressCooldownTicks > 0) memory.PressCooldownTicks--;
-        if (memory.RepositionTicks > 0) memory.RepositionTicks--;
-
-        bool inAttack = self.AttackSlot > 0;
-
-        // Rising edge of hitstun → reset spacing (the bot just took a hit).
-        if (self.HitstunTicks > 0 && !memory.WasInHitstun)
-            memory.RepositionTicks = Math.Max(memory.RepositionTicks, HitBackoff);
-        memory.WasInHitstun = self.HitstunTicks > 0;
-
-        // Attack ended this tick (AttackSlot just dropped to 0) → the bot is actionable again;
-        // force a backoff so it steps out before re-engaging instead of chaining into a deadlock.
-        if (memory.WasAttacking && !inAttack)
-            memory.RepositionTicks = Math.Max(memory.RepositionTicks, PostAttackBackoff);
-        memory.WasAttacking = inAttack;
+        if (!actionable)
+        {
+            memory.WasActionable = false;
+            return input;
+        }
 
         float dx = target.PX - self.PX;
         float dz = target.PZ - self.PZ;
         float dist = MathF.Sqrt(dx * dx + dz * dz);
         float dy = target.PY - self.PY;
+        bool hasTarget = dist > 0.001f;
+        bool targetAttacking = target.State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping;
+        bool targetThreatening = IsThreatening(target);
 
-        bool moving = self.HitstunTicks == 0 && self.HitstopTicks == 0
-            && self.BurstRecoveryTicks == 0 && self.LandingLagTicks == 0;
-        bool actionable = moving && self.AnimLockTicks == 0
-            && (self.State == ActionState.Idle || self.State == ActionState.Run);
+        // The runner records the previous pre-tick target state. A rising threat starts the
+        // profile's reaction delay; the bot still faces and approaches during that delay.
+        if (targetThreatening && !memory.LastTargetWasAttacking)
+            memory.ReactionTicksRemaining = Math.Max(memory.ReactionTicksRemaining, profile.ReactionDelayTicks);
 
-        // ── Disengage: back off for the reposition window (no attacks, face away) ──
-        if (actionable && memory.RepositionTicks > 0 && dist > 0.001f)
+        if (hasTarget)
         {
-            input.MoveX = -dx / dist;
-            input.MoveY = -dz / dist;
-            return input;
-        }
-
-        // ── Face the opponent (reuse the game's LMB facing snap) ──
-        if (moving && dist > 0.001f)
-        {
-            input.AimYaw = (short)Math.Clamp(MathF.Atan2(dx, dz) * (180f / MathF.PI) * 100f, -32768f, 32767f);
+            input.AimYaw = (short)Math.Clamp(
+                MathF.Atan2(dx, dz) * (180f / MathF.PI) * 100f, -32768f, 32767f);
             input.FaceToCamera = true;
         }
 
-        // ── Approach (world space; MoveY IS the world Z axis) ──
-        if (moving && dist > 0.001f)
+        if (!hasTarget)
+        {
+            memory.WasActionable = true;
+            return input;
+        }
+
+        // Far targets are always approached. Movement remains normalized and uses world X/Z,
+        // matching Simulation.ProcessNormalMovement's input contract.
+        float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
+        float perceivedMaxReach = MaxConnectReach(self, def) * rangeScale;
+        bool inRange = dist <= perceivedMaxReach;
+        if (!inRange)
         {
             input.MoveX = dx / dist;
             input.MoveY = dz / dist;
         }
 
-        // ── Attack when the opponent is within the bot's jittered perceived range ──
-        if (actionable && memory.PressCooldownTicks == 0 && memory.RepositionTicks == 0 && dist > 0.001f)
+        bool waiting = memory.DecisionTicksRemaining > 0 || memory.ReactionTicksRemaining > 0;
+        if (waiting)
         {
-            float baseReach = MaxConnectReach(self, def);
-            float perceived = baseReach * (RangeJitterMin + (RangeJitterMax - RangeJitterMin) * (float)rng.NextDouble());
-            if (dist <= perceived)
-            {
-                byte? slot = ChooseSlot(self, def, dist, rng);
-                if (slot.HasValue)
-                {
-                    input.ActiveSlot = slot.Value;
-                    memory.PressCooldownTicks = PressCooldown;
-                    memory.RepositionTicks = PostAttackBackoff;
-                    return input;
-                }
-            }
+            memory.WasActionable = true;
+            return input;
         }
 
-        // ── Jump toward an airborne opponent above the bot ──
-        if (actionable && memory.RepositionTicks == 0 && self.IsGrounded && !target.IsGrounded && dy > JumpGap)
+        // Every fresh decision gets a cadence gate, including a no-op/approach decision.
+        memory.DecisionTicksRemaining = profile.DecisionIntervalTicks;
+        if (!inRange)
+        {
+            memory.WasActionable = true;
+            return input;
+        }
+
+        // Hold range by default once inside the perceived band. Individual branches below
+        // replace this with a strafe, retreat, or dash vector.
+        input.MoveX = 0f;
+        input.MoveY = 0f;
+
+        bool targetIsHigherOrAirborne = !target.IsGrounded || dy > JumpGap;
+        if (self.IsGrounded && targetIsHigherOrAirborne
+            && rng.NextDouble() < profile.JumpChance)
         {
             input.Jump = true;
             input.JumpHeld = true;
+            memory.WasActionable = true;
+            return input;
         }
 
+        byte? slot = ChooseSlot(self, def, dist, rangeScale, rng);
+        bool canDash = self.DashCooldownTicks == 0
+            && self.DashDurationTicks == 0
+            && self.BurstRecoveryTicks == 0;
+
+        // A dash is a defensive choice only against a visible threat and only when the
+        // simulation's cooldown contract says it can start.
+        if (targetAttacking && canDash && rng.NextDouble() < profile.DodgeChance)
+        {
+            input.Dash = true;
+            input.MoveX = -dx / dist;
+            input.MoveY = -dz / dist;
+            memory.WasActionable = true;
+            return input;
+        }
+
+        // Punishes and confirmed-hit follow-ups are bonuses to the normal attack roll, not
+        // unconditional attacks. AttackSlot is never consulted as a hit/start/end signal.
+        bool punish = slot.HasValue
+            && targetThreatening
+            && rng.NextDouble() < profile.PunishChance;
+        bool combo = slot.HasValue
+            && memory.LastAttackConnected
+            && rng.NextDouble() < profile.ComboChance;
+        bool attack = slot.HasValue
+            && (punish || combo || rng.NextDouble() < profile.AttackChance);
+        if (attack)
+        {
+            input.ActiveSlot = slot!.Value;
+            memory.LastPressedSlot = input.ActiveSlot;
+            memory.WasActionable = true;
+            return input;
+        }
+
+        // Retreat only has an explicit reason: an active threat, point-blank spacing without
+        // a usable move, or the profile's voluntary retreat roll. A prior attack press alone
+        // never creates a backoff window.
+        bool pointBlankWithoutAttack = dist <= 0.35f && !slot.HasValue;
+        bool retreat = targetThreatening
+            || pointBlankWithoutAttack
+            || rng.NextDouble() < profile.RetreatChance;
+        if (retreat)
+        {
+            input.MoveX = -dx / dist;
+            input.MoveY = -dz / dist;
+            memory.WasActionable = true;
+            return input;
+        }
+
+        if (memory.StrafeDirection == 0)
+            memory.StrafeDirection = rng.Next(2) == 0 ? (sbyte)-1 : (sbyte)1;
+        input.MoveX = -dz / dist * memory.StrafeDirection;
+        input.MoveY = dx / dist * memory.StrafeDirection;
+        memory.WasActionable = true;
         return input;
+    }
+
+    private static bool IsThreatening(in CharacterState state)
+    {
+        return state.State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping
+            || state.AnimLockTicks > 0
+            || state.LandingLagTicks > 0
+            || state.BurstRecoveryTicks > 0;
     }
 
     /// <summary>Max connect range across the slots for the current state (metres).</summary>
@@ -146,9 +207,12 @@ public sealed class HeuristicBotPolicy : IBotPolicy
         return max;
     }
 
-    /// <summary>Pick a slot whose connect reach is within tolerance of the distance — seeded choice
-    /// among the viable pool (near-misses allowed, so whiffs occur). Skips cooldown / data-less slots.</summary>
-    private static byte? ChooseSlot(in CharacterState self, CharacterDefinition def, float dist, Random rng)
+    /// <summary>
+    /// Pick a slot whose perceived connect reach is within tolerance of the distance. Skips
+    /// cooldown / data-less slots and uses only the caller's seeded RNG for tie-breaking.
+    /// </summary>
+    private static byte? ChooseSlot(in CharacterState self, CharacterDefinition def, float dist,
+        float rangeScale, Random rng)
     {
         bool air = !self.IsGrounded;
         var viable = new byte[Slots.Length];
@@ -156,7 +220,7 @@ public sealed class HeuristicBotPolicy : IBotPolicy
         foreach (byte slot in Slots)
         {
             if (self.GetCooldown(slot) > 0) continue;
-            float reach = ForwardReach(def, slot, air) + VictimRadiusMargin;
+            float reach = (ForwardReach(def, slot, air) + VictimRadiusMargin) * rangeScale;
             if (reach > 0f && reach >= dist * SlotReachTolerance)
                 viable[n++] = slot;
         }
@@ -166,10 +230,8 @@ public sealed class HeuristicBotPolicy : IBotPolicy
 
     /// <summary>
     /// Forward reach of a slot's hitboxes in the facing frame (metres): max forward extent
-    /// (OffX/OffZ distance + radius) over the first-stage hitboxes, plus lunge travel. This is
-    /// the ACTUAL hitbox reach — the connect distance is this plus the victim's hurtbox radius.
-    /// Deliberately NOT the authored <c>AttackRange</c>. 0 when the slot has no data for the given
-    /// airborne state. Public for the reach-envelope tests.
+    /// (OffZ + radius) over the first-stage hitboxes, plus lunge travel. This is the actual
+    /// hitbox reach, deliberately not the authored auto-dash AttackRange.
     /// </summary>
     public static float ForwardReach(CharacterDefinition def, byte activeSlot, bool airborne)
     {
@@ -182,10 +244,6 @@ public sealed class HeuristicBotPolicy : IBotPolicy
         {
             foreach (var evt in stage.HitboxEvents)
             {
-                // Forward reach = furthest point along the forward (+Z) axis: OffZ + Radius.
-                // NOT hypot(OffX,OffZ)+Radius — that counts sideways offsets (large OffX) as
-                // forward reach, so a side-kick like a3 High Kick (OffX=0.43, OffZ=-0.16) was
-                // reported as 0.86 m when it barely reaches 0.24 m forward.
                 float extent = MathF.Max(0f, evt.OffZ + evt.Radius);
                 if (extent > reach) reach = extent;
             }

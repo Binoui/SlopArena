@@ -37,7 +37,8 @@ namespace SlopArena.Client.World
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
         [SerializeField] private ProjectileVFXManager _projectileVFX;
-        [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Attack;
+        [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Heuristic;
+        [SerializeField, Range(1, 9)] private int _npcCpuLevel = 5;
 
         [Header("Hitboxes")]
         [SerializeField] private bool _showHitboxes;
@@ -119,6 +120,7 @@ namespace SlopArena.Client.World
             _npcDef = npcDef;
             _npcRng = new System.Random();
             _npcMemory.Reset();
+            _npcMemory.DifficultyLevel = Mathf.Clamp(_npcCpuLevel, 1, 9);
  
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
@@ -235,6 +237,18 @@ namespace SlopArena.Client.World
                 { PlayerEntityId, input },
                 { NpcEntityId, npcInput }
             });
+            // Feed only authoritative resolver hits and the pre-tick target snapshot back to
+            // the runner-owned bot memory. AttackSlot is persistent and is never used here.
+            _npcMemory.LastAttackConnected = false;
+            foreach (var hit in _bridge.LastTickHits)
+            {
+                if (hit.OwnerEntityId == NpcEntityId)
+                {
+                    _npcMemory.LastAttackConnected = true;
+                    break;
+                }
+            }
+            _npcMemory.LastTargetWasAttacking = IsThreatening(playerState);
 
             // Track NPC death for visual feedback
             var npcStateAfter = _bridge.GetState(NpcEntityId);
@@ -294,6 +308,14 @@ namespace SlopArena.Client.World
                 return;
             }
             _cameraMount.ClearLockFocus(_playerRenderer.transform);
+        }
+
+        private static bool IsThreatening(in CharacterState state)
+        {
+            return state.State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping
+                || state.AnimLockTicks > 0
+                || state.LandingLagTicks > 0
+                || state.BurstRecoveryTicks > 0;
         }
 
         /// <summary>

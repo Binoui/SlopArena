@@ -31,8 +31,9 @@ public class SelfPlayTests
         };
     }
 
-    private static MatchRecord Run(int seed, int maxTicks = 2000)
-        => SelfPlayMatch.Run(Def, KillArena(), seed, TestHelpers.LoadBakedData(Def), maxTicks);
+    private static MatchRecord Run(int seed, int maxTicks = 2000, int cpuLevel = 5)
+        => SelfPlayMatch.Run(Def, KillArena(), seed, TestHelpers.LoadBakedData(Def), maxTicks,
+            cpuLevel: cpuLevel);
 
     [Fact]
     public void SameSeed_TerminatesWithIdenticalMatch()
@@ -107,5 +108,46 @@ public class SelfPlayTests
             Assert.True(float.IsFinite(s.PY), $"NaN PY at tick {s.Tick}");
             Assert.True(float.IsFinite(s.PZ), $"NaN PZ at tick {s.Tick}");
         }
+    }
+
+    [Fact]
+    public void SameSeedAndLevel_IsIdentical_ChangingLevelChangesTrace()
+    {
+        var a = Run(42, maxTicks: 1200, cpuLevel: 5);
+        var b = Run(42, maxTicks: 1200, cpuLevel: 5);
+
+        Assert.Equal(a.DurationTicks, b.DurationTicks);
+        Assert.Equal(a.Swings.Count, b.Swings.Count);
+        Assert.Equal(a.Hits.Count, b.Hits.Count);
+        Assert.Equal(a.Samples.Count, b.Samples.Count);
+        for (int i = 0; i < a.Samples.Count; i++)
+        {
+            Assert.Equal(a.Samples[i].Tick, b.Samples[i].Tick);
+            Assert.Equal(a.Samples[i].EntityId, b.Samples[i].EntityId);
+            Assert.Equal(a.Samples[i].PX, b.Samples[i].PX);
+            Assert.Equal(a.Samples[i].PY, b.Samples[i].PY);
+            Assert.Equal(a.Samples[i].PZ, b.Samples[i].PZ);
+        }
+
+        var low = Run(42, maxTicks: 1200, cpuLevel: 1);
+        var high = Run(42, maxTicks: 1200, cpuLevel: 9);
+        bool different = low.Swings.Count != high.Swings.Count
+            || low.Hits.Count != high.Hits.Count
+            || low.Samples.Count != high.Samples.Count;
+        if (!different)
+        {
+            for (int i = 0; i < low.Samples.Count; i++)
+            {
+                if (low.Samples[i].PX != high.Samples[i].PX
+                    || low.Samples[i].PY != high.Samples[i].PY
+                    || low.Samples[i].PZ != high.Samples[i].PZ)
+                {
+                    different = true;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(different, "changing CPU level did not change the self-play trace");
     }
 }

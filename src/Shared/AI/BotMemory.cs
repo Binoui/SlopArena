@@ -6,25 +6,40 @@ namespace SlopArena.Shared.AI;
 /// </summary>
 public sealed class BotMemory
 {
-    /// <summary>Ticks to wait before considering another attack press (anti-buffer spam).</summary>
-    public int PressCooldownTicks;
+    /// <summary>Smash-style CPU level, clamped by the caller/profile factory to 1..9.</summary>
+    public int DifficultyLevel = 5;
 
-    /// <summary>Remaining ticks backing off from the opponent (disengage spacing). While > 0 the
-    /// bot moves away and does not attack — breaks the point-blank mash deadlock so fights develop.</summary>
-    public int RepositionTicks;
+    /// <summary>Ticks remaining before a fresh attack/pressure decision.</summary>
+    public int DecisionTicksRemaining;
 
-    /// <summary>Whether the bot was in hitstun last tick (hitstun rising-edge detection).</summary>
-    public bool WasInHitstun;
+    /// <summary>Ticks remaining before a newly detected threat can trigger a reaction.</summary>
+    public int ReactionTicksRemaining;
 
-    /// <summary>Whether the bot was mid-attack (AttackSlot &gt; 0) last tick (attack-end detection).</summary>
-    public bool WasAttacking;
+    /// <summary>Last slot pressed by this bot; runner-owned telemetry, not sim state.</summary>
+    public byte LastPressedSlot;
 
-    /// <summary>Reset per-tick-decrementing fields; called once before a match starts.</summary>
+    /// <summary>True for the previous tick when this bot's hitbox connected.</summary>
+    public bool LastAttackConnected;
+
+    /// <summary>Whether the target was attacking/recovering on the previous pre-tick snapshot.</summary>
+    public bool LastTargetWasAttacking;
+
+    /// <summary>Whether this bot was actionable on the previous policy call.</summary>
+    public bool WasActionable;
+
+    /// <summary>Stable lateral direction for range-holding: -1 or +1 once selected.</summary>
+    public sbyte StrafeDirection;
+
+    /// <summary>Reset all runner-owned policy state before a match starts.</summary>
     public void Reset()
     {
-        PressCooldownTicks = 0;
-        RepositionTicks = 0;
-        WasInHitstun = false;
-        WasAttacking = false;
+        DifficultyLevel = 5;
+        DecisionTicksRemaining = 0;
+        ReactionTicksRemaining = 0;
+        LastPressedSlot = 0;
+        LastAttackConnected = false;
+        LastTargetWasAttacking = false;
+        WasActionable = false;
+        StrafeDirection = 0;
     }
 }

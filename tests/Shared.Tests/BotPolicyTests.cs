@@ -133,4 +133,86 @@ public class BotPolicyTests
         Assert.Equal(a.Dash, b.Dash);
         Assert.Equal(a.Jump, b.Jump);
     }
+
+    [Fact]
+    public void LockedState_EmitsNoActionInput()
+    {
+        var self = Self();
+        self.AnimLockTicks = 4;
+        var target = Opponent(z: 0.5f);
+
+        var input = Decide(self, target);
+
+        Assert.Equal(0f, input.MoveX);
+        Assert.Equal(0f, input.MoveY);
+        Assert.Equal(0, input.ActiveSlot);
+        Assert.Equal(0, input.AimYaw);
+        Assert.False(input.FaceToCamera);
+        Assert.False(input.Dash);
+        Assert.False(input.Jump);
+    }
+
+    [Fact]
+    public void ThreatResponse_HigherLevelCanDodgeWhileLowLevelWaits()
+    {
+        var self = Self();
+        var target = Opponent(z: 0.5f);
+        target.State = ActionState.Attacking;
+        int highLevelDodges = 0;
+
+        for (int seed = 0; seed < 100; seed++)
+        {
+            var lowMemory = new BotMemory { DifficultyLevel = 1 };
+            var highMemory = new BotMemory { DifficultyLevel = 9 };
+            var low = Policy.Decide(self, target, Def, new Random(seed), lowMemory);
+            var high = Policy.Decide(self, target, Def, new Random(seed), highMemory);
+
+            Assert.Equal(0, low.ActiveSlot);
+            Assert.False(low.Dash);
+            Assert.False(low.Jump);
+            if (high.Dash) highLevelDodges++;
+        }
+
+        Assert.True(highLevelDodges > 0, "level 9 never selected a threat dodge across 100 seeds");
+    }
+
+    [Fact]
+    public void ConfirmedHitMemory_EnablesMoreHighLevelFollowUps()
+    {
+        var self = Self();
+        var target = Opponent(z: 0.5f);
+        int lowAttacks = 0;
+        int highAttacks = 0;
+
+        for (int seed = 0; seed < 200; seed++)
+        {
+            var lowMemory = new BotMemory { DifficultyLevel = 1, LastAttackConnected = true };
+            var highMemory = new BotMemory { DifficultyLevel = 9, LastAttackConnected = true };
+            if (Policy.Decide(self, target, Def, new Random(seed), lowMemory).ActiveSlot > 0)
+                lowAttacks++;
+            if (Policy.Decide(self, target, Def, new Random(seed), highMemory).ActiveSlot > 0)
+                highAttacks++;
+        }
+
+        Assert.True(highAttacks > lowAttacks,
+            $"expected more level-9 follow-ups, got low={lowAttacks} high={highAttacks}");
+    }
+
+    [Fact]
+    public void AttackPress_IsNotFollowedByMandatoryRetreatWindow()
+    {
+        var self = Self();
+        var target = Opponent(z: 0.5f);
+        var memory = new BotMemory();
+        var rng = new Random(42);
+
+        var first = Policy.Decide(self, target, Def, rng, memory);
+        Assert.True(first.ActiveSlot > 0);
+
+        var next = Policy.Decide(self, target, Def, rng, memory);
+
+        Assert.Equal(0, next.ActiveSlot);
+        Assert.Equal(0f, next.MoveX);
+        Assert.Equal(0f, next.MoveY);
+    }
 }
