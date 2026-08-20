@@ -129,6 +129,10 @@ client/Unity/Assets/~AnimationPacks.meta
 client/Unity/Assets/AnimationPacks/
 client/Unity/Assets/AnimationPacks.meta
 
+# Locally imported JMO Cartoon FX bundle (non-redistributable)
+client/Unity/Assets/JMO\ Assets/
+client/Unity/Assets/JMO\ Assets.meta
+
 # Locally generated Cartoon FX variants (Asset Store source dependency)
 client/Unity/Assets/Resources/VFX/SlopArena/
 client/Unity/Assets/Resources/VFX/SlopArena.meta
