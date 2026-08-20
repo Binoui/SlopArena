@@ -16,11 +16,12 @@ MonoBehaviour:
   Run: {fileID: 7400000, guid: f460b4e334f59bc9ab8b8bcc12743b75, type: 3}
   JumpUp: {fileID: 1827226128182048838, guid: 5cfebe60ac2cf1354b9275f716e2ac9c, type: 3}
   JumpDown: {fileID: 1827226128182048838, guid: eb9bbcbe807ad2b0abfb258a8aec0d23, type: 3}
+  Tumble: {fileID: 7400000, guid: ffdd4576e95d423f795b334bda1d5eb5, type: 2}
   Fall: {fileID: 1827226128182048838, guid: 3fd85fce516651489a02bfbb8456ffdf, type: 3}
   Dash: {fileID: 7400000, guid: 05261071379df35278f910e44d9c5b8d, type: 2}
-  HitSmall: {fileID: -203655887218126122, guid: 0d47f09b34f2f647daeadc3ed46404cc, type: 3}
-  HitMedium: {fileID: -203655887218126122, guid: 99faf08884a12b982950b36229ad6965, type: 3}
-  HitHard: {fileID: -203655887218126122, guid: 05fa095eee4e8bb52a4c0c926592faff, type: 3}
+  HitSmall: {fileID: 7400000, guid: 2c20e3646ca4bc0e1a62bc32373e9000, type: 2}
+  HitMedium: {fileID: 7400000, guid: 44833e4cdd42997d2bce91c985a58a6a, type: 2}
+  HitHard: {fileID: 7400000, guid: 3f3fbde2c4e4181669da0484ea7f2a8f, type: 2}
   Death: {fileID: 8993902097722301239, guid: e2eb8871bf81bb449ab74e86581b3f3a, type: 3}
   AbilityClips:
   - Name: kistu_g_1

@@ -127,11 +127,7 @@ public static partial class CharacterRegistry
                     // ftilt: two-hit sword slash. Hit 1 (6-11) is a soft pop, hit 2 (18-23)
                     // sends out — a combo tool that starts neutral and finishes a string.
                     new() { DurationTicks = 34, IasaTicks = 30,
-                            HitboxEvents = new HitboxEvent[]
-                            {
-                                new() { TriggerTick = 6, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 25, BaseKnockback = 3f, KnockbackGrowth = 16f }, StunTicks = 10, Interruptible = true },
-                                new() { TriggerTick = 18, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 7f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 5f, KnockbackGrowth = 26f }, StunTicks = 16, Interruptible = true },
-                            },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 8, DurationTicks = 6, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", EndBoneName = "_weapon_tip", Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 25, BaseKnockback = 3f, KnockbackGrowth = 16f }, StunTicks = 10, Interruptible = true } },
                             AttackRange = 2.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.85f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
                 },
@@ -202,7 +198,7 @@ public static partial class CharacterRegistry
                     // dtilt/smash-style: telegraphed startup (14-27 active), big damage +
                     // high growth — the grounded kill move. Whiffs are punished.
                     new() { DurationTicks = 44, IasaTicks = 39,
-                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 14, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 8, BaseKnockback = 8f, KnockbackGrowth = 32f }, StunTicks = 22, Interruptible = true } },
+                            HitboxEvents = new HitboxEvent[] { new() { TriggerTick = 18, DurationTicks = 14, Shape = HitboxShape.Capsule, Radius = 0.25f, OffX = 0f, OffY = 0f, OffZ = 0f, BoneName = "_weapon_hilt", Damage = 12f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 8, BaseKnockback = 8f, KnockbackGrowth = 32f }, StunTicks = 22, Interruptible = true } },
                             AttackRange = 2.75f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.8f,
                             BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightHand", Width = 0.12f, R = 1f, G = 0.55f, B = 0.1f, A = 1f } } },
                 },

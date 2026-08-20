@@ -212,6 +212,10 @@ namespace SlopArena.Client.Entities
         {
             foreach (ParticleSystem particle in _particles)
             {
+                // Instantiated prefabs may auto-play on enable. Stop and clear
+                // before changing MainModule.duration; Unity rejects duration
+                // changes while a system is still playing.
+                particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 var main = particle.main;
                 main.stopAction = ParticleSystemStopAction.None;
                 main.loop = false;

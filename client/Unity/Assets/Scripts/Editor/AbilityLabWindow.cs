@@ -158,6 +158,7 @@ namespace SlopArena.EditorTools
             EditorGUILayout.LabelField("Display", EditorStyles.boldLabel);
             _lab.ShowHurtboxes = EditorGUILayout.Toggle("Hurtboxes (green)", _lab.ShowHurtboxes);
             _lab.ShowHitboxes = EditorGUILayout.Toggle("Hitboxes (orange)", _lab.ShowHitboxes);
+            _lab.ShowBakedBones = EditorGUILayout.Toggle("Baked bones (cyan; weapon tip magenta)", _lab.ShowBakedBones);
             _lab.ShowDummy = EditorGUILayout.Toggle("Dummy opponent (red)", _lab.ShowDummy);
             if (_lab.ShowDummy)
             {

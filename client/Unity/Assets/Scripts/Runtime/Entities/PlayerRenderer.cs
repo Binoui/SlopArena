@@ -282,6 +282,9 @@ namespace SlopArena.Client.Entities
         private float _hitstunAnimStartTime;
         private float _hitstunAnimLength;
         private string _lastHitstunAnimName = "";
+        // ── Airborne launch tumble tracking ──
+        private bool _tumbleActive;
+        private float _tumbleReleaseNormalizedTime = float.PositiveInfinity;
         // ── Hitstop freeze tracking (ADR-0012) ──
         // True while the current clip is paused at Speed 0 for a hitstop freeze;
         // _hitstopPausedSpeed holds the pre-freeze speed for the resume frame.
@@ -406,7 +409,9 @@ namespace SlopArena.Client.Entities
                 }
             }
 
+
             UpdateAnimationState(state);
+            MaintainTumbleLoop();
 
             _lastState = state;
             _hasAppliedState = true;
@@ -621,6 +626,59 @@ namespace SlopArena.Client.Entities
             return true;
         }
 
+        private bool IsStrongAirborneLaunch(CharacterState state)
+        {
+            if (state.IsGrounded || !state.WasAirborneDuringKnockback)
+                return false;
+
+            // InPostHitstunFlight is authoritative in the local simulation. The
+            // motion fallback keeps the presentation correct for states reconstructed
+            // from the wire, where that server-local marker is not serialized.
+            if (state.InPostHitstunFlight)
+                return true;
+
+            const float motionEpsilon = 0.01f;
+            return Mathf.Abs(state.VY) > motionEpsilon
+                || state.VX * state.VX + state.VZ * state.VZ > motionEpsilon * motionEpsilon;
+        }
+
+        private void ClearTumble()
+        {
+            _tumbleActive = false;
+            _tumbleReleaseNormalizedTime = float.PositiveInfinity;
+        }
+
+        private bool TryPlayFall(float fadeDuration)
+        {
+            var clip = _charConfig.GetClipByName("fall");
+            if (clip == null)
+                return false;
+
+            _animancer.Play(clip, fadeDuration);
+            _jumpArcActive = false;
+            return true;
+        }
+
+        private bool TryPlayTumble()
+        {
+            var clip = _charConfig.GetClipByName("tumble");
+            if (clip == null)
+                return false;
+
+            // Tumble loops while hitstun is active. Once the server makes the
+            // fighter actionable, the current cycle is allowed to finish before
+            // falling. The explicit release time handles Loop Time-enabled clips.
+            clip.wrapMode = WrapMode.Loop;
+            var tumbleState = _animancer.Play(clip, 0.1f);
+            tumbleState.Speed = 1f;
+            _tumbleActive = true;
+            _tumbleReleaseNormalizedTime = float.PositiveInfinity;
+            _currentAnimState = tumbleState;
+            _activeExtrapolator = null;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            return true;
+        }
+
         private void UpdateAnimationState(CharacterState state)
         {
             if (_animancer == null || _charConfig == null)
@@ -691,10 +749,23 @@ namespace SlopArena.Client.Entities
                 // stun follow-up); the old ">= last" check missed those and the clip
                 // played only once per string.
                 _jumpArcActive = false;
+
                 bool naturalCountdown = _lastAnimState == ActionState.Hitstun
                     && _lastState.HitstunTicks > 0
                     && state.HitstunTicks == _lastState.HitstunTicks - 1;
                 bool newHit = !naturalCountdown;
+                if (newHit)
+                    ClearTumble();
+                else if (_inHitstunAnim
+                    && Time.time - _hitstunAnimStartTime >= _hitstunAnimLength
+                    && IsStrongAirborneLaunch(state)
+                    && TryPlayTumble())
+                {
+                    _inHitstunAnim = false;
+                    _lastAnimState = ActionState.Hitstun;
+                    return;
+                }
+
                 if (newHit)
                 {
                     var clip = _charConfig.GetClipByName(hitName);
@@ -720,20 +791,85 @@ namespace SlopArena.Client.Entities
             }
 
             // ── Hitstun extrapolation guard ──
-            // Let the hitstun clip finish naturally before transitioning — but
-            // release immediately if the server state has moved on (e.g. Dashing).
+            // Let the hitstun clip finish naturally before transitioning. This guard
+            // also covers the server's actionable Idle state while post-hitstun flight
+            // still carries an airborne launch.
             if (_inHitstunAnim)
             {
-                if (state.State == ActionState.Hitstun)
+                float elapsed = Time.time - _hitstunAnimStartTime;
+                bool actionStarted = (state.State != ActionState.Hitstun
+                        && state.State != ActionState.Idle
+                        && state.State != ActionState.Run)
+                    || state.JumpsLeft < _lastState.JumpsLeft
+                    || (_lastState.IsGrounded && !state.IsGrounded);
+                bool airborneLaunch = !actionStarted && IsStrongAirborneLaunch(state);
+                if (elapsed < _hitstunAnimLength
+                    && (state.State == ActionState.Hitstun || airborneLaunch))
                 {
-                    float elapsed = Time.time - _hitstunAnimStartTime;
-                    if (elapsed < _hitstunAnimLength)
-                    {
-                        _lastAnimState = ActionState.Hitstun; // Keep trigger for next re-hit
-                        return;
-                    }
+                    _lastAnimState = state.State;
+                    return;
+                }
+                if (elapsed >= _hitstunAnimLength
+                    && airborneLaunch
+                    && TryPlayTumble())
+                {
+                    _inHitstunAnim = false;
+                    _lastAnimState = state.State;
+                    return;
                 }
                 _inHitstunAnim = false;
+            }
+
+            // Tumble loops through hitstun, then releases into fall once the
+            // authoritative hitstun marker says the fighter is actionable.
+            if (_tumbleActive)
+            {
+                bool jumpStarted = state.JumpsLeft < _lastState.JumpsLeft
+                    || (_lastState.IsGrounded && !state.IsGrounded);
+                bool explicitAction = state.State != ActionState.Idle
+                    && state.State != ActionState.Run
+                    && state.State != ActionState.Hitstun;
+                bool actionable = state.State != ActionState.Hitstun
+                    && state.HitstunTicks == 0;
+
+                if (state.IsGrounded || jumpStarted || explicitAction)
+                {
+                    ClearTumble();
+                }
+                else if (actionable && !state.IsGrounded)
+                {
+                    var tumble = _animancer.States.Current;
+                    var tumbleClip = _charConfig.GetClipByName("tumble");
+                    if (tumble != null && tumble.Clip == tumbleClip)
+                    {
+                        if (float.IsPositiveInfinity(_tumbleReleaseNormalizedTime))
+                        {
+                            _tumbleReleaseNormalizedTime =
+                                Mathf.Floor(tumble.NormalizedTime) + 1f;
+                            // Disable the asset loop for the release phase. The
+                            // normalized-time boundary remains authoritative even
+                            // if Animancer cached the old loop mode.
+                            tumbleClip.wrapMode = WrapMode.ClampForever;
+                        }
+
+                        if (tumble.NormalizedTime >= _tumbleReleaseNormalizedTime)
+                        {
+                            ClearTumble();
+                            if (TryPlayFall(0.15f))
+                            {
+                                _lastAnimState = state.State;
+                                _wasGrounded = state.IsGrounded;
+                                return;
+                            }
+                        }
+                    }
+                }
+                else if (!isCombat)
+                {
+                    _lastAnimState = state.State;
+                    _wasGrounded = state.IsGrounded;
+                    return;
+                }
             }
 
             // ── Non-combat: ground/air state machine ──
@@ -792,22 +928,17 @@ namespace SlopArena.Client.Entities
                     }
                     else
                     {
-                        // Descending: slow crossfade from jump_up / attack pose → fall
+                        // Descending: transition from jump_up / attack pose into fall.
                         if (wasAscending && _jumpArcActive)
                         {
-                            // Fresh descent from a jump — slow transition to fall
-                            var clip = _charConfig.GetClipByName("fall");
-                            if (clip != null)
-                                _animancer.Play(clip, 2f); // Very slow crossfade — blends jump_up into fall
+                            TryPlayFall(0.15f);
                             _jumpArcActive = false;
                         }
                         else if (!_jumpArcActive)
                         {
                             // Already descending (after attack, after jump_down expired, etc.)
-                            // Ensure fall is eventually playing
-                            var fallClip = _charConfig.GetClipByName("fall");
-                            if (fallClip != null && _animancer.States.Current?.Clip != fallClip)
-                                _animancer.Play(fallClip, 2f);
+                            // Ensure fall is eventually playing.
+                            TryPlayFall(0.15f);
                         }
                     }
                 }
@@ -862,8 +993,25 @@ namespace SlopArena.Client.Entities
             _lastAnimState = state.State;
         }
 
+        private void MaintainTumbleLoop()
+        {
+            if (!_tumbleActive
+                || !(_animancer?.States.Current is { } tumble)
+                || tumble.IsLooping
+                || tumble.Length <= 0f
+                || tumble.Time < tumble.Length)
+                return;
+
+            // Imported clips can arrive with Loop Time unset. Keep the presentation
+            // loop safe at runtime until the supplied tumble asset is configured.
+            tumble.Time %= tumble.Length;
+            tumble.IsPlaying = true;
+        }
+
         private void LateUpdate()
         {
+            MaintainTumbleLoop();
+
             if (_activeExtrapolator != null && _currentAnimState != null
                 && _currentExtrapolationMode == ExtrapolationMode.Continuous
                 && _currentAnimState.IsPlaying)
@@ -1185,6 +1333,7 @@ namespace SlopArena.Client.Entities
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;
             _hitstopPaused = false;
+            _tumbleActive = false;
             _wasAttacking = false;
             _attackStartedGrounded = false;
             DisableAttackAccents();

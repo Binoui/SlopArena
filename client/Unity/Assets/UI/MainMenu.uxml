@@ -18,7 +18,7 @@
                     <ui:Label text="ARENA" class="menu-title menu-title--arena" />
                 </ui:VisualElement>
                 <ui:VisualElement class="menu-title-rule" />
-                <ui:Label text="WEIRDASS FIGHTERS. &#10;QUESTIONNABLE IDEAS." class="menu-tagline" />
+                <ui:Label text="AWKWARD FIGHTERS. &#10;QUESTIONNABLE IDEAS." class="menu-tagline" />
             </ui:VisualElement>
             <ui:VisualElement name="status-area" class="menu-status">
                 <ui:Label name="online-count" text="4 CHARACTERS" class="menu-status-pill menu-status-pill--online" />

@@ -93,6 +93,7 @@ public class SlopArenaBaker : EditorWindow
         AddClip("hit_medium", animConfig.HitMedium);
         AddClip("hit_hard", animConfig.HitHard);
         AddClip("death", animConfig.Death);
+        AddClip("tumble", animConfig.Tumble);
 
         // Ability clips (character-specific, from the AbilityClips list)
         foreach (var entry in animConfig.AbilityClips)

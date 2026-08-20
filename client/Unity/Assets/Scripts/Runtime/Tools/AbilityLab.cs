@@ -44,6 +44,7 @@ namespace SlopArena.Client.Tools
         public float FacingYaw { get; set; }
         public bool ShowHurtboxes { get; set; } = true;
         public bool ShowHitboxes { get; set; } = true;
+        public bool ShowBakedBones { get; set; }
         public bool ShowDummy { get; set; }
         public float DummyDistance { get; set; } = 2.5f;
 
@@ -760,6 +761,10 @@ namespace SlopArena.Client.Tools
                     WireSphere(new Vector3(hb.PosX, hb.PosY, hb.PosZ), hb.Radius);
                 }
             }
+            if (ShowBakedBones)
+            {
+                DrawBakedBonePoints();
+            }
             if (ShowHitboxes)
             {
                 GL.Color(new Color(1f, 0.45f, 0f));
@@ -823,6 +828,44 @@ namespace SlopArena.Client.Tools
                 }
             }
         }
+        private void DrawBakedBonePoints()
+        {
+            if (Baked == null) return;
+
+            var spec = CurrentSpec();
+            if (spec == null || !TryGetStage(out var stage)) return;
+
+            string animName = AnimNameFor(spec, StageIndex);
+            if (!ResolvePose(animName, stage.DurationTicks, out string resolvedAnim, out int bakedFrame)) return;
+
+            float cos = Mathf.Cos(FacingYaw);
+            float sin = Mathf.Sin(FacingYaw);
+            float scale = DisplayDef?.HurtboxBoneScale ?? 1f;
+            var state = new CharacterState { PX = transform.position.x, PY = BasePosition().y, PZ = transform.position.z };
+
+            for (int i = 0; i < Baked.BoneNames.Length; i++)
+            {
+                string bone = Baked.BoneNames[i];
+                if (!Baked.GetBonePosition(resolvedAnim, bakedFrame, i, out float x, out float y, out float z)) continue;
+
+                bool weaponPoint = bone.StartsWith("_", StringComparison.Ordinal);
+                float pointScale = weaponPoint ? 1f : scale;
+                float wx = x * pointScale;
+                float wy = y * pointScale;
+                float wz = z * pointScale;
+                var world = new Vector3(
+                    state.PX + wx * cos + wz * sin,
+                    DisplayDef.BoneYToWorldY(state.PY, wy),
+                    state.PZ - wx * sin + wz * cos);
+
+                GL.Color(bone == "_weapon_tip"
+                    ? new Color(1f, 0.1f, 1f)
+                    : bone == "_weapon_hilt"
+                        ? new Color(1f, 1f, 0.1f)
+                        : new Color(0.1f, 0.8f, 1f));
+                WireSphere(world, weaponPoint ? 0.09f : 0.045f);
+            }
+        }
 
         private static void WireCapsule(Vector3 a, Vector3 b, float radius)
         {
@@ -847,6 +890,13 @@ namespace SlopArena.Client.Tools
                 Line(q0, q1);
                 Line(p0, q0);
             }
+
+            // The collision capsule includes hemispherical ends centered at the
+            // resolved endpoints. The cylinder rings above are inset by one
+            // radius, so draw the endpoint spheres too; without them the
+            // wireframe appears shorter than the actual capsule.
+            WireSphere(a, radius);
+            WireSphere(b, radius);
         }
     }
 }

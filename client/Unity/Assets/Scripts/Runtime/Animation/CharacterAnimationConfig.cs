@@ -6,7 +6,7 @@ namespace SlopArena.Client.Animation
     /// <summary>
     /// Maps animation clips to the names PlayerRenderer looks up via GetClipByName().
     ///
-    /// Standard clips (idle/run/jump/fall/dash/hit/death) are named fields — every character
+    /// Standard clips (idle/run/jump/fall/dash/hit/tumble/death) are named fields — every character
     /// always has these, and the generator wires them automatically.
     ///
     /// Ability clips are character-specific: wire them in the AbilityClips list using the exact
@@ -31,6 +31,7 @@ namespace SlopArena.Client.Animation
         public AnimationClip Run;
         public AnimationClip JumpUp;
         public AnimationClip JumpDown;
+        public AnimationClip Tumble;
         public AnimationClip Fall;
 
         [Header("Combat")]
@@ -79,6 +80,7 @@ namespace SlopArena.Client.Animation
                 case "jump":        return JumpUp ?? JumpDown; // backward compat
                 case "dash":        return Dash;
                 case "fall":        return Fall;
+                case "tumble":      return Tumble;
                 case "hit_small":
                 case "hit_light":   return HitSmall;
                 case "hit_medium":  return HitMedium;

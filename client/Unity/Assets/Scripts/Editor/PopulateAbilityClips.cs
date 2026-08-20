@@ -161,7 +161,7 @@ public class PopulateAbilityClips : EditorWindow
     {
         return name switch
         {
-            "idle" or "run" or "jump" or "fall" or "dash" or "death" => true,
+            "idle" or "run" or "jump" or "fall" or "tumble" or "dash" or "death" => true,
             "hit_small" or "hit_light" or "hit_medium" or "hit_hard" => true,
             _ => false,
         };
