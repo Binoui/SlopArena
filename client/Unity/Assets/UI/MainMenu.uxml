@@ -70,6 +70,7 @@
         </ui:VisualElement>
         <ui:VisualElement class="menu-actions" style="bottom: 219px; left: 534px;">
             <ui:Button name="btn-training" text="TRAINING" class="menu-action menu-action--primary" />
+            <ui:Button name="btn-solo" text="SOLO" class="menu-action menu-action--secondary" />
             <ui:Button name="btn-multiplayer" text="JOIN A FIGHT" class="menu-action menu-action--secondary" />
             <ui:VisualElement name="submenu" class="menu-submenu">
                 <ui:Button name="btn-serverbrowser" text="SERVER BROWSER" class="menu-action menu-action--small menu-action--primary" />

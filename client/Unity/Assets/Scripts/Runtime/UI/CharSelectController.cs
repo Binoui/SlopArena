@@ -92,6 +92,8 @@ namespace SlopArena.Client.UI
 
             if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(root);
+            else if (MatchConfig.Mode == GameMode.Solo)
+                InitSolo(root);
             else
             {
                 AddTrainingMarker();
@@ -119,6 +121,76 @@ namespace SlopArena.Client.UI
                 string prev = MatchConfig.Mode == GameMode.Training ? "MainMenu" : "Lobby";
                 SceneManager.LoadScene(prev);
             };
+        }
+        private void InitSolo(VisualElement root)
+        {
+            root.Q<Label>("roster-meta").text = $"{Classes.Length} FIGHTERS // SOLO";
+            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
+            root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
+            var selectButton = root.Q<Button>("btn-select");
+            selectButton.style.display = DisplayStyle.Flex;
+            selectButton.text = "START SOLO";
+
+            _rosterPanel = root.Q<VisualElement>("roster-panel");
+            RenderSoloRoster();
+
+            var config = new VisualElement();
+            config.AddToClassList("solo-config");
+            var botLabel = new Label("CPU CHARACTER: select a fighter, then assign it to CPU");
+            botLabel.AddToClassList("pvp-status");
+            config.Add(botLabel);
+
+            var assignBot = new Button(() =>
+            {
+                MatchConfig.SoloBotClass = _selected;
+                RenderSoloRoster();
+                botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
+            })
+            {
+                text = "USE SELECTED FIGHTER AS CPU"
+            };
+            assignBot.AddToClassList("btn-primary");
+            config.Add(assignBot);
+
+            var levelLabel = new Label($"CPU LEVEL: {MatchConfig.SoloCpuLevel}");
+            levelLabel.AddToClassList("pvp-status");
+            config.Add(levelLabel);
+            var levelRow = new VisualElement();
+            levelRow.AddToClassList("pvp-buttons");
+            for (int level = 1; level <= 9; level++)
+            {
+                int capturedLevel = level;
+                var button = new Button(() =>
+                {
+                    MatchConfig.SoloCpuLevel = capturedLevel;
+                    levelLabel.text = $"CPU LEVEL: {capturedLevel}";
+                })
+                {
+                    text = capturedLevel.ToString()
+                };
+                button.AddToClassList("btn-primary");
+                levelRow.Add(button);
+            }
+            config.Add(levelRow);
+            root.Q<VisualElement>("pvp-panel").Add(config);
+
+            selectButton.clicked += () =>
+            {
+                MatchConfig.PlayerClass = _selected;
+                SceneManager.LoadScene("StageSelect");
+            };
+            root.Q<Button>("btn-back").clicked += () => SceneManager.LoadScene("MainMenu");
+        }
+
+        private void RenderSoloRoster()
+        {
+            if (_rosterPanel == null) return;
+            _rosterPanel.Clear();
+            _rosterPanel.Add(BuildPlayerCard(
+                "P1", "YOU", _selected, "SELECTED", local: true, host: true));
+            _rosterPanel.Add(BuildPlayerCard(
+                "P2", "CPU", MatchConfig.SoloBotClass,
+                $"CPU {MatchConfig.SoloCpuLevel}", local: false, host: false));
         }
 
         private void InitPvP(VisualElement root)
@@ -437,7 +509,10 @@ namespace SlopArena.Client.UI
                 RolePhrases.TryGetValue(cls, out var role) ? role : "FIGHTER / UNKNOWN";
             if (MatchConfig.Mode == GameMode.Training && _rosterPanel != null)
                 RenderTrainingRoster();
-        }
+            else if (MatchConfig.Mode == GameMode.Solo && _rosterPanel != null)
+                RenderSoloRoster();
+
+            }
 
         private void RenderCardMarkers()
         {

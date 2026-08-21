@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using SlopArena.Shared;
 using SlopArena.Shared.AI;
@@ -62,6 +63,10 @@ namespace SlopArena.Client.World
 #endif
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
+        private ushort _soloCountdownTicks;
+        private ushort _lastSoloPlayerDeaths;
+        private ushort _lastSoloNpcDeaths;
+        private bool _soloResultsShown;
 
         // Presentation-only input seam used by VisualBaselineCaptureController. The
         // normal training path leaves this null and continues to consume player input.
@@ -94,15 +99,16 @@ namespace SlopArena.Client.World
                 return;
             }
             Debug.Log($"[TrainingMatch] Loaded arena: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
+            SpawnStageVisual(arena);
 
             // Wire sim debug logging to Unity console
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
-            SpawnStageVisual(arena);
-
-            // Bridge (local). NoWinMatchRule: training never eliminates or ends —
-            // the only way out is the Esc exit below (issue #37 follow-up).
-            _bridge = new LocalSimulationBridge(arena, NoWinMatchRule.Instance);
+            bool solo = MatchConfig.Mode == GameMode.Solo;
+            _soloCountdownTicks = solo ? (ushort)180 : (ushort)0;
+            _bridge = new LocalSimulationBridge(
+                arena,
+                solo ? new StockMatchRule((byte)MatchConfig.MaxStocks) : NoWinMatchRule.Instance);
             _combatFeedback.SetSimulation(_bridge);
             if (_projectileVFX == null)
                 _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
@@ -112,14 +118,16 @@ namespace SlopArena.Client.World
             var playerBaked = LoadBakedData(playerDef);
             playerDef = ApplyHurtboxOverride(playerDef, playerBaked);
             _playerDef = playerDef;
-            var npcDef = CharacterRegistry.Get(_npcClass);
+            var npcClass = solo ? MatchConfig.SoloBotClass : _npcClass;
+            var npcDef = CharacterRegistry.Get(npcClass);
             var npcBaked = LoadBakedData(npcDef);
             npcDef = ApplyHurtboxOverride(npcDef, npcBaked);
             // Heuristic bot: keep the NPC def, re-seed per match, reset policy memory.
             _npcDef = npcDef;
             _npcRng = new System.Random();
             _npcMemory.Reset();
-            _npcMemory.DifficultyLevel = Mathf.Clamp(_npcCpuLevel, 1, 9);
+            _npcMemory.DifficultyLevel = Mathf.Clamp(
+                solo ? MatchConfig.SoloCpuLevel : _npcCpuLevel, 1, 9);
  
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
@@ -127,9 +135,8 @@ namespace SlopArena.Client.World
             SetupPlayerRenderer(playerDef, playerBaked, arena);
             SetupHUD(playerDef, new[]
             {
-                new HUDManager.HudPlayer(NpcEntityId, "P2", _npcClass, isLocal: false),
+                new HUDManager.HudPlayer(NpcEntityId, "P2", npcClass, isLocal: false),
             });
-
             // NPC renderer
             if (_npcRenderer != null)
             {
@@ -143,7 +150,7 @@ namespace SlopArena.Client.World
                 _npcRenderer.SetCharacterDefinition(npcDef);
                 _npcRenderer.LoadModel(npcDef);
                 _npcRenderer.GetComponent<WeaponAttach>()
-                    ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{_npcClass}"));
+                    ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{npcClass}"));
                 _npcRenderer.InitBillboard(_bridge.InternalSim.GetState, NpcEntityId);
             }
 
@@ -176,6 +183,8 @@ namespace SlopArena.Client.World
 
             // Shared camera + aim setup
             SetupCamera();
+            if (solo)
+                _hudManager?.ShowMatchCallout("READY", 0.55f);
             SetupAimHandler(playerDef);
             SetupLockIndicator(new[] { _playerRenderer, _npcRenderer }, arena);
         }
@@ -202,10 +211,18 @@ namespace SlopArena.Client.World
             // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
 
-            // ── Aim ──
             var aimCtx = _aimHandler != null
                 ? _aimHandler.Evaluate(_bridge.GetState(PlayerEntityId), slot, _playerDef, _inputController)
                 : AimContext.None;
+            if (MatchConfig.Mode == GameMode.Solo && _soloCountdownTicks > 0)
+            {
+                _soloCountdownTicks--;
+                if (_soloCountdownTicks == 120) _hudManager?.ShowMatchCallout("3", 0.7f);
+                else if (_soloCountdownTicks == 60) _hudManager?.ShowMatchCallout("2", 0.7f);
+                else if (_soloCountdownTicks == 1) _hudManager?.ShowMatchCallout("1", 0.7f);
+                else if (_soloCountdownTicks == 0) _hudManager?.ShowMatchCallout("FIGHT!", 0.8f);
+                return;
+            }
             _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
 
             // ── Build input ──
@@ -278,8 +295,78 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             if (_npcRenderer != null)
                 _npcRenderer.ApplyServerState(_bridge.GetState(NpcEntityId));
+            if (MatchConfig.Mode == GameMode.Solo)
+            {
+                var soloPlayer = _bridge.GetState(PlayerEntityId);
+                var soloNpc = _bridge.GetState(NpcEntityId);
+                if (soloPlayer.Deaths > _lastSoloPlayerDeaths)
+                {
+                    _lastSoloPlayerDeaths = soloPlayer.Deaths;
+                    _hudManager?.ShowStockToast(PlayerEntityId, "YOU  -1 STOCK", Color.yellow);
+                }
+                if (soloNpc.Deaths > _lastSoloNpcDeaths)
+                {
+                    _lastSoloNpcDeaths = soloNpc.Deaths;
+                    _hudManager?.ShowStockToast(NpcEntityId, "CPU  -1 STOCK", Color.cyan);
+                }
+            }
 
             UpdateLockCamera();
+            if (MatchConfig.Mode == GameMode.Solo && !_soloResultsShown)
+            {
+                var outcome = new StockMatchRule((byte)MatchConfig.MaxStocks)
+                    .Evaluate(_bridge.GetAllStates());
+                if (outcome.IsEnded)
+                    BuildSoloResults(outcome);
+            }
+        }
+
+        private void BuildSoloResults(MatchOutcome outcome)
+        {
+            _soloResultsShown = true;
+            var states = _bridge.GetAllStates();
+            var results = new ClientSession.MatchResultsData
+            {
+                SharedVictory = outcome.IsSharedVictory,
+                Entries = new List<ClientSession.ResultEntry>
+                {
+                    new()
+                    {
+                        EntityId = PlayerEntityId,
+                        Name = "YOU",
+                        ClassName = MatchConfig.PlayerClass.ToString(),
+                        StocksRemaining = MatchConfig.MaxStocks - states[PlayerEntityId].Deaths,
+                        DamagePercent = states[PlayerEntityId].DamagePercent,
+                        IsWinner = !outcome.IsSharedVictory && outcome.WinnerEntityId == PlayerEntityId,
+                    },
+                    new()
+                    {
+                        EntityId = NpcEntityId,
+                        Name = "CPU",
+                        ClassName = MatchConfig.SoloBotClass.ToString(),
+                        StocksRemaining = MatchConfig.MaxStocks - states[NpcEntityId].Deaths,
+                        DamagePercent = states[NpcEntityId].DamagePercent,
+                        IsWinner = !outcome.IsSharedVictory && outcome.WinnerEntityId == NpcEntityId,
+                    },
+                },
+            };
+            results.Entries.Sort((a, b) =>
+            {
+                int byStocks = b.StocksRemaining.CompareTo(a.StocksRemaining);
+                return byStocks != 0 ? byStocks : a.DamagePercent.CompareTo(b.DamagePercent);
+            });
+            ClientSession.CurrentMatchResults = results;
+            var winner = results.Entries.Find(e => e.IsWinner);
+            _hudManager?.ShowMatchCallout(
+                results.SharedVictory ? "DOUBLE K.O.!" : $"{winner?.Name ?? "CPU"} WINS!",
+                1.4f);
+            StartCoroutine(LoadSoloResults());
+        }
+
+        private System.Collections.IEnumerator LoadSoloResults()
+        {
+            yield return new WaitForSecondsRealtime(2f);
+            SceneManager.LoadScene("Results");
         }
 
         /// <summary>

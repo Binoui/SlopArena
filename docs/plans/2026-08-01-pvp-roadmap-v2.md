@@ -4,6 +4,12 @@
 > **Goal:** Online PvP demo — 2-4 players, server browser, lobby room, stock mode, over UDP.
 > **ADRs:** [0003](../adr/0003-server-browser-over-matchmaking.md)–[0008](../adr/0008-lobby-room-match-flow.md) define the architecture.
 > **Repos:** SlopArena (this repo: client + game server + shared) · [SlopArena-MasterServer](https://github.com/Binoui/SlopArena-MasterServer) (matchmaking/meta API).
+ 
+**Post-demo architecture direction:** ADR-0022–ADR-0028 establish the Workshop-first
+content boundary, deterministic creator primitives, package compatibility, online
+content synchronization, built-in capability versioning, and the open-source ModKit.
+These decisions constrain new systems now but do not add Workshop shipping
+requirements to this PvP demo roadmap.
 
 ---
 

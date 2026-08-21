@@ -21,6 +21,7 @@ namespace SlopArena.Client.Editor
             string windSource = FindPrefab("CFXR4 Wind Trails");
             string ringSource = FindPrefab("CFXR Water Ripples");
             string groundSource = FindPrefab("CFXR2 Ground Hit");
+            string smashSource = FindPrefab("CFXR Hit A (Red) + Text") ?? FindPrefab("CFXR _SMASH_");
             if (poofSource == null || windSource == null || ringSource == null || groundSource == null)
                 throw new InvalidOperationException(
                     "Cartoon FX Remaster Free is missing. Import it from the Unity Asset Store first.");
@@ -31,7 +32,8 @@ namespace SlopArena.Client.Editor
             Copy(windSource, "MovementWindTrails");
             Copy(ringSource, "MovementAirRing");
             Copy(groundSource, "MovementGroundHit");
-
+            if (smashSource != null)
+                Copy(smashSource, "MatchTextSmash");
             TunePoof();
             TuneWind();
             TuneRing();

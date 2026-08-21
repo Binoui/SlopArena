@@ -811,6 +811,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e0d06a7465872c1190de639fe9e6f41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _bindings: {fileID: 0}
 --- !u!114 &1512223012
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -831,6 +832,7 @@ MonoBehaviour:
   _capsuleRadius: 0.6
   _capsuleHeight: 1.3
   _modelYOffset: 0
+  _boneTrailPrefab: {fileID: 0}
 --- !u!95 &1512223013
 Animator:
   serializedVersion: 7
@@ -906,6 +908,7 @@ MonoBehaviour:
   _capsuleRadius: 0.6
   _capsuleHeight: 1.3
   _modelYOffset: 0
+  _boneTrailPrefab: {fileID: 0}
 --- !u!95 &1554294299
 Animator:
   serializedVersion: 7

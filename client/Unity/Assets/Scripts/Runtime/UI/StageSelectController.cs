@@ -32,7 +32,7 @@ namespace SlopArena.Client.UI
             _playerCards = root.Q<VisualElement>("player-cards-area");
             var btnBack = root.Q<Button>("btn-back");
 
-            bool isHost = MatchConfig.Mode == GameMode.Training || ClientSession.IsLobbyHost;
+            bool isHost = MatchConfig.Mode != GameMode.PvP || ClientSession.IsLobbyHost;
             _btnConfirm.style.display = DisplayStyle.None;
             _lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
             root.Q<Label>("lbl-host").text = isHost
@@ -91,10 +91,15 @@ namespace SlopArena.Client.UI
             if (_playerCards == null) return;
             _playerCards.Clear();
 
-            if (MatchConfig.Mode == GameMode.Training)
+            if (MatchConfig.Mode is GameMode.Training or GameMode.Solo)
             {
-                _playerCards.Add(BuildPlayerCard("P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
-                _playerCards.Add(BuildPlayerCard("P2", "TRAINING BOT", CharacterClass.FightGuy, "BOT", false, false));
+                _playerCards.Add(BuildPlayerCard(
+                    "P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
+                _playerCards.Add(BuildPlayerCard(
+                    "P2", MatchConfig.Mode == GameMode.Solo ? "CPU" : "TRAINING BOT",
+                    MatchConfig.Mode == GameMode.Solo ? MatchConfig.SoloBotClass : CharacterClass.FightGuy,
+                    MatchConfig.Mode == GameMode.Solo ? $"CPU {MatchConfig.SoloCpuLevel}" : "BOT",
+                    false, false));
                 return;
             }
 
@@ -169,7 +174,7 @@ namespace SlopArena.Client.UI
             if (string.IsNullOrEmpty(_selectedArena)) return;
             MatchConfig.ArenaName = _selectedArena;
 
-            if (MatchConfig.Mode == GameMode.Training)
+            if (MatchConfig.Mode is GameMode.Training or GameMode.Solo)
             {
                 SceneManager.LoadScene("Arena_Offline");
                 return;

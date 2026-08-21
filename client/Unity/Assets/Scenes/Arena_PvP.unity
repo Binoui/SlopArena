@@ -349,6 +349,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _uiDocument: {fileID: 1212363337}
+  _textVfx: {fileID: 0}
 --- !u!114 &1212363337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -361,9 +362,9 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 11400000, guid: 375219e0f9be73791af68905fab77544, type: 2}
+  m_PanelSettings: {fileID: 0}
   m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 9197481963319205126, guid: c1ac87288658425aaab7dc752a06bbbe, type: 3}
+  sourceAsset: {fileID: 0}
   m_SortingOrder: 0
   m_WorldSpaceSizeMode: 1
   m_WorldSpaceWidth: 1920
@@ -638,6 +639,7 @@ MonoBehaviour:
   _crosshairSize: 32
   _opponentRenderer: {fileID: 1399963925}
   _networkClient: {fileID: 5000000004}
+  _combatFeedback: {fileID: 0}
 --- !u!114 &5000000004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -841,6 +843,10 @@ PrefabInstance:
       propertyPath: Target.TrackingTarget
       value: 
       objectReference: {fileID: 1553613840}
+    - target: {fileID: 2363612637730096979, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
+      propertyPath: m_TagString
+      value: MainCamera
+      objectReference: {fileID: 0}
     - target: {fileID: 2607289433223189454, guid: 455bc6d55d776c34482adf02e622c2d9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

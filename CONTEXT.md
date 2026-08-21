@@ -224,3 +224,33 @@ The word "server" is overloaded in SlopArena. Three distinct things share it:
 - **ServerSimulation** — the pure C# tick loop in `src/Shared/` (`Simulation.cs`, `CombatMath.cs`). Runs identically on client (prediction) and GameServer (authority). Not a process — a class.
 
 When any of these is meant, use the full term. Bare "server" is ambiguous and should be challenged.
+ 
+## Workshop / Creator Content
+
+**WorkshopContent**:
+Creator-authored fighter, stage, or presentation content distributed through Steam Workshop. WorkshopContent references SlopArena capabilities by public identity and owns its creator-provided assets.
+_Avoid_: mod, addon, user content
+
+**BuiltInContent**:
+SlopArena-provided animation, VFX, SFX, material, or gameplay capability available to WorkshopContent through a public semantic identifier. Its runtime implementation is private to SlopArena.
+_Avoid_: internal asset, Unity asset, default asset
+
+**BuiltInContentId**:
+The public semantic identifier for a BuiltInContent capability. Compatible implementation replacement may retain the ID; incompatible semantics require a new versioned ID.
+_Avoid_: asset path, prefab ID, resource path
+
+**CreatorPrimitive**:
+An engine-owned, versioned, deterministic gameplay capability that WorkshopContent composes for movement, combat, stage, or presentation behavior. It is not creator-executable code.
+_Avoid_: mod script, plugin, custom code
+
+**WorkshopPackage**:
+An immutable published unit of WorkshopContent with an identity, version, cooked runtime content hash, dependencies, compatibility declaration, and creator rights metadata.
+_Avoid_: mod file, Workshop item (when exact bytes matter)
+
+**ContentRequirement**:
+The exact WorkshopPackage and BuiltInContentId set a match must resolve and validate before its simulation starts.
+_Avoid_: mod list, asset list, loadout
+
+**OfficialException**:
+An explicit case where official content bypasses the creator-facing content model. It records the reason, scope, owner, and migration path.
+_Avoid_: special case, internal shortcut

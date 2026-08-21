@@ -37,6 +37,8 @@ namespace SlopArena.Client.World
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;
         private RollbackSimulationBridge _bridge = null!;
+        private readonly Dictionary<ulong, ushort> _lastPresentedDeaths = new();
+        private Coroutine? _countdownPresentation;
         protected override ISimulationBridge Bridge => _bridge;
 
         protected override void LeaveMatch()
@@ -186,6 +188,10 @@ namespace SlopArena.Client.World
                 AirDodgesLeft = 1,
                 DamagePercent = 0,
             }, playerBaked);
+            _lastPresentedDeaths.Clear();
+            _lastPresentedDeaths[PlayerEntityId] = 0;
+            foreach (var id in _opponentRenderers.Keys)
+                _lastPresentedDeaths[id] = 0;
 
 
             // Shared camera + aim setup
@@ -255,16 +261,28 @@ namespace SlopArena.Client.World
 
             UpdateLockCamera();
 
+            PresentStockLosses();
 
-            // Surface server match state transitions (countdown → fight → results)
+            // Presentation follows authoritative match-state transitions.
             var matchState = _bridge.GetState(PlayerEntityId).MatchState;
             if (matchState != _lastMatchState)
             {
                 Debug.Log($"[PvP] MatchState transition: {_lastMatchState} → {matchState}");
                 _lastMatchState = matchState;
 
-                if (matchState == MatchState.Ended)
+                if (matchState == MatchState.Countdown)
                 {
+                    if (_countdownPresentation != null)
+                        StopCoroutine(_countdownPresentation);
+                    _countdownPresentation = StartCoroutine(ShowCountdownPresentation());
+                }
+                else if (matchState == MatchState.Playing)
+                {
+                    _hudManager?.ShowMatchCallout("FIGHT!", 0.8f);
+                }
+                else if (matchState == MatchState.Ended)
+                {
+                    _hudManager?.ShowMatchCallout("SLOP OVER!", 1.4f);
                     BuildAndShowResults();
                 }
             }
@@ -308,9 +326,66 @@ namespace SlopArena.Client.World
             GUI.Label(new Rect(10, 30, 400, 20), $"Frontier window: {_bridge.LastFrontierTicks} ticks", style);
         }
 
+        private void PresentStockLosses()
+        {
+            PresentStockLoss(PlayerEntityId, _bridge.GetState(PlayerEntityId));
+            foreach (var id in _opponentRenderers.Keys)
+                PresentStockLoss(id, _bridge.GetState(id));
+        }
+
+        private void PresentStockLoss(ulong entityId, CharacterState state)
+        {
+            if (!_lastPresentedDeaths.TryGetValue(entityId, out var previous))
+            {
+                _lastPresentedDeaths[entityId] = state.Deaths;
+                return;
+            }
+
+            if (state.Deaths <= previous)
+                return;
+
+            _lastPresentedDeaths[entityId] = state.Deaths;
+            _hudManager?.ShowStockToast(entityId, $"{PlayerLabel(entityId)}  -1 STOCK", PlayerColor(entityId));
+        }
+
+        private string PlayerLabel(ulong entityId)
+        {
+            if (entityId == PlayerEntityId)
+                return "YOU";
+            foreach (var opponent in MatchConfig.Opponents)
+                if (opponent.EntityId == entityId)
+                    return $"P{entityId}";
+            return $"P{entityId}";
+        }
+
+        private Color PlayerColor(ulong entityId)
+        {
+            int index = entityId == PlayerEntityId
+                ? 0
+                : MatchConfig.Opponents.FindIndex(p => p.EntityId == entityId) + 1;
+            return index switch
+            {
+                1 => new Color(0.918f, 0.345f, 0.165f),
+                2 => new Color(0.231f, 0.51f, 0.965f),
+                3 => new Color(0.133f, 0.773f, 0.451f),
+                _ => new Color(0.984f, 0.749f, 0.141f),
+            };
+        }
+
+        private System.Collections.IEnumerator ShowCountdownPresentation()
+        {
+            _hudManager?.ShowMatchCallout("READY", 0.55f);
+            yield return new WaitForSecondsRealtime(0.55f);
+            _hudManager?.ShowMatchCallout("3", 0.7f);
+            yield return new WaitForSecondsRealtime(0.7f);
+            _hudManager?.ShowMatchCallout("2", 0.7f);
+            yield return new WaitForSecondsRealtime(0.7f);
+            _hudManager?.ShowMatchCallout("1", 0.7f);
+        }
+
         /// <summary>
-        /// Build the final standings from the last server states and schedule the
-        /// return to the results screen (issue #40). Runs once on the Ended transition.
+        /// Build the final standings and schedule the Results scene. Runs once on
+        /// the authoritative Ended transition.
         /// </summary>
         private void BuildAndShowResults()
         {
@@ -368,6 +443,10 @@ namespace SlopArena.Client.World
             Debug.Log($"[PvP] Match ended — {data.Entries.Count} entries, shared={outcome.IsSharedVictory}");
 
             // 2s beat so the KO moment renders; the server keeps broadcasting the
+            var winnerEntry = data.Entries.Find(e => e.IsWinner);
+            _hudManager?.ShowMatchCallout(
+                data.SharedVictory ? "DOUBLE K.O.!" : $"{winnerEntry?.Name ?? "P1"} WINS!",
+                1.4f);
             // Ended state for its 3s post-match window, then we cut to Results.
             StartCoroutine(ReturnToLobbyAfterDelay());
         }

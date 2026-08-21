@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace SlopArena.Client.UI
 {
-    public enum GameMode { Training, PvP }
+    public enum GameMode { Training, Solo, PvP }
 
     public static class MatchConfig
     {
@@ -27,6 +27,10 @@ namespace SlopArena.Client.UI
             }
         }
 
+        public static SlopArena.Shared.CharacterClass SoloBotClass
+            = SlopArena.Shared.CharacterClass.FightGuy;
+        public static int SoloCpuLevel = 5;
+
         // Per-match entity IDs assigned by the master server at match start
         // (issue #35). The local player drives LocalEntityId; the opponents
         // come from Opponents (issue #36). Defaults keep training and the old
@@ -44,6 +48,8 @@ namespace SlopArena.Client.UI
         {
             Mode = GameMode.Training;
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
+            SoloBotClass = SlopArena.Shared.CharacterClass.FightGuy;
+            SoloCpuLevel = 5;
             ArenaName = "slop_court";
             IsHost = true;
             ServerIP = "127.0.0.1";

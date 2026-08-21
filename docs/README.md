@@ -72,3 +72,15 @@
 | Doc | Covers |
 |-----|--------|
 | [`plans/2026-08-01-pvp-roadmap-v2.md`](plans/2026-08-01-pvp-roadmap-v2.md) | Online PvP implementation plan (current) |
+ 
+## 🧭 Architecture Decision Records
+
+| ADR | Decision |
+|-----|----------|
+| [`adr/0022-workshop-first-content-architecture.md`](adr/0022-workshop-first-content-architecture.md) | Workshop-first product framing and content boundary |
+| [`adr/0023-built-in-content-api.md`](adr/0023-built-in-content-api.md) | Semantic built-in capability IDs and dynamic registry |
+| [`adr/0024-deterministic-creator-gameplay-primitives.md`](adr/0024-deterministic-creator-gameplay-primitives.md) | Data-driven, engine-owned creator gameplay primitives |
+| [`adr/0025-workshop-package-architecture.md`](adr/0025-workshop-package-architecture.md) | Immutable package identity, cooking, dependencies, and compatibility |
+| [`adr/0026-workshop-multiplayer-synchronization.md`](adr/0026-workshop-multiplayer-synchronization.md) | Exact package synchronization and online admission |
+| [`adr/0027-open-source-modkit-preview.md`](adr/0027-open-source-modkit-preview.md) | Open ModKit and installed-game authoritative preview |
+| [`adr/0028-built-in-content-compatibility.md`](adr/0028-built-in-content-compatibility.md) | Versioned built-in capability contracts and support windows |

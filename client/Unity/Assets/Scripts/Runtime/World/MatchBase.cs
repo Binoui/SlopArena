@@ -107,6 +107,7 @@ namespace SlopArena.Client.World
             if (_cameraMount == null) return;
             _cameraMount.SetTarget(_playerRenderer.transform);
             _cameraMount.ResetView(_playerRenderer.transform);
+            _hudManager?.SetCamera(_cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
             var brain = FindFirstObjectByType<CinemachineBrain>();
             if (brain != null)
                 brain.DefaultBlend = new CinemachineBlendDefinition(
@@ -148,11 +149,12 @@ namespace SlopArena.Client.World
                 players.AddRange(extraPlayers);
             players.Sort((a, b) => a.EntityId.CompareTo(b.EntityId));
 
-            // Stocks only in PvP (the game server's StockMatchRule); training has
-            // no win condition, so stock display is hidden (maxStocks <= 0).
-            int maxStocks = MatchConfig.Mode == GameMode.PvP ? MatchConfig.MaxStocks : 0;
+            int maxStocks = MatchConfig.Mode is GameMode.Solo or GameMode.PvP
+                ? MatchConfig.MaxStocks
+                : 0;
             _hudManager?.Initialize(Bridge.GetState, players, maxStocks);
             _hudManager?.SetCharacterDefinition(def);
+            _hudManager?.SetCamera(_cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
         }
 
         protected void SetupAimHandler(CharacterDefinition def)

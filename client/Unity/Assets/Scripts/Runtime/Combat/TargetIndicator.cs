@@ -15,16 +15,15 @@ namespace SlopArena.Client.Combat
     ///    so you can read position even when airborne above you. White by default; red
     ///    under the local player's lock target (CharacterState.LockOn + TargetEntityId).
     /// 2. Height tether — a vertical line from the ring up to the lock target's model,
-    ///    shown only while that target is airborne AND in hitstun (i.e. a juggle). Makes
-    ///    the airborne Y/Z height instantly readable without cluttering neutral.
+    ///    shown whenever that target is airborne. Makes the airborne Y/Z height
+    ///    readable throughout a jump, not only during hitstun.
     /// 3. Launch arc — when any entity is launched (State == Hitstun with knockback
     ///    velocity), predict its flight to landing through the real flight law
-    ///    (ServerSimulation + the same arena/def the live sim uses) and draw the
-    ///    trajectory as a phase-colored ribbon (cyan = hitstun, blue = flight, white =
-    ///    apex, red = landing) while it is airborne. Lets the attacker read whether a
-    ///    short-hop, full-run, or double-jump is needed to follow up.
+    ///    (ServerSimulation + the same arena/def the live sim uses) and expose the
+    ///    trajectory as editor gizmos. It is intentionally absent from gameplay.
     ///
     /// A ring hides while its player is off the heightmap grid (knocked out of the arena).
+    /// The height tether remains a runtime renderer for the locked target while airborne.
     /// </summary>
     public class TargetIndicator : MonoBehaviour
     {
@@ -62,7 +61,6 @@ namespace SlopArena.Client.Combat
 
         // Per-ring indicator state, indexed identically to _rings.
         private LineRenderer[] _tetherLines = Array.Empty<LineRenderer>();
-        private LineRenderer[] _arcLines = Array.Empty<LineRenderer>();
         private List<(Vector3 pos, char phase)>[] _arcPoints = Array.Empty<List<(Vector3 pos, char phase)>>();
         private bool[] _wasLaunched = Array.Empty<bool>();
         private bool[] _arcActive = Array.Empty<bool>();
@@ -76,7 +74,6 @@ namespace SlopArena.Client.Combat
 
             _rings = new Ring[renderers?.Length ?? 0];
             _tetherLines = new LineRenderer[_rings.Length];
-            _arcLines = new LineRenderer[_rings.Length];
             _arcPoints = new List<(Vector3, char)>[_rings.Length];
             _wasLaunched = new bool[_rings.Length];
             _arcActive = new bool[_rings.Length];
@@ -100,8 +97,6 @@ namespace SlopArena.Client.Combat
                 ringGO.SetActive(false);
 
                 _tetherLines[i] = CreateLine(transform, $"HeightTether_{renderer?.EntityId}", TetherColor);
-                _arcLines[i] = CreateLine(transform, $"LaunchArc_{renderer?.EntityId}", Color.cyan);
-                _arcLines[i].enabled = false;
             }
         }
 
@@ -122,7 +117,6 @@ namespace SlopArena.Client.Combat
                     ring.Transform.gameObject.SetActive(false);
                     _tetherLines[i].enabled = false;
                     _arcActive[i] = false;
-                    _arcLines[i].enabled = false;
                     continue;
                 }
 
@@ -134,15 +128,13 @@ namespace SlopArena.Client.Combat
                     ring.Transform.gameObject.SetActive(false);
                     _tetherLines[i].enabled = false;
                     _arcActive[i] = false;
-                    _arcLines[i].enabled = false;
                     continue;
                 }
 
                 ring.Transform.gameObject.SetActive(true);
                 ring.Transform.position = new Vector3(pos.x, floorY + RingHeightAboveFloor, pos.z);
-                ring.Mesh.material.color = locked && targetId == ring.EntityId ? Red : White;
-
                 var state = _getState(ring.EntityId);
+                ring.Mesh.material.color = locked && targetId == ring.EntityId ? Red : White;
                 UpdateTether(i, ring, pos, floorY, locked, targetId, state);
                 UpdateLaunchArc(i, ring, state);
             }
@@ -153,7 +145,7 @@ namespace SlopArena.Client.Combat
         private void UpdateTether(int i, in Ring ring, Vector3 pos, float floorY, bool locked, ulong targetId, in CharacterState state)
         {
             bool isLockTarget = locked && targetId == ring.EntityId;
-            bool show = isLockTarget && !state.IsGrounded && state.State == ActionState.Hitstun;
+            bool show = isLockTarget && !state.IsGrounded;
             if (!show)
             {
                 _tetherLines[i].enabled = false;
@@ -174,81 +166,42 @@ namespace SlopArena.Client.Combat
                 state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
             bool inLaunch = state.State == ActionState.Hitstun && kvMag > LaunchSpeedThreshold;
 
-            // Detect a new launch: first frame State == Hitstun with real knockback velocity.
-            // Predict its flight ONCE here — KV already reflects any initial DI — and hold the
-            // arc while the victim is airborne; it traces the predicted path as it flies.
             if (inLaunch && !_wasLaunched[i] && ring.Renderer.CharacterDef != null)
             {
                 _wasLaunched[i] = true;
                 var arc = PredictFlight(state, ring.Renderer.CharacterDef);
-                if (arc.Count > 1)
-                {
-                    _arcPoints[i] = arc;
-                    _arcActive[i] = true;
-                    // Draw once — the arc is static; only visibility toggles per frame.
-                    DrawArc(i, ring, arc);
-                }
+                _arcPoints[i] = arc;
+                _arcActive[i] = arc.Count > 1;
             }
             else if (!inLaunch)
             {
                 _wasLaunched[i] = false;
             }
 
-            if (_arcActive[i])
-            {
-                if (state.IsGrounded)
-                {
-                    // Victim landed — prediction served its purpose.
-                    _arcActive[i] = false;
-                    _arcLines[i].enabled = false;
-                }
-                else
-                {
-                    // Keep the (static) predicted path visible while the victim flies.
-                    _arcLines[i].enabled = true;
-                }
-            }
-            else
-            {
-                _arcLines[i].enabled = false;
-            }
+            if (_arcActive[i] && state.IsGrounded)
+                _arcActive[i] = false;
         }
 
-        private void DrawArc(int i, in Ring ring, List<(Vector3 pos, char phase)> arc)
+        private void OnDrawGizmos()
         {
-            var line = _arcLines[i];
-            line.positionCount = arc.Count;
-            var positions = new Vector3[arc.Count];
-            float yOff = ring.Renderer.ModelYOffset;
-
-            // Phase colors via a Gradient (LineRenderer has no per-vertex color array).
-            // One key where each phase begins; normalized 0..1 along the arc.
-            var colorKeys = new List<GradientColorKey>();
-            for (int j = 0; j < arc.Count; j++)
+            for (int i = 0; i < _rings.Length; i++)
             {
-                positions[j] = new Vector3(arc[j].pos.x, arc[j].pos.y + yOff, arc[j].pos.z);
-                if (j == 0 || arc[j].phase != arc[j - 1].phase)
+                if (!_arcActive[i] || _arcPoints[i] == null) continue;
+
+                var arc = _arcPoints[i];
+                for (int j = 1; j < arc.Count; j++)
                 {
-                    float t = arc.Count > 1 ? (float)j / (arc.Count - 1) : 0f;
-                    colorKeys.Add(new GradientColorKey(PhaseColor(arc[j].phase), t));
+                    Gizmos.color = PhaseColor(arc[j].phase);
+                    Gizmos.DrawLine(arc[j - 1].pos, arc[j].pos);
                 }
             }
-
-            line.SetPositions(positions);
-            line.colorGradient = new Gradient
-            {
-                colorKeys = colorKeys.ToArray(),
-                alphaKeys = new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) },
-            };
-            line.enabled = true;
         }
 
         /// <summary>
         /// Forward-simulate the victim's launch to landing through the REAL flight law
         /// (a ServerSimulation over the live arena, seeded with the victim's current
         /// post-launch state). Mirrors AbilityLab.ResolveTrajectory but seeds existing
-        /// knockback velocity instead of re-applying the hit. Returns phase-tagged
-        /// world-space samples (always at least the launch point).
+        /// knockback velocity instead of re-applying the hit.
         /// </summary>
         private List<(Vector3 pos, char phase)> PredictFlight(in CharacterState victim, CharacterDefinition def)
         {
@@ -275,7 +228,6 @@ namespace SlopArena.Client.Combat
             }
             return arc;
         }
-
         // ── Helpers ──
 
         private static LineRenderer CreateLine(Transform parent, string name, Color color)
@@ -299,10 +251,10 @@ namespace SlopArena.Client.Combat
 
         private static Color PhaseColor(char phase) => phase switch
         {
-            'H' => new Color(0f, 1f, 1f, 0.6f),        // hitstun (cyan)
-            'F' => new Color(0.2f, 0.5f, 1f, 0.6f),   // flight (blue)
-            'A' => new Color(1f, 1f, 1f, 0.7f),        // apex (white)
-            _   => new Color(1f, 0.2f, 0.1f, 0.6f),    // landing (red)
+            'H' => new Color(0f, 1f, 1f, 0.6f),
+            'F' => new Color(0.2f, 0.5f, 1f, 0.6f),
+            'A' => new Color(1f, 1f, 1f, 0.7f),
+            _   => new Color(1f, 0.2f, 0.1f, 0.6f),
         };
     }
 }

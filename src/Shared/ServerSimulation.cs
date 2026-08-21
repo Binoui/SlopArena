@@ -714,8 +714,100 @@ namespace SlopArena.Shared
 					_states[id] = lagState;
 				}
 			}
+			ResolvePushboxes(simIds);
 		}
 
+		/// <summary>
+		/// Resolve stable body pushboxes after all movement and ability movement for this tick.
+		/// Pushboxes are horizontal cylinders derived from each character definition; they are
+		/// deliberately separate from animation-driven attack hurtboxes.
+		/// </summary>
+		private void ResolvePushboxes(ulong[] simIds)
+		{
+			Array.Sort(simIds);
+			for (int i = 0; i < simIds.Length; i++)
+			{
+				ulong firstId = simIds[i];
+				if (!_states.TryGetValue(firstId, out var first)
+				    || !_defs.TryGetValue(firstId, out var firstDef)
+				    || _rule.IsEliminated(first))
+					continue;
+
+				for (int j = i + 1; j < simIds.Length; j++)
+				{
+					ulong secondId = simIds[j];
+					if (!_states.TryGetValue(secondId, out var second)
+					    || !_defs.TryGetValue(secondId, out var secondDef)
+					    || _rule.IsEliminated(second))
+						continue;
+
+					float verticalReach = (firstDef.CapsuleHeight + secondDef.CapsuleHeight) * 0.5f;
+					if (MathF.Abs(first.PY - second.PY) >= verticalReach)
+						continue;
+
+					float dx = second.PX - first.PX;
+					float dz = second.PZ - first.PZ;
+					float distanceSquared = dx * dx + dz * dz;
+					float radiusSum = firstDef.CapsuleRadius + secondDef.CapsuleRadius;
+					if (distanceSquared >= radiusSum * radiusSum)
+						continue;
+
+					float distance;
+					if (distanceSquared > 0.000001f)
+					{
+						distance = MathF.Sqrt(distanceSquared);
+						dx /= distance;
+						dz /= distance;
+					}
+					else
+					{
+						distance = 0f;
+						float angle = ((firstId ^ secondId) & 1UL) == 0UL ? 0f : MathF.PI * 0.5f;
+						dx = MathF.Sin(angle);
+						dz = MathF.Cos(angle);
+					}
+
+					float penetration = radiusSum - distance;
+					bool firstWarping = first.WarpSpeed > 0f;
+					bool secondWarping = second.WarpSpeed > 0f;
+					if (firstWarping && secondWarping)
+						continue;
+
+					float firstCorrection = secondWarping ? 1f : firstWarping ? 0f : 0.5f;
+					float secondCorrection = firstWarping ? 1f : secondWarping ? 0f : 0.5f;
+					first.PX -= dx * penetration * firstCorrection;
+					first.PZ -= dz * penetration * firstCorrection;
+					second.PX += dx * penetration * secondCorrection;
+					second.PZ += dz * penetration * secondCorrection;
+
+					float relativeVelocity = (second.VX - first.VX) * dx + (second.VZ - first.VZ) * dz;
+					if (relativeVelocity < 0f)
+					{
+						if (!firstWarping && !secondWarping)
+						{
+							float impulse = relativeVelocity * 0.5f;
+							first.VX += dx * impulse;
+							first.VZ += dz * impulse;
+							second.VX -= dx * impulse;
+							second.VZ -= dz * impulse;
+						}
+						else if (!firstWarping)
+						{
+							first.VX += dx * relativeVelocity;
+							first.VZ += dz * relativeVelocity;
+						}
+						else if (!secondWarping)
+						{
+							second.VX -= dx * relativeVelocity;
+							second.VZ -= dz * relativeVelocity;
+						}
+					}
+
+					_states[firstId] = first;
+					_states[secondId] = second;
+				}
+			}
+		}
 		/// <summary>
 		/// Find the closest enemy entity ID for target lock.
 		/// Scans all registered entities, skipping self.

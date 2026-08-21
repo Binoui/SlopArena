@@ -29,7 +29,7 @@ namespace SlopArena.Client.UI
     public class HUDManager : MonoBehaviour
     {
         [SerializeField] private UIDocument _uiDocument;
-
+        [SerializeField] private MatchTextVFX _textVfx;
         /// <summary>Identity required by both the tracked readout and broadcast card.</summary>
         public readonly struct HudPlayer
         {
@@ -54,6 +54,8 @@ namespace SlopArena.Client.UI
             public Label DamageOutline = null!;
             public VisualElement[] StockIcons = Array.Empty<VisualElement>();
             public Label StockCountLabel = null!;
+            public Label StockToast = null!;
+            public float StockToastTimer;
             public Color IdentityColor = Color.white;
             public bool UseIdentityColor;
             public Color TierColor = Color.white;
@@ -155,6 +157,8 @@ namespace SlopArena.Client.UI
         private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
         private VisualElement _actionBar;
+        private Label _matchCallout;
+        private float _matchCalloutTimer;
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
@@ -193,9 +197,15 @@ namespace SlopArena.Client.UI
             }
 
             var root = _uiDocument.rootVisualElement;
+            if (_textVfx == null)
+                _textVfx = gameObject.AddComponent<MatchTextVFX>();
+            var cam = UnityEngine.Camera.main ?? FindFirstObjectByType<UnityEngine.Camera>();
+            if (cam != null)
+                _textVfx.SetCamera(cam);
             _overheadLayer = root.Q<VisualElement>("overhead-layer");
             _billboardLayer = root.Q<VisualElement>("player-billboard");
             _actionBar = root.Q<VisualElement>("action-bar");
+            _matchCallout = root.Q<Label>("match-callout");
 
             // Rebuild player panels from the roster (badge color by roster position).
             _overheadLayer?.Clear();
@@ -319,12 +329,18 @@ namespace SlopArena.Client.UI
 
             var damage = new Label("0%");
             damage.AddToClassList("overhead-damage");
-
-            var panel = new OverheadPanel { Root = root, Damage = damage };
+            var panel = new OverheadPanel { Root = root, Damage = damage, IdentityColor = identityColor };
             AddStocks(panel, details);
             copy.Add(details);
             copy.Add(damage);
             root.Add(copy);
+
+            var stockToast = new Label();
+            stockToast.AddToClassList("stock-toast-player");
+            stockToast.style.display = DisplayStyle.None;
+            stockToast.style.borderLeftColor = identityColor;
+            root.Add(stockToast);
+            panel.StockToast = stockToast;
             return panel;
         }
 
@@ -424,6 +440,41 @@ namespace SlopArena.Client.UI
             }
         }
 
+        public void ShowMatchCallout(string text, float seconds = 0.9f)
+        {
+            _textVfx?.Show(text, new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+                text == "FIGHT!" ? 1.35f : 0.9f,
+                Color.white, new Color(1f, 0.72f, 0.12f), seconds);
+            if (_matchCallout == null) return;
+            _matchCallout.text = text;
+            _matchCalloutTimer = Mathf.Max(0.01f, seconds);
+            _matchCallout.style.display = DisplayStyle.Flex;
+            _matchCallout.style.opacity = 1f;
+        }
+
+        public void ShowStockToast(ulong entityId, string text, Color identityColor, float seconds = 1.15f)
+        {
+            if (!_billboardPanels.TryGetValue(entityId, out var panel) || panel.StockToast == null)
+                return;
+
+            panel.StockToast.text = text;
+            panel.StockToastTimer = Mathf.Max(0.01f, seconds);
+            var bounds = panel.Root.worldBound;
+            _textVfx?.Show(text,
+                new Vector2(bounds.xMax + 70f, Screen.height - bounds.yMin - bounds.height * 0.5f),
+                0.7f, identityColor, Color.white, seconds);
+            panel.StockToast.style.display = DisplayStyle.Flex;
+            panel.StockToast.style.opacity = 1f;
+            panel.StockToast.style.borderLeftColor = identityColor;
+        }
+
+        public void SetCamera(UnityEngine.Camera camera)
+        {
+            if (_textVfx == null)
+                _textVfx = gameObject.AddComponent<MatchTextVFX>();
+            _textVfx.SetCamera(camera);
+        }
+
         /// <summary>
         /// Refresh all HUD data from the simulation. Called by the owning MatchBase
         /// each fixed tick. Overhead panel screen positions are smoothed in LateUpdate.
@@ -520,10 +571,20 @@ namespace SlopArena.Client.UI
             s.PrevCooldown = cooldown;
         }
 
-        /// <summary>Drive transient juice timers and overhead hit-flashes at render rate.</summary>
         private void Update()
         {
-            float dt = Time.deltaTime;
+            float dt = Time.unscaledDeltaTime;
+
+            if (_matchCalloutTimer > 0f)
+            {
+                _matchCalloutTimer -= dt;
+                if (_matchCalloutTimer <= 0f)
+                {
+                    _matchCallout.style.opacity = 0f;
+                    _matchCallout.style.display = DisplayStyle.None;
+                }
+            }
+
 
             if (_dashSlot != null) TickSlotJuice(_dashSlot, dt);
             if (_burstSlot != null) TickSlotJuice(_burstSlot, dt);
@@ -540,6 +601,16 @@ namespace SlopArena.Client.UI
             bool flashing = panel.HitFlashTimer > 0f;
             if (flashing) panel.HitFlashTimer -= dt;
             panel.Damage.style.color = flashing ? Color.white : panel.TierColor;
+
+            if (panel.StockToastTimer > 0f)
+            {
+                panel.StockToastTimer -= dt;
+                if (panel.StockToastTimer <= 0f)
+                {
+                    panel.StockToast.style.opacity = 0f;
+                    panel.StockToast.style.display = DisplayStyle.None;
+                }
+            }
         }
 
         private static void TickSlotJuice(ActionSlot s, float dt)

@@ -25,6 +25,7 @@ namespace SlopArena.Client.UI
             var submenu             = root.Q<VisualElement>("submenu");
             var directConnectModal  = root.Q<VisualElement>("direct-connect-modal");
             var btnTraining         = root.Q<Button>("btn-training");
+            var btnSolo             = root.Q<Button>("btn-solo");
             var btnMultiplayer      = root.Q<Button>("btn-multiplayer");
             var btnHost             = root.Q<Button>("btn-host");
             var btnServerBrowser    = root.Q<Button>("btn-serverbrowser");
@@ -40,6 +41,12 @@ namespace SlopArena.Client.UI
             btnTraining.clicked += () =>
             {
                 MatchConfig.Mode   = GameMode.Training;
+                MatchConfig.IsHost = true;
+                SceneManager.LoadScene("CharSelect");
+            };
+            btnSolo.clicked += () =>
+            {
+                MatchConfig.Mode = GameMode.Solo;
                 MatchConfig.IsHost = true;
                 SceneManager.LoadScene("CharSelect");
             };

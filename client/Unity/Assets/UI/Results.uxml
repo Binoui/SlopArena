@@ -4,7 +4,7 @@
         <ui:Label name="title" text="RESULTS" class="title" />
         <ui:Label name="lbl-winner" class="subtitle" />
         <ui:VisualElement name="standings-list" class="player-list lobby-list" />
-        <ui:Label name="lbl-countdown" class="subtitle" />
+    <ui:Button name="btn-return-lobby" text="RETURN TO LOBBY" class="btn-primary" />
         <ui:VisualElement name="global-chat" class="global-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
