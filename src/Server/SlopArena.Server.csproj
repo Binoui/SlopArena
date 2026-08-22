@@ -9,11 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\SlopArena.Shared.csproj" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Jitter2" Version="2.*" />
   </ItemGroup>
 
   <ItemGroup>

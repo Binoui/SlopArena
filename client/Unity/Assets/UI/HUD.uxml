@@ -1,7 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/HUD.uss?fileID=7433441132597879392&amp;guid=82c4820ef1cdb99f79947584a2b83902&amp;type=3#HUD" />
     <ui:VisualElement name="hud-root" class="hud-root">
-        <ui:Label name="match-callout" class="match-callout" />
         <ui:Label name="stock-toast" class="stock-toast" />
         <ui:VisualElement name="overhead-layer" class="overhead-layer" />
         <ui:VisualElement name="player-billboard" class="player-billboard" />

@@ -23,7 +23,7 @@ namespace SlopArena.Shared.AI;
 /// hitstun/hitstop/burst-recovery/landing-lag/anim-lock; no dash on cooldown; no slot press on
 /// cooldown. Same <c>Random</c> stream → same decisions.
 /// </summary>
-public sealed class HeuristicBotPolicy : IBotPolicy
+public sealed class HeuristicBotPolicy
 {
     /// <summary>Ground-normal priority pool — ActiveSlot bytes for kit slots 1–4.</summary>
     private static readonly byte[] Slots =

@@ -59,26 +59,93 @@ namespace SlopArena.Client
         /// </summary>
         public static bool IsLobbyHost;
 
-        /// <summary>Final standings, set by PvPMatch when the match ends; consumed by ResultsUI.</summary>
-        public static MatchResultsData? CurrentMatchResults;
+        /// <summary>Immutable final standings snapshot consumed by ResultsUI.</summary>
+        public static MatchResultsData? CurrentMatchResults { get; private set; }
 
-        /// <summary>One player's final standing line on the results screen.</summary>
+        /// <summary>One player's immutable final standing line.</summary>
         public sealed class ResultEntry
         {
-            public ulong EntityId;
-            public string Name = "";
-            public string ClassName = "";
-            public int StocksRemaining;
-            public int DamagePercent;
-            public bool IsWinner;
+            public ResultEntry(
+                ulong entityId,
+                int placement,
+                int kos,
+                int falls,
+                string name = "",
+                string className = "",
+                int stocksRemaining = 0,
+                int damagePercent = 0)
+            {
+                EntityId = entityId;
+                Placement = placement;
+                KOs = kos;
+                Falls = falls;
+                Name = name ?? "";
+                ClassName = className ?? "";
+                StocksRemaining = stocksRemaining;
+                DamagePercent = damagePercent;
+            }
+
+            public ulong EntityId { get; }
+            public int Placement { get; }
+            public int KOs { get; }
+            public int Falls { get; }
+            public string Name { get; }
+            public string ClassName { get; }
+            public int StocksRemaining { get; }
+            public int DamagePercent { get; }
+            public bool IsWinner => Placement == 1;
         }
 
-        /// <summary>Final standings snapshot for the results screen.</summary>
+        /// <summary>Immutable final standings snapshot for the Results scene.</summary>
         public sealed class MatchResultsData
         {
-            public bool SharedVictory;
-            public List<ResultEntry> Entries = new();
+            public MatchResultsData(
+                bool sharedVictory,
+                string stageName,
+                uint durationTicks,
+                IReadOnlyList<ResultEntry> entries)
+            {
+                if (entries == null) throw new ArgumentNullException(nameof(entries));
+                var copy = new ResultEntry[entries.Count];
+                for (int i = 0; i < entries.Count; i++)
+                    copy[i] = entries[i];
+
+                SharedVictory = sharedVictory;
+                StageName = stageName ?? "";
+                DurationTicks = durationTicks;
+                PlayerCount = copy.Length;
+                Entries = Array.AsReadOnly(copy);
+            }
+
+            public bool SharedVictory { get; }
+            public string StageName { get; }
+            public uint DurationTicks { get; }
+            public int PlayerCount { get; }
+            public IReadOnlyList<ResultEntry> Entries { get; }
         }
+
+        /// <summary>Store the server-authored final result without local re-ranking.</summary>
+        public static void ApplyAuthoritativeMatchResult(Shared.MatchResultPacket packet)
+        {
+            var entries = new ResultEntry[packet.Entries.Length];
+            for (int i = 0; i < packet.Entries.Length; i++)
+            {
+                var entry = packet.Entries[i];
+                entries[i] = new ResultEntry(
+                    entry.EntityId,
+                    entry.Placement,
+                    entry.KOs,
+                    entry.Falls);
+            }
+
+            CurrentMatchResults = new MatchResultsData(
+                packet.SharedVictory,
+                UI.MatchConfig.ArenaName,
+                packet.DurationTicks,
+                entries);
+        }
+        public static void SetLocalMatchResults(MatchResultsData results)
+            => CurrentMatchResults = results;
 
         /// <summary>
         /// Apply a <c>MatchStarted</c> push: stash the match config (arena, port,
@@ -89,6 +156,8 @@ namespace SlopArena.Client
         /// </summary>
         public static void ApplyMatchStarted(Shared.MatchStartedConfig config)
         {
+            // A new match invalidates every previous result snapshot.
+            CurrentMatchResults = null;
             // Find the local player in the roster (by SteamId). The master
             // server assigned entity IDs 1..N by join order (issue #35); the
             // game server spawns each with the roster's character class, so

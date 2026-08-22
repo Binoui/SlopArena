@@ -7,13 +7,11 @@
             <ui:VisualElement class="backdrop-burst backdrop-burst--yellow" />
             <ui:Label text="FIND A CREW. START A MESS." class="backdrop-note backdrop-note--right" />
         </ui:VisualElement>
-
         <ui:Button name="btn-back" text="← BACK" class="btn-back server-browser-back" />
         <ui:Label text="ONLINE // SERVER BROWSER" class="server-browser-eyebrow" />
         <ui:Label name="title" text="SERVER BROWSER" class="server-browser-title" />
         <ui:Label text="FIND A MATCH WORTH JOINING" class="server-browser-subtitle" />
-
-        <ui:VisualElement name="browser-panel" class="browser-panel">
+        <ui:VisualElement name="browser-panel" class="browser-panel" style="align-self: auto; align-items: stretch; justify-content: flex-start; position: absolute; bottom: 609px; right: 836px; width: 737px; top: 283px; left: 395px;">
             <ui:VisualElement class="browser-panel__header">
                 <ui:Label text="ACTIVE ARENAS" class="browser-panel__eyebrow" />
                 <ui:Label text="PUBLIC ROOMS" class="browser-panel__capacity" />
@@ -25,9 +23,8 @@
                 <ui:Button name="btn-refresh" text="REFRESH" class="btn-primary browser-refresh" />
             </ui:VisualElement>
         </ui:VisualElement>
-
-        <ui:VisualElement name="global-chat" class="global-chat browser-chat">
-            <ui:VisualElement class="global-chat__header">
+        <ui:VisualElement name="global-chat" class="global-chat browser-chat" style="-unity-slice-scale: 1px; rotate: 0;">
+            <ui:VisualElement name="VisualElement" class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
                 <ui:Label text="1,204 ONLINE" class="global-chat__online" />
             </ui:VisualElement>

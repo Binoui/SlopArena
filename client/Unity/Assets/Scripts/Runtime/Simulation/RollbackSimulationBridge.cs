@@ -18,6 +18,8 @@ namespace SlopArena.Client.Simulation
         private readonly ulong _selfId;
         private uint _tick;
         private readonly List<SpellResolver.HitResult> _lastTickHits = new();
+        public MatchResultPacket? LatestMatchResult { get; private set; }
+
 
         public RollbackSimulationBridge(ArenaDefinition arena, NetworkClient client, ulong selfEntityId, IMatchRule? rule = null)
         {
@@ -44,6 +46,8 @@ namespace SlopArena.Client.Simulation
             _lastTickHits.AddRange(_core.LastTickHits);
 
             var packets = _client.ReceiveEntityPackets();
+            foreach (var result in _client.ReceiveMatchResults())
+                LatestMatchResult = result;
             if (packets.Count == 0) return;
 
             var opponentBatch = new List<ServerEntityPacket>(packets.Count);

@@ -37,6 +37,11 @@ namespace SlopArena.Tests
 
         private const string GuestAuthJson =
             "{\"token\":\"" + SampleToken + "\",\"steamId\":42}";
+        private const string EscapedServerListJson =
+            "[{\"id\":\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"," +
+            "\"name\":\"EU \\\"Prime\\\" & <1>\"," +
+            "\"ipAddress\":\"127.0.0.1\",\"port\":9876,\"region\":\"eu-west\"," +
+            "\"currentMatches\":0,\"maxConcurrentMatches\":4,\"isOfficial\":true}]";
 
         private const string UserInfoJson =
             "{\"steamId\":42,\"username\":\"Guest-12345\",\"mmr\":1000}";
@@ -105,6 +110,13 @@ namespace SlopArena.Tests
             Assert.False(ok);
             Assert.Null(client.Token);
         }
+        [Fact]
+        public async Task AuthenticateGuest_ReturnsFalseOnMalformedJson()
+        {
+            using var client = MakeClient(_ => JsonOk("{"));
+
+            Assert.False(await client.AuthenticateGuestAsync());
+        }
 
         // ── GetMeAsync ──
 
@@ -153,6 +165,18 @@ namespace SlopArena.Tests
             var info = await client.GetMeAsync();
 
             Assert.Null(info);
+        }
+        [Fact]
+        public async Task GetMe_ReturnsNullOnMalformedJson()
+        {
+            using var client = MakeClient(req =>
+                req.RequestUri!.ToString().Contains("auth/guest")
+                    ? GuestAuthResponse()
+                    : JsonOk("{"));
+
+            await client.AuthenticateGuestAsync();
+
+            Assert.Null(await client.GetMeAsync());
         }
 
         // ── Bearer header propagation ──
@@ -265,6 +289,21 @@ namespace SlopArena.Tests
             Assert.False(s1.IsOfficial);
             Assert.Equal("us-east", s1.Region);
         }
+        [Fact]
+        public async Task GetServers_DeserializesEscapedServerName()
+        {
+            using var client = MakeClient(req =>
+                req.RequestUri!.ToString().Contains("auth/guest")
+                    ? GuestAuthResponse()
+                    : JsonOk(EscapedServerListJson));
+
+            await client.AuthenticateGuestAsync();
+            var servers = await client.GetServersAsync();
+
+            Assert.NotNull(servers);
+            Assert.Single(servers!);
+            Assert.Equal("EU \"Prime\" & <1>", servers[0].Name);
+        }
 
         [Fact]
         public async Task GetServers_ReturnsNullBeforeAuth()
@@ -300,6 +339,18 @@ namespace SlopArena.Tests
             await client.AuthenticateGuestAsync();
             var servers = await client.GetServersAsync();
             Assert.Null(servers);
+        }
+        [Fact]
+        public async Task GetServers_ReturnsNullOnMalformedJson()
+        {
+            using var client = MakeClient(req =>
+                req.RequestUri!.ToString().Contains("auth/guest")
+                    ? GuestAuthResponse()
+                    : JsonOk("{"));
+
+            await client.AuthenticateGuestAsync();
+
+            Assert.Null(await client.GetServersAsync());
         }
     }
 }

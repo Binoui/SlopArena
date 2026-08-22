@@ -6,21 +6,6 @@
     pointer-events: none;
 }
 
-.match-callout {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 34%;
-    height: 120px;
-    display: none;
-    color: #fffcee;
-    font-size: 72px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
-    -unity-text-outline-width: 6px;
-    -unity-text-outline-color: #0d0d14;
-    letter-spacing: 2px;
-}
 
 .stock-toast {
     position: absolute;

@@ -59,6 +59,120 @@ AbilitySpec.BoneTrails[]    ← per-ability data (BoneTrailDef struct)
 - Trails are toggled on/off via emission module, not created/destroyed per swing
 
 ---
+## Match Text VFX
+
+Match-start broadcasts use Cartoon FX particle text. The particle effect is the only
+visible countdown layer; do not pair it with a second UI Toolkit text label.
+
+### Match-start contract
+
+| Mode | Sequence | Authority |
+|------|----------|-----------|
+| Solo | `READY` (2s) → `1` → `2` → `3` (1s each) → `SLOP IT OUT` | Local match gate |
+| PvP | `READY` (2s) → `1` → `2` → `3` (1s each) → `SLOP IT OUT` | GameServer `Countdown` → `Playing` |
+| Training | No countdown | Immediate control |
+
+PvP uses `MatchInstance.CountdownDuration = 300` ticks. Solo uses the same
+300-tick gate in `TrainingMatch`. `SLOP IT OUT` is shown when the match becomes
+playable; the presentation does not grant gameplay control.
+
+**Key files:**
+
+- `client/Unity/Assets/Scripts/Runtime/UI/MatchTextVFX.cs`
+- `client/Unity/Assets/Scripts/Runtime/UI/HUDManager.cs`
+- `client/Unity/Assets/Scripts/Runtime/World/TrainingMatch.cs`
+- `client/Unity/Assets/Scripts/Runtime/World/PvPMatch.cs`
+- `src/Server/MatchInstance.cs`
+
+### Static versus dynamic particle text
+
+`CFXR_ParticleText` has two modes:
+
+- **Static (`isDynamic: 0`)** — the editor bakes each letter as particle
+  children. Runtime text mutation is invalid.
+- **Dynamic (`isDynamic: 1`)** — runtime `UpdateText()` regenerates letter
+  children from a template particle system.
+
+Match-start text uses static, authored variants because the MatchTextSmash
+style is more controlled and reliable in-game. The variants are generated in
+the Unity Editor from `MatchTextSmash.prefab`, not mutated during gameplay:
+
+```text
+MatchTextREADY.prefab
+MatchText1.prefab
+MatchText2.prefab
+MatchText3.prefab
+MatchTextSLOPITOUT.prefab
+```
+
+The editor authoring flow is:
+
+1. Instantiate `MatchTextSmash.prefab` as a non-prefab editor object.
+2. Set `CFXR_ParticleText.text`.
+3. Call `UpdateText()` in the editor so the letter particle children regenerate.
+4. Save a phrase-specific prefab under `Assets/Resources/MatchTextVFX/`.
+5. Destroy the temporary instance.
+
+The non-prefab step matters: the Cartoon FX editor guard prevents `UpdateText()`
+from rewriting a prefab asset or connected prefab instance.
+
+At runtime, `MatchTextVFX` resolves the phrase-specific prefab, instantiates it,
+parents it to the gameplay camera, positions it at camera center, replays its
+particle systems with unscaled time, and destroys it after the authored lifetime.
+Other messages can use the dynamic prefab fallback.
+
+### Text shader contract
+
+The SlopArena font material uses:
+
+```text
+Shader "SlopArena/Particles/Font"
+```
+
+Source: `client/Unity/Assets/Shaders/SlopArenaParticleFont.shader`.
+
+The shader is URP transparent particle rendering:
+
+- `Blend SrcAlpha OneMinusSrcAlpha`
+- `ZWrite Off`
+- `Cull Off`
+- `RenderPipeline = UniversalPipeline`
+
+`CFXR_ParticleText` uses packed font texture channels:
+
+| Font texture channel | Meaning |
+|----------------------|---------|
+| Blue | Background/particle color |
+| Green | `Custom1` / text `color1` |
+| Red | `Custom2` / text `color2` |
+| Alpha | Glyph opacity |
+
+The particle renderer must preserve the custom vertex streams consumed by the
+shader: position, color, UV, `Custom1`, and `Custom2`. If `Custom1` or `Custom2`
+is missing, the glyph can render with incorrect or missing gradient colors even
+when the prefab and texture are valid.
+
+Use `MatchTextFontSlopArena.mat` with the custom font shader. The URP font and
+impact materials are separate assets; do not replace the font material with a
+generic particle material unless the custom vertex streams and packed texture
+contract are also replaced.
+
+### Shader/VFX failure checklist
+
+| Symptom | First check |
+|---------|-------------|
+| Pink or invisible text | Shader resolves to URP and the material is not missing |
+| White/flat text | Particle renderer still has `Custom1` and `Custom2` streams |
+| Missing outline/gradient | Font texture channel packing and `MatchTextFontSlopArena.mat` |
+| Text appears behind the arena | Transparent queue, camera depth, and particle sorting |
+| Text works in editor but not runtime | Static prefab was regenerated in the editor; runtime is not calling `UpdateText()` on `isDynamic: 0` |
+| Duplicate countdown text | `HUDManager` must call `MatchTextVFX` without displaying a UI Toolkit label |
+
+The Cartoon FX source package remains a local dependency. Keep source-package
+provenance and shader/material changes aligned with
+`docs/contributing/conventions.md`.
+
+---
 
 ## Shared Impact Tiers
 
@@ -157,6 +271,7 @@ No code changes needed — PlayerRenderer picks it up automatically.
 |-----|--------|------|
 | Shared impact tiers | Implemented | `GraphicHitEffect.cs` + `CombatFeedback.cs` |
 | Bone trails | Implemented | `BoneTrail.prefab` + `PlayerRenderer.cs` |
+| Match-start text broadcasts | Implemented | `MatchTextVFX.cs` + `MatchTextVFX/MatchText*.prefab` |
 | Character-specific hit layers | Not implemented | — |
 
 ### Authored bone trails
@@ -187,4 +302,7 @@ No code changes needed — PlayerRenderer picks it up automatically.
 - `PlayerRenderer.cs` — `client/Unity/Assets/Scripts/Runtime/Entities/PlayerRenderer.cs`
 - BoneTrail prefab — `Assets/Resources/VFX/BoneTrail.prefab`
 - `BoneTrailDef` struct — `src/Shared/AttackData.cs`
+- Match text controller — `client/Unity/Assets/Scripts/Runtime/UI/MatchTextVFX.cs`
+- Match text prefabs — `client/Unity/Assets/Resources/MatchTextVFX/`
+- Font shader — `client/Unity/Assets/Shaders/SlopArenaParticleFont.shader`
 - Historical prototype spec — `docs/superpowers/specs/2026-07-19-hit-spark-vfx-design.md`

@@ -27,7 +27,7 @@
 | [`systems/blast-zones.md`](systems/blast-zones.md) | Void death, kill boundaries |
 | [`systems/npc-system.md`](systems/npc-system.md) | Training dummies, AI |
 | [`systems/spell-vfx.md`](systems/spell-vfx.md) | Spell visual effects |
-| [`systems/vfx-particles.md`](systems/vfx-particles.md) | Particle system design |
+| [`systems/vfx-particles.md`](systems/vfx-particles.md) | Impact particles, text VFX, shader contracts |
 | [`systems/range-based-combat.md`](systems/range-based-combat.md) | Range & attack distance design |
 
 ---

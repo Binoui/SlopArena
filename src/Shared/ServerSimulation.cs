@@ -10,12 +10,20 @@ namespace SlopArena.Shared
 		private readonly ArenaDefinition _arena;
 		private readonly Dictionary<ulong, CharacterState> _states = new();
 		private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
+		private readonly Dictionary<ulong, byte> _kos = new();
+		private readonly Dictionary<ulong, (ulong attackerId, uint tick)> _lastHitCredits = new();
+		private uint _tick;
+		private const uint KillCreditWindowTicks = 180;
+
 		private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
 		private readonly Dictionary<ulong, int> _animFrames = new();
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
 		private readonly SpellResolver _spellResolver = new();
+		/// <summary>Authoritative KOs credited during the current match.</summary>
+		public byte GetKOs(ulong entityId) => _kos.TryGetValue(entityId, out var kos) ? kos : (byte)0;
+
 		private readonly Dictionary<ulong, (float x, float y, float z, float yaw)> _respawnPositions = new();
 		// Track pending attack slots for warp-in-progress entities
 		private readonly Dictionary<ulong, byte> _pendingWarpAttacks = new();
@@ -57,6 +65,9 @@ namespace SlopArena.Shared
 			_defs[id] = def;
 			initialState.EntityId = id;
 			_states[id] = initialState;
+			_kos[id] = 0;
+			_lastHitCredits.Remove(id);
+
 			if (baked != null) _bakedData[id] = baked;
 			_animFrames[id] = 0;
 			_prevAnimIndex[id] = -1;
@@ -76,6 +87,9 @@ namespace SlopArena.Shared
 			_prevAnimIndex.Remove(id);
 			_activeAbilities.Remove(id);
 			_respawnPositions.Remove(id);
+			_kos.Remove(id);
+			_lastHitCredits.Remove(id);
+
 		}
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
@@ -1073,22 +1087,21 @@ namespace SlopArena.Shared
 				// Invincible (respawn grace, dash) — the hit is fully ignored (issue #37).
 				if (targetState.InvincibilityTicks > 0) continue;
 
-
 				// ── Counter interception (target-side): if the defender has an active
 				// ability that counters this hit, it absorbs the hit and applies its own
 				// riposte to the attacker. Skip normal damage/knockback for this hit. ──
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId
 				    && _activeAbilities.TryGetValue(hit.TargetEntityId, out var defenderAbility))
 				{
-                    if (defenderAbility.TryCounter(ref targetState, ref attackerState,
-                        _defs[hit.OwnerEntityId], hit.Damage))
+					if (defenderAbility.TryCounter(ref targetState, ref attackerState,
+					    _defs[hit.OwnerEntityId], hit.Damage))
 					{
+						_lastHitCredits[hit.OwnerEntityId] = (hit.TargetEntityId, _tick);
 						_states[hit.TargetEntityId] = targetState;
 						_states[hit.OwnerEntityId] = attackerState;
 						continue;
 					}
 				}
-
 				// Knockback direction: from attacker to target (not hitbox to target).
 				// The hitbox offset can place it past the target, inverting the direction.
 				// Smash convention: always push away from the attacker.
@@ -1115,6 +1128,9 @@ namespace SlopArena.Shared
 				// Placed after the invincibility/counter continues, so ignored hits never mark.
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
 					targetState.LastAttackerEntityId = hit.OwnerEntityId;
+				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+					_lastHitCredits[hit.TargetEntityId] = (hit.OwnerEntityId, _tick);
+
 
 				float finalDamage = hit.Damage;
 				targetState.DamagePercent += (ushort)finalDamage;
@@ -1360,7 +1376,17 @@ namespace SlopArena.Shared
 			{
 				var d = _defs[id];
 				var oldState = _states[id];
+				if (_lastHitCredits.TryGetValue(id, out var credit)
+				    && _tick - credit.tick <= KillCreditWindowTicks
+				    && credit.attackerId != id
+				    && _kos.ContainsKey(credit.attackerId))
+				{
+					if (_kos[credit.attackerId] < byte.MaxValue)
+						_kos[credit.attackerId]++;
+				}
+				_lastHitCredits.Remove(id);
 				byte newDeaths = oldState.Deaths < byte.MaxValue ? (byte)(oldState.Deaths + 1) : oldState.Deaths;
+
 
 				// Respawn point: per-entity override when set (MatchInstance/TrainingMatch
 				// distribute spawn points), else deterministic by entity index so players
@@ -1409,6 +1435,7 @@ namespace SlopArena.Shared
 
 		public void Tick(Dictionary<ulong, InputState> inputs)
 		{
+			_tick++;
 			PreTickAbilities(inputs);
 
 			ProcessTargetLock(inputs);

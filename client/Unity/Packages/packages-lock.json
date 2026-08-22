@@ -336,15 +336,6 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
-    "com.unity.visualeffectgraph": {
-      "version": "17.0.4",
-      "depth": 0,
-      "source": "builtin",
-      "dependencies": {
-        "com.unity.shadergraph": "17.0.4",
-        "com.unity.render-pipelines.core": "17.0.4"
-      }
-    },
     "extensions.unity.playerprefsex": {
       "version": "2.1.5",
       "depth": 1,

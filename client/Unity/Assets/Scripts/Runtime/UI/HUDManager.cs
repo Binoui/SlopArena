@@ -153,12 +153,10 @@ namespace SlopArena.Client.UI
         private CharacterDefinition _charDef;
         private InputBindings _bindings;
         private UnityEngine.Camera _camera;
-
         private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
         private VisualElement _actionBar;
-        private Label _matchCallout;
-        private float _matchCalloutTimer;
+
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
@@ -205,7 +203,6 @@ namespace SlopArena.Client.UI
             _overheadLayer = root.Q<VisualElement>("overhead-layer");
             _billboardLayer = root.Q<VisualElement>("player-billboard");
             _actionBar = root.Q<VisualElement>("action-bar");
-            _matchCallout = root.Q<Label>("match-callout");
 
             // Rebuild player panels from the roster (badge color by roster position).
             _overheadLayer?.Clear();
@@ -440,16 +437,16 @@ namespace SlopArena.Client.UI
             }
         }
 
+        /// <summary>
+        /// Shows the authored particle-text broadcast. Match callouts deliberately
+        /// have no UI Toolkit text fallback so one message cannot render twice.
+        /// </summary>
         public void ShowMatchCallout(string text, float seconds = 0.9f)
         {
             _textVfx?.Show(text, new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
-                text == "FIGHT!" ? 1.35f : 0.9f,
-                Color.white, new Color(1f, 0.72f, 0.12f), seconds);
-            if (_matchCallout == null) return;
-            _matchCallout.text = text;
-            _matchCalloutTimer = Mathf.Max(0.01f, seconds);
-            _matchCallout.style.display = DisplayStyle.Flex;
-            _matchCallout.style.opacity = 1f;
+                text == "SLOP IT OUT" ? 0.9f : 1f,
+                Color.white, new Color(1f, 0.72f, 0.12f),
+                seconds / 1.5f, centerInCamera: true);
         }
 
         public void ShowStockToast(ulong entityId, string text, Color identityColor, float seconds = 1.15f)
@@ -571,20 +568,11 @@ namespace SlopArena.Client.UI
             s.PrevCooldown = cooldown;
         }
 
+
+
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
-
-            if (_matchCalloutTimer > 0f)
-            {
-                _matchCalloutTimer -= dt;
-                if (_matchCalloutTimer <= 0f)
-                {
-                    _matchCallout.style.opacity = 0f;
-                    _matchCallout.style.display = DisplayStyle.None;
-                }
-            }
-
 
             if (_dashSlot != null) TickSlotJuice(_dashSlot, dt);
             if (_burstSlot != null) TickSlotJuice(_burstSlot, dt);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -496,8 +497,7 @@ internal static class Program
         return s != null && int.TryParse(s, out int v) ? v : fallback;
     }
 
-    internal static string Escape(string s) =>
-        s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+    internal static string Escape(string s) => WebUtility.HtmlEncode(s);
 
     internal static string F(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
     internal static string Fi(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);

@@ -46,9 +46,11 @@ namespace SlopArena.Server
 		// Match lifecycle
 		private MatchState _matchState = MatchState.Waiting;
 		private ushort _countdownTicks;
-		private const ushort CountdownDuration = 180; // 3 seconds at 60Hz
+		private const ushort CountdownDuration = 300; // 5 seconds at 60Hz
 		private readonly IMatchRule _rule;
 		private ulong _winnerEntityId;
+		private MatchResultPacket? _matchResultPacket;
+
 		private ushort _postMatchTicks;
 		private const ushort PostMatchDuration = 180; // 3 seconds before cleanup
 
@@ -362,6 +364,10 @@ namespace SlopArena.Server
 					Console.WriteLine($"[Match:{_matchId}] Post-match complete — stopping.");
 					_running = false;
 				}
+				else
+				{
+					SendState();
+				}
 				return;
 			}
 
@@ -370,23 +376,16 @@ namespace SlopArena.Server
 			bool anyPending = false;
 			foreach (var slot in _slots)
 			{
-				// Disconnected/eliminated players freeze as spectators (issue #36/#37):
-				// discard their inputs and keep the queue bounded.
 				if (slot.Disconnected || _rule.IsEliminated(_sim.GetState(slot.EntityId)))
 				{
 					slot.Queue.Clear();
 					continue;
 				}
 
-				// Drop already-consumed ticks; keep everything newer. Consuming in tick
-				// order (not "newest only") means single-tick inputs — jump presses, slot
-				// presses — survive any backlog or burst instead of being silently dropped.
 				slot.Queue.Prune(_serverTick);
 				if (slot.Queue.Count == 0) continue;
 				anyPending = true;
 
-				// Input for THIS tick, or hold the last-known input (same semantics as the
-				// client's prediction replay). A missing tick never stalls the sim.
 				InputState input = slot.LastInput;
 				if (slot.Queue.TryTake(targetTick, out var queuedInput))
 					input = queuedInput;
@@ -394,67 +393,49 @@ namespace SlopArena.Server
 				inputs[slot.EntityId] = input;
 			}
 
-			// Run authoritative simulation (movement + hit detection + hurtboxes + void death)
+			// Run authoritative simulation (movement + hit detection + hurtboxes + void death).
 			_lastTickInputs = inputs;
 			if (anyPending)
 			{
 				_serverTick = targetTick;
 				_sim.Tick(inputs);
 
-				// Check for match end: the rule decides (stock: last player standing wins;
-				// simultaneous last-stock trade → shared victory). ADR-0007, issue #36/#37.
 				var outcome = _rule.Evaluate(_sim.GetAllStates());
 				if (outcome.IsEnded)
 				{
 					_matchState = MatchState.Ended;
 					_winnerEntityId = outcome.WinnerEntityId;
+					_matchResultPacket = BuildMatchResultPacket(outcome);
 					_postMatchTicks = PostMatchDuration;
 					Console.WriteLine(outcome.IsSharedVictory
 						? $"[Match:{_matchId}] Shared victory — all players eliminated simultaneously."
 						: $"[Match:{_matchId}] Winner: {_winnerEntityId}");
 
-					// Report the result to the master server (issue #40). Fire-and-forget:
-					// ReportMatchResultAsync swallows errors. Shared victory (_winnerEntityId == 0)
-					// reports winnerSteamId = 0, which the master stores as NULL. Runs exactly once
-					// because subsequent ticks take the Ended branch above.
 					if (_onMatchResult != null && Guid.TryParse(_matchId, out var matchGuid))
 					{
 						long winnerSteamId = 0;
 						var winnerSlot = FindSlot(_winnerEntityId);
 						if (winnerSlot != null) winnerSteamId = winnerSlot.SteamId;
-						_onMatchResult(matchGuid, winnerSteamId); // fire-and-forget; ReportMatchResultAsync swallows errors
+						_onMatchResult(matchGuid, winnerSteamId);
 					}
 				}
 			}
 
-			// Broadcast every tick — including empty ones. Otherwise the GO tick's
-			// queue clear (PrimeTickCounter) plus packet RTT stalls state broadcasts
-			// for 2-4 ticks at match start (final review finding). Duplicate-tick
-			// packets on empty ticks are idempotent client-side.
+			// Broadcast every tick, including empty ones.
 			SendState();
 		}
+
 
 		private void SendState()
 		{
 			if (_udpServer == null) return;
 
-			// Packet format (matching NetworkClient expectations):
-			//   entityId(8) + tick(4) + CharacterStatePacket(112)
-			//   + hasInput(1) + InputState(20) when this entity's input was consumed
-			//   this tick — the input relay for client rollback prediction (issue #80).
-			// Max 145 bytes per entity; the flag is always present (125B no-input marker).
-
-			// Build a packet per entity once, then send each to every connected client.
 			var packets = new List<(byte[] buffer, int length)>(_slots.Count);
 			foreach (var slot in _slots)
 			{
 				var statePacket = CharacterStatePacket.FromState(_sim.GetState(slot.EntityId), _serverTick);
 				statePacket.MatchState = _matchState;
 
-				// Relay the exact input the sim consumed this tick — membership in the
-				// consumed dict — or the explicit no-input marker. Entities excluded
-				// from the sim inputs (empty queue, eliminated, disconnected) must relay
-				// nothing so clients reproduce the server's default(InputState) path.
 				InputState consumed = default;
 				bool hasInput = _lastTickInputs != null && _lastTickInputs.TryGetValue(slot.EntityId, out consumed);
 				var packet = new ServerEntityPacket
@@ -478,6 +459,13 @@ namespace SlopArena.Server
 					if (slot.EndPoint == null || slot.Disconnected) continue;
 					foreach (var pkt in packets)
 						_udpServer.Send(pkt.buffer, pkt.length, slot.EndPoint);
+
+					if (_matchState == MatchState.Ended && _matchResultPacket != null)
+					{
+						var resultBuffer = new byte[_matchResultPacket.WireSize];
+						_matchResultPacket.Serialize(resultBuffer);
+						_udpServer.Send(resultBuffer, resultBuffer.Length, slot.EndPoint);
+					}
 				}
 			}
 			catch (Exception ex)
@@ -486,12 +474,48 @@ namespace SlopArena.Server
 			}
 		}
 
+		private MatchResultPacket BuildMatchResultPacket(MatchOutcome outcome)
+		{
+			var entries = new List<MatchResultEntry>(_slots.Count);
+			foreach (var slot in _slots)
+			{
+				var state = _sim.GetState(slot.EntityId);
+				entries.Add(new MatchResultEntry(
+					slot.EntityId,
+					placement: 0,
+					_sim.GetKOs(slot.EntityId),
+					state.Deaths));
+			}
+
+			entries.Sort((a, b) =>
+			{
+				int winnerOrder = outcome.IsSharedVictory
+					? 0
+					: (a.EntityId == outcome.WinnerEntityId ? -1 : b.EntityId == outcome.WinnerEntityId ? 1 : 0);
+				if (winnerOrder != 0) return winnerOrder;
+
+				int byFalls = a.Falls.CompareTo(b.Falls);
+				if (byFalls != 0) return byFalls;
+				int byKOs = b.KOs.CompareTo(a.KOs);
+				return byKOs != 0 ? byKOs : a.EntityId.CompareTo(b.EntityId);
+			});
+
+			var ranked = new MatchResultEntry[entries.Count];
+			for (int i = 0; i < entries.Count; i++)
+			{
+				var entry = entries[i];
+				ranked[i] = new MatchResultEntry(entry.EntityId, (byte)(i + 1), entry.KOs, entry.Falls);
+			}
+
+			return new MatchResultPacket(_serverTick, outcome.IsSharedVictory, ranked);
+		}
+
 		/// <summary>
 		/// On GO, the clients' tick counters are already ~CountdownDuration ahead (they
 		/// predict and send during countdown). Discard the countdown-era input backlog
 		/// and start the shared tick counter at the clients' current tick, so the server
 		/// and client sim clocks stay aligned from the first Playing tick instead of the
-		/// server replaying three seconds of stale inputs.
+		/// server replaying five seconds of stale inputs.
 		/// </summary>
 		private void PrimeTickCounter()
 		{

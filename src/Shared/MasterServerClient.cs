@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,6 +18,10 @@ namespace SlopArena.Shared
         private readonly HttpClient _http;
         private readonly bool _ownsHttpClient;
 
+        private static readonly JsonSerializerOptions ServerJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+        };
         private string? _token;
         private long? _steamId;
 
@@ -67,10 +71,16 @@ namespace SlopArena.Shared
                     return false;
 
                 var json = await response.Content.ReadAsStringAsync();
-                var token = ExtractStringField(json, "token");
-                var steamId = ExtractNumberField(json, "steamId");
-
-                if (string.IsNullOrEmpty(token) || steamId == null)
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("token", out var tokenElement) ||
+                    tokenElement.ValueKind != JsonValueKind.String ||
+                    !root.TryGetProperty("steamId", out var steamIdElement) ||
+                    steamIdElement.ValueKind != JsonValueKind.Number ||
+                    !steamIdElement.TryGetInt64(out var steamId))
+                    return false;
+                var token = tokenElement.GetString();
+                if (string.IsNullOrEmpty(token))
                     return false;
 
                 _token = token;
@@ -105,18 +115,26 @@ namespace SlopArena.Shared
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync();
-                var steamId = ExtractNumberField(json, "steamId");
-                var username = ExtractStringField(json, "username");
-                var mmr = ExtractNumberField(json, "mmr");
-
-                if (steamId == null || username == null || mmr == null)
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("steamId", out var steamIdElement) ||
+                    steamIdElement.ValueKind != JsonValueKind.Number ||
+                    !steamIdElement.TryGetInt64(out var steamId) ||
+                    !root.TryGetProperty("username", out var usernameElement) ||
+                    usernameElement.ValueKind != JsonValueKind.String ||
+                    !root.TryGetProperty("mmr", out var mmrElement) ||
+                    mmrElement.ValueKind != JsonValueKind.Number ||
+                    !mmrElement.TryGetInt64(out var mmr))
+                    return null;
+                var username = usernameElement.GetString();
+                if (username == null)
                     return null;
 
                 return new GuestUserInfo
                 {
-                    SteamId = steamId.Value,
+                    SteamId = steamId,
                     Username = username,
-                    Mmr = (int)mmr.Value
+                    Mmr = (int)mmr
                 };
             }
             catch (OperationCanceledException)
@@ -146,7 +164,8 @@ namespace SlopArena.Shared
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync();
-                return ParseServerList(json);
+                var servers = JsonSerializer.Deserialize<List<ServerInfo>>(json, ServerJsonOptions);
+                return servers;
             }
             catch (OperationCanceledException)
             {
@@ -158,74 +177,6 @@ namespace SlopArena.Shared
             }
         }
 
-        /// <summary>
-        /// Parse a JSON array of flat server objects into ServerInfo list.
-        /// Objects are flat (no nesting), so regex block extraction is safe.
-        /// </summary>
-        private static List<ServerInfo> ParseServerList(string json)
-        {
-            var result = new List<ServerInfo>();
-
-            // Match each {...} block (objects are flat — no nested braces)
-            var blockMatches = Regex.Matches(json, @"\{[^{}]*\}");
-
-            foreach (Match block in blockMatches)
-            {
-                var obj = block.Value;
-
-                var idStr = ExtractStringField(obj, "id");
-                var name = ExtractStringField(obj, "name");
-                var ipAddress = ExtractStringField(obj, "ipAddress");
-                var port = ExtractNumberField(obj, "port");
-                var region = ExtractStringField(obj, "region");
-                var currentMatches = ExtractNumberField(obj, "currentMatches");
-                var maxConcurrentMatches = ExtractNumberField(obj, "maxConcurrentMatches");
-                var isOfficial = ExtractBoolField(obj, "isOfficial");
-
-                if (idStr == null || name == null || ipAddress == null ||
-                    port == null || region == null || currentMatches == null ||
-                    maxConcurrentMatches == null || isOfficial == null)
-                    continue;
-
-                result.Add(new ServerInfo
-                {
-                    Id = Guid.Parse(idStr),
-                    Name = name,
-                    IpAddress = ipAddress,
-                    Port = (int)port.Value,
-                    Region = region,
-                    CurrentMatches = (int)currentMatches.Value,
-                    MaxConcurrentMatches = (int)maxConcurrentMatches.Value,
-                    IsOfficial = isOfficial.Value
-                });
-            }
-
-            return result;
-        }
-
-        // ── Lightweight JSON field extraction (avoids System.Text.Json dependency) ──
-        // Safe for controlled API responses: JWT tokens are base64url (no quotes),
-        // guest usernames are alphanumeric+dashes, numbers are non-negative integers.
-
-        private static string? ExtractStringField(string json, string fieldName)
-        {
-            var match = Regex.Match(json, $"\"{fieldName}\"\\s*:\\s*\"([^\"]*)\"");
-            return match.Success ? match.Groups[1].Value : null;
-        }
-
-        private static long? ExtractNumberField(string json, string fieldName)
-        {
-            var match = Regex.Match(json, $"\"{fieldName}\"\\s*:\\s*(\\d+)");
-            return match.Success ? long.Parse(match.Groups[1].Value) : null;
-        }
-
-        private static bool? ExtractBoolField(string json, string fieldName)
-        {
-            var match = Regex.Match(json, $"\"{fieldName}\"\\s*:\\s*(true|false)");
-            if (!match.Success)
-                return null;
-            return match.Groups[1].Value == "true";
-        }
 
         public void Dispose()
         {

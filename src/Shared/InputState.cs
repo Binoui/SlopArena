@@ -5,7 +5,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Input state for one tick of simulation.
-    /// Pure C# — no Godot types. Matches what ClientInputPacket carries.
+    /// Pure C# — no Godot types; this is the serialized input payload.
     /// </summary>
     public struct InputState
     {

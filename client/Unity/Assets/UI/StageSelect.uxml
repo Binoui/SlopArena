@@ -1,20 +1,17 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
     <ui:VisualElement name="root" class="screen stage-select-screen">
-        <ui:VisualElement class="stage-backdrop">
+        <ui:VisualElement class="stage-backdrop" style="top: -1px;">
             <ui:VisualElement class="backdrop-grid" />
             <ui:VisualElement class="backdrop-burst backdrop-burst--orange" />
             <ui:Label text="PICK THE PLACE. CAUSE PROBLEMS." class="backdrop-note backdrop-note--right" />
         </ui:VisualElement>
-
-        <ui:Button name="btn-back" text="← BACK" class="btn-back stage-back" />
-        <ui:Label name="eyebrow" text="MATCH SETUP // STAGE SELECT" class="stage-eyebrow" />
-        <ui:Label name="title" text="SELECT STAGE" class="stage-title" />
-        <ui:Label name="subtitle" text="CHOOSE THE BATTLEGROUND" class="stage-subtitle" />
+        <ui:Button name="btn-back" text="← BACK" class="btn-back stage-back" style="top: 15px; bottom: 1026px; right: 1782px; left: 31px;" />
+        <ui:Label name="eyebrow" text="MATCH SETUP // STAGE SELECT" class="stage-eyebrow" style="top: 53px; left: 43px;" />
+        <ui:Label name="title" text="SELECT STAGE" class="stage-title" style="top: 76px; left: 41px;" />
+        <ui:Label name="subtitle" text="CHOOSE THE BATTLEGROUND" class="stage-subtitle" style="top: 131px; left: 41px;" />
         <ui:Label name="lbl-host" text="HOST PICKS THE BATTLEGROUND" class="stage-host-status" />
-
         <ui:VisualElement name="stage-grid" class="stage-grid" />
-
         <ui:VisualElement name="bottom-panel" class="stage-bottom-panel">
             <ui:VisualElement name="player-cards-area" class="stage-player-cards" />
             <ui:VisualElement name="stage-action-area" class="stage-action-area">
@@ -23,7 +20,6 @@
                 <ui:Button name="btn-confirm" text="START MATCH" class="btn-primary stage-confirm" style="display: none;" />
             </ui:VisualElement>
         </ui:VisualElement>
-
         <ui:VisualElement name="global-chat" class="global-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />

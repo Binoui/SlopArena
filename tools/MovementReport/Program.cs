@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -503,5 +504,5 @@ internal static class Program
         return rows;
     }
 
-    private static string Escape(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+    private static string Escape(string s) => WebUtility.HtmlEncode(s);
 }

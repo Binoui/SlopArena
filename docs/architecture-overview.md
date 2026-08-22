@@ -55,7 +55,6 @@ SlopArena/
 ├── src/
 │   ├── Shared/            ← canonical Shared code (netstandard2.1)
 │   ├── Server/            ← Headless .NET server (MatchInstance, UDP loop)
-│   └── ServerApp/         ← Prototype test server
 │
 ├── tests/
 │   └── Shared.Tests/      ← xUnit tests (ServerSimulation, SpellResolver, etc.)
@@ -128,13 +127,11 @@ SlopArena/
 
 1. **Don't use `UnityEngine.*` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
 2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
-3. **Don't modify `CharacterDefinition.cs` values without understanding them** — source of truth for balance and hit registration.
-4. **`ServerApp/` and `Server/` are two different servers** — `Server/` is the real one (`MatchInstance`). `ServerApp/` is a prototype stub. Use `Server/`.
-5. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. Auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target.
-6. **Cooldown struct persistence** — `CharacterState` is a value type. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
-7. **Dash duration comes from `MovementStats.DashDurationTicks`** — not the const `Simulation.DashDurationTicks`. Character definition is authoritative.
-8. **Proportional friction is asymptotic** — `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0. Applied after ground friction and air drag.
-9. **`MatchConfig` is static** — it persists across scene loads. Call `MatchConfig.Reset()` in `MainMenuController.OnEnable` so stale values from a previous match don't leak into the next one.
+3. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. Auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target.
+4. **Cooldown struct persistence** — `CharacterState` is a value type. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
+5. **Dash duration comes from `MovementStats.DashDurationTicks`** — not the const `Simulation.DashDurationTicks`. Character definition is authoritative.
+6. **Proportional friction is asymptotic** — `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0. Applied after ground friction and air drag.
+7. **`MatchConfig` is static** — it persists across scene loads. Call `MatchConfig.Reset()` in `MainMenuController.OnEnable` so stale values from a previous match don't leak into the next one.
 
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`

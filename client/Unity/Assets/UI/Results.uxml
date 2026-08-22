@@ -1,23 +1,51 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen" style="background-image: none;">
-        <ui:Label name="title" text="RESULTS" class="title" />
-        <ui:Label name="lbl-winner" class="subtitle" />
-        <ui:VisualElement name="standings-list" class="player-list lobby-list" />
-    <ui:Button name="btn-return-lobby" text="RETURN TO LOBBY" class="btn-primary" />
-        <ui:VisualElement name="global-chat" class="global-chat">
-            <ui:VisualElement class="global-chat__header">
-                <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
-                <ui:Label text="1,204 ONLINE" class="global-chat__online" />
+    <ui:VisualElement name="root" class="results-screen">
+        <ui:VisualElement class="results-background">
+            <ui:VisualElement class="results-grid" />
+            <ui:VisualElement class="results-burst results-burst--orange" />
+            <ui:VisualElement class="results-burst results-burst--yellow" />
+            <ui:Label text="SIGNAL // 07" class="results-background-note results-background-note--left" />
+            <ui:Label text="LIVE FEED // POST-FIGHT" class="results-background-note results-background-note--right" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="results-header" class="results-header">
+            <ui:VisualElement class="results-header-copy">
+                <ui:Label text="MATCH COMPLETE" class="results-eyebrow" />
+                <ui:Label name="results-headline" text="FIGHT OVER" class="results-headline" />
+                <ui:Label name="results-stage" text="MATCH COMPLETE // STAGE" class="results-stage" />
             </ui:VisualElement>
-            <ui:VisualElement name="chat-feed" class="global-chat__feed">
-                <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="global-chat__message" />
-                <ui:Label text="slopqueen: run it back?" class="global-chat__message global-chat__message--accent" />
-                <ui:Label text="dude420: host is up, join fast" class="global-chat__message global-chat__message--hot" />
+            <ui:Label name="results-metadata" text="DURATION N/A // 0 PLAYERS" class="results-metadata" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="results-content" class="results-content">
+            <ui:VisualElement name="results-winner" class="results-winner" />
+            <ui:VisualElement name="results-standings" class="results-standings">
+                <ui:Label name="results-standings-label" text="FINAL STANDINGS" class="results-standings-label" />
             </ui:VisualElement>
-            <ui:VisualElement class="global-chat__input-row">
-                <ui:TextField name="chat-input" placeholdertext="type here…" class="global-chat__input" />
-                <ui:Button name="chat-send" text="➜" class="global-chat__send" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="results-footer" class="results-footer">
+            <ui:VisualElement name="global-chat" class="global-chat results-chat">
+                <ui:VisualElement class="global-chat__header">
+                    <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
+                    <ui:Label text="1,204 ONLINE" class="global-chat__online" />
+                </ui:VisualElement>
+                <ui:VisualElement name="chat-feed" class="global-chat__feed">
+                    <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="global-chat__message" />
+                    <ui:Label text="slopqueen: run it back?" class="global-chat__message global-chat__message--accent" />
+                    <ui:Label text="dude420: host is up, join fast" class="global-chat__message global-chat__message--hot" />
+                </ui:VisualElement>
+                <ui:VisualElement class="global-chat__input-row">
+                    <ui:TextField name="chat-input" placeholdertext="type here…" class="global-chat__input" />
+                    <ui:Button name="chat-send" text="➜" class="global-chat__send" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="results-actions" class="results-actions">
+                <ui:Label text="NEXT BROADCAST" class="results-actions-eyebrow" />
+                <ui:Label text="RUN IT BACK // CHANGE FIGHTERS" class="results-actions-future" />
+                <ui:Button name="btn-return-lobby" text="RETURN TO LOBBY" class="results-return" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

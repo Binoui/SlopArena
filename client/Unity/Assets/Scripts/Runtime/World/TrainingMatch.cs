@@ -105,7 +105,7 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
             bool solo = MatchConfig.Mode == GameMode.Solo;
-            _soloCountdownTicks = solo ? (ushort)180 : (ushort)0;
+            _soloCountdownTicks = solo ? (ushort)300 : (ushort)0;
             _bridge = new LocalSimulationBridge(
                 arena,
                 solo ? new StockMatchRule((byte)MatchConfig.MaxStocks) : NoWinMatchRule.Instance);
@@ -184,7 +184,7 @@ namespace SlopArena.Client.World
             // Shared camera + aim setup
             SetupCamera();
             if (solo)
-                _hudManager?.ShowMatchCallout("READY", 0.55f);
+                _hudManager?.ShowMatchCallout("READY", 2f);
             SetupAimHandler(playerDef);
             SetupLockIndicator(new[] { _playerRenderer, _npcRenderer }, arena);
         }
@@ -217,10 +217,10 @@ namespace SlopArena.Client.World
             if (MatchConfig.Mode == GameMode.Solo && _soloCountdownTicks > 0)
             {
                 _soloCountdownTicks--;
-                if (_soloCountdownTicks == 120) _hudManager?.ShowMatchCallout("3", 0.7f);
-                else if (_soloCountdownTicks == 60) _hudManager?.ShowMatchCallout("2", 0.7f);
-                else if (_soloCountdownTicks == 1) _hudManager?.ShowMatchCallout("1", 0.7f);
-                else if (_soloCountdownTicks == 0) _hudManager?.ShowMatchCallout("FIGHT!", 0.8f);
+                if (_soloCountdownTicks == 180) _hudManager?.ShowMatchCallout("1", 1f);
+                else if (_soloCountdownTicks == 120) _hudManager?.ShowMatchCallout("2", 1f);
+                else if (_soloCountdownTicks == 60) _hudManager?.ShowMatchCallout("3", 1f);
+                else if (_soloCountdownTicks == 0) _hudManager?.ShowMatchCallout("SLOP IT OUT", 1f);
                 return;
             }
             _showCrosshair = _aimHandler?.ShowCrosshair ?? false;
@@ -324,41 +324,41 @@ namespace SlopArena.Client.World
         private void BuildSoloResults(MatchOutcome outcome)
         {
             _soloResultsShown = true;
-            var states = _bridge.GetAllStates();
-            var results = new ClientSession.MatchResultsData
+            var player = _bridge.GetState(PlayerEntityId);
+            var npc = _bridge.GetState(NpcEntityId);
+            bool playerFirst = !outcome.IsSharedVictory && outcome.WinnerEntityId == PlayerEntityId;
+            var entries = new List<ClientSession.ResultEntry>
             {
-                SharedVictory = outcome.IsSharedVictory,
-                Entries = new List<ClientSession.ResultEntry>
-                {
-                    new()
-                    {
-                        EntityId = PlayerEntityId,
-                        Name = "YOU",
-                        ClassName = MatchConfig.PlayerClass.ToString(),
-                        StocksRemaining = MatchConfig.MaxStocks - states[PlayerEntityId].Deaths,
-                        DamagePercent = states[PlayerEntityId].DamagePercent,
-                        IsWinner = !outcome.IsSharedVictory && outcome.WinnerEntityId == PlayerEntityId,
-                    },
-                    new()
-                    {
-                        EntityId = NpcEntityId,
-                        Name = "CPU",
-                        ClassName = MatchConfig.SoloBotClass.ToString(),
-                        StocksRemaining = MatchConfig.MaxStocks - states[NpcEntityId].Deaths,
-                        DamagePercent = states[NpcEntityId].DamagePercent,
-                        IsWinner = !outcome.IsSharedVictory && outcome.WinnerEntityId == NpcEntityId,
-                    },
-                },
+                new(
+                    PlayerEntityId,
+                    playerFirst || outcome.IsSharedVictory ? 1 : 2,
+                    kos: 0,
+                    falls: player.Deaths,
+                    name: "YOU",
+                    className: MatchConfig.PlayerClass.ToString(),
+                    stocksRemaining: MatchConfig.MaxStocks - player.Deaths,
+                    damagePercent: player.DamagePercent),
+                new(
+                    NpcEntityId,
+                    !playerFirst && !outcome.IsSharedVictory ? 1 : 2,
+                    kos: 0,
+                    falls: npc.Deaths,
+                    name: "CPU",
+                    className: MatchConfig.SoloBotClass.ToString(),
+                    stocksRemaining: MatchConfig.MaxStocks - npc.Deaths,
+                    damagePercent: npc.DamagePercent),
             };
-            results.Entries.Sort((a, b) =>
-            {
-                int byStocks = b.StocksRemaining.CompareTo(a.StocksRemaining);
-                return byStocks != 0 ? byStocks : a.DamagePercent.CompareTo(b.DamagePercent);
-            });
-            ClientSession.CurrentMatchResults = results;
-            var winner = results.Entries.Find(e => e.IsWinner);
+
+            entries.Sort((a, b) => a.Placement.CompareTo(b.Placement));
+            var results = new ClientSession.MatchResultsData(
+                outcome.IsSharedVictory,
+                MatchConfig.ArenaName,
+                0,
+                entries);
+            ClientSession.SetLocalMatchResults(results);
+            var winner = playerFirst ? "YOU" : "CPU";
             _hudManager?.ShowMatchCallout(
-                results.SharedVictory ? "DOUBLE K.O.!" : $"{winner?.Name ?? "CPU"} WINS!",
+                results.SharedVictory ? "DOUBLE K.O.!" : $"{winner} WINS!",
                 1.4f);
             StartCoroutine(LoadSoloResults());
         }

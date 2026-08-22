@@ -86,7 +86,6 @@ SlopArena/
 │   │   ├── SpellResolver.cs # Hit detection math
 │   │   └── CharacterState.cs# Per-tick entity state
 │   ├── Server/              # Headless server
-│   └── ServerApp/           # Server host (prototype)
 ├── tests/                   # xUnit simulation tests
 ├── assets/                  # 3D models, textures, UI source
 ├── data/                    # Skeleton data, arenas

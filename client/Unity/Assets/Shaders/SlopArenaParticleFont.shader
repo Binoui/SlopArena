@@ -68,7 +68,7 @@ Shader "SlopArena/Particles/Font"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(input.positionOS.xyz);
                 output.uv = TRANSFORM_TEX(input.texcoord.xy, _BaseMap);
                 output.color = input.color * _BaseColor;
                 output.custom1 = input.custom1;

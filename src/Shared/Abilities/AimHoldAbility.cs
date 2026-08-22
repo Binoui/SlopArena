@@ -11,7 +11,7 @@ namespace SlopArena.Shared.Abilities
     ///     ChargeTicks reset, and the aerial ascent-stop. ServerSimulation.ActivateAbility
     ///     only cancels DOWNWARD VY and re-opens the zero-g float window (AirTimeTicks=0),
     ///     so without zeroing VY here an aim cast mid-jump-rise would climb through the
-    ///     float — same fix as AirChargeAttack.OnChargeStart applies to the charge family.
+    ///     float.
     ///     Simulation's movement gate treats Aiming + AimedProjectile/Projectile behavior
     ///     as a fixed stance (friction only, no input control).
     ///   - Aim phase: 8-tick debounce, optional mid-hold anim swap, manual release

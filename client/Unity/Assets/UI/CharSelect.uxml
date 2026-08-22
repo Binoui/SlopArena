@@ -1,16 +1,12 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
     <ui:VisualElement name="root" class="screen char-select-screen">
-        <ui:Label name="title" text="CHARACTER SELECT // SERVER LOBBY" class="title char-select-title" />
         <ui:Label name="roster-meta" text="4 FIGHTERS // 1 PLAYER" class="char-select-meta" />
-
         <ui:VisualElement name="char-grid" class="char-grid" />
-
         <ui:VisualElement name="selection-copy" class="selection-copy">
             <ui:Label name="char-name" text="—" class="char-name" />
             <ui:Label name="char-role" text="—" class="char-role" />
         </ui:VisualElement>
-
         <ui:VisualElement name="pvp-panel" class="pvp-panel">
             <ui:VisualElement name="player-cards-area" class="player-cards-area">
                 <ui:VisualElement name="roster-panel" class="roster-panel" />
@@ -23,10 +19,8 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-
         <ui:Button name="btn-select" text="SELECT FIGHTER" class="btn-primary" />
         <ui:Button name="btn-back" text="← BACK" class="btn-back" />
-
         <ui:VisualElement name="global-chat" class="global-chat">
             <ui:VisualElement class="global-chat__header">
                 <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
@@ -42,5 +36,6 @@
                 <ui:Button name="chat-send" text="➜" class="global-chat__send" />
             </ui:VisualElement>
         </ui:VisualElement>
+        <ui:Label name="title" text="CHARACTER SELECT // SERVER LOBBY" class="title char-select-title" style="top: 91px; left: 37px;" />
     </ui:VisualElement>
 </ui:UXML>

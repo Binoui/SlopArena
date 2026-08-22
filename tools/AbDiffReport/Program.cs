@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -804,8 +805,7 @@ internal static class Program
         return args[i + 1].Split(',').Select(int.Parse).ToArray();
     }
 
-    private static string Escape(string s) =>
-        s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+    private static string Escape(string s) => WebUtility.HtmlEncode(s);
 
     private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
 }

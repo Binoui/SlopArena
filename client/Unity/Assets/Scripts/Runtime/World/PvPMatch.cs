@@ -38,6 +38,7 @@ namespace SlopArena.Client.World
         private MatchState _lastMatchState = MatchState.Waiting;
         private RollbackSimulationBridge _bridge = null!;
         private readonly Dictionary<ulong, ushort> _lastPresentedDeaths = new();
+        private bool _resultsScheduled;
         private Coroutine? _countdownPresentation;
         protected override ISimulationBridge Bridge => _bridge;
 
@@ -252,6 +253,9 @@ namespace SlopArena.Client.World
             });
             _combatFeedback?.OnTick();
 
+            if (_bridge.LatestMatchResult != null && ClientSession.CurrentMatchResults == null)
+                ClientSession.ApplyAuthoritativeMatchResult(_bridge.LatestMatchResult);
+
             _hudManager?.Refresh();
 
             // Apply server states to renderers
@@ -278,14 +282,16 @@ namespace SlopArena.Client.World
                 }
                 else if (matchState == MatchState.Playing)
                 {
-                    _hudManager?.ShowMatchCallout("FIGHT!", 0.8f);
+                    _hudManager?.ShowMatchCallout("SLOP IT OUT", 1f);
                 }
                 else if (matchState == MatchState.Ended)
                 {
-                    _hudManager?.ShowMatchCallout("SLOP OVER!", 1.4f);
-                    BuildAndShowResults();
+                    _hudManager?.ShowMatchCallout("MATCH COMPLETE", 1.4f);
                 }
             }
+
+            if (matchState == MatchState.Ended)
+                TryScheduleResults();
 
             _tick++;
             if (_tick % 120 == 1)
@@ -374,93 +380,33 @@ namespace SlopArena.Client.World
 
         private System.Collections.IEnumerator ShowCountdownPresentation()
         {
-            _hudManager?.ShowMatchCallout("READY", 0.55f);
-            yield return new WaitForSecondsRealtime(0.55f);
-            _hudManager?.ShowMatchCallout("3", 0.7f);
-            yield return new WaitForSecondsRealtime(0.7f);
-            _hudManager?.ShowMatchCallout("2", 0.7f);
-            yield return new WaitForSecondsRealtime(0.7f);
-            _hudManager?.ShowMatchCallout("1", 0.7f);
+            _hudManager?.ShowMatchCallout("READY", 2f);
+            yield return new WaitForSecondsRealtime(2f);
+            _hudManager?.ShowMatchCallout("1", 1f);
+            yield return new WaitForSecondsRealtime(1f);
+            _hudManager?.ShowMatchCallout("2", 1f);
+            yield return new WaitForSecondsRealtime(1f);
+            _hudManager?.ShowMatchCallout("3", 1f);
         }
 
-        /// <summary>
-        /// Build the final standings and schedule the Results scene. Runs once on
-        /// the authoritative Ended transition.
-        /// </summary>
-        private void BuildAndShowResults()
+        private void TryScheduleResults()
         {
-            var states = new Dictionary<ulong, CharacterState>
+            if (_resultsScheduled || ClientSession.CurrentMatchResults == null)
+                return;
+
+            _resultsScheduled = true;
+            StartCoroutine(ReturnToResultsAfterDelay());
+        }
+
+        private System.Collections.IEnumerator ReturnToResultsAfterDelay()
+        {
+            yield return new WaitForSecondsRealtime(2f);
+            if (ClientSession.CurrentMatchResults == null)
             {
-                { PlayerEntityId, _bridge.GetState(PlayerEntityId) }
-            };
-            foreach (var id in _opponentRenderers.Keys)
-                states[id] = _bridge.GetState(id);
-
-            // Winner via the shared rule — same decision the game server made.
-            var outcome = new StockMatchRule((byte)MatchConfig.MaxStocks).Evaluate(states);
-
-            var data = new ClientSession.MatchResultsData
-            {
-                SharedVictory = outcome.IsSharedVictory,
-            };
-
-            if (ClientSession.MatchRoster != null)
-            {
-                foreach (var roster in ClientSession.MatchRoster)
-                {
-                    if (roster.EntityId <= 0) continue;
-                    var id = (ulong)roster.EntityId;
-                    if (!states.TryGetValue(id, out var st)) continue;
-
-                    var className = roster.CharacterSelection;
-                    if (string.IsNullOrEmpty(className))
-                    {
-                        className = id == PlayerEntityId
-                            ? MatchConfig.PlayerClass.ToString()
-                            : OpponentClass(id);
-                    }
-
-                    data.Entries.Add(new ClientSession.ResultEntry
-                    {
-                        EntityId = id,
-                        Name = string.IsNullOrEmpty(roster.Name) ? $"P{id}" : roster.Name,
-                        ClassName = className,
-                        StocksRemaining = MatchConfig.MaxStocks - st.Deaths,
-                        DamagePercent = st.DamagePercent,
-                        IsWinner = !outcome.IsSharedVictory && id == outcome.WinnerEntityId,
-                    });
-                }
+                Debug.LogError("[PvP] Match ended without an authoritative result snapshot.");
+                yield break;
             }
 
-            // Rank: most stocks first, then least damage (tie-break).
-            data.Entries.Sort((a, b) =>
-            {
-                int byStocks = b.StocksRemaining.CompareTo(a.StocksRemaining);
-                return byStocks != 0 ? byStocks : a.DamagePercent.CompareTo(b.DamagePercent);
-            });
-
-            ClientSession.CurrentMatchResults = data;
-            Debug.Log($"[PvP] Match ended — {data.Entries.Count} entries, shared={outcome.IsSharedVictory}");
-
-            // 2s beat so the KO moment renders; the server keeps broadcasting the
-            var winnerEntry = data.Entries.Find(e => e.IsWinner);
-            _hudManager?.ShowMatchCallout(
-                data.SharedVictory ? "DOUBLE K.O.!" : $"{winnerEntry?.Name ?? "P1"} WINS!",
-                1.4f);
-            // Ended state for its 3s post-match window, then we cut to Results.
-            StartCoroutine(ReturnToLobbyAfterDelay());
-        }
-
-        private string OpponentClass(ulong entityId)
-        {
-            foreach (var opp in MatchConfig.Opponents)
-                if (opp.EntityId == entityId) return opp.Class.ToString();
-            return $"P{entityId}";
-        }
-
-        private System.Collections.IEnumerator ReturnToLobbyAfterDelay()
-        {
-            yield return new WaitForSeconds(2f);
             SceneManager.LoadScene("Results");
         }
     }

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -22,6 +23,8 @@ namespace SlopArena.Client.Network
         private bool _connected;
         private Thread? _receiveThread;
         private volatile bool _running;
+        private readonly ConcurrentQueue<MatchResultPacket> _matchResultQueue = new();
+
         private readonly ConcurrentQueue<ServerEntityPacket> _receivedQueue = new();
 
         public ulong EntityId { get => _entityId; set => _entityId = value; }
@@ -99,8 +102,8 @@ namespace SlopArena.Client.Network
 
             int bufSize = 8 + 4 + InputState.Size;
             byte[] buf = new byte[bufSize];
-            WriteUInt64LE(buf, 0, _entityId);
-            WriteUInt32LE(buf, 8, tick);
+            BinaryPrimitives.WriteUInt64LittleEndian(buf.AsSpan(0, 8), _entityId);
+            BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(8, 4), tick);
             input.Write(buf.AsSpan(12));
             try
             {
@@ -131,6 +134,15 @@ namespace SlopArena.Client.Network
             }
             return result;
         }
+        /// <summary>Drain authoritative final match snapshots received from the server.</summary>
+        public List<MatchResultPacket> ReceiveMatchResults()
+        {
+            var result = new List<MatchResultPacket>();
+            while (_matchResultQueue.TryDequeue(out var entry))
+                result.Add(entry);
+            return result;
+        }
+
 
         // ── Receive loop ──
 
@@ -140,13 +152,15 @@ namespace SlopArena.Client.Network
             {
                 try
                 {
-                    if (_udp == null || !_udp.Client.Poll(1000, SelectMode.SelectRead))
-                        continue;
-
                     var ep = new IPEndPoint(IPAddress.Any, 0);
                     byte[] buf = _udp.Receive(ref ep);
-                    if (buf.Length < ServerEntityPacket.BaseSize) continue;
+                    if (MatchResultPacket.TryDeserialize(buf, out var matchResult))
+                    {
+                        _matchResultQueue.Enqueue(matchResult!);
+                        continue;
+                    }
 
+                    if (buf.Length < ServerEntityPacket.BaseSize) continue;
                     _receivedQueue.Enqueue(ServerEntityPacket.Deserialize(buf));
                 }
                 catch
@@ -168,20 +182,5 @@ namespace SlopArena.Client.Network
             }
         }
 
-        // ── Little-endian helpers ──
-
-        private static void WriteUInt64LE(byte[] buf, int off, ulong val)
-        {
-            buf[off] = (byte)val; buf[off+1] = (byte)(val>>8);
-            buf[off+2] = (byte)(val>>16); buf[off+3] = (byte)(val>>24);
-            buf[off+4] = (byte)(val>>32); buf[off+5] = (byte)(val>>40);
-            buf[off+6] = (byte)(val>>48); buf[off+7] = (byte)(val>>56);
-        }
-
-        private static void WriteUInt32LE(byte[] buf, int off, uint val)
-        {
-            buf[off] = (byte)val; buf[off+1] = (byte)(val>>8);
-            buf[off+2] = (byte)(val>>16); buf[off+3] = (byte)(val>>24);
-        }
     }
 }

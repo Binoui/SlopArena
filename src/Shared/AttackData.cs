@@ -85,18 +85,9 @@ namespace SlopArena.Shared
         public float LungeForce;
         /// <summary>
         /// Per-tick velocity during this stage (world space). Set VY for jump arcs / slams.
-        /// Honoured by <c>AirChargeAttack</c> ONLY (Nilus' Collapse is the sole declarer in the
-        /// game — its tap and charged stages both drive a downward MoveY). Every other class
-        /// that reads <c>AbilitySpec.Stages</c> ignores these three fields entirely —
-        /// <c>StageChainAbility</c> (and its <c>LmbCombo</c> / <c>AirLmbCombo</c> subclasses),
-        /// <c>ChargeAttackAbility</c> (and its <c>LungeChargeAttack</c> subclass, which drives
-        /// Nilus' own RMB), <c>KistuRisingSlash</c>, <c>KistuUltFlurry</c>,
-        /// <c>FightGuyUppercut</c>, <c>NilusNetherGrasp</c> and <c>NilusRiftwalk</c>.
-        /// Declaring <c>Move*</c> on a stage driven by any of those is a SILENT no-op that no
-        /// test will notice, so wire it in the consumer first.
         /// Non-zero components are written each tick; a zero component is left alone so a
-        /// MoveY-only stage keeps its LungeForce horizontal velocity. <c>AirChargeAttack</c>
-        /// additionally refuses a downward write while grounded — see the note there.
+        /// MoveY-only stage keeps its LungeForce horizontal velocity. Consumers must apply
+        /// these values during their attack tick.
         /// </summary>
         public float MoveX, MoveY, MoveZ;
 
@@ -120,37 +111,6 @@ namespace SlopArena.Shared
         public BoneTrailDef[]? BoneTrails;
     }
 
-    /// <summary>
-    /// Config for a targeted projectile ability (hold-to-aim, release-to-throw).
-    /// The projectile trajectory is a parabolic arc computed from the client's
-    /// aim direction + distance.
-    /// </summary>
-    public struct ProjectileConfig
-    {
-        /// <summary>Launch angle above horizontal in degrees (e.g., 30 = 30° arc).</summary>
-        public float LaunchAngleDeg;
-        /// <summary>Gravity applied to the projectile per tick (m/s²). Use sim gravity (35) for consistency.</summary>
-        public float Gravity;
-        /// <summary>Max targeting range in meters (e.g., 20).</summary>
-        public float MaxRange;
-        /// <summary>Hitbox radius for the projectile sphere.</summary>
-        public float HitboxRadius;
-        /// <summary>Launch height offset from character feet (e.g., 1.2 = hand height).</summary>
-        public float LaunchOffsetY;
-        /// <summary>Damage on direct hit.</summary>
-        public float Damage;
-        /// <summary>Knockback profile + optional custom overrides. Resolved at projectile spawn time.</summary>
-        public KnockbackData Knockback;
-        /// <summary>Stun ticks on hit.</summary>
-        public ushort StunTicks;
-        /// <summary>Max lifetime of the projectile in ticks (600 = 10 seconds, more than enough).</summary>
-        public ushort MaxFlightTicks;
-        /// <summary>
-        /// Optional explosion on impact (entity hit or ground). If set, a spherical AoE
-        /// hitbox spawns at the projectile's last position when it deactivates.
-        /// </summary>
-        public ProjectileExplosion? Explosion;
-    }
 
     /// <summary>
     /// Explosion spawned when a projectile hits an entity or the ground.

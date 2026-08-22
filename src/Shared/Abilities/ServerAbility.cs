@@ -86,7 +86,7 @@ namespace SlopArena.Shared.Abilities
         // ── Context (set by simulation before first Tick) ──
 
         /// <summary>Hitbox resolver. Set by ServerSimulation before activation.</summary>
-        public ISpellResolver Resolver { get; set; } = null!;
+        public SpellResolver Resolver { get; set; } = null!;
         /// <summary>Baked animation data for bone-attached hitbox resolution. Set by ServerSimulation.</summary>
         public BakedAnimationData? BakedData { get; set; }
         /// <summary>Character definition for the ability owner. Set by ServerSimulation.</summary>

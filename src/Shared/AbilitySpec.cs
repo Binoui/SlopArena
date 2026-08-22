@@ -59,8 +59,8 @@ namespace SlopArena.Shared
         /// <summary>
         /// ADR-0015 / issue #115: recovery-designated move (Smash up-B analog). Only
         /// moves with this flag reset the FloatWindow (AirTimeTicks = 0 at activation) —
-        /// normal air attacks no longer hover. The shared <c>RecoveryMove</c> ability class
-        /// implements the burst; bespoke recovery moves just set the flag to get the reset.
+        /// normal air attacks no longer hover. Recovery abilities set this flag to opt into
+        /// the reset.
         /// </summary>
         public bool IsRecoveryMove;
         /// <summary>
