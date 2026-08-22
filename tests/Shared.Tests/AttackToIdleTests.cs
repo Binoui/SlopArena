@@ -5,8 +5,8 @@ namespace SlopArena.Shared.Tests;
 
 /// Tests that every character's abilities properly transition back to idle
 /// after their attack duration expires.
-/// Covers all attack slots: LMB (LmbCombo), AirLMB (AirLmbCombo), Q (MankiRoundBomb/FightGuyKiShot),
-/// E (MankiGrapple/FightGuyCycloneKick), R (MankiBazooka/FightGuyDragonKick), F (MankiOverclock/FightGuyTempest).
+/// Covers all attack slots: LMB (LmbCombo), AirLMB (AirLmbCombo), A (MankiRoundBomb/FightGuyKiShot),
+/// E (MankiGrapple/FightGuyRisingKick), R (MankiBazooka/FightGuyCycloneKick), F (MankiOverclock/FightGuyDragonBeam).
 /// The RMB slot (slot 2) is retired — it is the target-lock toggle, ADR-0018, no attack.
 public class AttackToIdleTests
 {
@@ -155,25 +155,19 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  FIGHTGUY Q — FightGuyKiShot (hold → throw)
+    //  FIGHTGUY A — FightGuyKiShot
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void FightGuyQ_HoldAndRelease_ReturnsToIdle()
+    public void FightGuyA_KiShot_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 3, aiming: true) } });
-
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 0, aiming: true) } });
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 0, aiming: false) } });
-
-        for (int i = 0; i < 70; i++)
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
+        for (int i = 0; i < 30; i++)
             sim.Tick(new() { { 1, default } });
 
         var after = sim.GetState(1);
@@ -182,11 +176,11 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  FIGHTGUY E — FightGuyCycloneKick
+    //  FIGHTGUY E — FightGuyRisingKick
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void FightGuyE_CycloneKick_ReturnsToIdle()
+    public void FightGuyE_RisingDragon_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -202,37 +196,37 @@ public class AttackToIdleTests
     }
 
     // ════════════════════════════════════════════════
-    //  FIGHTGUY R — FightGuyDragonKick
+    //  FIGHTGUY R — FightGuyCycloneKick
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void FightGuyR_DragonKick_ReturnsToIdle()
+    public void FightGuyR_CycloneKick_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
-        // max_flight_ticks=60 + end_duration=15 + margin
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 200);
+        // duration_ticks=40 plus a recovery margin
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 80);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);
     }
 
     // ════════════════════════════════════════════════
-    //  FIGHTGUY F — FightGuyTempest
+    //  FIGHTGUY F — FightGuyDragonBeam
     // ════════════════════════════════════════════════
 
     [Fact]
-    public void FightGuyF_Tempest_ReturnsToIdle()
+    public void FightGuyF_DragonBeam_ReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 120);
+        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 40);
 
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);

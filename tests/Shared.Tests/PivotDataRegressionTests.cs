@@ -11,8 +11,7 @@ namespace SlopArena.Shared.Tests;
 ///      The machinery stays dormant (not deleted): one data flip re-enables it.
 ///   2. Launcher profile at most one move per kit (kill-move territory).
 ///   3. StunTicks in the ~10-25 band (short hitstun, reset to neutral), except
-///      sustained zone hits (DurationTicks >= 40) like FightGuy's Tempest spin,
-///      which tick-stun at 6 by design.
+///      sustained zone hits (DurationTicks >= 40), which tick-stun at 6 by design.
 /// </summary>
 public class PivotDataRegressionTests
 {
@@ -77,7 +76,7 @@ public class PivotDataRegressionTests
                 if (stage.HitboxEvents == null) continue;
                 foreach (var h in stage.HitboxEvents)
                 {
-                    bool sustainedZone = h.DurationTicks >= 40; // e.g. FightGuy Tempest spin: tick-stun by design
+                    bool sustainedZone = h.DurationTicks >= 40; // sustained zone hit: tick-stun by design
                     Assert.True(sustainedZone || (h.StunTicks >= 10 && h.StunTicks <= 25),
                         $"{def.DisplayName}: StunTicks={h.StunTicks} outside the 10-25 band (ADR-0015 reset-to-neutral)");
                 }

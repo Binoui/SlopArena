@@ -6,7 +6,7 @@ namespace SlopArena.Shared.Abilities;
 /// Factory for instantiating server-side abilities.
 /// Maps (CharacterClass, slot) to concrete ServerAbility implementations.
 /// Slot: 0=LMB, 1=RMB (retired — the RMB is the camera-lock toggle, ADR-0018, no attack),
-/// 2=Slot1 (key "1"), 3=E, 4=R, 5=F, 6-10=Slot2-5/A (no kit data yet)
+/// 2=Slot1 (key "1"), 3=E, 4=R, 5=F, 6-10=Slot2-5/A
 /// </summary>
 public static class AbilityFactory
 {
@@ -46,14 +46,14 @@ public static class AbilityFactory
         (2, true) => new AirLmbCombo(),        // key "1" air — Double Punch
         (3, _) => new FightGuyRisingKick(),    // E — Rising Dragon (upward mobility / recovery)
         (4, _) => new FightGuyCycloneKick(),   // R — Cyclone Kick (moved from E, issue #117)
-        (5, _) => new FightGuyTempest(),       // F — Tempest
+        (5, _) => new FightGuyDragonBeam(),      // F — Dragon Beam
         (6, false) => new LmbCombo(),          // key "2" — Straight Punch (normal)
         (6, true) => new AirLmbCombo(),        // key "2" air — Floating Kick
         (7, false) => new LmbCombo(),          // key "3" — Sweeping Kick (normal)
         (7, true) => new AirLmbCombo(),        // key "3" air — High Kick
         (8, false) => new LmbCombo(),          // key "4" — Double Kick (normal)
         (8, true) => new AirLmbCombo(),        // key "4" air — Air Smash
-        (10, _) => new FightGuyKiShot(),       // Q key (slot 11) — Ki Shot (moved from slot 2, issue #117)
+        (10, _) => new FightGuyKiShot(),         // A key (slot 11) — Ki Shot
         _ => null,                             // key "5" — empty (demo)
     };
 

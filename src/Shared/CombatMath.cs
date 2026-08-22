@@ -89,7 +89,7 @@ namespace SlopArena.Shared
 
         /// <summary>
         /// Calculate knockback direction from attacker to target (horizontal only).
-        /// Used exclusively by pull-type abilities (FightGuy Tempest).
+        /// Used by pull-type abilities such as Nilus Event Horizon.
         /// NOT the main knockback path — see Simulation.ApplyKnockback for the
         /// standard Smash-style formula with BaseKnockback + KnockbackGrowth.
         /// </summary>

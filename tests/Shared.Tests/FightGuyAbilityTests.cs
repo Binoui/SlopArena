@@ -7,93 +7,73 @@ public class FightGuyAbilityTests
 {
     private static readonly float GroundPY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
 
-    // ── Q (FightGuyKiShot) ──
+    // ── A (FightGuyKiShot) ──
 
     [Fact]
-    public void FightGuyKiShot_ActivatesAimed()
+    public void FightGuyKiShot_ActivatesImmediately()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11, aiming: true, aimDistance: 500), 1);
-        Assert.Equal(ActionState.Aiming, t0.State);
+
+        var t0 = TestHelpers.TickN(sim, new InputState
+        {
+            ActiveSlot = 11,
+            AimYaw = 9000,
+            IsAiming = false,
+        }, 1);
+
+        Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)11, t0.AttackSlot);
-        Assert.True(t0.IsAiming);
+        Assert.False(t0.IsAiming);
     }
 
     [Fact]
-    public void FightGuyKiShot_ThrowsProjectile()
+    public void FightGuyKiShot_FiresOneMovingProjectileAtStartup()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-        var aim = TestHelpers.Input(activeSlot: 11, aiming: true, aimDistance: 500);
-        for (int i = 0; i < 15; i++) sim.Tick(new() { { 1, aim } });
-        var rel = new InputState { ActiveSlot = 11, AimDistance = 500 };
-        for (int i = 0; i < 15; i++) sim.Tick(new() { { 1, rel } });
-        Assert.Equal((byte)1, sim.GetState(1).ComboStage);
-        Assert.NotEmpty(sim.Resolver.GetActiveHitboxes());
+        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+
+        sim.Tick(new() { { 1, new InputState { AimYaw = 9000 } } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11 } } });
+        for (int i = 0; i < 7; i++)
+            sim.Tick(new() { { 1, default } });
+
+        var projectile = Assert.Single(sim.Resolver.GetActiveHitboxes());
+        Assert.Equal(HitboxShape.Sphere, projectile.Shape);
+        Assert.InRange(projectile.VX, 24.99f, 25.01f);
+        Assert.InRange(projectile.VY, -0.02f, 0f);
+        Assert.InRange(MathF.Abs(projectile.VZ), 0f, 0.02f);
     }
 
     [Fact]
-    public void FightGuyKiShot_AppliesMark()
+    public void FightGuyKiShot_HitDoesNotMarkTarget()
     {
         var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-        var npc = TestHelpers.NpcState(0f, 0.5f);
-        npc.PY = GroundPY;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-        var aim = TestHelpers.Input(activeSlot: 11, aiming: true, aimDistance: 50);
-        for (int i = 0; i < 15; i++) sim.Tick(new() { { 1, aim }, { 100, default } });
-        var rel = new InputState { ActiveSlot = 11, AimDistance = 50 };
-        for (int i = 0; i < 90; i++) sim.Tick(new() { { 1, rel }, { 100, default } });
-        var npcAfter = sim.GetState(100);
-        Assert.True((npcAfter.StatusFlags & (1 << 2)) != 0, "NPC should have Marked status");
-        Assert.True(npcAfter.StatusRemainingTicks > 0);
-    }
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPY;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
 
-    [Fact]
-    public void FightGuyKiShot_MarkExpiresAfterDuration()
-    {
-        var sim = TestHelpers.MakeSim();
-        var npc = TestHelpers.NpcState(0f, 0.5f);
-        npc.PY = GroundPY;
-        npc.StatusFlags = (1 << 2);
-        npc.StatusRemainingTicks = 300;  // 5s mark
+        var npc = TestHelpers.NpcState(0f, 2f);
+        npc.PY = GroundPY + 1.2f;
+        npc.IsGrounded = false;
+        npc.AirTimeTicks = 100;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
-        // Tick exactly 300 times — should clear at 0
-        for (int i = 0; i < 300; i++)
-            sim.Tick(new() { { 100, default } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11 } }, { 100, default } });
+        for (int i = 0; i < 40; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
 
-        var after = sim.GetState(100);
-        Assert.Equal((ushort)0, after.StatusRemainingTicks);
-        Assert.Equal((byte)0, after.StatusFlags);
+        var target = sim.GetState(100);
+        Assert.Equal((ushort)6, target.DamagePercent);
+        Assert.Equal((byte)0, target.StatusFlags);
+        Assert.Equal((ushort)0, target.StatusRemainingTicks);
     }
 
-    [Fact]
-    public void FightGuyKiShot_MarkStillActiveAtHalfDuration()
-    {
-        var sim = TestHelpers.MakeSim();
-        var npc = TestHelpers.NpcState(0f, 0.5f);
-        npc.PY = GroundPY;
-        npc.StatusFlags = (1 << 2);
-        npc.StatusRemainingTicks = 300;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-
-        for (int i = 0; i < 150; i++)
-            sim.Tick(new() { { 100, default } });
-
-        var after = sim.GetState(100);
-        Assert.Equal((ushort)150, after.StatusRemainingTicks);
-        Assert.Equal((byte)(1 << 2), after.StatusFlags);
-    }
-
-    // ── E (FightGuyCycloneKick) ──
+    // ── R (FightGuyCycloneKick) ──
 
     [Fact]
     public void FightGuyCycloneKick_Activates()
@@ -121,7 +101,7 @@ public class FightGuyAbilityTests
     }
 
     [Fact]
-    public void FightGuyCycloneKick_HitboxInFrontStuns()
+    public void FightGuyCycloneKick_HitsEachTargetOnceWithModerateKnockback()
     {
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
@@ -129,33 +109,28 @@ public class FightGuyAbilityTests
         player.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
 
-        // NPC in front (OffZ=1.8 hitbox, player lunges forward)
         var npc = TestHelpers.NpcState(0f, 3f);
         npc.PY = GroundPY;
-        npc.DamagePercent = 0;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
-        // Tick 0: press E (windup; hitbox triggers after ~6 ticks, re-hits every tick of the
-        // spin). Scan from the kick capturing the PEAK hitstun the kick inflicts — the repeated
-        // contacts re-freeze the victim, so "stun outside hitstop" is unreliable; the peak is not.
+        float maxHorizontalVelocity = 0f;
         ushort maxStun = 0;
-        for (int i = 0; i < 60; i++)
+        for (int i = 0; i < 80; i++)
         {
-            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default }, { 100, default } });
-            ushort stun = sim.GetState(100).HitstunTicks;
-            if (stun > maxStun) maxStun = stun;
+            sim.Tick(new()
+            {
+                { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default },
+                { 100, default },
+            });
+            var target = sim.GetState(100);
+            maxHorizontalVelocity = MathF.Max(maxHorizontalVelocity,
+                MathF.Sqrt(target.VX * target.VX + target.VZ * target.VZ));
+            maxStun = Math.Max(maxStun, target.HitstunTicks);
         }
 
-        Assert.True(sim.GetState(100).DamagePercent > 0,
-            "NPC should take damage from Cyclone Kick");
-
-        // KNOWN DEBT (accepted 2026-08-19): CycloneKick has NO knockback, so the no-floor
-        // melee-soft tuning (issue #149) derives ~1-tick hitstun (min clamp) — a flinch, not
-        // the 20-tick pin this test was originally written for. The authored 96-tick stun is
-        // only a zero-gate under ADR-0019. Revisit with the specials pass: give the kick KB
-        // (data) or accept the flinch.
-        Assert.True(maxStun > 0, "the kick must flinch the NPC");
-        Assert.True(maxStun <= 2, $"expected a ~1-tick flinch under melee-soft, got max stun {maxStun}");
+        Assert.Equal((ushort)7, sim.GetState(100).DamagePercent);
+        Assert.True(maxHorizontalVelocity > 0f, "Cyclone must apply nonzero knockback");
+        Assert.True(maxStun > 0 && maxStun <= 6, $"expected short stun, got {maxStun}");
     }
 
     [Fact]
@@ -167,7 +142,6 @@ public class FightGuyAbilityTests
         player.FacingYaw = 0f;
         sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
 
-        // NPC1 close (z=2), NPC2 far (z=6)
         var npc1 = TestHelpers.NpcState(0f, 2f);
         npc1.PY = GroundPY;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc1);
@@ -176,90 +150,104 @@ public class FightGuyAbilityTests
         npc2.PY = GroundPY;
         sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
 
-        // Activate E and tick through the dash, watching for each victim's flinch.
-        // KNOWN DEBT (accepted 2026-08-19): zero-KB kick ~flinches (1 tick) under the no-floor
-        // melee-soft tuning — detect the PEAK hitstun per victim (re-hits re-freeze, so stun
-        // outside hitstop is unreliable). The hits are staggered (NPC2 sits 4 m farther down
-        // the dash), so each victim peaks on its own contact.
-        ushort n1Max = 0, n2Max = 0;
         for (int i = 0; i < 150; i++)
         {
-            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default }, { 100, default }, { 101, default } });
-            ushort a = sim.GetState(100).HitstunTicks, b = sim.GetState(101).HitstunTicks;
-            if (a > n1Max) n1Max = a;
-            if (b > n2Max) n2Max = b;
+            sim.Tick(new()
+            {
+                { 1, i == 0 ? TestHelpers.Input(activeSlot: 5) : default },
+                { 100, default },
+                { 101, default },
+            });
         }
-        Assert.True(sim.GetState(100).DamagePercent > 0, "NPC1 should take damage");
-        Assert.True(sim.GetState(101).DamagePercent > 0, "NPC2 should take damage");
-        Assert.True(n1Max > 0 && n2Max > 0, $"both NPCs must flinch, peaks N1={n1Max} N2={n2Max}");
+
+        Assert.Equal((ushort)7, sim.GetState(100).DamagePercent);
+        Assert.Equal((ushort)7, sim.GetState(101).DamagePercent);
     }
 
-    // ── F (FightGuyTempest) ──
+    // ── F (FightGuyDragonBeam) ──
 
     [Fact]
-    public void FightGuyTempest_Activates()
+    public void FightGuyDragonBeam_ActivatesAndLocksInPlace()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
+        state.VX = 10f;
+        state.VZ = 5f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
         Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)6, t0.AttackSlot);
+        Assert.Equal(0f, t0.VX);
+        Assert.Equal(0f, t0.VZ);
     }
 
     [Fact]
-    public void FightGuyTempest_LocksInPlace()
+    public void FightGuyDragonBeam_NoHitboxBeforeFireThenSpawnsCapsule()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
-        state.VX = 10f; state.VZ = 5f;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 2);
-        Assert.Equal(0f, t1.VX);
-        Assert.Equal(0f, t1.VZ);
+
+        for (int i = 0; i < 23; i++)
+            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default } });
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+
+        sim.Tick(new() { { 1, default } });
+        var beam = Assert.Single(sim.Resolver.GetActiveHitboxes());
+        Assert.Equal(HitboxShape.Capsule, beam.Shape);
+        Assert.InRange(beam.EndZ - beam.Z, 17.99f, 18.01f);
+        Assert.Equal(0f, beam.VX);
+        Assert.Equal(0f, beam.VY);
+        Assert.Equal(0f, beam.VZ);
     }
 
     [Fact]
-    public void FightGuyTempest_PullsEnemies()
+    public void FightGuyDragonBeam_HitsOnceWithoutPull()
     {
         var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, state);
-        var npc = TestHelpers.NpcState(2f, 0f);
-        npc.PY = 5f; npc.IsGrounded = false;
-        npc.VX = 0f; npc.VZ = 0f;
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPY;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+
+        var npc = TestHelpers.NpcState(0f, 4f);
+        npc.PY = GroundPY + 2.5f;
+        npc.IsGrounded = false;
+        npc.AirTimeTicks = 100;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
-        var f = TestHelpers.Input(activeSlot: 6);
-        for (int i = 0; i < 40; i++)
-            sim.Tick(new() { { 1, f }, { 100, default } });
-        float dist = CombatMath.HorizontalDistance(0, 0, sim.GetState(100).PX, sim.GetState(100).PZ);
-        Assert.True(dist < 2f, $"NPC should be pulled closer (<2m), distance={dist:F3}");
+
+        for (int i = 0; i < 23; i++)
+            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default }, { 100, default } });
+        float beforeFireZ = sim.GetState(100).PZ;
+
+        for (int i = 0; i < 20; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var target = sim.GetState(100);
+        Assert.Equal((ushort)14, target.DamagePercent);
+        Assert.True(target.PZ > beforeFireZ, "Dragon Beam must launch away, not pull toward the caster");
     }
 
     [Fact]
-    public void FightGuyTempest_LauncherSpawnsOnFinalSpinTick()
+    public void FightGuyDragonBeam_ActivatesOnGroundAndAir()
     {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
+        var groundSim = TestHelpers.MakeSim();
+        var ground = TestHelpers.PlayerState();
+        ground.PY = GroundPY;
+        TestHelpers.RegisterPlayer(groundSim, TestHelpers.FightGuyDef, ground);
+        var groundAfter = TestHelpers.TickN(groundSim, TestHelpers.Input(activeSlot: 6), 28);
+        Assert.Equal(ActionState.Idle, groundAfter.State);
 
-        // Activate F and tick through windup (12) + spin (60) = 72 ticks
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 6) } });
-        // Tick through windup (12) + spin (60) = 72 ticks total from activation
-        // Launcher spawns at tick 72 (spinElapsed==_spinDuration)
-        for (int i = 0; i < 71; i++)
-            sim.Tick(new() { { 1, default } });
-
-        // Ability should be ended, but launcher hitbox (4 tick duration)
-        // should still be active with 3 remaining ticks
-        var after = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.True(sim.Resolver.GetActiveHitboxes().Count >= 1,
-            $"Expected at least 1 active hitbox (launcher), got {sim.Resolver.GetActiveHitboxes().Count}");
+        var airSim = TestHelpers.MakeSim();
+        var air = TestHelpers.PlayerState();
+        air.PY = GroundPY + 5f;
+        air.IsGrounded = false;
+        air.AirTimeTicks = 100;
+        TestHelpers.RegisterPlayer(airSim, TestHelpers.FightGuyDef, air);
+        var airAfter = TestHelpers.TickN(airSim, TestHelpers.Input(activeSlot: 6), 28);
+        Assert.Equal(ActionState.Idle, airAfter.State);
     }
 
     // ── Status ──

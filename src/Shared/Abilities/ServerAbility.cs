@@ -77,7 +77,7 @@ namespace SlopArena.Shared.Abilities
         public byte AnimIndex { get; protected set; }
 
         /// <summary>All entity states (set by ServerSimulation). Used by abilities that need
-        /// to inspect other entities (e.g., FightGuy Tempest pull, homing).</summary>
+        /// to inspect other entities (for example pull or homing abilities).</summary>
         public Dictionary<ulong, CharacterState>? SimulationStates { get; set; }
 
         /// <summary>Animation names from the spec. Indexed by AnimIndex.</summary>

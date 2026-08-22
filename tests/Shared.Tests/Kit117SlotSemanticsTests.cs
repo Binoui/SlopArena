@@ -5,10 +5,10 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Issue #117 — the 3-state ground/air slot semantics and the FightGuy kit rework:
-///   - null air spec = grounded-only (Tempest; slot 5 empty)
+///   - all four FightGuy specials have air specs (Dragon Beam; slots E/R/F/A share ground specs)
 ///   - normals 1-4 have DISTINCT air specs (AirSlot1-4 — the air normal pass)
-///   - Air* = ground spec reference = shared (Rising Dragon, Cyclone, Ki Shot)
-///   - the E-slot rising kick: anti-air on the ground, recovery burst in the air
+///   - Air* = ground spec reference = shared (Rising Dragon, Cyclone, Dragon Beam, Ki Shot)
+///   - the E-slot rising punch: anti-air on the ground, recovery burst in the air
 ///   - cooldowns on slots 6-11 now tick down (TickTimers loop fix)
 /// </summary>
 public class Kit117SlotSemanticsTests
@@ -40,16 +40,17 @@ public class Kit117SlotSemanticsTests
         Assert.NotSame(Def.GetSlotAbility(6, false), Def.GetSlotAbility(6, true));
         Assert.NotSame(Def.GetSlotAbility(7, false), Def.GetSlotAbility(7, true));
         Assert.NotSame(Def.GetSlotAbility(8, false), Def.GetSlotAbility(8, true));
-        Assert.Null(Def.GetSlotAbility(5, true));      // Tempest — ult is grounded-only
+        Assert.Same(Def.F, Def.GetSlotAbility(5, true));        // Dragon Beam — airborne
         Assert.NotNull(Def.GetSlotAbility(2, false));
     }
 
     [Fact]
     public void GetSlotAbility_SharedAbilitySlots_ResolveInAir()
     {
-        // Rising Dragon / Cyclone / Ki Shot share their spec across states (Air* = ground ref).
+        // Rising Dragon / Cyclone / Dragon Beam / Ki Shot share their specs across states.
         Assert.Same(Def.E, Def.GetSlotAbility(3, true));
         Assert.Same(Def.R, Def.GetSlotAbility(4, true));
+        Assert.Same(Def.F, Def.GetSlotAbility(5, true));
         Assert.Same(Def.A, Def.GetSlotAbility(10, true));
         Assert.Same(Def.E, Def.GetSlotAbility(3, false));
     }
@@ -81,14 +82,14 @@ public class Kit117SlotSemanticsTests
     }
 
     [Fact]
-    public void Tempest_RejectedWhileAirborne()
+    public void DragonBeam_ActivatesWhileAirborne()
     {
         var sim = TestHelpers.MakeSim();
         TestHelpers.RegisterPlayer(sim, Def, AirborneState());
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
-        Assert.Equal(ActionState.Idle, t0.State);
-        Assert.Equal((byte)0, t0.AttackSlot);
+        Assert.Equal(ActionState.Attacking, t0.State);
+        Assert.Equal((byte)6, t0.AttackSlot);
     }
 
     [Fact]
@@ -111,9 +112,10 @@ public class Kit117SlotSemanticsTests
         var sim = TestHelpers.MakeSim();
         TestHelpers.RegisterPlayer(sim, Def, AirborneState());
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11, aiming: true, aimDistance: 500), 1);
-        Assert.Equal(ActionState.Aiming, t0.State);
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11), 1);
+        Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)11, t0.AttackSlot);
+        Assert.False(t0.IsAiming);
     }
 
     // ── E-slot Rising Dragon ──
@@ -238,7 +240,7 @@ public class Kit117SlotSemanticsTests
     [InlineData(2.0f)]
     public void RisingDragon_Ground_WhiffsBeyondReach(float distance)
     {
-        // The connect envelope: the baked hitboxes reach ~1.4 m — past that the rising kick
+        // The connect envelope: the baked hitboxes reach ~1.4 m — past that the rising punch
         // whiffs (no warp; AttackRange only drives target-lock rotation). Pins the reach so a
         // future hitbox/offset change shows up as a failing test instead of a silent feel shift.
         var baked = TestHelpers.LoadBakedData(Def);
@@ -305,17 +307,17 @@ public class Kit117SlotSemanticsTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Fire Ki Shot: aim, then release to throw.
-        var aim = TestHelpers.Input(activeSlot: 11, aiming: true, aimDistance: 500);
-        for (int i = 0; i < 15; i++) sim.Tick(new() { { 1, aim } });
-        var rel = new InputState { ActiveSlot = 11, AimDistance = 500 };
-        for (int i = 0; i < 90; i++) sim.Tick(new() { { 1, rel } });
+        // Fire Ki Shot with a single non-aiming A press.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
+        for (int i = 0; i < 30; i++)
+            sim.Tick(new() { { 1, default } });
 
         ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);
-        Assert.True(cd > 0, $"expected cooldown on the Q slot after firing, got {cd}");
+        Assert.True(cd > 0, $"expected cooldown on the A slot after firing, got {cd}");
 
         // The 120-tick cooldown must expire (slots 6-11 decrement since issue #117).
-        for (int i = 0; i < 130; i++) sim.Tick(new() { { 1, default } });
+        for (int i = 0; i < 130; i++)
+            sim.Tick(new() { { 1, default } });
         Assert.Equal((ushort)0, sim.GetState(1).GetCooldown(AbilitySlots.A));
     }
 }

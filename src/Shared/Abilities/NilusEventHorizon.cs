@@ -13,8 +13,8 @@ namespace SlopArena.Shared.Abilities;
 /// and it is also what makes the drag *implementable*: ServerSimulation discards an
 /// ability instance the moment its caster leaves ActionState.Attacking
 /// (ServerSimulation.cs:143), so staying locked in Attacking is what keeps this instance
-/// alive long enough to run its own per-tick loop over SimulationStates. Same pattern as
-/// FightGuyTempest.
+/// alive long enough to run its own per-tick loop over SimulationStates. This is the
+/// standard locked-ability lifecycle.
 ///
 /// ── Why the lifecycle is NOT `_ticks >= s.AnimLockTicks` ──
 /// The house idiom (KistuRisingSlash, NilusRiftwalk) compares an INCREMENTING local
@@ -65,8 +65,8 @@ namespace SlopArena.Shared.Abilities;
 /// next TickAbilities drops the instance without OnEnd (ServerSimulation.cs:143-150) while
 /// still charging the full 540-tick cooldown. So "Nilus is locked in place for the whole
 /// ability" above is true for movement input and dash, and FALSE for jump.
-/// FightGuyTempest has the identical hole, so gating jump on AnimLockTicks would change the
-/// feel of every committed ability on the roster and is an owner decision, not a bug fix.
+/// An earlier pull ability had the identical hole, so gating jump on AnimLockTicks would
+/// change the feel of every committed ability on the roster and is an owner decision, not a bug fix.
 /// F_JumpCancelsTheUltAtFullCooldownCost pins the current behaviour so that a future gate
 /// shows up as a failing test rather than a silent feel change.
 ///
@@ -184,9 +184,8 @@ public sealed class NilusEventHorizon : ServerAbility
                 // targets in [0.01, 0.0316) slip through into the case it exists to prevent.
                 if (dist * dist <= 0.001f) continue;
 
-                // Arguments deliberately swapped against the parameter names: this yields the
-                // direction from the OTHER entity toward Nilus, i.e. inward (as FightGuyTempest
-                // does). Structs in the dictionary are values — copy out, modify, copy back.
+                // direction from the OTHER entity toward Nilus, i.e. inward. Structs in the
+                // dictionary are values — copy out, modify, copy back.
                 // See the class remarks for why hitstun does not shield a target from the pull.
                 CombatMath.CalculateKnockback(s.PX, s.PZ, other.PX, other.PZ,
                     dragForce, 0f, out float kx, out float _, out float kz);

@@ -5,7 +5,7 @@ namespace SlopArena.Shared.Abilities
     /// <summary>
     /// FightGuy's E-slot upward-mobility move (issue #117) — the ADR-0015 up-B analog.
     ///
-    /// A rising kick: Melee Falcon-Dive-style recovery. VY is SET to <c>rise_speed</c>
+    /// A rising punch: Melee Falcon-Dive-style recovery. VY is SET to <c>rise_speed</c>
     /// (cancels fall/drift — reliable recovery, not additive) and held at that constant speed
     /// for <c>rise_ticks</c> (overrides gravity: TickAbilities runs after ApplyGravity), then
     /// gravity resumes. Optional hitboxes from the spec's stage.

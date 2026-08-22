@@ -108,7 +108,7 @@ public static partial class CharacterRegistry
             E = new AbilitySpec
             {
                 Name = "Rising Dragon",
-                Description = "Rising kick — anti-air launcher on the ground, recovery burst in the air (resets the float window)",
+                Description = "Rising punch — anti-air launcher on the ground, recovery burst in the air (resets the float window)",
                 IconName = "e",
                 CooldownTicks = 240,
                 IsRecoveryMove = true,
@@ -133,9 +133,9 @@ public static partial class CharacterRegistry
             R = new AbilitySpec
             {
                 Name = "Cyclone Kick",
-                Description = "Dash forward with a rapid spinning kick",
+                Description = "Dash forward with a spinning engage kick",
                 IconName = "r",
-                CooldownTicks = 120,
+                CooldownTicks = 360,
                 Behavior = AbilityBehavior.MeleeCombo,
                 AimMode = AimMode.None,
                 Stages = new AttackStage[]
@@ -155,7 +155,10 @@ public static partial class CharacterRegistry
                     ["side_radius"] = 0.4f,
                     ["side_offset"] = 0.8f,
                     ["damage"] = 7f,
-                    ["stun_ticks"] = 20f,
+                    ["knockback_angle"] = 15f,
+                    ["knockback_base"] = 8f,
+                    ["knockback_growth"] = 5f,
+                    ["stun_ticks"] = 6f,
                     ["body_y"] = 0.8f,
                     ["side_y"] = 0.3f,
                 },
@@ -163,39 +166,44 @@ public static partial class CharacterRegistry
 
             F = new AbilitySpec
             {
-                Name = "Tempest",
-                Description = "Spin and pull nearby enemies inward, then launch them skyward",
+                Name = "Dragon Beam",
+                Description = "Fire a camera-directed beam that launches each target once",
                 IconName = "f",
-                CooldownTicks = 540,
+                CooldownTicks = 1200,
+                Behavior = AbilityBehavior.Projectile,
+                AimMode = AimMode.CameraForward3D,
                 Stages = new AttackStage[]
                 {
-                    // Stage 1: brief windup (no hitbox)
-                    new() { DurationTicks = 12, 
-                            HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                            AttackRange = 0f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
-                    // Stage 2: sustained spinning kick AoE
-                    new() { DurationTicks = 60, 
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 0, DurationTicks = 60, Radius = 2.8f, OffX = 0, OffY = 0.5f, OffZ = 0f, Damage = 3f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 6, Interruptible = false } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f },
+                    new()
+                    {
+                        DurationTicks = 28,
+                        HitboxEvents = System.Array.Empty<HitboxEvent>(),
+                        AttackRange = 0f,
+                        WarpRange = 0f,
+                        UseTargetLock = false,
+                        RotateTowardTarget = false,
+                        TrackingStrength = 0f,
+                    },
                 },
                 AnimationNames = new[] { "spell_f" },
-                SpecialEffectKeys = new[] { "FightGuyTempest" },
+                SpecialEffectKeys = new[] { "FightGuyDragonBeam" },
                 Params = new()
                 {
-                    ["pull_radius"] = 3.5f,
-                    ["pull_force"] = 3f,
-                    ["pull_interval_ticks"] = 10f,
-                    ["launcher_damage"] = 12f,
-                    ["launcher_kb_base"] = 10f,
-                    ["launcher_kb_growth"] = 10f,
-                    ["launcher_kb_angle"] = 25f,
-                    ["launcher_stun_ticks"] = 24f,
-                    ["windup_ticks"] = 12f,
-                    ["spin_duration_ticks"] = 60f,
+                    ["duration_ticks"] = 28f,
+                    ["fire_tick"] = 24f,
+                    ["launch_offset_y"] = 1.2f,
+                    ["beam_range"] = 18f,
+                    ["beam_radius"] = 0.45f,
+                    ["damage"] = 14f,
+                    ["knockback_angle"] = 20f,
+                    ["knockback_base"] = 18f,
+                    ["knockback_growth"] = 10f,
+                    ["stun_ticks"] = 24f,
+                    ["hitbox_duration_ticks"] = 2f,
                 },
             },
 
-            // ═══ ISSUE #117 — NORMAL TIER (keys 1-4) + Q-SLOT PROJECTILE ═══
+            // ═══ ISSUE #117 — NORMAL TIER (keys 1-4) + A-SLOT PROJECTILE ═══
 
             Slot2 = new AbilitySpec
             {
@@ -318,34 +326,40 @@ public static partial class CharacterRegistry
             A = new AbilitySpec
             {
                 Name = "Ki Shot",
-                Description = "Fire a ki projectile that marks the target for bonus damage",
-                IconName = "q",
+                Description = "Fire a camera-directed ki projectile",
+                IconName = "a",
                 CooldownTicks = 120,
-                Behavior = AbilityBehavior.AimedProjectile,
+                Behavior = AbilityBehavior.Projectile,
                 AimMode = AimMode.CameraForward3D,
                 Stages = new AttackStage[]
                 {
-                    new() { DurationTicks = 60, 
-                            HitboxEvents = new[] { new HitboxEvent { TriggerTick = 8, DurationTicks = 16, Radius = 0.5f, OffX = 0, OffY = 1.0f, OffZ = 1.5f, Damage = 6f, Knockback = new() { Profile = KnockbackProfile.Light }, StunTicks = 16, Interruptible = true } },
-                            AttackRange = 4f, WarpRange = 0f, UseTargetLock = true, RotateTowardTarget = true, TrackingStrength = 0.7f },
+                    new()
+                    {
+                        DurationTicks = 24,
+                        HitboxEvents = System.Array.Empty<HitboxEvent>(),
+                        AttackRange = 0f,
+                        WarpRange = 0f,
+                        UseTargetLock = false,
+                        RotateTowardTarget = false,
+                        TrackingStrength = 0f,
+                    },
                 },
                 AnimationNames = new[] { "spell_q_loop", "spell_q_attack" },
                 SpecialEffectKeys = new[] { "FightGuyKiShot" },
                 Params = new()
                 {
-                    ["charge_hold_ticks"] = 180f,    // 3s max aim
-                    ["throw_duration"] = 60f,
-                    ["throw_trigger_tick"] = 10f,
+                    ["startup_ticks"] = 8f,
+                    ["duration_ticks"] = 24f,
+                    ["launch_offset_y"] = 1.2f,
                     ["projectile_speed"] = 25f,
-                    ["gravity"] = 1f,                // ki blast — minimal float
+                    ["gravity"] = 1f,
                     ["hitbox_radius"] = 0.5f,
                     ["damage"] = 6f,
                     ["knockback_base"] = 3f,
                     ["knockback_growth"] = 4.5f,
                     ["kb_angle"] = 30f,
-                    ["stun_ticks"] = 20f,
+                    ["stun_ticks"] = 12f,
                     ["max_flight_ticks"] = 90f,
-                    ["mark_duration_ticks"] = 300f,  // 5s
                 },
             },
 
@@ -358,6 +372,7 @@ public static partial class CharacterRegistry
         def.AirE = def.E;   // Rising Dragon: same move in the air — recovery burst + FloatWindow reset
         def.AirR = def.R;   // Cyclone: works identically in the air
         def.AirA = def.A;   // Ki Shot: works in the air
+        def.AirF = def.F;   // Dragon Beam: works in the air
         return def;
     }
 }

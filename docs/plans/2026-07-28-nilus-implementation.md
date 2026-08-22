@@ -1370,7 +1370,7 @@ git commit -m "feat(nilus): R Nether Grasp — inward knockback yank"
 
 ### Task 6: F — Event Horizon
 
-The ult. Three phases in one ability: a 1.2s telegraph, a 60-tick inward drag with damage pulses, then a Kill-knockback detonation. Because Nilus stays locked in `ActionState.Attacking` for the whole duration, the instance survives and can run its own per-tick loop over `SimulationStates` — this is the `FightGuyTempest` pattern (`FightGuyTempest.cs:59-78`), and it is only valid *because* the caster is locked.
+The ult. Three phases in one ability: a 1.2s telegraph, a 60-tick inward drag with damage pulses, then a Kill-knockback detonation. Because Nilus stays locked in `ActionState.Attacking` for the whole duration, the instance survives and can run its own per-tick loop over `SimulationStates` — this is the standard locked-ability pattern, and it is only valid *because* the caster is locked.
 
 **Files:**
 - Create: `src/Shared/Abilities/NilusEventHorizon.cs`
@@ -1449,7 +1449,7 @@ namespace SlopArena.Shared.Abilities;
 /// is what keeps him in ActionState.Attacking, which is what keeps this instance alive
 /// — ServerSimulation drops ability instances the moment the state leaves Attacking
 /// (ServerSimulation.cs:142). The per-tick SimulationStates loop is only legal here
-/// for that reason (same pattern as FightGuyTempest).
+/// for that reason: the caster remains locked in Attacking for the whole ability.
 ///
 /// Params: windup_ticks, drag_duration_ticks, drag_radius, drag_force,
 /// drag_interval_ticks, drag_damage, detonation_damage, detonation_kb_angle,

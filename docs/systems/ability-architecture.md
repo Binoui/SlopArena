@@ -68,17 +68,16 @@ All abilities spawn their own hitboxes in `Tick()` via `SpawnHitbox(ref s, evt)`
 | key "1" (2) | `MankiRoundBomb` | `LmbCombo` (Dragon Thrust) | `KistuCounter` | Normal tier (issue #117) |
 | E (3) | `MankiGrapple` | `FightGuyRisingKick` (Rising Dragon) | `LungeChargeAttack` | E = upward mobility (FightGuy) |
 | R (4) | `MankiBazooka` | `FightGuyCycloneKick` (moved from E, #117) | `KistuRisingSlash` | Per-character |
-| F (5) | `MankiOverclock` | `FightGuyTempest` | `KistuUltFlurry` | Per-character |
+| F (5) | `MankiOverclock` | `FightGuyDragonBeam` | `KistuUltFlurry` | Per-character |
 | key "2" (6) | — | `LmbCombo` (Dragon Uppercut) | — | Normal tier |
 | key "3" (7) | — | `LmbCombo` (Dragon Stomp) | — | Normal tier |
 | key "4" (8) | — | `LmbCombo` (Ki Wave) | — | Normal tier |
 | key "5" (9) | — | — | — | Empty (demo) |
-| Q key (10) | — | `FightGuyKiShot` (Ki Shot, moved #117) | — | Q = projectile slot |
+| A key (10) | — | `FightGuyKiShot` (moved #117) | — | A = projectile slot |
 
 Ground/air (issue #117): an `Air*` spec is required to fire a move in the air — null =
 grounded-only, same reference = shared. LMB/RMB always have air variants; FightGuy's normals
-1-4 and Tempest are grounded-only; Rising Dragon / Cyclone / Ki Shot are shared. Dragon's
-Kick was cut in #117 (redundant with Cyclone).
+1-4 and all four specials are shared. Rising Dragon / Cyclone / Dragon Beam / Ki Shot are shared.
 
 ## Key Patterns
 
