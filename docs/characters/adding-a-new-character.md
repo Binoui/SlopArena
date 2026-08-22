@@ -72,74 +72,49 @@ private static CharacterDefinition BuildYourClass()
             MaxJumps = 2,
         },
 
-        // ═══════ ABILITIES ═══════
-        // Each slot: LMB, AirLMB, RMB, AirRMB, Q, E, R, F
-
-        LMB = new AbilitySpec
-        {
-            Name = "My Combo",
-            CooldownTicks = 0,         // 0 = no cooldown (basic attacks)
-            Stages = new AttackStage[]
-            {
-                new()
-                {
-                    Shape = AttackShape.MeleeCone,
-                    Damage = 6f,
-                    Range = 2.8f,          // Cone range in meters
-                    HitAngleDeg = 45f,     // Cone half-angle
-                    Radius = 0f,           // Only used for CircleAOE/Projectile
-                    BaseKnockback = 1.2f,
-                    KnockbackGrowth = 1.8f,
-                    KnockbackUpward = 2f,
-                    LungeForce = 12f,      // Forward burst
-                    StunTicks = 12,        // Hitstun in 16.6ms ticks
-                    DurationTicks = 8,      // Total animation lock
-                    ChainWindowTicks = 42, // 0 = last hit, use for combo chain window
-                },
-                // ... more stages for multi-hit combos
-            },
-            // Charged variant (hold RMB):
-            ChargedStages = new AttackStage[] { ... },
-            ChargeHoldTicks = 18,          // ticks before charge fires
-
-            // Animation names matching FBX files:
-            AnimationNames = new[] { "great_sword_slash", "great_sword_spin" },
-
-            // Special effects (keys registered in AbilityRegistry):
-            SpecialEffectKeys = new[] { "YourClassEffectName" },
-        },
-
-        // Air LMB — separate ability, used when airborne
-        AirLMB = new AbilitySpec
-        {
-            Name = "Rising Slash",
-            CooldownTicks = 0,
-            Stages = new AttackStage[]
-            {
-                new() { Shape = AttackShape.MeleeCone, Damage = 6f, Range = 3f, HitAngleDeg = 50f, BaseKnockback = 3.2f, KnockbackGrowth = 4.8f, KnockbackUpward = 8f, LungeForce = 10f, StunTicks = 14, DurationTicks = 8, ChainWindowTicks = 0 },
-            }
-        },
-
-        // Air RMB — downward spike (hold to charge, like the ground RMB: Stages[0] = hold
-        // phase, Stages[1] = tap, ChargedStages[0] = charged. Driven by AirChargeAttack,
-        // shared by every character. Set Behavior = AbilityBehavior.ChargeAttack +
-        // ChargeHoldTicks (45) and give AnimationNames 2 entries (charge, attack).)
-        AirRMB = new AbilitySpec
-        {
-            Name = "Aerial Slam",
-            CooldownTicks = 0,
-            Behavior = AbilityBehavior.ChargeAttack,
-            ChargeHoldTicks = 45,
-            Stages = new AttackStage[]
-            {
-                new() { Shape = AttackShape.MeleeCone, Damage = 8f, Range = 3.5f, HitAngleDeg = 40f, BaseKnockback = 6f, KnockbackGrowth = 9f, KnockbackUpward = -8f, LungeForce = 15f, StunTicks = 16, DurationTicks = 10, ChainWindowTicks = 0 },
-            }
-        },
-
-        Q = new AbilitySpec { ... },
-        E = new AbilitySpec { ... },
-        R = new AbilitySpec { ... },
-        F = new AbilitySpec { ... },   // Ultimate
+        // ═══════ KIT DESIGN ═══════
+        // Camera controls: LMB / RMB. They are not attack slots.
+        //
+        // Normals: 1 / 2 / 3 / 4, each with a grounded and aerial variant.
+        // Specials: A / E / R / F.
+        //
+        // The exact CharacterDefinition field names may change during the
+        // slot migration. Treat the character document as the design source
+        // of truth until the data API is migrated.
+        //
+        // Normals must work without specials:
+        //   1  = grounded normal + aerial normal
+        //   2  = grounded normal + aerial normal
+        //   3  = grounded normal + aerial normal
+        //   4  = grounded normal + aerial normal
+        //
+        // Specials:
+        //   A  = signature mechanic
+        //   E  = recovery-capable mobility
+        //   R  = playmaking tool
+        //   F  = long-cooldown power move
+        //
+        // Use one move per input. Do not author automatic LMB chains or
+        // charged RMB attacks; the mouse buttons remain camera controls.
+        //
+        // Each grounded/aerial variant gets its own authored timing,
+        // hitbox geometry, recovery and knockback data. A special may share
+        // behavior between ground and air only when the character design
+        // explicitly calls for it. E must remain recovery-capable.
+        //
+        // Example design record:
+        //   Normal1Ground = new AbilitySpec { ... };
+        //   Normal1Air    = new AbilitySpec { ... };
+        //   Normal2Ground = new AbilitySpec { ... };
+        //   Normal2Air    = new AbilitySpec { ... };
+        //   Normal3Ground = new AbilitySpec { ... };
+        //   Normal3Air    = new AbilitySpec { ... };
+        //   Normal4Ground = new AbilitySpec { ... };
+        //   Normal4Air    = new AbilitySpec { ... };
+        //   SpecialA      = new AbilitySpec { ... };
+        //   SpecialE      = new AbilitySpec { ... };
+        //   SpecialR      = new AbilitySpec { ... };
+        //   SpecialF      = new AbilitySpec { ... };
     };
 }
 ```
@@ -159,7 +134,7 @@ private static CharacterDefinition BuildYourClass()
 | `LungeForce` | float | Self-forward burst | Moves attacker forward |
 | `StunTicks` | ushort | Hitstun duration on target | 1 tick = 16.6ms |
 | `DurationTicks` | ushort | Total animation lock duration | Prevents other actions |
-| `ChainWindowTicks` | ushort | Combo chain window | 0 = final/no chain |
+| `ChainWindowTicks` | ushort | Legacy chain field | Keep zero for the one-move-per-input kit contract; automatic LMB chains are not part of the design. |
 
 ---
 
@@ -367,16 +342,16 @@ Update this switch when adding a new class.
 - [ ] `CharacterClass` enum — new entry appended
 - [ ] `BuildRegistry()` — method added + registered in array
 - [ ] `MovementStats` — tuned for the class role (slow/tank, fast/assassin, etc.)
-- [ ] `LMB` — 3-hit combo with chain windows
-- [ ] `AirLMB` — upward launch for juggling
-- [ ] `RMB` — heavy attack (hold variant optional)
-- [ ] `AirRMB` — downward spike
-- [ ] `Q`, `E`, `R` — 3 utility/combat abilities
-- [ ] `F` — ultimate ability
+- [ ] Normals `1`-`4` — grounded + aerial variant for each (8 normals total)
+- [ ] Special `A` — signature mechanic
+- [ ] Special `E` — recovery-capable mobility
+- [ ] Special `R` — playmaking tool
+- [ ] Special `F` — long-cooldown power move
+- [ ] Confirm `LMB` and `RMB` remain camera controls
 - [ ] Special effect code — if needed, created in `Scripts/Characters/{Name}/`
 - [ ] `AbilityRegistry` — keys registered
 - [ ] GLB file — in `assets/characters/{Name}/`
-- [ ] Animations — all 8 slots + locomotion (idle/run/jump/fall)
+- [ ] Animations — all authored normal variants + special variants + locomotion
 - [ ] `AnimationNames` — set in each AbilitySpec
 - [ ] Bake skeleton — run `BakeSkeletonTool` → check `.bin` in `data/`
 - [ ] `BakedDataPath` + `HurtboxBoneScale` set in `CharacterDefinition`

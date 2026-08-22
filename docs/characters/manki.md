@@ -47,6 +47,8 @@ kit:
 ---
 
 # Manki — Mad Bomber Monkey
+> **Legacy implementation record.** The canonical kit contract is now eight normals on `1 / 2 / 3 / 4` (grounded and aerial) plus specials on `A / E / R / F`. `LMB` and `RMB` are camera controls, not attacks. This file records the current prototype and is not a template for new kit design.
+
 
 > Status: Implemented (prototype — animations placeholder)
 > Replaces: Narodin (removed)
@@ -125,4 +127,4 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 
 This character was initially designed as a **Fire Dancer / rushdown acrobat** (pure fire, full melee). The kit was redesigned in June 2026 to reposition him as a **pyromaniac/mad inventor** with explosives, while keeping a rushdown base. See git history for the old kit version.
 
-See `docs/character-kit-design-principles.md` for design patterns and `docs/combat-systems.md` for universal combat mechanics.
+See `docs/characters/character-kit-design-principles.md` for the canonical kit contract and `docs/combat-systems.md` for universal combat mechanics.

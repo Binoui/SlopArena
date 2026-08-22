@@ -47,6 +47,10 @@ kit:
 ---
 
 # Kistu — The Kitsune Blade
+> **Legacy implementation record.** The canonical kit contract is now eight normals on `1 / 2 / 3 / 4` (grounded and aerial) plus specials on `A / E / R / F`. `LMB` and `RMB` are camera controls, not attacks. This file records the current simulation implementation and is not a template for new kit design.
+> Normals are considered working for now. Current design work is limited to replacing and refining the four specials under the `A / E / R / F` contract.
+
+
 
 > Status: Implemented in Shared sim (all 8 slots + counter/charge-stock infra, 18 passing tests). Model/animation/VFX assets pending; plays now with a placeholder (FightGuy prefab, T-pose). See `docs/plans/2026-07-27-kistu-implementation.md`.
 > Inspired by: **Marth** (spacing, reach, punish, counter, exploitable recovery) × **Amaterasu** (DKO — fast agile sword, launcher, air-juggle payoff).

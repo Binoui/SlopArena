@@ -8,7 +8,8 @@
 ## ☐ Phase 0 — Concept & Kit
 
 - [ ] Define archetype (rushdown, control, assassin, tank)
-- [ ] Design ability kit (LMB, RMB, Q, E, R, F) + Air LMB + Air RMB
+- [ ] Design eight normals (`1 / 2 / 3 / 4`, grounded + aerial) and four specials (`A / E / R / F`)
+- [ ] Confirm `LMB` and `RMB` remain camera controls, not attacks
 - [ ] Define signature color palette (max 5 colors)
 - [ ] Define silhouette hooks (headband, cape, weapon shape, etc.)
 - [ ] Write concept art prompt for 3daistudio (front T-pose, Pixel8r2 style)

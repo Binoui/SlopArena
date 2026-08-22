@@ -134,45 +134,27 @@ namespace SlopArena.Client.UI
             _rosterPanel = root.Q<VisualElement>("roster-panel");
             RenderSoloRoster();
 
-            var config = new VisualElement();
-            config.AddToClassList("solo-config");
-            var botLabel = new Label("CPU CHARACTER: select a fighter, then assign it to CPU");
-            botLabel.AddToClassList("pvp-status");
-            config.Add(botLabel);
+            var config = root.Q<VisualElement>("solo-config");
+            config.style.display = DisplayStyle.Flex;
 
-            var assignBot = new Button(() =>
+            var botLabel = root.Q<Label>("solo-bot-label");
+            root.Q<Button>("btn-assign-cpu").clicked += () =>
             {
                 MatchConfig.SoloBotClass = _selected;
                 RenderSoloRoster();
                 botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
-            })
-            {
-                text = "USE SELECTED FIGHTER AS CPU"
             };
-            assignBot.AddToClassList("btn-primary");
-            config.Add(assignBot);
 
-            var levelLabel = new Label($"CPU LEVEL: {MatchConfig.SoloCpuLevel}");
-            levelLabel.AddToClassList("pvp-status");
-            config.Add(levelLabel);
-            var levelRow = new VisualElement();
-            levelRow.AddToClassList("pvp-buttons");
+            var levelLabel = root.Q<Label>("solo-level-label");
             for (int level = 1; level <= 9; level++)
             {
                 int capturedLevel = level;
-                var button = new Button(() =>
+                root.Q<Button>($"btn-cpu-level-{level}").clicked += () =>
                 {
                     MatchConfig.SoloCpuLevel = capturedLevel;
                     levelLabel.text = $"CPU LEVEL: {capturedLevel}";
-                })
-                {
-                    text = capturedLevel.ToString()
                 };
-                button.AddToClassList("btn-primary");
-                levelRow.Add(button);
             }
-            config.Add(levelRow);
-            root.Q<VisualElement>("pvp-panel").Add(config);
 
             selectButton.clicked += () =>
             {

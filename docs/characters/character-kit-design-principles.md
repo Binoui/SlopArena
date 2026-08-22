@@ -1,293 +1,240 @@
-# Character Kit Design Principles
+# Character Moveset Structure
 
-> Design patterns extracted from DKO, Battlerite, Supervive, Fangs, Omega Strikers, Smash.
-> These patterns appear in **every** game analyzed — they're the fundamentals of a character kit
-> for a 3D platform fighter with abilities.
->
-> Use as a reference when designing SlopArena class kits.
+## Overview
 
----
+SlopArena characters use two complementary layers of attacks:
 
-## The 8 Ability Archetypes
+* **8 normals** on `1 / 2 / 3 / 4`, with grounded and aerial variants.
+* **4 specials** on `A / E / R / F`.
 
-Every ability has a **specific job**. A character kit is a selection from these archetypes.
-No character has everything — each gets 4-6 slots distributed among these roles.
+Normals provide the character's fundamental fighting-game moveset.
 
-### 1. Poke / Projectile
-- Ranged attack, directional skillshot
-- Use: spacing, zone control, chip damage
-- CD: 0.5-3s (or spammable with low damage)
-- In DKO: neutral-B equivalent, or LMB for mages
+Specials provide character identity, unusual movement, utility, setup, and larger gameplay moments.
 
-### 2. Mobility / Recovery
-- Dash, teleport, sprint boost, grapple, leap
-- Use: close the distance (engage) or escape danger (disengage)
-- CD: 3-6s (short — players need to use it often for the game to feel dynamic)
-- **Very frequent pattern: bound to E**
-- Sometimes a double charge with refire (Zeus Surge in DKO)
-
-### 3. Crowd Control / Engage
-- Stun, root, slow, silence, knockup, fear, pull
-- Use: **initiate a fight** → land the CC → follow up
-- CD: 6-10s
-- **Frequent pattern: bound to Q**
-- In a platform fighter: CC lasts 1-2s max. More = stunlock, less = no punish window.
-
-### 4. Zone / Area Denial
-- Persistent AOE, ground trap, wall, smoke, burning ground
-- Use: control space, force enemy movement, cut off escape routes
-- CD: 8-12s
-- Duration: 3-6s (long enough to matter, short enough not to frustrate)
-- Examples: Ymir Ice Wall (6s), Sol Fireball burning ground, Thor Tectonic Rift (5s)
-
-### 5. Counter / Parry
-- "Trance" (Battlerite), "Protector Guardian" (Athena DKO)
-- Use: **defensive read** — if the enemy hits you during the buff, they get punished
-- CD: 8-12s
-- Active window: 0.5-0.75s
-- **Rule**: 1 character per pool max, or a very specific counter (projectiles only)
-- Outcome: either a stun on the attacker, or a big damage payoff
-
-### 6. Buff / Self-Enhancement
-- Shield, damage boost, speed boost, invisibility, damage resistance
-- Use: prepare before an engage, or pop during combat
-- CD: 10-15s
-- Duration: 4-8s
-- **Rule**: buff must be visible to the opponent (clear feedback)
-
-### 7. Combo Extender / Finisher
-- A stronger hit that connects after a CC or setup
-- Use: **convert a hit into real damage** — the "payoff"
-- CD: 4-8s
-- **Common pattern**: conditional — "if target has slow → stun", "if target is stunned → bonus damage"
-- This archetype turns poke into kill threat
-
-### 8. Ultimate / Burst
-- Big hit with clear visual impact
-- Use: finisher, reversal, teamfight swing
-- CD: 25-35s
-- **Pattern**: must be dodgeable but impactful if it lands
-- Examples: zone ult (Athena Aegis Charge), damage ult (Battlerite), summon ult (Wukong clone)
+A character should be able to participate meaningfully in combat using normals alone. Specials are not intended to replace basic attacks; they are where the character is allowed to bend the normal rules of combat.
 
 ---
 
-## Keybinding Patterns by Game
+## Normals — `1 / 2 / 3 / 4`
 
-Different games map abilities differently. The common thread across all of them:
+Each input has:
 
-| Game | LMB | RMB | Q | E | R | F | Shift |
-|------|-----|-----|--|--|--|--|-------|
-| **DKO** | Light | Heavy¹ | Ability² (aimed) | Ability³ (mobility) | Ability⁴ (burst) | **ULT** | Dodge |
-| **Battlerite** | Basic attack | Secondary | Main spell | Main spell | **ULT** | EX version | — |
-| **Supervive** | Basic attack | Sprint atk | Ability | Ability | **ULT** | Ability | — |
-| **Fangs** | Light | Heavy | Ability | Ability | **ULT** | — | Dodge |
-| **Omega Strikers** | Basic attack | — | Ability | Ability | **ULT** | — | Dodge |
+* one grounded attack;
+* one aerial attack.
 
+This gives every character eight baseline attacks.
 
-**Footnotes:**
-¹ **RMB base damage ~10% uncharged** — the standard heavy attack damage across DKO
-² **Q = aimed spell, often recovery** — aimed skillshots go on Q for muscle memory; many recovery abilities also on Q (the most accessible key for frequent use). Cancel aimed Q spells with RMB (quick cancel, not charge).
-³ **E = mobility/utility** — gap closers, movement tech, self-buffs. CD ~16s.
-⁴ **R = burst/spam tool** — lower CD (~12s), often the highest DPS ability. Spammable finisher or poke.
+Normals should generally be:
 
----
+* immediately understandable;
+* relatively low-commitment;
+* usable frequently;
+* driven primarily by hitboxes, knockback, startup, recovery and positioning;
+* suitable for neutral, combos, juggling, edgeguarding and kill confirms.
 
-## Cooldown Templates (DKO Baseline)
+Examples include:
 
-| Slot | CD | Role |
-|------|----|------|
-| Q | 21s | Aimed ability, often recovery. Highest CD of the 3 ability slots because it's the most accessible key and often defines the character's identity |
-| E | 16s | Mobility, utility, setup. Mid-range CD — frequent enough to use each engage, long enough to punish whiffs |
-| R | 12s | Burst/spam tool. Lowest CD — repeatable threat, defines DPS pattern |
-| F | 25-35s | Ultimate. Impact-per-use, not spam |
+* jabs;
+* kicks;
+* sweeps;
+* launchers;
+* anti-airs;
+* aerial pokes;
+* spikes;
+* heavier finishers.
 
-These are **baseline values**. They shift per character identity and class archetype:
-- Rushdown characters tend to have lower CDs on engage tools
-- Control/zone characters have longer CDs on area-denial tools
-- Assassins have shorter CDs on mobility, longer on burst
+Normals can still be powerful or highly characterful, but they should normally stay within the standard combat system.
 
-### Key Takeaways
+### Guideline
 
-- **Q = engage/CC** across most games; **DKO standard is aimed + recovery** on Q — the most accessible key for frequent-use abilities. Cancel aimed Q spells with RMB (quick cancel, not charge).
-- **E = mobility/recovery** is extremely frequent — Battlerite, Fangs, DKO, Supervive all use it this way. DKO baseline CD: ~16s.
-- **R = burst/spam tool** in DKO (lowest CD at ~12s, defines DPS pattern). Other games map R = ult.
-- **DKO is the exception**: ult on **F**, with R being a regular (but often strong) ability
-- **Shift = dodge / physical roll** — never a spell, always a universal mechanic
-- **RMB baseline: ~10% uncharged** across DKO. The exact value can vary per character but 10 is the tuning anchor.
+> Normals interact with the combat system. Specials are allowed to bend it.
 
----
+A move probably belongs in the special kit if it involves mechanics such as:
 
-## The 4 Class Archetypes
-
-Across DKO, Battlerite, and all games in the genre, characters fall into 4 broad archetypes
-with distinct ability slot distributions:
-
-### Rushdown / Brawler
-| Slot | Role | CD |
-|------|------|----|
-| LMB | Light attack or weak poke | 0s |
-| Q | CC engage (knockup, stun) | 6-8s |
-| E | Mobility / gap close | 4-6s |
-| R or F | Big damage burst | 25s |
-| Passive | Damage buff or movespeed | permanent |
-
-Examples: Thor (DKO), Hercules (DKO), Shaggy (MultiVersus), Bakko (Battlerite)
-**Gameplan**: gap close → CC → damage. No poke, no zone. All-in on engage.
-
-### Control / Zone
-| Slot | Role | CD |
-|------|------|----|
-| LMB | Projectile poke | 1-2s |
-| Q | CC (slow, root) | 7-10s |
-| E | Zone / area denial | 8-12s |
-| R or F | Big zone ult | 30s |
-| Passive | Zone buff or range bonus | permanent |
-
-Examples: Ymir (DKO), Sol (DKO), Iva (Battlerite), Sirius (Battlerite)
-**Gameplan**: poke at range → place zones → force the enemy into a trap.
-
-### Support / Utility
-| Slot | Role | CD |
-|------|------|----|
-| LMB | Medium poke | 1s |
-| Q | Mobility (self or team) | 6-8s |
-| E | Counter / Parry or heal | 8-12s |
-| R or F | Team buff / heal / resurrection | 30s |
-| Passive | Ally buff | permanent |
-
-Examples: Arthur (DKO), Poloma (Battlerite), Pearl (Omega Strikers), Lucie (Battlerite)
-**Gameplan**: stay in backline, buff teammates, counter enemy engages.
-
-### Assassin / Glass Cannon
-| Slot | Role | CD |
-|------|------|----|
-| LMB | Fast light combo (often 4 hits) | 0s |
-| Q | Stealth / teleport / trick | 5-8s |
-| E | Combo extender (conditional) | 6-8s |
-| R or F | Big single-target ult | 30s |
-| Passive | Bonus damage under a condition | permanent |
-
-Examples: Loki (DKO), Izanami (DKO), Croak (Battlerite), Shifu (Battlerite)
-**Gameplan**: flank → burst → escape. High risk, rewards individual skill.
+* projectiles with unusual behaviour;
+* persistent objects;
+* grapples;
+* teleports;
+* marks or debuffs;
+* major movement effects;
+* temporary rule changes;
+* stage interaction;
+* unusual defensive mechanics.
 
 ---
 
-## 9 Design Rules
+# Specials
 
-### Rule 1: Abilities have commitment
-- Startup + endlag. The stronger the ability, the more you risk on a whiff
-- Light abilities: startup 0.1-0.2s, endlag 0.1s (you can act almost immediately)
-- Heavy abilities: startup 0.3-0.6s, endlag 0.3s (you're vulnerable on whiff)
-- Ultimates: startup 0.5-1.0s (very telegraphed, opponent can dodge)
+## `A` — Signature Special
 
-### Rule 2: CC is the combat key
-- Without CC, nobody can punish → chip damage stalemate
-- With too much CC, it's stunlock → not fun
-- **Sweet spot: 1 CC ability per kit** (6-10s CD)
-- Hard CC (stun) lasts 1-2s max in a platform fighter
+`A` is the most direct expression of the character's unique combat mechanic.
 
-### Rule 3: Each ability has a general role
-- Every ability has a **primary job**: poke, move, CC, zone, counter, buff, burst, extender, finisher
-- Don't cram 3 jobs into one spell — a finisher can have a small slow attached, a movement ability can have a small hitbox, but a spell that simultaneously zones + heals + silences is overloaded
-- The role is a **design north star**, not a straightjacket
-- Synergies between **different slots** are encouraged
-  (e.g. Q applies slow → E hits harder on slowed targets)
+It is usually useful in neutral and should help establish the character's identity quickly.
 
-### Rule 4: Recovery abilities must be usable often
-- Short CD (3-6s). This is what makes combat dynamic
-- Without mobility, a character is immobile and predictable
-- The player should be able to use it for both engage **and** disengage
+Possible roles include:
 
-### Rule 5: Counter/parry is optional but powerful
-- Rewards reads and creates "outplay" moments
-- 1 character per pool max, or reserved for a specific archetype (support/control)
-- Must have a whiff punish — if the player misses the counter window, they're vulnerable
+* projectile;
+* charge attack;
+* stance;
+* trap;
+* summon;
+* mark;
+* resource interaction;
+* unusual defensive option.
 
-### Rule 6: No mana, cooldowns only
-- Players manage **timing**, not a resource
-- Cooldowns let opponents read patterns ("he used his Q, I can engage now")
-- Exception: a self-damage character (Thanatos in DKO) works as a trade-off mechanic
+`A` does not need to be the character's strongest move.
 
-### Rule 7: Abilities interact between slots
-- **Combinations between abilities** are encouraged
-- Classic DKO combo flow:
-  1. Q = slow (CC)
-  2. E = stun if target has slow (combo extender)
-  3. R or F = big damage during stun (burst)
-
-### Rule 8: Every kit must have a clear weakness
-- Rushdown: weak at range, predictable approach
-- Control: weak in close range, vulnerable when rushed
-- Support: weak in 1v1, depends on teammates
-- Assassin: fragile, dead if the burst misses
-
-### Rule 9: All characters have basic attacks
-- LMB = light attack (2-4 hit combo depending on character)
-- RMB = heavy attack (slower, stronger, often has a charge hold variant)
-- In DKO, light attacks deal ~6/6/12 (total 24), heavy attacks deal ~10
-- Even mages have physical light attacks (staff slap, punch, etc.)
+It should ideally be a move that makes the character immediately feel different from the rest of the roster.
 
 ---
 
-## The Standard Normal Schema (SlopArena, issue #117 — 2026-08-10)
+## `E` — Recovery / Mobility Special
 
-The normal tier is **universal across characters** — every kit uses the same six keys with the
-same roles. Only damage/hitbox/flavor change per character. This is the foundation for all
-future kits; abilities (Q E R F) layer on top.
+`E` is the character's primary recovery-capable move.
 
-| Key | Role | Design |
-|---|---|---|
-| **LMB** | jab | light, fastest, lowest commit, short range. Universal + **air variant required** |
-| **RMB** | chargeable poke/lunge | medium-heavy, hold-to-charge, more range. Universal + **air variant required** |
-| **1** | medium spacing | more range than jab, mid speed/damage — the footsies key |
-| **2** | anti-air | upward geometry, launches into air combos |
-| **3** | big punish normal | slow, telegraphed, high KB — the reward move (FightGuy: stomp) |
-| **4** | get-off-me | hits around the character (360°), small-medium KB, escapes pressure |
+The goal is **input consistency without mechanical homogenization**.
 
-- **Ground/air:** LMB/RMB always have air variants (schema); keys 1-4 air variants are
-  **optional per character** — engine rule: no air spec = grounded-only.
-- **All four (1-4) are single presses, pure data** (`LmbCombo` plays `spec.Stages`); no
-  charge/aim machinery on the normal tier.
-- Ladder: LMB (light) → 1 (medium) → RMB (heavy charge) → 3 (punish). 2/4 are the directional
-  utilities (up / around).
+Pressing `E` should generally mean:
 
-## The Ability Tier (Q E R F — B-moves / MOBA layer, issue #117)
+> "Use my character's special movement/recovery tool."
 
-The four ability slots carry the spectacular, identity-defining moves: projectile (Q),
-upward mobility / recovery (E), engage or burst (R), ult (F). Role assignment is per
-character but the *tier* is fixed — abilities never live on the 1-4 keys and normals never
-live on QERF. Keys 5/A are optional extras (demo phase skips them).
+It does **not** mean that every character receives the equivalent of a traditional vertical Up-B.
 
----
+Examples:
 
-## Applying to SlopArena — Current Roster
+* rising attack;
+* grapple;
+* teleport;
+* rocket jump;
+* air dash;
+* hover;
+* temporary platform;
+* movement toward a placed object.
 
-Only one character is active in the codebase. Design others from scratch following these patterns.
+An `E` can also have offensive or utility applications.
 
-### Manki (Explosive Bomber / Rushdown Hybrid)
+### Design rule
 
-| Slot | Role | Type | Notes |
-|------|------|------|-------|
-| LMB | Light combo (3 hits) | Physical | Punch → kick → fire uppercut (launcher) |
-| AirLMB | Air Kick (2 hits) | Physical | 2-hit air combo, first kick lunges, second has higher KB |
-| RMB | Aerosol + Lighter (charge) | Ability | Charged heavy, cone flame zone denial |
-| AirRMB | Knuckle Spike | Physical | Slow windup downward spike, high KB |
-| Q | Round Bomb (projectile) | Ability | Lobbed arc, explodes on impact — poke/zone |
-| E | Grapple Gun | Ability | Fire tether, reel toward enemy or terrain. 3 dmg, no stun. |
-| R | Bazooka | Ability | Fire rocket in aim direction, arcs with gravity, explodes on contact. Rocket jump via self-damage (4). |
-| F | Overclock (ult) | Ability | Self-buff 8s — all attacks deal +3 bonus damage and +0.5m larger hitboxes |
-| Passive | — | — | (None yet) |
+> `E` should be recovery-capable, not recovery-only.
 
-**Gameplan**: poke with Q → close gap with grapple → ground combo → rocket jump for air follow-up. E grapple is gap closer AND escape tool.
-### Future characters
-
-When designing a new character, start from one of the 4 archetypes defined above, then fill the 8 ability slots (LMB, AirLMB, RMB, AirRMB, Q, E, R, F). Document in `docs/characters/<name>.md`.
+This allows recovery mechanics to become a meaningful part of character identity while keeping the control scheme predictable.
 
 ---
 
-## References
-- `docs/design/melee-feel-guidelines.md` — **numeric tuning rules: damage bands, commitment→damage tradeoff, launch angles, the Adaptive auto-angle.** Read this before tuning any move's damage/knockback/angle.
-- `docs/research/dko-character-kits.md` — raw DKO data (13 gods, full ability tables)
-- `docs/combat-systems.md` — universal combat mechanics: attack patterns, aerial rules, aiming types, hitbox philosophy, finisher design
-- Research sessions: Battlerite (6 abilities, all skillshots), Supervive (4 abilities + platform fighter movement), Fangs (2 abilities + ult), Rumble (pure movement, no abilities)
+## `R` — Playmaking Special
 
+`R` is generally the character's strongest regularly available playmaking tool.
+
+It should create situations that normals alone cannot easily create.
+
+Typical functions include:
+
+* engage;
+* displacement;
+* combo extension;
+* area control;
+* strong defensive utility;
+* setup;
+* high-commitment kill option;
+* interaction with the character's signature mechanic.
+
+`R` can have a noticeably longer cooldown than `A` or `E`, but should still appear multiple times during normal gameplay.
+
+---
+
+## `F` — Power Special
+
+`F` is the character's largest or most expressive ability.
+
+It is **not an ultimate** in the MOBA sense.
+
+SlopArena does not currently use:
+
+* ultimate charge;
+* damage-generated meter;
+* once-per-match supers;
+* comeback meter;
+* an ultimate economy shared across the roster.
+
+Instead, `F` is governed primarily through a **longer cooldown**.
+
+The cooldown should be long enough that using `F` is a meaningful decision, but short enough that players expect to use it more than once during a normal match.
+
+As a starting design space, this likely means cooldowns closer to roughly **15–30 seconds** than 60+ second MOBA ultimates.
+
+Exact values remain character-specific and should be determined through playtesting.
+
+### F should not simply mean "buff"
+
+Temporary steroids, rage states and generic stat increases are valid mechanics, but they should not become the default solution for `F`.
+
+A good `F` should ideally express the character fantasy in a way that changes the immediate match situation.
+
+Possible designs include:
+
+* a large movement technique;
+* a powerful command grab;
+* temporary terrain or object creation;
+* a large projectile with unusual properties;
+* a character-specific transformation of an existing mechanic;
+* a strong repositioning tool;
+* a persistent threat;
+* a special interaction with marked or prepared opponents;
+* a high-risk attack with unusual payoff.
+
+The emphasis is on **distinctive gameplay**, not simply higher numbers.
+
+---
+
+# Cooldown Hierarchy
+
+Cooldowns are part of the identity of specials rather than a universal fixed rule.
+
+A rough expected hierarchy is:
+
+`A` — short / frequently available
+`E` — short-to-medium, with recovery availability considered carefully
+`R` — medium
+`F` — long
+
+This hierarchy can be broken when a character concept requires it.
+
+In particular, recovery design must account for the possibility that `E` is unavailable while the character is offstage. Some characters may therefore require:
+
+* short E cooldowns;
+* cooldown refresh rules;
+* multiple charges;
+* partial recovery options elsewhere in the kit.
+
+These should be solved per character rather than by introducing a universal recovery system.
+
+---
+
+# Kit Design Process
+
+A new character can be designed in the following order:
+
+1. **Normals — How does this character fight?**
+   Establish the eight basic attacks and make sure the character functions without relying constantly on abilities.
+
+2. **A — What makes this character unusual?**
+   Introduce the central gimmick or signature interaction.
+
+3. **E — How does this character move and recover?**
+   Turn recovery into part of the character fantasy.
+
+4. **R — What creates the character's big plays?**
+   Add an ability capable of strongly changing positioning, pressure or combo situations.
+
+5. **F — What is the most expressive version of the character concept?**
+   Add a high-impact ability with a meaningful cooldown, without requiring an ultimate meter.
+
+The objective is consistent controls across the roster while allowing the actual mechanics behind those controls to vary dramatically.
+
+---
+
+## Related References
+
+* `docs/design/melee-feel-guidelines.md` — numeric tuning rules for normals and hit response.
+* `docs/characters/fightguy.md` — the active FightGuy kit design.
+* `docs/characters/adding-a-new-character.md` — implementation pipeline after kit design is settled.

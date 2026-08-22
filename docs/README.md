@@ -38,9 +38,9 @@
 |-----|--------|
 | [`characters/adding-a-new-character.md`](characters/adding-a-new-character.md) | Full pipeline guide |
 | [`characters/character-import-checklist.md`](characters/character-import-checklist.md) | Asset import checklist |
-| [`characters/character-kit-design-principles.md`](characters/character-kit-design-principles.md) | Design rules for abilities |
+| [`characters/character-kit-design-principles.md`](characters/character-kit-design-principles.md) | Canonical 8-normal / 4-special kit structure |
 | [`characters/manki.md`](characters/manki.md) | Manki — Mad Bomber Monkey |
-| [`characters/fightguy.md`](characters/bunny.md) | FightGuy — Martial Arts Champion |
+| [`characters/fightguy.md`](characters/fightguy.md) | FightGuy — Martial Arts Champion |
 
 ---
 

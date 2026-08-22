@@ -403,7 +403,17 @@ public class SlopArenaBaker : EditorWindow
             // Optional weapon: characters with a WeaponConfigs/<name> asset get the
             // synthetic _weapon_tip point baked (fist/staff characters have none).
             var weapon = Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{charName}");
-            baker.BakeSkeleton(model, config, sampleRate, weaponConfig: weapon);
+            try
+            {
+                // BakeSkeleton is an instance method, but this is a temporary worker,
+                // not a user-facing editor window. Destroy it after each character so
+                // orphaned windows cannot survive into play-mode layout finalization.
+                baker.BakeSkeleton(model, config, sampleRate, weaponConfig: weapon);
+            }
+            finally
+            {
+                DestroyImmediate(baker);
+            }
             baked++;
         }
         Debug.Log($"[BakeAll] Done — baked {baked} character(s)");

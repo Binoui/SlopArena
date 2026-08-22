@@ -2,8 +2,8 @@
 id: "fightguy"
 name: "FightGuy"
 title: "Martial Arts Champion"
-status: "Alpha Core (Ready)"
-archetype: "High-Agility Melee Brawler / Execution Specialist. Uses ki projectiles to apply marks, triggering high-damage pursuit finishers."
+status: "Design target"
+archetype: "Technical melee brawler. Uses precise martial-arts normals, ki pressure, recovery movement, and committed playmaking attacks."
 source_image: "fightguy_action.png"
 palette:
   skin: "#F5D0A9"
@@ -14,50 +14,97 @@ palette:
 
 # FightGuy — Martial Arts Champion
 
-> Status: Implemented (Unity — initial)
-> Prefab: `Resources/Characters/FightGuy.prefab`
-> Animator: `fightguy_Animator.controller`
-> AnimConfig: `fightguy_AnimConfig.asset`
-> Skeleton: `data/fightguy_skeleton.bin`
-> Inspired by: Ryu (Street Fighter) × Lee Sin (LoL) — traditional martial artist with ki-infused techniques
+> Design contract: eight normals (`1 / 2 / 3 / 4`, grounded and aerial) plus four specials (`A / E / R / F`). The mouse buttons are camera controls, not attacks.
+> Normals are considered working for now. Current design work is limited to the four specials and their interactions.
+
+> Implementation status is tracked separately; this document is the canonical kit design.
+
+**Prefab:** `Resources/Characters/FightGuy.prefab`
+**AnimConfig:** `fightguy_AnimConfig.asset`
+**Skeleton:** `data/fightguy_skeleton.bin`
+**Inspired by:** Ryu (Street Fighter) × Lee Sin (LoL) — traditional martial artist with ki-infused techniques
 
 ## Concept
 
-A disciplined martial artist who channels inner ki for devastating attacks. Trained in a remote mountain temple, FightGuy combines precise strikes with projectile-based zone control. What appears as simple martial arts is infused with explosive ki energy — a technical fighter who excels at setting up targets with Ki Shot marks, then executing with Dragon's Kick.
+A disciplined martial artist who channels inner ki for devastating attacks. FightGuy combines precise strikes with projectile pressure and explosive movement. His normal attacks must be useful without relying on abilities; his specials create the unusual situations that make him feel like a ki-trained martial artist.
 
-FightGuy's theme is **martial arts mastery** — every ability channels ki through traditional fighting stances. Think **Ryu × Lee Sin** — serious martial arts with explosive ki effects.
+FightGuy's theme is **martial arts mastery**: clean fundamentals first, then ki-infused techniques that bend the ordinary rules of combat.
 
-## Abilities
+## Input contract
 
-11-slot kit (issue #117 design, v2). Two tiers: the **universal normal schema** (LMB/RMB +
-keys 1-4 — same roles for every character) and the **ability tier** (Q E R F — the
-identity-defining moves). Ground/air: LMB/RMB have required air variants; keys 1-4 have
-**distinct air variants** (melee frame-data pass, 2026-08-12 — frame data per
-`docs/research/melee-frame-analysis.md`); ability slots work both unless noted.
-Q = slot 11 (key "Q" position — the physical A key on AZERTY).
+- `1 / 2 / 3 / 4` are the four normal inputs. Each has one grounded and one aerial attack, for eight normals total.
+- `A / E / R / F` are the four special inputs.
+- `LMB` and `RMB` control the camera. They are not attack slots and must not appear in kit power budgets.
+- Normal attacks are single moves, not automatic LMB chains and not charged RMB attacks.
 
-| Slot | Key | Move | Anim | Description | Notes |
-|---|---|---|---|---|---|
-| **LMB** | LMB | Dragon Jab | `spell_lmb_1` | Fast low-kick jab | 0 CD, neutral poke, lunge-forward |
-| **AirLMB** | LMB (air) | Rising Kick | `spell_lmb_3` | Rising two-hit airborne uppercut | launcher into air combos |
-| **RMB** | RMB | Uppercut | `spell_rmb` | Charged uppercut — hold to charge, release to strike | more charge = more damage/stun, launcher |
-| **AirRMB** | RMB (air) | Helicopter | `spell_rmb_air` | Hold to charge aerial spinning heel drop; tap = quick spike, charged = heavy spike | spikes downward |
-| **Slot1** | 1 | Low Kick | `spell_g_1` | Fast low right-foot kick — jab-class poke | startup 4, active 4–8, 17 total, IASA 13 |
-| **AirSlot1** | 1 (air) | Double Punch | `spell_a_1` | Left then right punch — fast air poke | two hitboxes (trig 6/16), ~33 total, IASA 29 |
-| **Slot2** | 2 | Straight Punch | `spell_g_2` | Fast right-hand forward check | startup 5, active 5–9, 25 total, IASA 22 |
-| **AirSlot2** | 2 (air) | Floating Kick | `spell_a_2` | Body-to-left-foot sex kick — early sweetspot, late sourspot | sweet 7–11 + shared-hit sourspot 12–31, 42 total, IASA 36 |
-| **Slot3** | 3 | Sweeping Kick | `spell_g_3` | Wide right-foot side check that lifts rather than sends far | startup 7, active 7–12, 29 total, IASA 25 |
-| **AirSlot3** | 3 (air) | High Kick | `spell_a_3` | High right-foot anti-air — sends up, not out | startup 14, active 14–19, 44 total, IASA 41 |
-| **Slot4** | 4 | Double Kick | `spell_g_4` | Two-foot heavy forward strike — grounded kill read | startup 10, active 10–16, 60 total, IASA 56 |
-| **AirSlot4** | 4 (air) | Air Smash | `spell_a_4` | Late right-hand forward aerial — horizontal kill read | startup 20, active 20–26, 54 total, IASA 50, landing lag 12 |
-| **Q** | Q | Ki Shot | `spell_q` | Aimed ki projectile; marks target 5s on hit | on the Q key (slot 11); AZERTY physical-A |
-| **E** | E | Rising Dragon | `spell_r_loop` | Upward mobility — rising kick: anti-air on ground, recovery burst in air (FloatWindow reset) | the up-B analog, `IsRecoveryMove`, ~4s CD |
-| **R** | R | Cyclone Kick | `spell_e` | Forward spinning kick ~10m; stuns enemies passed through | engage, moved from E |
-| **F** | F | Tempest | `spell_f` | Spin in place, pull enemies inward 1.5s, final launcher kick | ult, ground-only |
+## Kit
 
-> Key 5: empty in demo. Dragon's Kick: cut (redundant with Cyclone — both forward kicks);
-> Ki Shot marks remain as a setup hook. Status: slots LMB/F implemented; the rest designed in
-> `docs/plans/issue-117-kit-expansion.md` — implementation in flight.
+FightGuy is designed around eight normals and four specials. Every normal has a grounded and aerial variant. The four specials are available from the same input model across the roster, but each has a distinct job in this kit.
+
+### Normals — `1 / 2 / 3 / 4`
+
+| Input | Grounded move | Aerial move | Primary job | Design intent |
+|---|---|---|---|---|
+| **1** | Low Kick | Double Punch | fast poke / spacing reset | Quick low kick checks close approaches. The aerial version is a safe two-hit air poke. |
+| **2** | Straight Punch | Floating Kick | anti-air / air control | Grounded punch checks the front at mid range. The aerial kick covers the body and rewards early contact. |
+| **3** | Sweeping Kick | High Kick | launcher / vertical conversion | Grounded sweep lifts rather than sends far. The aerial kick controls space above FightGuy and sends upward. |
+| **4** | Double Kick | Air Smash | punish / kill confirm | Grounded double kick is the slow, high-commitment punish normal. Air Smash is a late horizontal aerial kill read. |
+
+Normals should remain understandable, repeatable and useful in neutral, combos, juggling, edgeguarding and kill confirms. They use ordinary hitbox, startup, recovery and knockback rules; they do not require a mark, resource or special state to function.
+
+### Specials — `A / E / R / F`
+
+| Input | Move | Primary job | Description | Cooldown direction |
+|---|---|---|---|---|
+| **A** | Ki Shot | signature pressure | A fast, camera-aimed ki projectile shared on the ground and in the air. It has no mark, charge state or required follow-up; its value is immediate ranged pressure and forcing movement. | Short |
+| **E** | Rising Dragon | mobility / recovery | A rising punch that attacks on the ground and becomes FightGuy's recovery-capable burst in the air. It resets the recovery float window only when used as an aerial recovery action. | Short-to-medium; recovery availability is the constraint |
+| **R** | Cyclone Kick | playmaking engage | A committed forward spinning kick that carries FightGuy through the opponent's space. A clean hit applies a short stun for a follow-up; damage and knockback stay moderate so it is not the kit's kill move. It must be punishable on a whiff. | Medium |
+| **F** | Dragon Beam | power / situation change | Press starts a visible fixed startup; the beam fires automatically after the telegraph. The same large camera-aimed beam works on the ground and in the air. It changes the immediate neutral situation through range and threat rather than a generic buff; the beam must be dodgeable and punishable during its commitment. | Long, roughly 15–30 seconds as a starting range |
+
+`A` establishes the ki identity through a clean projectile, not a secondary resource. `E` makes recovery part of that identity through a rising punch without being recovery-only. `R` creates the main neutral-to-combo conversion. `F` is the largest expression of FightGuy's martial-arts control, not a generic stat buff.
+
+The special concepts are now fixed: pure Ki Shot, implemented Rising Dragon rising punch, Cyclone Kick as the playmaking engage, and Dragon Beam as the power special. Remaining work is behavior and number design, not slot reassignment.
+
+## Intended gameplan
+
+1. Use `1` and `2` to check approaches and maintain ordinary neutral.
+2. Use `3` to lift opponents and begin aerial pressure when the read is correct.
+3. Use `4` as a committed punish or kill confirm, not as a default neutral button.
+4. Use `A` to add camera-aimed ki pressure and establish the character's signature threat.
+5. Use `E` to recover, reposition, or anti-air without making every recovery move identical to a vertical Up-B.
+6. Use `R` to force a high-value engage when the opponent commits or a ki opening appears.
+7. Use `F` to threaten a major camera-aimed beam, accepting its telegraph, long cooldown and punish window.
+ 
+## Strengths
+
+- Strong fundamentals: all eight normals have distinct neutral, anti-air, launcher, punish and aerial roles.
+- Reliable close-range pressure without requiring a special resource.
+- Ki Shot gives FightGuy a clear signature tool and limited ranged influence.
+- Rising Dragon gives him an identity-defining recovery option with offensive use.
+- Cyclone Kick and Dragon Beam can convert correct reads into large positional advantages.
+
+## Weaknesses
+
+- The normal kit is commitment-based; the strongest attacks are punishable on whiff.
+- Ki Shot is the only dedicated ranged pressure tool, so FightGuy should not win a prolonged projectile war.
+- Rising Dragon availability is a recovery risk when used carelessly or spent offensively.
+- Cyclone Kick and Dragon Beam are readable commitments rather than safe panic buttons.
+- No generic defensive mechanic is required; survival depends on movement, timing, normals and the universal Burst/Dodge systems.
+
+## Design constraints
+
+- The eight normals must be viable without `A / E / R / F`.
+- `A` uses one shared ground/air Ki Shot variant; it is pressure, not a recovery system.
+- `F` uses one shared ground/air Dragon Beam variant; it is not a second recovery system.
+- `R` and `F` must create situations that normals cannot easily create, with visible commitment and whiff punishment.
+- `F` must express FightGuy's martial-arts fantasy through a concrete beam threat, not only larger numbers or a generic buff.
+- Grounded and aerial variants are separate moves with separate authored timing, geometry and knockback, even when they share a theme.
+
+## Open tuning questions
+
+- Dragon Beam's fixed startup, beam width, range, damage band, knockback and punish window.
+- Cyclone Kick's carry distance, short-stun duration, damage/knockback band and punish window.
+- Air Smash's landing lag and whether High Kick or Floating Kick should be the primary aerial conversion starter.
 
 ## Stats
 
@@ -77,45 +124,13 @@ Q = slot 11 (key "Q" position — the physical A key on AZERTY).
 | Capsule (Radius × Height) | 0.35 × 1.7 m |
 | Hurtbox Radius | 1.0 m |
 
-## Gameplay
-
-### Strengths
-- **Complete normal tier** — low poke (1), forward check (2), side-lift (3), and a slow grounded kill read (4), with distinct aerial roles
-- **Projectile pressure** — Ki Shot (Q) zones and marks; camera-aimed
-- **Strong engage** — Cyclone Kick (R) stun-lunges into follow-ups
-- **Excellent air game** — Rising Kick (AirLMB) launches, Helicopter (AirRMB) spikes
-- **Upward mobility** — Rising Dragon (E) doubles as anti-air and the once-per-life recovery
-
-### Weaknesses
-- **Commit-heavy** — Cyclone (R) and Tempest (F) are all-in; whiffs are punished
-- **No zoning outside Ki Shot** — the normal tier is melee
-- **Recovery is one-shot** — Rising Dragon (E) has a long cooldown; off-stage mistakes cost the stock
-- **No defensive/armor tier in demo** — no panic normal; Double Kick and Air Smash are committed kill reads, not escapes
-
-### Normal roles
-1. **Low Kick (1)** — fast low poke; resets neutral rather than starting a guaranteed combo.
-2. **Straight Punch (2)** — brief forward check for an opponent approaching FightGuy's front.
-3. **Sweeping Kick (3)** — lateral/cross-up check that lifts the opponent for vertical pressure.
-4. **Double Kick (4)** — slow grounded horizontal kill read; both feet share one heavy hit.
-5. **Floating Kick (air 2)** — long body-covering aerial with a single strong early hit and weak late coverage.
-6. **High Kick (air 3) / Air Smash (air 4)** — high-angle anti-air versus a late, committed horizontal aerial kill read.
-
-## Unity Pipeline Notes
-
-### FBX Processing
-- Source model: Tripo-generated humanoid, exported as GLB, converted to FBX
-- All 14 animation FBXs from Mixamo (retargeted to humanoid skeleton)
-- Animator generated via `Assets/Art/Characters/fightguy/` → `Create SlopArena Animator`
-- The generator uses a **two-pass save/reload** to avoid Unity Editor NRE on AnyState transitions
-- `applyRootMotion = false` on the prefab Animator — server-authoritative position
-
-### Key Files
+## Asset and implementation references
 
 | File | Purpose |
 |---|---|
-| `src/Shared/Characters/FightGuyData.cs` | Character definition (stats, abilities, animation names) |
-| `client/Unity/Assets/Art/Characters/fightguy/fightguy.fbx` | Static mesh (no animation import) |
-| `client/Unity/Assets/Art/Characters/fightguy/Animations/*.fbx` | 14 per-animation FBX files from Mixamo |
+| `src/Shared/Characters/FightGuyData.cs` | Character definition and eventual ability data |
+| `client/Unity/Assets/Art/Characters/fightguy/fightguy.fbx` | Static mesh |
+| `client/Unity/Assets/Art/Characters/fightguy/Animations/*.fbx` | Animation source files |
 | `data/fightguy_skeleton.bin` | Baked skeleton data for hurtbox positions |
-| `client/Unity/Assets/Resources/Characters/FightGuy.prefab` | Unity prefab with Animator + controller |
+| `client/Unity/Assets/Resources/Characters/FightGuy.prefab` | Unity prefab |
 | `client/Unity/Assets/Art/Characters/fightguy/fightguy_AnimConfig.asset` | Animation configuration |

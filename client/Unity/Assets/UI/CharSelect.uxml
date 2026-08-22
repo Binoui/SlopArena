@@ -18,6 +18,22 @@
                     <ui:Button name="btn-start-match" text="SELECT STAGE" class="btn-primary pvp-btn" />
                 </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="solo-config" class="solo-config">
+                <ui:Label name="solo-bot-label" text="CPU CHARACTER: select a fighter, then assign it to CPU" class="pvp-status" />
+                <ui:Button name="btn-assign-cpu" text="USE SELECTED FIGHTER AS CPU" class="btn-primary solo-config__assign" />
+                <ui:Label name="solo-level-label" text="CPU LEVEL: 5" class="pvp-status" />
+                <ui:VisualElement name="solo-level-buttons" class="solo-level-buttons">
+                    <ui:Button name="btn-cpu-level-1" text="1" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-2" text="2" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-3" text="3" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-4" text="4" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-5" text="5" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-6" text="6" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-7" text="7" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-8" text="8" class="btn-primary solo-level-button" />
+                    <ui:Button name="btn-cpu-level-9" text="9" class="btn-primary solo-level-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:Button name="btn-select" text="SELECT FIGHTER" class="btn-primary" />
         <ui:Button name="btn-back" text="← BACK" class="btn-back" />
