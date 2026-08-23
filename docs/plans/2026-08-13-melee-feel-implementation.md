@@ -24,7 +24,7 @@ Affected core paths:
 - `src/Shared/CharacterState.cs`: `LaunchMagnitude`, DI/queued launch fields, hitstun state.
 - `src/Shared/CharacterDefinition.cs`: add static character `Weight`.
 - `src/Shared/KnockbackProfile.cs`: delete profile resolution after all callers migrate; retain explicit per-hit angle/base/growth data only.
-- `src/Shared/CSharpCharacterWriter.cs`: migrate serialized hitbox output away from profile fields.
+- Serialized hitbox output now uses versioned character content JSON.
 - `src/Shared/Abilities/` and `src/Shared/Characters/`: expand canned profiles and update custom hit paths.
 - Tests: `ComboInfluenceTests`, `HitstopTests`, `KnockbackPhysicsDataTests`, combat integration tests, kit regression/golden tests.
 

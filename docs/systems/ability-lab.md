@@ -2,8 +2,8 @@
 
 Visual hitbox/hurtbox authoring tool for SlopArena: a play-mode scene + editor window
 that poses a character frame-by-frame through the **same Shared resolvers the server
-uses**, shows server-accurate hurtboxes and hitboxes, and persists hitbox edits
-directly into the character's C# data source (`src/Shared/Characters/*Data.cs`).
+uses**, shows server-accurate hurtboxes and hitboxes, and persists complete authored
+character definitions as versioned JSON under `content/characters/<id>/character.json`.
 
 The preview cannot drift from the simulation: hurtbox poses come from
 `ServerSimulation.BuildEntitiesFromState` and hitbox positions from
@@ -56,68 +56,76 @@ attachable (`HitboxGeometry` looks up `BakedAnimationData.BoneNames` directly; t
 hurtbox defs are only a fallback). The bake carries 9 curated mixamorig bones
 (Head/Spine2/Hips/Hands/Feet/Toes) per character — see `SlopArenaBaker.humanBones`.
 
-## Persistence — save to source (C#)
+## Persistence — versioned character JSON
 
-**Save to source (C#)** writes the edited stages straight into
-`src/Shared/Characters/<Char>Data.cs` — the compiled source of truth. There is no
-intermediate JSON. Apply:
+The Shared serializer is `src/Shared/CharacterContentSerializer.cs`. The authored
+FightGuy file is:
 
+```text
+content/
+└── characters/
+    └── fightguy/
+        └── character.json
 ```
-dotnet build src/Shared/     # rebuilds the DLL, auto-copies to Unity Plugins
-```
 
-then start a match — server and client both read the compiled defs, so the edit is in
-the real kit. No deploy step, no mirror.
+The Ability Lab loads `content/characters/<id>/character.json` before calculating
+baked data, hurtbox display overrides, or preview state. FightGuy requires valid JSON
+content; an invalid or missing FightGuy file is reported and does not fall back to
+`FightGuyData.cs`. For other characters, a missing content file retains the existing
+`CharacterRegistry.Get` fallback.
 
-The writer (`src/Shared/CSharpCharacterWriter.cs`) is a structural text transform, not
-string replacement:
+**Save JSON** clones the complete loaded definition through the serializer, applies
+the working stage hitbox and hitstop edits, validates the edited definition, and
+writes one deterministic full document. It then reloads the JSON and clears the
+working overlays and undo/redo history. Saving an edit therefore preserves special
+effect keys, parameter dictionaries, movement, animation settings, and unrelated
+abilities; it does not rewrite C# source or require a Shared rebuild for Ability Lab
+preview. Revert discards unsaved overlays and returns to the loaded JSON baseline.
 
-- Addresses stages by `(slot, airborne, stage)` → the C# property
-  (`LMB`/`AirLMB`, `RMB`/`AirRMB`, `Slot1`/`AirSlot1`, `E`/`AirE`, `R`/`AirR`,
-  `F`/`AirF`, `Slot2`–`Slot5`/`AirSlot2`–`AirSlot5`, `A`/`AirA`).
-- Walks the file brace-balanced, skipping comments/strings; `Stages` never matches
-  `ChargedStages`; single-letter properties (`A =`, `R =`) never match
-  `BoneTrailDef` fields.
-- Replaces exactly the target stage's `HitboxEvents` initializer with generated C# in
-  the files' style (`new HitboxEvent[] { new() { … } }`); everything else in the file
-  stays byte-identical — hand-tuned params, comments, descriptions are untouched.
-- Handles `Array.Empty<HitboxEvent>()`, missing-property insert, and preserves zeroed
-  Custom knockback (Nilus' deliberately INERT hitbox) on round-trip.
-- **Revert edits** discards unsaved edits (preview snaps back to the last-built data).
+`CharacterContentSerializer` uses schema version `1`, camel-case field names, string
+enum values, indented output, and null-only omission. Zero and `false` authored values
+remain present. It serializes the existing gameplay structs/classes directly, keeps
+air ability aliases by reference identity, and emits the fixed ability slot order.
+Load errors include the JSON field or file path where available. Missing
+`schemaVersion`, missing `id`, unsupported versions, unknown enums, unknown ability
+keys, null ability entries, invalid aliases, and missing ability stages are rejected;
+the shared loader never silently falls back.
 
 ## Semantics & limits
 
-- Keys are delta-only: a save rewrites only stages you edited; untouched moves keep
-  their authored data.
+- Stage edit keys remain `slot:airborne:stage`; the content ability names are the
+  lower-camel slot identities (`slot1`, `airSlot1`, `e`, `airE`, and so on).
 - Trigger tick 0 never fires (the stage-chain ticker increments before the trigger
   check) — the editor clamps new events to tick 1+.
-- `ChargedStages` are **not editable** yet — the editor covers `Stages` only.
-- Editing targets the selected `(slot, airborne, stage)` literally. Air slots 2–10
-  share the ground spec in code (aliased fields); editing their air variant writes to
-  the same underlying stage unless a separate air spec exists.
-- No mid-match hot-swap: defs are bound at entity registration. Save → rebuild → next
-  match (by design, sim-authoritative).
-- Hurtboxes are display-only (the tool's editing scope is hitboxes). The hurtbox JSON
-  loader (`HurtboxOverride`) remains supported if a file exists.
+- `ChargedStages` are not separately editable yet, but full-definition JSON save
+  preserves them.
+- Editing targets the selected `(slot, airborne, stage)` literally. Aliased air
+  abilities share the ground object; distinct air specs remain distinct.
+- No mid-match hot-swap: normal game/server runtime still consumes the compile-time
+  `CharacterRegistry` and `FightGuyData.cs` fallback for this milestone. Save JSON
+  affects the next Ability Lab reload; runtime registry/content adoption is deferred.
+- Hurtboxes are display-only (the tool's editing scope is hitboxes). The existing
+  `HurtboxOverride` loader remains supported if a file exists.
+- Workshop packaging, semantic built-in capability IDs, and registry migration are
+  explicitly outside this change.
 
 ## Tests
 
-`tests/Shared.Tests/CSharpCharacterWriterTests.cs` (622+ total green):
-
-- Golden tests run against the **real** `MankiData.cs`: an edit changes exactly one
-  block; identical blocks in different stages resolve by position; `ChargedStages`
-  untouched.
-- Formatting goldens (sphere/capsule/custom knockback/bone-attached/multi-event/empty),
-  insert-into-empty-element, comment-with-commas splitting, unknown-property and
-  out-of-range failures, and key round-trip (all slots × airborne × stage).
+`tests/Shared.Tests/CharacterContentSerializerTests.cs` loads the real FightGuy JSON
+and compares it with `CharacterRegistry.Get(CharacterClass.FightGuy)`. It covers base
+data, movement and hurtboxes, representative normal hitboxes, air capsule data,
+special effects and all special parameter dictionaries, alias identity,
+deterministic byte output, invalid-content errors, and registration plus one
+simulation tick.
 
 ## Key files
 
 | File | Role |
 |---|---|
-| `client/Unity/Assets/Scripts/Runtime/Tools/AbilityLab.cs` | rig: pose, display, editing state, save |
-| `client/Unity/Assets/Scripts/Editor/AbilityLabWindow.cs` | window UI + scene handles |
-| `src/Shared/CSharpCharacterWriter.cs` | source write-back (shared, tested) |
+| `client/Unity/Assets/AbilityLab/Runtime/AbilityLab.cs` | rig: load, pose, display, edit overlays, JSON save |
+| `client/Unity/Assets/AbilityLab/Editor/AbilityLabWindow.cs` | window UI + scene handles + Save JSON |
+| `src/Shared/CharacterContentSerializer.cs` | versioned deterministic JSON envelope and validation |
+| `content/characters/fightguy/character.json` | authored FightGuy content |
 | `src/Shared/HitboxGeometry.cs` | hitbox position resolver (server + tool) |
 | `src/Shared/ServerSimulation.cs` | hurtbox pose resolver (server + tool) |
-| `src/Shared/Characters/*Data.cs` | the data files the tool writes |
+| `src/Shared/Characters/FightGuyData.cs` | compile-time runtime fallback/reference |

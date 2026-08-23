@@ -129,20 +129,6 @@ namespace SlopArena.Client.Entities
 
         /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
         public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
-        private StatusBillboard _billboard;
-
-        /// <summary>
-        /// Initialize the world-space status billboard (damage% + entity name).
-        /// Safe to call multiple times — no-op after first init.
-        /// </summary>
-        public void InitBillboard(Func<ulong, CharacterState> getState, ulong entityId)
-        {
-            if (_billboard == null)
-            {
-                _billboard = gameObject.AddComponent<StatusBillboard>();
-                _billboard.Init(this, getState, entityId);
-            }
-        }
 
         public float ModelYOffset
         {

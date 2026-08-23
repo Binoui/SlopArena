@@ -151,7 +151,6 @@ namespace SlopArena.Client.World
                 _npcRenderer.LoadModel(npcDef);
                 _npcRenderer.GetComponent<WeaponAttach>()
                     ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{npcClass}"));
-                _npcRenderer.InitBillboard(_bridge.InternalSim.GetState, NpcEntityId);
             }
 
             // Player spawn

@@ -73,6 +73,7 @@ namespace SlopArena.EditorTools
                 DrawDisplayToggles();
                 if (_showTimeline) DrawTimeline();
                 DrawActiveHitboxes();
+                DrawMoveProperties();
                 DrawHitboxEditor();
                 DrawPersistence();
             }
@@ -102,8 +103,12 @@ namespace SlopArena.EditorTools
             bool air = EditorGUILayout.Toggle("Airborne variant", _lab.Airborne);
             if (air != _lab.Airborne) _lab.SetAirborne(air);
 
-            int slot = EditorGUILayout.Popup("Ability", _lab.SlotIndex, AbilityLab.SlotNames);
-            if (slot != _lab.SlotIndex) _lab.SetSlot(slot);
+            int[] slotIndices = AbilityLab.SlotIndices;
+            int currentSlot = Array.IndexOf(slotIndices, _lab.SlotIndex);
+            int pickSlot = EditorGUILayout.Popup(
+                "Ability", Mathf.Max(0, currentSlot), AbilityLab.SlotNames);
+            if (pickSlot != currentSlot && pickSlot >= 0 && pickSlot < slotIndices.Length)
+                _lab.SetSlot(slotIndices[pickSlot]);
 
             var spec = _lab.CurrentSpec();
             int stageCount = spec?.Stages != null ? spec.Stages.Length : 0;
@@ -222,7 +227,7 @@ namespace SlopArena.EditorTools
                 if (GUILayout.Button("Jump", GUILayout.Width(44)))
                     _lab.SetTick(evt.TriggerTick);
                 EditorGUILayout.LabelField(
-                    $"t{evt.TriggerTick}-{evt.TriggerTick + evt.DurationTicks}  {shape} r={evt.Radius:0.00}  {bone}  dmg={evt.Damage:0.#}");
+                    $"active [{evt.TriggerTick}, {evt.TriggerTick + evt.DurationTicks})  {shape} r={evt.Radius:0.00}  {bone}  dmg={evt.Damage:0.#}");
                 EditorGUILayout.EndHorizontal();
             }
         }
@@ -246,6 +251,29 @@ namespace SlopArena.EditorTools
                 EditorGUILayout.LabelField($"#{index} {shape} r={evt.Radius:0.00}  @ {pos}");
             }
         }
+        private void DrawMoveProperties()
+        {
+            var spec = _lab.CurrentSpec();
+            if (spec == null) return;
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Move properties", EditorStyles.boldLabel);
+            float hitstop = EditorGUILayout.FloatField(
+                "Hitstop multiplier (override)", _lab.CurrentHitstopMultiplier);
+            if (!Mathf.Approximately(hitstop, _lab.CurrentHitstopMultiplier))
+                _lab.SetHitstopMultiplier(hitstop);
+
+            var events = _lab.CurrentWorkingEvents();
+            if (events.Length == 0) return;
+            int index = Mathf.Clamp(_selectedHitbox, 0, events.Length - 1);
+            var selected = events[index];
+            ushort authoredTicks = ServerSimulation.ComputeHitstopTicks(selected.Damage, spec);
+            ushort previewTicks = (ushort)Mathf.Clamp(
+                (int)((selected.Damage / 3f + 6f) * _lab.CurrentHitstopMultiplier), 1, 12);
+            EditorGUILayout.LabelField(
+                $"Hitstop ticks (selected damage): {previewTicks} current / {authoredTicks} authored");
+        }
+
 
         private void DrawHitboxEditor()
         {
@@ -274,14 +302,14 @@ namespace SlopArena.EditorTools
 
                     EditorGUI.indentLevel++;
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Trigger", GUILayout.Width(70));
+                    EditorGUILayout.LabelField("Active start", GUILayout.Width(82));
                     int trigger = EditorGUILayout.IntField(evt.TriggerTick);
                     if (trigger != evt.TriggerTick)
                     {
                         var n = evt; n.TriggerTick = (ushort)Mathf.Clamp(trigger, 1, 999);
                         _lab.SetWorkingEvent(i, n);
                     }
-                    EditorGUILayout.LabelField("Duration", GUILayout.Width(64));
+                    EditorGUILayout.LabelField("Active duration", GUILayout.Width(98));
                     int dur = EditorGUILayout.IntField(evt.DurationTicks);
                     if (dur != evt.DurationTicks)
                     {
@@ -289,6 +317,7 @@ namespace SlopArena.EditorTools
                         _lab.SetWorkingEvent(i, n);
                     }
                     EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.LabelField($"active range [{evt.TriggerTick}, {evt.TriggerTick + evt.DurationTicks})");
 
                     int shape = EditorGUILayout.Popup("Shape", evt.Shape == HitboxShape.Capsule ? 1 : 0, ShapeOptions);
                     if (shape != (evt.Shape == HitboxShape.Capsule ? 1 : 0))
@@ -358,11 +387,11 @@ namespace SlopArena.EditorTools
                         var n = evt; n.BoneName = pickedBone;
                         _lab.SetWorkingEvent(i, n);
                     }
-                    // Damage / Stun (editable)
+                    // Damage / hitstun gate (editable)
                     EditorGUILayout.BeginHorizontal();
                     float dmg = EditorGUILayout.FloatField("Damage", evt.Damage);
                     if (Mathf.Abs(dmg - evt.Damage) > 0.001f) { var n = evt; n.Damage = Mathf.Max(0f, dmg); _lab.SetWorkingEvent(i, n); }
-                    int stun = EditorGUILayout.IntField("Stun", evt.StunTicks);
+                    int stun = EditorGUILayout.IntField("Hitstun gate", evt.StunTicks);
                     if (stun != evt.StunTicks) { var n = evt; n.StunTicks = (ushort)Mathf.Clamp(stun, 0, 999); _lab.SetWorkingEvent(i, n); }
                     EditorGUILayout.EndHorizontal();
                     // Knockback (editable): angle + base + growth — the shape the trajectory preview draws.
@@ -370,37 +399,41 @@ namespace SlopArena.EditorTools
                     EditorGUILayout.BeginHorizontal();
                     if (customKb)
                     {
-                        int angle = EditorGUILayout.IntField("Angle", evt.Knockback.Angle);
+                        int angle = EditorGUILayout.IntField("Launch angle", evt.Knockback.Angle);
                         if (angle != evt.Knockback.Angle)
                         {
-                            var n = evt; var kb = n.Knockback; kb.Angle = (sbyte)Mathf.Clamp(angle, -180, 180); n.Knockback = kb;
+                            var n = evt; var kb = n.Knockback; kb.Angle = (sbyte)Mathf.Clamp(angle, -90, 90); n.Knockback = kb;
                             _lab.SetWorkingEvent(i, n);
                         }
                     }
                     else
                     {
-                        EditorGUILayout.LabelField($"Angle: {evt.Knockback.Profile} (fixed)");
+                        var resolvedKb = evt.Knockback.Resolve();
+                        EditorGUILayout.LabelField(
+                            $"Launch angle: {resolvedKb.angle}° ({evt.Knockback.Profile}, fixed)");
+                        EditorGUILayout.LabelField(
+                            $"Base knockback: {resolvedKb.baseKB:0.##} · Knockback growth: {resolvedKb.growthKB:0.##} (fixed)");
                     }
                     EditorGUILayout.EndHorizontal();
                     if (customKb)
                     {
                         EditorGUILayout.BeginHorizontal();
-                        float baseKb = EditorGUILayout.FloatField("Base KB", evt.Knockback.BaseKnockback);
+                        float baseKb = EditorGUILayout.FloatField("Base knockback", evt.Knockback.BaseKnockback);
                         if (Mathf.Abs(baseKb - evt.Knockback.BaseKnockback) > 0.001f)
                         {
-                            var n = evt; var kb = n.Knockback; kb.BaseKnockback = baseKb; n.Knockback = kb;
+                            var n = evt; var kb = n.Knockback; kb.BaseKnockback = Mathf.Max(0f, baseKb); n.Knockback = kb;
                             _lab.SetWorkingEvent(i, n);
                         }
-                        float growth = EditorGUILayout.FloatField("Growth", evt.Knockback.KnockbackGrowth);
+                        float growth = EditorGUILayout.FloatField("Knockback growth", evt.Knockback.KnockbackGrowth);
                         if (Mathf.Abs(growth - evt.Knockback.KnockbackGrowth) > 0.001f)
                         {
-                            var n = evt; var kb = n.Knockback; kb.KnockbackGrowth = growth; n.Knockback = kb;
+                            var n = evt; var kb = n.Knockback; kb.KnockbackGrowth = Mathf.Max(0f, growth); n.Knockback = kb;
                             _lab.SetWorkingEvent(i, n);
                         }
                         EditorGUILayout.EndHorizontal();
                     }
                     EditorGUILayout.LabelField(
-                        $"stun gate {evt.StunTicks} · kb {evt.Knockback.Profile}" +
+                        $"hitstun gate {evt.StunTicks} · kb {evt.Knockback.Profile}" +
                         (evt.Interruptible ? " · interruptible" : " · armor"));
                     EditorGUI.indentLevel--;
                 }
@@ -428,9 +461,9 @@ namespace SlopArena.EditorTools
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Persistence", EditorStyles.boldLabel);
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save to source (C#)"))
+            if (GUILayout.Button("Save JSON"))
             {
-                _lab.SaveToSource();
+                _lab.SaveToJson();
                 SceneView.RepaintAll();
             }
             if (GUILayout.Button("Revert edits"))
@@ -442,11 +475,11 @@ namespace SlopArena.EditorTools
                 }
             }
             EditorGUILayout.EndHorizontal();
-            if (_lab.SourceFilePath != null)
+            if (_lab.ContentFilePath != null)
                 EditorGUILayout.HelpBox(
-                    $"Writes to: {_lab.SourceFilePath}\n" +
-                    "Then run `dotnet build src/Shared/` (auto-copies the DLL to Unity) " +
-                    "and restart the match — the edit is in the real character data.", MessageType.None);
+                    $"File: {_lab.ContentFilePath}\n" +
+                    "Authored content is content/characters/<id>/character.json. " +
+                    "Reload Ability Lab to read the saved content.", MessageType.None);
         }
 
         // ── Scene handles ──

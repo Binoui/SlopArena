@@ -27,9 +27,9 @@ namespace SlopArena.Client.Tools
     {
         public const float TickRate = 60f; // sim ticks per second (matches bake sample rate)
 
-        /// <summary>Slot display names, index-aligned with GetSlotAbility (ADR-0016 layout).</summary>
-        public static readonly string[] SlotNames =
-            { "LMB", "RMB", "1", "E", "R", "F", "2", "3", "4", "5", "A" };
+        /// <summary>Fixed Ability Lab slot order: 1, 2, 3, 4, A, E, R, F.</summary>
+        public static readonly int[] SlotIndices = { 2, 6, 7, 8, 10, 3, 4, 5 };
+        public static readonly string[] SlotNames = { "1", "2", "3", "4", "A", "E", "R", "F" };
 
         public static AbilityLab Instance { get; private set; }
 
@@ -72,8 +72,11 @@ namespace SlopArena.Client.Tools
         /// <summary>Per-(slot, airborne, stage) hitbox event edits (key = "slot:airborne:stage").</summary>
         public Dictionary<string, HitboxEvent[]> WorkingEvents { get; private set; } = new();
 
-        /// <summary>Target .cs file for Save — the character's data source (src/Shared/Characters).</summary>
-        public string? SourceFilePath { get; private set; }
+        /// <summary>Per-(slot, airborne) hitstop multiplier edits keyed by content ability name.</summary>
+        public Dictionary<string, float> WorkingHitstopOverrides { get; private set; } = new();
+
+        /// <summary>Target JSON file for Save — the character's authored content.</summary>
+        public string? ContentFilePath { get; private set; }
 
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
@@ -86,11 +89,22 @@ namespace SlopArena.Client.Tools
         private Vector2 _orbitAngles = new(25f, 0f);
         private float _orbitDistance = 4.5f;
         private Vector3 _orbitPivot;
-
-        // ── Undo / redo (per-edit snapshots of WorkingEvents) ──
+        // ── Undo / redo (per-edit snapshots of WorkingEvents + hitstop overrides) ──
         private const int MaxUndoDepth = 50;
-        private readonly Stack<Dictionary<string, HitboxEvent[]>> _undo = new();
-        private readonly Stack<Dictionary<string, HitboxEvent[]>> _redo = new();
+        private sealed class WorkingSnapshot
+        {
+            public readonly Dictionary<string, HitboxEvent[]> Events;
+            public readonly Dictionary<string, float> HitstopOverrides;
+
+            public WorkingSnapshot(Dictionary<string, HitboxEvent[]> events, Dictionary<string, float> hitstopOverrides)
+            {
+                Events = events;
+                HitstopOverrides = hitstopOverrides;
+            }
+        }
+
+        private readonly Stack<WorkingSnapshot> _undo = new();
+        private readonly Stack<WorkingSnapshot> _redo = new();
         public bool CanUndo => _undo.Count > 0;
         public bool CanRedo => _redo.Count > 0;
 
@@ -186,17 +200,46 @@ namespace SlopArena.Client.Tools
         public void LoadCharacter(CharacterClass character)
         {
             if (character == CharacterClass.None || character == Character) return;
+
+            string contentPath = ResolveContentFilePath(character);
+            CharacterDefinition loadedDef;
+            if (File.Exists(contentPath))
+            {
+                try
+                {
+                    loadedDef = CharacterContentSerializer.LoadFile(contentPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[AbilityLab] Failed to load {character} JSON content '{contentPath}': {ex.Message}");
+                    return;
+                }
+            }
+            else if (character == CharacterClass.FightGuy)
+            {
+                Debug.LogError($"[AbilityLab] FightGuy JSON content file not found: {contentPath}");
+                return;
+            }
+            else
+            {
+                loadedDef = CharacterRegistry.Get(character);
+            }
+
+            var loadedBaked = LoadBaked(loadedDef);
+            var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
+
             Character = character;
-            Def = CharacterRegistry.Get(character);
-            Baked = LoadBaked(Def);
-            WorkingDefs = LoadWorkingDefs(Def, Baked);
+            Def = loadedDef;
+            Baked = loadedBaked;
+            WorkingDefs = loadedWorkingDefs;
             DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            SourceFilePath = ResolveSourceFilePath(Character);
-
+            WorkingHitstopOverrides = new Dictionary<string, float>();
+            ContentFilePath = contentPath;
             SpawnRenderer();
-            SlotIndex = 0;
+
             Airborne = false;
+            SlotIndex = SlotIndices[0];
             StageIndex = 0;
             Tick = 0;
             Playing = false;
@@ -247,14 +290,14 @@ namespace SlopArena.Client.Tools
         }
 
         /// <summary>
-        /// The character's C# data source: &lt;repo&gt;/src/Shared/Characters/&lt;Class&gt;Data.cs.
+        /// The character's JSON content: &lt;repo&gt;/content/characters/&lt;id&gt;/character.json.
         /// Repo root = three levels above Unity's Assets folder.
         /// </summary>
-        private static string? ResolveSourceFilePath(CharacterClass character)
+        private static string ResolveContentFilePath(CharacterClass character)
         {
             string repoRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
-            string file = Path.Combine(repoRoot, "src", "Shared", "Characters", character + "Data.cs");
-            return File.Exists(file) ? file : null;
+            return Path.Combine(
+                repoRoot, "content", "characters", character.ToString().ToLowerInvariant(), "character.json");
         }
 
         private void SpawnRenderer()
@@ -326,6 +369,7 @@ namespace SlopArena.Client.Tools
 
         public AbilitySpec? CurrentSpec() => Def?.GetSlotAbility(SlotIndex, Airborne);
 
+
         /// <summary>
         /// Stage lookup without nullable-struct pitfalls (AttackStage? member access
         /// does not narrow after == null in Roslyn). Returns false when there is no
@@ -380,7 +424,92 @@ namespace SlopArena.Client.Tools
         }
 
         /// <summary>Override key for the current selection ("slot:airborne:stage").</summary>
-        public string CurrentKey => CSharpCharacterWriter.Key(SlotIndex, Airborne, StageIndex);
+        public string CurrentKey => $"{SlotIndex}:{(Airborne ? 1 : 0)}:{StageIndex}";
+        /// <summary>Content ability name used for the current ability's authored parameters.</summary>
+        public string CurrentAbilityProperty => ContentAbilityName(SlotIndex, Airborne);
+
+        private static string ContentAbilityName(int slotIndex, bool airborne) => (slotIndex, airborne) switch
+        {
+            (0, false) => "lmb", (0, true) => "airLmb",
+            (1, false) => "rmb", (1, true) => "airRmb",
+            (2, false) => "slot1", (2, true) => "airSlot1",
+            (3, false) => "e", (3, true) => "airE",
+            (4, false) => "r", (4, true) => "airR",
+            (5, false) => "f", (5, true) => "airF",
+            (6, false) => "slot2", (6, true) => "airSlot2",
+            (7, false) => "slot3", (7, true) => "airSlot3",
+            (8, false) => "slot4", (8, true) => "airSlot4",
+            (9, false) => "slot5", (9, true) => "airSlot5",
+            (10, false) => "a", (10, true) => "airA",
+            _ => throw new ArgumentOutOfRangeException(nameof(slotIndex), slotIndex, "No ability content name for slot"),
+        };
+
+        private static bool TryParseStageKey(string key, out int slotIndex, out bool airborne, out int stageIndex)
+        {
+            slotIndex = -1;
+            airborne = false;
+            stageIndex = -1;
+            string[] parts = key.Split(':');
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], out slotIndex)
+                || (parts[1] != "0" && parts[1] != "1")
+                || !int.TryParse(parts[2], out stageIndex)
+                || slotIndex < 0 || slotIndex > 10 || stageIndex < 0)
+            {
+                slotIndex = -1;
+                stageIndex = -1;
+                return false;
+            }
+            airborne = parts[1] == "1";
+            return true;
+        }
+
+        private static bool TryGetContentAbility(
+            CharacterDefinition definition, string name, out AbilitySpec? ability)
+        {
+            ability = name switch
+            {
+                "lmb" => definition.LMB, "rmb" => definition.RMB,
+                "airLmb" => definition.AirLMB, "airRmb" => definition.AirRMB,
+                "slot1" => definition.Slot1, "airSlot1" => definition.AirSlot1,
+                "e" => definition.E, "airE" => definition.AirE,
+                "r" => definition.R, "airR" => definition.AirR,
+                "f" => definition.F, "airF" => definition.AirF,
+                "slot2" => definition.Slot2, "airSlot2" => definition.AirSlot2,
+                "slot3" => definition.Slot3, "airSlot3" => definition.AirSlot3,
+                "slot4" => definition.Slot4, "airSlot4" => definition.AirSlot4,
+                "slot5" => definition.Slot5, "airSlot5" => definition.AirSlot5,
+                "a" => definition.A, "airA" => definition.AirA,
+                _ => null,
+            };
+            return ability != null;
+        }
+
+        /// <summary>
+        /// Working hitstop override, authored ability parameter, or the simulation default.
+        /// </summary>
+        public float CurrentHitstopMultiplier
+        {
+            get
+            {
+                if (WorkingHitstopOverrides.TryGetValue(CurrentAbilityProperty, out float working))
+                    return working;
+                var spec = CurrentSpec();
+                return spec?.Params != null && spec.Params.TryGetValue("hitstop_multiplier", out float authored)
+                    ? authored : 1f;
+            }
+        }
+
+        public void SetHitstopMultiplier(float multiplier)
+        {
+            float value = Mathf.Max(0f, multiplier);
+            if (Mathf.Approximately(value, CurrentHitstopMultiplier)) return;
+            PushWorkingUndo();
+            WorkingHitstopOverrides[CurrentAbilityProperty] = value;
+            _trajDirty = "";
+            RefreshPose();
+        }
+
 
         /// <summary>
         /// The hitbox events that preview + timeline use: the working override for the
@@ -586,40 +715,40 @@ namespace SlopArena.Client.Tools
 
         // ── Hitbox event editing (spec #119: add / remove / move / scale) ──
 
-        private void PushEventUndo()
+        private WorkingSnapshot CaptureWorkingSnapshot()
         {
-            var snapshot = new Dictionary<string, HitboxEvent[]>(WorkingEvents.Count);
+            var events = new Dictionary<string, HitboxEvent[]>(WorkingEvents.Count);
             foreach (var kvp in WorkingEvents)
-                snapshot[kvp.Key] = (HitboxEvent[])kvp.Value.Clone();
-            _undo.Push(snapshot);
+                events[kvp.Key] = (HitboxEvent[])kvp.Value.Clone();
+            return new WorkingSnapshot(events, new Dictionary<string, float>(WorkingHitstopOverrides));
+        }
+
+        private void PushWorkingUndo()
+        {
+            _undo.Push(CaptureWorkingSnapshot());
             if (_undo.Count > MaxUndoDepth) _undo.Pop();
             _redo.Clear();
         }
 
-        private void StoreWorkingEvents(Dictionary<string, HitboxEvent[]> events)
+        private void StoreWorkingSnapshot(WorkingSnapshot snapshot)
         {
-            WorkingEvents = events;
+            WorkingEvents = snapshot.Events;
+            WorkingHitstopOverrides = snapshot.HitstopOverrides;
             RefreshPose();
         }
 
         public void UndoEvents()
         {
             if (_undo.Count == 0) return;
-            var snapshot = new Dictionary<string, HitboxEvent[]>(WorkingEvents.Count);
-            foreach (var kvp in WorkingEvents)
-                snapshot[kvp.Key] = (HitboxEvent[])kvp.Value.Clone();
-            _redo.Push(snapshot);
-            StoreWorkingEvents(_undo.Pop());
+            _redo.Push(CaptureWorkingSnapshot());
+            StoreWorkingSnapshot(_undo.Pop());
         }
 
         public void RedoEvents()
         {
             if (_redo.Count == 0) return;
-            var snapshot = new Dictionary<string, HitboxEvent[]>(WorkingEvents.Count);
-            foreach (var kvp in WorkingEvents)
-                snapshot[kvp.Key] = (HitboxEvent[])kvp.Value.Clone();
-            _undo.Push(snapshot);
-            StoreWorkingEvents(_redo.Pop());
+            _undo.Push(CaptureWorkingSnapshot());
+            StoreWorkingSnapshot(_redo.Pop());
         }
 
         public void SetWorkingEvent(int index, HitboxEvent evt)
@@ -627,7 +756,7 @@ namespace SlopArena.Client.Tools
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
             if (index < 0 || index >= events.Length) return;
             events[index] = evt;
-            PushEventUndo();
+            PushWorkingUndo();
             WorkingEvents[CurrentKey] = events;
             RefreshPose();
         }
@@ -650,7 +779,7 @@ namespace SlopArena.Client.Tools
                 Knockback = template.Knockback,
             };
             var list = new List<HitboxEvent>(events) { created };
-            PushEventUndo();
+            PushWorkingUndo();
             WorkingEvents[CurrentKey] = list.ToArray();
             RefreshPose();
         }
@@ -661,67 +790,101 @@ namespace SlopArena.Client.Tools
             if (index < 0 || index >= events.Length) return;
             var list = new List<HitboxEvent>(events);
             list.RemoveAt(index);
-            PushEventUndo();
+            PushWorkingUndo();
             WorkingEvents[CurrentKey] = list.ToArray();
             RefreshPose();
         }
 
-        // ── Persistence: write edits back into the C# data source (the compiled
-        //    source of truth — no JSON, no mirror; rebuild Shared to apply) ──
+        // ── Persistence: write the complete authored definition to character.json ──
 
-        public void SaveToSource()
+        public void SaveToJson()
         {
-            if (SourceFilePath == null || !File.Exists(SourceFilePath))
+            if (ContentFilePath == null || !File.Exists(ContentFilePath))
             {
-                Debug.LogWarning($"[AbilityLab] Character data file not found: {SourceFilePath ?? "<unknown>"}");
+                Debug.LogWarning($"[AbilityLab] Character JSON file not found: {ContentFilePath ?? "<unknown>"}");
                 return;
             }
-            if (WorkingEvents.Count == 0)
+            if (WorkingEvents.Count == 0 && WorkingHitstopOverrides.Count == 0)
             {
-                Debug.LogWarning("[AbilityLab] No hitbox edits to save.");
+                Debug.LogWarning("[AbilityLab] No edits to save.");
                 return;
             }
-            string text;
+
+            string contentId = Character.ToString().ToLowerInvariant();
             try
             {
-                text = File.ReadAllText(SourceFilePath);
+                var saveDef = CharacterContentSerializer.Load(
+                    CharacterContentSerializer.Serialize(contentId, Def));
+
+                int stageCount = 0;
+                foreach (var kvp in WorkingEvents)
+                {
+                    if (!TryParseStageKey(kvp.Key, out int slot, out bool airborne, out int stageIndex))
+                    {
+                        Debug.LogError($"[AbilityLab] Cannot save JSON: malformed edit key '{kvp.Key}'.");
+                        return;
+                    }
+
+                    var ability = saveDef.GetSlotAbility(slot, airborne);
+                    if (ability?.Stages == null || stageIndex < 0 || stageIndex >= ability.Stages.Length)
+                    {
+                        Debug.LogError(
+                            $"[AbilityLab] Cannot save JSON: no stage {stageIndex} in {ContentAbilityName(slot, airborne)} " +
+                            $"for {Character}. File not written.");
+                        return;
+                    }
+
+                    var editedStage = ability.Stages[stageIndex];
+                    editedStage.HitboxEvents = kvp.Value == null
+                        ? Array.Empty<HitboxEvent>()
+                        : (HitboxEvent[])kvp.Value.Clone();
+                    ability.Stages[stageIndex] = editedStage;
+                    stageCount++;
+                }
+
+                int hitstopCount = 0;
+                foreach (var kvp in WorkingHitstopOverrides)
+                {
+                    if (!TryGetContentAbility(saveDef, kvp.Key, out var ability) || ability == null)
+                    {
+                        Debug.LogError(
+                            $"[AbilityLab] Cannot save JSON: no ability '{kvp.Key}' for {Character}. File not written.");
+                        return;
+                    }
+
+                    ability.Params ??= new Dictionary<string, float>();
+                    ability.Params["hitstop_multiplier"] = kvp.Value;
+                    hitstopCount++;
+                }
+
+                // Validate the complete edited definition before touching disk.
+                string serialized = CharacterContentSerializer.Serialize(contentId, saveDef);
+                var validatedDef = CharacterContentSerializer.Load(serialized);
+                CharacterContentSerializer.SaveFile(ContentFilePath, contentId, validatedDef);
+
+                Def = CharacterContentSerializer.LoadFile(ContentFilePath);
+                WorkingDefs = LoadWorkingDefs(Def, Baked);
+                DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
+                if (Renderer != null) ConfigureRenderer(Renderer, DisplayDef, "LabCharacter");
+                if (_dummyRenderer != null) ConfigureRenderer(_dummyRenderer, DisplayDef, "LabDummy");
+                WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+                WorkingHitstopOverrides = new Dictionary<string, float>();
+                _undo.Clear();
+                _redo.Clear();
+                RefreshPose();
+                Debug.Log($"[AbilityLab] Saved {stageCount} edited stage(s) and {hitstopCount} hitstop override(s) to {ContentFilePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AbilityLab] Failed to read {SourceFilePath}: {ex.Message}");
-                return;
+                Debug.LogError($"[AbilityLab] Failed to save JSON '{ContentFilePath}': {ex.Message}");
             }
-            foreach (var kvp in WorkingEvents)
-            {
-                if (!CSharpCharacterWriter.TryParseKey(kvp.Key, out int slot, out bool airborne, out int stage))
-                {
-                    Debug.LogError($"[AbilityLab] Cannot save: malformed edit key '{kvp.Key}'.");
-                    return;
-                }
-                string property = CSharpCharacterWriter.PropertyName(slot, airborne);
-                if (!CSharpCharacterWriter.TryReplaceHitboxEvents(text, property, stage, kvp.Value, out text))
-                {
-                    Debug.LogError($"[AbilityLab] Cannot save: no stage {stage} in {property} for {Character}. Aborted — file not written.");
-                    return;
-                }
-            }
-            try
-            {
-                File.WriteAllText(SourceFilePath, text);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AbilityLab] Failed to write {SourceFilePath}: {ex.Message}");
-                return;
-            }
-            Debug.Log($"[AbilityLab] Saved {WorkingEvents.Count} edited stage(s) to {SourceFilePath}\n" +
-                      "Apply: run `dotnet build src/Shared/` (DLL auto-copies to Unity), then restart the match.");
         }
 
         /// <summary>Discard unsaved edits — the preview reverts to the last-built data.</summary>
         public void RevertEdits()
         {
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+            WorkingHitstopOverrides = new Dictionary<string, float>();
             _undo.Clear();
             _redo.Clear();
             RefreshPose();
