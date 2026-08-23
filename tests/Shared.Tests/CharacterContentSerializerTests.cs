@@ -6,6 +6,12 @@ using Xunit;
 
 namespace SlopArena.Shared.Tests;
 
+[CollectionDefinition("CharacterRegistry", DisableParallelization = true)]
+public sealed class CharacterRegistryCollection
+{
+}
+
+[Collection("CharacterRegistry")]
 public sealed class CharacterContentSerializerTests
 {
     private static string CharacterPath => FindRepoFile("content/characters/fightguy/character.json");
@@ -13,8 +19,8 @@ public sealed class CharacterContentSerializerTests
     [Fact]
     public void LoadFile_MatchesKnownGoodFightGuyBaseData()
     {
+        var actual = LoadAndRegisterFightGuy();
         var expected = CharacterRegistry.Get(CharacterClass.FightGuy);
-        var actual = CharacterContentSerializer.LoadFile(CharacterPath);
 
         Assert.Equal(expected.Class, actual.Class);
         Assert.Equal(expected.DisplayName, actual.DisplayName);
@@ -52,9 +58,8 @@ public sealed class CharacterContentSerializerTests
     [Fact]
     public void LoadFile_MatchesRepresentativeNormalAbilityData()
     {
+        var actual = LoadAndRegisterFightGuy();
         var expected = CharacterRegistry.Get(CharacterClass.FightGuy);
-        var actual = CharacterContentSerializer.LoadFile(CharacterPath);
-
         Assert.NotNull(expected.Slot1);
         Assert.NotNull(actual.Slot1);
         Assert.Equal(expected.Slot1!.Name, actual.Slot1!.Name);
@@ -103,9 +108,8 @@ public sealed class CharacterContentSerializerTests
     [Fact]
     public void LoadFile_PreservesSpecialDataAndAirAliases()
     {
+        var actual = LoadAndRegisterFightGuy();
         var expected = CharacterRegistry.Get(CharacterClass.FightGuy);
-        var actual = CharacterContentSerializer.LoadFile(CharacterPath);
-
         AssertSpecial(expected.E, actual.E);
         AssertSpecial(expected.R, actual.R);
         AssertSpecial(expected.F, actual.F);
@@ -141,6 +145,71 @@ public sealed class CharacterContentSerializerTests
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
 
         Assert.Equal(1UL, sim.GetState(1).EntityId);
+    }
+
+    [Fact]
+    public void RegisterOverride_ChangesFightGuyOnly()
+    {
+        var priorFightGuy = CharacterRegistry.Get(CharacterClass.FightGuy);
+        var manki = CharacterRegistry.Get(CharacterClass.Manki);
+        var kistu = CharacterRegistry.Get(CharacterClass.Kistu);
+        var nilus = CharacterRegistry.Get(CharacterClass.Nilus);
+        string tempPath = Path.GetTempFileName();
+
+        try
+        {
+            string changedJson = File.ReadAllText(CharacterPath)
+                .Replace("\"runSpeed\": 14", "\"runSpeed\": 27.25");
+            File.WriteAllText(tempPath, changedJson);
+
+            var changed = CharacterContentSerializer.LoadFile(tempPath);
+            CharacterRegistry.RegisterOverride(changed);
+
+            Assert.Equal(27.25f, CharacterRegistry.Get(CharacterClass.FightGuy).Movement.RunSpeed);
+            Assert.Same(manki, CharacterRegistry.Get(CharacterClass.Manki));
+            Assert.Same(kistu, CharacterRegistry.Get(CharacterClass.Kistu));
+            Assert.Same(nilus, CharacterRegistry.Get(CharacterClass.Nilus));
+        }
+        finally
+        {
+            CharacterRegistry.RegisterOverride(priorFightGuy);
+            File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public void RegisterOverride_RejectsInvalidClass()
+    {
+        Assert.Throws<ArgumentNullException>(() => CharacterRegistry.RegisterOverride(null!));
+        Assert.Throws<InvalidDataException>(() => CharacterRegistry.RegisterOverride(
+            new CharacterDefinition { Class = CharacterClass.None }));
+        Assert.Throws<InvalidDataException>(() => CharacterRegistry.RegisterOverride(
+            new CharacterDefinition { Class = (CharacterClass)255 }));
+    }
+
+    [Fact]
+    public void LoadFile_ReportsMissingPath()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.json");
+        var ex = Assert.Throws<InvalidDataException>(() => CharacterContentSerializer.LoadFile(path));
+        Assert.Contains(path, ex.Message);
+    }
+
+    [Fact]
+    public void LoadFile_ReportsMalformedPathAndReason()
+    {
+        string path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "{");
+            var ex = Assert.Throws<InvalidDataException>(() => CharacterContentSerializer.LoadFile(path));
+            Assert.Contains(path, ex.Message);
+            Assert.Contains("Invalid character content", ex.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -184,6 +253,13 @@ public sealed class CharacterContentSerializerTests
             "{\"schemaVersion\":1,\"id\":\"fightguy\",\"class\":\"FightGuy\",\"abilities\":{\"slot1\":{\"name\":\"No stages\"}}}" )).Message);
 
     private static CharacterDefinition LoadText(string json) => CharacterContentSerializer.Load(json);
+    private static CharacterDefinition LoadAndRegisterFightGuy()
+    {
+        var definition = CharacterContentSerializer.LoadFile(CharacterPath);
+        CharacterRegistry.RegisterOverride(definition);
+        return definition;
+    }
+
 
     private static void AssertSpecial(AbilitySpec? expected, AbilitySpec? actual)
     {

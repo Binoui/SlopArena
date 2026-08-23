@@ -11,6 +11,7 @@ namespace SlopArena.Server
             // Load configuration
             string configPath = args.Length > 0 ? args[0] : "server.json";
             var config = ServerConfig.Load(configPath);
+            LoadFightGuyOverride("content/characters/fightguy/character.json");
             Console.WriteLine($"Server: {config.ServerName}");
             Console.WriteLine($"Region: {config.Region}");
             Console.WriteLine($"Port range: {config.Port}-{config.Port + config.MaxConcurrentMatches - 1}");
@@ -79,6 +80,30 @@ namespace SlopArena.Server
             orchestrator.Shutdown();
             Console.WriteLine("Server stopped.");
 
+        }
+        static void LoadFightGuyOverride(string path)
+        {
+            try
+            {
+                var definition = CharacterContentSerializer.LoadFile(path);
+                if (definition.Class != CharacterClass.FightGuy)
+                {
+                    throw new InvalidDataException(
+                        $"declared class '{definition.Class}', expected '{CharacterClass.FightGuy}'.");
+                }
+
+                CharacterRegistry.RegisterOverride(definition);
+                Console.WriteLine($"[Startup] Loaded FightGuy character content '{Path.GetFullPath(path)}'.");
+            }
+            catch (Exception ex) when (
+                ex is InvalidDataException ||
+                ex is IOException ||
+                ex is UnauthorizedAccessException ||
+                ex is ArgumentException)
+            {
+                throw new InvalidDataException(
+                    $"[Startup] FightGuy character content '{path}' could not be loaded: {ex.Message}", ex);
+            }
         }
     }
 }

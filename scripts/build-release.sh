@@ -38,6 +38,8 @@ cp "$ROOT"/data/arenas/*.arena "$SA/arenas/"
 # WorkingDirectory = the server binary dir). Issue #77: without this, bone-attached
 # hitboxes degrade to capsules in the shipped exe.
 cp "$ROOT"/data/*.bin "$SA/data/"
+mkdir -p "$SA/content/characters/fightguy"
+cp "$ROOT/content/characters/fightguy/character.json" "$SA/content/characters/fightguy/character.json"
 cp "$ROOT"/data/*.bin "$SA/Server/data/"
 
 echo "== Version stamp =="
@@ -55,7 +57,7 @@ echo "== Restore committed bundleVersion =="
 git -C "$ROOT" checkout -- client/Unity/ProjectSettings/ProjectSettings.asset
 
 echo "== Unstage build-only artifacts =="
-rm -rf "$SA/Server" "$SA/arenas" "$SA/data"
+rm -rf "$SA/Server" "$SA/arenas" "$SA/data" "$SA/content"
 
 echo "== Ship docs + zip =="
 cp "$ROOT/docs/release/PLAY_GUIDE.md" "$REL/README.txt"

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 #nullable enable
 
@@ -253,6 +254,21 @@ namespace SlopArena.Shared
         }
 
         public static CharacterDefinition Get(CharacterClass c) => All[(int)c];
+
+        public static void RegisterOverride(CharacterDefinition definition)
+        {
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+
+            var definitions = All;
+            int index = (int)definition.Class;
+            if (index == 0 || index >= definitions.Length)
+            {
+                throw new InvalidDataException(
+                    $"Invalid character override class '{definition.Class}'.");
+            }
+
+            _definitions![index] = definition;
+        }
 
         private static CharacterDefinition[] BuildRegistry()
         {
