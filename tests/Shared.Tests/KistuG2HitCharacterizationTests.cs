@@ -85,12 +85,24 @@ public sealed class KistuG2HitCharacterizationTests
         var baked = TestHelpers.LoadBakedData(def);
         Assert.NotNull(baked);
 
+        var spec = def.Slot2!;
+        var stage = Assert.Single(spec.Stages);
+        var evt = stage.HitboxEvents[0];
+        ushort targetTick = (ushort)(evt.TriggerTick + evt.DurationTicks / 2);
+        var pose = TestHelpers.PlayerState();
+        pose.PY = TestHelpers.GroundPY(def);
+        pose.AttackElapsedTicks = targetTick;
+        HitboxGeometry.ResolvePositions(
+            pose, evt, baked, def, spec.AnimationNames, 0, slot: 6, airborne: false,
+            out float hx, out float hy, out float hz,
+            out float tx, out float ty, out float tz);
+
         var sim = TestHelpers.MakeSim();
         var attacker = TestHelpers.PlayerState();
         attacker.PY = TestHelpers.GroundPY(def);
         sim.RegisterEntity(1, def, attacker, baked);
-        var target = TestHelpers.NpcState(0f, 0.6f);
-        target.PY = TestHelpers.GroundPY(def);
+        var target = TestHelpers.NpcState((hx + tx) * 0.5f, (hz + tz) * 0.5f);
+        target.PY = (hy + ty) * 0.5f;
         sim.RegisterEntity(100, def, target, baked);
 
         var record = new StringBuilder("simTick,attackElapsed,targetDamage,state");
@@ -108,7 +120,6 @@ public sealed class KistuG2HitCharacterizationTests
             if (firstHit < 0 && targetAfter.DamagePercent > 0) firstHit = tick;
         }
 
-        _output.WriteLine(record.ToString());
-        Assert.True(firstHit >= 0, $"Fixed target at z=0.6 was never hit.\n{record}");
+        Assert.True(firstHit >= 0, $"Representative baked G2 target was never hit.\n{record}");
     }
 }

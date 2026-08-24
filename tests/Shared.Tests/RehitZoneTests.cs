@@ -85,9 +85,10 @@ public class RehitZoneTests
         var sim = SimWithNpc(out var npc);
         sim.Resolver.Spawn(Zone(npc, 3f, duration: 31, rehit: 30));
 
-        Idle(sim, 200);
+        // Stop immediately after the second pulse and expiry. A longer run lets the dummy
+        // fall out of the finite test arena and respawn, resetting its damage.
+        Idle(sim, 31);
 
-        // Pulses at 0 and 30 only; the zone is gone long before tick 200.
         Assert.Equal((ushort)6, sim.GetState(100).DamagePercent);
         Assert.Empty(sim.Resolver.GetActiveHitboxes());
     }

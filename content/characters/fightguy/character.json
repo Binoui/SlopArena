@@ -10,11 +10,11 @@
     "dashSpeed": 20,
     "airSpeedMax": 7.5,
     "airAccelStick": 16,
-    "airAccelBase": 3.2,
+    "airAccelBase": 3.20000005,
     "jumpForce": 12,
-    "shortHopForce": 7.2,
-    "airJumpVMultiplier": 0.8,
-    "airJumpHMultiplier": 0.85,
+    "shortHopForce": 7.19999981,
+    "airJumpVMultiplier": 0.800000012,
+    "airJumpHMultiplier": 0.850000024,
     "gravity": 36,
     "airFloatGravity": 0,
     "dashDurationTicks": 20,
@@ -29,64 +29,64 @@
     "rushTicks": 10
   },
   "weight": 100,
-  "capsuleRadius": 0.35,
-  "capsuleHeight": 1.7,
-  "hipHeight": 0.82,
+  "capsuleRadius": 0.349999994,
+  "capsuleHeight": 1.70000005,
+  "hipHeight": 0.819999993,
   "hurtboxRadius": 1,
   "hurtboxCapsules": [
     {
       "sx": 0,
-      "sy": 0.2,
+      "sy": 0.200000003,
       "sz": 0,
       "ex": 0,
-      "ey": 0.9,
+      "ey": 0.899999976,
       "ez": 0,
-      "radius": 0.3
+      "radius": 0.300000012
     },
     {
       "sx": 0,
-      "sy": 1.2,
+      "sy": 1.20000005,
       "sz": 0,
       "ex": 0,
-      "ey": 1.2,
+      "ey": 1.20000005,
       "ez": 0,
-      "radius": 0.22
+      "radius": 0.219999999
     },
     {
-      "sx": 0.3,
-      "sy": 0.8,
+      "sx": 0.300000012,
+      "sy": 0.800000012,
       "sz": 0,
-      "ex": 0.6,
-      "ey": 0.6,
-      "ez": 0.2,
-      "radius": 0.12
+      "ex": 0.600000024,
+      "ey": 0.600000024,
+      "ez": 0.200000003,
+      "radius": 0.119999997
     },
     {
-      "sx": -0.3,
-      "sy": 0.8,
+      "sx": -0.300000012,
+      "sy": 0.800000012,
       "sz": 0,
-      "ex": -0.6,
-      "ey": 0.6,
-      "ez": 0.2,
-      "radius": 0.12
+      "ex": -0.600000024,
+      "ey": 0.600000024,
+      "ez": 0.200000003,
+      "radius": 0.119999997
     },
     {
-      "sx": 0.15,
+      "sx": 0.150000006,
       "sy": 0,
       "sz": 0,
-      "ex": 0.15,
-      "ey": -0.8,
+      "ex": 0.150000006,
+      "ey": -0.800000012,
       "ez": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     },
     {
-      "sx": -0.15,
+      "sx": -0.150000006,
       "sy": 0,
       "sz": 0,
-      "ex": -0.15,
-      "ey": -0.8,
+      "ex": -0.150000006,
+      "ey": -0.800000012,
       "ez": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     }
   ],
   "hurtboxBoneDefs": [
@@ -95,54 +95,54 @@
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.22
+      "radius": 0.219999999
     },
     {
       "boneName": "mixamorig:Spine2",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.26
+      "radius": 0.25999999
     },
     {
       "boneName": "mixamorig:Hips",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.26
+      "radius": 0.25999999
     },
     {
       "boneName": "mixamorig:RightHand",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.12
+      "radius": 0.119999997
     },
     {
       "boneName": "mixamorig:LeftHand",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.12
+      "radius": 0.119999997
     },
     {
       "boneName": "mixamorig:RightFoot",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     },
     {
       "boneName": "mixamorig:LeftFoot",
       "offX": 0,
       "offY": 0,
       "offZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     }
   ],
   "bakedDataPath": "res://data/fightguy_skeleton.bin",
   "modelResourcePath": "Characters/FightGuy",
-  "hurtboxBoneScale": 0.85,
+  "hurtboxBoneScale": 0.850000024,
   "modelYOffset": 0,
   "modelSoleOffset": 0,
   "autoModelYOffset": true,
@@ -155,7 +155,7 @@
   "hitSmallAnim": "hit_light",
   "hitMediumAnim": "hit_medium",
   "hitHardAnim": "hit_hard",
-  "landStartOffset": 0.49,
+  "landStartOffset": 0.49000001,
   "abilities": {
     "slot1": {
       "behavior": "MeleeCombo",
@@ -179,10 +179,10 @@
               "triggerTick": 4,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.35,
+              "radius": 0.349999994,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.21,
+              "offZ": 0.209999993,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -207,13 +207,13 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.85,
+          "trackingStrength": 0.850000024,
           "boneTrails": [
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -249,7 +249,7 @@
               "triggerTick": 6,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.3,
+              "radius": 0.300000012,
               "offX": 0,
               "offY": 0,
               "offZ": 0,
@@ -272,7 +272,7 @@
               "triggerTick": 16,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
               "offZ": 0,
@@ -300,21 +300,21 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.8,
+          "trackingStrength": 0.800000012,
           "boneTrails": [
             {
               "boneName": "mixamorig:LeftHand",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             },
             {
               "boneName": "mixamorig:RightHand",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -350,10 +350,10 @@
               "triggerTick": 6,
               "durationTicks": 25,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.23,
+              "offZ": 0.230000004,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -373,9 +373,9 @@
               "triggerTick": 6,
               "durationTicks": 25,
               "shape": "Sphere",
-              "radius": 0.3,
+              "radius": 0.300000012,
               "offX": 0,
-              "offY": 0.18,
+              "offY": 0.180000007,
               "offZ": 0,
               "endOffX": 0,
               "endOffY": 0,
@@ -396,10 +396,10 @@
               "triggerTick": 10,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.63,
+              "offZ": 0.629999995,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -428,9 +428,9 @@
           "boneTrails": [
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -470,10 +470,10 @@
               "triggerTick": 6,
               "durationTicks": 25,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.23,
+              "offZ": 0.230000004,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -493,9 +493,9 @@
               "triggerTick": 6,
               "durationTicks": 25,
               "shape": "Sphere",
-              "radius": 0.3,
+              "radius": 0.300000012,
               "offX": 0,
-              "offY": 0.18,
+              "offY": 0.180000007,
               "offZ": 0,
               "endOffX": 0,
               "endOffY": 0,
@@ -516,10 +516,10 @@
               "triggerTick": 10,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.63,
+              "offZ": 0.629999995,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -548,9 +548,9 @@
           "boneTrails": [
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -609,16 +609,16 @@
         "windup_ticks": 6,
         "hitbox_end_tick": 34,
         "duration_ticks": 40,
-        "body_radius": 0.8,
-        "side_radius": 0.4,
-        "side_offset": 0.8,
+        "body_radius": 0.800000012,
+        "side_radius": 0.400000006,
+        "side_offset": 0.800000012,
         "damage": 7,
         "knockback_angle": 15,
         "knockback_base": 8,
         "knockback_growth": 5,
         "stun_ticks": 6,
-        "body_y": 0.8,
-        "side_y": 0.3
+        "body_y": 0.800000012,
+        "side_y": 0.300000012
       }
     },
     "airR": {
@@ -662,16 +662,16 @@
         "windup_ticks": 6,
         "hitbox_end_tick": 34,
         "duration_ticks": 40,
-        "body_radius": 0.8,
-        "side_radius": 0.4,
-        "side_offset": 0.8,
+        "body_radius": 0.800000012,
+        "side_radius": 0.400000006,
+        "side_offset": 0.800000012,
         "damage": 7,
         "knockback_angle": 15,
         "knockback_base": 8,
         "knockback_growth": 5,
         "stun_ticks": 6,
-        "body_y": 0.8,
-        "side_y": 0.3
+        "body_y": 0.800000012,
+        "side_y": 0.300000012
       }
     },
     "f": {
@@ -691,7 +691,77 @@
           "landingLagTicks": 0,
           "autoCancelBeforeTicks": 0,
           "autoCancelAfterTicks": 0,
-          "hitboxEvents": [],
+          "hitboxEvents": [
+            {
+              "triggerTick": 4,
+              "durationTicks": 10,
+              "shape": "Sphere",
+              "radius": 0.400000006,
+              "offX": 0,
+              "offY": -0.150000006,
+              "offZ": 0.180000007,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:RightHand",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            },
+            {
+              "triggerTick": 6,
+              "durationTicks": 9,
+              "shape": "Sphere",
+              "radius": 0.400000006,
+              "offX": 0,
+              "offY": -0.150000006,
+              "offZ": 0.180000007,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:LeftHand",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            },
+            {
+              "triggerTick": 18,
+              "durationTicks": 10,
+              "shape": "Sphere",
+              "radius": 0.5,
+              "offX": 0.270000011,
+              "offY": 0.300000012,
+              "offZ": 0.689999998,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:LeftFoot",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            }
+          ],
           "lungeForce": 0,
           "moveX": 0,
           "moveY": 0,
@@ -714,9 +784,9 @@
       "params": {
         "duration_ticks": 28,
         "fire_tick": 24,
-        "launch_offset_y": 1.2,
+        "launch_offset_y": 1.20000005,
         "beam_range": 18,
-        "beam_radius": 0.45,
+        "beam_radius": 0.449999988,
         "damage": 14,
         "knockback_angle": 20,
         "knockback_base": 18,
@@ -742,7 +812,77 @@
           "landingLagTicks": 0,
           "autoCancelBeforeTicks": 0,
           "autoCancelAfterTicks": 0,
-          "hitboxEvents": [],
+          "hitboxEvents": [
+            {
+              "triggerTick": 4,
+              "durationTicks": 10,
+              "shape": "Sphere",
+              "radius": 0.400000006,
+              "offX": 0,
+              "offY": -0.150000006,
+              "offZ": 0.180000007,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:RightHand",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            },
+            {
+              "triggerTick": 6,
+              "durationTicks": 9,
+              "shape": "Sphere",
+              "radius": 0.400000006,
+              "offX": 0,
+              "offY": -0.150000006,
+              "offZ": 0.180000007,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:LeftHand",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            },
+            {
+              "triggerTick": 18,
+              "durationTicks": 10,
+              "shape": "Sphere",
+              "radius": 0.5,
+              "offX": 0.270000011,
+              "offY": 0.300000012,
+              "offZ": 0.689999998,
+              "endOffX": 0,
+              "endOffY": 0,
+              "endOffZ": 0,
+              "boneName": "mixamorig:LeftFoot",
+              "damage": 0,
+              "knockback": {
+                "profile": "Light",
+                "angle": 0,
+                "baseKnockback": 0,
+                "knockbackGrowth": 0
+              },
+              "stunTicks": 0,
+              "interruptible": true,
+              "hitGroup": 0
+            }
+          ],
           "lungeForce": 0,
           "moveX": 0,
           "moveY": 0,
@@ -765,9 +905,9 @@
       "params": {
         "duration_ticks": 28,
         "fire_tick": 24,
-        "launch_offset_y": 1.2,
+        "launch_offset_y": 1.20000005,
         "beam_range": 18,
-        "beam_radius": 0.45,
+        "beam_radius": 0.449999988,
         "damage": 14,
         "knockback_angle": 20,
         "knockback_base": 18,
@@ -798,10 +938,10 @@
               "triggerTick": 5,
               "durationTicks": 5,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.21,
+              "offZ": 0.209999993,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -826,13 +966,13 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.85,
+          "trackingStrength": 0.850000024,
           "boneTrails": [
             {
               "boneName": "mixamorig:RightHand",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -868,7 +1008,7 @@
               "triggerTick": 7,
               "durationTicks": 5,
               "shape": "Capsule",
-              "radius": 0.35,
+              "radius": 0.349999994,
               "offX": 0,
               "offY": 0,
               "offZ": 0,
@@ -892,7 +1032,7 @@
               "triggerTick": 12,
               "durationTicks": 20,
               "shape": "Capsule",
-              "radius": 0.35,
+              "radius": 0.349999994,
               "offX": 0,
               "offY": 0,
               "offZ": 0,
@@ -921,13 +1061,13 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.8,
+          "trackingStrength": 0.800000012,
           "boneTrails": [
             {
               "boneName": "mixamorig:LeftFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -963,10 +1103,10 @@
               "triggerTick": 7,
               "durationTicks": 6,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.21,
+              "offZ": 0.209999993,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -991,13 +1131,13 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.85,
+          "trackingStrength": 0.850000024,
           "boneTrails": [
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -1033,10 +1173,10 @@
               "triggerTick": 14,
               "durationTicks": 6,
               "shape": "Sphere",
-              "radius": 0.35,
+              "radius": 0.349999994,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.14,
+              "offZ": 0.140000001,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -1061,13 +1201,13 @@
           "warpRange": 0,
           "useTargetLock": true,
           "rotateTowardTarget": true,
-          "trackingStrength": 0.8,
+          "trackingStrength": 0.800000012,
           "boneTrails": [
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -1103,7 +1243,7 @@
               "triggerTick": 10,
               "durationTicks": 7,
               "shape": "Capsule",
-              "radius": 0.42,
+              "radius": 0.419999987,
               "offX": 0,
               "offY": 0,
               "offZ": 0,
@@ -1136,17 +1276,17 @@
           "boneTrails": [
             {
               "boneName": "mixamorig:LeftFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             },
             {
               "boneName": "mixamorig:RightFoot",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -1182,10 +1322,10 @@
               "triggerTick": 20,
               "durationTicks": 7,
               "shape": "Sphere",
-              "radius": 0.4,
+              "radius": 0.400000006,
               "offX": 0,
               "offY": 0,
-              "offZ": 0.24,
+              "offZ": 0.239999995,
               "endOffX": 0,
               "endOffY": 0,
               "endOffZ": 0,
@@ -1214,9 +1354,9 @@
           "boneTrails": [
             {
               "boneName": "mixamorig:RightHand",
-              "width": 0.12,
-              "r": 0.3,
-              "g": 0.6,
+              "width": 0.119999997,
+              "r": 0.300000012,
+              "g": 0.600000024,
               "b": 1,
               "a": 1
             }
@@ -1271,7 +1411,7 @@
       "params": {
         "startup_ticks": 8,
         "duration_ticks": 24,
-        "launch_offset_y": 1.2,
+        "launch_offset_y": 1.20000005,
         "projectile_speed": 25,
         "gravity": 1,
         "hitbox_radius": 0.5,
@@ -1324,7 +1464,7 @@
       "params": {
         "startup_ticks": 8,
         "duration_ticks": 24,
-        "launch_offset_y": 1.2,
+        "launch_offset_y": 1.20000005,
         "projectile_speed": 25,
         "gravity": 1,
         "hitbox_radius": 0.5,

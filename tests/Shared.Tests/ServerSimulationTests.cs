@@ -288,7 +288,7 @@ public class ServerSimulationTests
         Assert.Equal(0f, result.PZ);
     }
 
-    // ── Multiple entities ──
+    // ── Multiple entities / pushboxes ──
 
     [Fact]
     public void Tick_TwoEntitiesIdle_NeitherChanges()
@@ -308,8 +308,12 @@ public class ServerSimulationTests
         var s2 = sim.GetState(2);
         Assert.Equal(ActionState.Idle, s1.State);
         Assert.Equal(ActionState.Idle, s2.State);
-        Assert.Equal(0f, s1.PX);
-        Assert.Equal(0f, s2.PX);
+
+        // Idle entities do not self-move, but overlapping pushboxes separate symmetrically.
+        Assert.True(s1.PX < 0f);
+        Assert.True(s2.PX > 0f);
+        Assert.InRange(s1.PZ, -0.00001f, 0.00001f);
+        Assert.InRange(s2.PZ, -0.00001f, 0.00001f);
     }
 
     // ── GetState/SetState round-trip ──

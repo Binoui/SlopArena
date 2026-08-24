@@ -105,106 +105,6 @@ public static partial class CharacterRegistry
                 AnimationNames = new[] { "spell_a_1" },
             },
 
-            E = new AbilitySpec
-            {
-                Name = "Rising Dragon",
-                Description = "Rising punch — anti-air launcher on the ground, recovery burst in the air (resets the float window)",
-                IconName = "e",
-                CooldownTicks = 240,
-                IsRecoveryMove = true,
-                Behavior = AbilityBehavior.MeleeCombo,
-                AimMode = AimMode.None,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 34,
-                            HitboxEvents = new HitboxEvent[]
-                            {
-                                new() { TriggerTick = 6, DurationTicks = 25, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0.23f, BoneName = "mixamorig:RightHand", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
-                                new() { TriggerTick = 6, DurationTicks = 25, Radius = 0.3f, OffX = 0f, OffY = 0.18f, OffZ = 0f, BoneName = "mixamorig:Head", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
-                                new() { TriggerTick = 10, DurationTicks = 5, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0.63f, BoneName = "mixamorig:Hips", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
-                            },
-                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
-                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
-                },
-                AnimationNames = new[] { "spell_e" },
-                Params = new() { ["rise_speed"] = 11f, ["rise_ticks"] = 12f, ["rise_delay"] = 8f, },
-            },
-
-            R = new AbilitySpec
-            {
-                Name = "Cyclone Kick",
-                Description = "Dash forward with a spinning engage kick",
-                IconName = "r",
-                CooldownTicks = 360,
-                Behavior = AbilityBehavior.MeleeCombo,
-                AimMode = AimMode.None,
-                Stages = new AttackStage[]
-                {
-                    new() { DurationTicks = 40 },
-                },
-                AnimationNames = new[] { "spell_e" },
-                AnimSpeed = 2f,
-                SpecialEffectKeys = new[] { "FightGuyCycloneKick" },
-                Params = new()
-                {
-                    ["forward_speed"] = 17f,
-                    ["windup_ticks"] = 6f,
-                    ["hitbox_end_tick"] = 34f,
-                    ["duration_ticks"] = 40f,
-                    ["body_radius"] = 0.8f,
-                    ["side_radius"] = 0.4f,
-                    ["side_offset"] = 0.8f,
-                    ["damage"] = 7f,
-                    ["knockback_angle"] = 15f,
-                    ["knockback_base"] = 8f,
-                    ["knockback_growth"] = 5f,
-                    ["stun_ticks"] = 6f,
-                    ["body_y"] = 0.8f,
-                    ["side_y"] = 0.3f,
-                },
-            },
-
-            F = new AbilitySpec
-            {
-                Name = "Dragon Beam",
-                Description = "Fire a camera-directed beam that launches each target once",
-                IconName = "f",
-                CooldownTicks = 1200,
-                Behavior = AbilityBehavior.Projectile,
-                AimMode = AimMode.CameraForward3D,
-                Stages = new AttackStage[]
-                {
-                    new()
-                    {
-                        DurationTicks = 28,
-                        HitboxEvents = System.Array.Empty<HitboxEvent>(),
-                        AttackRange = 0f,
-                        WarpRange = 0f,
-                        UseTargetLock = false,
-                        RotateTowardTarget = false,
-                        TrackingStrength = 0f,
-                    },
-                },
-                AnimationNames = new[] { "spell_f" },
-                SpecialEffectKeys = new[] { "FightGuyDragonBeam" },
-                Params = new()
-                {
-                    ["duration_ticks"] = 28f,
-                    ["fire_tick"] = 24f,
-                    ["launch_offset_y"] = 1.2f,
-                    ["beam_range"] = 18f,
-                    ["beam_radius"] = 0.45f,
-                    ["damage"] = 14f,
-                    ["knockback_angle"] = 20f,
-                    ["knockback_base"] = 18f,
-                    ["knockback_growth"] = 10f,
-                    ["stun_ticks"] = 24f,
-                    ["hitbox_duration_ticks"] = 2f,
-                },
-            },
-
-            // ═══ ISSUE #117 — NORMAL TIER (keys 1-4) + A-SLOT PROJECTILE ═══
-
             Slot2 = new AbilitySpec
             {
                 Name = "Straight Punch",
@@ -362,6 +262,104 @@ public static partial class CharacterRegistry
                     ["max_flight_ticks"] = 90f,
                 },
             },
+
+            E = new AbilitySpec
+            {
+                Name = "Rising Dragon",
+                Description = "Rising punch — anti-air launcher on the ground, recovery burst in the air (resets the float window)",
+                IconName = "e",
+                CooldownTicks = 240,
+                IsRecoveryMove = true,
+                Behavior = AbilityBehavior.MeleeCombo,
+                AimMode = AimMode.None,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 34,
+                            HitboxEvents = new HitboxEvent[]
+                            {
+                                new() { TriggerTick = 6, DurationTicks = 25, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0.23f, BoneName = "mixamorig:RightHand", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
+                                new() { TriggerTick = 6, DurationTicks = 25, Radius = 0.3f, OffX = 0f, OffY = 0.18f, OffZ = 0f, BoneName = "mixamorig:Head", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
+                                new() { TriggerTick = 10, DurationTicks = 5, Radius = 0.4f, OffX = 0f, OffY = 0f, OffZ = 0.63f, BoneName = "mixamorig:Hips", Damage = 8f, Knockback = new() { Profile = KnockbackProfile.Custom, Angle = 75, BaseKnockback = 30f, KnockbackGrowth = 6f }, StunTicks = 22, Interruptible = true },
+                            },
+                            AttackRange = 1.75f, WarpRange = 0f, UseTargetLock = false, RotateTowardTarget = false, TrackingStrength = 0f,
+                            BoneTrails = new[] { new BoneTrailDef { BoneName = "mixamorig:RightFoot", Width = 0.12f, R = 0.3f, G = 0.6f, B = 1f, A = 1f } } },
+                },
+                AnimationNames = new[] { "spell_e" },
+                Params = new() { ["rise_speed"] = 11f, ["rise_ticks"] = 12f, ["rise_delay"] = 8f, },
+            },
+
+            R = new AbilitySpec
+            {
+                Name = "Cyclone Kick",
+                Description = "Dash forward with a spinning engage kick",
+                IconName = "r",
+                CooldownTicks = 360,
+                Behavior = AbilityBehavior.MeleeCombo,
+                AimMode = AimMode.None,
+                Stages = new AttackStage[]
+                {
+                    new() { DurationTicks = 40 },
+                },
+                AnimationNames = new[] { "spell_r" },
+                SpecialEffectKeys = new[] { "FightGuyCycloneKick" },
+                Params = new()
+                {
+                    ["forward_speed"] = 17f,
+                    ["windup_ticks"] = 6f,
+                    ["hitbox_end_tick"] = 34f,
+                    ["duration_ticks"] = 40f,
+                    ["body_radius"] = 0.8f,
+                    ["side_radius"] = 0.4f,
+                    ["side_offset"] = 0.8f,
+                    ["damage"] = 7f,
+                    ["knockback_angle"] = 15f,
+                    ["knockback_base"] = 8f,
+                    ["knockback_growth"] = 5f,
+                    ["stun_ticks"] = 6f,
+                    ["body_y"] = 0.8f,
+                    ["side_y"] = 0.3f,
+                },
+            },
+
+            F = new AbilitySpec
+            {
+                Name = "Dragon Beam",
+                Description = "Fire a camera-directed beam that launches each target once",
+                IconName = "f",
+                CooldownTicks = 1200,
+                Behavior = AbilityBehavior.Projectile,
+                AimMode = AimMode.CameraForward3D,
+                Stages = new AttackStage[]
+                {
+                    new()
+                    {
+                        DurationTicks = 28,
+                        HitboxEvents = System.Array.Empty<HitboxEvent>(),
+                        AttackRange = 0f,
+                        WarpRange = 0f,
+                        UseTargetLock = false,
+                        RotateTowardTarget = false,
+                        TrackingStrength = 0f,
+                    },
+                },
+                AnimationNames = new[] { "spell_f" },
+                SpecialEffectKeys = new[] { "FightGuyDragonBeam" },
+                Params = new()
+                {
+                    ["duration_ticks"] = 28f,
+                    ["fire_tick"] = 24f,
+                    ["launch_offset_y"] = 1.2f,
+                    ["beam_range"] = 18f,
+                    ["beam_radius"] = 0.45f,
+                    ["damage"] = 14f,
+                    ["knockback_angle"] = 20f,
+                    ["knockback_base"] = 18f,
+                    ["knockback_growth"] = 10f,
+                    ["stun_ticks"] = 24f,
+                    ["hitbox_duration_ticks"] = 2f,
+                },
+            },
+
 
 
 

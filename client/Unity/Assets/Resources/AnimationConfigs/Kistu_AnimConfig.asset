@@ -18,7 +18,7 @@ MonoBehaviour:
   JumpDown: {fileID: 1827226128182048838, guid: eb9bbcbe807ad2b0abfb258a8aec0d23, type: 3}
   Tumble: {fileID: 7400000, guid: ffdd4576e95d423f795b334bda1d5eb5, type: 2}
   Fall: {fileID: 1827226128182048838, guid: 3fd85fce516651489a02bfbb8456ffdf, type: 3}
-  Dash: {fileID: 7400000, guid: 05261071379df35278f910e44d9c5b8d, type: 2}
+  Dash: {fileID: 7400000, guid: bb89e4b61e13e48ac944e8e29df27fa1, type: 2}
   HitSmall: {fileID: 7400000, guid: 2c20e3646ca4bc0e1a62bc32373e9000, type: 2}
   HitMedium: {fileID: 7400000, guid: 44833e4cdd42997d2bce91c985a58a6a, type: 2}
   HitHard: {fileID: 7400000, guid: 3f3fbde2c4e4181669da0484ea7f2a8f, type: 2}

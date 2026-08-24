@@ -88,16 +88,17 @@ public class HitstunRehitAnimationTests
         return sim;
     }
 
-    /// One-shot hitbox centered on a state's position (damage 4 → freeze 10,
-    /// diagonal launch, no owner — receiver-only freeze).
-    private static Hitbox HitAt(CharacterState at, ushort stun)
+    /// One-shot hitbox centered on a state's position (damage 4, diagonal launch, no owner —
+    /// receiver-only hitstop). The base knockback is explicit because current ADR-0019 derives
+    /// hitstun from launch magnitude; StunTicks is only a nonzero gate.
+    private static Hitbox HitAt(CharacterState at, ushort stun, float baseKnockback = 100f)
         => new()
         {
             X = at.PX, Y = at.PY, Z = at.PZ,
             EndX = at.PX, EndY = at.PY, EndZ = at.PZ,
             Radius = 2f, Shape = HitboxShape.Sphere,
             Damage = 4f,
-            BaseKnockback = 10f, KnockbackGrowth = 5f, KnockbackAngle = 45,
+            BaseKnockback = baseKnockback, KnockbackGrowth = 5f, KnockbackAngle = 45,
             StunTicks = stun,
             DurationTicks = 1,
             OwnerId = 0,
@@ -167,14 +168,12 @@ public class HitstunRehitAnimationTests
         ushort preRehitStun = sim.GetState(100).HitstunTicks;
         Assert.Equal(1, tracker.FixedRestarts);
         Assert.True(preRehitStun > 16, $"need >16 remaining before the re-hit, got {preRehitStun}");
-
-        // Phase 2: a weaker hit (stun 16) lands while the victim is still stunned.
-        sim.Resolver.Spawn(HitAt(sim.GetState(100), stun: 16));
+        // Phase 2: a weaker knockback hit lands while the victim is still stunned. Under
+        // ADR-0019 this produces the shorter derived hitstun; StunTicks remains the gate.
+        sim.Resolver.Spawn(HitAt(sim.GetState(100), stun: 16, baseKnockback: 10f));
         TickUntilHitstun(sim, tracker);
         ushort postRehitStun = sim.GetState(100).HitstunTicks;
 
-        // Root cause: ResolveHits OVERWRITES HitstunTicks with the new hit's
-        // raw StunTicks, so the re-hit sends the countdown DOWN (24 → 16).
         Assert.True(postRehitStun < preRehitStun,
             $"expected the re-hit to lower HitstunTicks ({preRehitStun} → {postRehitStun})");
 

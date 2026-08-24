@@ -63,14 +63,14 @@ public class DashTests
     [Fact]
     public void Dash_UsesCharacterDefDuration()
     {
-        // FightGuy has DashDurationTicks = 10 vs Manki's 15
+        // The assertion must follow the character definition, not a duplicated tuning number.
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(FightGuyDef);
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(dash: true, moveY: 1f), 1);
-        Assert.Equal((ushort)10, t0.DashDurationTicks);
+        Assert.Equal(FightGuyDef.Movement.DashDurationTicks, t0.DashDurationTicks);
     }
 
     [Fact]
@@ -280,10 +280,9 @@ public class DashTests
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(dash: true, moveX: 1f) } });
 
-        // Tick past the dash duration — still airborne, but the burst hard-stops on the
-        // expiry frame (same wavedash contract as grounded): the air dash is a clean
-        // 0.25s horizontal dodge, not a momentum boost that sails.
-        for (int i = 0; i < 12; i++)
+        // Tick past the definition's dash duration — still airborne, but the burst hard-stops
+        // on the expiry frame (same wavedash contract as grounded).
+        for (int i = 0; i <= FightGuyDef.Movement.DashDurationTicks; i++)
             sim.Tick(new Dictionary<ulong, InputState> { { 1, default(InputState) } });
         var s = sim.GetState(1);
         Assert.False(s.IsGrounded, "should still be airborne");

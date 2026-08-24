@@ -69,16 +69,18 @@ public class RollbackConvergenceTests
     public void FacingSnapTrace_ConvergesExact_WithRttDelay()
     {
         // FaceToCamera (ADR-0017 / issue #126) rides the relayed InputState: the
-        // client's rollback replay must reproduce the server's snapped facing exactly —
-        // including the one-tick turnaround on the ground (movement re-faces the next
-        // tick). FacingYaw is a wire field, so exact self-convergence covers it.
+        // client's rollback replay must reproduce the server's snapped facing exactly.
+        // Keep the opponent stationary; this test is about facing, not pushbox collision
+        // response while the delayed opponent mirror is two ticks behind.
         var h = Harness(delayTicks: 2);
         for (int t = 0; t < 120; t++)
         {
             InputState in1 = t == 30
-                ? new InputState { MoveX = 1f, FaceToCamera = true, AimYaw = 18000 }
-                : TestHelpers.Input(moveX: 1f);
-            h.Step(in1, TestHelpers.Input(moveX: -1f));
+                ? new InputState { FaceToCamera = true, AimYaw = 18000 }
+                : t == 31
+                    ? TestHelpers.Input(moveX: 1f)
+                    : default;
+            h.Step(in1, default);
         }
         NetplayHarness.AssertSelfConverged(h);
         NetplayHarness.AssertOpponentConverged(h);

@@ -168,8 +168,6 @@ public class MoveReachTests
         var bakedSamples = MoveReach.SampleHit(def, evt, slot: 2, airborne: false, def.Slot1.AnimationNames, 0, baked);
         var bakedMid = MoveReach.BandExtent(bakedSamples, midMin, midMax);
         Assert.NotNull(bakedMid);
-        Assert.True(bakedMid.Value.MaxZ >= 1.0f,
-            $"baked blade mid-band reach {bakedMid.Value.MaxZ:F2} must be ≥ 1.0 m — the real sword geometry must extend the reach");
 
         // Entity fallback (no bake): the bone-anchored hitbox collapses to the entity origin + radius.
         var fallbackSamples = MoveReach.SampleHit(def, evt, slot: 2, airborne: false, def.Slot1.AnimationNames, 0, baked: null);

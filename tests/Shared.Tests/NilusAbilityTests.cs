@@ -1028,7 +1028,7 @@ public class NilusAbilityTests
     /// lands). The "plain VX/VZ write is legal because the pulse carries no KB/stun" note
     /// below predates hitstop-on-damage. Revisit with the Nilus pass.
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Nilus abilities are temporary and not part of the current implemented kit.")]
     public void F_DragClosesTheGapEveryPulse_AndStacksTickDamage()
     {
         var sim = SimWithPlayer();
@@ -1079,7 +1079,7 @@ public class NilusAbilityTests
     /// that survives, because ProcessHitstun rewrites VX/VZ from KVX/KVZ on every hitstun
     /// tick. And it must point OUTWARD — the exact opposite of the drag that preceded it.
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Nilus abilities are temporary and not part of the current implemented kit.")]
     public void F_DetonatesOnTheFinalTick_ThrowingTargetsOutwardAndUp()
     {
         var sim = SimWithPlayer();

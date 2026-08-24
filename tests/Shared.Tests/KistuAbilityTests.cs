@@ -72,15 +72,27 @@ public class KistuAbilityTests
     public void GroundNormal_DamagesEnemyInReach(byte slot)
     {
         var sim = SimWithPlayer(out _);
-        // PZ 0.6, not 1.5: the blade-anchored normals sweep at chest/head height with a
-        // short forward reach (g_1's clip ~0.6 m at the apex; the old entity capsule
-        // reached 1.8 m). 0.6 is inside every normal's blade reach.
-        var npc = TestHelpers.NpcState(0f, 0.6f);
-        npc.PY = GroundPY;
-        sim.RegisterEntity(100, Def, npc, TestHelpers.LoadBakedData(Def));
+        var spec = Def.GetSlotAbility(slot - 1, airborne: false)!;
+        var stage = Assert.Single(spec.Stages);
+        var evt = stage.HitboxEvents[0];
+        var baked = TestHelpers.LoadBakedData(Def);
+
+        // Use the final authored capsule pose during its active window. A fixed world position
+        // is not valid for every normal because the baked blade pose moves each tick.
+        ushort targetTick = (ushort)(evt.TriggerTick + evt.DurationTicks - 1);
+        var pose = TestHelpers.PlayerState();
+        pose.PY = GroundPY;
+        pose.AttackElapsedTicks = targetTick;
+        HitboxGeometry.ResolvePositions(
+            pose, evt, baked, Def, spec.AnimationNames, 0, slot: (byte)(slot - 1), airborne: false,
+            out float hx, out float hy, out float hz,
+            out float tx, out float ty, out float tz);
+
+        var npc = TestHelpers.NpcState((hx + tx) * 0.5f, (hz + tz) * 0.5f);
+        npc.PY = (hy + ty) * 0.5f;
+        sim.RegisterEntity(100, Def, npc, baked);
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: slot) }, { 100, default } });
-        // Enough ticks for the slowest normal (g_4 hitbox at trigger 21) to land.
         for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");

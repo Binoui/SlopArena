@@ -26,7 +26,7 @@ public sealed class KistuServerPoseRecordingTests
         output.AppendLine("move=g2 hit=1 source=kistu_g_2 durationTicks=34 bakeFps=60");
         output.AppendLine("tick,bakedFrame,hiltX,hiltY,hiltZ,tipX,tipY,tipZ,bladeY");
 
-        float tick7BladeY = 0f;
+        float triggerBladeY = 0f;
         for (ushort tick = evt.TriggerTick; tick < evt.TriggerTick + evt.DurationTicks; tick++)
         {
             var state = TestHelpers.PlayerState();
@@ -40,11 +40,12 @@ public sealed class KistuServerPoseRecordingTests
 
             int bakedFrame = Math.Min(tick * frameCount / stage.DurationTicks, frameCount - 1);
             output.AppendLine($"{tick},{bakedFrame},{hx:F3},{hy:F3},{hz:F3},{tx:F3},{ty:F3},{tz:F3},{ty - hy:F3}");
-            if (tick == 7) tick7BladeY = ty - hy;
+            if (tick == evt.TriggerTick) triggerBladeY = ty - hy;
         }
 
         Console.WriteLine(output.ToString());
-        Assert.True(tick7BladeY < 0f,
-            $"Server tick 7 must use the side/downward G2 pose, but blade Y delta was {tick7BladeY:F3}.\n{output}");
+        Assert.True(triggerBladeY < 0f,
+            $"Server trigger tick {evt.TriggerTick} must use the side/downward G2 pose, " +
+            $"but blade Y delta was {triggerBladeY:F3}.\n{output}");
     }
 }
