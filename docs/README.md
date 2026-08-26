@@ -51,6 +51,7 @@
 | [`contributing/conventions.md`](contributing/conventions.md) | Art direction, animation naming, bone naming |
 | [`contributing/quality.md`](contributing/quality.md) | Code quality guidelines |
 | [`contributing/security.md`](contributing/security.md) | Security considerations |
+| [`contributing/unity-cli.md`](contributing/unity-cli.md) | Local Unity CLI workflow, verified commands, Pipeline compatibility gate |
 
 ---
 
