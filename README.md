@@ -1,161 +1,115 @@
 # SlopArena
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Unity-6000-FFFFFF?logo=unity&logoColor=white" alt="Unity 6000">
-  <img src="https://img.shields.io/badge/C%23-.NET%208-512BD4?logo=dotnet&logoColor=white" alt="C# .NET 8">
-  <img src="https://img.shields.io/github/license/Binoui/SlopArena" alt="License">
-  <img src="https://img.shields.io/badge/status-playable-2ea043" alt="Status">
-</p>
+SlopArena is an open-source 3D platform fighter inspired by Smash and DKO. Fighters bring distinct hero kits to a shared arena: normals, recovery tools, playmaking specials, and high-commitment power moves.
 
-**Brawl your way to the top.** — An open-source 3D Arena Brawler with platform fighter movement.
+The playable demo is built in **Unity 6** with a pure C# simulation shared by the client and GameServer. The simulation advances at **60 Hz**, keeps gameplay deterministic, and supports client prediction with server reconciliation and rollback.
 
-SlopArena fuses platform fighter movement with
-character kits from hero brawlers. Built with **Unity 6000**,
-featuring a data-driven character system with a tick-based simulation
-shared between client and server.
+> **Current state:** FightGuy is the first complete cooked-character vertical slice. Manki, Kistu, and Nilus remain playable through the legacy compatibility path while they are migrated package by package.
 
-> **Status:** Playable prototype — movement, combat, and **Manki** (mad bomber monkey) are functional in training mode.
-
----
-
-## Quick Start
+## Quick start
 
 ```bash
 git clone https://github.com/Binoui/SlopArena.git
 cd SlopArena
 ```
 
-1. Install **Unity 6000.0.47f1** from [Unity Hub](https://unity.com/download)
-2. Install **.NET SDK 8.0+** (`sudo pacman -S dotnet-sdk` on Arch)
-3. Open `client/Unity/` in Unity Hub and press **Play**
+Install Unity `6000.0.78f1` and .NET SDK 8. Open `client/Unity/` in Unity Hub and press Play for the local training flow.
 
----
+Build the simulation and run its tests from the repository root:
 
-## Controls
-
-| Input | Action |
-|-------|--------|
-| **ZQSD / WASD** | Movement (camera-relative) |
-| **Space** | Jump (double jump available) |
-| **LMB** | Light attack (3-hit combo) |
-| **RMB** | Heavy attack (hold to charge) |
-| **Q / E / R** | Abilities |
-| **F** | Ultimate |
-| **Shift** | Dash |
-| **Tab** | Cycle target |
-| **Scroll Wheel** | Zoom |
-| **Escape** | Pause menu |
-
----
-
-## Architecture Overview
-
-```
-┌─ Unity Client ─────────────────────────────┐
-│  TrainingMatch (orchestrator)               │
-│   ├─ InputController (polling)              │
-│   ├─ LocalSimulationBridge (wraps sim)      │
-│   ├─ PlayerRenderer (drives Animator)       │
-│   └─ CombatFeedback (hit reactions, VFX)   │
-├─ Shared/ (pure C#, zero Unity deps) ────────┤
-│  CharacterDefinition → AbilityData → Stages │
-│  Simulation.SimulateTick()                  │
-│  SpellResolver (hit detection)              │
-│  CharacterState (pos, vel, cooldowns...)    │
-├─ Server/ (headless) ────────────────────────┤
-│  UDP loop at 60Hz                           │
-└─────────────────────────────────────────────┘
+```bash
+dotnet build src/Shared/ --nologo
+dotnet test tests/Shared.Tests/ --nologo
+dotnet build src/Server/ --nologo
 ```
 
-Key design decisions:
-- **Data-driven characters** — all stats, abilities, and animations live in `CharacterDefinition.cs`. Adding a new character = writing a factory function.
-- **Tick-based everything** — durations are `ushort` ticks (1/60s). Netcode-ready.
-- **Server-authoritative** — simulation is the source of truth. Client predicts, server reconciles.
-- **Pure C# Shared/** — no Unity dependencies in the core library. Runnable in tests and server independently.
+Run the headless GameServer locally:
 
----
-
-## Project Structure
-
-```
-SlopArena/
-├── client/Unity/            # Unity game client
-├── src/
-│   ├── Shared/              # Pure C# library (no Unity deps)
-│   │   ├── Simulation.cs    # SimulateTick() — movement + combat
-│   │   ├── SpellResolver.cs # Hit detection math
-│   │   └── CharacterState.cs# Per-tick entity state
-│   ├── Server/              # Headless server
-├── tests/                   # xUnit simulation tests
-├── assets/                  # 3D models, textures, UI source
-├── data/                    # Skeleton data, arenas
-├── tools/                   # Asset pipeline scripts
-└── docs/                    # Design docs, research, conventions
+```bash
+dotnet run --project src/Server/
 ```
 
----
+## The game
 
-## Current Roster
+SlopArena combines:
 
-| Character | Style | Abilities |
-|-----------|-------|-----------|
-| **Manki** | Agile rushdown / mad bomber | 3-hit melee combo, aerosol flamethrower, round bomb, dynamite jump, dive bomb, overclock ult |
+- camera-relative 8-direction movement, jump arcs, double jumps, fast-fall, ledges, and Dash;
+- Smash-style damage percent, Knockback, Hitstun, Hitstop, Combo Influence, Clash, and Burst;
+- readable hero kits with generous 3D hitboxes and meaningful recovery, zoning, and finisher choices;
+- a server-authoritative GameServer for online matches and a local Shared simulation for prediction and training.
 
-See `docs/characters/manki.md` for the full kit.
+Each kit has a canonical **16-entry grid**: grounded and aerial variants for normals `1`, `2`, `3`, `4` and specials `A`, `E`, `R`, `F`. `LMB` and `RMB` are not persisted move identities; physical controls map to the canonical slots through the client input layer.
 
----
+## Current roster
 
-## Adding a Character
+| Fighter | Style | Content status |
+| --- | --- | --- |
+| **FightGuy** | Direct martial-arts fundamentals, projectile, launcher, and beam | Cooked package; reference vertical slice |
+| **Manki** | Agile rushdown and explosive space control | Legacy compatibility path |
+| **Kistu** | Sword pressure and counterplay | Legacy compatibility path |
+| **Nilus** | Void-based zoning and control | Legacy compatibility path |
 
-1. Add `CharacterClass` enum value in `Shared/CharacterDefinition.cs`
-2. Write a `BuildXxx()` factory with `MovementStats` + 8 `AbilityData` slots
-3. Register it in `BuildRegistry()`
-4. Add CharacterAnimationConfig ScriptableObject in Unity
+See the [FightGuy package reference](docs/characters/fightguy.md) and the [character roster](docs/README.md#character-roster) for details.
 
-No changes to gameplay code needed — everything is data-driven.
+## Architecture in one view
 
-Full guide: [`docs/characters/adding-a-new-character.md`](docs/characters/adding-a-new-character.md)
+```text
+Unity client ── input ──► Shared ServerSimulation ◄── input/state ── GameServer
+     │                            │
+     └── render authoritative state/events
 
----
+Editable Character Package
+  package.json + character.json + CharacterAssetCatalog.asset
+                    │
+                    ▼
+       Shared compiler + Unity asset cook
+                    │
+                    ▼
+Immutable content-cooked package
+  manifest + runtime definition + poses + client bindings
+```
+
+The server and client consume the same cooked deterministic representation. Runtime matches pin package IDs, versions, hashes, dependencies, and capability versions in an immutable Match Content Catalog. Raw authoring JSON is cook input, not a runtime contract.
+
+The longer-term direction is cautious Workshop/package support: creators compose approved deterministic primitives and package-owned assets; they do not ship arbitrary simulation code, native plugins, or direct Unity-path dependencies. See [ADR-0022](docs/adr/0022-workshop-first-content-architecture.md) through [ADR-0030](docs/adr/0030-ability-lab-canonical-slot-projection.md).
+
+## FightGuy and Ability Lab
+
+FightGuy demonstrates the package-native workflow:
+
+- edit `client/Unity/Assets/CharacterPackages/fightguy/`;
+- inspect and cook through the Unity CLI;
+- validate source, asset bindings, deterministic pose data, generated client bindings, and hashes;
+- load the immutable result in Ability Lab, Training, PvP, and GameServer paths.
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.inspect --target fightguy --format json
+unity command --project-path client/Unity \
+  sloparena.character.cook --target fightguy --format json
+```
+
+Ability Lab is the primary gameplay editor for package drafts. It previews valid drafts through the same cooked definition and interpreter used by the game; an invalid draft is never silently substituted into a match.
+
+To add a new character, start with [Adding a Character](docs/characters/adding-a-new-character.md). Do not copy the legacy C# registry path for new work.
 
 ## Documentation
 
-> Full index: [`docs/README.md`](docs/README.md)
+Start with the [documentation map](docs/README.md), then read:
 
-| Section | Key docs |
-|---------|----------|
-| **Orientation** | [`docs/architecture-overview.md`](docs/architecture-overview.md), [`docs/testing.md`](docs/testing.md) |
-| **Systems** | [`docs/systems/combat-systems.md`](docs/systems/combat-systems.md), [`docs/systems/animation-system.md`](docs/systems/animation-system.md), [`docs/systems/netcode-architecture.md`](docs/systems/netcode-architecture.md) |
-| **Characters** | [`docs/characters/manki.md`](docs/characters/manki.md), [`docs/characters/bunny.md`](docs/characters/bunny.md), [`docs/characters/adding-a-new-character.md`](docs/characters/adding-a-new-character.md) |
-| **Contributing** | [`docs/contributing/conventions.md`](docs/contributing/conventions.md), [`docs/contributing/quality.md`](docs/contributing/quality.md) |
-
----
-
-## AI Usage
-
-The name *SlopArena* is obviously ironic, but I don't intend for this to be a low quality project.
-
-**Code.** I've been a software developer for years. I wrote code before AI assistants existed, and I still do. At work, ~90% of my output is agent-written, reviewed, and shipped, and it's quality code. I don't think I'm an exception — this is the state of the industry as of today. Agentic coding is a powerful tool, especially when you know what you're doing. SlopArena is built exactly the way I work: using agents to think, plan, document, and write code. That's how I've been able to build a scalable game architecture while actively learning game development at the same time.
-
-**Assets.** I used a few platforms to generate art assets. I'm busy with code, I've never had any artistic talent, and although I've tried, it's really not my thing. I don't think AI-generated assets are *better* — they're often unoptimized, generic, and soulless. But they're a quick and cheap way to get something on screen, and I don't have a problem with that tradeoff.
-
----
+- [Architecture overview](docs/architecture-overview.md)
+- [Combat systems](docs/systems/combat-systems.md)
+- [Ability architecture](docs/systems/ability-architecture.md)
+- [Ability Lab](docs/systems/ability-lab.md)
+- [Animation system](docs/systems/animation-system.md)
+- [Netcode architecture](docs/systems/netcode-architecture.md)
+- [Testing and verification](docs/testing.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Contributing
 
-SlopArena is a **community-driven project** — everyone is welcome!
+Issues, design feedback, code, art, documentation, and testing are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. This project uses the [MIT license](LICENSE) and follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-- **🐛 Found a bug?** [Open an issue](https://github.com/Binoui/SlopArena/issues/new)
-- **💡 Have an idea?** Submit a feature request
-- **🛠️ Want to code?** Check the docs above, then open a PR
-- **🎨 Designer / artist / writer?** Non-code contributions are just as valuable
+## AI usage
 
-We use **Roslynator analyzers** for C# linting — `dotnet build` will show warnings.
-
-By participating, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+SlopArena uses agent-assisted development and generated art as practical tools. Contributions remain reviewed project work: determinism, licensing, gameplay correctness, and maintainability matter more than how an asset or patch was produced.

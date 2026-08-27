@@ -1,92 +1,120 @@
 ---
 name: sloparena-character-workflow
-description: "Full pipeline for adding a new character to SlopArena: concept, kit, model import, clip config, hurtbox bake, and C# code wiring. Covers the Unity FBX/GLB import path + CharacterAnimationConfig approach."
+description: "Package-native workflow for designing, authoring, cooking, validating, and previewing SlopArena characters. Covers Character Packages, asset catalogs, deterministic cooking, generated bindings, admission, hashes, and Ability Lab."
 category: game-dev
 ---
 
 # SlopArena Character Workflow
 
-Trigger when the user wants to design, generate, or implement a new playable character in SlopArena. Full reference: `docs/characters/character-import-checklist.md` (checklist lives there — this skill is the condensed pipeline).
+Use this skill when designing or implementing a playable character. The canonical authoring guide is [`docs/characters/adding-a-new-character.md`](../../../docs/characters/adding-a-new-character.md). New characters are packages, not registry factories.
 
-## User Workflow Preferences
+## Authority and boundaries
 
-- **Diagnose the full pipeline before any change** — When debugging (jump doesn't work, hurtboxes misaligned, etc.), DO NOT make random changes in a loop. Instead: trace the complete data/execution flow first (input → simulation → state → action → animation → render), identify the exact point of divergence, THEN propose ONE fix with justification. The user will tell you to "step back" and "stop making random changes" if you skip this step.
-- **Explain every change before making it** — The user explicitly said "ne fais pas des changements sans m'expliquer" when changes were applied without explanation. Always state the root cause and the proposed fix before applying the patch.
-- **Incremental changes, one step at a time** — Do NOT batch all files in one turn. Do ONE file change, wait for feedback, then move to the next.
-- **Look at the user's work first.** When the user says "regarde mon X" or "j'ai mis les Y dans le glb", stop proposing solutions and examine what they've already set up (GLB animation names, imported clip names, code changes). The user often prepares assets (animations in Blender/GLB, clip configs) before asking for wiring.
-- **Fix at source** — orientation and bone naming are fixed in Blender; no runtime track remapping.
-- **Production-ready** — each step must be repeatable for all future characters, not a hack for today.
-- **Prefer the Unity Editor for manual setup** — import options, clip renaming, prefab wiring happen in the Editor. Repetitive operations can be scripted (Editor tools) when the format is too complex for manual work.
-- **Prefer direct file reads for simple inspections** — reserve Unity MCP for operations that genuinely need the editor (checking live state, running the project, screenshots).
-- **Direct** — when asked a specific question, answer it directly. Do not execute code or make changes. Do not propose alternatives or caveats unless asked.
-- **Let the user experiment with values** — when the user chooses a specific numeric value (crossfade time, tick count, etc.), don't argue or say "X is overkill" or "Y is too long". Suggest respectfully once if there's a clear correctness issue, then accept their choice and implement it. The user is iterating by feel in the game.
-- **Enforce the standard** — all clip playback goes through Animancer via `PlayerRenderer`; no ad-hoc fallback paths for new characters.
-- **Check existing infrastructure before extending** — When adding a new feature (projectiles, hitboxes, input fields), first verify what the data structures already support. The `Hitbox` struct has `VX/VY/VZ` for velocity, `SpellResolver.Tick()` already moves hitboxes by velocity. The existing system may already cover 80% of what you need — don't recreate it.
-- **Do NOT apply Ctrl+A → Scale on only the Armature in Blender** — mesh and bone animation data remains in cm while the Armature node's local transform is reset → 100m character. Always handle scale in Unity import settings (`VisualScale`).
+A Character Package contains exactly one playable character:
 
-## 1. Concept and Kit Design
+```text
+client/Unity/Assets/CharacterPackages/<package>/
+├── package.json                 # identity, version, dependencies, creator, license
+├── character.json               # gameplay source and canonical slots
+└── CharacterAssetCatalog.asset  # package-local Unity asset bindings
+```
 
-### Art Direction (Pixel8r2)
-- Pixel art 3D (not blocky Roblox)
-- 3-tone cell shading, 1px outlines, no gradients, no dithering
-- ~4000 triangles, Mixamo rig (mixamorig: prefix, 23 bones)
-- Fire/effects = Unity VFX (`ProjectileVFXManager` / particle systems), never on model
-- No floating parts, no weapons/props on the model — attach via bone child in Unity
+`package.json` owns package metadata. `character.json` owns gameplay semantics: movement, hurtboxes, animation IDs, fixed timelines, typed operations, timings, and parameters. `CharacterAssetCatalog.asset` owns imported rig and clip bindings. Do not duplicate one fact across these modules.
 
-### Kit Slot Convention (DKO-style)
+The authoritative pipeline is:
 
-| Slot | Role | CD (ticks) |
-|------|------|------------|
-| LMB | 3-hit light combo, 3rd launches | 0 |
-| Air LMB | Upward air attack | 0 |
-| RMB | Heavy chargeable attack | 15-20 |
-| Air RMB | Downward spike | 0 |
-| Q | CC (slow/stun/knockup) | 60-120 |
-| E | Recovery/mobility | 120-180 |
-| R | Get-off-me/burst | 120-180 |
-| F | Ultimate finisher | 360-420 |
+```text
+source package
+    │
+    ├── Shared CharacterPackageCompiler
+    ├── Unity asset catalog and pose cook
+    └── package assembler and hash calculation
+          │
+          ▼
+content-cooked/<package>/
+  manifest.json
+  character.runtime.json
+  poses.bin
+  client.bindings
+```
 
-All characters get AirLMB + AirRMB. No floating/capes/weapons on geometry.
+Raw JSON is cook input. Runtime consumers load the immutable cooked package through the Match Content Catalog. The generated client catalog is a regenerable cache, not a second source of gameplay truth.
 
-## 2. Model Import (Unity)
+## Canonical move grid
 
-- **GLB/FBX via the Unity importer** — no `.import` sidecars; the importer handles the conversion. Static mesh FBX with `importAnimation = OFF`; per-animation FBX files with `importAnimation = ON`.
-- **`VisualScale = 1.0f`** on `CharacterDefinition` (NOT the old 0.022f-era value). Scale lives in Unity import settings + `VisualScale`, never in Blender node transforms.
-- **Clip renaming after import** — imported clips are renamed from `mixamo.com` to the animation name (`run.fbx` → `run`, `spell_lmb_1`, `spell_q`, ...). Batch via an Editor script that updates `ModelImporter.clipAnimations[0].name`.
-- **Feet alignment** — tune `ModelYOffset` / `AutoModelYOffset` so the mesh sole touches the ground: `ModelYOffset` is visual-only (never in server hurtbox formulas); the server uses `py - capsuleHalf + by`, universal.
-- **Bone naming** — Mixamo standard, 23 bones, `mixamorig:` prefix, colon separator. Never change after export. No finger/twist bones.
-- **Size rule** — if the new character's mesh height differs by >1.5× from Manki (~1.516m), adjust the import scale. Update `HurtboxBoneScale` to match the baked export scale.
+Every package resolves the sixteen canonical slots in this order:
 
-## 3. Clip Config
+```text
+ground.1  ground.2  ground.3  ground.4  ground.A  ground.E  ground.R  ground.F
+air.1     air.2     air.3     air.4     air.A     air.E     air.R     air.F
+```
 
-- **`CharacterAnimationConfig` ScriptableObject per class** (`client/Unity/Assets/Scripts/Runtime/Animation/CharacterAnimationConfig.cs`): standard clip fields (idle/run/jump_up/jump_down/fall/dash/hit_small/hit_medium/hit_hard/death) + an `AbilityClips` name→clip list.
-- **Auto-loaded** in `PlayerRenderer.LoadModel()` from `Resources/AnimationConfigs/{Class}_AnimConfig` (with a fallback to the model class path).
-- **`AnimationNames[]` on each `AbilitySpec` drives the lookup** — keys must match the config's `AbilityClips` entries exactly. Wrong name = T-pose with zero errors.
-- **`PopulateAbilityClips` editor window** (`Assets/Scripts/Editor/PopulateAbilityClips.cs`) fills the config from the character's animation files.
-- **Playback** — `PlayerRenderer.UpdateAnimationState()` detects `(AttackSlot, ComboStage)` changes and calls `_animancer.Play(clip, fade)`; attack clip speed = `frameCount / DurationTicks` (`GetAnimSpeedFromDuration`), so the animation ends exactly when the server advances the stage.
-- **Extrapolation** — `ClipExtrapolator` (`Runtime/Animation/`) continues bone motion past clip end for hover/drift/aura (position curves from baked data; rotation holds the last keyframe). Set per clip on the config entry.
-- No animator controller states to build — Animancer drives the Animator directly from server state. See `docs/systems/animation-system.md`.
+Use package slot IDs as persisted identity. Ability Lab labels are projections of that identity. `LMB`, `RMB`, `Q`, and other physical controls are input adapters, not alternate package slots. Ground/air aliases may appear once in authoring and are expanded by the compiler; runtime data is explicit.
 
-## 4. Hurtbox Bake
+## Workflow
 
-- **`SlopArenaBaker`** (`Assets/Scripts/Editor/SlopArenaBaker.cs`, menu `Tools/SlopArena/Bake Skeleton...`) bakes bone positions per animation frame into `data/<name>_skeleton.bin`.
-- **Set `HurtboxBoneScale` to match the export scale** — it converts baked bone coords into sim meters. `VisualScale` and `HurtboxBoneScale` must agree (Manki: both 1.0).
-- **Diagnose with `tools/read_skeleton_bin.py`** — check Hips Y ≈ 0 (within ±5) at idle frame 0 and that the lowest bone is negative (below root). All-positive Y = shifted coordinate space → rebake with the skeleton at origin.
-- Hurtbox definitions: `HurtboxBoneDefs[]` (bone spheres, preferred) replace `HurtboxCapsules[]` (fixed local-space capsules) when loaded; `BakedDataPath` points at the `.bin`.
+### 1. Design the kit
 
-## 5. C# Wiring Checklist
+Define the fighter's role, counterplay, movement profile, eight normals, four specials, recovery choice, and presentation needs. Author timing in 60 Hz ticks. Prefer engine-owned deterministic primitives and fixed timelines over bespoke simulation code.
 
-1. **`src/Shared/Characters/<Name>Data.cs`** — new `static partial class CharacterRegistry` file with `Build<Name>()` returning the `CharacterDefinition` (copy the pattern of `MankiData.cs`): `Class`, `DisplayName`, `MovementStats`, capsule, `HipHeight`, `HurtboxBoneDefs`, `ModelResourcePath`, `VisualScale`, `HurtboxBoneScale`, `ModelYOffset`/`AutoModelYOffset`, `BakedDataPath`, and an `AbilitySpec` per slot with `AnimationNames[]` (matching imported clip names).
-2. **`CharacterClass` enum** (`src/Shared/CharacterDefinition.cs`) — add the new value.
-3. **`BuildRegistry()`** (same file) — add `Build<Name>()` at the matching enum index (index 0 is `default` for `None`).
-4. **Ability classes** — simple kits are pure `AbilitySpec` data; unique mechanics get a `ServerAbility` subclass in `src/Shared/Abilities/` wired via `SpecialEffectKeys` and created by `AbilityFactory.CreateServer(def.Class, slot, airborne)` (`src/Shared/Abilities/AbilityFactory.cs`).
-5. **Selection** — the class is picked through the `TrainingMatch` / `PvPMatch` player-setup path (`client/Unity/Assets/Scripts/Runtime/World/`); `PlayerRenderer` loads the prefab from `def.ModelResourcePath` and the anim config from `Resources/AnimationConfigs/`.
+### 2. Create source
 
-## 6. Tools
+Start from the minimal universal package template, not a copied existing fighter. Use stable lowercase semantic IDs (`anim.*`, package-local bones, and package-owned presentation IDs). Declare every built-in capability requirement and every referenced animation or bone.
 
-- `tools/inspect_glb.py` — list embedded animation names in a GLB (use before setting `AnimationNames[]`).
-- `tools/strip_root_motion.py` — strip Hips root motion from Mixamo animations (character must stay in place).
-- `tools/read_skeleton_bin.py` — dump baked skeleton frames for coordinate-space diagnostics.
-- `scripts/build_character_sheets.py` — generate character reference sheets.
+Community/Workshop profiles may use approved versioned primitives only. Trusted built-in profiles may use explicitly admitted temporary `slop.internal.*` capabilities; the package cannot grant itself that privilege.
 
-Blender root-motion stripping (manual alternative): delete `mixamorig:Hips` location keyframes per action in the Action Editor, then re-export. Mixamo always uses `rotation_quaternion`, never `rotation_euler`; animations may have inconsistent channel counts.
+### 3. Bind Unity assets
+
+Import the rig and clips through Unity. Bind them in `CharacterAssetCatalog.asset` with one semantic animation ID and one deterministic pose-track ID per required animation. The Unity cook stage bakes pose data from the exact clip, rig, import settings, and catalog binding. Do not hand-coordinate a standalone pose file with a clip.
+
+Use Humanoid for ordinary humanoid fighters when built-in retargeting helps. Custom rigs remain valid when they provide the required package-owned animation data. Keep art and naming rules in [`docs/contributing/conventions.md`](../../../docs/contributing/conventions.md).
+
+### 4. Inspect, cook, and repair
+
+The supported agent loop is direct source editing plus typed Unity CLI commands:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.inspect --target <package> --format json
+unity command --project-path client/Unity \
+  sloparena.character.cook --target <package> --format json
+```
+
+`inspect` reports the canonical 16-slot projection, source/cooked hashes, status, stale reasons, and diagnostics. `cook` validates the Shared source, resolves Unity bindings, bakes poses, writes generated bindings, assembles the immutable package, and reports source, cooked-content, and package hashes.
+
+A semantic failure has a structured result with `success: false`; a failed cook preserves the last valid cooked artifact and status. Repair diagnostics and retry. Do not edit generated runtime output to hide a source or catalog error.
+
+### 5. Admit and verify
+
+The package assembler writes an immutable manifest under `content-cooked/<package>/`. The manifest pins package ID, version, cooked-content hash, package hash, schema/API compatibility, dependencies, and capability requirements. Built-in roster admission pins the exact package requirement in `content-cooked/roster/manifest.json`.
+
+Validation must fail closed for missing or mismatched source, catalog, pose payload, capability, dependency, schema, or hash. A Match Content Catalog pins the verified package set per match; a later recook cannot change a running match.
+
+### 6. Preview through the real path
+
+Ability Lab edits drafts and previews valid drafts through the in-memory cooked definition and the same interpreter used by Training, PvP, and GameServer. Invalid drafts may show a clearly non-authoritative editing pose only; they must never silently become match content.
+
+Check the package in Ability Lab, then exercise Training. For online content, verify server admission and exact client/server hash agreement. Presentation resolves semantic IDs to generated package bindings and plays through Animancer; presentation never feeds back into simulation.
+
+## Legacy compatibility
+
+Manki, Kistu, and Nilus are legacy implementation cases behind `LegacyCharacterCatalogAdapter` until their package migrations. The legacy path is **modification-only compatibility**, not a template for new work.
+
+For legacy maintenance, preserve its existing registry and baked-data contracts unless the migration task explicitly changes them. For new work, do not:
+
+- add `Build<Name>`, `BuildRegistry`, `CharacterRegistry`, or `(CharacterClass, slot)` dispatch;
+- copy `MankiData` or another legacy character definition;
+- load raw authoring JSON at runtime;
+- add registry overrides or manual FightGuy animation-config ownership;
+- make a standalone skeleton `.bin` the runtime owner of a new package;
+- introduce a second persisted slot mapping or a client-only gameplay path.
+
+## Verification checklist
+
+- source package has one owner for every authored fact;
+- compiler resolves all sixteen slots and rejects invalid IDs, units, references, and budgets;
+- catalog bindings match required semantic IDs and exact imported assets;
+- cook succeeds and replaces the prior artifact atomically;
+- manifest, runtime definition, pose payload, generated bindings, and hashes agree;
+- Ability Lab and Training consume the cooked definition;
+- Shared/server authority remains unchanged and presentation is client-only.

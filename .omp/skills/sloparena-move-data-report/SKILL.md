@@ -136,11 +136,14 @@ interactive main session, explain the proposal and wait for approval before edit
 
 ### Applicability and source of truth
 
-- Audit the full normal tier: g1–g4 and a1–a4. Treat each `HitboxEvent` as an independently
-  authored contact, not merely each button as one move.
-- Server simulation is authoritative. Read `src/Shared/Characters/<Character>Data.cs`; use
-  `HitboxGeometry.ResolvePositions` / `ServerSimulation.BuildEntitiesFromState` geometry and
-  `ServerSimulation` outcomes. Never infer gameplay behavior solely from a client animation.
+- Audit the full normal tier: `ground.1`–`ground.4` and `air.1`–`air.4`. Treat each
+  `SpawnHitbox` operation as an independently authored contact, not merely each input label
+  as one move.
+- Server simulation is authoritative. Read the package's `character.json` and cooked
+  definition; for legacy Manki/Kistu/Nilus maintenance, use the existing
+  `LegacyCharacterCatalogAdapter` definition. Use `HitboxGeometry.ResolvePositions` /
+  `ServerSimulation.BuildEntitiesFromState` geometry and simulation outcomes. Never infer
+  gameplay behavior solely from a client animation.
 - Ability Lab is the visual truth surface: it scrubs the same sim-tick pose, green hurtboxes,
   and orange hitboxes that the server resolves. See `docs/systems/ability-lab.md`.
 - The report requires usable normal data. Kistu's Adaptive moves are representative-angle

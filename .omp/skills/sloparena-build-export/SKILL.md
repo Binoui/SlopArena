@@ -32,7 +32,7 @@ Master repo change  → C only
 # into client/Unity/Assets/Plugins/SlopArena.Shared/ automatically.
 dotnet build src/Shared/ --nologo
 
-# Test suite (~451 tests)
+# Run the current Shared test suite; do not rely on a hardcoded test count.
 dotnet test tests/Shared.Tests/ --nologo
 ```
 

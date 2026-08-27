@@ -44,7 +44,8 @@ kit:
     type: "ult"
     description: "1.2s telegraphed rift, drags every enemy within 6m for 60t (3 dmg per 10t pulse = 18 over the drag), then detonates for 18 dmg with Kill-class knockback (`Custom{40°, 16, 9}`). Pulses and detonation damage every target in radius. Dodgeable by dashing out."
 ---
-> **Legacy implementation record.** The canonical kit contract is now eight normals on `1 / 2 / 3 / 4` (grounded and aerial) plus specials on `A / E / R / F`. `LMB` and `RMB` are camera controls, not attacks. This file records the current simulation implementation and is not a template for new kit design.
+> **Legacy implementation record — modification only.** The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities. This file records the current simulation implementation and is not a template for new kit design. New characters must use `client/Unity/Assets/CharacterPackages/<package>/`.
+> Legacy source, registry, and baked-data details below remain valid only while Nilus is maintained through `LegacyCharacterCatalogAdapter`.
 
 
 # Nilus — The Void Stalker

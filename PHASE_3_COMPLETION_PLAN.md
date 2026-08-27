@@ -1,4 +1,5 @@
 # Phase 3 — FightGuy Operation Catalog Completion
+> **Planning record:** This root-level phase document is preserved for historical context. Current implementation guidance is in the living docs and accepted ADRs; do not treat unresolved plan text as shipped behavior.
 
 ## Status
 

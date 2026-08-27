@@ -1,97 +1,59 @@
 ---
 name: sloparena-entity-system
-description: SlopArena entity architecture — NPCs, hitboxes, entity IDs, processing order, bone attachments, and per-character components
+description: SlopArena entity identity, Shared hitbox processing, NPC input, bone attachments, and Unity presentation boundaries.
 ---
 
 # SlopArena Entity System
 
-Architectural patterns for SlopArena's entity/hitbox/NPC system. Covers identity management, hit detection pipeline, NPC input flow, processing order, and character-specific component extraction.
+Entities are registered in the Shared simulation with stable IDs. The same ID is used for state lookup, hitbox ownership, collision filtering, network packets, and presentation lookup.
 
-## ⭐ Workflow Rule — Design Doc First for Architecture Changes
+## Runtime boundaries
 
-Before making ANY architecture-level change (new system, refactor of existing system, protocol changes), write a brief design doc FIRST:
-1. Describe the problem and the current approach
-2. Present 2-3 options with pros/cons
-3. Propose the chosen design with a clear data flow diagram
-4. Ask Binoui for feedback BEFORE implementing
+- `src/Shared/ServerSimulation` owns entity state, movement, combat, collision, and match rules.
+- `src/Server/MatchInstance` owns authoritative match transport and tick scheduling.
+- `TrainingMatch` supplies local player/NPC inputs through the Shared bridge.
+- `PvPMatch` supplies local input and receives server packets through the rollback bridge.
+- `PlayerRenderer.ApplyServerState` renders state and semantic events. It does not modify gameplay state.
 
-This prevents the "back-and-forth on decisions" problem. The doc goes in `docs/<topic>.md`.
+New character content enters through the immutable Match Content Catalog. FightGuy uses the cooked package path. Manki, Kistu, and Nilus remain legacy definitions behind `LegacyCharacterCatalogAdapter` until migration; their source and registry details are modification-only compatibility.
 
-Triggers: user says "je veux faire mais j'ai l'impression qu'on fasse des aller retours" or asks for a comparison of approaches. Don't code the first idea — document it, discuss it, then implement.
+## Entity identity
 
-## ⭐ Workflow Rule — Explain Before Editing (MANDATORY)
+Use the registered `ulong` entity ID as `Hitbox.OwnerId`. Never hardcode a player ID for NPCs or spawned entities. The training convention currently uses player IDs starting at `1` and NPC IDs in the `100` range; match composition remains responsible for the actual registration map.
 
-Applies to ALL SlopArena code. **This is the #1 rule. Violating it erodes trust faster than any bug.**
+## NPC input
 
-### Before ANY edit:
-1. **State the problem** (1-2 sentences): "Le bug c'est X parce que Y."
-2. **Describe the fix** (2-3 sentences minimum): what you'll change, in which files, and why this approach
-3. **Wait for confirmation** — do not start coding until the user says "vas y" or equivalent
+NPCs do not read keyboard or mouse state. Training AI creates `InputState` values and sends them through the same Shared simulation tick as player input. Do not add a client-only combat path for an NPC.
 
-### For multi-file changes (>2 files):
-Same as above, but also list the files you intend to modify and what each change does.
+## Hit detection
 
-### For architecture-level changes:
-Write a design doc in `docs/<topic>.md` first. Present options with pros/cons. Get feedback before implementing.
+The authoritative path is pure Shared math:
 
-### Trigger phrases — STOP, explain, wait:
-- "je préfère que tu m'expliques un peu plus ce que tu changes"
-- "encore une fois, explique moi chaque changement que tu fais"
-- "tu viens encore de changer 15 fichiers sans m'expliquer"
-- "c'est quoi ce délire ?" or "t'as fais nimp"
-- Any variant of "parle-moi de ton plan AVANT"
+1. A cooked timeline or trusted capability issues a hitbox/projectile operation.
+2. Shared geometry resolves entity-relative, facing-relative, or cooked pose positions.
+3. `SpellResolver` advances volumes and checks entity/terrain collision.
+4. `ServerSimulation` applies damage, Knockback, Hitstun, Hitstop, Clash, Burst, and state transitions.
+5. State and semantic presentation events are emitted for client rendering.
 
-**Failure mode from this session (June 12):** I made 5+ file changes in rapid succession without explaining the plan. User: "encore une fois tu as implémenté sans me dire ce que t'as fais et t'as fais nimp. c'est quoi ce délire activeSlot=2 ? le rmb fait le meme coup que le lmb maintenant et le qerf fait plus rien". The issue wasn't the code — it was that the user had no chance to review the design before I broke things.
+Unity physics queries may support presentation or editor inspection, but never determine authoritative hit results.
 
-## Architecture
+## Baked pose and bones
 
-Unity client (renderer only) + `src/Server` .NET console over UDP localhost. There is **no client-side prediction** in Phase 1:
+New package pose data is generated by the Unity cook from the exact catalog-bound clip and rig. Use semantic bone IDs from the Character Authoring Document. The generated cooked payload is the runtime input for package hitbox geometry.
 
-- Training mode: `LocalSimulationBridge` ticks the shared `ServerSimulation` in-process.
-- PvP: `NetworkSimulationBridge` sends input over UDP and returns server states.
-- `PlayerRenderer.ApplyServerState(state)` renders the server state directly (one-tick display latency is intentional).
+Legacy characters may still use their existing baked-data and registry contracts while being maintained. Do not make a standalone legacy skeleton payload the runtime owner for a new package.
 
-Reference docs: `docs/systems/hitbox-system.md`, `docs/systems/npc-system.md`, `docs/systems/netcode-architecture.md`, `docs/architecture-overview.md`.
+## Processing order
 
-## Entity Identity
+When changing entity behavior, preserve the existing `ServerSimulation` order: timers and locks, hitstop/Hitstun/Knockback, active content, action gates, movement/gravity, terrain/ledge/landing resolution, then hitbox/projectile resolution and output. Read the implementation before adding a new seam.
 
-Each entity (player or NPC) has a **unique, consistent entity ID** from spawn to combat resolution. It is the `OwnerId` on every hitbox this entity spawns.
+## Verification
 
-| Entity | ID |
-|--------|----|
-| Player | `1` |
-| NPCs | `100-104` (100 + index) |
+For Shared entity or collision changes:
 
-The classic bug: hardcoding `1` for every NPC makes each NPC's hitbox carry `OwnerId=1` while they're registered in the simulation as `100-104` — the self-filter never triggers. Match the registered ID exactly.
+```bash
+dotnet build src/Shared/ --nologo
+dotnet test tests/Shared.Tests/ --nologo
+```
 
-## NPC Input Flow
-
-NPCs do not read keyboard/mouse. Two mechanisms exist:
-
-- **`InputController.InjectAI(InputState)`** (`client/Unity/Assets/Scripts/Runtime/Input/InputController.cs:61`) — public API that switches an `InputController` into AI mode (`_aiControlled = true`); `Poll()` then consumes the injected input instead of the InputSystem. `ClearAI()` reverts. Declared but not yet called by any scene code.
-- **Live training path** — `TrainingMatch.OnMatchFixedUpdate()` builds NPC input itself via `BuildNpcInput(npcState, playerState, tick)` (driven by the `NpcAiMode` enum: `Attack` / `Idle`) and passes player + NPC inputs together into `_bridge.Tick(inputs)`.
-
-NPC visuals render from server state exactly like players — `PlayerRenderer.ApplyServerState(state)` — always authoritative, no prediction.
-
-## Hit Detection Pipeline
-
-Sim-authoritative, pure math — the server never runs physics queries.
-
-1. `HitboxEvent.TriggerTick` — data-driven definition (`AttackStage.HitboxEvents[]`): when `state.AttackElapsedTicks == evt.TriggerTick`, the simulation spawns the hitbox.
-2. `ServerSimulation.Tick()` spawns hitboxes into `SpellResolver` — position = `entityPos + rotate(OffX, OffY, OffZ)` by facing yaw (or resolved from a bone name via baked data when `BoneName` is set).
-3. `SpellResolver.Tick()` — sphere/capsule collision vs hurtboxes, damage, knockback, hitstun. No engine physics queries.
-4. Hurtboxes come from **baked skeleton data** (`SlopArenaBaker`, `client/Unity/Assets/Scripts/Editor/SlopArenaBaker.cs` bakes `.bin` files), not live bone reads. `CharacterDefinition.HurtboxBoneDefs[]` (bone spheres) replaces `HurtboxCapsules[]` (fixed local-space capsules) when loaded; `BakedDataPath` points at the `.bin`.
-
-Client role in combat: render only. `Runtime/` contains `ProjectileVFXManager`, `AimHandler`, `AimIndicator`, `TargetIndicator`, `CombatFeedback` — no ability or FSM classes. Projectile visuals are prefab-driven via `ProjectileVFXManager`; hit detection stays on the server.
-
-## Per-Character Components
-
-- **Server definition** — `CharacterDefinition` lives in `src/Shared/Characters/<Name>Data.cs` (`MankiData.cs`, `KistuData.cs`, `FightGuyData.cs`, `NilusData.cs`): movement stats, `AbilitySpec[]`, `HurtboxBoneDefs`/`HurtboxCapsules`, `BakedDataPath`, `AnimationNames[]`.
-- **Client visuals** — `PlayerRenderer` (`Runtime/Entities/PlayerRenderer.cs`) plays clips via Animancer from the sim state; `WeaponAttach` + `WeaponAttachConfig` (`Runtime/Entities/`) mount weapons to skeleton bones.
-- Registration: `ServerSimulation.RegisterEntity(id, def, state)` on the server; the client bridge mirrors it (no-op for `NetworkSimulationBridge` — the server owns registration).
-
-## Processing Order
-
-- Unity callbacks: `Update` / `FixedUpdate` — there is no separate physics callback to hook.
-- The match loop lives in `TrainingMatch.OnMatchFixedUpdate()` and `PvPMatch.FixedUpdate()` (`client/Unity/Assets/Scripts/Runtime/World/`): poll input → build `InputState` → `_bridge.Tick(inputs)` → `ApplyServerState`.
-- No parent-child process-priority tricks — that is an engine-specific concept and does not apply here.
+For Unity-facing entity presentation, run the Unity CLI compile/console gate and exercise Training. For networked entity changes, build the GameServer and exercise local PvP. See [`docs/testing.md`](../../../docs/testing.md).

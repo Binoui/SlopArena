@@ -76,11 +76,11 @@ Golden tests: movement/hitstop/DI snapshots regenerate (REGENERATE_GOLDENS) when
 
 ## Animation Tiers
 
-`HitstunLevel` — 0 = small / 1 = medium / 2 = hard — **re-derived from applied hitstun** at hit time (ADR-0019 consequence), not from authored `StunTicks`. The client maps level → clip (`hit_light` / `hit_medium` / `hit_hard`) through `CharacterAnimationConfig`, played via `_animancer` with speed from `HitstunTicks`.
+`HitstunLevel` — 0 = small / 1 = medium / 2 = hard — is re-derived from applied hitstun at hit time (ADR-0019), not from authored `StunTicks`. The client maps the level to the package's semantic hit-reaction bindings and plays the resolved clip through Animancer at the server-provided duration.
 
 ## References
 
-- **[ADR-0019](docs/adr/0019-melee-based-hit-response.md)** — authoritative decision record.
+- **[ADR-0019](../adr/0019-melee-based-hit-response.md)** — authoritative decision record.
 - ADR-0012 (hitstop per-pair freeze), ADR-0013 (superseded — Combo Influence), ADR-0014 (Burst exception), ADR-0020 (movement), ADR-0021 (frame timing).
-- `docs/research/melee-knockback-model.md`, `melee-frame-analysis.md` — the Melee research.
+- [`../research/melee-knockback-model.md`](../research/melee-knockback-model.md), [`../research/melee-frame-analysis.md`](../research/melee-frame-analysis.md) — Melee research.
 - Ticket lineage: [#130](https://github.com/Binoui/SlopArena/issues/130) flight, [#131](https://github.com/Binoui/SlopArena/issues/131) hitstun, [#132](https://github.com/Binoui/SlopArena/issues/132) KB formula, [#133](https://github.com/Binoui/SlopArena/issues/133) DI, [#134](https://github.com/Binoui/SlopArena/issues/134) SDI, [#143](https://github.com/Binoui/SlopArena/issues/143) hitstop.

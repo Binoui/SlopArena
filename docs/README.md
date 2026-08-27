@@ -1,89 +1,104 @@
-# SlopArena Documentation
+# SlopArena Documentation Map
 
-> Start here. Pick your section.
+Canonical guidance is short and linked below. Dated plans, research, generated reports, handoffs, and accepted ADRs are preserved as project records; they are not automatically current implementation instructions.
 
----
+## Start here
 
-## 🗺️ Orientation
+| Document | Use it for |
+| --- | --- |
+| [Architecture overview](architecture-overview.md) | Repository map, cooked/legacy boundary, and runtime flow |
+| [Testing and verification](testing.md) | Shared, package, Unity, and local PvP verification ladder |
+| [Contributing](../CONTRIBUTING.md) | Contribution rules and required checks |
+| [Project context](../CONTEXT.md) | Canonical domain vocabulary and settled mechanics |
 
-| Doc | Read when |
-|-----|-----------|
-| [`architecture-overview.md`](architecture-overview.md) | **First.** Codebase map, data flow, naming conventions. |
-| [`testing.md`](testing.md) | How to verify changes. Sandbox, PvP, tools. |
+## Architecture
 
----
+| Document | Use it for |
+| --- | --- |
+| [Ability Architecture](systems/ability-architecture.md) | Cooked timelines, typed operations, capabilities, and interruption |
+| [Animation System](systems/animation-system.md) | Animancer playback, semantic bindings, and timing |
+| [Netcode Architecture](systems/netcode-architecture.md) | GameServer, prediction, reconciliation, and transport |
+| [Release Pipeline](systems/release-pipeline.md) | Build, packaging, and release flow |
+| [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands and live Editor verification |
 
-## ⚙️ Systems — How the game works
+## Gameplay systems
 
-| Doc | Covers |
-|-----|--------|
-| [`systems/animation-system.md`](systems/animation-system.md) | Animancer clip playback, server-timed transitions |
-| [`systems/combat-systems.md`](systems/combat-systems.md) | Universal combat mechanics |
-| [`systems/hitbox-system.md`](systems/hitbox-system.md) | Hitbox/hurtbox architecture |
-| [`systems/attack-hitbox-system.md`](systems/attack-hitbox-system.md) | Attack hitbox data pipeline |
-| [`systems/ability-lab.md`](systems/ability-lab.md) | Visual hitbox/hurtbox authoring tool |
-| [`systems/hitstun-di.md`](systems/hitstun-di.md) | Hitstun & directional influence |
-| [`systems/netcode-architecture.md`](systems/netcode-architecture.md) | Server-authoritative model, prediction, reconciliation |
-| [`systems/blast-zones.md`](systems/blast-zones.md) | Void death, kill boundaries |
-| [`systems/npc-system.md`](systems/npc-system.md) | Training dummies, AI |
-| [`systems/spell-vfx.md`](systems/spell-vfx.md) | Spell visual effects |
-| [`systems/vfx-particles.md`](systems/vfx-particles.md) | Impact particles, text VFX, shader contracts |
-| [`systems/range-based-combat.md`](systems/range-based-combat.md) | Range & attack distance design |
+| Document | Use it for |
+| --- | --- |
+| [Combat Systems](systems/combat-systems.md) | Universal 8-normal/4-special model and combat mechanics |
+| [Hitbox System](systems/hitbox-system.md) | Hitbox, hurtbox, and collision geometry |
+| [Hitstun DI](systems/hitstun-di.md) | Hitstun, Hitstop, and Combo Influence design |
+| [Ability Lab](systems/ability-lab.md) | Package editing and authoritative preview |
+| [NPC System](systems/npc-system.md) | Training entities and AI |
+| [Blast Zones](systems/blast-zones.md) | Void death and arena boundaries |
+| [VFX and Particles](systems/vfx-particles.md) | Presentation effects and visual contracts |
 
----
+## Character authoring
 
-## 🎮 Characters — Roster & pipeline
+| Document | Use it for |
+| --- | --- |
+| [Adding a Character](characters/adding-a-new-character.md) | Package source, asset catalog, cooking, and admission |
+| [Character import checklist](characters/character-import-checklist.md) | Asset import and presentation checklist |
+| [Kit design principles](characters/character-kit-design-principles.md) | Fighter roles, counterplay, and the canonical move grid |
+| [FightGuy reference](characters/fightguy.md) | First cooked package and runtime path |
 
-| Doc | Covers |
-|-----|--------|
-| [`characters/adding-a-new-character.md`](characters/adding-a-new-character.md) | Full pipeline guide |
-| [`characters/character-import-checklist.md`](characters/character-import-checklist.md) | Asset import checklist |
-| [`characters/character-kit-design-principles.md`](characters/character-kit-design-principles.md) | Canonical 8-normal / 4-special kit structure |
-| [`characters/manki.md`](characters/manki.md) | Manki — Mad Bomber Monkey |
-| [`characters/fightguy.md`](characters/fightguy.md) | FightGuy — Martial Arts Champion |
+New packages live under `client/Unity/Assets/CharacterPackages/<package>/`. Cooked runtime artifacts live under `content-cooked/<package>/`.
 
----
+## Character roster
 
-## 🤝 Contributing — For contributors
+| Character | Status | Reference |
+| --- | --- | --- |
+| FightGuy | Cooked package; reference vertical slice | [FightGuy](characters/fightguy.md) |
+| Manki | Legacy compatibility implementation | [Manki](characters/manki.md) |
+| Kistu | Legacy compatibility implementation | [Kistu](characters/kistu.md) |
+| Nilus | Legacy compatibility implementation | [Nilus](characters/nilus.md) |
 
-| Doc | Covers |
-|-----|--------|
-| [`contributing/conventions.md`](contributing/conventions.md) | Art direction, animation naming, bone naming |
-| [`contributing/quality.md`](contributing/quality.md) | Code quality guidelines |
-| [`contributing/security.md`](contributing/security.md) | Security considerations |
-| [`contributing/unity-cli.md`](contributing/unity-cli.md) | Local Unity CLI workflow, verified commands, Pipeline compatibility gate |
+The Manki, Kistu, and Nilus pages are modification-only implementation records. Their legacy details must not be copied into new package work.
 
----
+## Contributing
 
-## 📚 Research — Design reference (not active)
+| Document | Use it for |
+| --- | --- |
+| [Art and asset conventions](contributing/conventions.md) | Visual direction, naming, licensing, and asset hygiene |
+| [Unity CLI](contributing/unity-cli.md) | Package inspection/cooking and Editor checks |
+| [Repository contributing guide](../CONTRIBUTING.md) | Setup, rules, verification, and pull requests |
+| [Code of Conduct](../CODE_OF_CONDUCT.md) | Community standards |
 
-| Doc | Covers |
-|-----|--------|
-| [`research/dko-character-kits.md`](research/dko-character-kits.md) | DKO character kit analysis |
-| [`research/dko-mechanics.md`](research/dko-mechanics.md) | DKO systems reference |
-| [`research/frame-data-reference.md`](research/frame-data-reference.md) | DKO manual frame counts |
-| [`research/melee-frame-data.md`](research/melee-frame-data.md) | Melee frame data — full reference (25 chars) |
-| [`research/melee-frame-analysis.md`](research/melee-frame-analysis.md) | Melee comparative analysis → 8+4 kit profiles |
-| [`research/melee-knockback-model.md`](research/melee-knockback-model.md) | Melee KB/hitstun/flight/DI/weight — decompiled formulas + migration deltas |
+## Accepted ADRs
 
----
+The current package and creator-content direction is defined by these accepted records:
 
-## 📋 Plans — Implementation roadmaps
+- [ADR-0022: Workshop-first content architecture](adr/0022-workshop-first-content-architecture.md)
+- [ADR-0023: Built-in content API](adr/0023-built-in-content-api.md)
+- [ADR-0024: Deterministic creator gameplay primitives](adr/0024-deterministic-creator-gameplay-primitives.md)
+- [ADR-0025: Workshop package architecture](adr/0025-workshop-package-architecture.md)
+- [ADR-0026: Workshop multiplayer synchronization](adr/0026-workshop-multiplayer-synchronization.md)
+- [ADR-0027: Open-source ModKit and installed-game preview](adr/0027-open-source-modkit-preview.md)
+- [ADR-0028: Built-in content compatibility](adr/0028-built-in-content-compatibility.md)
+- [ADR-0029: Character authoring and cooking](adr/0029-character-authoring-and-cooking.md)
+- [ADR-0030: Ability Lab canonical slot projection](adr/0030-ability-lab-canonical-slot-projection.md)
 
-| Doc | Covers |
-|-----|--------|
-| [`plans/2026-08-01-pvp-roadmap-v2.md`](plans/2026-08-01-pvp-roadmap-v2.md) | Online PvP implementation plan (current) |
-| [`plans/2026-08-26-fightguy-character-cooking-cutover.md`](plans/2026-08-26-fightguy-character-cooking-cutover.md) | FightGuy-first Character authoring, cooking, and immutable runtime cutover |
- 
-## 🧭 Architecture Decision Records
+Older accepted ADRs remain the decision record for the mechanics they cover. If a living guide conflicts with an accepted ADR or current code, update the living guide; do not rewrite the historical decision.
 
-| ADR | Decision |
-|-----|----------|
-| [`adr/0022-workshop-first-content-architecture.md`](adr/0022-workshop-first-content-architecture.md) | Workshop-first product framing and content boundary |
-| [`adr/0023-built-in-content-api.md`](adr/0023-built-in-content-api.md) | Semantic built-in capability IDs and dynamic registry |
-| [`adr/0024-deterministic-creator-gameplay-primitives.md`](adr/0024-deterministic-creator-gameplay-primitives.md) | Data-driven, engine-owned creator gameplay primitives |
-| [`adr/0025-workshop-package-architecture.md`](adr/0025-workshop-package-architecture.md) | Immutable package identity, cooking, dependencies, and compatibility |
-| [`adr/0026-workshop-multiplayer-synchronization.md`](adr/0026-workshop-multiplayer-synchronization.md) | Exact package synchronization and online admission |
-| [`adr/0027-open-source-modkit-preview.md`](adr/0027-open-source-modkit-preview.md) | Open ModKit and installed-game authoritative preview |
-| [`adr/0028-built-in-content-compatibility.md`](adr/0028-built-in-content-compatibility.md) | Versioned built-in capability contracts and support windows |
-| [`adr/0029-character-authoring-and-cooking.md`](adr/0029-character-authoring-and-cooking.md) | Canonical Character source, deterministic cooking, and immutable match content |
+## Research and reference
+
+The `research/` directory contains design analysis and external references, including:
+
+- [Melee frame data](research/melee-frame-data.md)
+- [Melee frame analysis](research/melee-frame-analysis.md)
+- [Melee Knockback model](research/melee-knockback-model.md)
+- [Melee movement audit](research/melee-movement-audit.md)
+- [Melee/netcode impact](research/melee-model-netcode-impact.md)
+- [DKO mechanics](research/dko-mechanics.md)
+- [DKO character kits](research/dko-character-kits.md)
+
+These documents inform design but do not override the Shared implementation or accepted ADRs.
+
+## Historical plans and reports
+
+- `plans/` contains dated roadmaps, implementation plans, handoffs, and superseded approaches.
+- `generated/` contains generated move-data, self-play, and analysis reports.
+- `handoffs/` contains dated implementation handoffs.
+- `superpowers/` contains archived plans and specifications.
+
+Read these for context on why a decision exists. Treat a dated plan as historical unless a current task explicitly adopts it. The [FightGuy cooking cutover](plans/2026-08-26-fightguy-character-cooking-cutover.md) is the current migration record for the first cooked slice.

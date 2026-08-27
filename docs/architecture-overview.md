@@ -1,167 +1,129 @@
-# Architecture Overview — Codebase Map
+# Architecture Overview
 
-> **For agents and new contributors.** Read this first — it tells you where everything lives.
-> For netcode theory, see `docs/systems/netcode-architecture.md`. For art/naming, see `docs/contributing/conventions.md`.
+Read this map before changing SlopArena. The authoritative gameplay implementation is the pure C# Shared simulation. Unity presents it; the GameServer hosts it.
 
----
+## Repository map
 
-```
+```text
 SlopArena/
-├── client/Unity/Assets/Scripts/  ← Shared is NOT under Assets/Scripts; see src/Shared + Plugins/SlopArena.Shared DLL
-│
-├── src/Shared/          ← canonical Shared code (netstandard2.1), built to client/Unity/Assets/Plugins/SlopArena.Shared/
-│   ├── Abilities/           ← ServerAbility implementations
-│   │   ├── ServerAbility.cs     ← Base class: OnStart/Tick/OnEnd lifecycle
-│   │   ├── AbilityFactory.cs    ← Maps AbilityTypeId to concrete implementations
-│   │   ├── LmbCombo.cs          ← Manki LMB: 3-hit combo with lunge (StageChainAbility)
-│   │   ├── MankiRoundBomb.cs    ← Manki Q: hold-to-aim parabolic bomb
-│   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
-│   │   ├── MankiBazooka.cs      ← Manki R: rise-aim-fire bazooka
-│   │   ├── MankiOverclock.cs    ← Manki F: self-buff 8s
-│   │   └── legacy Manki/Kistu/Nilus ability implementations
-│   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
-│   ├── SpellResolver.cs     ← hitbox collision math
-│   ├── CharacterState.cs    ← per-tick entity state
-│   ├── CharacterStatePacket.cs ← UDP packet (63 bytes, +13B envelope)
-│   ├── ClientInputPacket.cs ← legacy — the wire uses InputState; kept for compat
-│   ├── InputState.cs        ← normalized input (MoveX/Y, flags, ActiveSlot), 19 bytes
-│   ├── AttackData.cs        ← HitboxEvent, AttackStage, AbilityData structs
-│   ├── CombatMath.cs        ← knockback, facing, damage scaling
-│   ├── BakedAnimationData.cs← cooked pose projection used by Shared simulation
-│   ├── ArenaDefinition.cs   ← arena data (platforms, spawns, kill height)
-│   └── ... (lobby/codec DTOs: LobbyPayloadCodec, MasterServerClient, HostedServerConfig, ServerLogParser)
-│
-├── client/Unity/         ← Unity game client
-│   └── Assets/Scripts/
-│       ├── Runtime/
-│       │   ├── Entities/       ← PlayerRenderer, StatusBillboard, WeaponAttach
-│       │   ├── World/          ← GameManager, MatchBase, TrainingMatch, PvPMatch (match orchestration)
-│       │   ├── Simulation/     ← ISimulationBridge, LocalSimulationBridge, NetworkSimulationBridge
-│       │   ├── Network/        ← NetworkClient (UDP, Connect/SendInput/ReceiveStates)
-│       │   ├── UI/             ← MatchConfig, MainMenuController, LobbyController, CharSelectController, StageSelectController, HUDManager
-│       │   ├── Input/          ← InputController (Unity Input → InputState)
-│       │   ├── Camera/         ← CameraMount, AimCameraMount (orbit + aim camera)
-│       │   ├── Combat/         ← CombatFeedback, AimHandler, AimIndicator
-│       │   └── Animation/      ← generated cooked animation catalogs
-│       ├── Editor/
-│       │   ├── SlopArenaBaker.cs        ← legacy non-FightGuy pose bake
-│       │   ├── SlopArenaArenaBaker.cs   ← arena bake
-│       │   ├── SlopArenaSceneSetup.cs   ← scene setup
-│       │   ├── PopulateAbilityClips.cs  ← populate legacy ability clip slots
-│       │   ├── SetupArenaLighting.cs     ← scene lighting
-│       │   └── SetupArenaSkybox.cs       ← scene skybox
-│
+├── client/Unity/
+│   └── Assets/
+│       ├── Scripts/                 # Unity input, presentation, networking, UI, editor tools
+│       ├── AbilityLab/              # package editing and preview
+│       ├── CharacterPackages/       # editable package source and asset catalogs
+│       └── Plugins/SlopArena.Shared/ # generated Shared DLL consumed by Unity
 ├── src/
-│   ├── Shared/            ← canonical Shared code (netstandard2.1)
-│   ├── Server/            ← Headless .NET server (MatchInstance, UDP loop)
-│
-├── tests/
-│   └── Shared.Tests/      ← xUnit tests (ServerSimulation, SpellResolver, etc.)
-│
-├── docs/                 ← All documentation
-├── content-cooked/        ← immutable cooked runtime packages and roster manifest
-│   └── fightguy/          ← runtime definition, bindings, poses, and manifest
-├── client/Unity/Assets/CharacterPackages/
-│                           ← editable authoring documents and asset catalogs
-├── data/                  ← legacy arena and non-FightGuy editor inputs
-└── tools/                ← Python scripts, build tools
+│   ├── Shared/                      # netstandard2.1 compiler, simulation, codecs, runtime model
+│   └── Server/                      # headless GameServer and match orchestration
+├── tests/Shared.Tests/              # Shared simulation, compiler, codec, and catalog tests
+├── content-cooked/                  # immutable cooked runtime packages and roster manifest
+├── content/                         # source content still used by legacy compatibility paths
+├── tools/                           # asset inspection, baking, reports, and documentation checks
+└── docs/                            # canonical guidance, ADRs, plans, research, and reports
 ```
 
----
+## Content boundary
 
-┌─ CLIENT (Unity) ──────────────────────────────────────────────┐
-│                                                                  │
-│  MainMenu → Lobby → CharSelect → StageSelect                    │
-│       ↓ (MatchConfig: Mode, PlayerClass, ArenaName, ServerIP)   │
-│  MatchBase.Start() → OnMatchStart()                             │
-│    ├── TrainingMatch  → LocalSimulationBridge.Tick(inputs)      │
-│    │   └── ServerSimulation.Tick()                              │
-│    │       ├── PreTickAbilities() / SimulateMovement()           │
-│    │       └── SpellResolver.Tick()                             │
-│    └── PvPMatch  → NetworkSimulationBridge.Tick(inputs)         │
-│                     ├── NetworkClient.SendInput()               │
-│                     └── NetworkClient.ReceiveStates()           │
-│                                                                  │
-│  InputController.Poll() → InputState                            │
-│  PlayerRenderer.ApplyServerState(state)                         │
-│       └── UpdateAnimationState() → _animancer.Play(clip)        │
-└──────────────────────────────────────────────────────────────────┘
+New characters follow one source-to-runtime path:
 
----
+```text
+Assets/CharacterPackages/<package>/
+  package.json + character.json + CharacterAssetCatalog.asset
+                         │
+                         ▼
+        Shared compiler + Unity asset/pose cook
+                         │
+                         ▼
+content-cooked/<package>/
+  manifest.json + character.runtime.json + poses.bin + client.bindings
+                         │
+                         ▼
+              Match Content Catalog
+```
 
-## Key Naming Conventions
+`package.json` owns identity and metadata. `character.json` owns gameplay semantics. `CharacterAssetCatalog.asset` owns imported Unity bindings. Raw authoring JSON is not a runtime contract. Cooked packages are immutable, hash-addressed, and pinned per match.
 
-| Convention | Meaning | Example |
-|------------|---------|---------|
-| `PX, PY, PZ` | World position (Y=up) | `state.PX` |
-| `VX, VY, VZ` | World velocity | `state.VY` (jump velocity) |
-| `ushort` durations | ALL durations in ticks (1/60s) | `DashCooldownTicks = 56` |
-| `_fieldName` | Private instance field | `_serverTick` |
-| `EntityId` | `ulong` unique ID per entity | player=1, opponent=2, NPCs=100+ |
-| `Tick` suffix | Duration in ticks | `StunTicks`, `DurationTicks` |
-| `Def` suffix | Definition struct | `_charDef`, `HurtboxBoneDef` |
+FightGuy is the first cooked vertical slice. Its editable source is under `client/Unity/Assets/CharacterPackages/fightguy/`; its canonical runtime package is under `content-cooked/fightguy/`. The generated client catalog is a regenerable presentation cache.
 
----
+Manki, Kistu, and Nilus remain behind `LegacyCharacterCatalogAdapter` until migrated. Their C# definitions, legacy registry, source paths, and baked data are modification-only compatibility. They are not templates for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
 
-## Changing Gameplay Data
+## Runtime flow
 
-### Tune a character's stats
-→ `client/Unity/Assets/CharacterPackages/<Name>/` and its Character Authoring Document
-- `Movement` struct: speed, jump, gravity, dash
-- `HurtboxBoneDefs[]`: bone-attached hurtbox spheres
-- `LMB/RMB/Q/E/R/F` abilities: `AbilitySpec` with `AbilityTypeId` and `Params`
+```text
+InputController / NetworkClient
+          │
+          ▼
+      InputState
+          │
+          ▼
+Shared ServerSimulation
+  ├── movement and state transitions
+  ├── cooked timeline/capability execution
+  ├── SpellResolver hitbox/projectile collision
+  └── authoritative CharacterState/events
+          │
+          ├── Training: LocalSimulationBridge
+          └── PvP: NetworkSimulationBridge + GameServer
+                         │
+                         ▼
+               PlayerRenderer / UI / VFX
+```
 
-### Tune a specific ability's behavior
-→ `Shared/Characters/MankiData.cs` → the ability's `Params` dictionary
-- Tunable parameters like `lunge_duration`, `explosion_damage`, `charge_threshold`
-- No code recompilation needed for balance changes
-- Logic lives in `Shared/Abilities/<CharacterName><AbilityName>.cs`
+The GameServer validates and loads the exact package set before simulation starts. Clients verify the same package IDs, versions, dependencies, capability versions, and hashes. A match never observes a later recook.
 
-### Tune a specific ability's hitbox
-→ `Shared/Characters/MankiData.cs` → the ability's `Stages[].HitboxEvents[]`
-- `TriggerTick`: when during the animation the hitbox spawns
-- `DurationTicks`: how long it lives
-- `Radius`: hitbox size (sphere) or capsule radius
-## Common Pitfalls
+## Ability boundary
 
-1. **Don't use `UnityEngine.*` in `Shared/`** — it breaks the pure C# contract. Use `System.MathF`.
-2. **Durations are `ushort` ticks, not `float` seconds** — `_timer -= delta` is wrong.
-3. **`Shared/` is built as a netstandard2.1 DLL** — run `dotnet build src/Shared/` after editing Shared code. Auto-copies to `client/Unity/Assets/Plugins/SlopArena.Shared/` via post-build target.
-4. **Cooldown struct persistence** — `CharacterState` is a value type. Always `_states[id] = state` after modifying cooldowns, otherwise the change is discarded.
-5. **Dash duration comes from `MovementStats.DashDurationTicks`** — not the const `Simulation.DashDurationTicks`. Character definition is authoritative.
-6. **Proportional friction is asymptotic** — `VelocityDeadZone` (0.015) in `ApplyVelocityDeadZone()` snaps horizontal velocity to 0. Applied after ground friction and air drag.
-7. **`MatchConfig` is static** — it persists across scene loads. Call `MatchConfig.Reset()` in `MainMenuController.OnEnable` so stale values from a previous match don't leak into the next one.
+Package abilities are fixed timelines of typed, versioned operations on the canonical 16-entry grid: grounded and aerial variants for `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`. Engine-owned Shared primitives implement movement, hitbox/projectile resolution, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events.
 
-### Add a new character
-→ Full guide: `docs/characters/adding-a-new-character.md`
+`CookedTimelineAbility` is the current interpreter. `ServerAbility` and character-specific classes remain for legacy implementations and trusted temporary FightGuy capabilities. They are not a universal new-content authoring API. `AbilityFactory(CharacterClass, slot)` and `MankiData` references in legacy docs must be read only in that compatibility scope.
 
----
+## Unity responsibilities
 
-## Quick Commands
+Unity owns imported assets, package asset catalogs, Ability Lab, input polling, animation playback, cameras, UI, VFX, audio, and network transport. `PlayerRenderer` resolves generated semantic animation bindings and plays them through Animancer. Unity does not decide hit results, damage, timing, or match admission.
+
+## Common change paths
+
+### Package gameplay
+
+Edit the package source, inspect it, cook it through the Unity CLI, then verify the cooked artifact, catalog, hashes, Ability Lab, and Training. See [Adding a Character](characters/adding-a-new-character.md).
+
+### Shared mechanics
+
+Edit `src/Shared/`, add/update a behavioral test, build Shared, and run the relevant tests. Keep the code free of Unity dependencies and engine physics.
+
+### Server or netcode
+
+Edit `src/Server/` or the Unity network bridge only after tracing the authoritative flow. Build the server and exercise a local match when the change affects admission, transport, reconciliation, or match lifecycle. See [Netcode Architecture](systems/netcode-architecture.md).
+
+### Legacy character maintenance
+
+Change only the compatibility implementation needed for Manki, Kistu, or Nilus. Preserve its existing contract unless the migration explicitly removes it. Do not create new legacy registry entries for a package-native character.
+
+## Quick commands
 
 ```bash
-# Build Shared library (run after any src/Shared/ change)
 dotnet build src/Shared/ --nologo
-
-# Run simulation unit tests
 dotnet test tests/Shared.Tests/ --nologo
-
-# Run headless server
+dotnet build src/Server/ --nologo
 dotnet run --project src/Server/
 ```
 
----
+Package commands:
 
-## Related Docs
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.inspect --target <package> --format json
+unity command --project-path client/Unity \
+  sloparena.character.cook --target <package> --format json
+```
 
-| Doc | Covers |
-|-----|--------|
-| `docs/systems/animation-system.md` | Animancer clip playback, server-timed transitions, extrapolation |
-| `docs/systems/netcode-architecture.md` | Server-authoritative model, prediction, reconciliation |
-| `docs/systems/ability-architecture.md` | ServerAbility pattern, lifecycle, creating new abilities |
-| `docs/systems/combat-systems.md` | Universal combat mechanics |
-| `docs/contributing/conventions.md` | Art direction, animation naming, bone naming |
-| `docs/characters/adding-a-new-character.md` | Full pipeline for new characters |
-| `docs/superpowers/specs/2026-07-09-menu-ui-flow-design.md` | Menu flow design: MainMenu → Lobby → CharSelect → StageSelect |
-| `docs/plans/match-architecture.md` | MatchBase/ISimulationBridge seam design |
-| `CLAUDE.md` | Coding rules (Shared/ purity, tick-based, no engine physics in Shared/) |
+## Related docs
+
+- [Ability Architecture](systems/ability-architecture.md)
+- [Combat Systems](systems/combat-systems.md)
+- [Ability Lab](systems/ability-lab.md)
+- [Animation System](systems/animation-system.md)
+- [Netcode Architecture](systems/netcode-architecture.md)
+- [Testing and Verification](testing.md)
+- [Conventions](contributing/conventions.md)
+- [Documentation map](README.md)

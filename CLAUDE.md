@@ -71,15 +71,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ```bash
 dotnet test tests/Shared.Tests/ --nologo
 ```
-93+ tests cover physics, ability lifecycles, combat integration, and edge cases
-— all pure C#, no Unity needed. Build + test completes in <3s.
+Tests cover movement, ability lifecycle, combat integration, content, and edge cases in pure C#; use the current suite rather than relying on a hardcoded count.
 
 SlopArena uses a server-authoritative 60Hz UDP model with client-side prediction + reconciliation.
 Every line of gameplay code must be written to work deterministically on both client and server.
 
 ### 5a. Shared/ is Sacred
 
-`Shared/` is a pure C# library with **zero** Unity dependencies. Rules:
+`src/Shared/` is a pure C# library with **zero** Unity dependencies. Rules:
 - No `UnityEngine.*` or `Godot.*` imports in any Shared/ file — ever
 - All math uses `System.MathF`, `System.Math` (not Unity/Godot's `Mathf`)
 - All data types use plain C# structs (not Unity's `Vector3`, Godot's `Transform3D`)
@@ -115,38 +114,36 @@ The client CAN use Unity physics for rendering/prediction, but the server is the
 ### 5e. Packet Serialization
 
 - All network packets use `System.Buffers.Binary.BinaryPrimitives` for explicit little-endian serialization
-- Packet size is a compile-time constant (`Size`)
+- Packet size is a compile-time constant (`Size`); use the source constants and codec tests rather than copying counts into documentation
 - No Unity/Godot types in packet structs — serialize as primitives (float, int, byte, ushort)
-- Client sends `ClientInputPacket` (14 bytes), server responds with `CharacterStatePacket` (38 bytes)
+- Client and server use `InputState`, `CharacterStatePacket`, and `ServerEntityPacket`; update every serializer/deserializer when their fields change
 
 ### 5f. Don't Mix Rendering with Logic
 
-- Visual effects (particles, sounds, animations) are client-only
-- Game state (position, health, cooldowns, action states) is computed in Shared/ and authoritative on server
-- Client predicts forward from last server state, server reconciles
+- Game state (position, damage, cooldowns, action states) is computed in `src/Shared/` and authoritative on server
+- Client predicts forward from confirmed state and relayed input, then reconciles through rollback
 
 ### 5g. Architecture Summary
 
 ```
 ┌─────────────────────┐      UDP       ┌─────────────────────┐
 │   Unity Client       │ ◄──────────►   │   .NET Server       │
-│   client/Unity/      │                │   Server/            │
+│   client/Unity/      │                │   src/Server/       │
 │   ┌───────────────┐  │  InputPacket  │   ┌───────────────┐  │
 │   │ Prediction    │  │   Character   │   │ SimulateTick  │  │
 │   │ + Rendering   │  │   StatePacket │   │ (authority)   │  │
 │   └───────┬───────┘  │                │   └───────┬───────┘  │
 │           │          │                │           │          │
 │   ┌───────▼───────┐  │                │   ┌───────▼───────┐  │
-│   │   Shared/     │  │                │   │   Shared/     │  │
+│   │  src/Shared/    │  │                │   │  src/Shared/    │  │
 │   │ (pure C#)     │  │                │   │ (pure C#)     │  │
-│   │ Simulation.cs │  │                │   │ Simulation.cs │  │
+│   │ ServerSimulation│  │                │   │ ServerSimulation│  │
 │   │ CombatMath.cs │  │                │   │ CombatMath.cs │  │
 │   └───────────────┘  │                │   └───────────────┘  │
 └─────────────────────┘                  └─────────────────────┘
          │                                        │
-         │ CharacterDefinition.cs (data-driven)   │
-         │ CharacterState.cs (per-tick state)     │
-         │ AttackData.cs (AbilityData/Stage)      │
+         │ package/cooked content + CharacterState │
+         │ operation and slot definitions           │
          └────────────────────────────────────────┘
 ```
 

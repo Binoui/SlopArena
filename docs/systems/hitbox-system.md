@@ -1,4 +1,5 @@
 # SlopArena Hitbox/Hurtbox System — Architecture & Usage
+> **Scope:** This page preserves low-level collision implementation notes, including legacy `HitboxEvent` examples. For current package authoring and runtime execution, use [`ability-architecture.md`](ability-architecture.md), [`combat-systems.md`](combat-systems.md), and [`../characters/adding-a-new-character.md`](../characters/adding-a-new-character.md). Do not copy legacy file paths or data shapes into new package work.
 
 ## 🎯 Overview
 
