@@ -64,17 +64,21 @@ public sealed class AbilityLabPackageWorkspace
 
     public bool OpenPackage(string packageRoot)
     {
-        string normalized = packageRoot.Replace('\\', '/').TrimEnd('/');
-        if (!normalized.StartsWith("Assets/CharacterPackages/", StringComparison.Ordinal) || !AssetDatabase.IsValidFolder(normalized)) return Fail("package.path.invalid", normalized, "Package must be inside Assets/CharacterPackages.");
-        string packagePath = ToFull(normalized + "/package.json"); string characterPath = ToFull(normalized + "/character.json");
-        if (!File.Exists(packagePath)) return Fail("schema.missing", normalized + "/package.json", "Package manifest is required.");
-        if (!File.Exists(characterPath)) return Fail("schema.missing", normalized + "/character.json", "Character document is required.");
-        string package = File.ReadAllText(packagePath); string character = File.ReadAllText(characterPath);
-        var loaded = CharacterPackageSourceCodec.Load(package, character);
-        if (!loaded.IsValid || loaded.Source == null) { SetDiagnostics(loaded.Diagnostics, "Failed"); return false; }
-        var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(normalized + "/CharacterAssetCatalog.asset");
-        if (catalog == null) return Fail("asset-catalog.missing", normalized + "/CharacterAssetCatalog.asset", "CharacterAssetCatalog.asset is required.");
-        PackageRoot = normalized; Manifest = loaded.Source.Manifest; Draft = loaded.Source.Character; Catalog = catalog; AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft), true); LoadedDiskHash = ComputeDiskHash(); IsDirty = false; SetDiagnostics(loaded.Diagnostics, "Valid"); return true;
+        var inspection = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Inspect(packageRoot);
+        if (!inspection.Success || inspection.Source == null || inspection.Catalog == null)
+        {
+            SetDiagnostics(inspection.RawDiagnostics, "Failed");
+            return false;
+        }
+        PackageRoot = inspection.SourcePath;
+        Manifest = inspection.Source.Manifest;
+        Draft = inspection.Source.Character;
+        Catalog = inspection.Catalog;
+        AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft), true);
+        LoadedDiskHash = ComputeDiskHash();
+        IsDirty = false;
+        SetDiagnostics(inspection.RawDiagnostics, inspection.Status == "valid" ? "Valid" : inspection.Status == "stale" ? "Stale" : "Failed");
+        return true;
     }
 
     public bool ReloadPackage() => HasPackage && OpenPackage(PackageRoot);
@@ -89,23 +93,24 @@ public sealed class AbilityLabPackageWorkspace
             string packageJson = CharacterPackageSourceCodec.SerializeManifest(Manifest);
             string characterJson = CharacterPackageSourceCodec.SerializeCharacter(Draft);
             ReplaceSources(packagePath, characterPath, Encoding.UTF8.GetBytes(packageJson), Encoding.UTF8.GetBytes(characterJson));
-            CharacterCookOutput output = CharacterCookOutput.For(PackageId);
-            var profile = PackageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
             LoadedDiskHash = ComputeDiskHash(); IsDirty = false;
-            if (!SlopArenaCharacterCook.TryRecookPackage(PackageRoot, Catalog, output, profile, out var assembly, out var failure))
+            var cook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(PackageRoot);
+            if (!cook.Success)
             {
-                SetDiagnostics(SlopArenaCharacterCook.LastDiagnostics.Count > 0 ? SlopArenaCharacterCook.LastDiagnostics : new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "cook.failed", PackageRoot, failure) }, "Failed");
+                SetDiagnostics(cook.RawDiagnostics, "Failed");
                 AbilityLab.Instance?.MarkPreviewNonAuthoritative();
                 return false;
             }
-            LastValidAssembly = assembly;
-            CookedSourceHash = assembly.SourceHash; CookedContentHash = assembly.CookedContentHash; PackageHash = assembly.PackageHash;
-            var loadedAssembly = CookedCharacterPackageLoader.LoadAssembly(assembly);
+            LastValidAssembly = cook.Assembly;
+            CookedSourceHash = cook.SourceHash;
+            CookedContentHash = cook.CookedContentHash;
+            PackageHash = cook.PackageHash;
+            var loadedAssembly = CookedCharacterPackageLoader.LoadAssembly(cook.Assembly);
             SetDiagnostics(loadedAssembly.Diagnostics, loadedAssembly.IsValid ? "Valid" : "Failed");
             if (!loadedAssembly.IsValid) AbilityLab.Instance?.MarkPreviewNonAuthoritative();
             if (loadedAssembly.IsValid && loadedAssembly.Package != null)
             {
-                var generated = CharacterAnimationCatalogGenerator.Create(assembly.BindingBytes);
+                var generated = CharacterAnimationCatalogGenerator.Create(cook.Assembly.BindingBytes);
                 AbilityLab.Instance?.ApplyCookedPackagePreview(loadedAssembly.Package, loadedAssembly.BakedAnimation, generated, Catalog.Rig, PackageId == "fightguy" ? CharacterClass.FightGuy : CharacterClass.None, true);
             }
             return loadedAssembly.IsValid;

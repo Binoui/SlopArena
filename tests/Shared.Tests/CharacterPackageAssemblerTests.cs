@@ -134,7 +134,7 @@ public sealed class CharacterPackageAssemblerTests
 
     private static CookedCharacterPackage Compile()
     {
-        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/FightGuy");
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
         var result = CharacterPackageCompiler.Compile(
             File.ReadAllText(Path.Combine(root, "package.json")),
             File.ReadAllText(Path.Combine(root, "character.json")), CharacterCookProfile.TrustedBuiltIn);

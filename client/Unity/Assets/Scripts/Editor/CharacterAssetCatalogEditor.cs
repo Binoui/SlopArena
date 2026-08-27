@@ -16,7 +16,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
     [MenuItem("Tools/SlopArena/Character Asset Catalog")]
     public static void ShowWindow() => GetWindow<CharacterAssetCatalogEditor>("Character Asset Catalog");
 
-    private void OnEnable() => _status = SlopArenaCharacterCook.ReadStatus();
+    private void OnEnable() => _status = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).ReadStatus("fightguy");
 
     private void OnGUI()
     {
@@ -50,13 +50,12 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
             if (GUILayout.Button("Cook"))
             {
                 string packageRoot = Path.GetDirectoryName(AssetDatabase.GetAssetPath(_catalog)).Replace('\\', '/');
-                var output = CharacterCookOutput.For(_catalog.PackageId);
-                var profile = _catalog.PackageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
-                SlopArenaCharacterCook.TryRecookPackage(packageRoot, _catalog, output, profile, out _, out _);
+                var result = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(packageRoot);
+                _diagnostics = result.RawDiagnostics.ToList();
             }
             EditorGUI.EndDisabledGroup();
         }
-        _status = SlopArenaCharacterCook.ReadStatus(_catalog.PackageId);
+        _status = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).ReadStatus(_catalog.PackageId);
         EditorGUILayout.LabelField("Status", _status.State);
         EditorGUILayout.LabelField("Current source hash", _status.CurrentSourceHash);
         EditorGUILayout.LabelField("Cooked source hash", _status.CookedSourceHash);
@@ -115,8 +114,8 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
     private void Validate()
     {
         string packageRoot = Path.GetDirectoryName(AssetDatabase.GetAssetPath(_catalog)).Replace('\\', '/');
-        CharacterAssetCookResult result = UnityCharacterAssetCooker.Cook(packageRoot, _catalog, CharacterCookOutput.For(_catalog.PackageId), _catalog.PackageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop);
-        _diagnostics = result.Diagnostics.ToList();
+        var result = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Inspect(packageRoot);
+        _diagnostics = result.RawDiagnostics.ToList();
         Repaint();
     }
 }

@@ -2,12 +2,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-UNITY="${UNITY_EDITOR:-/home/binoui/Unity/Hub/Editor/6000.0.78f1/Editor/Unity}"
+UNITY_CLI="${UNITY_CLI:-$HOME/.local/bin/unity}"
 PROJECT="$ROOT/client/Unity"
 
 [[ -d "$PROJECT" ]] || { echo "error: Unity project missing: $PROJECT" >&2; exit 1; }
-[[ -x "$UNITY" ]] || { echo "error: Unity editor is not executable: $UNITY" >&2; exit 1; }
+[[ -x "$UNITY_CLI" ]] || { echo "error: Unity CLI is not executable: $UNITY_CLI" >&2; exit 1; }
 
-echo "== Verify committed FightGuy package in Unity =="
-"$UNITY" -batchmode -quit -nographics -projectPath "$PROJECT" \
-  -executeMethod SlopArenaCharacterCook.VerifyCommittedFightGuy
+echo "== Verify cooked FightGuy package through Pipeline =="
+response="$("$UNITY_CLI" command --project-path "$PROJECT" \
+  sloparena.character.inspect --target fightguy --format json)"
+printf '%s\n' "$response"
+jq -e '.data.result.success and .data.result.status == "valid" and .data.result.dirtyOrStale == false' <<<"$response" >/dev/null

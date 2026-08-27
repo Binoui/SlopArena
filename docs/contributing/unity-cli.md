@@ -59,6 +59,40 @@ unity command --project-path client/Unity recompile --format json
 unity command --project-path client/Unity recompile_status --format json
 unity command --project-path client/Unity editor_play --format json
 unity command --project-path client/Unity editor_stop --format json
+
+## Agent-facing character authoring
+
+Character source files are the agent-facing authoring representation. SlopArena CLI
+commands validate, cook, inspect, and operate on Unity-owned concerns; they are not
+intended to replace source editing with a command per property.
+
+The Editor exposes two typed Pipeline commands. Both accept a package ID or a
+project-relative package root under `Assets/CharacterPackages`:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.inspect --target fightguy --format json
+unity command --project-path client/Unity \
+  sloparena.character.cook --target fightguy --format json
+```
+
+Pipeline wraps the typed command result under `data.result`. Inspect returns the
+canonical 16-slot summary, source/cooked hashes, status, stale reasons, and existing
+compiler/cooker diagnostics. Cook returns source, cooked-content, and package hashes
+when successful. Semantic cook failures return `data.result.success: false` with
+structured diagnostics; the outer Pipeline transport command remains successful.
+Shell automation can propagate that semantic result explicitly:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.cook --target fightguy --format json \
+  | jq -e '.data.result.success'
+```
+
+The agent workflow is: inspect the package, edit `character.json` or
+`package.json` directly, run the cook command, repair diagnostics, and retry. A
+failed cook does not replace the last valid cooked package, generated assets, or
+persisted cook status.
 ```
 
 ## Live C# evaluation

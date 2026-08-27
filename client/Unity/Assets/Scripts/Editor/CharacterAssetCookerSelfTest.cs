@@ -20,7 +20,7 @@ public static class CharacterAssetCookerSelfTest
 
     public static void RunFightGuySelfTest()
     {
-        var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(SlopArenaCharacterCook.CatalogPath);
+        var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>("Assets/CharacterPackages/fightguy/CharacterAssetCatalog.asset");
         if (catalog == null) throw new InvalidOperationException("FightGuy catalog is missing.");
         CharacterAssetCookResult first = Cook(catalog);
         CharacterAssetCookResult second = Cook(catalog);
@@ -50,7 +50,7 @@ public static class CharacterAssetCookerSelfTest
         if (CharacterPackageAssembler.Verify(committedFiles).IsValid)
             throw new InvalidOperationException("Cross-payload mismatch unexpectedly verified.");
         var generated = AssetDatabase.LoadAssetAtPath<CharacterAnimationCatalog>(
-            "Assets/Resources/Generated/CharacterPackages/FightGuy/FightGuy_AnimationCatalog.asset");
+            "Assets/Resources/Generated/CharacterPackages/fightguy/FightGuy_AnimationCatalog.asset");
         if (generated == null || generated.Animations.Length != ExpectedIds.Length ||
             generated.Animations.Any(x => x == null || x.Clip == null))
             throw new InvalidOperationException("Generated catalog did not resolve every animation binding.");
@@ -98,7 +98,8 @@ public static class CharacterAssetCookerSelfTest
         CharacterCookAssetPostprocessor.QueueRecook();
         if (CharacterCookAssetPostprocessor.QueueRequestCount != 1)
             throw new InvalidOperationException("Repeated postprocessor notifications were not coalesced.");
-        SlopArenaCharacterCook.CookFightGuy();
+        var finalCook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook("fightguy");
+        if (!finalCook.Success) throw new InvalidOperationException("Final FightGuy cook failed.");
         Debug.Log("[SlopArena] FightGuy cooker self-test passed.");
     }
     private static void AssertDependencyIdentityInvalidatesHash(CharacterAssetCatalog catalog, CharacterAssetCookResult result)
@@ -112,8 +113,8 @@ public static class CharacterAssetCookerSelfTest
             MetaHash = x.MetaHash,
             ImporterSettings = x.ImporterSettings,
         }).ToList();
-        string packageJson = System.IO.File.ReadAllText(UnityCharacterAssetCooker.ResolveFile(SlopArenaCharacterCook.PackageRoot, "package.json"));
-        string characterJson = System.IO.File.ReadAllText(UnityCharacterAssetCooker.ResolveFile(SlopArenaCharacterCook.PackageRoot, "character.json"));
+        string packageJson = System.IO.File.ReadAllText(UnityCharacterAssetCooker.ResolveFile("Assets/CharacterPackages/fightguy", "package.json"));
+        string characterJson = System.IO.File.ReadAllText(UnityCharacterAssetCooker.ResolveFile("Assets/CharacterPackages/fightguy", "character.json"));
         string alteredHash = CharacterCookDependencyTracker.ComputeSourceHash(
             packageJson, characterJson, catalog, altered, result.Animations);
         if (alteredHash == result.SourceHash)
@@ -125,7 +126,9 @@ public static class CharacterAssetCookerSelfTest
         string root = UnityCharacterAssetCooker.ProjectRoot();
         string posePath = System.IO.Path.Combine(root, CharacterCookOutput.FightGuy.IntermediateDirectory, "poses.bin");
         string bindingPath = System.IO.Path.Combine(root, CharacterCookOutput.FightGuy.IntermediateDirectory, "client.bindings");
-        string generatedPath = System.IO.Path.Combine(root, "Assets/Resources/Generated/CharacterPackages/FightGuy/FightGuy_AnimationCatalog.asset");
+        string generatedPath = System.IO.Path.Combine(root, "Assets/Resources/Generated/CharacterPackages/fightguy/FightGuy_AnimationCatalog.asset");
+        string statusPath = System.IO.Path.Combine(root, CharacterCookOutput.FightGuy.IntermediateDirectory, "cook-status.json");
+        byte[] status = System.IO.File.ReadAllBytes(statusPath);
         string canonicalPath = System.IO.Path.Combine(root, "content-cooked/fightguy");
         byte[] pose = System.IO.File.ReadAllBytes(posePath);
         byte[] binding = System.IO.File.ReadAllBytes(bindingPath);
@@ -139,8 +142,8 @@ public static class CharacterAssetCookerSelfTest
             catalog.SampleRate = 30;
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
-            string failure;
-            if (SlopArenaCharacterCook.TryRecookFightGuy(out failure))
+            var failedCook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook("fightguy");
+            if (failedCook.Success)
                 throw new InvalidOperationException("Invalid sample rate unexpectedly cooked.");
             if (!System.IO.File.ReadAllBytes(posePath).SequenceEqual(pose) ||
                 !System.IO.File.ReadAllBytes(bindingPath).SequenceEqual(binding) ||
@@ -152,15 +155,16 @@ public static class CharacterAssetCookerSelfTest
                 if (after.Count != canonical.Count || canonical.Any(x => !after.TryGetValue(x.Key, out var bytes) || !bytes.SequenceEqual(x.Value)))
                     throw new InvalidOperationException("Failed recook replaced last-valid canonical package.");
             }
-            if (SlopArenaCharacterCook.ReadStatus().State != "Failed")
-                throw new InvalidOperationException("Failed recook did not persist Failed status.");
+            if (!System.IO.File.ReadAllBytes(statusPath).SequenceEqual(status))
+                throw new InvalidOperationException("Failed recook changed the last-valid status.");
         }
         finally
         {
             catalog.SampleRate = sampleRate;
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
-            SlopArenaCharacterCook.CookFightGuy();
+            var restoredCook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook("fightguy");
+            if (!restoredCook.Success) throw new InvalidOperationException("Failed to restore FightGuy after invalid cook test.");
         }
     }
 
@@ -171,7 +175,7 @@ public static class CharacterAssetCookerSelfTest
         try
         {
             mutate?.Invoke(copy);
-            return UnityCharacterAssetCooker.Cook(SlopArenaCharacterCook.PackageRoot, copy, CharacterCookOutput.FightGuy, CharacterCookProfile.TrustedBuiltIn);
+            return UnityCharacterAssetCooker.Cook("Assets/CharacterPackages/fightguy", copy, CharacterCookOutput.FightGuy, CharacterCookProfile.TrustedBuiltIn);
         }
         finally
         {

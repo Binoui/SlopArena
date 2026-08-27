@@ -92,7 +92,7 @@ Simulation, rendering, UI, reports, and tests receive catalog entries or resolve
 ## Target source and artifact layout
 
 ```text
-client/Unity/Assets/CharacterPackages/FightGuy/
+client/Unity/Assets/CharacterPackages/fightguy/
 ├── package.json
 ├── character.json
 ├── CharacterAssetCatalog.asset
@@ -281,7 +281,7 @@ Expose explicit authoring-schema migration and atomic semantic-ID rename operati
 
 After all preparatory gates pass, switch every FightGuy production consumer in one cutover:
 
-1. stage the source package under `Assets/CharacterPackages/FightGuy/`;
+1. stage the source package under `Assets/CharacterPackages/fightguy/`;
 2. commit its deterministic cooked package;
 3. load FightGuy only through the Built-In Roster Manifest and Match Content Catalog;
 4. remove direct raw `character.json` loading from Ability Lab runtime, `GameManager`, and GameServer startup;

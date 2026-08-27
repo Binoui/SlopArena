@@ -24,7 +24,7 @@ The editable package has three authoritative source modules, each with one conce
 
 The Character Authoring Document does not repeat package `id` or legacy `CharacterClass`. Package-local IDs are scoped by package, for example `anim.cyclone-kick`; shared built-in capabilities use versioned `slop.*` IDs. Before publication, an ID rename is an explicit atomic refactor across the document and catalog, never free-text coordination.
 
-FightGuy is the first vertical slice. Its authoring package moves under one Unity source root such as `Assets/CharacterPackages/FightGuy/`. Other built-in Characters remain legacy inputs until migrated one at a time.
+FightGuy is the first vertical slice. Its authoring package lives under `Assets/CharacterPackages/fightguy/`. Other built-in Characters remain legacy inputs until migrated one at a time.
 
 ### Ability Lab authoring workflow
 

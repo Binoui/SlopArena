@@ -38,8 +38,9 @@ public sealed class CharacterCookAssetPostprocessor : AssetPostprocessor
         if (!_pending) _queueRequestCount++;
         _pending = true;
         _dueTime = UnityEditor.EditorApplication.timeSinceStartup + 0.25;
-        CharacterCookStatus status = SlopArenaCharacterCook.ReadStatus();
-        if (status.State == "Valid") SlopArenaCharacterCook.MarkStale();
+        var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
+        CharacterCookStatus status = service.ReadStatus("fightguy");
+        if (status.State == "Valid") service.MarkStale("fightguy");
         EditorApplication.update -= ProcessQueue;
         EditorApplication.update += ProcessQueue;
     }
@@ -54,7 +55,7 @@ public sealed class CharacterCookAssetPostprocessor : AssetPostprocessor
                 || normalized.EndsWith("/CharacterAssetCatalog.asset", StringComparison.Ordinal)
                 || normalized.EndsWith("/CharacterAssetCatalog.asset.meta", StringComparison.Ordinal)))
             return true;
-        CharacterCookStatus status = SlopArenaCharacterCook.ReadStatus();
+        CharacterCookStatus status = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).ReadStatus("fightguy");
         return status.Dependencies != null && status.Dependencies.Any(x => x.Identity == normalized);
     }
 
@@ -70,9 +71,7 @@ public sealed class CharacterCookAssetPostprocessor : AssetPostprocessor
                 var catalog = AssetDatabase.LoadAssetAtPath<SlopArena.Client.Animation.CharacterAssetCatalog>(catalogPath);
                 if (catalog == null || string.IsNullOrEmpty(catalog.PackageId)) continue;
                 string packageRoot = catalogPath.Substring(0, catalogPath.LastIndexOf('/'));
-                var output = CharacterCookOutput.For(catalog.PackageId);
-                var profile = catalog.PackageId == "fightguy" ? SlopArena.Shared.CharacterCookProfile.TrustedBuiltIn : SlopArena.Shared.CharacterCookProfile.Workshop;
-                SlopArenaCharacterCook.TryRecookPackage(packageRoot, catalog, output, profile, out _, out _);
+                new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(packageRoot);
             }
         }
         finally

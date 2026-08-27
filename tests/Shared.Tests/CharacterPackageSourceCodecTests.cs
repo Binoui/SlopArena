@@ -10,7 +10,7 @@ namespace SlopArena.Shared.Tests;
 
 public sealed class CharacterPackageSourceCodecTests
 {
-    private static string Fixture(string name) => File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/FightGuy/" + name));
+    private static string Fixture(string name) => File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy/" + name));
     private static string FindRepoFile(string relative)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

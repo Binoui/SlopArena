@@ -14,7 +14,7 @@ public sealed class CharacterPackageCompilerTests
     {
         string relative = name == "cooked.expected.hex"
             ? "tests/Shared.Tests/Fixtures/FightGuyAuthoring/cooked.expected.hex"
-            : $"client/Unity/Assets/CharacterPackages/FightGuy/{name}";
+            : $"client/Unity/Assets/CharacterPackages/fightguy/{name}";
         return File.ReadAllText(FindRepoFile(relative));
     }
     private static CharacterCompileResult CompileCharacter(Action<JsonObject>? mutate = null, CharacterCookProfile profile = CharacterCookProfile.TrustedBuiltIn)

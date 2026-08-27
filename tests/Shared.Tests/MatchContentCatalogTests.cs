@@ -17,7 +17,7 @@ public sealed class MatchContentCatalogTests
         var result = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), roster.Requirement);
         Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         Assert.Equal("fightguy", result.Identity.PackageId);
-        Assert.Equal("456852603d00c5053cb4840c66b69b71702b4ab4fb6a4197852c28756de27c35", result.Identity.CookedContentHash);
+        Assert.Equal("d0fe631f57433ad4faef6e0e368f4c6faafea6b83f41f18118e5910a97300f7e", result.Identity.CookedContentHash);
         Assert.Equal(16, result.Package!.Definition.Slots.Count);
         Assert.NotNull(result.BakedAnimation);
     }

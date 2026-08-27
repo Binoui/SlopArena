@@ -10,7 +10,7 @@ public static class FightGuyCatalogBootstrap
     [MenuItem("Tools/SlopArena/Create FightGuy Catalog")]
     public static void CreateFightGuyCatalog()
     {
-        const string path = "Assets/CharacterPackages/FightGuy/CharacterAssetCatalog.asset";
+        const string path = "Assets/CharacterPackages/fightguy/CharacterAssetCatalog.asset";
         var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(path);
         if (catalog == null)
         {

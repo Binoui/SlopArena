@@ -38,6 +38,8 @@ public static class CharacterPackageCompiler
         "ground.1", "ground.2", "ground.3", "ground.4", "ground.A", "ground.E", "ground.R", "ground.F",
         "air.1", "air.2", "air.3", "air.4", "air.A", "air.E", "air.R", "air.F",
     };
+    private static readonly IReadOnlyList<string> CanonicalSlotIdsReadOnly = Array.AsReadOnly(CanonicalSlots);
+    public static IReadOnlyList<string> CanonicalSlotIds => CanonicalSlotIdsReadOnly;
     private static readonly string[] TrustedCapabilities =
     {
         "slop.internal.fightguy.ki-shot.v1",
