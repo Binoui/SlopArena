@@ -114,35 +114,28 @@ public static class LobbyPayloadCodec
     {
         var snap = TryParseSnapshot(element);
         if (snap is null) return null;
-
         int matchPort = 0;
-        if (element.TryGetProperty("matchPort", out var mp) &&
-            mp.ValueKind == JsonValueKind.Number)
+        if (element.TryGetProperty("matchPort", out var mp))
         {
-            matchPort = mp.GetInt32();
+            if (mp.ValueKind != JsonValueKind.Number || !mp.TryGetInt32(out matchPort) || matchPort < 0) return null;
         }
-
         string arenaName = string.Empty;
-        if (element.TryGetProperty("arenaName", out var an) &&
-            an.ValueKind == JsonValueKind.String)
+        if (element.TryGetProperty("arenaName", out var an))
         {
-            var s = an.GetString();
-            if (!string.IsNullOrEmpty(s)) arenaName = s;
+            if (an.ValueKind != JsonValueKind.String) return null;
+            arenaName = an.GetString() ?? string.Empty;
         }
-
-        // maxStocks is optional (absent → default 3, matching MatchStartRequest and
-        // the game server's StockMatchRule). Present-but-malformed also falls back
-        // to the default, mirroring how matchPort/arenaName treat bad input — a
-        // malformed optional field must never abort the whole match-start push.
         int maxStocks = MatchDefaults.DefaultMaxStocks;
-        if (element.TryGetProperty("maxStocks", out var ms) &&
-            ms.ValueKind == JsonValueKind.Number &&
-            ms.TryGetInt32(out int parsed) &&
-            parsed >= 1 && parsed <= 99)
+        if (element.TryGetProperty("maxStocks", out var ms))
         {
-            maxStocks = parsed;
+            if (ms.ValueKind != JsonValueKind.Number || !ms.TryGetInt32(out maxStocks) || maxStocks < 1 || maxStocks > 99) return null;
         }
-
-        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks);
+        MatchContentHandleMap? content = null;
+        if (matchPort > 0)
+        {
+            if (!element.TryGetProperty("content", out var c) || !MatchContentHandleMapCodec.TryParse(c, out content) || content == null) return null;
+        }
+        else if (element.TryGetProperty("content", out var localContent) && !MatchContentHandleMapCodec.TryParse(localContent, out content)) return null;
+        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks, content);
     }
 }

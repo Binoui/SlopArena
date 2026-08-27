@@ -156,11 +156,21 @@ namespace SlopArena.Shared
         internal static bool IsIasaUnlocked(CharacterState state, CharacterDefinition def)
         {
             if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
+            var cooked = def.GetCookedSlotAbility(state.AttackSlot, !state.IsGrounded);
+            if (cooked != null)
+            {
+                var stageIndex = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
+                var stage = cooked.Timeline.Stages[stageIndex];
+                if (stage.IasaTicks == 0) return false;
+                var elapsed = state.AttackElapsedTicks;
+                for (var i = 0; i < stageIndex; i++) elapsed -= cooked.Timeline.Stages[i].DurationTicks;
+                return elapsed >= stage.IasaTicks;
+            }
             var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
             if (spec?.Stages is not { Length: > 0 }) return false;
-            var stage = ResolveStage(spec, state);
-            if (stage.IasaTicks == 0) return false;
-            return ElapsedInStage(state, spec) >= stage.IasaTicks;
+            var legacyStage = ResolveStage(spec, state);
+            if (legacyStage.IasaTicks == 0) return false;
+            return ElapsedInStage(state, spec) >= legacyStage.IasaTicks;
         }
 
         /// <summary>

@@ -15,10 +15,17 @@
     <None Update="server.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="..\..\content\characters\fightguy\character.json"
-          Link="content\characters\fightguy\character.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\content-cooked\fightguy\**"
+          LinkBase="content-cooked\fightguy"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\content-cooked\roster\manifest.json"
+          Link="content-cooked\roster\manifest.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

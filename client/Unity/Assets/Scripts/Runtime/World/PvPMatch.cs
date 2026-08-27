@@ -91,7 +91,6 @@ namespace SlopArena.Client.World
             // Bridge
             _networkClient.EntityId = PlayerEntityId;
             _bridge = new RollbackSimulationBridge(arena, _networkClient, PlayerEntityId);
-            _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
             SpawnStageVisual(arena);
             if (_combatFeedback == null)
                 _combatFeedback = FindFirstObjectByType<CombatFeedback>();
@@ -99,14 +98,25 @@ namespace SlopArena.Client.World
                 _combatFeedback = gameObject.AddComponent<CombatFeedback>();
             _combatFeedback.SetSimulation(_bridge);
 
-            // Character definitions
-            var playerDef = CharacterRegistry.Get(MatchConfig.PlayerClass);
-            var playerBaked = LoadBakedData(playerDef);
-            playerDef = ApplyHurtboxOverride(playerDef, playerBaked);
+            // Character definitions come only from the admitted match catalog.
+            var contentCatalog = SlopArena.Client.ClientSession.MatchContentCatalog;
+            if (contentCatalog == null)
+            {
+                Debug.LogError("[PvPMatch] No admitted match content catalog.");
+                return;
+            }
+            var playerEntry = contentCatalog.Resolve(MatchConfig.PlayerClass);
+            if (playerEntry == null)
+            {
+                Debug.LogError($"[PvPMatch] Player selector {MatchConfig.PlayerClass} is absent from the content catalog.");
+                return;
+            }
+            var playerDef = playerEntry.Definition;
             _playerDef = playerDef;
 
             // Shared player renderer + HUD setup
-            SetupPlayerRenderer(playerDef, playerBaked, arena);
+            if (!SetupPlayerRenderer(playerEntry, arena))
+                return;
             SetupHUD(playerDef);
 
             // Opponent renderers — one per MatchConfig.Opponents entry. The scene's
@@ -133,18 +143,15 @@ namespace SlopArena.Client.World
                     continue;
                 }
 
-                var def = CharacterRegistry.Get(opp.Class);
-                var baked = LoadBakedData(def);
-                def = ApplyHurtboxOverride(def, baked);
-                renderer.EntityId = opp.EntityId;
-                renderer.ModelYOffset = def.ModelYOffset;
-                renderer.CapsuleRadius = def.CapsuleRadius;
-                renderer.CapsuleHeight = def.CapsuleHeight;
-                renderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
-                renderer.SetBlastLines(arena);
-                renderer.SetBakedData(baked);
-                renderer.SetCharacterDefinition(def);
-                renderer.LoadModel(def);
+                var opponentEntry = contentCatalog.Resolve(opp.Class);
+                if (opponentEntry == null)
+                {
+                    Debug.LogError($"[PvPMatch] Opponent selector {opp.Class} is absent from the content catalog.");
+                    return;
+                }
+                var def = opponentEntry.Definition;
+                if (!SetupRenderer(renderer, opponentEntry, arena, opp.EntityId, false))
+                    return;
                 renderer.transform.position = SpawnPosition(arena, opp.EntityId);
                 _opponentRenderers[opp.EntityId] = renderer;
 
@@ -163,7 +170,7 @@ namespace SlopArena.Client.World
                     JumpsLeft = def.Movement.MaxJumps,
                     AirDodgesLeft = 1,
                     DamagePercent = 0,
-                }, baked);
+                }, opponentEntry.BakedAnimation);
             }
             _opponentArray = new List<PlayerRenderer>(_opponentRenderers.Values).ToArray();
 
@@ -188,11 +195,12 @@ namespace SlopArena.Client.World
                 JumpsLeft = playerDef.Movement.MaxJumps,
                 AirDodgesLeft = 1,
                 DamagePercent = 0,
-            }, playerBaked);
+            }, playerEntry.BakedAnimation);
             _lastPresentedDeaths.Clear();
             _lastPresentedDeaths[PlayerEntityId] = 0;
             foreach (var id in _opponentRenderers.Keys)
                 _lastPresentedDeaths[id] = 0;
+            _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
 
 
             // Shared camera + aim setup

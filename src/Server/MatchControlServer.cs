@@ -11,9 +11,9 @@ namespace SlopArena.Server
     /// and exposes <c>POST /match/start</c> for the master server.
     ///
     /// The handler parses the body with <see cref="MatchStartRequestCodec"/> (the
-    /// pure, unit-tested seam), asks the orchestrator to assign a UDP port with
-    /// the roster, and replies with <c>{ "port": N }</c>. This keeps the game
-    /// server stateless between matches (ADR-0008): one shot in, one port out.
+    /// pure, unit-tested seam), asks the orchestrator to assign a UDP port with the
+    /// roster, and replies with <c>{ "port": N, "content": { ... } }</c>. This keeps
+    /// the game server stateless between matches (ADR-0008): one shot in, one port out.
     ///
     /// The prefix binds all interfaces (<c>http://*:{port}/</c>) because the
     /// master server POSTs to the LAN IP returned by
@@ -83,26 +83,25 @@ namespace SlopArena.Server
         /// </summary>
         public (int port, string? error) TryStartMatch(string jsonBody)
         {
+            var result = TryStartMatchWithContent(jsonBody);
+            return (result.port, result.error);
+        }
+
+        public (int port, MatchContentHandleMap? content, string? error) TryStartMatchWithContent(string jsonBody)
+        {
             MatchStartRequest? req;
             try
             {
                 using var doc = JsonDocument.Parse(jsonBody);
                 req = MatchStartRequestCodec.TryParse(doc.RootElement);
             }
-            catch (JsonException)
-            {
-                return (0, "Malformed JSON body.");
-            }
-
+            catch (JsonException) { return (0, null, "Malformed JSON body."); }
             if (req is null)
-                return (0, "Invalid match-start body (need matchId, arenaName, and 2-4 players with a known characterClass + entityId).");
-
+                return (0, null, "Invalid match-start body (need matchId, arenaName, and 2-4 players with a known characterClass + entityId).");
             var arena = string.IsNullOrEmpty(req.ArenaName) ? _defaultArena : req.ArenaName;
-            int port = _orchestrator.AssignMatch(req.MatchId, arena, req.Players, (byte)req.MaxStocks);
-            if (port < 0)
-                return (0, "No match slots available on this game server.");
-
-            return (port, null);
+            if (!_orchestrator.TryAssignMatch(req.MatchId, arena, req.Players, (byte)req.MaxStocks, out int port, out var content, out var error))
+                return (0, null, error ?? "Failed to build match content.");
+            return (port, content, null);
         }
 
         private async Task HandleAsync(HttpListenerContext ctx)
@@ -119,18 +118,18 @@ namespace SlopArena.Server
             using (var sr = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding))
                 body = await sr.ReadToEndAsync();
 
-            var (port, error) = TryStartMatch(body);
-            if (error is not null)
+            var result = TryStartMatchWithContent(body);
+            if (result.error is not null)
             {
                 ctx.Response.StatusCode = 400;
                 ctx.Response.ContentType = "application/json";
-                var errBytes = System.Text.Encoding.UTF8.GetBytes($"{{\"error\":\"{error}\"}}");
+                var errBytes = System.Text.Encoding.UTF8.GetBytes($"{{\"error\":\"{result.error}\"}}");
                 await ctx.Response.OutputStream.WriteAsync(errBytes);
                 return;
             }
 
             ctx.Response.ContentType = "application/json";
-            var ok = System.Text.Encoding.UTF8.GetBytes($"{{\"port\":{port}}}");
+            var ok = System.Text.Encoding.UTF8.GetBytes($"{{\"port\":{result.port},\"content\":{MatchContentHandleMapCodec.Serialize(result.content!)}}}");
             await ctx.Response.OutputStream.WriteAsync(ok);
         }
 

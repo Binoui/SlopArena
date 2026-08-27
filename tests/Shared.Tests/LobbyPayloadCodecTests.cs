@@ -205,7 +205,7 @@ public class LobbyPayloadCodecTests
     public void TryParseMatchStarted_ParsesMatchPortAndArena()
     {
         var json = """
-        {"serverId":"22222222-2222-2222-2222-222222222222","matchPort":9877,"arenaName":"split","players":[
+        {"serverId":"22222222-2222-2222-2222-222222222222","matchPort":9877,"arenaName":"split","content":{"schemaVersion":1,"entries":[{"handle":1,"selector":"fightguy","identity":{"packageId":"fightguy","version":"0.0.0-dev","sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cookedContentHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","packageHash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"displayName":"FightGuy"}]},"players":[
             {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true,"entityId":1},
             {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false,"entityId":2}
         ]}

@@ -29,5 +29,8 @@
          reading them. The suite runs in ~1s either way. -->
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures/FightGuyAuthoring/cooked.expected.hex" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

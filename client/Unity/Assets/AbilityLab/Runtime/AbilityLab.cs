@@ -2,22 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using SlopArena.Shared;
+using SlopArena.Client.Animation;
 using SlopArena.Client.Entities;
 
 namespace SlopArena.Client.Tools
 {
-    /// <summary>
-    /// Ability Lab rig (spec #119): stateless frame-by-frame preview of a character's
-    /// hurtboxes + hitboxes for any ability slot. No simulation tick loop — poses come
-    /// from the baked skeleton .bin through the same Shared resolvers the server uses
-    /// (BuildEntitiesFromState for hurtboxes, HitboxGeometry for hitboxes), so what you
-    /// see is exactly what collides.
+    /// Ability Lab rig: frame-by-frame preview of hurtboxes + hitboxes for the selected
+    /// legacy catalog entry or an in-memory cooked Character Package. Poses come from
+    /// the baked skeleton through the same Shared resolvers used by the server.
     ///
-    /// Hitbox editing: WorkingEvents holds per-(slot, airborne, stage) HitboxEvent[]
-    /// replacements, loaded from a per-character JSON next to the baked skeleton. The
-    /// game server and training sim load that file at entity registration, so edits
-    /// made here are the hitboxes that spawn in a real match. Hurtboxes are display-only.
+    /// Package source ownership, typed DTO editing, hashes, persistence, and cooking live
+    /// in AbilityLabPackageWorkspace. WorkingEvents is only a transient legacy/render
+    /// projection and never writes package source.
     ///
     /// ExecuteAlways: the orbit camera works in edit mode too (frame the view before
     /// pressing Play). Pose/scrub/boxes are play-mode only.
@@ -64,19 +64,19 @@ namespace SlopArena.Client.Tools
         public CharacterDefinition Def { get; private set; } = null!;
         public CharacterDefinition DisplayDef { get; private set; } = null!; // Def + hurtbox override
         public BakedAnimationData? Baked { get; private set; }
-        /// <summary>Every bone in the baked skeleton (mixamorig set) — the attachable bone options.</summary>
         public string[] BakedBoneNames => Baked?.BoneNames ?? Array.Empty<string>();
+        public bool AuthoritativePreview { get; private set; }
+        public string PreviewStatus { get; private set; } = "Legacy";
+        private CharacterAnimationCatalog _previewAnimationCatalog;
+        private GameObject _previewRig;
         public PlayerRenderer Renderer { get; private set; } = null!;
         public HurtboxBoneDef[] WorkingDefs { get; private set; } = Array.Empty<HurtboxBoneDef>();
-
         /// <summary>Per-(slot, airborne, stage) hitbox event edits (key = "slot:airborne:stage").</summary>
         public Dictionary<string, HitboxEvent[]> WorkingEvents { get; private set; } = new();
 
         /// <summary>Per-(slot, airborne) hitstop multiplier edits keyed by content ability name.</summary>
         public Dictionary<string, float> WorkingHitstopOverrides { get; private set; } = new();
 
-        /// <summary>Target JSON file for Save — the character's authored content.</summary>
-        public string? ContentFilePath { get; private set; }
 
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
@@ -89,22 +89,11 @@ namespace SlopArena.Client.Tools
         private Vector2 _orbitAngles = new(25f, 0f);
         private float _orbitDistance = 4.5f;
         private Vector3 _orbitPivot;
-        // ── Undo / redo (per-edit snapshots of WorkingEvents + hitstop overrides) ──
+        // Undo/redo stores complete source DTOs; WorkingEvents remains a render projection.
         private const int MaxUndoDepth = 50;
-        private sealed class WorkingSnapshot
-        {
-            public readonly Dictionary<string, HitboxEvent[]> Events;
-            public readonly Dictionary<string, float> HitstopOverrides;
-
-            public WorkingSnapshot(Dictionary<string, HitboxEvent[]> events, Dictionary<string, float> hitstopOverrides)
-            {
-                Events = events;
-                HitstopOverrides = hitstopOverrides;
-            }
-        }
-
-        private readonly Stack<WorkingSnapshot> _undo = new();
-        private readonly Stack<WorkingSnapshot> _redo = new();
+        private CharacterPackageSource? _sourceDocument;
+        private readonly Stack<CharacterPackageSource> _undo = new();
+        private readonly Stack<CharacterPackageSource> _redo = new();
         public bool CanUndo => _undo.Count > 0;
         public bool CanRedo => _redo.Count > 0;
 
@@ -200,42 +189,70 @@ namespace SlopArena.Client.Tools
         public void LoadCharacter(CharacterClass character)
         {
             if (character == CharacterClass.None || character == Character) return;
-
-            string contentPath = ResolveContentFilePath(character);
-            CharacterDefinition loadedDef;
-            if (File.Exists(contentPath))
+            if (!SlopArena.Client.ClientSession.TryBuildLocalMatchCatalog(out var catalog, out var failure) || catalog == null)
             {
-                try
-                {
-                    loadedDef = CharacterContentSerializer.LoadFile(contentPath);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[AbilityLab] Failed to load {character} JSON content '{contentPath}': {ex.Message}");
-                    return;
-                }
-            }
-            else if (character == CharacterClass.FightGuy)
-            {
-                Debug.LogError($"[AbilityLab] FightGuy JSON content file not found: {contentPath}");
+                Debug.LogError($"[AbilityLab] Failed to build local content catalog: {failure}");
                 return;
             }
-            else
+            var entry = catalog.Resolve(character);
+            if (entry == null)
             {
-                loadedDef = CharacterRegistry.Get(character);
+                Debug.LogError($"[AbilityLab] No catalog entry for {character}.");
+                return;
+            }
+            LoadCharacter(entry.Handle);
+        }
+
+        public void LoadCharacter(ContentHandle handle)
+        {
+            if (!handle.IsValid) return;
+            if (!SlopArena.Client.ClientSession.TryBuildLocalMatchCatalog(out var catalog, out var failure) || catalog == null)
+            {
+                Debug.LogError($"[AbilityLab] Failed to build local content catalog: {failure}");
+                return;
+            }
+            var entry = catalog.Resolve(handle);
+            if (entry == null)
+            {
+                Debug.LogError($"[AbilityLab] Unknown content handle {handle.Value}.");
+                return;
+            }
+            if (entry.CookedCharacterPackage != null)
+            {
+                CharacterAnimationCatalog animationCatalog = null;
+                GameObject rig = null;
+                string error = "";
+                bool resolved = entry.BakedAnimation != null &&
+                    CookedCharacterClientAssetResolver.TryResolve(entry, out animationCatalog, out rig, out error);
+                if (!resolved)
+                {
+                    if (entry.BakedAnimation == null)
+                        error = "Cooked pose payload is missing.";
+                    Debug.LogError($"[AbilityLab] Cooked client assets failed for {entry.Identity.PackageId}: {error}");
+                    return;
+                }
+                ApplyCookedPackagePreview(
+                    entry.CookedCharacterPackage, entry.BakedAnimation, animationCatalog, rig,
+                    entry.LegacySelector ?? CharacterClass.None, authoritative: true);
+                return;
             }
 
+            var loadedDef = entry.Definition;
             var loadedBaked = LoadBaked(loadedDef);
             var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
 
-            Character = character;
+            Character = entry.LegacySelector ?? CharacterClass.None;
             Def = loadedDef;
             Baked = loadedBaked;
             WorkingDefs = loadedWorkingDefs;
             DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
             WorkingHitstopOverrides = new Dictionary<string, float>();
-            ContentFilePath = contentPath;
+            AuthoritativePreview = false;
+            PreviewStatus = "Legacy";
+            if (_previewAnimationCatalog != null) DestroyImmediate(_previewAnimationCatalog);
+            _previewAnimationCatalog = null;
+            _previewRig = null;
             SpawnRenderer();
 
             Airborne = false;
@@ -246,11 +263,44 @@ namespace SlopArena.Client.Tools
             _undo.Clear();
             _redo.Clear();
             RefreshPose();
+
+        }
+
+        public void ApplyCookedPackagePreview(
+            CookedCharacterPackage package,
+            BakedAnimationData baked,
+            CharacterAnimationCatalog animationCatalog,
+            GameObject rig,
+            CharacterClass legacySelector = CharacterClass.None,
+            bool authoritative = true)
+        {
+            if (_previewAnimationCatalog != null) DestroyImmediate(_previewAnimationCatalog);
+            _previewAnimationCatalog = animationCatalog;
+            _previewRig = rig;
+            var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, legacySelector);
+            Character = legacySelector;
+            Def = definition;
+            Baked = baked;
+            WorkingDefs = definition.HurtboxBoneDefs != null ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
+            DisplayDef = definition;
+            AuthoritativePreview = authoritative;
+            PreviewStatus = authoritative ? "Authoritative" : "Non-authoritative draft";
+            SpawnRenderer();
+            Airborne = false; SlotIndex = SlotIndices[0]; StageIndex = 0; Tick = 0; Playing = false;
+            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+            WorkingHitstopOverrides = new Dictionary<string, float>();
+            _undo.Clear(); _redo.Clear();
+            RefreshPose();
+        }
+        public void MarkPreviewNonAuthoritative()
+        {
+            AuthoritativePreview = false;
+            PreviewStatus = "Non-authoritative draft";
         }
 
         private static BakedAnimationData? LoadBaked(CharacterDefinition def)
         {
-            if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
+            if (def.Class == CharacterClass.FightGuy || string.IsNullOrEmpty(def.BakedDataPath)) return null;
             string? path = BakedContentPaths.ResolveBaked(def.BakedDataPath);
             if (path == null) return null;
             try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
@@ -289,22 +339,22 @@ namespace SlopArena.Client.Tools
             return def.HurtboxBoneDefs != null ? (HurtboxBoneDef[])def.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
         }
 
-        /// <summary>
-        /// The character's JSON content: &lt;repo&gt;/content/characters/&lt;id&gt;/character.json.
-        /// Repo root = three levels above Unity's Assets folder.
-        /// </summary>
-        private static string ResolveContentFilePath(CharacterClass character)
+
+        private void ClearPreviewSelection()
         {
-            string repoRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
-            return Path.Combine(
-                repoRoot, "content", "characters", character.ToString().ToLowerInvariant(), "character.json");
+#if UNITY_EDITOR
+            if (Selection.activeGameObject == gameObject ||
+                (Selection.activeTransform != null && Selection.activeTransform.IsChildOf(transform)))
+                Selection.activeObject = gameObject;
+#endif
         }
 
         private void SpawnRenderer()
         {
+            ClearPreviewSelection();
             if (Renderer != null)
             {
-                _weaponAttach?.Init(null, null); // free the previous character's weapon instances
+                _weaponAttach?.Init(null, null);
                 Destroy(Renderer.gameObject);
             }
             var go = new GameObject("LabCharacter");
@@ -340,16 +390,17 @@ namespace SlopArena.Client.Tools
             return attach;
         }
 
-        private static void ConfigureRenderer(PlayerRenderer renderer, CharacterDefinition def, string name)
+        private void ConfigureRenderer(PlayerRenderer renderer, CharacterDefinition def, string name)
         {
             renderer.name = name;
             renderer.ModelYOffset = def.ModelYOffset;
             renderer.CapsuleRadius = def.CapsuleRadius;
             renderer.CapsuleHeight = def.CapsuleHeight;
             renderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
-            renderer.SetBakedData(null); // baked pose comes from the tool's own resolve, not renderer playback
+            renderer.SetBakedData(Baked);
+            renderer.SetAnimationCatalog(_previewAnimationCatalog);
             renderer.SetCharacterDefinition(def);
-            renderer.LoadModel(def);
+            renderer.LoadModel(def, _previewRig);
         }
 
         private Vector3 BasePosition() => transform.position + new Vector3(0f, Def.CapsuleHeight * 0.5f, 0f);
@@ -504,7 +555,7 @@ namespace SlopArena.Client.Tools
         {
             float value = Mathf.Max(0f, multiplier);
             if (Mathf.Approximately(value, CurrentHitstopMultiplier)) return;
-            PushWorkingUndo();
+            PushSourceUndo();
             WorkingHitstopOverrides[CurrentAbilityProperty] = value;
             _trajDirty = "";
             RefreshPose();
@@ -715,40 +766,34 @@ namespace SlopArena.Client.Tools
 
         // ── Hitbox event editing (spec #119: add / remove / move / scale) ──
 
-        private WorkingSnapshot CaptureWorkingSnapshot()
+        public void SetSourceDocument(CharacterPackageSource source, bool clearHistory = false)
         {
-            var events = new Dictionary<string, HitboxEvent[]>(WorkingEvents.Count);
-            foreach (var kvp in WorkingEvents)
-                events[kvp.Key] = (HitboxEvent[])kvp.Value.Clone();
-            return new WorkingSnapshot(events, new Dictionary<string, float>(WorkingHitstopOverrides));
+            _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
+            if (clearHistory) { _undo.Clear(); _redo.Clear(); }
         }
 
-        private void PushWorkingUndo()
+        private void PushSourceUndo()
         {
-            _undo.Push(CaptureWorkingSnapshot());
+            if (_sourceDocument == null) return;
+            _undo.Push(_sourceDocument);
             if (_undo.Count > MaxUndoDepth) _undo.Pop();
             _redo.Clear();
-        }
-
-        private void StoreWorkingSnapshot(WorkingSnapshot snapshot)
-        {
-            WorkingEvents = snapshot.Events;
-            WorkingHitstopOverrides = snapshot.HitstopOverrides;
-            RefreshPose();
         }
 
         public void UndoEvents()
         {
             if (_undo.Count == 0) return;
-            _redo.Push(CaptureWorkingSnapshot());
-            StoreWorkingSnapshot(_undo.Pop());
+            if (_sourceDocument != null) _redo.Push(_sourceDocument);
+            _sourceDocument = _undo.Pop();
+            RefreshPose();
         }
 
         public void RedoEvents()
         {
             if (_redo.Count == 0) return;
-            _undo.Push(CaptureWorkingSnapshot());
-            StoreWorkingSnapshot(_redo.Pop());
+            if (_sourceDocument != null) _undo.Push(_sourceDocument);
+            _sourceDocument = _redo.Pop();
+            RefreshPose();
         }
 
         public void SetWorkingEvent(int index, HitboxEvent evt)
@@ -756,11 +801,9 @@ namespace SlopArena.Client.Tools
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
             if (index < 0 || index >= events.Length) return;
             events[index] = evt;
-            PushWorkingUndo();
             WorkingEvents[CurrentKey] = events;
             RefreshPose();
         }
-
         public void AddWorkingEvent()
         {
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
@@ -779,7 +822,7 @@ namespace SlopArena.Client.Tools
                 Knockback = template.Knockback,
             };
             var list = new List<HitboxEvent>(events) { created };
-            PushWorkingUndo();
+            PushSourceUndo();
             WorkingEvents[CurrentKey] = list.ToArray();
             RefreshPose();
         }
@@ -790,95 +833,11 @@ namespace SlopArena.Client.Tools
             if (index < 0 || index >= events.Length) return;
             var list = new List<HitboxEvent>(events);
             list.RemoveAt(index);
-            PushWorkingUndo();
+            PushSourceUndo();
             WorkingEvents[CurrentKey] = list.ToArray();
             RefreshPose();
         }
 
-        // ── Persistence: write the complete authored definition to character.json ──
-
-        public void SaveToJson()
-        {
-            if (ContentFilePath == null || !File.Exists(ContentFilePath))
-            {
-                Debug.LogWarning($"[AbilityLab] Character JSON file not found: {ContentFilePath ?? "<unknown>"}");
-                return;
-            }
-            if (WorkingEvents.Count == 0 && WorkingHitstopOverrides.Count == 0)
-            {
-                Debug.LogWarning("[AbilityLab] No edits to save.");
-                return;
-            }
-
-            string contentId = Character.ToString().ToLowerInvariant();
-            try
-            {
-                var saveDef = CharacterContentSerializer.Load(
-                    CharacterContentSerializer.Serialize(contentId, Def));
-
-                int stageCount = 0;
-                foreach (var kvp in WorkingEvents)
-                {
-                    if (!TryParseStageKey(kvp.Key, out int slot, out bool airborne, out int stageIndex))
-                    {
-                        Debug.LogError($"[AbilityLab] Cannot save JSON: malformed edit key '{kvp.Key}'.");
-                        return;
-                    }
-
-                    var ability = saveDef.GetSlotAbility(slot, airborne);
-                    if (ability?.Stages == null || stageIndex < 0 || stageIndex >= ability.Stages.Length)
-                    {
-                        Debug.LogError(
-                            $"[AbilityLab] Cannot save JSON: no stage {stageIndex} in {ContentAbilityName(slot, airborne)} " +
-                            $"for {Character}. File not written.");
-                        return;
-                    }
-
-                    var editedStage = ability.Stages[stageIndex];
-                    editedStage.HitboxEvents = kvp.Value == null
-                        ? Array.Empty<HitboxEvent>()
-                        : (HitboxEvent[])kvp.Value.Clone();
-                    ability.Stages[stageIndex] = editedStage;
-                    stageCount++;
-                }
-
-                int hitstopCount = 0;
-                foreach (var kvp in WorkingHitstopOverrides)
-                {
-                    if (!TryGetContentAbility(saveDef, kvp.Key, out var ability) || ability == null)
-                    {
-                        Debug.LogError(
-                            $"[AbilityLab] Cannot save JSON: no ability '{kvp.Key}' for {Character}. File not written.");
-                        return;
-                    }
-
-                    ability.Params ??= new Dictionary<string, float>();
-                    ability.Params["hitstop_multiplier"] = kvp.Value;
-                    hitstopCount++;
-                }
-
-                // Validate the complete edited definition before touching disk.
-                string serialized = CharacterContentSerializer.Serialize(contentId, saveDef);
-                var validatedDef = CharacterContentSerializer.Load(serialized);
-                CharacterContentSerializer.SaveFile(ContentFilePath, contentId, validatedDef);
-
-                Def = CharacterContentSerializer.LoadFile(ContentFilePath);
-                WorkingDefs = LoadWorkingDefs(Def, Baked);
-                DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
-                if (Renderer != null) ConfigureRenderer(Renderer, DisplayDef, "LabCharacter");
-                if (_dummyRenderer != null) ConfigureRenderer(_dummyRenderer, DisplayDef, "LabDummy");
-                WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-                WorkingHitstopOverrides = new Dictionary<string, float>();
-                _undo.Clear();
-                _redo.Clear();
-                RefreshPose();
-                Debug.Log($"[AbilityLab] Saved {stageCount} edited stage(s) and {hitstopCount} hitstop override(s) to {ContentFilePath}");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AbilityLab] Failed to save JSON '{ContentFilePath}': {ex.Message}");
-            }
-        }
 
         /// <summary>Discard unsaved edits — the preview reverts to the last-built data.</summary>
         public void RevertEdits()

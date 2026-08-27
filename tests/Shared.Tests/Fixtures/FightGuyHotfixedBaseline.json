@@ -601,7 +601,7 @@
         "FightGuyCycloneKick"
       ],
       "animationNames": [
-        "spell_e"
+        "spell_r"
       ],
       "animSpeed": 2,
       "params": {
@@ -654,7 +654,7 @@
         "FightGuyCycloneKick"
       ],
       "animationNames": [
-        "spell_e"
+        "spell_r"
       ],
       "animSpeed": 2,
       "params": {

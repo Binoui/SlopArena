@@ -58,6 +58,7 @@ namespace SlopArena.Shared.Rollback
                 _lastKnownInput[packet.EntityId] = packet.HasInput ? packet.Input : default;
                 if (packet.Tick > maxConfirmedTick) maxConfirmedTick = packet.Tick;
             }
+            _sim.SetTick(maxConfirmedTick);
 
             uint frontierTicks = currentLocalTick > maxConfirmedTick ? currentLocalTick - maxConfirmedTick : 0;
             if (frontierTicks > WindowCap) frontierTicks = WindowCap;
@@ -82,6 +83,9 @@ namespace SlopArena.Shared.Rollback
             }
         }
 
+
+        public IReadOnlyList<TimelinePresentationEvent> DrainPresentationEvents()
+            => _sim.GetPresentationEvents(clear: true);
         public CharacterState GetState(ulong id) => _sim.GetState(id);
     }
 }

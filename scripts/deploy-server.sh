@@ -25,12 +25,19 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/build/minipc"
 COMPOSE="/root/homelab/sloparena/docker-compose.yml"
 
+echo "== Verify committed FightGuy package =="
+dotnet test "$ROOT/tests/Shared.Tests/" --nologo --filter FullyQualifiedName~CommittedFightGuyPackage
+
 echo "== Publish linux-x64 (framework-dependent) =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release \
   -r linux-x64 --self-contained false -o "$OUT" --nologo
 # server.json is copied by the csproj (dev defaults, localhost:5000); drop it —
 # the live config on alfred is authoritative and must never be overwritten.
 rm -f "$OUT/server.json"
+for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
+  test -f "$OUT/content-cooked/fightguy/$package_file"
+done
+cmp "$ROOT/content-cooked/fightguy/manifest.json" "$OUT/content-cooked/fightguy/manifest.json"
 
 echo "== Prepare target dir =="
 ssh "$HOST" "sudo mkdir -p /srv/sloparena/server && sudo chown alfred:alfred /srv/sloparena/server"

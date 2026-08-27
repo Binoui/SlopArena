@@ -33,19 +33,6 @@ namespace SlopArena.Client
             return FirstExisting(relative);
         }
 
-        /// <summary>Absolute path to the committed FightGuy definition, or null if not found.</summary>
-        public static string? ResolveFightGuyCharacter()
-        {
-            const string relative = "content/characters/fightguy/character.json";
-            string inBuild = Path.Combine(Application.streamingAssetsPath, relative);
-            if (File.Exists(inBuild)) return inBuild;
-
-            string? repoRoot = RepoRoot();
-            if (repoRoot == null) return null;
-
-            string inRepo = Path.GetFullPath(Path.Combine(repoRoot, relative));
-            return File.Exists(inRepo) ? inRepo : null;
-        }
 
         /// <summary>
         /// First arena directory that actually contains baked .arena files:

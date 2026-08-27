@@ -29,7 +29,7 @@ public class IasaTests : KitScenarioTests
     /// </summary>
     private static CharacterDefinition MakeIasaDef(bool iasa)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.FightGuyDef);
+        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
         def.LMB = new AbilitySpec
         {
             Name = "IASA Jab",
@@ -135,7 +135,7 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_DoesNotInterruptDuringAttackerHitstop_ButDoesAfterFreeze()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.FightGuyDef);
+        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
         def.LMB = new AbilitySpec
         {
             Name = "IASA Jab Hit",

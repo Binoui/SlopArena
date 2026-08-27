@@ -90,5 +90,8 @@ namespace SlopArena.Shared.Rollback
         public CharacterState GetState() => _sim.GetState(_entityId);
         public SpellResolver? Resolver => _sim.Resolver;
         public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _sim.LastTickHits;
+
+        public IReadOnlyList<TimelinePresentationEvent> DrainPresentationEvents()
+            => _sim.GetPresentationEvents(clear: true);
     }
 }

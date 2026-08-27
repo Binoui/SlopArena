@@ -48,6 +48,9 @@ namespace SlopArena.Client
 
         /// <summary>Roster stashed at match start (entityId → name/class) for the results screen (issue #40).</summary>
         public static IReadOnlyList<Shared.LobbyPlayerInfo>? MatchRoster;
+        /// <summary>Immutable content identity admitted for the active match.</summary>
+        public static Shared.MatchContentCatalog? MatchContentCatalog { get; private set; }
+        public static Shared.MatchContentHandleMap? MatchContentHandleMap { get; private set; }
 
         /// <summary>
         /// True when the local player is the lobby host. Computed from the
@@ -156,6 +159,20 @@ namespace SlopArena.Client
         /// </summary>
         public static void ApplyMatchStarted(Shared.MatchStartedConfig config)
         {
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            if (config.MatchPort > 0)
+            {
+                string failure = null;
+                if (config.Content == null || !TryBuildAndValidateMatchCatalog(config.Content, out var catalog, out failure))
+                {
+                    UnityEngine.Debug.LogError($"[PvP] Match content admission failed: {failure ?? "authoritative content map is missing."}");
+                    UnityEngine.SceneManagement.SceneManager.LoadScene("ServerBrowser");
+                    return;
+                }
+                MatchContentCatalog = catalog;
+                MatchContentHandleMap = config.Content;
+            }
             // A new match invalidates every previous result snapshot.
             CurrentMatchResults = null;
             // Find the local player in the roster (by SteamId). The master
@@ -181,6 +198,7 @@ namespace SlopArena.Client
             UI.MatchConfig.ServerPort = config.MatchPort > 0 ? config.MatchPort : UI.MatchConfig.ServerPort;
             // ServerIP is already set (host: localhost, joiner: server browser IP).
             UI.MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, Shared.CharacterClass.Manki);
+            UI.MatchConfig.PlayerPackageId = MatchContentCatalog?.Resolve(UI.MatchConfig.PlayerClass)?.Identity.PackageId ?? string.Empty;
             UI.MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
             // Codec guarantees [1,99] (default 3); assign directly so a stale value
             // from a previous match can never leak through (issue #38).
@@ -193,9 +211,11 @@ namespace SlopArena.Client
             {
                 if (p.SteamId == SteamId) continue;
                 if (p.EntityId <= 0) continue;
+                var opponentClass = ParseClass(p.CharacterSelection, Shared.CharacterClass.Manki);
                 UI.MatchConfig.Opponents.Add(new UI.MatchConfig.OpponentInfo(
                     (ulong)p.EntityId,
-                    ParseClass(p.CharacterSelection, Shared.CharacterClass.Manki)));
+                    opponentClass,
+                    MatchContentCatalog?.Resolve(opponentClass)?.Identity.PackageId ?? string.Empty));
             }
 
             // Stash the roster so the results screen can render names/classes.
@@ -204,6 +224,73 @@ namespace SlopArena.Client
             // Go straight to the PvP arena — the master server already launched
             // the game server and assigned the UDP port (issue #35).
             UnityEngine.SceneManagement.SceneManager.LoadScene("Arena_PvP");
+        }
+        public static void InstallLocalMatchCatalog(Shared.MatchContentCatalog catalog)
+        {
+            MatchContentCatalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            var records = new System.Collections.Generic.List<Shared.MatchContentHandleRecord>();
+            foreach (var entry in catalog.Entries)
+                if (entry.LegacySelector.HasValue)
+                    records.Add(new Shared.MatchContentHandleRecord(entry.Handle, entry.LegacySelector.Value, entry.Identity, entry.DisplayName));
+            MatchContentHandleMap = new Shared.MatchContentHandleMap(Shared.MatchContentHandleMap.CurrentSchemaVersion, records);
+        }
+        public static bool TryBuildLocalMatchCatalog(out Shared.MatchContentCatalog? catalog, out string? failure)
+        {
+            catalog = null; failure = null;
+            try
+            {
+                string[] roots = { "content-cooked", System.IO.Path.Combine(UnityEngine.Application.dataPath, "../../../content-cooked"), System.IO.Path.Combine(UnityEngine.Application.streamingAssetsPath, "content-cooked") };
+                string? rosterPath = null;
+                foreach (var root in roots)
+                {
+                    var candidate = System.IO.Path.Combine(root, "roster", "manifest.json");
+                    if (System.IO.File.Exists(candidate)) { rosterPath = candidate; break; }
+                }
+                if (rosterPath == null) { failure = "Local cooked roster manifest is missing."; return false; }
+                var manifest = Shared.BuiltInRosterManifestCodec.Load(rosterPath);
+                var fightGuy = manifest.Resolve(Shared.CharacterClass.FightGuy);
+                if (fightGuy == null) { failure = "Local cooked roster has no FightGuy package."; return false; }
+                var packageRoot = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(rosterPath)!)!;
+                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(System.IO.Path.Combine(packageRoot, fightGuy.PackageId), fightGuy.Requirement);
+                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult> { [fightGuy.PackageId] = loaded };
+                var built = new Shared.MatchContentCatalogBuilder().Build(manifest, packages, new Shared.LegacyCharacterCatalogAdapter());
+                if (!built.IsValid || built.Catalog == null) { failure = string.Join("; ", built.Diagnostics); return false; }
+                catalog = built.Catalog; return true;
+            }
+            catch (Exception ex) { failure = ex.Message; return false; }
+        }
+        private static bool TryBuildAndValidateMatchCatalog(Shared.MatchContentHandleMap received, out Shared.MatchContentCatalog? catalog, out string? failure)
+        {
+            catalog = null;
+            failure = null;
+            try
+            {
+                string[] roots = { "content-cooked", System.IO.Path.Combine(UnityEngine.Application.dataPath, "../../../content-cooked"), System.IO.Path.Combine(UnityEngine.Application.streamingAssetsPath, "content-cooked") };
+                string? rosterPath = null;
+                foreach (var root in roots)
+                {
+                    var candidate = System.IO.Path.Combine(root, "roster", "manifest.json");
+                    if (System.IO.File.Exists(candidate)) { rosterPath = candidate; break; }
+                }
+                if (rosterPath == null) { failure = "Local cooked roster manifest is missing."; return false; }
+                var manifest = Shared.BuiltInRosterManifestCodec.Load(rosterPath);
+                var fightGuy = manifest.Resolve(Shared.CharacterClass.FightGuy);
+                if (fightGuy == null) { failure = "Local cooked roster has no FightGuy package."; return false; }
+                var packageRoot = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(rosterPath)!)!;
+                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(System.IO.Path.Combine(packageRoot, fightGuy.PackageId), fightGuy.Requirement);
+                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult> { [fightGuy.PackageId] = loaded };
+                var built = new Shared.MatchContentCatalogBuilder().Build(manifest, packages, new Shared.LegacyCharacterCatalogAdapter());
+                if (!built.IsValid || built.Catalog == null) { failure = string.Join("; ", built.Diagnostics); return false; }
+                if (received.Entries.Count != built.Catalog.Entries.Count) { failure = "Authoritative content handle map is incomplete."; return false; }
+                foreach (var record in received.Entries)
+                {
+                    var local = built.Catalog.Resolve(record.Handle);
+                    if (local == null || local.Identity != record.Identity || local.LegacySelector != record.Selector) { failure = $"Content handle {record.Handle.Value} identity mismatch."; return false; }
+                }
+                catalog = built.Catalog;
+                return true;
+            }
+            catch (Exception ex) { failure = ex.Message; return false; }
         }
 
         private static Shared.CharacterClass ParseClass(string? name, Shared.CharacterClass fallback)
@@ -226,6 +313,8 @@ namespace SlopArena.Client
             ActiveLobby = null;
             LobbyRoster = null;
             MatchRoster = null;
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
             CurrentMatchResults = null;
             IsLobbyHost = false;
         }

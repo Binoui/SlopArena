@@ -113,45 +113,41 @@ namespace SlopArena.Client.World
             if (_projectileVFX == null)
                 _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
             _projectileVFX.SetSimulation(_bridge.InternalSim);
+            if (!SlopArena.Client.ClientSession.TryBuildLocalMatchCatalog(out var contentCatalog, out var contentFailure) || contentCatalog == null)
+            {
+                Debug.LogError($"[TrainingMatch] Content catalog build failed: {contentFailure}");
+                return;
+            }
+            SlopArena.Client.ClientSession.InstallLocalMatchCatalog(contentCatalog);
             var playerClass = _playerClassOverride != CharacterClass.None ? _playerClassOverride : MatchConfig.PlayerClass;
-            var playerDef = CharacterRegistry.Get(playerClass);
-            var playerBaked = LoadBakedData(playerDef);
-            playerDef = ApplyHurtboxOverride(playerDef, playerBaked);
-            _playerDef = playerDef;
+            var playerEntry = contentCatalog.Resolve(playerClass);
             var npcClass = solo ? MatchConfig.SoloBotClass : _npcClass;
-            var npcDef = CharacterRegistry.Get(npcClass);
-            var npcBaked = LoadBakedData(npcDef);
-            npcDef = ApplyHurtboxOverride(npcDef, npcBaked);
-            // Heuristic bot: keep the NPC def, re-seed per match, reset policy memory.
-            _npcDef = npcDef;
+            var npcEntry = contentCatalog.Resolve(npcClass);
+            if (playerEntry == null || npcEntry == null)
+            {
+                Debug.LogError($"[TrainingMatch] Missing catalog entry for player={playerClass} or NPC={npcClass}.");
+                return;
+            }
+            var playerDef = playerEntry.Definition;
+            _playerDef = playerDef;
+            var npcDef = npcEntry.Definition;
             _npcRng = new System.Random();
             _npcMemory.Reset();
             _npcMemory.DifficultyLevel = Mathf.Clamp(
                 solo ? MatchConfig.SoloCpuLevel : _npcCpuLevel, 1, 9);
- 
+
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
             // explicitly — otherwise its damage % has no overhead panel.
-            SetupPlayerRenderer(playerDef, playerBaked, arena);
+            if (!SetupPlayerRenderer(playerEntry, arena))
+                return;
             SetupHUD(playerDef, new[]
             {
                 new HUDManager.HudPlayer(NpcEntityId, "P2", npcClass, isLocal: false),
             });
             // NPC renderer
-            if (_npcRenderer != null)
-            {
-                _npcRenderer.EntityId = NpcEntityId;
-                _npcRenderer.ModelYOffset = npcDef.ModelYOffset;
-                _npcRenderer.CapsuleRadius = npcDef.CapsuleRadius;
-                _npcRenderer.CapsuleHeight = npcDef.CapsuleHeight;
-                _npcRenderer.HurtboxBoneDefs = npcDef.HurtboxBoneDefs;
-                _npcRenderer.SetBlastLines(arena);
-                _npcRenderer.SetBakedData(npcBaked);
-                _npcRenderer.SetCharacterDefinition(npcDef);
-                _npcRenderer.LoadModel(npcDef);
-                _npcRenderer.GetComponent<WeaponAttach>()
-                    ?.Init(_npcRenderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{npcClass}"));
-            }
+            if (_npcRenderer != null && !SetupRenderer(_npcRenderer, npcEntry, arena, NpcEntityId, false))
+                return;
 
             // Player spawn
             var pSpawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : new SpawnPoint();
@@ -160,7 +156,7 @@ namespace SlopArena.Client.World
                 PX = pSpawn.X, PY = pSpawn.Y, PZ = pSpawn.Z,
                 FacingYaw = pSpawn.Yaw,
                 JumpsLeft = playerDef.Movement.MaxJumps,
-            }, playerBaked);
+            }, playerEntry.BakedAnimation);
 
             // NPC spawn at fixed position
             float npcX = 0f;
@@ -170,7 +166,7 @@ namespace SlopArena.Client.World
                 PX = npcX, PY = 5f, PZ = npcZ,
                 FacingYaw = Mathf.PI,
                 JumpsLeft = npcDef.Movement.MaxJumps,
-            }, npcBaked);
+            }, npcEntry.BakedAnimation);
 
             // Position renderers
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);

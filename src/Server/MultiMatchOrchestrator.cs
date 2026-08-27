@@ -16,50 +16,47 @@ namespace SlopArena.Server
     {
         private readonly ConcurrentDictionary<int, MatchInstance> _activeMatches = new();
         private readonly ServerConfig _config;
+        private readonly MatchContentCatalogProvider _contentProvider;
+
+        public MatchContentCatalogProvider ContentProvider => _contentProvider;
 
         public MultiMatchOrchestrator(ServerConfig config)
         {
             _config = config;
+            _contentProvider = new MatchContentCatalogProvider();
         }
 
         /// <summary>Optional callback invoked with (match guid, winner steam id) when a match ends (issue #40).</summary>
         public Action<Guid, long>? ReportMatchResult { get; set; }
 
-        /// <summary>
-        /// Assign a new match to the next available port with a roster of
-        /// players + character classes (issue #35). Returns the assigned UDP
-        /// port, or -1 if no slots are available.
-        /// </summary>
-        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks = 3)
+        /// <summary>Assigns a match only after building its match-scoped catalog.</summary>
+        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks = MatchDefaults.DefaultMaxStocks)
+            => TryAssignMatch(matchId, arenaName, roster, maxStocks, out var port, out _, out _) ? port : -1;
+
+        public bool TryAssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks,
+            out int port, out MatchContentHandleMap? content, out string? error)
         {
+            port = -1; content = null; error = null;
+            if (roster == null || roster.Count is < 2 or > 4) { error = "Roster must contain 2-4 players."; return false; }
+            if (!_contentProvider.TryBuild(out var catalog, out content, out error) || catalog == null) return false;
             for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
             {
-                int port = _config.Port + offset;
-                if (!_activeMatches.ContainsKey(port))
+                int candidate = _config.Port + offset;
+                if (_activeMatches.ContainsKey(candidate)) continue;
+                MatchInstance match;
+                try { match = new MatchInstance(candidate, matchId, arenaName, roster, catalog, OnMatchEnd, maxStocks, ReportMatchResult); }
+                catch (Exception ex) { error = ex.Message; return false; }
+                if (_activeMatches.TryAdd(candidate, match))
                 {
-                    var match = new MatchInstance(port, matchId, arenaName, roster, OnMatchEnd, maxStocks, ReportMatchResult);
-                    if (_activeMatches.TryAdd(port, match))
-                    {
-                        match.Start();
-                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
-                        return port;
-                    }
+                    match.Start();
+                    port = candidate;
+                    Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
+                    return true;
                 }
             }
-
-            Console.WriteLine($"[Orchestrator] No ports available for match {matchId} (max {_config.MaxConcurrentMatches})");
-            return -1;
+            error = $"No ports available for match {matchId} (max {_config.MaxConcurrentMatches}).";
+            return false;
         }
-
-        /// <summary>
-        /// Assign a match with two Manki players (legacy/training path).
-        /// </summary>
-        public int AssignMatch(string matchId, string arenaName)
-            => AssignMatch(matchId, arenaName, new[]
-            {
-                new MatchPlayer(0, CharacterClass.Manki, 1),
-                new MatchPlayer(0, CharacterClass.Manki, 2),
-            });
 
         /// <summary>
         /// Called by MatchInstance when a match ends (thread callback).

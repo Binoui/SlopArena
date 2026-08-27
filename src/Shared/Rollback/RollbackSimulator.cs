@@ -17,6 +17,8 @@ namespace SlopArena.Shared.Rollback
         private readonly Dictionary<ulong, BakedAnimationData?> _baked = new();
         private readonly ulong _selfId;
         private uint _localTick;
+        private readonly List<TimelinePresentationEvent> _acceptedPresentationEvents = new();
+        private readonly HashSet<PresentationEventKey> _seenPresentationEvents = new();
 
         public RollbackSimulator(ArenaDefinition arena, ulong selfEntityId, IMatchRule? rule = null)
         {
@@ -49,6 +51,8 @@ namespace SlopArena.Shared.Rollback
             var input = inputs.TryGetValue(_selfId, out var i) ? i : default;
             _local.Tick(input);
             _localTick++;
+            Publish(_local.DrainPresentationEvents());
+
         }
 
         /// <summary>Feed one network drain's worth of opponent packets. Splits by ActionState
@@ -74,7 +78,11 @@ namespace SlopArena.Shared.Rollback
                 }
             }
             if (predictable.Count > 0)
+            {
                 _predicted.ApplyBatch(predictable, _localTick, _defs, _baked);
+                Publish(_predicted.DrainPresentationEvents());
+            }
+
         }
 
         /// <summary>Feed the self entity's own received packet (LocalTrack correction, D4).</summary>
@@ -94,6 +102,28 @@ namespace SlopArena.Shared.Rollback
                 if (id != _selfId) result[id] = GetState(id);
             return result;
         }
+
+        public void IngestPresentationEvent(TimelinePresentationEvent value)
+        {
+            if (_seenPresentationEvents.Add(value.Key))
+                _acceptedPresentationEvents.Add(value);
+        }
+
+        public void IngestPresentationEvents(IReadOnlyList<TimelinePresentationEvent> values)
+        {
+            foreach (var value in values)
+                IngestPresentationEvent(value);
+        }
+
+        public List<TimelinePresentationEvent> DrainPresentationEvents()
+        {
+            var result = new List<TimelinePresentationEvent>(_acceptedPresentationEvents);
+            _acceptedPresentationEvents.Clear();
+            return result;
+        }
+
+        private void Publish(IReadOnlyList<TimelinePresentationEvent> values)
+            => IngestPresentationEvents(values);
 
         public SpellResolver? Resolver => _local.Resolver;
         public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _local.LastTickHits;

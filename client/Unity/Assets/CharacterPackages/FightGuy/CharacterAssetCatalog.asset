@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e24271275a4fc0af82df0240843b6bf, type: 3}
+  m_Name: CharacterAssetCatalog
+  m_EditorClassIdentifier: 
+  _packageId: fightguy
+  _catalogSchemaVersion: 1
+  _rig: {fileID: 1802147238805907036, guid: eb6307c86ccb789bd94bc718e2060bcd, type: 3}
+  _sampleRate: 60
+  _bindings:
+  - _semanticId: anim.idle
+    _clip: {fileID: 7400000, guid: 3952341bf4d7a779a8f7ff121269b536, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.idle
+  - _semanticId: anim.run
+    _clip: {fileID: 7400000, guid: 9497b614d4d8cbbc2b075339b0c00c6b, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.run
+  - _semanticId: anim.dash
+    _clip: {fileID: 7400000, guid: bb89e4b61e13e48ac944e8e29df27fa1, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.dash
+  - _semanticId: anim.jump
+    _clip: {fileID: 7400000, guid: c0e91d6138f429cfabe18ad13b1543bf, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.jump
+  - _semanticId: anim.fall
+    _clip: {fileID: 7400000, guid: a3937bd5c9d45f6c382bfe04128a81a1, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.fall
+  - _semanticId: anim.hit-light
+    _clip: {fileID: 7400000, guid: 2c20e3646ca4bc0e1a62bc32373e9000, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-light
+  - _semanticId: anim.hit-medium
+    _clip: {fileID: 7400000, guid: 44833e4cdd42997d2bce91c985a58a6a, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-medium
+  - _semanticId: anim.hit-hard
+    _clip: {fileID: 7400000, guid: 3f3fbde2c4e4181669da0484ea7f2a8f, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-hard
+  - _semanticId: anim.low-kick
+    _clip: {fileID: 7400000, guid: eb14612d3e2086d5dbbc4f6176ca362d, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.low-kick
+  - _semanticId: anim.double-punch
+    _clip: {fileID: 7400000, guid: ef68c8deeec6feeb7be8cdd4f6263483, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.double-punch
+  - _semanticId: anim.straight-punch
+    _clip: {fileID: 7400000, guid: 2abcbbc86b240cfa4a3850e8922b0298, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.straight-punch
+  - _semanticId: anim.floating-kick
+    _clip: {fileID: 7400000, guid: 34fbf978157a3a889b7e7d58c95dc8d8, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.floating-kick
+  - _semanticId: anim.sweeping-kick
+    _clip: {fileID: 7400000, guid: 35926af06601f9cb09b07da1ddb3c406, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.sweeping-kick
+  - _semanticId: anim.high-kick
+    _clip: {fileID: 7400000, guid: 4e90ecac4c0d8c718aa349996204222e, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.high-kick
+  - _semanticId: anim.double-kick
+    _clip: {fileID: 7400000, guid: e9165de70bb6b826b99b10f936b4f473, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.double-kick
+  - _semanticId: anim.air-smash
+    _clip: {fileID: 7400000, guid: 5a508ebe2c74b524d8e9b5f6459036d8, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.air-smash
+  - _semanticId: anim.ki-shot
+    _clip: {fileID: 3094330708855449807, guid: e40302a18e6c6e526bf471320e9fd420, type: 3}
+    _extrapolation: 2
+    _poseTrackId: anim.ki-shot
+  - _semanticId: anim.rising-dragon
+    _clip: {fileID: 7400000, guid: 5f606dcec44be2d9e95dd0ccf2556208, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.rising-dragon
+  - _semanticId: anim.cyclone-kick
+    _clip: {fileID: 7400000, guid: ae32872e5b28602cfb5f3386e41be7d8, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.cyclone-kick
+  - _semanticId: anim.dragon-beam
+    _clip: {fileID: 7400000, guid: 06b5ae14db42011d2a04c0da717ef035, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.dragon-beam

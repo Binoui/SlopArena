@@ -13,6 +13,8 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, byte> _kos = new();
 		private readonly Dictionary<ulong, (ulong attackerId, uint tick)> _lastHitCredits = new();
 		private uint _tick;
+		public void SetTick(uint tick) => _tick = tick;
+		private readonly List<TimelinePresentationEvent> _presentationEvents = new();
 		private const uint KillCreditWindowTicks = 180;
 
 		private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
@@ -80,6 +82,11 @@ namespace SlopArena.Shared
 
 		public void RemoveEntity(ulong id)
 		{
+			if (_activeAbilities.TryGetValue(id, out var ability)
+			    && _states.TryGetValue(id, out var state))
+			{
+				ability.OnCancel(ref state);
+			}
 			_states.Remove(id);
 			_defs.Remove(id);
 			_bakedData.Remove(id);
@@ -97,6 +104,14 @@ namespace SlopArena.Shared
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
 		public SpellResolver Resolver => _spellResolver;
+		public IReadOnlyList<TimelinePresentationEvent> GetPresentationEvents(bool clear = false)
+		{
+			var snapshot = new List<TimelinePresentationEvent>(_presentationEvents);
+			if (clear) _presentationEvents.Clear();
+			return snapshot;
+		}
+
+		public void ClearPresentationEvents() => _presentationEvents.Clear();
 
 		// ── Ability pool management ──
 
@@ -112,35 +127,35 @@ namespace SlopArena.Shared
 			ability.BakedData = _bakedData.TryGetValue(entityId, out var b) ? b : null;
 			ability.CharacterDef = def;
 			ability.Arena = _arena;
+			ability.PresentationSink = e => _presentationEvents.Add(e with { MatchTick = _tick });
 			ability.Slot = slot;
 			ability.AirborneAtStart = !state.IsGrounded;
             var spec = def.GetSlotAbility(slot, !state.IsGrounded);
-            // ADR-0015 §2 refinement (2026-08-12): momentum-preserve is an AERIAL property —
-            // air attacks ride their trajectory. A GROUNDED activation stops the incoming
-            // run/dash momentum (VX/VZ = 0) unless the spec opts out with
-            // PreserveMomentumOnStart (dash-attack style moves). Applied BEFORE OnStart so a
-            // move's own lunge / OnStart velocity still lands.
-            if (state.IsGrounded && (spec == null || !spec.PreserveMomentumOnStart))
+            var cookedSlot = def.GetCookedSlotAbility((byte)(slot + 1), !state.IsGrounded);
+            bool preserveMomentum = cookedSlot?.PreserveMomentumOnStart ?? spec?.PreserveMomentumOnStart ?? false;
+            // ADR-0015 §2 refinement: grounded activations stop incoming momentum unless
+            // the move explicitly preserves it. The move's own OnStart velocity follows.
+            if (state.IsGrounded && !preserveMomentum)
             {
                 state.VX = 0f;
                 state.VZ = 0f;
             }
-            // Ability refresh (ADR-0020): activating any ability refills the Rush
-            // dash-dance window to full. Combined with the state-gated countdown in
-            // Simulation.TickTimers (only counts while purely running in one direction),
-            // this keeps the fighter in Rush through footsies — Run with its slow
-            // Turnaround only appears after holding one direction a long time.
+            // Ability refresh (ADR-0020): activating any ability refills the Rush window.
             state.RushTicks = def.Movement.RushTicks;
-			// ADR-0019 §6: acting ends the post-hitstun flight regime — an aerial out of
-			// the tail is a normal attack (its own FloatWindow hover applies), not a floaty one.
+			// Acting ends the post-hitstun flight regime.
 			state.InPostHitstunFlight = false;
 			ability.OnStart(ref state, def);
 			state.AnimIndex = ability.AnimIndex;
+			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
+			{
+				if (ability.Slot < AbilitySlots.Count)
+					state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
+				_states[entityId] = state;
+				return;
+			}
 			state.AttackSlot = (byte)(slot + 1);
-            // ADR-0015 / issue #115: momentum-preserve removed the blanket AirTime reset
-            // and VY-cancel for every aerial ability. The FloatWindow now resets ONLY for
-            // recovery-designated moves (AbilitySpec.IsRecoveryMove) — the Smash up-B analog.
-            if (spec != null && spec.IsRecoveryMove)
+            // ADR-0015 / issue #115: recovery-designated moves reset the float window.
+            if (cookedSlot?.IsRecoveryMove == true || (cookedSlot == null && spec?.IsRecoveryMove == true))
                 state.AirTimeTicks = 0;
 			_states[entityId] = state;
 			_activeAbilities[entityId] = ability;
@@ -173,9 +188,10 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue;
 
-				// Interrupt: if state left Attacking or Aiming (dash, idle, or other), deactivate without OnEnd.
 				if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 				{
+					ability.OnCancel(ref state);
+					_states[id] = state;
 					ended.Add(id);
 					if (Simulation.OnDebugLog != null)
 						Simulation.OnDebugLog.Invoke(
@@ -364,14 +380,24 @@ namespace SlopArena.Shared
             if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
             {
                 bool airborne = !state.IsGrounded;
-                var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                if (ability != null)
+                var cooked = def.GetCookedSlotAbility(state.AttackSlot, airborne);
+                if (cooked != null)
                 {
-                    int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-                    if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                    int stageIdx = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
+                    int durationTicks = cooked.Timeline.Stages[stageIdx].DurationTicks;
+                    if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                }
+                else
+                {
+                    var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                    if (ability != null)
                     {
-                        int durationTicks = ability.Stages[stageIdx].DurationTicks;
-                        if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                        int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
+                        if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
+                        {
+                            int durationTicks = ability.Stages[stageIdx].DurationTicks;
+                            if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
+                        }
                     }
                 }
             }
@@ -416,13 +442,33 @@ namespace SlopArena.Shared
 			// and landed mid-move keeps its ground behavior — no termination.
 			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
 
-			var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
-			if (spec?.Stages is not { Length: > 0 }) return;
-			var stage = Simulation.ResolveStage(spec, state);
-
-			int elapsed = Simulation.ElapsedInStage(state, spec);
-			bool autoCancel = (stage.AutoCancelBeforeTicks > 0 && elapsed <= stage.AutoCancelBeforeTicks)
-				|| (stage.AutoCancelAfterTicks > 0 && elapsed >= stage.AutoCancelAfterTicks);
+			var cooked = def.GetCookedSlotAbility(state.AttackSlot, airborne: true);
+			ushort landingLagTicks;
+			ushort autoCancelBeforeTicks;
+			ushort autoCancelAfterTicks;
+			int elapsed;
+			if (cooked != null)
+			{
+				var stage = cooked.Timeline.Stages[Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1))];
+				landingLagTicks = stage.LandingLagTicks;
+				autoCancelBeforeTicks = stage.AutoCancelBeforeTicks;
+				autoCancelAfterTicks = stage.AutoCancelAfterTicks;
+				elapsed = state.AttackElapsedTicks;
+				for (var i = 0; i < state.ComboStage && i < cooked.Timeline.Stages.Count; i++)
+					elapsed -= cooked.Timeline.Stages[i].DurationTicks;
+			}
+			else
+			{
+				var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
+				if (spec?.Stages is not { Length: > 0 }) return;
+				var stage = Simulation.ResolveStage(spec, state);
+				landingLagTicks = stage.LandingLagTicks;
+				autoCancelBeforeTicks = stage.AutoCancelBeforeTicks;
+				autoCancelAfterTicks = stage.AutoCancelAfterTicks;
+				elapsed = Simulation.ElapsedInStage(state, spec);
+			}
+			bool autoCancel = (autoCancelBeforeTicks > 0 && elapsed <= autoCancelBeforeTicks)
+				|| (autoCancelAfterTicks > 0 && elapsed >= autoCancelAfterTicks);
 
 			// The aerial always ENDS on landing. Auto-cancel: end with no lock at all (Melee's
 			// AC: no landing commitment). Otherwise the landing lag (possibly 0) is the ONLY
@@ -435,7 +481,7 @@ namespace SlopArena.Shared
 			state.BufferedSlot = 0;
 			if (autoCancel)
 				return;
-			state.LandingLagTicks = stage.LandingLagTicks;
+			state.LandingLagTicks = landingLagTicks;
         }
 
         /// <summary>Occupancy-aware ledge grab (ADR-0020): an off-grid, non-hitstun entity
@@ -471,6 +517,7 @@ namespace SlopArena.Shared
             state.PY = surfaceY + capsuleHalf;
         }
 
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -498,12 +545,11 @@ namespace SlopArena.Shared
 				if (state.State != ActionState.Idle && state.State != ActionState.Attacking && state.State != ActionState.Run) continue;
 
 				bool airborne = !state.IsGrounded;
+				var cookedSlot = def.GetCookedSlotAbility(input.ActiveSlot, airborne);
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
 
-				// Issue #117: no spec for this (slot, state) — grounded-only move pressed in
-				// the air, or a data-less slot. Reject and consume (nothing to buffer); the
-				// old code NRE'd on spec.Stages below for data-less slots 6-10.
-				if (spec == null)
+				// Issue #117: reject slots with no cooked or legacy definition.
+				if (cookedSlot == null && spec == null)
 				{
 					var rejected = input;
 					rejected.ActiveSlot = 0;
@@ -521,7 +567,7 @@ namespace SlopArena.Shared
 				}
 
 				// ── Warp check: sprint to target if between WarpRange and AttackRange ──
-				if ((state.State == ActionState.Idle || state.State == ActionState.Run) && spec.Stages != null && spec.Stages.Length > 0)
+				if ((state.State == ActionState.Idle || state.State == ActionState.Run) && spec?.Stages is { Length: > 0 })
 				{
 					var firstStage = spec.Stages[0];
 					if (firstStage.WarpRange > 0f)
@@ -575,7 +621,7 @@ namespace SlopArena.Shared
 				// ── Charge-stock gate: abilities that declare a "max_charges" param are
 				// limited by a refundable charge pool (Kistu Rising Slash) rather than a flat
 				// cooldown. Blocked when the pool is exhausted. ──
-				int maxCharges = (spec.Params != null && spec.Params.TryGetValue("max_charges", out var mc)) ? (int)mc : 0;
+				int maxCharges = cookedSlot == null && spec!.Params != null && spec.Params.TryGetValue("max_charges", out var mc) ? (int)mc : 0;
 				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
 				{
 					// Consume the input so SimulateTick doesn't start a data-driven attack.
@@ -585,8 +631,10 @@ namespace SlopArena.Shared
 					continue;
 				}
 
-				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
-				if (ability == null) continue; // unsupported character or slot
+                var ability = cookedSlot != null
+                    ? new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray())
+                    : AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
+                if (ability == null) continue;
 
 				// ── IASA interrupt ──
 				// An active ability whose stage has passed its IasaTicks is dropped without
@@ -601,6 +649,7 @@ namespace SlopArena.Shared
 				{
 					if (!iasaUnlocked) continue;
 
+					currentAbility.OnCancel(ref state);
 					_activeAbilities.Remove(id);
 					if (currentAbility.Slot < AbilitySlots.Count)
 						state.SetCooldown((byte)(currentAbility.Slot + 1), currentAbility.Cooldown);
@@ -612,7 +661,15 @@ namespace SlopArena.Shared
 					_states[id] = state;
 				}
 
-				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(input.ActiveSlot - 1));
+				if (cookedSlot != null)
+				{
+					ability.Cooldown = cookedSlot.CooldownTicks;
+                    ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
+				}
+				else
+				{
+					AbilityFactory.InitFromSpec(ability, spec!, (byte)(input.ActiveSlot - 1));
+				}
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 
 				// Spend a charge from the pool (refunded on hit by the ability's OnHitEntity).
@@ -861,85 +918,54 @@ namespace SlopArena.Shared
 		/// </summary>
 		private void ProcessTargetLock(Dictionary<ulong, InputState> inputs)
 		{
-			// Snapshot keys to avoid InvalidOperationException when writing _states[id] = state
 			ulong[] ids = new ulong[_states.Count];
 			_states.Keys.CopyTo(ids, 0);
 			foreach (var id in ids)
 			{
 				if (!_states.TryGetValue(id, out var state)) continue;
 				bool hasInput = inputs.TryGetValue(id, out var input);
-
-				// ── Persistent lock toggle (ADR-0018 / issue #127) ──
-				// RMB edge bit → sim-authoritative LockOn on/off. No gate: the toggle is
-				// a persistent mode switch, honored even through hitstop/locks.
 				if (hasInput && input.ToggleLock)
 					state.LockOn = !state.LockOn;
 
-				// ── Find target ──
-				// Check if client provided a target (screen-center override)
 				ulong targetId = 0;
-				if (hasInput && input.TargetEntityId > 0)
-				{
-					ulong candidateId = input.TargetEntityId;
-					if (_states.ContainsKey(candidateId))
-						targetId = candidateId;
-				}
-
-				// Fall back to nearest scan if no client target
+				if (hasInput && input.TargetEntityId > 0 && _states.ContainsKey(input.TargetEntityId))
+					targetId = input.TargetEntityId;
 				if (targetId == 0)
-				{
-					float searchRange = 20f;
-					targetId = FindClosestEnemy(id, state.PX, state.PZ, searchRange, out _);
-				}
-
+					targetId = FindClosestEnemy(id, state.PX, state.PZ, 20f, out _);
 				state.TargetEntityId = targetId;
 
-				// ── Persistent lock (ADR-0018 / issue #127): passive target tracking.
-				// Facing is NOT steered while locked — the fighter keeps normal movement
-				// facing (runs where it runs, sticky air facing); the lock only keeps the
-				// target resolved so attack stages auto-face it (per-stage UseTargetLock /
-				// RotateTowardTarget below) and the client can frame it (camera + indicator).
-				// Disengages on toggle-off (above), no resolved target, or target beyond
-				// LockRangeMeters; a dead target is handled by the resolver re-picking
-				// (death re-target).
 				if (state.LockOn)
 				{
 					if (targetId == 0)
-					{
 						state.LockOn = false;
-					}
 					else
 					{
 						var lockTarget = _states[targetId];
 						float lockDx = lockTarget.PX - state.PX;
 						float lockDz = lockTarget.PZ - state.PZ;
-						float lockDistSq = lockDx * lockDx + lockDz * lockDz;
-						if (lockDistSq > LockRangeMeters * LockRangeMeters)
-						{
+						if (lockDx * lockDx + lockDz * lockDz > LockRangeMeters * LockRangeMeters)
 							state.LockOn = false;
-						}
 					}
 				}
 
-				if (targetId == 0) { _states[id] = state; continue; }
-				// ── Warping: rotation tracking (no warp init — already set by PreTickAbilities) ──
+				if (targetId == 0)
+				{
+					_states[id] = state;
+					continue;
+				}
+
 				if (state.State == ActionState.Warping)
 				{
 					if (_pendingWarpAttacks.TryGetValue(id, out byte pendingSlot))
 					{
 						var def = _defs[id];
-						bool airborne = !state.IsGrounded;
-						var spec = def.GetSlotAbility(pendingSlot - 1, airborne);
-						if (spec != null && spec.Stages != null && spec.Stages.Length > 0)
+						var spec = def.GetSlotAbility(pendingSlot - 1, !state.IsGrounded);
+						if (spec?.Stages is { Length: > 0 })
 						{
 							var stage = spec.Stages[0];
 							var target = _states[targetId];
 							float dx = target.PX - state.PX;
 							float dz = target.PZ - state.PZ;
-
-							// ── Rotate toward target each tick ──
-							// Not gated by attack range (a dead facing concept — issue #127):
-							// a locked warp snaps to the target, unlocked keeps the lerp.
 							if (stage.RotateTowardTarget && dx * dx + dz * dz > 0.001f)
 							{
 								float targetYaw = MathF.Atan2(dx, dz);
@@ -959,15 +985,11 @@ namespace SlopArena.Shared
 					continue;
 				}
 
-				// ── Attacking/Aiming behaviors (warp, rotation) ──
 				if (state.State is not (ActionState.Attacking or ActionState.Aiming) || state.AttackSlot == 0)
 				{
 					_states[id] = state;
 					continue;
 				}
-
-				// ── Hitstop (ADR-0012): keep TargetEntityId fresh but block warp-init and
-				// face-toward-target rotation while the attacker is frozen. ──
 				if (state.HitstopTicks > 0)
 				{
 					_states[id] = state;
@@ -977,11 +999,14 @@ namespace SlopArena.Shared
 				var attackDef = _defs[id];
 				bool attackAirborne = !state.IsGrounded;
 				var attackSpec = attackDef.GetSlotAbility(state.AttackSlot - 1, attackAirborne);
+				var attackCooked = attackDef.GetCookedSlotAbility(state.AttackSlot, attackAirborne);
 				if (attackSpec == null)
 				{
-					// Issue #117 backstop: an AttackSlot placeholder with no air spec
-					// (grounded-only move buffered mid-air) must reset, not stick in
-					// Attacking forever.
+					if (attackCooked != null)
+					{
+						_states[id] = state;
+						continue;
+					}
 					state.State = ActionState.Idle;
 					state.AttackSlot = 0;
 					state.AnimLockTicks = 0;
@@ -989,22 +1014,22 @@ namespace SlopArena.Shared
 					_states[id] = state;
 					continue;
 				}
-
-				if (attackSpec.Stages == null || attackSpec.Stages.Length == 0) { _states[id] = state; continue; }
+				if (attackSpec.Stages == null || attackSpec.Stages.Length == 0)
+				{
+					_states[id] = state;
+					continue;
+				}
 				var attackStage = Simulation.ResolveStage(attackSpec, state);
-
-				// Only process warp/rotation if target lock is enabled for this stage
-				if (!attackStage.UseTargetLock) { _states[id] = state; continue; }
+				if (!attackStage.UseTargetLock)
+				{
+					_states[id] = state;
+					continue;
+				}
 
 				var attackTarget = _states[targetId];
 				float attackDx = attackTarget.PX - state.PX;
 				float attackDz = attackTarget.PZ - state.PZ;
 				float attackDist = MathF.Sqrt(attackDx * attackDx + attackDz * attackDz);
-
-				// ── Warp toward target if within WarpRange but outside AttackRange ──
-				// Only for initial engage: don't re-warp if a ServerAbility is active.
-				// Without this guard, hitting a target knocks it back > AttackRange but ≤
-				// WarpRange, and ProcessTargetLock re-triggers warp every tick ("follow").
 				if (!_activeAbilities.ContainsKey(id) && state.WarpSpeed <= 0f
 				    && attackStage.WarpRange > 0f
 				    && attackDist > attackStage.AttackRange
@@ -1015,12 +1040,6 @@ namespace SlopArena.Shared
 					state.WarpAttackRange = attackStage.AttackRange;
 					state.WarpSpeed = 1f;
 				}
-
-				// ── Rotate toward target each tick ──
-				// Not gated by attack range (a dead facing concept — issue #127): attacks
-				// auto-aim at the resolved target regardless of distance. Locked attacks
-				// SNAP (short windows; the lock's contract is attacks face the enemy),
-				// unlocked attacks keep the per-stage TrackingStrength lerp.
 				if (attackStage.RotateTowardTarget && attackDx * attackDx + attackDz * attackDz > 0.001f)
 				{
 					float targetYaw = MathF.Atan2(attackDx, attackDz);
@@ -1034,10 +1053,10 @@ namespace SlopArena.Shared
 						state.FacingYaw += diff * attackStage.TrackingStrength * Simulation.TickDt;
 					}
 				}
-
 				_states[id] = state;
 			}
 		}
+
 
 		private List<SpellResolver.EntityData> BuildHurtboxList()
 		{
@@ -1340,22 +1359,33 @@ namespace SlopArena.Shared
 
 				var def = _defs[id];
 				bool airborne = !state.IsGrounded;
+				var cookedSlot = def.GetCookedSlotAbility(slot, airborne);
 				var spec = def.GetSlotAbility(slot - 1, airborne);
-				if (spec == null)
+				if (cookedSlot == null && spec == null)
 				{
 					state.State = ActionState.Idle;
 					_states[id] = state;
 					continue;
 				}
 
-				var ability = SlopArena.Shared.Abilities.AbilityFactory.CreateServer(def.Class, (byte)(slot - 1), airborne);
+                var ability = cookedSlot != null
+                    ? new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray())
+                    : AbilityFactory.CreateServer(def.Class, (byte)(slot - 1), airborne);
 				if (ability == null)
 				{
 					state.State = ActionState.Idle;
 					_states[id] = state;
 					continue;
 				}
-				SlopArena.Shared.Abilities.AbilityFactory.InitFromSpec(ability, spec, (byte)(slot - 1));
+				if (cookedSlot != null)
+				{
+					ability.Cooldown = cookedSlot.CooldownTicks;
+					ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
+				}
+				else
+				{
+					AbilityFactory.InitFromSpec(ability, spec!, (byte)(slot - 1));
+				}
 				ActivateAbility(id, ability, (byte)(slot - 1), def);
 			}
 		}
@@ -1376,6 +1406,11 @@ namespace SlopArena.Shared
 			{
 				var d = _defs[id];
 				var oldState = _states[id];
+				if (_activeAbilities.TryGetValue(id, out var deadAbility))
+				{
+					deadAbility.OnCancel(ref oldState);
+					_activeAbilities.Remove(id);
+				}
 				if (_lastHitCredits.TryGetValue(id, out var credit)
 				    && _tick - credit.tick <= KillCreditWindowTicks
 				    && credit.attackerId != id

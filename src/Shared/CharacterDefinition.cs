@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 
 #nullable enable
 
@@ -183,6 +184,28 @@ namespace SlopArena.Shared
         public AbilitySpec? AirSlot5;
         public AbilitySpec? AirA;
         // No constructor needed — class fields auto-default
+        /// <summary>Immutable cooked timeline catalog used by migrated characters.</summary>
+        public IReadOnlyList<CookedSlotDefinition>? CookedSlots;
+
+        /// <summary>Resolve a cooked slot from the wire slot and airborne state.</summary>
+        public CookedSlotDefinition? GetCookedSlotAbility(byte wireSlot, bool airborne)
+        {
+            if (CookedSlots == null) return null;
+            int index = wireSlot switch
+            {
+                AbilitySlots.Slot1 => airborne ? 8 : 0,
+                AbilitySlots.E => airborne ? 13 : 5,
+                AbilitySlots.R => airborne ? 14 : 6,
+                AbilitySlots.F => airborne ? 15 : 7,
+                AbilitySlots.Slot2 => airborne ? 9 : 1,
+                AbilitySlots.Slot3 => airborne ? 10 : 2,
+                AbilitySlots.Slot4 => airborne ? 11 : 3,
+                AbilitySlots.A => airborne ? 12 : 4,
+                _ => -1,
+            };
+            return index >= 0 && index < CookedSlots.Count ? CookedSlots[index] : null;
+        }
+
 
         /// <summary>
         /// Resolve the ability spec for a slot index (0-10) and airborne state (issue #117).
@@ -241,45 +264,13 @@ namespace SlopArena.Shared
             new("mixamorig:LeftFoot", 0, 0, 0, 0.16f),
         };
 
-        private static CharacterDefinition[]? _definitions;
-
-        public static CharacterDefinition[] All
+        public static CharacterDefinition Get(CharacterClass c) => c switch
         {
-            get
-            {
-                if (_definitions == null)
-                    _definitions = BuildRegistry();
-                return _definitions;
-            }
-        }
-
-        public static CharacterDefinition Get(CharacterClass c) => All[(int)c];
-
-        public static void RegisterOverride(CharacterDefinition definition)
-        {
-            if (definition == null) throw new ArgumentNullException(nameof(definition));
-
-            var definitions = All;
-            int index = (int)definition.Class;
-            if (index == 0 || index >= definitions.Length)
-            {
-                throw new InvalidDataException(
-                    $"Invalid character override class '{definition.Class}'.");
-            }
-
-            _definitions![index] = definition;
-        }
-
-        private static CharacterDefinition[] BuildRegistry()
-        {
-            return new CharacterDefinition[]
-            {
-                default,            // None (placeholder)
-                BuildManki(),       // Manki
-                BuildFightGuy(),    // FightGuy
-                BuildKistu(),       // Kistu
-                BuildNilus(),       // Nilus
-            };
-        }
+            CharacterClass.Manki => BuildManki(),
+            CharacterClass.Kistu => BuildKistu(),
+            CharacterClass.Nilus => BuildNilus(),
+            _ => throw new InvalidDataException(
+                $"Character '{c}' is not provided by the legacy character catalog.")
+        };
     }
 }

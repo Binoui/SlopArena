@@ -78,28 +78,48 @@ namespace SlopArena.Client.World
 
         // ── Shared setup helpers ────────────────────────────────────────────
 
-        protected void SetupPlayerRenderer(
-            CharacterDefinition def, BakedAnimationData? baked, ArenaDefinition arena)
+        protected bool SetupPlayerRenderer(MatchContentEntry entry, ArenaDefinition arena)
+            => SetupRenderer(_playerRenderer, entry, arena, PlayerEntityId, true);
+
+        protected bool SetupRenderer(
+            PlayerRenderer renderer, MatchContentEntry entry, ArenaDefinition arena,
+            ulong entityId, bool local)
         {
-            _playerRenderer.EntityId = PlayerEntityId;
-            _playerRenderer.ModelYOffset = def.ModelYOffset;
-            _playerRenderer.CapsuleRadius = def.CapsuleRadius;
-            _playerRenderer.CapsuleHeight = def.CapsuleHeight;
-            _playerRenderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
-            _playerRenderer.SetBlastLines(arena);
-            _playerRenderer.SetBakedData(baked);
-            _playerRenderer.SetCharacterDefinition(def);
+            if (renderer == null || entry == null)
+            {
+                Debug.LogError($"[{GetType().Name}] Renderer and content entry are required.");
+                return false;
+            }
 
-            // Use drag-dropped assets, fall back to Resources.Load by convention
-            if (_playerAnimConfig != null)
-                _playerRenderer.SetAnimationConfig(_playerAnimConfig);
-            _playerRenderer.LoadModel(def, _playerModelPrefab);
+            var def = entry.Definition;
+            CharacterAnimationCatalog animationCatalog = null;
+            GameObject rig = null;
+            if (entry.CookedCharacterPackage != null &&
+                !CookedCharacterClientAssetResolver.TryResolve(entry, out animationCatalog, out rig, out var error))
+            {
+                Debug.LogError($"[{GetType().Name}] Cooked client assets failed for {entry.Identity.PackageId}: {error}");
+                return false;
+            }
 
-            var weaponConfig = _playerWeaponConfig != null
+            renderer.EntityId = entityId;
+            renderer.ModelYOffset = def.ModelYOffset;
+            renderer.CapsuleRadius = def.CapsuleRadius;
+            renderer.CapsuleHeight = def.CapsuleHeight;
+            renderer.HurtboxBoneDefs = def.HurtboxBoneDefs;
+            renderer.SetBlastLines(arena);
+            renderer.SetBakedData(entry.BakedAnimation);
+            renderer.SetCharacterDefinition(def);
+            renderer.SetAnimationCatalog(animationCatalog);
+
+            if (local && _playerAnimConfig != null && entry.CookedCharacterPackage == null)
+                renderer.SetAnimationConfig(_playerAnimConfig);
+            renderer.LoadModel(def, rig ?? (local ? _playerModelPrefab : null));
+
+            var weaponConfig = local && _playerWeaponConfig != null
                 ? _playerWeaponConfig
                 : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
-            _playerRenderer.GetComponent<WeaponAttach>()
-                ?.Init(_playerRenderer, weaponConfig);
+            renderer.GetComponent<WeaponAttach>()?.Init(renderer, weaponConfig);
+            return true;
         }
 
         protected void SetupCamera()
@@ -238,7 +258,7 @@ namespace SlopArena.Client.World
 
         protected static BakedAnimationData? LoadBakedData(CharacterDefinition def)
         {
-            if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
+            if (def.Class == CharacterClass.FightGuy || string.IsNullOrEmpty(def.BakedDataPath)) return null;
             string? path = BakedContentPaths.ResolveBaked(def.BakedDataPath);
             if (path == null) return null;
             try

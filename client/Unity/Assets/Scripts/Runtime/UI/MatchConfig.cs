@@ -9,21 +9,24 @@ namespace SlopArena.Client.UI
         public static GameMode Mode = GameMode.Training;
         public static SlopArena.Shared.CharacterClass PlayerClass
             = SlopArena.Shared.CharacterClass.FightGuy;
+        public static string PlayerPackageId = "fightguy";
         public static string ArenaName = "slop_court";
         public static bool IsHost = true;
         public static string ServerIP = "127.0.0.1";
         public static int ServerPort = 9876;
 
-        /// <summary>One opponent in the match (issue #36): entity ID + class.</summary>
+        /// <summary>One opponent in the match: entity ID, selector, and stable package ID.</summary>
         public sealed class OpponentInfo
         {
             public ulong EntityId { get; }
             public SlopArena.Shared.CharacterClass Class { get; }
+            public string PackageId { get; }
 
-            public OpponentInfo(ulong entityId, SlopArena.Shared.CharacterClass @class)
+            public OpponentInfo(ulong entityId, SlopArena.Shared.CharacterClass @class, string packageId = "")
             {
                 EntityId = entityId;
                 Class = @class;
+                PackageId = packageId ?? "";
             }
         }
 
@@ -47,6 +50,7 @@ namespace SlopArena.Client.UI
         public static void Reset()
         {
             Mode = GameMode.Training;
+            PlayerPackageId = "fightguy";
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloBotClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloCpuLevel = 5;

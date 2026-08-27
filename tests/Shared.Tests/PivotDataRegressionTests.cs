@@ -38,7 +38,7 @@ public class PivotDataRegressionTests
     {
         foreach (var c in Kits)
         {
-            var def = CharacterRegistry.Get(c);
+            var def = BuiltInContentResolver.Resolve(c).Definition;
             foreach (var stage in AllStages(def))
             {
                 Assert.True(stage.WarpRange == 0f,
@@ -52,7 +52,7 @@ public class PivotDataRegressionTests
     {
         foreach (var c in Kits)
         {
-            var def = CharacterRegistry.Get(c);
+            var def = BuiltInContentResolver.Resolve(c).Definition;
             int launchers = 0;
             foreach (var stage in AllStages(def))
             {
@@ -70,7 +70,7 @@ public class PivotDataRegressionTests
     {
         foreach (var c in Kits)
         {
-            var def = CharacterRegistry.Get(c);
+            var def = BuiltInContentResolver.Resolve(c).Definition;
             foreach (var stage in AllStages(def))
             {
                 if (stage.HitboxEvents == null) continue;

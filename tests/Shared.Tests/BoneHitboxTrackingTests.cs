@@ -14,7 +14,7 @@ public class BoneHitboxTrackingTests
     public void BoneAttachedHitbox_RepositionsEachTick()
     {
         var baked = TestHelpers.LoadBakedData(TestHelpers.FightGuyDef);
-        Assert.NotNull(baked); // data/fightguy_skeleton.bin must be present (committed)
+        Assert.NotNull(baked); // loaded from the admitted cooked FightGuy pose package
 
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();

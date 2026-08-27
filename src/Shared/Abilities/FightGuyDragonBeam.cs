@@ -8,25 +8,28 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public sealed class FightGuyDragonBeam : ServerAbility
     {
+        private readonly CookedDragonBeamCapabilityParameters _parameters;
         private ushort _ticks;
         private float _cachedAimYaw;
         private float _cachedAimPitch;
         private readonly HashSet<ulong> _hitEntities = new();
+
+        public FightGuyDragonBeam(CookedDragonBeamCapabilityParameters parameters)
+            => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _ticks = 0;
             _cachedAimYaw = s.AimYaw;
             _cachedAimPitch = s.AimPitch;
-
             s.State = ActionState.Attacking;
-            s.AttackSlot = (byte)(Slot + 1);
+            s.IsAiming = false;
             AnimIndex = 0;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
-            s.AnimLockTicks = (ushort)GetParam(def, "duration_ticks", 28f);
             s.VX = 0f;
             s.VZ = 0f;
+            _hitEntities.Clear();
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
@@ -34,47 +37,39 @@ namespace SlopArena.Shared.Abilities
             _ticks++;
             s.VX = 0f;
             s.VZ = 0f;
+            if (_ticks != _parameters.FireTick)
+                return;
 
-            ushort fireTick = (ushort)GetParam(def, "fire_tick", 24f);
-            if (_ticks == fireTick)
+            float cosPitch = MathF.Cos(_cachedAimPitch);
+            float dirX = cosPitch * MathF.Sin(_cachedAimYaw);
+            float dirY = MathF.Sin(_cachedAimPitch);
+            float dirZ = cosPitch * MathF.Cos(_cachedAimYaw);
+            float startY = s.PY + _parameters.LaunchOffsetY;
+            float damage = _parameters.Damage;
+            float radius = _parameters.BeamRadius;
+            ApplyBuffBonuses(ref s, ref damage, ref radius);
+
+            Resolver.Spawn(new Hitbox
             {
-                float pitch = _cachedAimPitch;
-                float cosPitch = MathF.Cos(pitch);
-                float dirX = cosPitch * MathF.Sin(_cachedAimYaw);
-                float dirY = MathF.Sin(pitch);
-                float dirZ = cosPitch * MathF.Cos(_cachedAimYaw);
-                float startY = s.PY + GetParam(def, "launch_offset_y", 1.2f);
-                float range = GetParam(def, "beam_range", 18f);
-
-                float damage = GetParam(def, "damage", 14f);
-                float radius = GetParam(def, "beam_radius", 0.45f);
-                ApplyBuffBonuses(ref s, ref damage, ref radius);
-
-                Resolver.Spawn(new Hitbox
-                {
-                    X = s.PX,
-                    Y = startY,
-                    Z = s.PZ,
-                    EndX = s.PX + (dirX * range),
-                    EndY = startY + (dirY * range),
-                    EndZ = s.PZ + (dirZ * range),
-                    Radius = radius,
-                    Shape = HitboxShape.Capsule,
-                    Damage = damage,
-                    BaseKnockback = GetParam(def, "knockback_base", 18f),
-                    KnockbackGrowth = GetParam(def, "knockback_growth", 10f),
-                    KnockbackAngle = (sbyte)GetParam(def, "knockback_angle", 20f),
-                    StunTicks = (ushort)GetParam(def, "stun_ticks", 24f),
-                    DurationTicks = (ushort)GetParam(def, "hitbox_duration_ticks", 2f),
-                    OwnerId = s.EntityId,
-                    FreezesOwner = false,
-                    HitsMultipleOpponents = true,
-                    HitEntities = _hitEntities,
-                });
-            }
-
-            if (_ticks >= (ushort)GetParam(def, "duration_ticks", 28f))
-                EndAbility(ref s);
+                X = s.PX,
+                Y = startY,
+                Z = s.PZ,
+                EndX = s.PX + dirX * _parameters.BeamRange,
+                EndY = startY + dirY * _parameters.BeamRange,
+                EndZ = s.PZ + dirZ * _parameters.BeamRange,
+                Radius = radius,
+                Shape = HitboxShape.Capsule,
+                Damage = damage,
+                BaseKnockback = _parameters.KnockbackBase,
+                KnockbackGrowth = _parameters.KnockbackGrowth,
+                KnockbackAngle = (sbyte)_parameters.KnockbackAngle,
+                StunTicks = _parameters.StunTicks,
+                DurationTicks = _parameters.HitboxDurationTicks,
+                OwnerId = s.EntityId,
+                FreezesOwner = false,
+                HitsMultipleOpponents = true,
+                HitEntities = _hitEntities,
+            });
         }
     }
 }

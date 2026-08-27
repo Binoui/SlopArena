@@ -107,18 +107,21 @@ internal static class Program
         _ => Array.Empty<Route>(),
     };
 
-    internal static CharacterDefinition ResolveCharacter(string which)
+    internal static MatchContentEntry ResolveEntry(string which)
     {
         return which.ToLowerInvariant() switch
         {
-            "fightguy" => CharacterRegistry.Get(CharacterClass.FightGuy),
-            "manki"    => CharacterRegistry.Get(CharacterClass.Manki),
-            "kistu"    => CharacterRegistry.Get(CharacterClass.Kistu),
-            "nilus"    => CharacterRegistry.Get(CharacterClass.Nilus),
+            "fightguy" => BuiltInContentResolver.Resolve(CharacterClass.FightGuy),
+            "manki"    => BuiltInContentResolver.Resolve(CharacterClass.Manki),
+            "kistu"    => BuiltInContentResolver.Resolve(CharacterClass.Kistu),
+            "nilus"    => BuiltInContentResolver.Resolve(CharacterClass.Nilus),
             var c => throw new ArgumentException(
                 $"unknown character: {c} (expected one of: fightguy, manki, kistu, nilus)"),
         };
     }
+
+    internal static CharacterDefinition ResolveCharacter(string which)
+        => ResolveEntry(which).Definition;
 
     internal static int Main(string[] args)
     {
@@ -129,17 +132,15 @@ internal static class Program
             : new[] { 0, 30, 60, 90, 120, 150 });
         string? outPath = ParseOut(args) ?? $"docs/generated/{which}-move-data.md";
 
-        var def = ResolveCharacter(which);
+        var entry = ResolveEntry(which);
+        var def = entry.Definition;
         var routes = RoutesFor(which);
 
         var hits = CollectHits(def);
 
-        // Baked skeleton data — needed by the real-hitbox paths (pipeline parity, combo probes,
-        // true-combo graph). Falls back to capsule hurtboxes when the file is absent.
-        BakedAnimationData? baked = null;
-        string bakedPath = def.BakedDataPath.Replace("res://", "");
-        if (File.Exists(bakedPath)) baked = BakedAnimationData.LoadFromBin(File.ReadAllBytes(bakedPath));
-        else Console.Error.WriteLine($"warn: {bakedPath} not found — probes run with un-baked hitbox resolution");
+        // Cooked FightGuy poses come from the admitted catalog entry; legacy characters
+        // retain their path-based baked data until their package migration.
+        var baked = LoadBakedData(entry);
 
         // --truecombos: freeform true-combo reachability graph (real sim, per starter × hit state
         // × %, which follow-ups connect while the victim is still in hitstun) + combo density.
@@ -216,7 +217,7 @@ internal static class Program
         // ApplyKnockback trajectory rows.
         if (args.Contains("--pipe"))
         {
-            PipeLaunch(def);
+            PipeLaunch(entry);
             return 0;
         }
 
@@ -920,6 +921,19 @@ internal static class Program
     internal static object? Get(Type t, object o, string name)
         => t.GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!.GetValue(o);
 
+    internal static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
+    {
+        if (entry.CookedCharacterPackage != null)
+            return entry.BakedAnimation;
+
+        var def = entry.Definition;
+        if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
+        string path = def.BakedDataPath.Replace("res://", "");
+        if (!File.Exists(path)) return null;
+        try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
+        catch { return null; }
+    }
+
     internal static int? ParseTraj(string[] args)
     {
         int i = Array.IndexOf(args, "--traj");
@@ -934,13 +948,10 @@ internal static class Program
     /// (inputs + baked bones → ResolveHits → hitstop queue → queued launch). Prints the
     /// victim's applied KV + hitstun + travel to landing — the number the GAME produces,
     /// vs the direct-ApplyKnockback trajectory rows.
-    /// </summary>
-    internal static void PipeLaunch(CharacterDefinition def)
+    internal static void PipeLaunch(MatchContentEntry entry)
     {
-        BakedAnimationData? baked = null;
-        string bakedPath = def.BakedDataPath.Replace("res://", "");
-        if (File.Exists(bakedPath)) baked = BakedAnimationData.LoadFromBin(File.ReadAllBytes(bakedPath));
-        else Console.Error.WriteLine($"warn: {bakedPath} not found — un-baked hitbox resolution");
+        var def = entry.Definition;
+        var baked = LoadBakedData(entry);
         float gpy = def.CapsuleHeight * 0.5f;
         foreach (var z in new[] { 0.8f, 1.0f, 1.2f, 1.5f, 2.0f })
         {

@@ -358,7 +358,7 @@ public class ServerSimulationTests
     {
         var arena = MakeTestArena();
         var sim = new ServerSimulation(arena);
-        var def = CharacterRegistry.Get(CharacterClass.Manki);
+        var def = BuiltInContentResolver.Resolve(CharacterClass.Manki).Definition;
         var state = MakeIdleState(1);
         sim.RegisterEntity(1, def, state);
 
@@ -370,7 +370,7 @@ public class ServerSimulationTests
     {
         var arena = MakeTestArena();
         var sim = new ServerSimulation(arena);
-        var def = CharacterRegistry.Get(CharacterClass.Manki);
+        var def = BuiltInContentResolver.Resolve(CharacterClass.Manki).Definition;
 
         var pState = MakeIdleState(1);
         sim.RegisterEntity(1, def, pState);
@@ -398,7 +398,7 @@ public class ServerSimulationTests
     {
         var arena = MakeTestArena();
         var sim = new ServerSimulation(arena);
-        var def = CharacterRegistry.Get(CharacterClass.Manki);
+        var def = BuiltInContentResolver.Resolve(CharacterClass.Manki).Definition;
         var state = MakeIdleState(1);
         sim.RegisterEntity(1, def, state);
 

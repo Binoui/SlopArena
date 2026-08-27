@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using SlopArena.Shared;
@@ -22,10 +23,14 @@ namespace SlopArena.EditorTools
         private static readonly string[] ShapeOptions = { "Sphere", "Capsule" };
 
         private AbilityLab _lab;
+        private AbilityLabPackageWorkspace _workspace = new();
+        private string _newPackageId = "new-character";
+        private string _newDisplayName = "New Character";
+        private string _renameOldId = "";
+        private string _renameNewId = "";
         private Vector2 _scroll;
         private int _selectedHitbox = -1;
         private bool _showTimeline = true;
-
         [MenuItem("Tools/SlopArena/Ability Lab")]
         public static void Open() => GetWindow<AbilityLabWindow>("Ability Lab");
 
@@ -36,38 +41,39 @@ namespace SlopArena.EditorTools
 
         private void OnGUI()
         {
-            _lab = FindLab();
-
-            if (_lab == null)
-            {
-                EditorGUILayout.HelpBox(
-                    "No Ability Lab rig in the scene. Create one, then press Play — the tool " +
-                    "previews poses and hitboxes in play mode.", MessageType.Info);
-                if (GUILayout.Button("Create Lab Rig"))
-                {
-                    var go = new GameObject("AbilityLab");
-                    var rig = go.AddComponent<AbilityLab>();
-                    rig.EnsureCamera();
-                    Selection.activeGameObject = go;
-                    _lab = rig;
-                }
-                return;
-            }
-
-            if (!Application.isPlaying)
-            {
-                EditorGUILayout.HelpBox(
-                    "Rig ready. Camera already works in edit mode — right-drag orbit, " +
-                    "middle-drag pan, scroll zoom. Press Play to load a character, scrub, " +
-                    "and see boxes.", MessageType.Info);
-                if (GUILayout.Button("Enter Play Mode"))
-                    EditorApplication.EnterPlaymode();
-                return;
-            }
-
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             try
             {
+                _lab = FindLab();
+                DrawPackageWorkspace();
+
+                if (_lab == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No Ability Lab rig in the scene. Create one, then press Play — the tool " +
+                        "previews poses and hitboxes in play mode.", MessageType.Info);
+                    if (GUILayout.Button("Create Lab Rig"))
+                    {
+                        var go = new GameObject("AbilityLab");
+                        var rig = go.AddComponent<AbilityLab>();
+                        rig.EnsureCamera();
+                        Selection.activeGameObject = go;
+                        _lab = rig;
+                    }
+                    return;
+                }
+
+                if (!Application.isPlaying)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Rig ready. Camera already works in edit mode — right-drag orbit, " +
+                        "middle-drag pan, scroll zoom. Press Play to load a character, scrub, " +
+                        "and see boxes.", MessageType.Info);
+                    if (GUILayout.Button("Enter Play Mode"))
+                        EditorApplication.EnterPlaymode();
+                    return;
+                }
+
                 DrawCharacterSelect();
                 DrawScrubber();
                 DrawDisplayToggles();
@@ -83,22 +89,226 @@ namespace SlopArena.EditorTools
             }
 
             // Keep the window live while the rig plays — scrub/timeline advance per tick.
-            if (_lab.Playing) Repaint();
+            if (_lab != null && _lab.Playing) Repaint();
         }
 
         // ── Sections ──
 
+        private void DrawPackageWorkspace()
+        {
+            EditorGUILayout.LabelField("Character Package", EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
+            _newPackageId = EditorGUILayout.TextField("New package ID", _newPackageId);
+            _newDisplayName = EditorGUILayout.TextField("Display name", _newDisplayName);
+            if (GUILayout.Button("New Package", GUILayout.Width(110)))
+            {
+                if (!_workspace.NewPackage(_newPackageId, _newDisplayName))
+                    ShowDiagnostics(_workspace.Diagnostics);
+            }
+            if (GUILayout.Button("Open Package", GUILayout.Width(110)))
+            {
+                string selected = EditorUtility.OpenFolderPanel("Open Character Package", "Assets/CharacterPackages", "");
+                if (!string.IsNullOrEmpty(selected))
+                {
+                    string project = UnityCharacterAssetCooker.ProjectRoot().Replace('\\', '/') + "/";
+                    string relative = selected.Replace('\\', '/');
+                    if (relative.StartsWith(project, StringComparison.Ordinal)) relative = relative.Substring(project.Length);
+                    if (!_workspace.OpenPackage(relative)) ShowDiagnostics(_workspace.Diagnostics);
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+            if (!_workspace.HasPackage) return;
+            EditorGUILayout.LabelField("Package", _workspace.PackageRoot);
+            EditorGUILayout.LabelField("Status", _workspace.Status);
+            var manifest = _workspace.Manifest;
+            string creator = EditorGUILayout.TextField("Creator", manifest.Creator);
+            string license = EditorGUILayout.TextField("License", manifest.License);
+            string attribution = EditorGUILayout.TextField("Attribution", manifest.Attribution);
+            if (creator != manifest.Creator || license != manifest.License || attribution != manifest.Attribution)
+                _workspace.SetManifest(manifest with { Creator = creator, License = license, Attribution = attribution });
+            EditorGUILayout.LabelField("Loaded source hash", _workspace.LoadedDiskHash);
+            EditorGUILayout.LabelField("Cooked source hash", _workspace.CookedSourceHash);
+            EditorGUILayout.LabelField("Cooked content hash", _workspace.CookedContentHash);
+            EditorGUILayout.LabelField("Package hash", _workspace.PackageHash);
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Reload Package")) _workspace.ReloadPackage();
+            if (GUILayout.Button("Save Package")) { _workspace.SavePackage(); Repaint(); }
+            if (GUILayout.Button("Revert Draft")) _workspace.RevertDraft();
+            _renameOldId = EditorGUILayout.TextField("Rename semantic ID", _renameOldId);
+            _renameNewId = EditorGUILayout.TextField("New semantic ID", _renameNewId);
+            if (GUILayout.Button("Rename ID") && !_workspace.RenameSemanticId(_renameOldId, _renameNewId))
+                ShowDiagnostics(_workspace.Diagnostics);
+            if (GUILayout.Button("Migrate Schema")) EditorUtility.DisplayDialog("Schema migration", "No authoring migration is registered for this schema.", "OK");
+            EditorGUILayout.EndHorizontal();
+            if (_workspace.Status == "Failed")
+                EditorGUILayout.HelpBox("Non-authoritative draft / Stale Cook. The last valid cooked preview remains active.", MessageType.Warning);
+            ShowDiagnostics(_workspace.Diagnostics);
+            DrawSourceEditor();
+        }
+
+        private static void ShowDiagnostics(IReadOnlyList<CharacterDiagnostic> diagnostics)
+        {
+            foreach (var diagnostic in diagnostics ?? Array.Empty<CharacterDiagnostic>())
+                EditorGUILayout.HelpBox($"{diagnostic.Code} {diagnostic.Path}: {diagnostic.Message}", diagnostic.Severity == CharacterDiagnosticSeverity.Error ? MessageType.Error : MessageType.Warning);
+        }
+
+        private static CharacterMovementSource DrawMovement(CharacterMovementSource m)
+        {
+            EditorGUILayout.LabelField("Movement", EditorStyles.boldLabel);
+            float runSpeed = EditorGUILayout.FloatField("Run speed (m/s)", m.RunSpeed);
+            float runAccelerationA = EditorGUILayout.FloatField("Run acceleration A", m.RunAccelerationA);
+            float runAccelerationB = EditorGUILayout.FloatField("Run acceleration B", m.RunAccelerationB);
+            float dashSpeed = EditorGUILayout.FloatField("Dash speed", m.DashSpeed);
+            float airSpeedMax = EditorGUILayout.FloatField("Air speed max", m.AirSpeedMax);
+            float airAccelStick = EditorGUILayout.FloatField("Air accel stick", m.AirAccelStick);
+            float airAccelBase = EditorGUILayout.FloatField("Air accel base", m.AirAccelBase);
+            float jumpForce = EditorGUILayout.FloatField("Jump force", m.JumpForce);
+            float shortHopForce = EditorGUILayout.FloatField("Short-hop force", m.ShortHopForce);
+            float airJumpVMultiplier = EditorGUILayout.FloatField("Air jump V multiplier", m.AirJumpVMultiplier);
+            float airJumpHMultiplier = EditorGUILayout.FloatField("Air jump H multiplier", m.AirJumpHMultiplier);
+            float gravity = EditorGUILayout.FloatField("Gravity", m.Gravity);
+            float airFloatGravity = EditorGUILayout.FloatField("Air float gravity", m.AirFloatGravity);
+            ushort dashDuration = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Dash duration (ticks)", m.DashDurationTicks), 0, ushort.MaxValue);
+            ushort dashCooldown = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Dash cooldown (ticks)", m.DashCooldownTicks), 0, ushort.MaxValue);
+            float groundFriction = EditorGUILayout.FloatField("Ground friction", m.GroundFriction);
+            float airFriction = EditorGUILayout.FloatField("Air friction", m.AirFriction);
+            float maxFallSpeed = EditorGUILayout.FloatField("Max fall speed", m.MaxFallSpeed);
+            float fastFallSpeed = EditorGUILayout.FloatField("Fast fall speed", m.FastFallSpeed);
+            byte maxJumps = (byte)Mathf.Clamp(EditorGUILayout.IntField("Max jumps", m.MaxJumps), 0, byte.MaxValue);
+            ushort jumpSquat = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Jump squat (ticks)", m.JumpSquatTicks), 0, ushort.MaxValue);
+            ushort floatWindow = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Float window (ticks)", m.FloatWindowTicks), 0, ushort.MaxValue);
+            ushort rush = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Rush (ticks)", m.RushTicks), 0, ushort.MaxValue);
+            return new CharacterMovementSource(runSpeed, runAccelerationA, runAccelerationB, dashSpeed, airSpeedMax, airAccelStick, airAccelBase, jumpForce, shortHopForce, airJumpVMultiplier, airJumpHMultiplier, gravity, airFloatGravity, dashDuration, dashCooldown, groundFriction, airFriction, maxFallSpeed, fastFallSpeed, maxJumps, jumpSquat, floatWindow, rush);
+        }
+        private static CharacterPresentationSource DrawPresentation(CharacterPresentationSource p)
+        {
+            EditorGUILayout.LabelField("Presentation semantic IDs", EditorStyles.boldLabel);
+            return new CharacterPresentationSource(
+                EditorGUILayout.TextField("Idle", p.Idle), EditorGUILayout.TextField("Run", p.Run), EditorGUILayout.TextField("Dash", p.Dash),
+                EditorGUILayout.TextField("Jump", p.Jump), EditorGUILayout.TextField("Fall", p.Fall), EditorGUILayout.TextField("Hit small", p.HitSmall),
+                EditorGUILayout.TextField("Hit medium", p.HitMedium), EditorGUILayout.TextField("Hit hard", p.HitHard),
+                EditorGUILayout.FloatField("Land start offset (s)", p.LandStartOffsetSeconds));
+        }
+        private int _sourceSlot;
+
+        private void DrawSourceEditor()
+        {
+            if (!_workspace.HasPackage) return;
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Authoring Document", EditorStyles.boldLabel);
+            var draft = _workspace.Draft;
+            string displayName = EditorGUILayout.TextField("Display name", draft.DisplayName);
+            float weight = EditorGUILayout.FloatField("Weight", draft.Weight);
+            float capsuleRadius = EditorGUILayout.FloatField("Capsule radius", draft.CapsuleRadius);
+            float capsuleHeight = EditorGUILayout.FloatField("Capsule height", draft.CapsuleHeight);
+            float hipHeight = EditorGUILayout.FloatField("Hip height", draft.HipHeight);
+            float hurtboxRadius = EditorGUILayout.FloatField("Hurtbox radius", draft.HurtboxRadius);
+            CharacterMovementSource movement = DrawMovement(draft.Movement);
+            CharacterPresentationSource presentation = DrawPresentation(draft.Presentation);
+            if (displayName != draft.DisplayName || !Mathf.Approximately(weight, draft.Weight) || !Mathf.Approximately(capsuleRadius, draft.CapsuleRadius) || !Mathf.Approximately(capsuleHeight, draft.CapsuleHeight) || !Mathf.Approximately(hipHeight, draft.HipHeight) || !Mathf.Approximately(hurtboxRadius, draft.HurtboxRadius) || !movement.Equals(draft.Movement) || !presentation.Equals(draft.Presentation))
+                _workspace.SetDraft(draft with { DisplayName = displayName, Weight = weight, CapsuleRadius = capsuleRadius, CapsuleHeight = capsuleHeight, HipHeight = hipHeight, HurtboxRadius = hurtboxRadius, Movement = movement, Presentation = presentation });
+            string[] slotIds = _workspace.Draft.Slots.Select(x => x.Id).ToArray();
+            _sourceSlot = Mathf.Clamp(EditorGUILayout.Popup("Source slot", _sourceSlot, slotIds), 0, Math.Max(0, slotIds.Length - 1));
+            if (slotIds.Length == 0) return;
+            var slot = _workspace.Draft.Slots[_sourceSlot];
+            EditorGUILayout.LabelField(slot.Id, slot.Name);
+            string slotName = EditorGUILayout.TextField("Name", slot.Name);
+            string description = EditorGUILayout.TextField("Description", slot.Description);
+            string iconId = EditorGUILayout.TextField("Icon ID", slot.IconId);
+            var behavior = (AuthoringAbilityBehavior)EditorGUILayout.EnumPopup("Behavior", slot.Behavior);
+            var aimMode = (AuthoringAimMode)EditorGUILayout.EnumPopup("Aim mode", slot.AimMode);
+            ushort cooldown = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Cooldown (ticks)", slot.CooldownTicks), 0, ushort.MaxValue);
+            bool recovery = EditorGUILayout.Toggle("Recovery move", slot.IsRecoveryMove);
+            bool momentum = EditorGUILayout.Toggle("Preserve momentum", slot.PreserveMomentumOnStart);
+            if (slotName != slot.Name || description != slot.Description || iconId != slot.IconId || behavior != slot.Behavior || aimMode != slot.AimMode || cooldown != slot.CooldownTicks || recovery != slot.IsRecoveryMove || momentum != slot.PreserveMomentumOnStart)
+            {
+                slot = slot with { Name = slotName, Description = description, IconId = iconId, Behavior = behavior, AimMode = aimMode, CooldownTicks = cooldown, IsRecoveryMove = recovery, PreserveMomentumOnStart = momentum };
+                _workspace.SetDraft(_workspace.Draft with { Slots = _workspace.Draft.Slots.Select((x, i) => i == _sourceSlot ? slot : x).ToArray() });
+            }
+            for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
+            {
+                var stage = slot.Timeline.Stages[stageIndex];
+                EditorGUILayout.LabelField($"Stage {stageIndex}", EditorStyles.boldLabel);
+                ushort duration = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Duration (ticks)", stage.DurationTicks), 0, ushort.MaxValue);
+                ushort iasa = (ushort)Mathf.Clamp(EditorGUILayout.IntField("IASA (ticks)", stage.IasaTicks), 0, ushort.MaxValue);
+                ushort landingLag = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Landing lag (ticks)", stage.LandingLagTicks), 0, ushort.MaxValue);
+                ushort autoBefore = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Auto-cancel before", stage.AutoCancelBeforeTicks), 0, ushort.MaxValue);
+                ushort autoAfter = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Auto-cancel after", stage.AutoCancelAfterTicks), 0, ushort.MaxValue);
+                string animationText = EditorGUILayout.TextField("Animation IDs (ordered)", string.Join(", ", stage.AnimationIds));
+                var animationIds = animationText.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
+                if (duration != stage.DurationTicks || iasa != stage.IasaTicks || landingLag != stage.LandingLagTicks || autoBefore != stage.AutoCancelBeforeTicks || autoAfter != stage.AutoCancelAfterTicks || !animationIds.SequenceEqual(stage.AnimationIds, StringComparer.Ordinal))
+                    _workspace.ReplaceStage(_sourceSlot, stageIndex, stage with { DurationTicks = duration, IasaTicks = iasa, LandingLagTicks = landingLag, AutoCancelBeforeTicks = autoBefore, AutoCancelAfterTicks = autoAfter, AnimationIds = animationIds });
+                for (int operationIndex = 0; operationIndex < stage.Operations.Count; operationIndex++)
+                {
+                    var operation = stage.Operations[operationIndex];
+                    EditorGUILayout.LabelField($"{operationIndex}: {operation.GetType().Name} @ {operation.Tick} {operation.Unit}");
+                    if (operation is SpawnHitboxOperationSource hitbox)
+                    {
+                        var h = hitbox.Hitbox;
+                        h = h with
+                        {
+                            Shape = (AuthoringHitboxShape)EditorGUILayout.EnumPopup("Shape", h.Shape),
+                            Radius = EditorGUILayout.FloatField("Radius", h.Radius),
+                            OffsetX = EditorGUILayout.FloatField("Offset X", h.OffsetX),
+                            OffsetY = EditorGUILayout.FloatField("Offset Y", h.OffsetY),
+                            OffsetZ = EditorGUILayout.FloatField("Offset Z", h.OffsetZ),
+                            EndOffsetX = EditorGUILayout.FloatField("End X", h.EndOffsetX),
+                            EndOffsetY = EditorGUILayout.FloatField("End Y", h.EndOffsetY),
+                            EndOffsetZ = EditorGUILayout.FloatField("End Z", h.EndOffsetZ),
+                            StartBoneId = EditorGUILayout.TextField("Start bone ID", h.StartBoneId ?? ""),
+                            EndBoneId = EditorGUILayout.TextField("End bone ID", h.EndBoneId ?? ""),
+                            Damage = EditorGUILayout.FloatField("Damage", h.Damage),
+                            Angle = EditorGUILayout.FloatField("Angle", h.Angle),
+                            BaseKnockback = EditorGUILayout.FloatField("Base knockback", h.BaseKnockback),
+                            KnockbackGrowth = EditorGUILayout.FloatField("Knockback growth", h.KnockbackGrowth),
+                            StunTicks = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Stun ticks", h.StunTicks), 0, ushort.MaxValue),
+                            DurationTicks = (ushort)Mathf.Clamp(EditorGUILayout.IntField("Duration ticks", h.DurationTicks), 0, ushort.MaxValue),
+                            Interruptible = EditorGUILayout.Toggle("Interruptible", h.Interruptible),
+                            HitGroup = (byte)Mathf.Clamp(EditorGUILayout.IntField("Hit group", h.HitGroup), 0, byte.MaxValue),
+                        };
+                        h = h with { StartBoneId = string.IsNullOrEmpty(h.StartBoneId) ? null : h.StartBoneId, EndBoneId = string.IsNullOrEmpty(h.EndBoneId) ? null : h.EndBoneId };
+                        if (!h.Equals(hitbox.Hitbox))
+                            _workspace.ReplaceOperation(_sourceSlot, stageIndex, operationIndex, hitbox with { Hitbox = h });
+                    }
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Up") && operationIndex > 0) _workspace.MoveOperation(_sourceSlot, stageIndex, operationIndex, operationIndex - 1);
+                    if (GUILayout.Button("Down") && operationIndex + 1 < stage.Operations.Count) _workspace.MoveOperation(_sourceSlot, stageIndex, operationIndex, operationIndex + 1);
+                    if (GUILayout.Button("Remove")) _workspace.RemoveOperation(_sourceSlot, stageIndex, operationIndex);
+                    EditorGUILayout.EndHorizontal();
+                }
+                if (GUILayout.Button("Add Operation"))
+                    _workspace.AddOperation(_sourceSlot, stageIndex, new SpawnHitboxOperationSource(1, AuthoringUnit.Meters, new HitboxSource(AuthoringHitboxShape.Sphere, 0.25f, 0f, 0f, 1f, 0f, 0f, 0f, null, null, 1f, 45f, 10f, 1f, 10, 1, true, 0)));
+            }
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Add Stage")) _workspace.AddStage(_sourceSlot, new CharacterStageSource(1, 0, 0, 0, 0, Array.Empty<string>(), Array.Empty<CharacterTimelineOperationSource>()));
+            if (GUILayout.Button("Remove Stage") && slot.Timeline.Stages.Count > 0) _workspace.RemoveStage(_sourceSlot, slot.Timeline.Stages.Count - 1);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.LabelField("Migrated hurtboxes (read-only)", EditorStyles.boldLabel);
+            foreach (var capsule in _workspace.Draft.HurtboxCapsules) EditorGUILayout.LabelField($"Capsule ({capsule.StartX}, {capsule.StartY}, {capsule.StartZ}) → ({capsule.EndX}, {capsule.EndY}, {capsule.EndZ}) r={capsule.Radius}");
+            foreach (var bone in _workspace.Draft.HurtboxBoneDefs) EditorGUILayout.LabelField($"Bone {bone.BoneId} offset=({bone.OffsetX}, {bone.OffsetY}, {bone.OffsetZ}) r={bone.Radius}");
+        }
+
         private void DrawCharacterSelect()
         {
             EditorGUILayout.LabelField("Character", EditorStyles.boldLabel);
-            // BuildRegistry()[0] is `default` (null placeholder for CharacterClass.None) —
-            // filter it out of the dropdown or DisplayName NREs on draw.
-            var defs = Array.FindAll(CharacterRegistry.All, d => d != null);
-            var names = new string[defs.Length];
-            for (int i = 0; i < defs.Length; i++) names[i] = defs[i].DisplayName;
-            int current = Array.FindIndex(defs, d => d.Class == _lab.Character);
+            BuiltInRosterManifest roster;
+            try
+            {
+                string path = System.IO.Path.Combine("content-cooked", "roster", "manifest.json");
+                roster = BuiltInRosterManifestCodec.Load(path);
+            }
+            catch (Exception ex)
+            {
+                EditorGUILayout.HelpBox($"Built-in roster unavailable: {ex.Message}", MessageType.Error);
+                return;
+            }
+            var entries = roster.Entries;
+            var names = new string[entries.Count];
+            for (int i = 0; i < entries.Count; i++) names[i] = entries[i].Selector.ToString();
+            int current = -1;
+            for (int i = 0; i < entries.Count; i++) if (entries[i].Selector == _lab.Character) current = i;
             int pick = EditorGUILayout.Popup("Character", Mathf.Max(0, current), names);
-            if (pick != current) _lab.LoadCharacter(defs[pick].Class);
+            if (pick != current && pick >= 0 && pick < entries.Count) _lab.LoadCharacter(entries[pick].Selector);
 
             bool air = EditorGUILayout.Toggle("Airborne variant", _lab.Airborne);
             if (air != _lab.Airborne) _lab.SetAirborne(air);
@@ -277,6 +487,11 @@ namespace SlopArena.EditorTools
 
         private void DrawHitboxEditor()
         {
+            if (_workspace.HasPackage)
+            {
+                EditorGUILayout.HelpBox("Package hitboxes are edited in the typed Authoring Document section above.", MessageType.Info);
+                return;
+            }
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Hitbox editor", EditorStyles.boldLabel);
             var events = _lab.CurrentWorkingEvents();
@@ -445,10 +660,10 @@ namespace SlopArena.EditorTools
                 _lab.AddWorkingEvent();
                 _selectedHitbox = events.Length; // select the new event
             }
-            using (new EditorGUI.DisabledScope(!_lab.CanUndo))
-                if (GUILayout.Button("Undo")) { _lab.UndoEvents(); SceneView.RepaintAll(); }
-            using (new EditorGUI.DisabledScope(!_lab.CanRedo))
-                if (GUILayout.Button("Redo")) { _lab.RedoEvents(); SceneView.RepaintAll(); }
+            using (new EditorGUI.DisabledScope(!_workspace.CanUndo))
+                if (GUILayout.Button("Undo")) { _workspace.Undo(); SceneView.RepaintAll(); }
+            using (new EditorGUI.DisabledScope(!_workspace.CanRedo))
+                if (GUILayout.Button("Redo")) { _workspace.Redo(); SceneView.RepaintAll(); }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.HelpBox(
                 "Scene handles: drag a sphere to move it (capsule: drag either end), drag the " +
@@ -460,26 +675,22 @@ namespace SlopArena.EditorTools
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Persistence", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save JSON"))
+            if (!_workspace.HasPackage)
             {
-                _lab.SaveToJson();
-                SceneView.RepaintAll();
+                EditorGUILayout.HelpBox("Open or create a Character Package to persist source edits. Legacy previews are read-only.", MessageType.Info);
+                return;
             }
-            if (GUILayout.Button("Revert edits"))
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Save Package")) { _workspace.SavePackage(); SceneView.RepaintAll(); }
+            if (GUILayout.Button("Revert Draft"))
             {
-                if (EditorUtility.DisplayDialog("Ability Lab", "Discard all unsaved hitbox edits?", "Revert", "Cancel"))
+                if (EditorUtility.DisplayDialog("Ability Lab", "Discard all unsaved source edits?", "Revert", "Cancel"))
                 {
-                    _lab.RevertEdits();
+                    _workspace.RevertDraft();
                     SceneView.RepaintAll();
                 }
             }
             EditorGUILayout.EndHorizontal();
-            if (_lab.ContentFilePath != null)
-                EditorGUILayout.HelpBox(
-                    $"File: {_lab.ContentFilePath}\n" +
-                    "Authored content is content/characters/<id>/character.json. " +
-                    "Reload Ability Lab to read the saved content.", MessageType.None);
         }
 
         // ── Scene handles ──
@@ -488,6 +699,7 @@ namespace SlopArena.EditorTools
         {
             var lab = FindLab();
             if (lab == null || !Application.isPlaying || lab.Def == null) return;
+            if (_workspace.HasPackage) return;
             if (!lab.ShowHitboxes) return;
 
             float yaw = lab.FacingYaw;

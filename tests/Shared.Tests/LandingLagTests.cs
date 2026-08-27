@@ -34,7 +34,7 @@ public class LandingLagTests : KitScenarioTests
     private static CharacterDefinition MakeDef(ushort lag, ushort before, ushort after,
         float lunge = 0f, float airFloatGravity = 0f)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.FightGuyDef);
+        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
         if (airFloatGravity != 0f)
             def.Movement = def.Movement with { AirFloatGravity = airFloatGravity };
         def.AirLMB = new AbilitySpec
@@ -86,7 +86,7 @@ public class LandingLagTests : KitScenarioTests
     private static readonly CharacterDefinition FreezeDef =
         MakeDef(AirLmbLag, AirLmbBefore, AirLmbAfter, lunge: 4f, airFloatGravity: 36f);
 
-    private static float Gpy => TestHelpers.GroundPY(TestHelpers.FightGuyDef); // 0.85
+    private static float Gpy => TestHelpers.GroundPY(TestHelpers.KistuDef); // legacy fixture ground
 
     /// <summary>Airborne falling start: heightAbove above ground, straight down, no horizontal input.</summary>
     private static CharacterState FallingStart(float heightAbove)
@@ -121,7 +121,7 @@ public class LandingLagTests : KitScenarioTests
     [Fact]
     public void AirSlot1_LandingMidWindow_AppliesLandingLag()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.FightGuyDef);
+        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
         def.AirSlot1 = new AbilitySpec
         {
             Name = "Test Aerial Slot1",

@@ -6,13 +6,13 @@ namespace SlopArena.Shared.Tests;
 
 public static class TestHelpers
 {
-    public static CharacterDefinition MankiDef => CharacterRegistry.Get(CharacterClass.Manki);
+    public static CharacterDefinition MankiDef => BuiltInContentResolver.Resolve(CharacterClass.Manki).Definition;
 
-    public static CharacterDefinition FightGuyDef => CharacterRegistry.Get(CharacterClass.FightGuy);
+    public static CharacterDefinition FightGuyDef => BuiltInContentResolver.Resolve(CharacterClass.FightGuy).Definition;
 
-    public static CharacterDefinition KistuDef => CharacterRegistry.Get(CharacterClass.Kistu);
+    public static CharacterDefinition KistuDef => BuiltInContentResolver.Resolve(CharacterClass.Kistu).Definition;
 
-    public static CharacterDefinition NilusDef => CharacterRegistry.Get(CharacterClass.Nilus);
+    public static CharacterDefinition NilusDef => BuiltInContentResolver.Resolve(CharacterClass.Nilus).Definition;
 
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests
@@ -393,6 +393,8 @@ public static class TestHelpers
     /// </summary>
     public static BakedAnimationData? LoadBakedData(CharacterDefinition def)
     {
+        if (def.Class == CharacterClass.FightGuy)
+            return BuiltInContentResolver.Resolve(CharacterClass.FightGuy).BakedAnimation;
         if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
         string relative = def.BakedDataPath.Replace("res://", "");
         // Test runs from tests/Shared.Tests/bin/Debug/net8.0/

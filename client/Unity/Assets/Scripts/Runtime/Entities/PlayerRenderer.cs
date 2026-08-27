@@ -1,11 +1,12 @@
 using System;
-using SlopArena.Shared;
-using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using System.Collections.Generic;
 using Animancer;
-
+using UnityEngine;
+using SlopArena.Shared;
 using SlopArena.Client.Animation;
-
 
 namespace SlopArena.Client.Entities
 {
@@ -24,6 +25,7 @@ namespace SlopArena.Client.Entities
         [SerializeField] private AnimancerComponent _animancer;
 
         [SerializeField] private CharacterAnimationConfig _charConfig;
+        private CharacterAnimationCatalog _animationCatalog;
 
         [Header("Thresholds")]
         [SerializeField] private float _runSpeedThreshold = 0.1f;
@@ -127,6 +129,8 @@ namespace SlopArena.Client.Entities
         /// <summary>Character definition (capsule geometry, weight, baked bones) — set at spawn.</summary>
         public CharacterDefinition? CharacterDef => _charDef;
 
+        /// <summary>Set the temporary/generated semantic animation catalog for package previews.</summary>
+        public void SetAnimationCatalog(CharacterAnimationCatalog catalog) => _animationCatalog = catalog;
         /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
         public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
 
@@ -146,6 +150,10 @@ namespace SlopArena.Client.Entities
         public void LoadModel(CharacterDefinition def, GameObject prefabOverride = null)
         {
             if (prefabOverride == null && string.IsNullOrEmpty(def.ModelResourcePath)) return;
+#if UNITY_EDITOR
+            if (Selection.activeTransform != null && Selection.activeTransform.IsChildOf(transform))
+                Selection.activeObject = gameObject;
+#endif
 
             // Destroy existing model children
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -181,17 +189,17 @@ namespace SlopArena.Client.Entities
             if (_animancer == null)
                 _animancer = instance.AddComponent<AnimancerComponent>();
 
-            // Auto-load CharacterAnimationConfig by class convention if not wired in Inspector
-            if (_charConfig == null)
+            if (def.Class == CharacterClass.FightGuy)
+            {
+                Debug.LogError("[PlayerRenderer] FightGuy requires generated cooked animation assets.");
+                return;
+            }
+            if (_animationCatalog == null && _charConfig == null)
             {
                 string path = $"AnimationConfigs/{def.Class}_AnimConfig";
                 _charConfig = Resources.Load<CharacterAnimationConfig>(path);
                 if (_charConfig == null)
                 {
-                    // Placeholder characters borrow another class's prefab (e.g. Nilus and Kistu
-                    // both ship ModelResourcePath = "Characters/FightGuy"). The model IS that
-                    // class's model, so its clips are the right ones to borrow — without this
-                    // the applier early-returns on a null config and the character T-poses.
                     string modelClass = def.ModelResourcePath.Substring(
                         def.ModelResourcePath.LastIndexOf('/') + 1);
                     string fallbackPath = $"AnimationConfigs/{modelClass}_AnimConfig";
@@ -295,12 +303,32 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void PlayScrubbed(string clipName, float normalizedTime)
         {
-            if (_animancer == null || _charConfig == null) return;
-            var clip = _charConfig.GetClipByName(clipName);
-            if (clip == null) return;
+            if (_animancer == null || !TryGetAnimation(clipName, out var clip, out _)) return;
             var state = _animancer.Play(clip, 0f);
             state.Time = clip.length > 0f ? normalizedTime * clip.length : 0f;
             state.Speed = 0f;
+        }
+
+        private bool TryGetAnimation(
+            string semanticId, out AnimationClip clip, out ExtrapolationMode extrapolation)
+        {
+            clip = null;
+            extrapolation = ExtrapolationMode.None;
+            if (_animationCatalog != null)
+            {
+                foreach (var entry in _animationCatalog.Animations ?? Array.Empty<CharacterAnimationCatalog.AnimationEntry>())
+                {
+                    if (entry != null && entry.SemanticId == semanticId)
+                    {
+                        clip = entry.Clip;
+                        extrapolation = entry.Extrapolation;
+                        return clip != null;
+                    }
+                }
+                return false;
+            }
+            clip = _charConfig?.GetClipByName(semanticId);
+            return clip != null;
         }
 
         // ── Lifecycle ──
@@ -573,35 +601,26 @@ namespace SlopArena.Client.Entities
                     animSpeed = spec.AnimSpeed;
             }
 
-            var clip = _charConfig.GetClipByName(animName);
-            if (clip == null)
+            if (!TryGetAnimation(animName, out var clip, out var extrapolation))
                 return false;
 
             var animState = _animancer.Play(clip, 0.05f);
             animState.Speed = animSpeed;
             _currentAnimState = animState;
             _currentExtrapolationMode = ExtrapolationMode.None;
-            // Extrapolation is driven entirely by baked skeleton frames. Characters
-            // with no BakedDataPath (placeholders: Nilus, Kistu) have none, and
-            // FromBakedData dereferences its argument — so gate on it here.
-            if (_bakedData != null && _charDef?.ClipOverrides != null)
+            // Cooked catalogs own extrapolation metadata; legacy configs retain
+            // their existing per-definition overrides.
+            if (_bakedData != null && extrapolation == ExtrapolationMode.Continuous)
+            {
+                _currentExtrapolationMode = ExtrapolationMode.Continuous;
+                _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
+            }
+            if (_bakedData != null && _currentExtrapolationMode == ExtrapolationMode.None
+                && _animationCatalog == null && _charDef?.ClipOverrides != null)
             {
                 foreach (var cfg in _charDef.ClipOverrides)
                 {
                     if (cfg.Name == animName && cfg.Extrapolation == ExtrapolationMode.Continuous)
-                    {
-                        _currentExtrapolationMode = ExtrapolationMode.Continuous;
-                        _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
-                        break;
-                    }
-                }
-            }
-            if (_bakedData != null && _currentExtrapolationMode == ExtrapolationMode.None
-                && _charConfig?.AbilityClips != null)
-            {
-                foreach (var entry in _charConfig.AbilityClips)
-                {
-                    if (entry.Name == animName && entry.Extrapolation == ExtrapolationMode.Continuous)
                     {
                         _currentExtrapolationMode = ExtrapolationMode.Continuous;
                         _activeExtrapolator = ClipExtrapolator.FromBakedData(_bakedData, animName);
@@ -636,8 +655,7 @@ namespace SlopArena.Client.Entities
 
         private bool TryPlayFall(float fadeDuration)
         {
-            var clip = _charConfig.GetClipByName("fall");
-            if (clip == null)
+            if (!TryGetAnimation(_charDef?.FallAnim ?? "fall", out var clip, out _))
                 return false;
 
             _animancer.Play(clip, fadeDuration);
@@ -647,8 +665,7 @@ namespace SlopArena.Client.Entities
 
         private bool TryPlayTumble()
         {
-            var clip = _charConfig.GetClipByName("tumble");
-            if (clip == null)
+            if (!TryGetAnimation("tumble", out var clip, out _))
                 return false;
 
             // Tumble loops while hitstun is active. Once the server makes the
@@ -667,7 +684,7 @@ namespace SlopArena.Client.Entities
 
         private void UpdateAnimationState(CharacterState state)
         {
-            if (_animancer == null || _charConfig == null)
+            if (_animancer == null || _charDef == null)
                 return;
             if (state.State != ActionState.Attacking && _attackAccentsEnabled)
                 DisableAttackAccents();
@@ -724,9 +741,9 @@ namespace SlopArena.Client.Entities
             {
                 string hitName = state.HitstunLevel switch
                 {
-                    1 => "hit_medium",
-                    2 => "hit_hard",
-                    _ => "hit_small"
+                    1 => _charDef.HitMediumAnim,
+                    2 => _charDef.HitHardAnim,
+                    _ => _charDef.HitSmallAnim
                 };
                 // Re-hit detection: restart the clip on first entry into hitstun OR
                 // whenever HitstunTicks does not follow the natural 1-tick countdown.
@@ -754,8 +771,7 @@ namespace SlopArena.Client.Entities
 
                 if (newHit)
                 {
-                    var clip = _charConfig.GetClipByName(hitName);
-                    if (clip != null)
+                    if (TryGetAnimation(hitName, out var clip, out _))
                     {
                         float hsAnimSpeed = GetAnimSpeedFromDuration(hitName, state.HitstunTicks);
                         var hsState = _animancer.Play(clip, 0f);
@@ -825,8 +841,7 @@ namespace SlopArena.Client.Entities
                 else if (actionable && !state.IsGrounded)
                 {
                     var tumble = _animancer.States.Current;
-                    var tumbleClip = _charConfig.GetClipByName("tumble");
-                    if (tumble != null && tumble.Clip == tumbleClip)
+                    if (tumble != null && TryGetAnimation("tumble", out var tumbleClip, out _) && tumble.Clip == tumbleClip)
                     {
                         if (float.IsPositiveInfinity(_tumbleReleaseNormalizedTime))
                         {
@@ -873,8 +888,7 @@ namespace SlopArena.Client.Entities
                 }
                 else if (state.State == ActionState.JumpSquat)
                 {
-                    var clip = _charConfig.GetClipByName("jump_up");
-                    if (clip != null)
+                    if (TryGetAnimation(_charDef.JumpAnim, out var clip, out _))
                     {
                         _animancer.Play(clip, 0.05f);
                         _jumpArcActive = true;
@@ -883,8 +897,8 @@ namespace SlopArena.Client.Entities
                 else if (state.State == ActionState.LedgeHang)
                 {
                     // Placeholder pose: no hang anim asset yet (ADR-0020 §4) — play fall.
-                    var clip = _charConfig.GetClipByName("fall");
-                    if (clip != null && _animancer.States.Current?.Clip != clip)
+                    if (TryGetAnimation(_charDef.FallAnim, out var clip, out _)
+                        && _animancer.States.Current?.Clip != clip)
                         _animancer.Play(clip, 0.1f);
                 }
                 else if (!state.IsGrounded)
@@ -903,8 +917,7 @@ namespace SlopArena.Client.Entities
                             // Only play jump_up if it's a fresh jump (not recovery from attack hitstun)
                             if (_jumpArcActive || doubleJumped)
                             {
-                                var clip = _charConfig.GetClipByName("jump_up");
-                                if (clip != null)
+                                if (TryGetAnimation(_charDef.JumpAnim, out var clip, out _))
                                 {
                                     _animancer.Play(clip, 0.05f);
                                     _jumpArcActive = true;
@@ -931,10 +944,10 @@ namespace SlopArena.Client.Entities
                 else
                 {
                     _jumpArcActive = false;
-                    var clip = hSpeed > _runSpeedThreshold
-                        ? _charConfig.GetClipByName("run")
-                        : _charConfig.GetClipByName("idle");
-                    if (clip != null)
+                    string animationId = hSpeed > _runSpeedThreshold
+                        ? _charDef.RunAnim
+                        : _charDef.IdleAnim;
+                    if (TryGetAnimation(animationId, out var clip, out _))
                         _animancer.Play(clip, 0.1f);
                 }
             }
@@ -958,10 +971,9 @@ namespace SlopArena.Client.Entities
                 }
                 else if (state.State == ActionState.Dashing)
                 {
-                    var clip = _charConfig.GetClipByName("dash");
-                    if (clip != null && _charDef != null)
+                    if (TryGetAnimation(_charDef.DashAnim, out var clip, out _))
                     {
-                        float dashAnimSpeed = GetAnimSpeedFromDuration("dash", _charDef.Movement.DashDurationTicks);
+                        float dashAnimSpeed = GetAnimSpeedFromDuration(_charDef.DashAnim, _charDef.Movement.DashDurationTicks);
                         var dashState = _animancer.Play(clip, 0f);
                         dashState.Speed = dashAnimSpeed;
                     }

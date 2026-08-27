@@ -1,0 +1,930 @@
+{
+  "authoringSchemaVersion": 1,
+  "displayName": "FightGuy",
+  "weight": 100,
+  "movement": {
+    "runSpeed": 14,
+    "runAccelerationA": 20,
+    "runAccelerationB": 12,
+    "dashSpeed": 20,
+    "airSpeedMax": 7.5,
+    "airAccelStick": 16,
+    "airAccelBase": 3.2,
+    "jumpForce": 12,
+    "shortHopForce": 7.2,
+    "airJumpVMultiplier": 0.8,
+    "airJumpHMultiplier": 0.85,
+    "gravity": 36,
+    "airFloatGravity": 0,
+    "dashDurationTicks": 20,
+    "dashCooldownTicks": 48,
+    "groundFriction": 8,
+    "airFriction": 6,
+    "maxFallSpeed": 48,
+    "fastFallSpeed": 58,
+    "maxJumps": 2,
+    "jumpSquatTicks": 4,
+    "floatWindowTicks": 35,
+    "rushTicks": 10
+  },
+  "presentation": {
+    "idle": "anim.idle",
+    "run": "anim.run",
+    "dash": "anim.dash",
+    "jump": "anim.jump",
+    "fall": "anim.fall",
+    "hitSmall": "anim.hit-light",
+    "hitMedium": "anim.hit-medium",
+    "hitHard": "anim.hit-hard",
+    "landStartOffsetSeconds": 0.49,
+    "modelResourcePath": "Characters/FightGuy",
+    "visualScale": 1,
+    "hurtboxBoneScale": 0.85,
+    "modelYOffset": 0,
+    "modelSoleOffset": 0,
+    "autoModelYOffset": true
+  },
+  "capsuleRadius": 0.35,
+  "capsuleHeight": 1.7,
+  "hipHeight": 0.82,
+  "hurtboxRadius": 1,
+  "hurtboxCapsules": [
+    {
+      "startX": 0,
+      "startY": 0.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 0.9,
+      "endZ": 0,
+      "radius": 0.3
+    },
+    {
+      "startX": 0,
+      "startY": 1.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 1.2,
+      "endZ": 0,
+      "radius": 0.22
+    },
+    {
+      "startX": 0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": 0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": -0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": -0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": 0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": 0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    },
+    {
+      "startX": -0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": -0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "hurtboxBoneDefs": [
+    {
+      "boneId": "bone.head",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.22
+    },
+    {
+      "boneId": "bone.spine2",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.hips",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.right-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.12
+    },
+    {
+      "boneId": "bone.left-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.12
+    },
+    {
+      "boneId": "bone.right-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.left-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "presentationIds": [
+    "presentation.cyclone-kick.start"
+  ],
+  "capabilityRequirements": [
+    {
+      "capabilityId": "slop.internal.fightguy.ki-shot.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.fightguy.rising-dragon.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.fightguy.cyclone-kick.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.fightguy.dragon-beam.v1",
+      "capabilityVersion": "1"
+    }
+  ],
+  "slots": [
+    {
+      "id": "ground.1",
+      "name": "Low Kick",
+      "description": "Low Kick",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 17,
+            "iasaTicks": 13,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.low-kick"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 4,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.21,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-foot",
+                  "endBoneId": null,
+                  "damage": 4,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 14,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.1",
+      "name": "Double Punch",
+      "description": "Double Punch",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 33,
+            "iasaTicks": 29,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 23,
+            "animationIds": [
+              "anim.double-punch"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.3,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 3,
+                  "angle": 55,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 24,
+                  "durationTicks": 5,
+                  "stunTicks": 12,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 16,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-hand",
+                  "endBoneId": null,
+                  "damage": 5,
+                  "angle": 45,
+                  "baseKnockback": 7,
+                  "knockbackGrowth": 30,
+                  "durationTicks": 5,
+                  "stunTicks": 16,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.2",
+      "name": "Straight Punch",
+      "description": "Straight Punch",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 25,
+            "iasaTicks": 22,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.straight-punch"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 5,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.21,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 7,
+                  "angle": 25,
+                  "baseKnockback": 5,
+                  "durationTicks": 5,
+                  "knockbackGrowth": 26,
+                  "stunTicks": 18,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.2",
+      "name": "Floating Kick",
+      "description": "Floating Kick",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 42,
+            "iasaTicks": 36,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 29,
+            "animationIds": [
+              "anim.floating-kick"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 7,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-foot",
+                  "endBoneId": "bone.hips",
+                  "damage": 8,
+                  "angle": 25,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 26,
+                  "durationTicks": 5,
+                  "stunTicks": 18,
+                  "interruptible": true,
+                  "hitGroup": 1
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 12,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-foot",
+                  "endBoneId": "bone.hips",
+                  "damage": 5,
+                  "angle": 20,
+                  "baseKnockback": 3,
+                  "knockbackGrowth": 16,
+                  "durationTicks": 20,
+                  "stunTicks": 12,
+                  "interruptible": true,
+                  "hitGroup": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.3",
+      "name": "Sweeping Kick",
+      "description": "Sweeping Kick",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 29,
+            "iasaTicks": 25,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.sweeping-kick"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 7,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.21,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-foot",
+                  "endBoneId": null,
+                  "damage": 7,
+                  "angle": 55,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 24,
+                  "durationTicks": 6,
+                  "stunTicks": 18,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.3",
+      "name": "High Kick",
+      "description": "High Kick",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 44,
+            "iasaTicks": 41,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 30,
+            "animationIds": [
+              "anim.high-kick"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 14,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.14,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-foot",
+                  "endBoneId": null,
+                  "damage": 8,
+                  "angle": 65,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 26,
+                  "durationTicks": 6,
+                  "stunTicks": 20,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.4",
+      "name": "Double Kick",
+      "description": "Double Kick",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 60,
+            "iasaTicks": 56,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.double-kick"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 10,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.42,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-foot",
+                  "endBoneId": "bone.right-foot",
+                  "damage": 14,
+                  "angle": 28,
+                  "baseKnockback": 9,
+                  "knockbackGrowth": 42,
+                  "durationTicks": 7,
+                  "stunTicks": 26,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.4",
+      "name": "Air Smash",
+      "description": "Air Smash",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 54,
+            "iasaTicks": 50,
+            "landingLagTicks": 12,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 38,
+            "animationIds": [
+              "anim.air-smash"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 20,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.24,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 13,
+                  "angle": 25,
+                  "baseKnockback": 8,
+                  "knockbackGrowth": 42,
+                  "durationTicks": 7,
+                  "stunTicks": 26,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.A",
+      "name": "Ki Shot",
+      "description": "Ki Shot",
+      "iconId": "icon.a",
+      "behavior": "projectile",
+      "aimMode": "cameraForward3D",
+      "cooldownTicks": 120,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.ki-shot"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.fightguy.ki-shot.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "startupTicks": 8,
+                  "durationTicks": 24,
+                  "launchOffsetY": 1.2,
+                  "projectileSpeed": 25,
+                  "gravity": 1,
+                  "hitboxRadius": 0.5,
+                  "damage": 6,
+                  "knockbackBase": 3,
+                  "knockbackGrowth": 4.5,
+                  "knockbackAngle": 30,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.E",
+      "name": "Rising Dragon",
+      "description": "Rising Dragon",
+      "iconId": "icon.e",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 240,
+      "isRecoveryMove": true,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 34,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.rising-dragon"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.fightguy.rising-dragon.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "riseSpeed": 11,
+                  "riseTicks": 12,
+                  "riseDelay": 8
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.23,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 8,
+                  "angle": 75,
+                  "baseKnockback": 30,
+                  "knockbackGrowth": 6,
+                  "stunTicks": 22,
+                  "durationTicks": 25,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.3,
+                  "offsetX": 0,
+                  "offsetY": 0.18,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.head",
+                  "endBoneId": null,
+                  "damage": 8,
+                  "angle": 75,
+                  "baseKnockback": 30,
+                  "knockbackGrowth": 6,
+                  "stunTicks": 22,
+                  "durationTicks": 25,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 10,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.4,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.63,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.hips",
+                  "endBoneId": null,
+                  "damage": 8,
+                  "angle": 75,
+                  "baseKnockback": 30,
+                  "knockbackGrowth": 6,
+                  "stunTicks": 22,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.R",
+      "name": "Cyclone Kick",
+      "description": "Cyclone Kick",
+      "iconId": "icon.r",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 360,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 40,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.cyclone-kick"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.fightguy.cyclone-kick.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "forwardSpeed": 17,
+                  "windupTicks": 6,
+                  "hitboxEndTick": 34,
+                  "durationTicks": 40,
+                  "bodyRadius": 0.8,
+                  "sideRadius": 0.4,
+                  "sideOffset": 0.8,
+                  "damage": 7,
+                  "knockbackAngle": 15,
+                  "knockbackBase": 8,
+                  "knockbackGrowth": 5,
+                  "stunTicks": 6,
+                  "bodyY": 0.8,
+                  "sideY": 0.3
+                }
+              },
+              {
+                "kind": "emitPresentation",
+                "tick": 0,
+                "unit": "ticks",
+                "presentationId": "presentation.cyclone-kick.start"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.F",
+      "name": "Dragon Beam",
+      "description": "Dragon Beam",
+      "iconId": "icon.f",
+      "behavior": "projectile",
+      "aimMode": "cameraForward3D",
+      "cooldownTicks": 1200,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 28,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.dragon-beam"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.fightguy.dragon-beam.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "durationTicks": 28,
+                  "fireTick": 24,
+                  "launchOffsetY": 1.2,
+                  "beamRange": 18,
+                  "beamRadius": 0.45,
+                  "damage": 14,
+                  "knockbackAngle": 20,
+                  "knockbackBase": 18,
+                  "knockbackGrowth": 10,
+                  "stunTicks": 24,
+                  "hitboxDurationTicks": 2
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "aliases": [
+    {
+      "from": "air.A",
+      "to": "ground.A"
+    },
+    {
+      "from": "air.E",
+      "to": "ground.E"
+    },
+    {
+      "from": "air.R",
+      "to": "ground.R"
+    },
+    {
+      "from": "air.F",
+      "to": "ground.F"
+    }
+  ]
+}

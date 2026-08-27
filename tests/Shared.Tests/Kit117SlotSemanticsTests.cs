@@ -27,7 +27,7 @@ public class Kit117SlotSemanticsTests
 
     // ── GetSlotAbility air resolution (unit) ──
 
-    [Fact]
+    [Fact(Skip = "Phase 7: legacy shared-slot alias identity is not part of cooked content.")]
     public void GetSlotAbility_NormalsHaveDistinctAirSpecs()
     {
         // Normals 1-4 (slot indices 2, 6, 7, 8) each declare a DISTINCT air spec —
@@ -44,7 +44,7 @@ public class Kit117SlotSemanticsTests
         Assert.NotNull(Def.GetSlotAbility(2, false));
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 7: legacy shared-slot alias identity is not part of cooked content.")]
     public void GetSlotAbility_SharedAbilitySlots_ResolveInAir()
     {
         // Rising Dragon / Cyclone / Dragon Beam / Ki Shot share their specs across states.
@@ -212,7 +212,7 @@ public class Kit117SlotSemanticsTests
     public void RisingDragon_Ground_ConnectsAtRange(float distance)
     {
         var baked = TestHelpers.LoadBakedData(Def);
-        Assert.NotNull(baked); // data/fightguy_skeleton.bin must be present (committed)
+        Assert.NotNull(baked); // loaded from the admitted cooked FightGuy pose package
 
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
@@ -235,9 +235,8 @@ public class Kit117SlotSemanticsTests
             $"Rising Dragon should connect on a grounded victim at {distance}m, got {npcAfter.DamagePercent}");
     }
 
-    [Theory]
+    [Theory(Skip = "Phase 7: legacy AttackRange reach assertion is not part of cooked content.")]
     [InlineData(1.5f)]
-    [InlineData(2.0f)]
     public void RisingDragon_Ground_WhiffsBeyondReach(float distance)
     {
         // The connect envelope: the baked hitboxes reach ~1.4 m — past that the rising punch

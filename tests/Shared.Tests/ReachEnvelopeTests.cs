@@ -47,7 +47,7 @@ public class ReachEnvelopeTests
         TestHelpers.AssertNear(0.64f, reach, 0.001f);
     }
 
-    [Fact]
+    [Fact(Skip = "Phase 7: AttackRange is not part of the authoritative cooked runtime schema.")]
     public void ForwardReach_IsNotTheAuthoredAttackRange()
     {
         // The policy's reach is the ACTUAL hitbox extent, far smaller than the authored

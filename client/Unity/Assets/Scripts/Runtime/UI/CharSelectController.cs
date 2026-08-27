@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
@@ -38,11 +39,27 @@ namespace SlopArena.Client.UI
 
         private static CharacterClass[] GetPlayableClasses()
         {
-            var values = (CharacterClass[])System.Enum.GetValues(typeof(CharacterClass));
-            var playable = new System.Collections.Generic.List<CharacterClass>(values.Length);
-            foreach (var c in values)
-                if (c != CharacterClass.None) playable.Add(c);
-            return playable.ToArray();
+            try
+            {
+                string[] roots =
+                {
+                    "content-cooked",
+                    System.IO.Path.Combine(Application.dataPath, "../../../content-cooked"),
+                    System.IO.Path.Combine(Application.streamingAssetsPath, "content-cooked"),
+                };
+                foreach (string root in roots)
+                {
+                    string path = System.IO.Path.Combine(root, "roster", "manifest.json");
+                    if (System.IO.File.Exists(path))
+                        return BuiltInRosterManifestCodec.Load(path).Entries.Select(x => x.Selector).ToArray();
+                }
+                throw new System.IO.FileNotFoundException("Cooked roster manifest is missing.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[CharSelect] Built-in roster unavailable: {ex.Message}");
+                return System.Array.Empty<CharacterClass>();
+            }
         }
 
         private static readonly System.Collections.Generic.Dictionary<CharacterClass, string> RolePhrases = new()

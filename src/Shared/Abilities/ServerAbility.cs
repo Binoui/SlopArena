@@ -33,6 +33,11 @@ namespace SlopArena.Shared.Abilities
         /// NOT called on interruption. Override to clean up or apply lingering effects.
         /// </summary>
         public virtual void OnEnd(ref CharacterState s) { }
+        /// <summary>Called when the ability is interrupted; natural completion does not use this hook.</summary>
+        public virtual void OnCancel(ref CharacterState s) { }
+
+        /// <summary>Runtime sink for semantic presentation events.</summary>
+        public Action<TimelinePresentationEvent>? PresentationSink { get; set; }
 
 
         /// <summary>

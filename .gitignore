@@ -115,6 +115,8 @@ client/Unity/*.user
 client/Unity/Assets/Shared/*.pdb
 client/Unity/Assets/Shared/*.deps.json
 client/Unity/Assets/Shared/*.meta
+client/Unity/Assets/Generated/CharacterPackages/
+client/Unity/Assets/Resources/Generated/CharacterPackages/
 client/Unity/Assets/Shared/*.runtimeconfig.json
 
 # Root Unity artifacts (orphaned)

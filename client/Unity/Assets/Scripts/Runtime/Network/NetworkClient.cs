@@ -24,9 +24,9 @@ namespace SlopArena.Client.Network
         private Thread? _receiveThread;
         private volatile bool _running;
         private readonly ConcurrentQueue<MatchResultPacket> _matchResultQueue = new();
+        private readonly ConcurrentQueue<TimelinePresentationEvent> _presentationEventQueue = new();
 
         private readonly ConcurrentQueue<ServerEntityPacket> _receivedQueue = new();
-
         public ulong EntityId { get => _entityId; set => _entityId = value; }
         public bool IsServerConnected => _connected;
         public uint LastServerTick { get; private set; }
@@ -134,6 +134,14 @@ namespace SlopArena.Client.Network
             }
             return result;
         }
+
+        public List<TimelinePresentationEvent> ReceivePresentationEvents()
+        {
+            var result = new List<TimelinePresentationEvent>();
+            while (_presentationEventQueue.TryDequeue(out var entry))
+                result.Add(entry);
+            return result;
+        }
         /// <summary>Drain authoritative final match snapshots received from the server.</summary>
         public List<MatchResultPacket> ReceiveMatchResults()
         {
@@ -157,6 +165,11 @@ namespace SlopArena.Client.Network
                     if (MatchResultPacket.TryDeserialize(buf, out var matchResult))
                     {
                         _matchResultQueue.Enqueue(matchResult!);
+                        continue;
+                    }
+                    if (PresentationEventPacket.TryDeserialize(buf, out var presentationPacket))
+                    {
+                        _presentationEventQueue.Enqueue(presentationPacket!.Value.ToEvent());
                         continue;
                     }
 

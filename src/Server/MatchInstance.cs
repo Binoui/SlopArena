@@ -22,8 +22,8 @@ namespace SlopArena.Server
 		private readonly int _port;
 		private readonly string _matchId;
 		private readonly string _arenaName;
+		private readonly MatchContentCatalog _contentCatalog;
 		private readonly List<PlayerSlot> _slots;
-
 		private UdpClient? _udpServer;
 		private bool _running = true;
 
@@ -62,19 +62,24 @@ namespace SlopArena.Server
 		/// <param name="maxStocks">Stocks per player (default 3, issue #37).</param>
 		/// <param name="onMatchResult">Optional callback invoked once when the match ends (match guid, winner steam id).</param>
 		public MatchInstance(int port, string matchId, string arenaName,
-			IReadOnlyList<MatchPlayer> roster, Action<int> onMatchEnd, byte maxStocks = MatchDefaults.DefaultMaxStocks,
-			Action<Guid, long>? onMatchResult = null)
+			IReadOnlyList<MatchPlayer> roster, MatchContentCatalog contentCatalog, Action<int> onMatchEnd,
+			byte maxStocks = MatchDefaults.DefaultMaxStocks, Action<Guid, long>? onMatchResult = null)
 		{
 			_port = port;
 			_matchId = matchId;
 			_arenaName = arenaName;
+			_contentCatalog = contentCatalog ?? throw new ArgumentNullException(nameof(contentCatalog));
 			_onMatchEnd = onMatchEnd;
 			_onMatchResult = onMatchResult;
 			_rule = new StockMatchRule(maxStocks);
 
 			_slots = new List<PlayerSlot>(roster.Count);
 			foreach (var p in roster)
-				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass, p.SteamId));
+			{
+				var content = _contentCatalog.Resolve(p.CharacterClass)
+					?? throw new InvalidDataException($"Roster selector '{p.CharacterClass}' is not in the match content catalog.");
+				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass, p.SteamId, content));
+			}
 		}
 
 		/// <summary>True while the match loop is active.</summary>
@@ -112,10 +117,8 @@ namespace SlopArena.Server
 			for (int i = 0; i < _slots.Count; i++)
 			{
 				var slot = _slots[i];
-				var def = CharacterRegistry.Get(slot.CharacterClass);
-				var baked = LoadBakedData(def);
-				def = TryApplyHurtboxOverride(def, baked);
-				_sim.RegisterEntity(slot.EntityId, def, CreateInitialState(def, i), baked);
+				var def = slot.Content.Definition;
+				_sim.RegisterEntity(slot.EntityId, def, CreateInitialState(def, i), slot.Content.BakedAnimation);
 				// Respawn at the same distributed spawn point as initial spawn (issue #37).
 				var respawnSpawn = PickSpawn(i);
 				_sim.SetRespawnPosition(slot.EntityId, respawnSpawn.X, respawnSpawn.Y, respawnSpawn.Z, respawnSpawn.Yaw);
@@ -190,53 +193,6 @@ namespace SlopArena.Server
 			return true;
 		}
 
-		private static BakedAnimationData? LoadBakedData(CharacterDefinition def)
-		{
-			// Reuse the existing BakedDataPath + LoadFromBin path (same as the
-			// pre-refactor server). Falls back to null (no baked skeleton) when
-			// the file is absent or unreadable.
-			if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-
-			try
-			{
-				string sysPath = def.BakedDataPath.Replace("res://", "");
-				var binData = File.ReadAllBytes(sysPath);
-				var baked = BakedAnimationData.LoadFromBin(binData);
-				Console.WriteLine($"[Match] Loaded baked data: {sysPath} ({binData.Length} bytes, {baked.Animations.Length} anims)");
-				return baked;
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[Match] Failed to load baked data: {ex.Message} — using fallback");
-				return null;
-			}
-		}
-
-		/// <summary>
-		/// Apply the Ability Lab hurtbox override (spec #119) when one exists for the
-		/// character: a per-character JSON next to the baked skeleton that fully
-		/// replaces HurtboxBoneDefs. Returns the def unchanged when absent or invalid.
-		/// </summary>
-		private static CharacterDefinition TryApplyHurtboxOverride(CharacterDefinition def, BakedAnimationData? baked)
-		{
-			var overridePath = HurtboxOverride.OverridePathFor(def);
-			if (overridePath == null || baked == null) return def;
-			try
-			{
-				string sysPath = overridePath.Replace("res://", "");
-				if (!File.Exists(sysPath)) return def;
-				string json = File.ReadAllText(sysPath);
-				if (!HurtboxOverride.TryParse(json, out _, out var defs) || defs == null) return def;
-				if (!HurtboxOverride.ValidateOrder(defs, baked)) return def;
-				Console.WriteLine($"[Match] Applied hurtbox override: {sysPath} ({defs.Length} bones)");
-				return HurtboxOverride.Apply(def, defs);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"[Match] Failed to apply hurtbox override: {ex.Message} — using C# defs");
-				return def;
-			}
-		}
 
 		private CharacterState CreateInitialState(CharacterDefinition def, int spawnIndex)
 		{
@@ -452,6 +408,15 @@ namespace SlopArena.Server
 				packets.Add((buf, packet.WireSize));
 			}
 
+			var presentationPackets = new List<(byte[] buffer, int length)>();
+			foreach (var evt in _sim.GetPresentationEvents(clear: true))
+			{
+				var eventPacket = new PresentationEventPacket(evt.MatchTick, evt.EntityId, evt.OperationIndex, evt.PresentationId);
+				var eventBuffer = new byte[eventPacket.WireSize];
+				eventPacket.Serialize(eventBuffer);
+				presentationPackets.Add((eventBuffer, eventBuffer.Length));
+			}
+
 			try
 			{
 				foreach (var slot in _slots)
@@ -466,6 +431,8 @@ namespace SlopArena.Server
 						_matchResultPacket.Serialize(resultBuffer);
 						_udpServer.Send(resultBuffer, resultBuffer.Length, slot.EndPoint);
 					}
+					foreach (var evt in presentationPackets)
+						_udpServer.Send(evt.buffer, evt.length, slot.EndPoint);
 				}
 			}
 			catch (Exception ex)
@@ -540,19 +507,20 @@ namespace SlopArena.Server
 			public ulong EntityId { get; }
 			public CharacterClass CharacterClass { get; }
 			public long SteamId { get; }
+			public MatchContentEntry Content { get; }
 			public IPEndPoint? EndPoint { get; set; }
 			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
 			public bool Disconnected { get; set; }
 			public TickInputBuffer Queue { get; } = new();
-			/// <summary>Last input consumed for this slot — held across ticks when a tick's
-			/// input hasn't arrived yet (same semantics as client-side prediction replay).</summary>
+			/// <summary>Last input consumed for this slot.</summary>
 			public InputState LastInput;
 
-			public PlayerSlot(ulong entityId, CharacterClass characterClass, long steamId)
+			public PlayerSlot(ulong entityId, CharacterClass characterClass, long steamId, MatchContentEntry content)
 			{
 				EntityId = entityId;
 				CharacterClass = characterClass;
 				SteamId = steamId;
+				Content = content;
 			}
 		}
 	}

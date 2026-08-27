@@ -232,10 +232,10 @@ namespace SlopArena.Client.UI
             if (string.IsNullOrEmpty(playerName))
                 playerName = $"P{entry.EntityId}";
 
-            var definition = CharacterRegistry.Get(character);
-            string fighterName = string.IsNullOrEmpty(definition.DisplayName)
+            var content = ClientSession.MatchContentCatalog?.Resolve(character);
+            string fighterName = string.IsNullOrEmpty(content?.DisplayName)
                 ? character.ToString()
-                : definition.DisplayName;
+                : content!.DisplayName;
             return new PlayerMetadata(
                 playerName.ToUpperInvariant(),
                 fighterName.ToUpperInvariant(),
@@ -247,12 +247,7 @@ namespace SlopArena.Client.UI
                 && Enum.TryParse(value, true, out CharacterClass parsed)
                 && parsed != CharacterClass.None)
                 return parsed;
-            if (fallback != CharacterClass.None)
-                return fallback;
-            foreach (var definition in CharacterRegistry.All)
-                if (definition.Class != CharacterClass.None)
-                    return definition.Class;
-            return CharacterClass.None;
+            return fallback;
         }
 
         private void SendChatMessage()

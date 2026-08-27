@@ -133,7 +133,6 @@ public static class CharacterContentSerializer
                 SetAbility(definition, alias.Key, target);
             }
         }
-
         return definition;
     }
 

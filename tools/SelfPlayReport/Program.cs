@@ -69,7 +69,8 @@ internal static class Program
             "nilus" => CharacterClass.Nilus,
             _ => CharacterClass.FightGuy,
         };
-        var def = CharacterRegistry.Get(cls);
+        var entry = BuiltInContentResolver.Resolve(cls);
+        var def = entry.Definition;
         if (def.Class == CharacterClass.None)
         {
             Console.Error.WriteLine($"Unknown character '{charName}'.");
@@ -77,7 +78,7 @@ internal static class Program
         }
 
         var arena = BuildKillArena();
-        var baked = LoadBakedData(def);
+        var baked = LoadBakedData(entry);
 
         var records = new List<MatchRecord>(matches);
         for (int m = 0; m < matches; m++)
@@ -86,7 +87,7 @@ internal static class Program
             records.Add(rec);
         }
 
-        var report = Aggregate(def, records, seed);
+        var report = Aggregate(entry, records, seed);
 
         Console.WriteLine(BuildMarkdown(report));
 
@@ -111,8 +112,9 @@ internal static class Program
 
     // ── Aggregation ─────────────────────────────────────────────────────────
 
-    internal static ReportData Aggregate(CharacterDefinition def, List<MatchRecord> records, int seed)
+    internal static ReportData Aggregate(MatchContentEntry entry, List<MatchRecord> records, int seed)
     {
+        var def = entry.Definition;
         var perMove = new Dictionary<string, MoveStats>();
         string Key(bool air, byte slotByte) => $"{(air ? "a" : "g")}{SlotOf(slotByte)}";
 
@@ -168,7 +170,7 @@ internal static class Program
         // is not stored on hits; approximate per-move damage via the swings' slot on the hit's attacker.
         // We use per-move Hit counts only for the table; Damage column is filled from connected swings.
 
-        var envelope = SampleEnvelope(def);
+        var envelope = SampleEnvelope(entry);
         var (whiffGrid, silhouette) = AccumulateWhiffs(records, envelope);
 
         var perMoveArray = perMove.Values.OrderBy(m => m.Label, StringComparer.Ordinal).ToArray();
@@ -198,10 +200,11 @@ internal static class Program
     /// <summary>Sample each normal's active hitboxes from a real sim run (attacker at origin,
     /// facing +Z, no opponent) so the envelope captures lunge, bones, capsules — the actual
     /// threat zone the game produces. Facing +Z ⇒ world == facing frame.</summary>
-    internal static MoveEnvelope[] SampleEnvelope(CharacterDefinition def)
+    internal static MoveEnvelope[] SampleEnvelope(MatchContentEntry entry)
     {
+        var def = entry.Definition;
         var result = new List<MoveEnvelope>();
-        var baked = LoadBakedData(def);
+        var baked = LoadBakedData(entry);
         foreach (bool air in new[] { false, true })
         {
             for (int i = 0; i < SlotBytes.Length; i++)
@@ -471,12 +474,13 @@ internal static class Program
         };
     }
 
-    internal static BakedAnimationData? LoadBakedData(CharacterDefinition def)
+    internal static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
     {
+        if (entry.CookedCharacterPackage != null)
+            return entry.BakedAnimation;
+
+        var def = entry.Definition;
         if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-        // "res://data/fightguy_skeleton.bin" → "data/fightguy_skeleton.bin", repo-root relative
-        // (same resolution as MoveDataReport + TestHelpers). A previous "data" prefix here made
-        // the path "data/data/…", silently disabling bone hitboxes in self-play (issue #149).
         string path = def.BakedDataPath.Replace("res://", "");
         if (!File.Exists(path)) return null;
         try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }

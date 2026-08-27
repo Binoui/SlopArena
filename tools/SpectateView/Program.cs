@@ -40,7 +40,8 @@ internal static class Program
             "nilus" => CharacterClass.Nilus,
             _ => CharacterClass.FightGuy,
         };
-        var def = CharacterRegistry.Get(cls);
+        var entry = BuiltInContentResolver.Resolve(cls);
+        var def = entry.Definition;
         if (def.Class == CharacterClass.None)
         {
             Console.Error.WriteLine($"Unknown character '{charName}'.");
@@ -48,7 +49,7 @@ internal static class Program
         }
 
         var arena = BuildKillArena();
-        var baked = LoadBakedData(def);
+        var baked = LoadBakedData(entry);
 
         var rule = new StockMatchRule((byte)stocks);
         var sim = new ServerSimulation(arena, rule);
@@ -281,8 +282,12 @@ internal static class Program
         sim.SetRespawnPosition(id, x, py, 0f, state.FacingYaw);
     }
 
-    private static BakedAnimationData? LoadBakedData(CharacterDefinition def)
+    private static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
     {
+        if (entry.CookedCharacterPackage != null)
+            return entry.BakedAnimation;
+
+        var def = entry.Definition;
         if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
         string relative = def.BakedDataPath.Replace("res://", "");
         string path = Path.Combine("data", relative);

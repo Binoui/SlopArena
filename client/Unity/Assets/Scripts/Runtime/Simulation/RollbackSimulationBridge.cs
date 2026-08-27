@@ -18,6 +18,7 @@ namespace SlopArena.Client.Simulation
         private readonly ulong _selfId;
         private uint _tick;
         private readonly List<SpellResolver.HitResult> _lastTickHits = new();
+        private readonly List<TimelinePresentationEvent> _lastTickPresentationEvents = new();
         public MatchResultPacket? LatestMatchResult { get; private set; }
 
 
@@ -48,7 +49,6 @@ namespace SlopArena.Client.Simulation
             var packets = _client.ReceiveEntityPackets();
             foreach (var result in _client.ReceiveMatchResults())
                 LatestMatchResult = result;
-            if (packets.Count == 0) return;
 
             var opponentBatch = new List<ServerEntityPacket>(packets.Count);
             foreach (var packet in packets)
@@ -60,10 +60,14 @@ namespace SlopArena.Client.Simulation
             }
             if (opponentBatch.Count > 0)
                 _core.IngestOpponentBatch(opponentBatch);
+            _core.IngestPresentationEvents(_client.ReceivePresentationEvents());
+            _lastTickPresentationEvents.Clear();
+            _lastTickPresentationEvents.AddRange(_core.DrainPresentationEvents());
         }
 
         public CharacterState GetState(ulong id) => _core.GetState(id);
         public Dictionary<ulong, CharacterState> GetAllStates() => _core.GetAllStates();
+        public IReadOnlyList<TimelinePresentationEvent> LastTickPresentationEvents => _lastTickPresentationEvents;
         public SpellResolver? Resolver => _core.Resolver;
         public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _lastTickHits;
     }

@@ -1,107 +1,52 @@
 # Unity Animation System
 
-> Animancer-driven clip playback. Server timing dictates when clips start and end.
-> No animator controller, no trigger parameters, no transition tables.
-
-## Architecture
-
-```
-CharacterState (server simulation, 60Hz)
-  → PlayerRenderer.ApplyServerState()
-    → UpdateAnimationState()
-      → _charConfig.GetClipByName(name)     → AnimationClip
-      → _animancer.Play(clip, fadeDuration)  → drives the Animator directly
-```
-
-## State transitions
-
-PlayerRenderer tracks `_lastAnimState` / `_lastAttackSlot` / `_lastComboStage` and
-detects state changes. On change, plays the appropriate clip with a 0.05-0.1s
-crossfade. The state machine is pure C# in `UpdateAnimationState()`:
-
-- **Non-combat:** idle ↔ run (crossfade by Speed threshold), jump, fall
-- **Double jump:** override fall with jump when upward impulse detected
-- **Attacking:** lookup by `(AttackSlot, ComboStage)` → `AnimationNames[]` → clip
-  → apply speed modulation = `frameCount / DurationTicks`
-- **Dashing:** play dash clip (0s crossfade)
-- **Hitstun:** play `hit_small`/`hit_medium`/`hit_hard` by HitstunLevel
-
-No blend tree, no animator parameters, no any-state transitions.
-
-## Clip lookup
-
-`CharacterAnimationConfig` ScriptableObject (loaded from `Resources/AnimationConfigs/`):
-  - **Standard clips:** idle, run, jump, fall, dash, hit_small, hit_medium, hit_hard, death
-  - **Ability clips:** Name→Clip dictionary, one entry per `AnimationNames` string
-  - **Auto-loaded** in `PlayerRenderer.LoadModel()` by `CharacterDefinition.Class`
-
-## Per-clip overrides
-
-`AnimationClipConfig` on `CharacterDefinition`:
-  - **Extrapolation:** `None` | `Hold` | `Continuous` (how clip behaves past its length)
-  - **FrameRateOverride:** override baked framerate (0 = use clip's native framerate)
-
-See also: `AnimationClipConfig.cs` in Shared.
-
-## Speed modulation
-
-For data-driven abilities with baked skeleton data:
-
-```
-animSpeed = frameCount / DurationTicks
-```
-
-This ensures the animation finishes exactly when the server moves to the next
-stage. Without baked data (or `AnimSpeed > 0` override), plays at 1x speed.
-
-## Extrapolation (Continuous)
-
-When a clip reaches its end and Extrapolation = Continuous:
-1. `StopOnEnd = false` on the AnimancerState (time keeps advancing)
-2. `ClipExtrapolator` reads each bone curve's last two position frames from baked data
-3. In LateUpdate, applies extrapolated bone positions:
-   `lastPosition + velocity * extraTime`
-4. Once the server sends a new state, crossfade to the next clip takes over
-
-This replaces separate "loop" clips for continuous motion (hover, drift, aura).
-**Rotation holds the last keyframe** (v1 — position curves only from baked data).
-
-## Humanoid weapon attachment
-
-Weapon props are configured by `WeaponAttachConfig` and follow a named renderer bone.
-`WeaponEntry.PositionOffset` and `RotationOffset` are expressed in that bone's **destination
-bind space**. `WeaponAttach` uses them for the visible prop; `SlopArenaBaker` must use the
-same values when baking synthetic `_weapon_hilt` and `_weapon_tip` points. This shared
-transform is the visual/server-alignment invariant.
-
-Do not copy a source rig helper's local transform directly onto a humanoid-retargeted
-destination hand. Bone-local axes can differ even when both bones represent the right hand.
-Convert the helper through the source-to-destination bind-pose basis:
+Animancer plays clips selected from authoritative server state. The runtime path is:
 
 ```text
-basis          = inverse(destinationHandBindRotation) * sourceHandBindRotation
-PositionOffset = basis * sourceHelperLocalPosition
-RotationOffset = basis * sourceHelperLocalRotation
+MatchContentCatalog
+  -> cooked FightGuy package + generated client catalog/rig
+  -> PlayerRenderer
+  -> Animancer
 ```
 
-This is one attachment transform for the weapon and applies across animation clips.
-Per-animation pose tracks are not the default fix for a retargeting mismatch: they copy
-source world-space motion, duplicate animation data, and partially defeat humanoid
-retargeting. Use per-animation weapon motion only when the weapon intentionally moves
-independently of the destination hand.
+## Runtime ownership
 
-Kistu is the reference implementation. Its Grruzam katana uses `hand_r/ik_hand_gun` on the
-source rig and `mixamorig:RightHand` on Kistu. The converted values live in
-`Resources/WeaponConfigs/kistu.asset`; see
-`docs/handoffs/kistu-sword-orientation.md` for the diagnosis and verification.
+FightGuy has one runtime owner: its verified cooked package under
+`content-cooked/fightguy/`. The package contains the runtime definition, pose tracks,
+client bindings, and manifest hashes. `MatchContentCatalog` admits the package and
+keeps its immutable definition and baked pose projection together.
 
-## Pitfalls
+The generated Unity `CharacterAnimationCatalog` is a regenerable client binding. It
+contains the package ID, source hash, rig reference, semantic animation IDs, frame
+counts, and extrapolation metadata. Client setup rejects missing, duplicate, or
+mismatched package bindings. Generated assets live under
+`Resources/Generated/CharacterPackages/<package>/`.
 
-- **AnimancerComponent** is added at runtime by `PlayerRenderer.LoadModel()`.
-  The prefab's built-in Animator must NOT have a dead controller reference.
-- **Extrapolation** only activates when the clip reaches its natural end —
-  invisible during normal playback where the server transitions before clip end.
-- **Baked data frame rate** must be uniform (currently all exported 30fps).
-  Variable frame rate would produce inaccurate velocity extrapolation.
-- **Rotation extrapolation** (not in v1) would need quaternion data added to
-  `BakedAnimationData` format or Editor-only `AnimationUtility.GetCurveBindings()`.
+Non-FightGuy characters remain on the temporary legacy policy: their catalog entries
+may use `BakedDataPath` and `CharacterAnimationConfig`. That policy does not apply to
+FightGuy. FightGuy never loads `Resources/AnimationConfigs/FightGuy`.
+
+## Playback
+
+`PlayerRenderer.ApplyServerState()` drives `UpdateAnimationState()`:
+
+- idle/run use cooked presentation semantic IDs;
+- jump, fall, dash, and hitstun use cooked presentation IDs;
+- attacks use `(AttackSlot, ComboStage)` and cooked `AnimationNames`;
+- the clip speed is `frameCount / DurationTicks`;
+- generated extrapolation metadata controls behavior past clip length.
+
+There is no AnimatorController, trigger table, or blend tree. Animancer clips are
+played directly.
+
+## Cooked poses
+
+Server hitboxes use cooked pose tracks and semantic bone IDs. The client receives the
+same `entry.BakedAnimation` payload used by the catalog entry. This keeps rendered
+poses, bone-attached collision, and server timing on the same package hash.
+
+## Weapon attachment
+
+Weapon props use destination humanoid bones and the shared bind-space conversion
+implemented by `WeaponAttachConfig` and `SlopArenaBaker`. Kistu remains the reference
+for retargeted hand orientation.

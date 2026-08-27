@@ -44,7 +44,7 @@ internal static class Program
         if (charName == "all")
         {
             foreach (CharacterClass c in Enum.GetValues(typeof(CharacterClass)))
-                if (c != CharacterClass.None) defs.Add(CharacterRegistry.Get(c));
+                if (c != CharacterClass.None) defs.Add(BuiltInContentResolver.Resolve(c).Definition);
         }
         else
         {
@@ -95,7 +95,7 @@ internal static class Program
             "nilus" => CharacterClass.Nilus,
             _ => throw new ArgumentException($"unknown character: {which} (expected one of: fightguy, manki, kistu, nilus, all)"),
         };
-        return CharacterRegistry.Get(cls);
+        return BuiltInContentResolver.Resolve(cls).Definition;
     }
 
     /// <summary>Load a real baked stage for stage-relative reads. Falls back to the flat

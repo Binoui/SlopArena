@@ -51,9 +51,10 @@ public class AttackMomentumTests
     public void GroundedNormal_PreserveMomentumOverride_KeepsVelocity()
     {
         var sim = TestHelpers.MakeSim();
-        var def = TestHelpers.CloneDef(Def);
-        def.Slot1 = CloneSpec(Def.Slot1, preserveMomentum: true);
-        var state = TestHelpers.PlayerState() with { PY = GroundPy, VX = 10f, VZ = 5f };
+        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
+        def.Slot1 = CloneSpec(def.Slot1!, preserveMomentum: true);
+        var groundPy = TestHelpers.GroundPY(def);
+        var state = TestHelpers.PlayerState() with { PY = groundPy, VX = 10f, VZ = 5f };
         TestHelpers.RegisterPlayer(sim, def, state);
 
         // Same Low Kick with PreserveMomentumOnStart=true: the run velocity coasts through.

@@ -4,6 +4,7 @@ using System.IO;
 using System.Collections.Generic;
 using System;
 using System.Text;
+using System.Linq;
 using SlopArena.Client.Animation;
 using SlopArena.Client.Entities;
 
@@ -23,8 +24,9 @@ using SlopArena.Client.Entities;
 ///   [boneNames]: uint nameLen + UTF-8 name
 ///   [anims]: uint nameLen + UTF-8 name + uint frameCount + float x/y/z per bone per frame
 ///
-/// Positions are Hips-relative (subtract Hips, rotate by inverse Hips rotation)
-/// so they stay attached to the entity regardless of animation root motion.
+/// Positions are Hips-relative (subtract Hips, without inverse-Hips rotation)
+/// so they stay attached to the entity regardless of animation root motion. HitboxGeometry
+/// applies scale, facing yaw, and Y remapping when consuming this data.
 /// </summary>
 public class SlopArenaBaker : EditorWindow
 {
@@ -59,6 +61,13 @@ public class SlopArenaBaker : EditorWindow
 
     private void BakeSkeleton(GameObject model, CharacterAnimationConfig animConfig, float sampleRate = 60f, string outputPath = "data/", WeaponAttachConfig? weaponConfig = null)
     {
+        if ((model != null && model.name.IndexOf("fightguy", StringComparison.OrdinalIgnoreCase) >= 0) ||
+            (animConfig != null && animConfig.name.IndexOf("fightguy", StringComparison.OrdinalIgnoreCase) >= 0))
+        {
+            Debug.LogError("[SlopArenaBaker] FightGuy is owned by CharacterAssetCatalog; use Tools/SlopArena/Cook FightGuy.");
+            return;
+        }
+
         var animator = model.GetComponent<Animator>();
         if (animator == null)
         {
@@ -108,6 +117,35 @@ public class SlopArenaBaker : EditorWindow
             return;
         }
         Debug.Log($"Found {clips.Count} animation clips from config");
+        if (weaponConfig == null)
+        {
+            var sampled = clips.Select(x => new DeterministicPoseTrackBaker.SampledAnimation
+            {
+                SemanticId = x.name,
+                PoseTrackId = x.name,
+                Clip = x.clip,
+                FrameCount = Mathf.CeilToInt(x.clip.length * 60f),
+            }).ToArray();
+            try
+            {
+                byte[] bytes = DeterministicPoseTrackBaker.Bake(model, sampled, 60);
+                string deterministicOutputFile = Path.GetFullPath(Path.Combine(
+                    Application.dataPath, "..", "..", "..",
+                    outputPath.TrimEnd('/'), model.name.ToLowerInvariant() + "_skeleton.bin"));
+                Directory.CreateDirectory(Path.GetDirectoryName(deterministicOutputFile)!);
+                File.WriteAllBytes(deterministicOutputFile, bytes);
+                MirrorToStreamingAssets(deterministicOutputFile, "data");
+                MirrorToStreamingAssets(deterministicOutputFile, Path.Combine("Server", "data"));
+                AssetDatabase.Refresh();
+                Debug.Log($"Baked {bytes.Length} bytes with deterministic baker -> {deterministicOutputFile}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SlopArenaBaker] Deterministic bake failed: {ex.Message}");
+            }
+            return;
+        }
+
 
         // Bone order MUST match HurtboxBoneDefs index order:
         //   0=Head, 1=Spine2(UpperChest), 2=Hips, 3=RightHand, 4=LeftHand,
@@ -366,6 +404,12 @@ public class SlopArenaBaker : EditorWindow
             string configPath = AssetDatabase.GUIDToAssetPath(guid);
             var config = AssetDatabase.LoadAssetAtPath<CharacterAnimationConfig>(configPath);
             if (config == null) continue;
+            if (config.name.IndexOf("fightguy", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                Debug.Log("[BakeAll] Skipping FightGuy; package catalog owns its assets.");
+                continue;
+            }
+
 
             string configDir = Path.GetDirectoryName(configPath);
             string charDir = Path.GetDirectoryName(configDir);
@@ -380,7 +424,7 @@ public class SlopArenaBaker : EditorWindow
                 model = AssetDatabase.LoadAssetAtPath<GameObject>($"{configDir}/{charName}.fbx");
             }
 
-            // Fallback: derive charName from config asset filename (e.g. FightGuy_AnimConfig -> fightguy)
+            // Fallback: derive charName from config asset filename.
             if (model == null && config.name.EndsWith("_AnimConfig"))
             {
                 charName = config.name.Replace("_AnimConfig", "").ToLowerInvariant();

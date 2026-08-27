@@ -73,6 +73,7 @@
 | Doc | Covers |
 |-----|--------|
 | [`plans/2026-08-01-pvp-roadmap-v2.md`](plans/2026-08-01-pvp-roadmap-v2.md) | Online PvP implementation plan (current) |
+| [`plans/2026-08-26-fightguy-character-cooking-cutover.md`](plans/2026-08-26-fightguy-character-cooking-cutover.md) | FightGuy-first Character authoring, cooking, and immutable runtime cutover |
  
 ## 🧭 Architecture Decision Records
 
@@ -85,3 +86,4 @@
 | [`adr/0026-workshop-multiplayer-synchronization.md`](adr/0026-workshop-multiplayer-synchronization.md) | Exact package synchronization and online admission |
 | [`adr/0027-open-source-modkit-preview.md`](adr/0027-open-source-modkit-preview.md) | Open ModKit and installed-game authoritative preview |
 | [`adr/0028-built-in-content-compatibility.md`](adr/0028-built-in-content-compatibility.md) | Versioned built-in capability contracts and support windows |
+| [`adr/0029-character-authoring-and-cooking.md`](adr/0029-character-authoring-and-cooking.md) | Canonical Character source, deterministic cooking, and immutable match content |

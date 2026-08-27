@@ -247,6 +247,38 @@ _Avoid_: mod script, plugin, custom code
 An immutable published unit of WorkshopContent with an identity, version, cooked runtime content hash, dependencies, compatibility declaration, and creator rights metadata.
 _Avoid_: mod file, Workshop item (when exact bytes matter)
 
+**Character Package**:
+A content package containing exactly one playable Character. Package identity is Character identity; a published revision is fixed by package ID, version, and cooked-content hash.
+_Avoid_: character class, fighter file, character bundle
+
+**Character Authoring Document**:
+The editable source of a Character's gameplay semantics within a Character Package. It is an input to cooking, not a runtime definition.
+_Avoid_: character config, runtime JSON, CharacterDefinition
+
+**Cooked Character Definition**:
+The immutable, normalized gameplay definition produced from a Character Authoring Document and loaded for simulation.
+_Avoid_: character source, authoring JSON, fallback definition
+
+**Character Asset Catalog**:
+The authoritative package mapping from local semantic asset identifiers to the source assets used during cooking.
+_Avoid_: AnimConfig, resource list, asset paths
+
+**Animation Definition**:
+A package-local animation capability that pairs one visual animation with its deterministic pose track.
+_Avoid_: clip name, animation file, spell animation
+
+**Match Content Catalog**:
+The immutable, match-scoped mapping from compact content handles to exact loaded package revisions.
+_Avoid_: global registry, CharacterRegistry, content cache
+
+**Content Handle**:
+A compact identifier assigned during match creation to one exact entry in the Match Content Catalog. It has no stable meaning outside that match.
+_Avoid_: CharacterClass, package ID, global content ID
+
+**Stale Cook**:
+The state where saved authoring inputs no longer match the source hash recorded by the last valid cooked artifact.
+_Avoid_: dirty content, cache issue, stale JSON
+
 **ContentRequirement**:
 The exact WorkshopPackage and BuiltInContentId set a match must resolve and validate before its simulation starts.
 _Avoid_: mod list, asset list, loadout

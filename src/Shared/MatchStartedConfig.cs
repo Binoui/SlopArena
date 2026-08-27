@@ -18,4 +18,5 @@ public sealed record MatchStartedConfig(
     IReadOnlyList<LobbyPlayerInfo> Players,
     int MatchPort = 0,
     string ArenaName = "",
-    int MaxStocks = MatchDefaults.DefaultMaxStocks);
+    int MaxStocks = MatchDefaults.DefaultMaxStocks,
+    MatchContentHandleMap? Content = null);

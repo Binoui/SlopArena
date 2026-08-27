@@ -1,0 +1,457 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using UnityEditor;
+using UnityEngine;
+using SlopArena.Client.Animation;
+using SlopArena.Shared;
+
+public sealed class CharacterCookOutput
+{
+    public string PackageId;
+    public string IntermediateDirectory;
+    public string PoseFileName = "poses.bin";
+    public string BindingFileName = "client.bindings";
+    public string StatusFileName = "cook-status.json";
+    public string GeneratedAssetPath;
+
+    private CharacterCookOutput(string packageId)
+    {
+        PackageId = packageId;
+        IntermediateDirectory = "Library/SlopArena/CharacterCook/" + packageId;
+        string display = packageId == "fightguy" ? "FightGuy" : packageId;
+        GeneratedAssetPath = "Assets/Resources/Generated/CharacterPackages/" + packageId + "/" + display + "_AnimationCatalog.asset";
+    }
+
+    public static CharacterCookOutput For(string packageId)
+    {
+        if (!MatchContentCatalogBuilder.IsStablePackageId(packageId))
+            throw new ArgumentException("Package ID must be a stable lowercase identifier.", nameof(packageId));
+        return new CharacterCookOutput(packageId);
+    }
+
+    public static CharacterCookOutput FightGuy => For("fightguy");
+}
+
+public sealed class CharacterCookDependencyRecord
+{
+    public string Kind = "";
+    public string Identity = "";
+    public string Guid = "";
+    public string DependencyHash = "";
+    public string MetaHash = "";
+    public string ImporterSettings = "";
+}
+
+public sealed class CharacterCookAnimationDefinition
+{
+    public string SemanticId = "";
+    public string PoseTrackId = "";
+    public AnimationClip Clip = null!;
+    public string ClipGlobalObjectId = "";
+    public string ClipAssetGuid = "";
+    public string ClipAssetPath = "";
+    public int FrameCount;
+    public int ClipLengthBits;
+    public int SampleRate;
+    public ExtrapolationMode Extrapolation;
+}
+
+public sealed class CharacterAssetCookResult
+{
+    public CookedCharacterPackage? CookedPackage { get; internal set; }
+    public byte[] PoseBytes { get; internal set; } = Array.Empty<byte>();
+    public byte[] BindingBytes { get; internal set; } = Array.Empty<byte>();
+    public IReadOnlyList<CharacterCookAnimationDefinition> Animations { get; internal set; } = Array.Empty<CharacterCookAnimationDefinition>();
+    public IReadOnlyList<CharacterCookDependencyRecord> Dependencies { get; internal set; } = Array.Empty<CharacterCookDependencyRecord>();
+    public IReadOnlyList<PackageDependencySource> PackageDependencies { get; internal set; } = Array.Empty<PackageDependencySource>();
+    public IReadOnlyList<CookedCapabilityRequirement> CapabilityRequirements { get; internal set; } = Array.Empty<CookedCapabilityRequirement>();
+    public string Creator { get; internal set; } = "";
+    public string License { get; internal set; } = "";
+    public string Attribution { get; internal set; } = "";
+    public ushort AuthoringSchemaVersion { get; internal set; }
+    public string SourceHash { get; internal set; } = "";
+    public IReadOnlyList<CharacterDiagnostic> Diagnostics { get; internal set; } = Array.Empty<CharacterDiagnostic>();
+    public bool HasErrors => Diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error);
+}
+
+internal sealed class PackageMetadata
+{
+    public string Creator = "";
+    public string License = "";
+    public string Attribution = "";
+    public ushort AuthoringSchemaVersion;
+    public IReadOnlyList<PackageDependencySource> Dependencies = Array.Empty<PackageDependencySource>();
+}
+public static class UnityCharacterAssetCooker
+{
+    public const int BindingSchemaVersion = 1;
+    public const int PoseVersion = 1;
+    public const int SampleRate = 60;
+    public const string CookerVersion = "fightguy-phase5-1";
+
+    public static CharacterAssetCookResult Cook(string packageRoot, CharacterAssetCatalog catalog, CharacterCookOutput output, CharacterCookProfile profile)
+    {
+        var diagnostics = new List<CharacterDiagnostic>();
+        string packagePath = ResolveFile(packageRoot, "package.json");
+        string characterPath = ResolveFile(packageRoot, "character.json");
+        if (!File.Exists(packagePath))
+        {
+            diagnostics.Add(Error("asset-catalog.schema", "package.json", "Package manifest is missing."));
+            return Failure(diagnostics);
+        }
+        if (!File.Exists(characterPath))
+        {
+            diagnostics.Add(Error("asset-catalog.schema", "character.json", "Character document is missing."));
+            return Failure(diagnostics);
+        }
+
+        string packageJson = File.ReadAllText(packagePath);
+        string characterJson = File.ReadAllText(characterPath);
+        CharacterCompileResult compiled = CharacterPackageCompiler.Compile(packageJson, characterJson, profile);
+        diagnostics.AddRange(compiled.Diagnostics);
+        if (compiled.CookedPackage == null || compiled.HasErrors)
+            return Failure(diagnostics, compiled.CookedPackage);
+        string packageId = ReadPackageId(packageJson);
+        PackageMetadata packageMetadata = ReadPackageMetadata(packageJson, characterJson, diagnostics);
+        ValidateCatalog(catalog, packageId, compiled.CookedPackage, diagnostics, out var requiredIds);
+        if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
+            return Failure(diagnostics, compiled.CookedPackage);
+
+        var definitions = new List<CharacterCookAnimationDefinition>(requiredIds.Count);
+        foreach (var required in requiredIds)
+        {
+            CharacterAssetCatalog.AnimationBinding binding = catalog.Bindings.First(x => x.SemanticId == required.Id);
+            string clipPath = AssetDatabase.GetAssetPath(binding.Clip);
+            string clipGuid = AssetDatabase.AssetPathToGUID(clipPath);
+            GlobalObjectId clipObjectId = GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip);
+            definitions.Add(new CharacterCookAnimationDefinition
+            {
+                SemanticId = required.Id,
+                PoseTrackId = binding.PoseTrackId,
+                Clip = binding.Clip,
+                ClipGlobalObjectId = clipObjectId.ToString(),
+                ClipAssetGuid = clipGuid,
+                ClipAssetPath = NormalizeProjectPath(clipPath),
+                FrameCount = Mathf.CeilToInt(binding.Clip.length * SampleRate),
+                ClipLengthBits = BitConverter.SingleToInt32Bits(binding.Clip.length),
+                SampleRate = SampleRate,
+                Extrapolation = binding.Extrapolation,
+            });
+        }
+        definitions.Sort((a, b) => StringComparer.Ordinal.Compare(a.SemanticId, b.SemanticId));
+
+        IReadOnlyList<CharacterCookDependencyRecord> dependencies =
+            CharacterCookDependencyTracker.Collect(packageRoot, catalog, definitions);
+        string sourceHash = CharacterCookDependencyTracker.ComputeSourceHash(
+            packageJson, characterJson, catalog, dependencies, definitions);
+        byte[] poseBytes;
+        try
+        {
+            poseBytes = DeterministicPoseTrackBaker.Bake(
+                catalog.Rig,
+                definitions.Select(x => new DeterministicPoseTrackBaker.SampledAnimation
+                {
+                    SemanticId = x.SemanticId,
+                    PoseTrackId = x.PoseTrackId,
+                    Clip = x.Clip,
+                    FrameCount = x.FrameCount,
+                }).ToArray(), SampleRate);
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("asset-catalog.rig.incompatible", "catalog.rig", ex.Message));
+            return Failure(diagnostics, compiled.CookedPackage, dependencies, sourceHash);
+        }
+
+        byte[] bindings = CharacterBindingWriter.Write(catalog, definitions, sourceHash);
+        return new CharacterAssetCookResult
+        {
+            CookedPackage = compiled.CookedPackage,
+            PoseBytes = poseBytes,
+            BindingBytes = bindings,
+            Animations = definitions,
+            Dependencies = dependencies,
+            PackageDependencies = packageMetadata.Dependencies,
+            CapabilityRequirements = compiled.CookedPackage.Definition.CapabilityRequirements
+                .Select(x => new CookedCapabilityRequirement(x.CapabilityId, x.CapabilityVersion)).ToArray(),
+            Creator = packageMetadata.Creator,
+            License = packageMetadata.License,
+            Attribution = packageMetadata.Attribution,
+            AuthoringSchemaVersion = packageMetadata.AuthoringSchemaVersion,
+            SourceHash = sourceHash,
+            Diagnostics = diagnostics,
+        };
+    }
+
+    internal static string ResolveFile(string packageRoot, string fileName)
+    {
+        string root = packageRoot;
+        if (!Path.IsPathRooted(root)) root = Path.Combine(ProjectRoot(), root);
+        return Path.Combine(root, fileName);
+    }
+
+    internal static string ProjectRoot()
+        => Directory.GetParent(Application.dataPath)!.FullName;
+
+    internal static CharacterPackageAssemblyInput BuildPackageInput(CharacterAssetCookResult result)
+    {
+        if (result.CookedPackage == null) throw new InvalidOperationException("Cook result has no cooked package.");
+        return new CharacterPackageAssemblyInput(
+            result.CookedPackage.Metadata.PackageId,
+            result.CookedPackage.Metadata.Version,
+            result.Creator,
+            result.License,
+            result.Attribution,
+            result.AuthoringSchemaVersion,
+            result.CookedPackage.Metadata.CookedSchemaVersion,
+            result.CookedPackage.Metadata.RuntimeApiMin,
+            result.CookedPackage.Metadata.RuntimeApiMax,
+            result.SourceHash,
+            result.PackageDependencies,
+            result.CapabilityRequirements,
+            CookerVersion,
+            Application.unityVersion,
+            BindingSchemaVersion,
+            "SKEL",
+            PoseVersion,
+            SampleRate,
+            result.Diagnostics.Where(x => x.Severity == CharacterDiagnosticSeverity.Warning).ToArray(),
+            result.CookedPackage.CanonicalBytes,
+            result.PoseBytes,
+            result.BindingBytes,
+            result.CookedPackage);
+    }
+
+    internal static bool TryComputeSourceHash(string packageRoot, CharacterAssetCatalog catalog, CharacterCookProfile profile, out string sourceHash, out IReadOnlyList<CharacterDiagnostic> diagnostics)
+    {
+        var errors = new List<CharacterDiagnostic>();
+        sourceHash = "";
+        try
+        {
+            string packageJson = File.ReadAllText(ResolveFile(packageRoot, "package.json"));
+            string characterJson = File.ReadAllText(ResolveFile(packageRoot, "character.json"));
+            CharacterCompileResult compiled = CharacterPackageCompiler.Compile(packageJson, characterJson, profile);
+            errors.AddRange(compiled.Diagnostics);
+            if (compiled.CookedPackage == null || compiled.HasErrors)
+            {
+                diagnostics = errors;
+                return false;
+            }
+            ValidateCatalog(catalog, ReadPackageId(packageJson), compiled.CookedPackage, errors, out var requiredIds);
+            if (errors.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
+            {
+                diagnostics = errors;
+                return false;
+            }
+            var definitions = new List<CharacterCookAnimationDefinition>(requiredIds.Count);
+            foreach (var required in requiredIds)
+            {
+                var binding = catalog.Bindings.First(x => x.SemanticId == required.Id);
+                string clipPath = AssetDatabase.GetAssetPath(binding.Clip);
+                definitions.Add(new CharacterCookAnimationDefinition
+                {
+                    SemanticId = required.Id,
+                    PoseTrackId = binding.PoseTrackId,
+                    Clip = binding.Clip,
+                    ClipGlobalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString(),
+                    ClipAssetGuid = AssetDatabase.AssetPathToGUID(clipPath),
+                    ClipAssetPath = NormalizeProjectPath(clipPath),
+                    FrameCount = Mathf.CeilToInt(binding.Clip.length * SampleRate),
+                    ClipLengthBits = BitConverter.SingleToInt32Bits(binding.Clip.length),
+                    SampleRate = SampleRate,
+                    Extrapolation = binding.Extrapolation,
+                });
+            }
+            definitions.Sort((a, b) => StringComparer.Ordinal.Compare(a.SemanticId, b.SemanticId));
+            var dependencies = CharacterCookDependencyTracker.Collect(packageRoot, catalog, definitions);
+            sourceHash = CharacterCookDependencyTracker.ComputeSourceHash(packageJson, characterJson, catalog, dependencies, definitions);
+            diagnostics = errors;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errors.Add(Error("asset-catalog.schema", "source-hash", ex.Message));
+            diagnostics = errors;
+            return false;
+        }
+    }
+
+    internal static string NormalizeProjectPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        string full = Path.GetFullPath(path).Replace('\\', '/');
+        string root = ProjectRoot().Replace('\\', '/').TrimEnd('/') + "/";
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            ? full.Substring(root.Length)
+            : path.Replace('\\', '/');
+    }
+
+    private static PackageMetadata ReadPackageMetadata(string packageJson, string characterJson, List<CharacterDiagnostic> diagnostics)
+    {
+        var result = new PackageMetadata();
+        try
+        {
+            using var packageDocument = JsonDocument.Parse(packageJson);
+            var package = packageDocument.RootElement;
+            result.Creator = package.TryGetProperty("creator", out var creator) ? creator.GetString() ?? "" : "";
+            result.License = package.TryGetProperty("license", out var license) ? license.GetString() ?? "" : "";
+            result.Attribution = package.TryGetProperty("attribution", out var attribution) ? attribution.GetString() ?? "" : "";
+            var dependencies = new List<PackageDependencySource>();
+            if (package.TryGetProperty("dependencies", out var dependencyArray) && dependencyArray.ValueKind == JsonValueKind.Array)
+                foreach (var dependency in dependencyArray.EnumerateArray())
+                    dependencies.Add(new PackageDependencySource(
+                        dependency.GetProperty("packageId").GetString() ?? "",
+                        dependency.GetProperty("version").GetString() ?? "",
+                        dependency.GetProperty("cookedHash").GetString() ?? ""));
+            result.Dependencies = dependencies;
+
+            using var characterDocument = JsonDocument.Parse(characterJson);
+            result.AuthoringSchemaVersion = characterDocument.RootElement.TryGetProperty("authoringSchemaVersion", out var schema)
+                ? schema.GetUInt16()
+                : (ushort)0;
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("asset-catalog.schema", "package.metadata", ex.Message));
+        }
+        return result;
+    }
+
+    private static string ReadPackageId(string packageJson)
+    {
+        try { return JsonDocument.Parse(packageJson).RootElement.GetProperty("packageId").GetString() ?? ""; }
+        catch { return ""; }
+    }
+    private static void ValidateCatalog(
+        CharacterAssetCatalog catalog,
+        string packageId,
+        CookedCharacterPackage package,
+        List<CharacterDiagnostic> diagnostics,
+        out List<(string Id, string Path)> requiredIds)
+    {
+        requiredIds = RequiredIds(package);
+        if (catalog == null)
+        {
+            diagnostics.Add(Error("asset-catalog.schema", "catalog", "Character asset catalog is missing."));
+            return;
+        }
+        if (catalog.PackageId != packageId || catalog.CatalogSchemaVersion != CharacterAssetCatalog.SchemaVersion)
+            diagnostics.Add(Error("asset-catalog.schema", "catalog", "Catalog package ID/schema is unsupported."));
+        if (catalog.SampleRate != SampleRate)
+            diagnostics.Add(Error("asset-catalog.sample.invalid", "catalog.sampleRate", "Catalog sample rate must be exactly 60 Hz."));
+        if (catalog.Rig == null)
+        {
+            diagnostics.Add(Error("asset-catalog.rig.missing", "catalog.rig", "Catalog rig is missing."));
+        }
+        else
+        {
+            string rigPath = AssetDatabase.GetAssetPath(catalog.Rig);
+            string rigExtension = Path.GetExtension(rigPath).ToLowerInvariant();
+            if (rigExtension != ".prefab" && rigExtension != ".fbx")
+                diagnostics.Add(Error("asset-catalog.rig.invalid", "catalog.rig", "Rig must be a prefab or imported model asset."));
+            Animator animator = catalog.Rig.GetComponent<Animator>();
+            bool validHumanoid = animator != null && animator.avatar != null && animator.avatar.isValid && animator.avatar.isHuman;
+            if (animator == null)
+                diagnostics.Add(Error("asset-catalog.rig.invalid", "catalog.rig", "Catalog rig has no Animator."));
+            else if (!validHumanoid)
+                diagnostics.Add(Error("asset-catalog.rig.incompatible", "catalog.rig", "Catalog rig requires a valid Humanoid Avatar."));
+            if (validHumanoid)
+                foreach (HumanBodyBones bone in DeterministicPoseTrackBaker.RequiredBones)
+                    if (animator.GetBoneTransform(bone) == null)
+                        diagnostics.Add(Error("asset-catalog.bone.missing", $"catalog.rig.{bone}", $"Required humanoid bone is missing: {bone}."));
+        }
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenTracks = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var binding in catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+        {
+            string id = binding?.SemanticId ?? "";
+            if (string.IsNullOrWhiteSpace(id) || !id.StartsWith("anim.", StringComparison.Ordinal))
+            {
+                diagnostics.Add(Error("asset-catalog.id.invalid", $"catalog.bindings[{id}]", "Binding semantic ID must use the anim.* namespace."));
+                continue;
+            }
+            if (!seenIds.Add(id)) diagnostics.Add(Error("asset-catalog.id.duplicate", $"catalog.bindings[{id}]", "Binding semantic ID is duplicated."));
+            if (string.IsNullOrWhiteSpace(binding.PoseTrackId))
+                diagnostics.Add(Error("asset-catalog.id.invalid", $"catalog.bindings[{id}].poseTrackId", "Pose track ID is empty."));
+            else if (!seenTracks.Add(binding.PoseTrackId))
+                diagnostics.Add(Error("asset-catalog.id.duplicate", $"catalog.bindings[{id}].poseTrackId", "Pose track ID is duplicated."));
+            if (binding.Clip == null)
+            {
+                diagnostics.Add(Error("asset-catalog.clip.missing", $"catalog.bindings[{id}].clip", "Animation clip is missing."));
+                continue;
+            }
+            string clipPath = AssetDatabase.GetAssetPath(binding.Clip);
+            string extension = Path.GetExtension(clipPath).ToLowerInvariant();
+            if (extension != ".anim" && extension != ".fbx")
+                diagnostics.Add(Error("asset-catalog.clip.unsupported", $"catalog.bindings[{id}].clip", "Clip must be a direct .anim or imported model sub-asset."));
+            if (string.IsNullOrEmpty(clipPath) || GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString().Length == 0)
+                diagnostics.Add(Error("asset-catalog.clip.unresolved", $"catalog.bindings[{id}].clip", "Clip has no stable Unity global object ID."));
+            if (float.IsNaN(binding.Clip.length) || float.IsInfinity(binding.Clip.length) || binding.Clip.length <= 0f)
+                diagnostics.Add(Error("asset-catalog.clip.unsupported", $"catalog.bindings[{id}].clip", "Clip length must be finite and positive."));
+            if (extension == ".fbx")
+            {
+                var importer = AssetImporter.GetAtPath(clipPath) as ModelImporter;
+                if (importer == null || importer.animationType != ModelImporterAnimationType.Human)
+                    diagnostics.Add(Error("asset-catalog.clip.unsupported", $"catalog.bindings[{id}].clip", "Imported clip source is not Humanoid."));
+            }
+        }
+        var requiredSet = new HashSet<string>(requiredIds.Select(x => x.Id), StringComparer.Ordinal);
+        foreach (string id in seenIds)
+            if (!requiredSet.Contains(id)) diagnostics.Add(Error("asset-catalog.id.orphan", $"catalog.bindings[{id}]", "Binding is not referenced by the canonical document."));
+        foreach (var required in requiredIds)
+            if (!seenIds.Contains(required.Id))
+                diagnostics.Add(Error("reference.animation.unresolved", required.Path, $"Animation ID '{required.Id}' is not bound by the catalog."));
+    }
+
+    private static List<(string Id, string Path)> RequiredIds(CookedCharacterPackage package)
+    {
+        var result = new List<(string Id, string Path)>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        void Add(string id, string path)
+        {
+            if (!string.IsNullOrEmpty(id) && seen.Add(id)) result.Add((id, path));
+        }
+        var p = package.Definition.Presentation;
+        Add(p.Idle, "character.presentation.idle");
+        Add(p.Run, "character.presentation.run");
+        Add(p.Dash, "character.presentation.dash");
+        Add(p.Jump, "character.presentation.jump");
+        Add(p.Fall, "character.presentation.fall");
+        Add(p.HitSmall, "character.presentation.hitSmall");
+        Add(p.HitMedium, "character.presentation.hitMedium");
+        Add(p.HitHard, "character.presentation.hitHard");
+        foreach (var slot in package.Definition.Slots)
+            for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
+                for (int idIndex = 0; idIndex < slot.Timeline.Stages[stageIndex].AnimationIds.Count; idIndex++)
+                {
+                    string id = slot.Timeline.Stages[stageIndex].AnimationIds[idIndex];
+                    Add(id, $"character.slots[{slot.Ordinal}].timeline.stages[{stageIndex}].animationIds[{idIndex}]");
+                }
+        return result;
+    }
+
+    internal static List<(string Id, string Path)> GetRequiredIds(CookedCharacterPackage package)
+        => RequiredIds(package);
+
+    private static CharacterAssetCookResult Failure(
+        List<CharacterDiagnostic> diagnostics,
+        CookedCharacterPackage? package = null,
+        IReadOnlyList<CharacterCookDependencyRecord>? dependencies = null,
+        string sourceHash = "")
+        => new CharacterAssetCookResult
+        {
+            CookedPackage = package,
+            Diagnostics = diagnostics,
+            Dependencies = dependencies ?? Array.Empty<CharacterCookDependencyRecord>(),
+            SourceHash = sourceHash,
+        };
+
+    internal static CharacterDiagnostic Error(string code, string path, string message)
+        => new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, code, path, message);
+}

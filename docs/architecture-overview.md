@@ -18,8 +18,7 @@ SlopArena/
 │   │   ├── MankiAerosolFlame.cs ← Manki RMB: hold-to-charge flamethrower
 │   │   ├── MankiBazooka.cs      ← Manki R: rise-aim-fire bazooka
 │   │   ├── MankiOverclock.cs    ← Manki F: self-buff 8s
-│   │   └── Kistu*/Nilus*/FightGuy* ← per-character ability implementations
-│   ├── Characters/          ← MankiData, FightGuyData, KistuData, NilusData (per-character definitions)
+│   │   └── legacy Manki/Kistu/Nilus ability implementations
 │   ├── Simulation.cs        ← SimulateTick(): one tick of movement + combat
 │   ├── SpellResolver.cs     ← hitbox collision math
 │   ├── CharacterState.cs    ← per-tick entity state
@@ -28,7 +27,7 @@ SlopArena/
 │   ├── InputState.cs        ← normalized input (MoveX/Y, flags, ActiveSlot), 19 bytes
 │   ├── AttackData.cs        ← HitboxEvent, AttackStage, AbilityData structs
 │   ├── CombatMath.cs        ← knockback, facing, damage scaling
-│   ├── BakedAnimationData.cs← offline-baked bone positions per frame
+│   ├── BakedAnimationData.cs← cooked pose projection used by Shared simulation
 │   ├── ArenaDefinition.cs   ← arena data (platforms, spawns, kill height)
 │   └── ... (lobby/codec DTOs: LobbyPayloadCodec, MasterServerClient, HostedServerConfig, ServerLogParser)
 │
@@ -43,14 +42,14 @@ SlopArena/
 │       │   ├── Input/          ← InputController (Unity Input → InputState)
 │       │   ├── Camera/         ← CameraMount, AimCameraMount (orbit + aim camera)
 │       │   ├── Combat/         ← CombatFeedback, AimHandler, AimIndicator
-│       │   └── Animation/      ← CharacterAnimationConfig (ScriptableObject)
+│       │   └── Animation/      ← generated cooked animation catalogs
 │       ├── Editor/
-│       │   ├── SlopArenaBaker.cs        ← skeleton bake (bone positions per anim frame → .bin)
+│       │   ├── SlopArenaBaker.cs        ← legacy non-FightGuy pose bake
 │       │   ├── SlopArenaArenaBaker.cs   ← arena bake
 │       │   ├── SlopArenaSceneSetup.cs   ← scene setup
-│       │   ├── PopulateAbilityClips.cs  ← populate ability clip slots
-│       │   ├── SetupArenaLighting.cs    ← arena lighting
-│       │   └── SetupArenaSkybox.cs      ← arena skybox
+│       │   ├── PopulateAbilityClips.cs  ← populate legacy ability clip slots
+│       │   ├── SetupArenaLighting.cs     ← scene lighting
+│       │   └── SetupArenaSkybox.cs       ← scene skybox
 │
 ├── src/
 │   ├── Shared/            ← canonical Shared code (netstandard2.1)
@@ -60,11 +59,11 @@ SlopArena/
 │   └── Shared.Tests/      ← xUnit tests (ServerSimulation, SpellResolver, etc.)
 │
 ├── docs/                 ← All documentation
-├── data/                 ← Baked binary data (.arena, _skeleton.bin). Versioned source;
-│                           staged into client/Unity/Assets/StreamingAssets/ by
-│                           scripts/build-release.sh for player builds. Clients resolve
-│                           via BakedContentPaths (StreamingAssets first, repo data/
-│                           fallback for the Editor) — issue #77
+├── content-cooked/        ← immutable cooked runtime packages and roster manifest
+│   └── fightguy/          ← runtime definition, bindings, poses, and manifest
+├── client/Unity/Assets/CharacterPackages/
+│                           ← editable authoring documents and asset catalogs
+├── data/                  ← legacy arena and non-FightGuy editor inputs
 └── tools/                ← Python scripts, build tools
 ```
 
@@ -107,7 +106,7 @@ SlopArena/
 ## Changing Gameplay Data
 
 ### Tune a character's stats
-→ `Shared/Characters/MankiData.cs` or `FightGuyData.cs`
+→ `client/Unity/Assets/CharacterPackages/<Name>/` and its Character Authoring Document
 - `Movement` struct: speed, jump, gravity, dash
 - `HurtboxBoneDefs[]`: bone-attached hurtbox spheres
 - `LMB/RMB/Q/E/R/F` abilities: `AbilitySpec` with `AbilityTypeId` and `Params`
@@ -135,7 +134,6 @@ SlopArena/
 
 ### Add a new character
 → Full guide: `docs/characters/adding-a-new-character.md`
-→ Quick version: add `CharacterClass` enum value → create `src/Shared/Characters/<Name>Data.cs` → register in `BuildRegistry()` → add `AbilitySpec.Description` for each ability slot → create `CharacterAnimationConfig` ScriptableObject.
 
 ---
 

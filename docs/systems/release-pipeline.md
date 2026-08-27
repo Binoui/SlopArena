@@ -33,8 +33,20 @@ scripts/build-release.sh 0.2.0-demo.1
 
 The script builds Shared + tests, publishes the self-contained Windows server
 (embedded host-and-play), publishes the linux-x64 server for the mini PC,
-stages arenas, stamps `bundleVersion`, runs the Unity Windows player build,
+stages arenas plus the cooked roster manifest and FightGuy package payloads,
+stamps `bundleVersion`, runs the Unity Windows player build,
 then restores `ProjectSettings.asset` and unstages `StreamingAssets/`.
+
+Both client and server staging trees contain:
+
+- `content-cooked/roster/manifest.json`
+- `content-cooked/fightguy/manifest.json`
+- `content-cooked/fightguy/character.runtime.json`
+- `content-cooked/fightguy/poses.bin`
+- `content-cooked/fightguy/client.bindings`
+
+Raw FightGuy authoring JSON, manual FightGuy animation configs, and
+`fightguy_skeleton.bin` are not release inputs.
 
 > The version stamp is reverted via `git checkout` of ProjectSettings.asset —
 > the script refuses to run if that file has uncommitted changes.
@@ -58,7 +70,7 @@ Send the release URL to friends. They download → unzip → run → Training or
 ## CI
 
 - This repo (`.github/workflows/ci.yml`): on push to main + PR — build
-  `src/Shared/`, run `tests/Shared.Tests/` (451 tests), build `src/Server/`.
+  `src/Shared/`, run `tests/Shared.Tests/` (757 passing, 9 skipped), build `src/Server/`.
 - Master repo (`.github/workflows/build.yml`): build + test on push/PR to
   main; on `v*` tag push, publishes `dotnet publish -c Release` output as a
   GitHub Actions artifact.

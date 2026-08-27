@@ -46,7 +46,7 @@ public class LedgeWalkOffTests
     {
         const float platformY = 6f;
         const int edgeCell = 16; // solid cells x in [0,16) — world edge at x=16
-        var def = CharacterRegistry.Get(cls);
+        var def = BuiltInContentResolver.Resolve(cls).Definition;
         var sim = TestHelpers.MakeSim(PlatformArena(platformY, edgeCell));
         var s = TestHelpers.PlayerState(12f, 100f);
         s.PY = platformY + def.CapsuleHeight * 0.5f;
@@ -82,7 +82,7 @@ public class LedgeWalkOffTests
     {
         const float platformY = 6f;
         const int edgeCell = 16;
-        var def = CharacterRegistry.Get(CharacterClass.FightGuy);
+        var def = BuiltInContentResolver.Resolve(CharacterClass.FightGuy).Definition;
         var sim = TestHelpers.MakeSim(PlatformArena(platformY, edgeCell));
         var s = TestHelpers.PlayerState(12f, 100f);
         s.PY = platformY + def.CapsuleHeight * 0.5f;
@@ -119,7 +119,7 @@ public class LedgeWalkOffTests
     {
         const float platformY = 6f;
         const int edgeCell = 16;
-        var def = CharacterRegistry.Get(cls);
+        var def = BuiltInContentResolver.Resolve(cls).Definition;
         var sim = TestHelpers.MakeSim(PlatformArena(platformY, edgeCell));
         var s = TestHelpers.PlayerState(12f, 100f);
         s.PY = platformY + def.CapsuleHeight * 0.5f;

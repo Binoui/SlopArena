@@ -79,7 +79,8 @@ internal static class Program
             "nilus" => CharacterClass.Nilus,
             _ => CharacterClass.FightGuy,
         };
-        var def = CharacterRegistry.Get(cls);
+        var entry = BuiltInContentResolver.Resolve(cls);
+        var def = entry.Definition;
         if (def.Class == CharacterClass.None)
         {
             Console.Error.WriteLine($"Unknown character '{charName}'.");
@@ -87,7 +88,7 @@ internal static class Program
         }
 
         string commit = CurrentCommit();
-        var baked = SelfPlay.LoadBakedData(def);
+        var baked = SelfPlay.LoadBakedData(entry);
         var hits = MoveData.CollectHits(def);
         var arena = SelfPlay.BuildKillArena();
 
@@ -97,7 +98,7 @@ internal static class Program
         var baseMove = MoveData.BuildReport(def, hits, pcts, baked, graph, di);
         var baseRecords = new List<MatchRecord>(matches);
         for (int m = 0; m < matches; m++) baseRecords.Add(SelfPlayMatch.Run(def, arena, seed + m, baked));
-        var baseTelemetry = SelfPlay.Aggregate(def, baseRecords, seed);
+        var baseTelemetry = SelfPlay.Aggregate(entry, baseRecords, seed);
         Console.Error.WriteLine($"baseline {TuningProfiles.Describe(baseProfile)} — " +
             $"move report + {matches} matches (seed {seed}) done");
 
@@ -105,7 +106,7 @@ internal static class Program
         var candMove = MoveData.BuildReport(def, hits, pcts, baked, graph, di);
         var candRecords = new List<MatchRecord>(matches);
         for (int m = 0; m < matches; m++) candRecords.Add(SelfPlayMatch.Run(def, arena, seed + m, baked));
-        var candTelemetry = SelfPlay.Aggregate(def, candRecords, seed);
+        var candTelemetry = SelfPlay.Aggregate(entry, candRecords, seed);
         Console.Error.WriteLine($"candidate {TuningProfiles.Describe(candProfile)} done");
 
         TuningProfiles.Apply(baseProfile); // leave the shipped tuning in place

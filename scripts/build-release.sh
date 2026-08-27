@@ -16,6 +16,9 @@ dotnet build "$ROOT/src/Shared/" --nologo
 echo "== Tests =="
 dotnet test "$ROOT/tests/Shared.Tests/" --nologo
 
+echo "== Verify committed FightGuy package =="
+dotnet test "$ROOT/tests/Shared.Tests/" --nologo --filter FullyQualifiedName~CommittedFightGuyPackage
+
 echo "== Self-contained Windows server (embedded host-and-play) =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 --self-contained true -o "$SA/Server"
 # The csproj copies server.json (dev defaults, localhost:5000) into publish
@@ -23,6 +26,10 @@ dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 
 # explicit config path as arg[0], so the shipped file is dead weight AND leaks
 # localhost:5000 into the zip (Task 7.2: must appear NOWHERE). Drop it.
 rm -f "$SA/Server/server.json"
+for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
+  test -f "$SA/Server/content-cooked/fightguy/$package_file"
+done
+cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/Server/content-cooked/fightguy/manifest.json"
 
 echo "== linux-x64 server for the mini PC =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x64 --self-contained false -o "$ROOT/build/minipc"
@@ -30,17 +37,26 @@ dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x6
 # server.json (real masterServerUrl + publicIp).
 rm -f "$ROOT/build/minipc/server.json"
 
-echo "== Stage baked data (arenas + skeleton bins) =="
-mkdir -p "$SA/arenas" "$SA/data" "$SA/Server/data"
+for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
+  test -f "$ROOT/build/minipc/content-cooked/fightguy/$package_file"
+done
+cmp "$ROOT/content-cooked/fightguy/manifest.json" "$ROOT/build/minipc/content-cooked/fightguy/manifest.json"
+echo "== Stage baked data (arenas) =="
+mkdir -p "$SA/arenas"
 cp "$ROOT"/data/arenas/*.arena "$SA/arenas/"
-# Skeleton bins: the client reads them from StreamingAssets/data (BakedContentPaths),
-# the bundled server from its CWD-relative data/ (MatchInstance.LoadBakedData runs with
-# WorkingDirectory = the server binary dir). Issue #77: without this, bone-attached
-# hitboxes degrade to capsules in the shipped exe.
-cp "$ROOT"/data/*.bin "$SA/data/"
-mkdir -p "$SA/content/characters/fightguy"
-cp "$ROOT/content/characters/fightguy/character.json" "$SA/content/characters/fightguy/character.json"
-cp "$ROOT"/data/*.bin "$SA/Server/data/"
+
+echo "== Stage canonical FightGuy package and roster =="
+mkdir -p "$SA/content-cooked/roster" "$SA/content-cooked/fightguy" "$SA/Server/content-cooked/roster" "$SA/Server/content-cooked/fightguy"
+cp "$ROOT/content-cooked/roster/manifest.json" "$SA/content-cooked/roster/"
+cp "$ROOT/content-cooked/roster/manifest.json" "$SA/Server/content-cooked/roster/"
+cp "$ROOT/content-cooked/fightguy/"* "$SA/content-cooked/fightguy/"
+cp "$ROOT/content-cooked/fightguy/"* "$SA/Server/content-cooked/fightguy/"
+cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/content-cooked/fightguy/manifest.json"
+cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/Server/content-cooked/fightguy/manifest.json"
+test ! -e "$SA/content/characters/fightguy/character.json"
+test ! -e "$SA/Server/content/characters/fightguy/character.json"
+test ! -e "$SA/data/fightguy_skeleton.bin"
+test ! -e "$SA/Server/data/fightguy_skeleton.bin"
 
 echo "== Version stamp =="
 # The stamp is reverted below with a hard checkout of the committed file; refuse
@@ -57,7 +73,7 @@ echo "== Restore committed bundleVersion =="
 git -C "$ROOT" checkout -- client/Unity/ProjectSettings/ProjectSettings.asset
 
 echo "== Unstage build-only artifacts =="
-rm -rf "$SA/Server" "$SA/arenas" "$SA/data" "$SA/content"
+rm -rf "$SA/Server" "$SA/arenas" "$SA/data" "$SA/content" "$SA/content-cooked"
 
 echo "== Ship docs + zip =="
 cp "$ROOT/docs/release/PLAY_GUIDE.md" "$REL/README.txt"

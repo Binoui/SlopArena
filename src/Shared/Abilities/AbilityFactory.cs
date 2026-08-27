@@ -18,7 +18,7 @@ public static class AbilityFactory
         return characterClass switch
         {
             CharacterClass.Manki => CreateMankiAbility(slot, airborne),
-            CharacterClass.FightGuy => CreateFightGuyAbility(slot, airborne),
+            CharacterClass.FightGuy => null,
             CharacterClass.Kistu => CreateKistuAbility(slot, airborne),
             CharacterClass.Nilus => CreateNilusAbility(slot, airborne),
             _ => null,
@@ -37,25 +37,6 @@ public static class AbilityFactory
         _ => null,
     };
 
-    private static ServerAbility? CreateFightGuyAbility(byte slot, bool airborne) => (slot, airborne) switch
-    {
-        (0, false) => new LmbCombo(),          // LMB ground — jab
-        (0, true) => new AirLmbCombo(),        // AirLMB — rising kick
-
-        (2, false) => new LmbCombo(),          // key "1" — Low Kick (normal)
-        (2, true) => new AirLmbCombo(),        // key "1" air — Double Punch
-        (3, _) => new FightGuyRisingKick(),    // E — Rising Dragon (upward mobility / recovery)
-        (4, _) => new FightGuyCycloneKick(),   // R — Cyclone Kick (moved from E, issue #117)
-        (5, _) => new FightGuyDragonBeam(),      // F — Dragon Beam
-        (6, false) => new LmbCombo(),          // key "2" — Straight Punch (normal)
-        (6, true) => new AirLmbCombo(),        // key "2" air — Floating Kick
-        (7, false) => new LmbCombo(),          // key "3" — Sweeping Kick (normal)
-        (7, true) => new AirLmbCombo(),        // key "3" air — High Kick
-        (8, false) => new LmbCombo(),          // key "4" — Double Kick (normal)
-        (8, true) => new AirLmbCombo(),        // key "4" air — Air Smash
-        (10, _) => new FightGuyKiShot(),         // A key (slot 11) — Ki Shot
-        _ => null,                             // key "5" — empty (demo)
-    };
 
     private static ServerAbility? CreateKistuAbility(byte slot, bool airborne) => (slot, airborne) switch
     {
