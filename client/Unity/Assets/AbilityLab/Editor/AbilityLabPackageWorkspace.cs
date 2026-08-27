@@ -18,6 +18,7 @@ public sealed class AbilityLabPackageWorkspace
     public PackageManifestSource Manifest { get; private set; } = null!;
     public CharacterAuthoringDocument Draft { get; private set; } = null!;
     public string LoadedDiskHash { get; private set; } = "";
+    private string LoadedCatalogFingerprint { get; set; } = "";
     public bool IsDirty { get; private set; }
     public IReadOnlyList<CharacterDiagnostic> Diagnostics => _diagnostics;
     public string CookedSourceHash { get; private set; } = "";
@@ -25,12 +26,14 @@ public sealed class AbilityLabPackageWorkspace
     public string PackageHash { get; private set; } = "";
     public CharacterAssetCatalog Catalog { get; private set; }
     public CharacterPackageAssemblyResult LastValidAssembly { get; private set; }
+    public AbilityLabPackagePreviewResult Preview { get; private set; }
     public string Status { get; private set; } = "Unknown";
     private const int MaxUndoDepth = 50;
-    private readonly Stack<CharacterPackageSource> _undo = new();
-    private readonly Stack<CharacterPackageSource> _redo = new();
+    private readonly Stack<WorkspaceSnapshot> _undo = new();
+    private readonly Stack<WorkspaceSnapshot> _redo = new();
 
     private readonly List<CharacterDiagnostic> _diagnostics = new();
+    public event Action? StatusChanged;
 
     public bool HasPackage => !string.IsNullOrEmpty(PackageRoot) && Manifest != null && Draft != null;
     public string PackageId => Manifest?.PackageId ?? "";
@@ -68,54 +71,95 @@ public sealed class AbilityLabPackageWorkspace
         if (!inspection.Success || inspection.Source == null || inspection.Catalog == null)
         {
             SetDiagnostics(inspection.RawDiagnostics, "Failed");
+            Preview = new AbilityLabPackagePreviewResult(
+                false, null, null, null, null, null, Array.Empty<SlotAddress>(), inspection.RawDiagnostics);
+            AbilityLab.Instance?.ApplyPreviewUnavailable(Preview.Diagnostics);
             return false;
         }
+
         PackageRoot = inspection.SourcePath;
         Manifest = inspection.Source.Manifest;
         Draft = inspection.Source.Character;
         Catalog = inspection.Catalog;
+        _undo.Clear();
+        _redo.Clear();
         AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft), true);
         LoadedDiskHash = ComputeDiskHash();
+        LoadedCatalogFingerprint = ComputeCatalogFingerprint();
         IsDirty = false;
-        SetDiagnostics(inspection.RawDiagnostics, inspection.Status == "valid" ? "Valid" : inspection.Status == "stale" ? "Stale" : "Failed");
+        CookedSourceHash = inspection.CookedSourceHash ?? "";
+        CookedContentHash = inspection.CookedContentHash ?? "";
+        PackageHash = inspection.PackageHash ?? "";
+        var inspectionDiagnostics = new List<CharacterDiagnostic>(inspection.RawDiagnostics);
+        if (inspection.Status == "stale")
+            inspectionDiagnostics.AddRange((inspection.StaleReasons ?? Array.Empty<CharacterPackageStaleReason>())
+                .Select(reason => new CharacterDiagnostic(CharacterDiagnosticSeverity.Warning, reason.Code, reason.Path, reason.Message)));
+        SetDiagnostics(inspectionDiagnostics, inspection.Status == "valid" ? "Valid" : inspection.Status == "stale" ? "Stale" : "Failed");
+        Preview = AbilityLabPackagePreviewLoader.Load(Manifest.PackageId);
+        if (Preview.IsAvailable)
+            AbilityLab.Instance?.ApplyPackagePreview(Preview);
+        else
+            AbilityLab.Instance?.ApplyPreviewUnavailable(Preview.Diagnostics);
+
+        if (!Preview.IsAvailable)
+        {
+            var previewDiagnostics = _diagnostics.Concat(Preview.Diagnostics).ToArray();
+            SetDiagnostics(previewDiagnostics, Status);
+        }
         return true;
     }
 
     public bool ReloadPackage() => HasPackage && OpenPackage(PackageRoot);
-
     public bool SavePackage()
     {
-        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
-        if (ComputeDiskHash() != LoadedDiskHash) return Fail("workspace.conflict", PackageRoot, "Package source changed externally; reload before saving.");
+        if (ComputeDiskHash() != LoadedDiskHash)
+            return Fail("workspace.conflict", PackageRoot, "Package source changed externally; reload before saving.");
+        if (ComputeCatalogFingerprint() != LoadedCatalogFingerprint)
+            return Fail("workspace.conflict", PackageRoot + "/CharacterAssetCatalog.asset", "Character asset catalog changed externally; reload before saving.");
         string packagePath = ToFull(PackageRoot + "/package.json"); string characterPath = ToFull(PackageRoot + "/character.json");
         try
         {
             string packageJson = CharacterPackageSourceCodec.SerializeManifest(Manifest);
             string characterJson = CharacterPackageSourceCodec.SerializeCharacter(Draft);
             ReplaceSources(packagePath, characterPath, Encoding.UTF8.GetBytes(packageJson), Encoding.UTF8.GetBytes(characterJson));
-            LoadedDiskHash = ComputeDiskHash(); IsDirty = false;
+            LoadedDiskHash = ComputeDiskHash();
+            IsDirty = false;
+            SetDiagnostics(Array.Empty<CharacterDiagnostic>(), "Cooking");
             var cook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(PackageRoot);
-            if (!cook.Success)
+            if (!cook.Success || cook.Assembly == null)
             {
                 SetDiagnostics(cook.RawDiagnostics, "Failed");
-                AbilityLab.Instance?.MarkPreviewNonAuthoritative();
                 return false;
             }
+
+            var loadedAssembly = CookedCharacterPackageLoader.LoadAssembly(cook.Assembly);
+            if (!loadedAssembly.IsValid)
+            {
+                SetDiagnostics(loadedAssembly.Diagnostics, "Failed");
+                return false;
+            }
+
+            var candidatePreview = AbilityLabPackagePreviewLoader.Load(PackageId);
+            if (!candidatePreview.IsAvailable)
+            {
+                SetDiagnostics(loadedAssembly.Diagnostics.Concat(candidatePreview.Diagnostics), "Failed");
+                return false;
+            }
+
             LastValidAssembly = cook.Assembly;
             CookedSourceHash = cook.SourceHash;
             CookedContentHash = cook.CookedContentHash;
             PackageHash = cook.PackageHash;
-            var loadedAssembly = CookedCharacterPackageLoader.LoadAssembly(cook.Assembly);
-            SetDiagnostics(loadedAssembly.Diagnostics, loadedAssembly.IsValid ? "Valid" : "Failed");
-            if (!loadedAssembly.IsValid) AbilityLab.Instance?.MarkPreviewNonAuthoritative();
-            if (loadedAssembly.IsValid && loadedAssembly.Package != null)
-            {
-                var generated = CharacterAnimationCatalogGenerator.Create(cook.Assembly.BindingBytes);
-                AbilityLab.Instance?.ApplyCookedPackagePreview(loadedAssembly.Package, loadedAssembly.BakedAnimation, generated, Catalog.Rig, PackageId == "fightguy" ? CharacterClass.FightGuy : CharacterClass.None, true);
-            }
-            return loadedAssembly.IsValid;
+            Preview = candidatePreview;
+            SetDiagnostics(loadedAssembly.Diagnostics.Concat(candidatePreview.Diagnostics), "Valid");
+            AbilityLab.Instance?.ApplyPackagePreview(candidatePreview);
+            return true;
         }
-        catch (Exception ex) { AbilityLab.Instance?.MarkPreviewNonAuthoritative(); SetDiagnostics(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "workspace.save.failed", PackageRoot, ex.Message) }, "Failed"); return false; }
+        catch (Exception ex)
+        {
+            SetDiagnostics(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "workspace.save.failed", PackageRoot, ex.Message) }, "Failed");
+            return false;
+        }
     }
 
     public bool RenameSemanticId(string oldId, string newId)
@@ -126,21 +170,177 @@ public sealed class AbilityLabPackageWorkspace
             .Select(x => new CharacterAssetCatalogBindingSnapshot(x.SemanticId ?? "", x.PoseTrackId ?? ""))
             .ToArray();
         var result = CharacterPackageSourceCodec.RenameSemanticId(new CharacterPackageSource(Manifest, Draft), oldId, newId, snapshots);
-        if (!result.IsValid || result.Source == null) { SetDiagnostics(result.Diagnostics, "Failed"); return false; }
-        var prior = Catalog.Bindings.Select(x => new CharacterAssetCatalog.AnimationBinding { SemanticId = x.SemanticId, PoseTrackId = x.PoseTrackId, Clip = x.Clip, Extrapolation = x.Extrapolation }).ToArray();
+        if (!result.IsValid || result.Source == null) { SetDiagnosticsWithoutNotify(result.Diagnostics, "Failed"); return false; }
+        WorkspaceSnapshot prior = CaptureSnapshot();
         try
         {
             UnityEditor.Undo.RecordObject(Catalog, "Rename semantic ID");
-            PushUndo();
-            Manifest = result.Source.Manifest; Draft = result.Source.Character; AbilityLab.Instance?.SetSourceDocument(result.Source);
-            Catalog.Bindings = Catalog.Bindings.Select(x => x == null ? null : new CharacterAssetCatalog.AnimationBinding { SemanticId = x.SemanticId == oldId ? newId : x.SemanticId, PoseTrackId = x.PoseTrackId == oldId ? newId : x.PoseTrackId, Clip = x.Clip, Extrapolation = x.Extrapolation }).ToArray();
-            EditorUtility.SetDirty(Catalog); IsDirty = true; SetDiagnostics(result.Diagnostics, "Valid"); return true;
+            Manifest = result.Source.Manifest;
+            Draft = result.Source.Character;
+            Catalog.Bindings = (Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+                .Select(x => x == null ? null : new CharacterAssetCatalog.AnimationBinding
+                {
+                    SemanticId = x.SemanticId == oldId ? newId : x.SemanticId,
+                    PoseTrackId = x.PoseTrackId == oldId ? newId : x.PoseTrackId,
+                    Clip = x.Clip,
+                    Extrapolation = x.Extrapolation,
+                }).ToArray();
+            EditorUtility.SetDirty(Catalog);
+            AssetDatabase.SaveAssets();
+            PushUndo(prior);
+            AbilityLab.Instance?.SetSourceDocument(result.Source);
+            IsDirty = true;
+            LoadedCatalogFingerprint = ComputeCatalogFingerprint();
+            SetDiagnosticsWithoutNotify(result.Diagnostics, "Stale");
+            SceneView.RepaintAll();
+            return true;
         }
         catch (Exception ex)
         {
-            Catalog.Bindings = prior; SetDiagnostics(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "rename.failed", "catalog", ex.Message) }, "Failed"); return false;
+            RestoreSnapshot(prior, false);
+            SetDiagnosticsWithoutNotify(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "rename.failed", "catalog", ex.Message) }, "Failed");
+            return false;
         }
     }
+
+    public bool ReplaceCatalogRig(GameObject rig)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        WorkspaceSnapshot prior = CaptureSnapshot();
+        try
+        {
+            UnityEditor.Undo.RecordObject(Catalog, "Replace character catalog rig");
+            Catalog.Rig = rig;
+            EditorUtility.SetDirty(Catalog);
+            AssetDatabase.SaveAssets();
+            PushUndo(prior);
+            MarkCatalogEdited();
+            SceneView.RepaintAll();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            RestoreSnapshot(prior, false);
+            return Fail("edit.catalog.failed", "catalog.rig", ex.Message);
+        }
+    }
+
+    public bool ReplaceCatalogBinding(string semanticId, AnimationClip clip, ExtrapolationMode extrapolation)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        var bindings = Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>();
+        var existing = bindings.FirstOrDefault(x => x != null && x.SemanticId == semanticId);
+        if (existing == null)
+            return Fail("asset-catalog.binding.missing", semanticId ?? "catalog.bindings", "Catalog binding does not exist; automatic binding creation is not supported.");
+
+        WorkspaceSnapshot prior = CaptureSnapshot();
+        try
+        {
+            UnityEditor.Undo.RecordObject(Catalog, "Replace character catalog binding");
+            existing.Clip = clip;
+            existing.Extrapolation = extrapolation;
+            EditorUtility.SetDirty(Catalog);
+            AssetDatabase.SaveAssets();
+            PushUndo(prior);
+            MarkCatalogEdited();
+            SceneView.RepaintAll();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            RestoreSnapshot(prior, false);
+            return Fail("edit.catalog.failed", $"catalog.bindings[{semanticId}]", ex.Message);
+        }
+    }
+
+    private void MarkCatalogEdited()
+    {
+        LoadedCatalogFingerprint = ComputeCatalogFingerprint();
+        IsDirty = true;
+        SetDiagnosticsWithoutNotify(_diagnostics, "Stale");
+    }
+    public bool TryResolveCanonicalSlot(string canonicalSlotId, out int explicitSourceSlotIndex, out CharacterSlotSource sourceSlot)
+    {
+        explicitSourceSlotIndex = -1;
+        sourceSlot = null!;
+        if (!HasPackage || !CanonicalSlotProjection.TryGet(canonicalSlotId, out _)) return false;
+
+        var explicitById = Draft.Slots
+            .Select((slot, index) => (slot, index))
+            .Where(item => item.slot != null)
+            .ToDictionary(item => item.slot.Id, item => item.index, StringComparer.Ordinal);
+        var aliases = (Draft.Aliases ?? Array.Empty<CharacterAliasSource>())
+            .Where(alias => alias != null)
+            .ToDictionary(alias => alias.From, alias => alias.To, StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        string current = canonicalSlotId;
+        while (true)
+        {
+            if (!visited.Add(current)) return false;
+            if (explicitById.TryGetValue(current, out explicitSourceSlotIndex))
+            {
+                sourceSlot = Draft.Slots[explicitSourceSlotIndex];
+                return true;
+            }
+            if (!aliases.TryGetValue(current, out string target)) return false;
+            current = target;
+        }
+    }
+
+    public bool ReplaceGeneral(string displayName, float weight, float capsuleRadius, float capsuleHeight, float hipHeight, float hurtboxRadius)
+        => !HasPackage
+            ? Fail("workspace.missing", "workspace", "No package is open.")
+            : ApplyEdit(CharacterPackageSourceCodec.ReplaceGeneral(
+                new CharacterPackageSource(Manifest, Draft), displayName, weight, capsuleRadius, capsuleHeight, hipHeight, hurtboxRadius));
+
+    public bool ReplaceMovement(CharacterMovementSource value)
+        => !HasPackage
+            ? Fail("workspace.missing", "workspace", "No package is open.")
+            : ApplyEdit(CharacterPackageSourceCodec.ReplaceMovement(new CharacterPackageSource(Manifest, Draft), value));
+
+    public bool ReplacePresentation(CharacterPresentationSource value)
+        => !HasPackage
+            ? Fail("workspace.missing", "workspace", "No package is open.")
+            : ApplyEdit(CharacterPackageSourceCodec.ReplacePresentation(new CharacterPackageSource(Manifest, Draft), value));
+
+    public bool ReplaceStage(string canonicalSlotId, int stageIndex, CharacterStageSource stage)
+    {
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out _))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        return ReplaceStage(slotIndex, stageIndex, stage);
+    }
+    public bool ReplaceOperationTick(string canonicalSlotId, int stageIndex, int operationIndex, int tick)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out _))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        return ApplyEdit(CharacterPackageSourceCodec.ReplaceOperationTick(new CharacterPackageSource(Manifest, Draft), slotIndex, stageIndex, operationIndex, tick));
+    }
+
+    public bool ReplaceHitboxDuration(string canonicalSlotId, int stageIndex, int operationIndex, int durationTicks)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out _))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        return ApplyEdit(CharacterPackageSourceCodec.ReplaceHitboxDuration(new CharacterPackageSource(Manifest, Draft), slotIndex, stageIndex, operationIndex, durationTicks));
+    }
+
+
+    public bool ReplaceHitbox(string canonicalSlotId, int stageIndex, int operationIndex, HitboxSource hitbox)
+    {
+        if (hitbox == null) return Fail("edit.source.missing", "hitbox", "Hitbox is required.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        var operations = sourceSlot.Timeline.Stages[stageIndex].Operations;
+        if (operationIndex < 0 || operationIndex >= operations.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}].operations[{operationIndex}]", "Operation index is out of range.");
+        if (operations[operationIndex] is not SpawnHitboxOperationSource original)
+            return Fail("edit.operation.type", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}].operations[{operationIndex}]", "Selected operation is not a hitbox operation.");
+        return ReplaceOperation(slotIndex, stageIndex, operationIndex, original with { Hitbox = hitbox });
+    }
+
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
     {
         var result = CharacterPackageSourceCodec.ReplaceStage(new CharacterPackageSource(Manifest, Draft), slotIndex, stageIndex, stage);
@@ -180,37 +380,140 @@ public sealed class AbilityLabPackageWorkspace
     public void Undo()
     {
         if (_undo.Count == 0) return;
-        if (Manifest != null && Draft != null) _redo.Push(new CharacterPackageSource(Manifest, Draft));
-        var source = _undo.Pop(); Manifest = source.Manifest; Draft = source.Character; AbilityLab.Instance?.SetSourceDocument(source, true); IsDirty = true; Status = "Stale";
+        _redo.Push(CaptureSnapshot());
+        RestoreSnapshot(_undo.Pop(), true);
     }
     public void Redo()
     {
         if (_redo.Count == 0) return;
-        if (Manifest != null && Draft != null) _undo.Push(new CharacterPackageSource(Manifest, Draft));
-        var source = _redo.Pop(); Manifest = source.Manifest; Draft = source.Character; AbilityLab.Instance?.SetSourceDocument(source, true); IsDirty = true; Status = "Stale";
+        _undo.Push(CaptureSnapshot());
+        RestoreSnapshot(_redo.Pop(), true);
     }
-
 
     public void SetDraft(CharacterAuthoringDocument draft) { PushUndo(); Draft = draft ?? throw new ArgumentNullException(nameof(draft)); if (Manifest != null) AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft)); IsDirty = true; }
     public void SetManifest(PackageManifestSource manifest) { PushUndo(); Manifest = manifest ?? throw new ArgumentNullException(nameof(manifest)); if (Draft != null) AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft)); IsDirty = true; }
     public void RevertDraft() => ReloadPackage();
 
-    private void PushUndo()
+    private void RestoreSnapshot(WorkspaceSnapshot snapshot, bool recordUnityUndo)
     {
-        if (Manifest == null || Draft == null) return;
-        _undo.Push(new CharacterPackageSource(Manifest, Draft));
+        if (recordUnityUndo && Catalog != null)
+            UnityEditor.Undo.RecordObject(Catalog, "Ability Lab workspace undo");
+        Manifest = snapshot.Source.Manifest;
+        Draft = snapshot.Source.Character;
+        if (Catalog != null && snapshot.Catalog != null)
+        {
+            Catalog.Rig = snapshot.Catalog.Rig;
+            Catalog.Bindings = CloneBindings(snapshot.Catalog.Bindings);
+            EditorUtility.SetDirty(Catalog);
+            AssetDatabase.SaveAssets();
+            LoadedCatalogFingerprint = ComputeCatalogFingerprint();
+        }
+        AbilityLab.Instance?.SetSourceDocument(snapshot.Source, true);
+        IsDirty = true;
+        SetDiagnosticsWithoutNotify(_diagnostics, "Stale");
+        SceneView.RepaintAll();
+    }
+
+    private WorkspaceSnapshot CaptureSnapshot()
+        => new(new CharacterPackageSource(Manifest, Draft), Catalog == null
+            ? null
+            : new CatalogSnapshot(Catalog.Rig, CloneBindings(Catalog.Bindings)));
+
+    private void PushUndo() => PushUndo(CaptureSnapshot());
+
+    private void PushUndo(WorkspaceSnapshot snapshot)
+    {
+        _undo.Push(snapshot);
         if (_undo.Count > MaxUndoDepth) _undo.Pop();
         _redo.Clear();
     }
 
-    private bool Fail(string code, string path, string message) { SetDiagnostics(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, code, path, message) }, "Failed"); return false; }
-    private void SetDiagnostics(IEnumerable<CharacterDiagnostic> diagnostics, string status) { _diagnostics.Clear(); _diagnostics.AddRange(diagnostics ?? Array.Empty<CharacterDiagnostic>()); Status = status; }
+    private static CharacterAssetCatalog.AnimationBinding[] CloneBindings(IEnumerable<CharacterAssetCatalog.AnimationBinding> bindings)
+        => (bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .Select(x => x == null ? null : new CharacterAssetCatalog.AnimationBinding
+            {
+                SemanticId = x.SemanticId,
+                PoseTrackId = x.PoseTrackId,
+                Clip = x.Clip,
+                Extrapolation = x.Extrapolation,
+            }).ToArray();
+
+    private sealed class WorkspaceSnapshot
+    {
+        public WorkspaceSnapshot(CharacterPackageSource source, CatalogSnapshot catalog)
+        {
+            Source = source;
+            Catalog = catalog;
+        }
+
+        public CharacterPackageSource Source { get; }
+        public CatalogSnapshot Catalog { get; }
+    }
+
+    private sealed class CatalogSnapshot
+    {
+        public CatalogSnapshot(GameObject rig, CharacterAssetCatalog.AnimationBinding[] bindings)
+        {
+            Rig = rig;
+            Bindings = bindings;
+        }
+
+        public GameObject Rig { get; }
+        public CharacterAssetCatalog.AnimationBinding[] Bindings { get; }
+    }
+
+    private bool Fail(string code, string path, string message) => SetFailure(code, path, message);
+    private bool SetFailure(string code, string path, string message)
+    {
+        SetDiagnostics(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, code, path, message) }, "Failed");
+        return false;
+    }
+    private void SetDiagnostics(IEnumerable<CharacterDiagnostic> diagnostics, string status)
+    {
+        var values = (diagnostics ?? Array.Empty<CharacterDiagnostic>()).ToArray();
+        _diagnostics.Clear();
+        _diagnostics.AddRange(values);
+        Status = status;
+        StatusChanged?.Invoke();
+    }
+    private void SetDiagnosticsWithoutNotify(IEnumerable<CharacterDiagnostic> diagnostics, string status)
+    {
+        var values = (diagnostics ?? Array.Empty<CharacterDiagnostic>()).ToArray();
+        _diagnostics.Clear();
+        _diagnostics.AddRange(values);
+        Status = status;
+    }
     private string ToFull(string path) => Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), path);
     private string ComputeDiskHash() => HashFiles(File.ReadAllBytes(ToFull(PackageRoot + "/package.json")), File.ReadAllBytes(ToFull(PackageRoot + "/character.json")));
+    private string ComputeCatalogFingerprint()
+    {
+        if (Catalog == null) return "";
+        var builder = new StringBuilder();
+        builder.Append(Catalog.PackageId).Append('\n')
+            .Append(Catalog.CatalogSchemaVersion).Append('\n')
+            .Append(Catalog.SampleRate).Append('\n')
+            .Append(Catalog.Rig == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(Catalog.Rig).ToString()).Append('\n');
+        foreach (var binding in Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+        {
+            builder.Append(binding?.SemanticId ?? "").Append('|')
+                .Append(binding?.PoseTrackId ?? "").Append('|')
+                .Append(binding == null || binding.Clip == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString()).Append('|')
+                .Append(binding?.Extrapolation.ToString() ?? "").Append('\n');
+        }
+        using var hash = SHA256.Create();
+        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", "").ToLowerInvariant();
+    }
     internal static string HashFiles(byte[] package, byte[] character)
     {
-        using var hash = SHA256.Create(); using var stream = new MemoryStream(); using var writer = new BinaryWriter(stream, Encoding.UTF8, true);
-        writer.Write(package.Length); writer.Write(package); writer.Write(character.Length); writer.Write(character); writer.Flush(); return BitConverter.ToString(hash.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
+        using var hash = SHA256.Create();
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, Encoding.UTF8, true);
+        writer.Write(package.Length);
+        writer.Write(package);
+        writer.Write(character.Length);
+        writer.Write(character);
+        writer.Flush();
+        return BitConverter.ToString(hash.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
     }
     private static void WriteAtomic(string path, byte[] bytes) { string temp = path + ".tmp-" + Guid.NewGuid().ToString("N"); File.WriteAllBytes(temp, bytes); if (File.Exists(path)) File.Replace(temp, path, path + ".previous", true); else File.Move(temp, path); }
     private static void ReplaceSources(string packagePath, string characterPath, byte[] package, byte[] character)

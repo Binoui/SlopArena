@@ -21,6 +21,7 @@ LIVING_DOCS = {
     Path("README.md"),
     Path("CONTRIBUTING.md"),
     Path("CONTEXT.md"),
+    Path(".omp/AGENTS.md"),
     Path("docs/README.md"),
     Path("docs/architecture-overview.md"),
     Path("docs/testing.md"),

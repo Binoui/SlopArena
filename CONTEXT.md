@@ -85,8 +85,13 @@ The symmetric commit resolution (phase 2, ADR-0015): two simultaneous Interrupti
 _Avoid_: parry (Kistu-specific), counter, trade
 
 **Slot**:
-One of the twelve character move units: eight normals (`1`-`4`, each with grounded and aerial variants) and four specials (`A`, `E`, `R`, `F`). `LMB` and `RMB` are camera controls, not attack slots. Normals are single moves; there are no automatic LMB chains or charged RMB attacks. `A` is the signature special, `E` is recovery-capable mobility, `R` is the playmaking special, and `F` is the long-cooldown power special. Ground/air: each normal has both variants; special air behavior is character-specific and must be recovery-aware for `E`.
+One canonical move entry in the 16-entry grid: ground/air × `1`-`4`, `A`, `E`, `R`, `F`. The kit has twelve button concepts—eight normals and four specials—each with grounded and aerial entries. `LMB` and `RMB` are camera controls, not attack slots. Normals are single moves; there are no automatic LMB chains or charged RMB attacks. `A` is the signature special, `E` is recovery-capable mobility, `R` is the playmaking special, and `F` is the long-cooldown power special.
 _Avoid_: button, ability slot, move slot
+
+**Move (UI label)**:
+The human-facing name for a **Slot** in Ability Lab. It never creates a second persisted domain object; selection and editing resolve directly to the canonical Slot identity.
+_Avoid_: move ID, move slot
+
 **Knockback**:
 The launch velocity applied when hitting a target. Combination of base push and damage-scaling growth (higher % = further launch). Uses frontloaded exponential decay (λ = 1.8/s): the launch is fastest right after the hit and smoothly slows — most travel happens early, the victim drifts in the tail. Decaying all axes also flattens launch arcs. Profile table maps archetypes to angle/base/growth:
 - **Light**: 15°, base=2, growth=1.5 — combo glue, slight pop
@@ -243,6 +248,14 @@ _Avoid_: asset path, prefab ID, resource path
 An engine-owned, versioned, deterministic gameplay capability that WorkshopContent composes for movement, combat, stage, or presentation behavior. It is not creator-executable code.
 _Avoid_: mod script, plugin, custom code
 
+**Ability (UI label)**:
+The human-facing name for a typed authoring operation that invokes a character capability. It does not create a second runtime or authoring model.
+_Avoid_: StartCapability, capability operation
+
+**Source Conflict**:
+The condition where loaded Working Draft source differs from package files changed externally. Saving is blocked until the user explicitly reloads or reverts.
+_Avoid_: merge conflict, last-writer-wins
+
 **WorkshopPackage**:
 An immutable published unit of WorkshopContent with an identity, version, cooked runtime content hash, dependencies, compatibility declaration, and creator rights metadata.
 _Avoid_: mod file, Workshop item (when exact bytes matter)
@@ -278,6 +291,18 @@ _Avoid_: CharacterClass, package ID, global content ID
 **Stale Cook**:
 The state where saved authoring inputs no longer match the source hash recorded by the last valid cooked artifact.
 _Avoid_: dirty content, cache issue, stale JSON
+
+**Working Draft**:
+The current editable Character Authoring Document state in Ability Lab. It may be invalid or unsaved and is never the authoritative preview.
+_Avoid_: live content, runtime definition
+
+**Authoritative Preview**:
+The Ability Lab presentation loaded from the last successfully cooked Character Package. It remains authoritative while the Working Draft is stale or cook-failed.
+_Avoid_: draft preview, editor preview
+
+**Compatibility Preview**:
+A read-only Ability Lab presentation loaded through the legacy character adapter for characters not yet represented by a Character Package.
+_Avoid_: legacy authoring, fallback package
 
 **ContentRequirement**:
 The exact WorkshopPackage and BuiltInContentId set a match must resolve and validate before its simulation starts.

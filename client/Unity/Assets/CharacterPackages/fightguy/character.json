@@ -9,11 +9,11 @@
     "dashSpeed": 20,
     "airSpeedMax": 7.5,
     "airAccelStick": 16,
-    "airAccelBase": 3.2,
+    "airAccelBase": 3.20000005,
     "jumpForce": 12,
-    "shortHopForce": 7.2,
-    "airJumpVMultiplier": 0.8,
-    "airJumpHMultiplier": 0.85,
+    "shortHopForce": 7.19999981,
+    "airJumpVMultiplier": 0.800000012,
+    "airJumpHMultiplier": 0.850000024,
     "gravity": 36,
     "airFloatGravity": 0,
     "dashDurationTicks": 20,
@@ -36,72 +36,72 @@
     "hitSmall": "anim.hit-light",
     "hitMedium": "anim.hit-medium",
     "hitHard": "anim.hit-hard",
-    "landStartOffsetSeconds": 0.49,
+    "landStartOffsetSeconds": 0.49000001,
     "modelResourcePath": "Characters/FightGuy",
     "visualScale": 1,
-    "hurtboxBoneScale": 0.85,
+    "hurtboxBoneScale": 0.850000024,
     "modelYOffset": 0,
     "modelSoleOffset": 0,
     "autoModelYOffset": true
   },
-  "capsuleRadius": 0.35,
-  "capsuleHeight": 1.7,
-  "hipHeight": 0.82,
+  "capsuleRadius": 0.349999994,
+  "capsuleHeight": 1.70000005,
+  "hipHeight": 0.819999993,
   "hurtboxRadius": 1,
   "hurtboxCapsules": [
     {
       "startX": 0,
-      "startY": 0.2,
+      "startY": 0.200000003,
       "startZ": 0,
       "endX": 0,
-      "endY": 0.9,
+      "endY": 0.899999976,
       "endZ": 0,
-      "radius": 0.3
+      "radius": 0.300000012
     },
     {
       "startX": 0,
-      "startY": 1.2,
+      "startY": 1.20000005,
       "startZ": 0,
       "endX": 0,
-      "endY": 1.2,
+      "endY": 1.20000005,
       "endZ": 0,
-      "radius": 0.22
+      "radius": 0.219999999
     },
     {
-      "startX": 0.3,
-      "startY": 0.8,
+      "startX": 0.300000012,
+      "startY": 0.800000012,
       "startZ": 0,
-      "endX": 0.6,
-      "endY": 0.6,
-      "endZ": 0.2,
-      "radius": 0.12
+      "endX": 0.600000024,
+      "endY": 0.600000024,
+      "endZ": 0.200000003,
+      "radius": 0.119999997
     },
     {
-      "startX": -0.3,
-      "startY": 0.8,
+      "startX": -0.300000012,
+      "startY": 0.800000012,
       "startZ": 0,
-      "endX": -0.6,
-      "endY": 0.6,
-      "endZ": 0.2,
-      "radius": 0.12
+      "endX": -0.600000024,
+      "endY": 0.600000024,
+      "endZ": 0.200000003,
+      "radius": 0.119999997
     },
     {
-      "startX": 0.15,
+      "startX": 0.150000006,
       "startY": 0,
       "startZ": 0,
-      "endX": 0.15,
-      "endY": -0.8,
+      "endX": 0.150000006,
+      "endY": -0.800000012,
       "endZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     },
     {
-      "startX": -0.15,
+      "startX": -0.150000006,
       "startY": 0,
       "startZ": 0,
-      "endX": -0.15,
-      "endY": -0.8,
+      "endX": -0.150000006,
+      "endY": -0.800000012,
       "endZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     }
   ],
   "hurtboxBoneDefs": [
@@ -110,49 +110,49 @@
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.22
+      "radius": 0.219999999
     },
     {
       "boneId": "bone.spine2",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.26
+      "radius": 0.25999999
     },
     {
       "boneId": "bone.hips",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.26
+      "radius": 0.25999999
     },
     {
       "boneId": "bone.right-hand",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.12
+      "radius": 0.119999997
     },
     {
       "boneId": "bone.left-hand",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.12
+      "radius": 0.119999997
     },
     {
       "boneId": "bone.right-foot",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     },
     {
       "boneId": "bone.left-foot",
       "offsetX": 0,
       "offsetY": 0,
       "offsetZ": 0,
-      "radius": 0.16
+      "radius": 0.159999996
     }
   ],
   "presentationIds": [
@@ -205,10 +205,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.35,
+                  "radius": 0.349999994,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetZ": 0.209999993,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -257,7 +257,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.3,
+                  "radius": 0.300000012,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -270,8 +270,8 @@
                   "angle": 55,
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
-                  "durationTicks": 5,
                   "stunTicks": 12,
+                  "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -282,7 +282,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -295,8 +295,8 @@
                   "angle": 45,
                   "baseKnockback": 7,
                   "knockbackGrowth": 30,
-                  "durationTicks": 5,
                   "stunTicks": 16,
+                  "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -334,10 +334,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetZ": 0.209999993,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -346,9 +346,9 @@
                   "damage": 7,
                   "angle": 25,
                   "baseKnockback": 5,
-                  "durationTicks": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
+                  "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -386,7 +386,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.35,
+                  "radius": 0.349999994,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -399,8 +399,8 @@
                   "angle": 25,
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
-                  "durationTicks": 5,
                   "stunTicks": 18,
+                  "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 1
                 }
@@ -411,7 +411,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.35,
+                  "radius": 0.349999994,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -424,8 +424,8 @@
                   "angle": 20,
                   "baseKnockback": 3,
                   "knockbackGrowth": 16,
-                  "durationTicks": 20,
                   "stunTicks": 12,
+                  "durationTicks": 20,
                   "interruptible": true,
                   "hitGroup": 1
                 }
@@ -463,10 +463,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetZ": 0.209999993,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -476,8 +476,8 @@
                   "angle": 55,
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
-                  "durationTicks": 6,
                   "stunTicks": 18,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -515,10 +515,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.35,
+                  "radius": 0.349999994,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.14,
+                  "offsetZ": 0.140000001,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -528,8 +528,8 @@
                   "angle": 65,
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
-                  "durationTicks": 6,
                   "stunTicks": 20,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -567,7 +567,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.42,
+                  "radius": 0.419999987,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -580,8 +580,8 @@
                   "angle": 28,
                   "baseKnockback": 9,
                   "knockbackGrowth": 42,
-                  "durationTicks": 7,
                   "stunTicks": 26,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -619,10 +619,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.24,
+                  "offsetZ": 0.239999995,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -632,8 +632,8 @@
                   "angle": 25,
                   "baseKnockback": 8,
                   "knockbackGrowth": 42,
-                  "durationTicks": 7,
                   "stunTicks": 26,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -674,7 +674,7 @@
                 "parameters": {
                   "startupTicks": 8,
                   "durationTicks": 24,
-                  "launchOffsetY": 1.2,
+                  "launchOffsetY": 1.20000005,
                   "projectileSpeed": 25,
                   "gravity": 1,
                   "hitboxRadius": 0.5,
@@ -731,10 +731,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.23,
+                  "offsetZ": 0.230000004,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -756,9 +756,9 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.3,
+                  "radius": 0.300000012,
                   "offsetX": 0,
-                  "offsetY": 0.18,
+                  "offsetY": 0.180000007,
                   "offsetZ": 0,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
@@ -781,10 +781,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.400000006,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.63,
+                  "offsetZ": 0.629999995,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -838,16 +838,16 @@
                   "windupTicks": 6,
                   "hitboxEndTick": 34,
                   "durationTicks": 40,
-                  "bodyRadius": 0.8,
-                  "sideRadius": 0.4,
-                  "sideOffset": 0.8,
+                  "bodyRadius": 0.800000012,
+                  "sideRadius": 0.400000006,
+                  "sideOffset": 0.800000012,
                   "damage": 7,
                   "knockbackAngle": 15,
                   "knockbackBase": 8,
                   "knockbackGrowth": 5,
                   "stunTicks": 6,
-                  "bodyY": 0.8,
-                  "sideY": 0.3
+                  "bodyY": 0.800000012,
+                  "sideY": 0.300000012
                 }
               },
               {
@@ -892,9 +892,9 @@
                 "parameters": {
                   "durationTicks": 28,
                   "fireTick": 24,
-                  "launchOffsetY": 1.2,
+                  "launchOffsetY": 1.20000005,
                   "beamRange": 18,
-                  "beamRadius": 0.45,
+                  "beamRadius": 0.449999988,
                   "damage": 14,
                   "knockbackAngle": 20,
                   "knockbackBase": 18,

@@ -33,11 +33,9 @@ public static class CharacterPackageCompiler
     private const ushort SchemaVersion = 1;
     private const string RuntimeApiMin = "1.0.0";
     private const string RuntimeApiMax = "1.x";
-    private static readonly string[] CanonicalSlots =
-    {
-        "ground.1", "ground.2", "ground.3", "ground.4", "ground.A", "ground.E", "ground.R", "ground.F",
-        "air.1", "air.2", "air.3", "air.4", "air.A", "air.E", "air.R", "air.F",
-    };
+    private static readonly string[] CanonicalSlots = CanonicalSlotProjection.All
+        .Select(slot => slot.Id)
+        .ToArray();
     private static readonly IReadOnlyList<string> CanonicalSlotIdsReadOnly = Array.AsReadOnly(CanonicalSlots);
     public static IReadOnlyList<string> CanonicalSlotIds => CanonicalSlotIdsReadOnly;
     private static readonly string[] TrustedCapabilities =

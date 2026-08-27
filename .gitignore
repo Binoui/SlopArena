@@ -64,6 +64,8 @@ Config/
 Intermediate/
 Saved/
 Content/
+!client/Unity/Assets/Scripts/Runtime/Content/
+!client/Unity/Assets/Scripts/Runtime/Content/**
 DerivedDataCache/
 Makefile
 *.modules

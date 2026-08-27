@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+  <ui:VisualElement name="inspector-template" class="inspector">
+    <ui:Label text="Inspector foundation surface" />
+  </ui:VisualElement>
+</ui:UXML>

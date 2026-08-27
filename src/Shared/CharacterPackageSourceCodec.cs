@@ -139,6 +139,21 @@ public static class CharacterPackageSourceCodec
                 0f, 0f, 0f, 0f, System.Array.Empty<HurtboxCapsuleSource>(), System.Array.Empty<HurtboxBoneSource>(), System.Array.Empty<string>(), System.Array.Empty<CapabilityRequirementSource>(), slots, System.Array.Empty<CharacterAliasSource>()));
     }
 
+    public static CharacterSourceEditResult ReplaceGeneral(CharacterPackageSource source, string displayName, float weight, float capsuleRadius, float capsuleHeight, float hipHeight, float hurtboxRadius)
+        => source == null
+            ? CharacterSourceEditResult.Failure("edit.source.missing", "source", "Source is required.")
+            : CharacterSourceEditResult.Success(source with
+            {
+                Character = source.Character with
+                {
+                    DisplayName = displayName,
+                    Weight = weight,
+                    CapsuleRadius = capsuleRadius,
+                    CapsuleHeight = capsuleHeight,
+                    HipHeight = hipHeight,
+                    HurtboxRadius = hurtboxRadius
+                }
+            });
     public static CharacterSourceEditResult ReplaceMovement(CharacterPackageSource source, CharacterMovementSource value)
         => source == null || value == null ? CharacterSourceEditResult.Failure("edit.source.missing", "source", "Source and movement are required.") : CharacterSourceEditResult.Success(source with { Character = source.Character with { Movement = value } });
     public static CharacterSourceEditResult ReplacePresentation(CharacterPackageSource source, CharacterPresentationSource value)
@@ -181,6 +196,33 @@ public static class CharacterPackageSourceCodec
         var operations = stage.Operations.ToList(); operations[operationIndex] = value;
         return ReplaceStage(source, slotIndex, stageIndex, stage with { Operations = operations });
     }
+    public static CharacterSourceEditResult ReplaceOperationTick(CharacterPackageSource source, int slotIndex, int stageIndex, int operationIndex, int tick)
+    {
+        if (!TryStage(source, slotIndex, stageIndex, out _, out var stage, out var path))
+            return CharacterSourceEditResult.Failure("edit.index.out-of-range", path, "Stage index is out of range.");
+        var operationPath = path + ".operations[" + operationIndex + "]";
+        if (operationIndex < 0 || operationIndex >= stage.Operations.Count)
+            return CharacterSourceEditResult.Failure("edit.index.out-of-range", operationPath, "Operation index is out of range.");
+        if (tick < 0 || tick >= stage.DurationTicks)
+            return CharacterSourceEditResult.Failure("edit.tick.out-of-range", operationPath + ".tick", "Operation tick must be inside the stage.");
+        var operation = stage.Operations[operationIndex];
+        return ReplaceOperation(source, slotIndex, stageIndex, operationIndex, operation with { Tick = (ushort)tick });
+    }
+
+    public static CharacterSourceEditResult ReplaceHitboxDuration(CharacterPackageSource source, int slotIndex, int stageIndex, int operationIndex, int durationTicks)
+    {
+        if (!TryStage(source, slotIndex, stageIndex, out _, out var stage, out var path))
+            return CharacterSourceEditResult.Failure("edit.index.out-of-range", path, "Stage index is out of range.");
+        var operationPath = path + ".operations[" + operationIndex + "]";
+        if (operationIndex < 0 || operationIndex >= stage.Operations.Count)
+            return CharacterSourceEditResult.Failure("edit.index.out-of-range", operationPath, "Operation index is out of range.");
+        if (stage.Operations[operationIndex] is not SpawnHitboxOperationSource hitbox)
+            return CharacterSourceEditResult.Failure("edit.operation.not-hitbox", operationPath, "Selected operation is not a hitbox.");
+        if (durationTicks <= 0 || hitbox.Tick < 0 || (long)hitbox.Tick + durationTicks > stage.DurationTicks)
+            return CharacterSourceEditResult.Failure("edit.duration.out-of-range", operationPath + ".hitbox.durationTicks", "Hitbox duration must be positive and end inside the stage.");
+        return ReplaceOperation(source, slotIndex, stageIndex, operationIndex, hitbox with { Hitbox = hitbox.Hitbox with { DurationTicks = (ushort)durationTicks } });
+    }
+
     public static CharacterSourceEditResult AddOperation(CharacterPackageSource source, int slotIndex, int stageIndex, CharacterTimelineOperationSource value)
     {
         if (value == null) return CharacterSourceEditResult.Failure("edit.source.missing", "operation", "Operation is required.");

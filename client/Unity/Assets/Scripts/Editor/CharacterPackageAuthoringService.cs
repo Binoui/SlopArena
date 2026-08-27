@@ -89,6 +89,15 @@ public sealed class CharacterPackageAuthoringService
             dirtyOrStale = false;
         }
 
+        CharacterCookStatus cookStatus = ReadStatus(package.PackageId);
+        CharacterPackageProvenance provenance = artifact.Manifest == null
+            ? null
+            : CharacterPackageProvenance.Create(
+                package.ProjectRelativeRoot,
+                CookedPath(package.PackageId),
+                artifact.Manifest,
+                ProfileFor(package.PackageId),
+                cookStatus);
         return CharacterPackageInspectionResult.CreateSuccess(
             package.PackageId,
             package.DisplayName,
@@ -103,7 +112,8 @@ public sealed class CharacterPackageAuthoringService
             slots,
             diagnostics,
             package.Source,
-            package.Catalog);
+            package.Catalog,
+            provenance);
     }
 
     public CharacterPackageCookResult Cook(string target)
@@ -521,7 +531,8 @@ public sealed class CharacterPackageAuthoringService
                 root.GetProperty("sourceHash").GetString(),
                 root.GetProperty("cookedContentHash").GetString(),
                 root.GetProperty("packageHash").GetString(),
-                diagnostics);
+                diagnostics,
+                ParseManifestProjection(root));
         }
         catch (Exception ex)
         {
@@ -529,6 +540,65 @@ public sealed class CharacterPackageAuthoringService
             return ArtifactSnapshot.Invalid(diagnostics);
         }
     }
+    private static CharacterPackageManifestProjection ParseManifestProjection(JsonElement root)
+    {
+        var result = new CharacterPackageManifestProjection
+        {
+            PackageId = ReadString(root, "packageId"),
+            Version = ReadString(root, "version"),
+            Creator = ReadString(root, "creator"),
+            License = ReadString(root, "license"),
+            Attribution = ReadString(root, "attribution"),
+            AuthoringSchemaVersion = ReadUShort(root, "authoringSchemaVersion"),
+            CookedSchemaVersion = ReadUShort(root, "cookedSchemaVersion"),
+            RuntimeApiMin = ReadString(root, "runtimeApiMin"),
+            RuntimeApiMax = ReadString(root, "runtimeApiMax"),
+        };
+        if (root.TryGetProperty("dependencies", out var dependencies) && dependencies.ValueKind == JsonValueKind.Array)
+            foreach (var dependency in dependencies.EnumerateArray())
+                result.Dependencies.Add(new PackageDependencySource(
+                    ReadString(dependency, "packageId"),
+                    ReadString(dependency, "version"),
+                    ReadString(dependency, "cookedHash")));
+        if (root.TryGetProperty("capabilityRequirements", out var capabilities) && capabilities.ValueKind == JsonValueKind.Array)
+            foreach (var capability in capabilities.EnumerateArray())
+                result.CapabilityRequirements.Add(new CookedCapabilityRequirement(
+                    ReadString(capability, "capabilityId"),
+                    ReadString(capability, "capabilityVersion")));
+        if (root.TryGetProperty("payloads", out var payloads) && payloads.ValueKind == JsonValueKind.Array)
+            foreach (var payload in payloads.EnumerateArray())
+                result.Payloads.Add(new CharacterPackagePayloadInfo(
+                    ReadString(payload, "path"),
+                    ReadString(payload, "sha256"),
+                    ReadLong(payload, "size")));
+        if (root.TryGetProperty("toolchain", out var toolchain) && toolchain.ValueKind == JsonValueKind.Object)
+        {
+            result.CookerVersion = ReadString(toolchain, "cookerVersion");
+            result.UnityVersion = ReadString(toolchain, "unityVersion");
+            result.BindingSchemaVersion = ReadInt(toolchain, "bindingSchemaVersion");
+            result.PoseFormat = ReadString(toolchain, "poseFormat");
+            result.PoseVersion = ReadInt(toolchain, "poseVersion");
+            result.SampleRate = ReadInt(toolchain, "sampleRate");
+        }
+        if (root.TryGetProperty("warnings", out var warnings) && warnings.ValueKind == JsonValueKind.Array)
+            foreach (var warning in warnings.EnumerateArray())
+                result.Warnings.Add(new CharacterPackageDiagnosticResult(
+                    ReadString(warning, "severity"),
+                    ReadString(warning, "code"),
+                    ReadString(warning, "path"),
+                    ReadString(warning, "message")));
+        return result;
+    }
+
+    private static string ReadString(JsonElement parent, string name)
+        => parent.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+    private static int ReadInt(JsonElement parent, string name)
+        => parent.TryGetProperty(name, out var value) && value.TryGetInt32(out int result) ? result : 0;
+    private static long ReadLong(JsonElement parent, string name)
+        => parent.TryGetProperty(name, out var value) && value.TryGetInt64(out long result) ? result : 0;
+    private static ushort ReadUShort(JsonElement parent, string name)
+        => parent.TryGetProperty(name, out var value) && value.TryGetUInt16(out ushort result) ? result : (ushort)0;
+
 
     private CharacterCookProfile ProfileFor(string packageId)
         => packageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
@@ -699,11 +769,12 @@ public sealed class CharacterPackageAuthoringService
         public string CookedContentHash { get; private set; }
         public string PackageHash { get; private set; }
         public IReadOnlyList<CharacterDiagnostic> Diagnostics { get; private set; }
+        public CharacterPackageManifestProjection Manifest { get; private set; }
 
         public static ArtifactSnapshot Missing() => new ArtifactSnapshot { IsMissing = true, Diagnostics = Array.Empty<CharacterDiagnostic>() };
         public static ArtifactSnapshot Invalid(IReadOnlyList<CharacterDiagnostic> diagnostics) => new ArtifactSnapshot { IsInvalid = true, Diagnostics = diagnostics };
-        public static ArtifactSnapshot Valid(string sourceHash, string cookedContentHash, string packageHash, IReadOnlyList<CharacterDiagnostic> diagnostics)
-            => new ArtifactSnapshot { SourceHash = sourceHash, CookedContentHash = cookedContentHash, PackageHash = packageHash, Diagnostics = diagnostics };
+        public static ArtifactSnapshot Valid(string sourceHash, string cookedContentHash, string packageHash, IReadOnlyList<CharacterDiagnostic> diagnostics, CharacterPackageManifestProjection manifest)
+            => new ArtifactSnapshot { SourceHash = sourceHash, CookedContentHash = cookedContentHash, PackageHash = packageHash, Diagnostics = diagnostics, Manifest = manifest };
     }
 
     private sealed class FileSnapshot
@@ -711,6 +782,125 @@ public sealed class CharacterPackageAuthoringService
         public byte[] Bytes { get; }
         public byte[] MetaBytes { get; }
         public FileSnapshot(byte[] bytes, byte[] metaBytes) { Bytes = bytes; MetaBytes = metaBytes; }
+    }
+}
+
+internal sealed class CharacterPackageManifestProjection
+{
+    public string PackageId = "";
+    public string Version = "";
+    public string Creator = "";
+    public string License = "";
+    public string Attribution = "";
+    public ushort AuthoringSchemaVersion;
+    public ushort CookedSchemaVersion;
+    public string RuntimeApiMin = "";
+    public string RuntimeApiMax = "";
+    public string CookerVersion = "";
+    public string UnityVersion = "";
+    public int BindingSchemaVersion;
+    public string PoseFormat = "";
+    public int PoseVersion;
+    public int SampleRate;
+    public readonly List<PackageDependencySource> Dependencies = new();
+    public readonly List<CookedCapabilityRequirement> CapabilityRequirements = new();
+    public readonly List<CharacterPackagePayloadInfo> Payloads = new();
+    public readonly List<CharacterPackageDiagnosticResult> Warnings = new();
+}
+
+public sealed class CharacterPackageProvenance
+{
+    [JsonProperty("packagePath")] public string PackagePath { get; }
+    [JsonProperty("sourcePath")] public string SourcePath { get; }
+    [JsonProperty("cookedPath")] public string CookedPath { get; }
+    [JsonProperty("packageId")] public string PackageId { get; }
+    [JsonProperty("version")] public string Version { get; }
+    [JsonProperty("creator")] public string Creator { get; }
+    [JsonProperty("license")] public string License { get; }
+    [JsonProperty("attribution")] public string Attribution { get; }
+    [JsonProperty("authoringSchemaVersion")] public ushort AuthoringSchemaVersion { get; }
+    [JsonProperty("cookedSchemaVersion")] public ushort CookedSchemaVersion { get; }
+    [JsonProperty("runtimeApiMin")] public string RuntimeApiMin { get; }
+    [JsonProperty("runtimeApiMax")] public string RuntimeApiMax { get; }
+    [JsonProperty("profile")] public CharacterCookProfile Profile { get; }
+    [JsonProperty("cookerVersion")] public string CookerVersion { get; }
+    [JsonProperty("unityVersion")] public string UnityVersion { get; }
+    [JsonProperty("bindingSchemaVersion")] public int BindingSchemaVersion { get; }
+    [JsonProperty("poseFormat")] public string PoseFormat { get; }
+    [JsonProperty("poseVersion")] public int PoseVersion { get; }
+    [JsonProperty("sampleRate")] public int SampleRate { get; }
+    [JsonProperty("dependencies")] public IReadOnlyList<PackageDependencySource> Dependencies { get; }
+    [JsonProperty("capabilityRequirements")] public IReadOnlyList<CookedCapabilityRequirement> CapabilityRequirements { get; }
+    [JsonProperty("payloads")] public IReadOnlyList<CharacterPackagePayloadInfo> Payloads { get; }
+    [JsonProperty("unityDependencies")] public IReadOnlyList<CharacterPackageUnityDependency> UnityDependencies { get; }
+    [JsonProperty("warnings")] public IReadOnlyList<CharacterPackageDiagnosticResult> Warnings { get; }
+    [JsonProperty("cookStatus")] public string CookStatus { get; }
+    [JsonProperty("cookStatusDiagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> CookStatusDiagnostics { get; }
+
+    private CharacterPackageProvenance(
+        string sourcePath,
+        string cookedPath,
+        CharacterPackageManifestProjection manifest,
+        CharacterCookProfile profile,
+        CharacterCookStatus status)
+    {
+        PackagePath = sourcePath;
+        SourcePath = sourcePath + "/character.json";
+        CookedPath = cookedPath;
+        PackageId = manifest.PackageId;
+        Version = manifest.Version;
+        Creator = manifest.Creator;
+        License = manifest.License;
+        Attribution = manifest.Attribution;
+        AuthoringSchemaVersion = manifest.AuthoringSchemaVersion;
+        CookedSchemaVersion = manifest.CookedSchemaVersion;
+        RuntimeApiMin = manifest.RuntimeApiMin;
+        RuntimeApiMax = manifest.RuntimeApiMax;
+        Profile = profile;
+        CookerVersion = manifest.CookerVersion;
+        UnityVersion = manifest.UnityVersion;
+        BindingSchemaVersion = manifest.BindingSchemaVersion;
+        PoseFormat = manifest.PoseFormat;
+        PoseVersion = manifest.PoseVersion;
+        SampleRate = manifest.SampleRate;
+        Dependencies = manifest.Dependencies.ToArray();
+        CapabilityRequirements = manifest.CapabilityRequirements.ToArray();
+        Payloads = manifest.Payloads.ToArray();
+        UnityDependencies = (status?.Dependencies ?? new List<CharacterCookStatusDependency>())
+            .Select(dependency => new CharacterPackageUnityDependency(dependency)).ToArray();
+        Warnings = manifest.Warnings.ToArray();
+        CookStatus = status?.State ?? "Unknown";
+        CookStatusDiagnostics = (status?.Diagnostics ?? new List<CharacterCookStatusDiagnostic>())
+            .Select(diagnostic => new CharacterPackageDiagnosticResult(diagnostic.Severity, diagnostic.Code, diagnostic.Path, diagnostic.Message))
+            .ToArray();
+    }
+
+    internal static CharacterPackageProvenance Create(
+        string sourcePath,
+        string cookedPath,
+        CharacterPackageManifestProjection manifest,
+        CharacterCookProfile profile,
+        CharacterCookStatus status)
+        => new(sourcePath, cookedPath, manifest, profile, status);
+}
+
+public sealed class CharacterPackageUnityDependency
+{
+    [JsonProperty("kind")] public string Kind { get; }
+    [JsonProperty("identity")] public string Identity { get; }
+    [JsonProperty("guid")] public string Guid { get; }
+    [JsonProperty("dependencyHash")] public string DependencyHash { get; }
+    [JsonProperty("metaHash")] public string MetaHash { get; }
+    [JsonProperty("importerSettings")] public string ImporterSettings { get; }
+
+    internal CharacterPackageUnityDependency(CharacterCookStatusDependency dependency)
+    {
+        Kind = dependency?.Kind ?? "";
+        Identity = dependency?.Identity ?? "";
+        Guid = dependency?.Guid ?? "";
+        DependencyHash = dependency?.DependencyHash ?? "";
+        MetaHash = dependency?.MetaHash ?? "";
+        ImporterSettings = dependency?.ImporterSettings ?? "";
     }
 }
 
@@ -729,6 +919,7 @@ public sealed class CharacterPackageInspectionResult
     [JsonProperty("staleReasons", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<CharacterPackageStaleReason> StaleReasons { get; }
     [JsonProperty("slots", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<CharacterPackageSlotSummary> Slots { get; }
     [JsonProperty("diagnostics", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+    [JsonProperty("provenance", NullValueHandling = NullValueHandling.Include)] public CharacterPackageProvenance Provenance { get; }
     internal CharacterPackageSource Source { get; }
     internal CharacterAssetCatalog Catalog { get; }
     internal IReadOnlyList<CharacterDiagnostic> RawDiagnostics { get; }
@@ -749,7 +940,8 @@ public sealed class CharacterPackageInspectionResult
         IReadOnlyList<CharacterPackageDiagnosticResult> diagnostics,
         CharacterPackageSource source,
         CharacterAssetCatalog catalog,
-        IReadOnlyList<CharacterDiagnostic> rawDiagnostics)
+        IReadOnlyList<CharacterDiagnostic> rawDiagnostics,
+        CharacterPackageProvenance provenance)
     {
         Success = success;
         PackageId = packageId;
@@ -764,6 +956,7 @@ public sealed class CharacterPackageInspectionResult
         StaleReasons = staleReasons;
         Slots = slots;
         Diagnostics = diagnostics;
+        Provenance = provenance;
         Source = source;
         Catalog = catalog;
         RawDiagnostics = rawDiagnostics;
@@ -783,7 +976,8 @@ public sealed class CharacterPackageInspectionResult
         IReadOnlyList<CharacterPackageSlotSummary> slots,
         IReadOnlyList<CharacterDiagnostic> diagnostics,
         CharacterPackageSource source,
-        CharacterAssetCatalog catalog)
+        CharacterAssetCatalog catalog,
+        CharacterPackageProvenance provenance)
         => new CharacterPackageInspectionResult(
             true,
             packageId,
@@ -800,7 +994,8 @@ public sealed class CharacterPackageInspectionResult
             CharacterPackageDiagnosticResult.From(diagnostics),
             source,
             catalog,
-            diagnostics.ToArray());
+            diagnostics.ToArray(),
+            provenance);
 
     internal static CharacterPackageInspectionResult CreateFailure(IReadOnlyList<CharacterDiagnostic> diagnostics)
         => new CharacterPackageInspectionResult(
@@ -819,7 +1014,8 @@ public sealed class CharacterPackageInspectionResult
             CharacterPackageDiagnosticResult.From(diagnostics),
             null,
             null,
-            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>());
+            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>(),
+            null);
 }
 
 public sealed class CharacterPackageCookResult
@@ -943,7 +1139,7 @@ public sealed class CharacterPackageDiagnosticResult
     [JsonProperty("path", NullValueHandling = NullValueHandling.Include)] public string Path { get; }
     [JsonProperty("message", NullValueHandling = NullValueHandling.Include)] public string Message { get; }
 
-    private CharacterPackageDiagnosticResult(string severity, string code, string path, string message)
+    internal CharacterPackageDiagnosticResult(string severity, string code, string path, string message)
     {
         Severity = severity;
         Code = code;

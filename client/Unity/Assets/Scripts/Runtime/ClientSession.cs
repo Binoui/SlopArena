@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SlopArena.Client
 {
@@ -235,62 +236,91 @@ namespace SlopArena.Client
             MatchContentHandleMap = new Shared.MatchContentHandleMap(Shared.MatchContentHandleMap.CurrentSchemaVersion, records);
         }
         public static bool TryBuildLocalMatchCatalog(out Shared.MatchContentCatalog? catalog, out string? failure)
-        {
-            catalog = null; failure = null;
-            try
-            {
-                string[] roots = { "content-cooked", System.IO.Path.Combine(UnityEngine.Application.dataPath, "../../../content-cooked"), System.IO.Path.Combine(UnityEngine.Application.streamingAssetsPath, "content-cooked") };
-                string? rosterPath = null;
-                foreach (var root in roots)
-                {
-                    var candidate = System.IO.Path.Combine(root, "roster", "manifest.json");
-                    if (System.IO.File.Exists(candidate)) { rosterPath = candidate; break; }
-                }
-                if (rosterPath == null) { failure = "Local cooked roster manifest is missing."; return false; }
-                var manifest = Shared.BuiltInRosterManifestCodec.Load(rosterPath);
-                var fightGuy = manifest.Resolve(Shared.CharacterClass.FightGuy);
-                if (fightGuy == null) { failure = "Local cooked roster has no FightGuy package."; return false; }
-                var packageRoot = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(rosterPath)!)!;
-                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(System.IO.Path.Combine(packageRoot, fightGuy.PackageId), fightGuy.Requirement);
-                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult> { [fightGuy.PackageId] = loaded };
-                var built = new Shared.MatchContentCatalogBuilder().Build(manifest, packages, new Shared.LegacyCharacterCatalogAdapter());
-                if (!built.IsValid || built.Catalog == null) { failure = string.Join("; ", built.Diagnostics); return false; }
-                catalog = built.Catalog; return true;
-            }
-            catch (Exception ex) { failure = ex.Message; return false; }
-        }
-        private static bool TryBuildAndValidateMatchCatalog(Shared.MatchContentHandleMap received, out Shared.MatchContentCatalog? catalog, out string? failure)
+            => TryBuildLocalMatchCatalogCore(out catalog, out failure);
+
+        private static bool TryBuildLocalMatchCatalogCore(out Shared.MatchContentCatalog? catalog, out string? failure)
         {
             catalog = null;
             failure = null;
             try
             {
-                string[] roots = { "content-cooked", System.IO.Path.Combine(UnityEngine.Application.dataPath, "../../../content-cooked"), System.IO.Path.Combine(UnityEngine.Application.streamingAssetsPath, "content-cooked") };
-                string? rosterPath = null;
-                foreach (var root in roots)
+                var resolver = LocalContentResolver.CreateDefault();
+                var rosterResolution = resolver.ResolveRoster();
+                if (!rosterResolution.Success || rosterResolution.Roster == null)
                 {
-                    var candidate = System.IO.Path.Combine(root, "roster", "manifest.json");
-                    if (System.IO.File.Exists(candidate)) { rosterPath = candidate; break; }
+                    failure = FormatDiagnostics(rosterResolution.Diagnostics);
+                    return false;
                 }
-                if (rosterPath == null) { failure = "Local cooked roster manifest is missing."; return false; }
-                var manifest = Shared.BuiltInRosterManifestCodec.Load(rosterPath);
-                var fightGuy = manifest.Resolve(Shared.CharacterClass.FightGuy);
-                if (fightGuy == null) { failure = "Local cooked roster has no FightGuy package."; return false; }
-                var packageRoot = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(rosterPath)!)!;
-                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(System.IO.Path.Combine(packageRoot, fightGuy.PackageId), fightGuy.Requirement);
-                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult> { [fightGuy.PackageId] = loaded };
-                var built = new Shared.MatchContentCatalogBuilder().Build(manifest, packages, new Shared.LegacyCharacterCatalogAdapter());
-                if (!built.IsValid || built.Catalog == null) { failure = string.Join("; ", built.Diagnostics); return false; }
-                if (received.Entries.Count != built.Catalog.Entries.Count) { failure = "Authoritative content handle map is incomplete."; return false; }
-                foreach (var record in received.Entries)
+
+                var fightGuy = rosterResolution.Roster.Resolve(Shared.CharacterClass.FightGuy);
+                if (fightGuy == null)
                 {
-                    var local = built.Catalog.Resolve(record.Handle);
-                    if (local == null || local.Identity != record.Identity || local.LegacySelector != record.Selector) { failure = $"Content handle {record.Handle.Value} identity mismatch."; return false; }
+                    failure = "Local cooked roster has no FightGuy package.";
+                    return false;
                 }
+
+                var packageResolution = resolver.ResolveCookedPackage(fightGuy.PackageId);
+                if (!packageResolution.Success || packageResolution.Requirement == null)
+                {
+                    failure = FormatDiagnostics(packageResolution.Diagnostics);
+                    return false;
+                }
+
+                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(
+                    System.IO.Path.Combine(packageResolution.RootPath, fightGuy.PackageId),
+                    packageResolution.Requirement);
+                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult>
+                {
+                    [fightGuy.PackageId] = loaded
+                };
+                var built = new Shared.MatchContentCatalogBuilder().Build(
+                    rosterResolution.Roster,
+                    packages,
+                    new Shared.LegacyCharacterCatalogAdapter());
+                if (!built.IsValid || built.Catalog == null)
+                {
+                    failure = FormatDiagnostics(built.Diagnostics);
+                    return false;
+                }
+
                 catalog = built.Catalog;
                 return true;
             }
-            catch (Exception ex) { failure = ex.Message; return false; }
+            catch (Exception ex)
+            {
+                failure = ex.Message;
+                return false;
+            }
+        }
+
+        private static string FormatDiagnostics(System.Collections.Generic.IEnumerable<Shared.CharacterDiagnostic> diagnostics)
+            => string.Join("; ", diagnostics.Select(d => $"{d.Code} ({d.Path}): {d.Message}"));
+
+        private static bool TryBuildAndValidateMatchCatalog(Shared.MatchContentHandleMap received, out Shared.MatchContentCatalog? catalog, out string? failure)
+        {
+            catalog = null;
+            failure = null;
+            if (!TryBuildLocalMatchCatalogCore(out var builtCatalog, out failure) || builtCatalog == null)
+                return false;
+
+            if (received == null || received.Entries.Count != builtCatalog.Entries.Count)
+            {
+                failure = "Authoritative content handle map is incomplete.";
+                return false;
+            }
+
+            foreach (var record in received.Entries)
+            {
+                var local = builtCatalog.Resolve(record.Handle);
+                if (local == null || local.Identity != record.Identity || local.LegacySelector != record.Selector)
+                {
+                    failure = $"Content handle {record.Handle.Value} identity mismatch.";
+                    return false;
+                }
+            }
+
+            catalog = builtCatalog;
+            return true;
         }
 
         private static Shared.CharacterClass ParseClass(string? name, Shared.CharacterClass fallback)

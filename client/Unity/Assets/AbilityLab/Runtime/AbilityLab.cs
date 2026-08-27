@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -19,9 +20,8 @@ namespace SlopArena.Client.Tools
     /// in AbilityLabPackageWorkspace. WorkingEvents is only a transient legacy/render
     /// projection and never writes package source.
     ///
-    /// ExecuteAlways: the orbit camera works in edit mode too (frame the view before
-    /// pressing Play). Pose/scrub/boxes are play-mode only.
-    /// </summary>
+    /// ExecuteAlways: the orbit camera and verified package preview work in edit mode.
+    /// Legacy compatibility preview remains play-mode only.
     [ExecuteAlways]
     public class AbilityLab : MonoBehaviour
     {
@@ -35,10 +35,14 @@ namespace SlopArena.Client.Tools
 
         // ── Selection state ──
         public CharacterClass Character { get; private set; } = CharacterClass.None;
+        public string SelectedPackageId { get; private set; } = "";
+        public string SelectedSlotId { get; private set; } = "";
+        public bool IsPackagePreview => AuthoritativePreview && !string.IsNullOrEmpty(SelectedPackageId);
         public int SlotIndex { get; private set; }
         public bool Airborne { get; private set; }
         public int StageIndex { get; private set; }
         public ushort Tick { get; private set; }
+        public int SelectedHitboxEventIndex { get; private set; } = -1;
         public bool Playing { get; set; }
         public float PlaySpeed { get; set; } = 1f;
         public float FacingYaw { get; set; }
@@ -186,21 +190,24 @@ namespace SlopArena.Client.Tools
             ResetCameraView();
         }
 
-        public void LoadCharacter(CharacterClass character)
+        public bool LoadCharacter(CharacterClass character)
         {
-            if (character == CharacterClass.None || character == Character) return;
-            if (!SlopArena.Client.ClientSession.TryBuildLocalMatchCatalog(out var catalog, out var failure) || catalog == null)
+            if (character == CharacterClass.None || character == Character) return character == Character;
+            var resolution = SlopArena.Client.LocalContentResolver.CreateDefault().ResolveLegacy(character);
+
+            if (!resolution.Success || resolution.LegacyEntry == null)
             {
-                Debug.LogError($"[AbilityLab] Failed to build local content catalog: {failure}");
-                return;
+                Debug.LogError($"[AbilityLab] Failed to resolve legacy content for {character}: {FormatDiagnostics(resolution.Diagnostics)}");
+                return false;
             }
-            var entry = catalog.Resolve(character);
-            if (entry == null)
+            if (!Application.isPlaying)
             {
-                Debug.LogError($"[AbilityLab] No catalog entry for {character}.");
-                return;
+                Debug.Log("[AbilityLab] Legacy compatibility preview is available only in Play Mode.");
+                return false;
             }
-            LoadCharacter(entry.Handle);
+
+            ApplyLegacyPreview(resolution.LegacyEntry);
+            return true;
         }
 
         public void LoadCharacter(ContentHandle handle)
@@ -233,15 +240,27 @@ namespace SlopArena.Client.Tools
                 }
                 ApplyCookedPackagePreview(
                     entry.CookedCharacterPackage, entry.BakedAnimation, animationCatalog, rig,
-                    entry.LegacySelector ?? CharacterClass.None, authoritative: true);
+                    CharacterClass.None, authoritative: true);
+                return;
+            }
+            if (!Application.isPlaying)
+            {
+                Debug.Log("[AbilityLab] Legacy compatibility preview is available only in Play Mode.");
                 return;
             }
 
+            ApplyLegacyPreview(entry);
+        }
+
+        private void ApplyLegacyPreview(MatchContentEntry entry)
+        {
             var loadedDef = entry.Definition;
             var loadedBaked = LoadBaked(loadedDef);
             var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
 
             Character = entry.LegacySelector ?? CharacterClass.None;
+            SelectedPackageId = "";
+            SelectedSlotId = "";
             Def = loadedDef;
             Baked = loadedBaked;
             WorkingDefs = loadedWorkingDefs;
@@ -249,9 +268,9 @@ namespace SlopArena.Client.Tools
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
             WorkingHitstopOverrides = new Dictionary<string, float>();
             AuthoritativePreview = false;
-            PreviewStatus = "Legacy";
-            if (_previewAnimationCatalog != null) DestroyImmediate(_previewAnimationCatalog);
-            _previewAnimationCatalog = null;
+            PreviewStatus = $"Compatibility Preview · {Character} · Legacy authority · Read-only";
+            _sourceDocument = null;
+            DestroyPreviewCatalog();
             _previewRig = null;
             SpawnRenderer();
 
@@ -263,7 +282,24 @@ namespace SlopArena.Client.Tools
             _undo.Clear();
             _redo.Clear();
             RefreshPose();
+        }
 
+        public void ApplyPackagePreview(AbilityLabPackagePreviewResult result)
+        {
+            if (result == null || !result.IsAvailable || result.Package == null ||
+                result.BakedPoses == null || result.AnimationCatalog == null ||
+                result.Rig == null || result.Identity == null)
+            {
+                ApplyPreviewUnavailable(result?.Diagnostics ?? Array.Empty<CharacterDiagnostic>());
+                return;
+            }
+
+            ApplyPackageData(
+                result.Package,
+                result.BakedPoses,
+                result.AnimationCatalog,
+                result.Rig,
+                result.Identity.PackageId);
         }
 
         public void ApplyCookedPackagePreview(
@@ -274,17 +310,34 @@ namespace SlopArena.Client.Tools
             CharacterClass legacySelector = CharacterClass.None,
             bool authoritative = true)
         {
-            if (_previewAnimationCatalog != null) DestroyImmediate(_previewAnimationCatalog);
+            if (package == null || baked == null || animationCatalog == null || rig == null)
+            {
+                ApplyPreviewUnavailable(new[]
+                {
+                    new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "preview.binding.failed", "package", "Cooked package preview data is incomplete."),
+                });
+                return;
+            }
+
+            if (authoritative)
+            {
+                ApplyPackageData(package, baked, animationCatalog, rig, package.Metadata.PackageId);
+                return;
+            }
+
+            DestroyPreviewCatalog();
             _previewAnimationCatalog = animationCatalog;
             _previewRig = rig;
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, legacySelector);
             Character = legacySelector;
+            SelectedPackageId = "";
+            SelectedSlotId = "";
             Def = definition;
             Baked = baked;
             WorkingDefs = definition.HurtboxBoneDefs != null ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
             DisplayDef = definition;
-            AuthoritativePreview = authoritative;
-            PreviewStatus = authoritative ? "Authoritative" : "Non-authoritative draft";
+            AuthoritativePreview = false;
+            PreviewStatus = "Non-authoritative draft";
             SpawnRenderer();
             Airborne = false; SlotIndex = SlotIndices[0]; StageIndex = 0; Tick = 0; Playing = false;
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
@@ -292,6 +345,90 @@ namespace SlopArena.Client.Tools
             _undo.Clear(); _redo.Clear();
             RefreshPose();
         }
+
+        private void ApplyPackageData(
+            CookedCharacterPackage package,
+            BakedAnimationData baked,
+            CharacterAnimationCatalog animationCatalog,
+            GameObject rig,
+            string packageId)
+        {
+            DestroyPreviewCatalog();
+            _previewAnimationCatalog = animationCatalog;
+            _previewRig = rig;
+            var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
+            Character = CharacterClass.None;
+            SelectedPackageId = packageId;
+            Def = definition;
+            Baked = baked;
+            WorkingDefs = definition.HurtboxBoneDefs != null ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
+            DisplayDef = definition;
+            AuthoritativePreview = true;
+            PreviewStatus = "Authoritative";
+            SpawnRenderer();
+            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+            WorkingHitstopOverrides = new Dictionary<string, float>();
+            _undo.Clear(); _redo.Clear();
+            SetSlot(CanonicalSlotProjection.All[0]);
+        }
+
+        public void ApplyPreviewUnavailable(IReadOnlyList<CharacterDiagnostic> diagnostics)
+        {
+            DestroyRenderer();
+            DestroyPreviewCatalog();
+            _previewRig = null;
+            Character = CharacterClass.None;
+            SelectedPackageId = "";
+            SelectedSlotId = "";
+            Def = null;
+            DisplayDef = null;
+            Baked = null;
+            WorkingDefs = Array.Empty<HurtboxBoneDef>();
+            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+            WorkingHitstopOverrides = new Dictionary<string, float>();
+            AuthoritativePreview = false;
+            PreviewStatus = "Preview unavailable";
+            StageIndex = 0;
+            Tick = 0;
+            Playing = false;
+            RefreshPose();
+        }
+
+        private void DestroyPreviewCatalog()
+        {
+            if (_previewAnimationCatalog == null) return;
+#if UNITY_EDITOR
+            if (!EditorUtility.IsPersistent(_previewAnimationCatalog))
+                DestroyImmediate(_previewAnimationCatalog);
+#else
+            Destroy(_previewAnimationCatalog);
+#endif
+            _previewAnimationCatalog = null;
+        }
+
+        private void DestroyRenderer()
+        {
+            if (Renderer != null)
+            {
+                _weaponAttach?.Init(null, null);
+                DestroyPreviewObject(Renderer.gameObject);
+                Renderer = null;
+            }
+            if (_dummyRenderer != null)
+            {
+                _dummyWeaponAttach?.Init(null, null);
+                DestroyPreviewObject(_dummyRenderer.gameObject);
+                _dummyRenderer = null;
+            }
+        }
+
+        private static void DestroyPreviewObject(UnityEngine.Object value)
+        {
+            if (value == null) return;
+            if (Application.isPlaying) UnityEngine.Object.Destroy(value);
+            else UnityEngine.Object.DestroyImmediate(value);
+        }
+
         public void MarkPreviewNonAuthoritative()
         {
             AuthoritativePreview = false;
@@ -355,7 +492,7 @@ namespace SlopArena.Client.Tools
             if (Renderer != null)
             {
                 _weaponAttach?.Init(null, null);
-                Destroy(Renderer.gameObject);
+                DestroyPreviewObject(Renderer.gameObject);
             }
             var go = new GameObject("LabCharacter");
             go.transform.SetParent(transform, false);
@@ -367,7 +504,7 @@ namespace SlopArena.Client.Tools
             if (_dummyRenderer != null)
             {
                 _dummyWeaponAttach?.Init(null, null);
-                Destroy(_dummyRenderer.gameObject);
+                DestroyPreviewObject(_dummyRenderer.gameObject);
             }
             var dgo = new GameObject("LabDummy");
             dgo.transform.SetParent(transform, false);
@@ -445,26 +582,62 @@ namespace SlopArena.Client.Tools
         {
             if (Airborne == airborne) return;
             Airborne = airborne;
+            UpdateSelectedSlotId();
             StageIndex = 0;
             Tick = 0;
+            SelectedHitboxEventIndex = -1;
             RefreshPose();
         }
+
+        public void SetSlot(SlotAddress address)
+        {
+            if (!CanonicalSlotProjection.TryGet(address.Id, out var canonical) || canonical != address)
+                return;
+
+            int labelIndex = Array.IndexOf(SlotNames, canonical.InputLabel);
+            if (labelIndex < 0) return;
+            Airborne = canonical.IsAirborne;
+            SlotIndex = SlotIndices[labelIndex];
+            SelectedSlotId = canonical.Id;
+            StageIndex = 0;
+            Tick = 0;
+            SelectedHitboxEventIndex = -1;
+            Playing = false;
+            RefreshPose();
+        }
+
 
         public void SetSlot(int slot)
         {
             if (SlotIndex == slot) return;
             SlotIndex = slot;
+            UpdateSelectedSlotId();
             StageIndex = 0;
             Tick = 0;
+            SelectedHitboxEventIndex = -1;
             RefreshPose();
+        }
+
+        private void UpdateSelectedSlotId()
+        {
+            if (!IsPackagePreview) return;
+            int labelIndex = Array.IndexOf(SlotIndices, SlotIndex);
+            if (labelIndex >= 0 && CanonicalSlotProjection.TryGet(Airborne, SlotNames[labelIndex], out var address))
+                SelectedSlotId = address.Id;
         }
 
         public void SetStage(int stage)
         {
-            if (StageIndex == stage) return;
             StageIndex = stage;
             Tick = 0;
+            SelectedHitboxEventIndex = -1;
             RefreshPose();
+        }
+
+        public void SelectHitbox(int index)
+        {
+            SelectedHitboxEventIndex = index >= 0 && index < CurrentWorkingEvents().Length ? index : -1;
+            QueueEditorRefresh();
         }
 
         public void SetTick(ushort tick)
@@ -553,6 +726,7 @@ namespace SlopArena.Client.Tools
 
         public void SetHitstopMultiplier(float multiplier)
         {
+            if (!IsPackagePreview) return;
             float value = Mathf.Max(0f, multiplier);
             if (Mathf.Approximately(value, CurrentHitstopMultiplier)) return;
             PushSourceUndo();
@@ -748,9 +922,17 @@ namespace SlopArena.Client.Tools
         /// </summary>
         public void RefreshPose()
         {
-            if (Renderer == null || Def == null) return;
+            if (Renderer == null || Def == null)
+            {
+                QueueEditorRefresh();
+                return;
+            }
             var spec = CurrentSpec();
-            if (spec == null || !TryGetStage(out var stage)) return;
+            if (spec == null || !TryGetStage(out var stage))
+            {
+                QueueEditorRefresh();
+                return;
+            }
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
             Renderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
             if (_dummyRenderer != null)
@@ -762,13 +944,25 @@ namespace SlopArena.Client.Tools
                     PositionDummy();
                 }
             }
+            QueueEditorRefresh();
+        }
+
+        private void QueueEditorRefresh()
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying && IsPackagePreview)
+            {
+                EditorApplication.QueuePlayerLoopUpdate();
+                SceneView.RepaintAll();
+            }
+#endif
         }
 
         // ── Hitbox event editing (spec #119: add / remove / move / scale) ──
-
         public void SetSourceDocument(CharacterPackageSource source, bool clearHistory = false)
         {
             _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
+            SelectedHitboxEventIndex = -1;
             if (clearHistory) { _undo.Clear(); _redo.Clear(); }
         }
 
@@ -787,17 +981,9 @@ namespace SlopArena.Client.Tools
             _sourceDocument = _undo.Pop();
             RefreshPose();
         }
-
-        public void RedoEvents()
-        {
-            if (_redo.Count == 0) return;
-            if (_sourceDocument != null) _undo.Push(_sourceDocument);
-            _sourceDocument = _redo.Pop();
-            RefreshPose();
-        }
-
         public void SetWorkingEvent(int index, HitboxEvent evt)
         {
+            if (!IsPackagePreview) return;
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
             if (index < 0 || index >= events.Length) return;
             events[index] = evt;
@@ -806,6 +992,7 @@ namespace SlopArena.Client.Tools
         }
         public void AddWorkingEvent()
         {
+            if (!IsPackagePreview) return;
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
             var template = events.Length > 0 ? events[events.Length - 1] : default;
             var created = new HitboxEvent
@@ -829,6 +1016,7 @@ namespace SlopArena.Client.Tools
 
         public void RemoveWorkingEvent(int index)
         {
+            if (!IsPackagePreview) return;
             var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
             if (index < 0 || index >= events.Length) return;
             var list = new List<HitboxEvent>(events);
@@ -837,7 +1025,6 @@ namespace SlopArena.Client.Tools
             WorkingEvents[CurrentKey] = list.ToArray();
             RefreshPose();
         }
-
 
         /// <summary>Discard unsaved edits — the preview reverts to the last-built data.</summary>
         public void RevertEdits()
@@ -867,7 +1054,7 @@ namespace SlopArena.Client.Tools
 
         private void OnRenderObject()
         {
-            if (!Application.isPlaying || Def == null) return;
+            if ((!Application.isPlaying && !IsPackagePreview) || Def == null) return;
             var mat = LineMat;
             if (mat == null) return;
             mat.SetPass(0);
@@ -883,15 +1070,13 @@ namespace SlopArena.Client.Tools
                     WireSphere(new Vector3(hb.PosX, hb.PosY, hb.PosZ), hb.Radius);
                 }
             }
-            if (ShowBakedBones)
-            {
-                DrawBakedBonePoints();
-            }
             if (ShowHitboxes)
             {
-                GL.Color(new Color(1f, 0.45f, 0f));
-                foreach (var (_, evt, start, end) in ResolveHitboxes())
+                foreach (var (index, evt, start, end) in ResolveHitboxes())
                 {
+                    GL.Color(index == SelectedHitboxEventIndex
+                        ? new Color(1f, 1f, 0.1f)
+                        : new Color(1f, 0.45f, 0f));
                     if (evt.Shape == HitboxShape.Capsule) WireCapsule(start, end, evt.Radius);
                     else WireSphere(start, evt.Radius);
                 }
@@ -921,6 +1106,8 @@ namespace SlopArena.Client.Tools
                     WireSphere(arc[^1].pos, 0.12f);
                 }
             }
+            if (ShowBakedBones)
+                DrawBakedBonePoints();
             GL.End();
             GL.PopMatrix();
         }
@@ -1020,5 +1207,7 @@ namespace SlopArena.Client.Tools
             WireSphere(a, radius);
             WireSphere(b, radius);
         }
+        private static string FormatDiagnostics(IReadOnlyList<CharacterDiagnostic> diagnostics)
+            => string.Join("; ", diagnostics.Select(d => $"{d.Code} ({d.Path}): {d.Message}"));
     }
 }

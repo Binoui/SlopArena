@@ -142,6 +142,7 @@ public static class CharacterAssetCookerSelfTest
             catalog.SampleRate = 30;
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
+            byte[] statusBeforeFailedCook = System.IO.File.ReadAllBytes(statusPath);
             var failedCook = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook("fightguy");
             if (failedCook.Success)
                 throw new InvalidOperationException("Invalid sample rate unexpectedly cooked.");
@@ -155,7 +156,7 @@ public static class CharacterAssetCookerSelfTest
                 if (after.Count != canonical.Count || canonical.Any(x => !after.TryGetValue(x.Key, out var bytes) || !bytes.SequenceEqual(x.Value)))
                     throw new InvalidOperationException("Failed recook replaced last-valid canonical package.");
             }
-            if (!System.IO.File.ReadAllBytes(statusPath).SequenceEqual(status))
+            if (!System.IO.File.ReadAllBytes(statusPath).SequenceEqual(statusBeforeFailedCook))
                 throw new InvalidOperationException("Failed recook changed the last-valid status.");
         }
         finally

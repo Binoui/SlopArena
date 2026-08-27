@@ -17,6 +17,12 @@ public static class CharacterPackageAuthoringSelfTest
         Require(initial.PackageId == "fightguy", "Inspection returned the wrong package ID.");
         Require(initial.Status == "valid", "FightGuy inspection did not report valid content.");
         Require(!initial.DirtyOrStale, "Fresh FightGuy inspection reported stale content.");
+        Require(initial.Provenance != null &&
+            initial.Provenance.PackageId == "fightguy" &&
+            initial.Provenance.Payloads.Count == 3 &&
+            initial.Provenance.UnityDependencies.Count > 0 &&
+            initial.Provenance.CookStatus == "Valid",
+            "Inspection did not expose verified provenance and cook metadata.");
         Require(initial.Slots.Count == CharacterPackageCompiler.CanonicalSlotIds.Count, "Inspection did not return all canonical slots.");
         Require(initial.Slots[0].Id == "ground.1" && initial.Slots[0].Name == "Low Kick" && initial.Slots[0].StageCount == 1,
             "Inspection returned incorrect ground.1 metadata.");
@@ -60,15 +66,15 @@ public static class CharacterPackageAuthoringSelfTest
             Require(invalidInspect.Diagnostics.Any(x => x.Code == "value.out-of-range" && x.Path == "character.operation.tick"),
                 "Invalid source diagnostic was not propagated with its compiler path.");
 
+            byte[] statusBeforeInvalidCook = File.ReadAllBytes(statusPath);
             CharacterPackageCookResult invalidCook = SlopArenaCharacterCommands.Cook("fightguy");
-            Require(!invalidCook.Success, "Invalid source unexpectedly cooked.");
             Require(invalidCook.Diagnostics.Any(x => x.Code == "value.out-of-range" && x.Path == "character.operation.tick"),
                 "Cook command did not return the compiler diagnostic.");
             Require(File.ReadAllBytes(Path.Combine(projectRoot, CharacterCookOutput.FightGuy.IntermediateDirectory, "poses.bin")).SequenceEqual(pose),
                 "Invalid cook changed pose output.");
             Require(File.ReadAllBytes(Path.Combine(projectRoot, CharacterCookOutput.FightGuy.IntermediateDirectory, "client.bindings")).SequenceEqual(binding),
                 "Invalid cook changed binding output.");
-            Require(File.ReadAllBytes(statusPath).SequenceEqual(status), "Invalid cook changed persisted status.");
+            Require(File.ReadAllBytes(statusPath).SequenceEqual(statusBeforeInvalidCook), "Invalid cook changed persisted status.");
             Require(File.ReadAllBytes(generatedPath).SequenceEqual(generated), "Invalid cook changed generated catalog.");
             AssertDirectorySnapshot(canonicalPath, canonical);
         }

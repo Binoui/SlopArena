@@ -1,0 +1,188 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+  <ui:VisualElement name="ability-lab-root" class="ability-lab-root">
+    <ui:VisualElement name="ability-lab-toolbar" class="toolbar">
+      <ui:Label name="package-label" text="Package:" class="toolbar-label" />
+      <ui:DropdownField name="package-selector" class="package-selector" />
+      <ui:Button name="package-status-toggle" text="No package" class="package-status-toggle" />
+      <ui:Label name="package-status" text="No package" class="package-status" />
+      <ui:Button name="toolbar-undo" text="Undo" />
+      <ui:Button name="toolbar-redo" text="Redo" />
+      <ui:Button name="toolbar-save" text="SAVE + COOK" class="save-button" />
+    </ui:VisualElement>
+    <ui:VisualElement name="ability-lab-tabs" class="tabs">
+      <ui:Button name="tab-moves" text="Moves" class="tab-button" />
+      <ui:Button name="tab-character" text="Character" class="tab-button" />
+      <ui:Button name="tab-assets" text="Assets" class="tab-button" />
+      <ui:Button name="tab-compatibility" text="Compatibility" class="tab-button" />
+      <ui:Button name="tab-advanced" text="Advanced" class="tab-button" />
+    </ui:VisualElement>
+    <ui:ScrollView name="diagnostics-panel" class="diagnostics-panel" />
+    <ui:Label name="compatibility-banner" text="Compatibility mode is read-only and uses the legacy authority. Package SAVE + COOK is unavailable here." class="legacy-banner" />
+    <ui:VisualElement name="moves-page" class="page">
+      <ui:TwoPaneSplitView name="moves-split" fixed-pane-initial-dimension="220" orientation="Horizontal" class="split-view">
+        <ui:VisualElement name="move-selector" class="move-selector" />
+        <ui:VisualElement name="moves-content" class="moves-content">
+          <ui:VisualElement name="ground-air-selector" class="ground-air-selector">
+            <ui:Button name="ground-moves-button" text="Ground" class="ground-air-button" />
+            <ui:Button name="air-moves-button" text="Air" class="ground-air-button" />
+          </ui:VisualElement>
+          <ui:TwoPaneSplitView name="preview-inspector-split" fixed-pane-initial-dimension="330" orientation="Horizontal" class="split-view">
+            <ui:VisualElement name="preview-bridge" class="preview-bridge">
+              <ui:Label name="package-display" text="No package selected" class="package-display" />
+              <ui:Label name="preview-status" text="Preview unavailable" class="preview-status" />
+              <ui:Label name="rig-setup-state" text="No Ability Lab scene rig." class="rig-setup-state" />
+              <ui:Button name="create-lab-rig" text="Create Lab Rig" />
+              <ui:Label name="scene-view-guidance" text="Select a verified cooked package." class="scene-view-guidance" />
+            </ui:VisualElement>
+            <ui:ScrollView name="inspector" class="inspector">
+              <ui:DropdownField name="stage-selector" label="Stage" />
+            </ui:ScrollView>
+          </ui:TwoPaneSplitView>
+          <ui:VisualElement name="move-timeline" class="move-timeline">
+            <ui:VisualElement name="timeline-controls" class="timeline-controls">
+              <ui:Label name="timeline-tick" text="Tick 0" />
+              <ui:Button name="timeline-play" text="Play" />
+              <ui:Button name="timeline-step-back" text="−1" />
+              <ui:Button name="timeline-step-forward" text="+1" />
+              <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
+              <ui:Label name="timeline-duration" text="Duration —" />
+              <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
+            </ui:VisualElement>
+            <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
+              <ui:VisualElement name="timeline-track" class="timeline-track" />
+            </ui:ScrollView>
+          </ui:VisualElement>
+        </ui:VisualElement>
+      </ui:TwoPaneSplitView>
+    </ui:VisualElement>
+    <ui:ScrollView name="character-page" class="page character-page">
+      <ui:Label text="Character" class="page-title" />
+      <ui:Foldout name="character-general" text="General" value="true" class="character-group">
+        <ui:TextField name="character-display-name" label="Display name" />
+        <ui:FloatField name="character-weight" label="Weight" />
+        <ui:FloatField name="character-capsule-radius" label="Capsule radius" />
+        <ui:FloatField name="character-capsule-height" label="Capsule height" />
+        <ui:FloatField name="character-hip-height" label="Hip height" />
+        <ui:FloatField name="character-hurtbox-radius" label="Hurtbox radius" />
+      </ui:Foldout>
+      <ui:Foldout name="character-movement" text="Movement" value="true" class="character-group">
+        <ui:Foldout name="movement-ground" text="Ground" value="true" class="movement-group">
+          <ui:FloatField name="movement-run-speed" label="Run speed" />
+          <ui:FloatField name="movement-run-acceleration-a" label="Run acceleration A" />
+          <ui:FloatField name="movement-run-acceleration-b" label="Run acceleration B" />
+          <ui:FloatField name="movement-dash-speed" label="Dash speed" />
+          <ui:FloatField name="movement-ground-friction" label="Ground friction" />
+          <ui:IntegerField name="movement-dash-duration-ticks" label="Dash duration ticks" />
+          <ui:IntegerField name="movement-dash-cooldown-ticks" label="Dash cooldown ticks" />
+          <ui:IntegerField name="movement-rush-ticks" label="Rush ticks" />
+        </ui:Foldout>
+        <ui:Foldout name="movement-air" text="Air" value="true" class="movement-group">
+          <ui:FloatField name="movement-air-speed-max" label="Air speed max" />
+          <ui:FloatField name="movement-air-acceleration-stick" label="Air acceleration stick" />
+          <ui:FloatField name="movement-air-acceleration-base" label="Air acceleration base" />
+          <ui:FloatField name="movement-air-friction" label="Air friction" />
+        </ui:Foldout>
+        <ui:Foldout name="movement-jump" text="Jump" value="true" class="movement-group">
+          <ui:FloatField name="movement-jump-force" label="Jump force" />
+          <ui:FloatField name="movement-short-hop-force" label="Short-hop force" />
+          <ui:FloatField name="movement-air-jump-vertical-multiplier" label="Air-jump vertical multiplier" />
+          <ui:FloatField name="movement-air-jump-horizontal-multiplier" label="Air-jump horizontal multiplier" />
+          <ui:IntegerField name="movement-max-jumps" label="Max jumps" />
+          <ui:IntegerField name="movement-jump-squat-ticks" label="Jump squat ticks" />
+        </ui:Foldout>
+        <ui:Foldout name="movement-falling" text="Falling" value="true" class="movement-group">
+          <ui:FloatField name="movement-gravity" label="Gravity" />
+          <ui:FloatField name="movement-air-float-gravity" label="Air-float gravity" />
+          <ui:FloatField name="movement-max-fall-speed" label="Max fall speed" />
+          <ui:FloatField name="movement-fast-fall-speed" label="Fast-fall speed" />
+          <ui:IntegerField name="movement-float-window-ticks" label="Float-window ticks" />
+        </ui:Foldout>
+      </ui:Foldout>
+      <ui:Foldout name="character-presentation" text="Presentation" value="true" class="character-group">
+        <ui:DropdownField name="presentation-idle" label="Idle" />
+        <ui:DropdownField name="presentation-run" label="Run" />
+        <ui:DropdownField name="presentation-dash" label="Dash" />
+        <ui:DropdownField name="presentation-jump" label="Jump" />
+        <ui:DropdownField name="presentation-fall" label="Fall" />
+        <ui:DropdownField name="presentation-hit-small" label="HitSmall" />
+        <ui:DropdownField name="presentation-hit-medium" label="HitMedium" />
+        <ui:DropdownField name="presentation-hit-hard" label="HitHard" />
+        <ui:FloatField name="presentation-land-start-offset-seconds" label="Land start offset seconds" />
+        <ui:TextField name="presentation-model-resource-path" label="Model resource path" />
+        <ui:FloatField name="presentation-visual-scale" label="Visual scale" />
+        <ui:FloatField name="presentation-hurtbox-bone-scale" label="Hurtbox-bone scale" />
+        <ui:FloatField name="presentation-model-y-offset" label="Model Y offset" />
+        <ui:FloatField name="presentation-model-sole-offset" label="Model sole offset" />
+        <ui:Toggle name="presentation-auto-model-y-offset" label="Auto model Y offset" />
+      </ui:Foldout>
+      <ui:Foldout name="character-hurtboxes" text="Hurtboxes" value="true" class="character-group">
+        <ui:Foldout name="character-hurtbox-capsules" text="Capsules" value="true" class="hurtbox-group" />
+        <ui:Foldout name="character-hurtbox-bones" text="Bones" value="true" class="hurtbox-group" />
+      </ui:Foldout>
+      <ui:Label name="character-unavailable" text="Character source unavailable." class="character-unavailable" />
+    </ui:ScrollView>
+    <ui:ScrollView name="assets-page" class="page assets-page">
+      <ui:Label text="Assets" class="page-title" />
+      <ui:Foldout name="assets-rig-group" text="Rig" value="true" class="asset-group">
+        <uie:ObjectField name="assets-rig-field" label="Rig" object-type="UnityEngine.GameObject" allow-scene-objects="false" />
+        <ui:Label name="assets-rig-status" text="No catalog rig." />
+        <ui:Foldout name="assets-skeleton" text="Baked required bones" value="true" />
+      </ui:Foldout>
+      <ui:Foldout name="assets-locomotion-group" text="Locomotion" value="true" class="asset-group">
+        <ui:VisualElement name="assets-locomotion-bindings" />
+      </ui:Foldout>
+      <ui:Foldout name="assets-hit-reactions-group" text="Hit Reactions" value="true" class="asset-group">
+        <ui:VisualElement name="assets-hit-reaction-bindings" />
+      </ui:Foldout>
+      <ui:Foldout name="assets-move-group" text="Move animations" value="true" class="asset-group">
+        <ui:VisualElement name="assets-move-bindings" />
+      </ui:Foldout>
+      <ui:Foldout name="assets-validation" text="Validation" value="true" class="asset-group" />
+    </ui:ScrollView>
+    <ui:VisualElement name="compatibility-page" class="page foundation-page">
+      <ui:Label text="Legacy compatibility" class="page-title" />
+      <ui:Label text="This read-only page is the only Ability Lab path that may use the legacy CharacterClass adapter." />
+      <ui:Label name="compatibility-authority" text="Compatibility Preview · Legacy authority · Read-only" class="preview-status" />
+      <ui:DropdownField name="legacy-selector" label="Legacy character" />
+      <ui:Button name="legacy-load" text="Load in Play Mode" />
+      <ui:Toggle name="compatibility-airborne" label="Airborne" />
+      <ui:DropdownField name="compatibility-slot-selector" label="Slot" />
+      <ui:DropdownField name="compatibility-stage-selector" label="Stage" />
+      <ui:VisualElement name="compatibility-timeline" class="move-timeline">
+        <ui:Label name="compatibility-tick" text="Tick 0" />
+        <ui:Button name="compatibility-play" text="Play" />
+        <ui:Button name="compatibility-step-back" text="−1" />
+        <ui:Button name="compatibility-step-forward" text="+1" />
+        <ui:SliderInt name="compatibility-slider" low-value="0" high-value="0" value="0" />
+        <ui:Label name="compatibility-duration" text="Duration —" />
+      </ui:VisualElement>
+      <ui:Toggle name="compatibility-show-hurtboxes" label="Show hurtboxes" />
+      <ui:Toggle name="compatibility-show-hitboxes" label="Show hitboxes" />
+      <ui:Toggle name="compatibility-show-baked-bones" label="Show baked bones" />
+      <ui:Toggle name="compatibility-show-dummy" label="Show dummy" />
+    </ui:VisualElement>
+    <ui:ScrollView name="advanced-page" class="page advanced-page">
+      <ui:Label text="Advanced" class="page-title" />
+      <ui:Foldout name="advanced-package-paths" text="Package paths" value="true" class="advanced-group">
+        <ui:Label name="advanced-source-path" text="Source: —" />
+        <ui:Label name="advanced-cooked-path" text="Cooked: —" />
+      </ui:Foldout>
+      <ui:Foldout name="advanced-hashes" text="Hashes" value="true" class="advanced-group" />
+      <ui:Foldout name="advanced-raw-ids" text="Raw IDs" value="true" class="advanced-group" />
+      <ui:Foldout name="advanced-diagnostics" text="Diagnostics" value="true" class="advanced-group" />
+      <ui:Foldout name="advanced-provenance" text="Provenance" value="true" class="advanced-group" />
+      <ui:Foldout name="advanced-schema-profile" text="Schema and profile" value="true" class="advanced-group" />
+      <ui:Foldout name="advanced-rename" text="Rename semantic ID" value="true" class="advanced-group">
+        <ui:TextField name="advanced-rename-old" label="Old ID" />
+        <ui:TextField name="advanced-rename-new" label="New ID" />
+        <ui:Button name="advanced-rename-confirm" text="Rename" />
+        <ui:Label name="advanced-rename-status" text="" />
+      </ui:Foldout>
+      <ui:Foldout name="advanced-migration-actions" text="Maintenance and migration" value="true" class="advanced-group">
+        <ui:Button name="advanced-migrate-authoring" text="Migrate authoring schema" />
+        <ui:Button name="advanced-migrate-catalog" text="Migrate catalog schema" />
+        <ui:Label name="advanced-migration-status" text="Current; no migration required" />
+      </ui:Foldout>
+    </ui:ScrollView>
+  </ui:VisualElement>
+</ui:UXML>
