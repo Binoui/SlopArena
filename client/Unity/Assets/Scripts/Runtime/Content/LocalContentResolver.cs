@@ -9,6 +9,12 @@ using UnityEngine;
 
 namespace SlopArena.Client;
 
+public enum LocalContentMode
+{
+    Development,
+    Player,
+}
+
 public sealed class LocalContentResolver
 {
     private readonly IReadOnlyList<string> _contentRoots;
@@ -20,14 +26,17 @@ public sealed class LocalContentResolver
     }
 
     public static LocalContentResolver CreateDefault()
+        => CreateForMode(Application.isEditor ? LocalContentMode.Development : LocalContentMode.Player);
+
+    public static LocalContentResolver CreateForMode(LocalContentMode mode)
     {
         string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         string repositoryRoot = Directory.GetParent(projectRoot)?.Parent?.FullName ?? projectRoot;
-        string[] roots =
-        {
-            Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, "content-cooked")),
-            Path.GetFullPath(Path.Combine(repositoryRoot, "content-cooked")),
-        };
+        string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, "content-cooked"));
+        string repositoryCookedRoot = Path.GetFullPath(Path.Combine(repositoryRoot, "content-cooked"));
+        string[] roots = mode == LocalContentMode.Development
+            ? new[] { repositoryCookedRoot, streamingRoot }
+            : new[] { streamingRoot };
         return new LocalContentResolver(
             projectRoot,
             new ReadOnlyCollection<string>(roots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));

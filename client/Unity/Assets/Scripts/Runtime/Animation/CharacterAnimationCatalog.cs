@@ -14,6 +14,7 @@ namespace SlopArena.Client.Animation
         [SerializeField] private int _sampleRate = 60;
         [SerializeField] private string _sourceHash = "";
         [SerializeField] private GameObject _rig;
+        [SerializeField] private SlopArena.Client.Entities.WeaponAttachConfig _weaponConfig;
         [SerializeField] private AnimationEntry[] _animations = Array.Empty<AnimationEntry>();
 
         public string PackageId { get => _packageId; set => _packageId = value; }
@@ -22,6 +23,7 @@ namespace SlopArena.Client.Animation
         public int SampleRate { get => _sampleRate; set => _sampleRate = value; }
         public string SourceHash { get => _sourceHash; set => _sourceHash = value; }
         public GameObject Rig { get => _rig; set => _rig = value; }
+        public SlopArena.Client.Entities.WeaponAttachConfig WeaponConfig { get => _weaponConfig; set => _weaponConfig = value; }
         public AnimationEntry[] Animations { get => _animations ?? Array.Empty<AnimationEntry>(); set => _animations = value ?? Array.Empty<AnimationEntry>(); }
 
         [Serializable]

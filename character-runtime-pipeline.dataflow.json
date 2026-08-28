@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Character Package to Runtime Pipeline",
+    "output": "character-runtime-pipeline.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 420],
+    "views": [
+      {
+        "id": "cook-path",
+        "label": "Cook path",
+        "focus": ["package-source", "shared-compiler", "unity-cook", "cooked-package"],
+        "note": "Follow editable package source into immutable runtime artifacts."
+      },
+      {
+        "id": "admission-path",
+        "label": "Admission path",
+        "focus": ["cooked-package", "catalog", "shared-simulation"],
+        "note": "See how exact package identity and hashes become match runtime input."
+      },
+      {
+        "id": "client-consumption",
+        "label": "Client consumption",
+        "focus": ["cooked-package", "shared-simulation", "client-runtime"],
+        "note": "Separate client bindings and presentation from server-authoritative gameplay."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Authoring" },
+    { "label": "Compile" },
+    { "label": "Cook" },
+    { "label": "Admission" },
+    { "label": "Runtime" }
+  ],
+  "nodes": [
+    {
+      "id": "package-source",
+      "type": "frontend",
+      "label": "Character Package Source",
+      "sublabel": "assets",
+      "tag": "editable",
+      "stage": 0,
+      "row": 0,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "shared-compiler",
+      "type": "backend",
+      "label": "Shared Package Compiler",
+      "sublabel": "normalize gameplay semantics",
+      "tag": "deterministic",
+      "stage": 1,
+      "row": 0,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "unity-cook",
+      "type": "backend",
+      "label": "Unity Asset / Pose Cook",
+      "sublabel": "bindings · baked poses",
+      "tag": "Unity Editor",
+      "stage": 2,
+      "row": 0,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "cooked-package",
+      "type": "database",
+      "label": "Immutable Cooked Package",
+      "sublabel": "manifest + poses",
+      "tag": "content-cooked/",
+      "stage": 3,
+      "row": 0,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "catalog",
+      "type": "security",
+      "label": "Match Content Catalog",
+      "sublabel": "IDs + hashes",
+      "tag": "fail closed",
+      "stage": 3,
+      "row": 1,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "shared-simulation",
+      "type": "backend",
+      "label": "Shared ServerSimulation",
+      "sublabel": "timelines + primitives",
+      "tag": "gameplay authority",
+      "stage": 4,
+      "row": 0,
+      "width": 150,
+      "height": 72
+    },
+    {
+      "id": "client-runtime",
+      "type": "frontend",
+      "label": "Unity Client Runtime",
+      "sublabel": "semantic bindings · presentation",
+      "tag": "no gameplay authority",
+      "stage": 4,
+      "row": 1,
+      "width": 150,
+      "height": 72
+    }
+  ],
+  "flows": [
+    {"id": "authoring-to-compiler", "from": "package-source", "to": "shared-compiler", "label": "input", "variant": "emphasis"},
+    {"id": "compiler-to-cook", "from": "shared-compiler", "to": "unity-cook", "label": "IR", "variant": "emphasis"},
+    {"id": "cook-to-package", "from": "unity-cook", "to": "cooked-package", "label": "cook output", "variant": "emphasis"},
+    {"id": "package-to-catalog", "from": "cooked-package", "to": "catalog", "label": "IDs + hashes", "variant": "security"},
+    {"id": "catalog-to-simulation", "from": "catalog", "to": "shared-simulation", "label": "admitted", "variant": "security"},
+    {"id": "simulation-to-client", "from": "shared-simulation", "to": "client-runtime", "label": "state + events", "variant": "emphasis"}
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Content contract",
+      "items": [
+        "Raw authoring files are cook input, not the runtime contract.",
+        "Cooked packages are immutable and hash-addressed for a match.",
+        "The canonical grid is grounded and aerial variants of 1, 2, 3, 4, A, E, R, and F."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Admission boundary",
+      "items": [
+        "The catalog pins package IDs, versions, dependencies, capability versions, and hashes.",
+        "Missing, invalid, stale, incompatible, or mismatched content fails closed.",
+        "A later recook applies only to a later match."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Authority split",
+      "items": [
+        "SharedSimulation executes gameplay on the authoritative server path.",
+        "Unity consumes cooked client bindings plus state and presentation events.",
+        "Unity does not decide hit results, damage, timing, or match admission."
+      ]
+    }
+  ]
+}

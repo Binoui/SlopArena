@@ -232,5 +232,16 @@ client/Unity/Assets/BOXOPHOBIC
 TESTING-UNITY.md
 
 # Staged by scripts/build-release.sh (bundled server + arenas for player build)
+
+__pycache__/
+*.pyc
 /client/Unity/Assets/StreamingAssets/
 .entire/
+
+# Archify visual-check outputs (regenerable QA artifacts)
+*.visual-check.json
+*.visual-check.html
+*.visual-check.*.png
+
+# Locally installed agent skills
+/.agents/

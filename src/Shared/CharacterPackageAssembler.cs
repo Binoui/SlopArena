@@ -300,7 +300,7 @@ public static class CharacterPackageAssembler
                 EnsureFields(metadata, new[] { "packageId", "version", "cookedSchemaVersion", "compatibility" }, RuntimePath + ".metadata", d);
                 if (HasObject(metadata, "compatibility"))
                     EnsureFields(metadata.GetProperty("compatibility"), new[] { "runtimeApiMin", "runtimeApiMax" }, RuntimePath + ".metadata.compatibility", d);
-                EnsureFields(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "hurtboxCapsules", "hurtboxBoneDefs", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
+                EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
                 if (HasObject(root.GetProperty("character"), "presentation"))
                     EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
                 EnsureFields(root.GetProperty("budget"), new[] { "slotCount", "stageCount", "operationCount", "hitboxCount", "projectileCount", "capabilityCount", "maxTimelineDurationTicks" }, RuntimePath + ".budget", d);
@@ -315,6 +315,10 @@ public static class CharacterPackageAssembler
             {
                 HashSet<string> required = RequiredAnimations(root, d);
                 ValidateReferences(required, binding, pose, d);
+                if (root.GetProperty("character").TryGetProperty("attachmentBoneIds", out var attachmentIds) && attachmentIds.ValueKind == JsonValueKind.Array)
+                    foreach (var id in attachmentIds.EnumerateArray())
+                        if (id.ValueKind != JsonValueKind.String || !pose.BoneNames.Contains(id.GetString() ?? ""))
+                            d.Add(Error("package.pose.attachment-missing", "character.attachmentBoneIds", "Attachment ID is missing from poses.bin."));
                 if (binding.PackageId != manifest.PackageId || binding.SourceHash != manifest.SourceHash || binding.BindingSchemaVersion != manifest.Toolchain.BindingSchemaVersion || binding.PoseFormat != manifest.Toolchain.PoseFormat || binding.PoseVersion != manifest.Toolchain.PoseVersion || binding.SampleRate != manifest.Toolchain.SampleRate)
                     d.Add(Error("package.binding.metadata-mismatch", BindingPath, "Binding metadata does not match manifest."));
             }
@@ -379,7 +383,7 @@ public static class CharacterPackageAssembler
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object) { d.Add(Error("package.binding.schema", BindingPath, "Binding payload must be an object.")); return null; }
-            EnsureFields(root, new[] { "packageId", "catalogSchemaVersion", "bindingSchemaVersion", "poseFormat", "poseVersion", "sampleRate", "sourceHash", "rigGlobalObjectId", "animations" }, BindingPath, d);
+            EnsureFieldsOptional(root, new[] { "packageId", "catalogSchemaVersion", "bindingSchemaVersion", "poseFormat", "poseVersion", "sampleRate", "sourceHash", "rigGlobalObjectId", "weaponConfigGlobalObjectId", "animations" }, BindingPath, d);
             var result = new BindingData
             {
                 PackageId = GetString(root, "packageId"),
@@ -413,8 +417,8 @@ public static class CharacterPackageAssembler
             uint boneCount = reader.ReadUInt32("boneCount");
             uint animationCount = reader.ReadUInt32("animationCount");
             if (boneCount == 0 || animationCount == 0 || boneCount > 4096 || animationCount > 4096) throw new InvalidDataException("Pose counts are outside safe bounds.");
-            for (uint i = 0; i < boneCount; i++) reader.ReadString("bone name");
             var result = new PoseData();
+            for (uint i = 0; i < boneCount; i++) result.BoneNames.Add(reader.ReadString("bone name"));
             for (uint i = 0; i < animationCount; i++)
             {
                 string name = reader.ReadString("animation name");
@@ -538,6 +542,12 @@ public static class CharacterPackageAssembler
         foreach (var p in element.EnumerateObject()) { if (!set.Contains(p.Name)) d.Add(Error("package.field.unknown", path + "." + p.Name, "Unknown field.")); if (!seen.Add(p.Name)) d.Add(Error("package.field.duplicate", path + "." + p.Name, "Duplicate field.")); }
         foreach (string field in allowed) if (!seen.Contains(field)) d.Add(Error("package.field.missing", path + "." + field, "Required field is missing."));
     }
+    private static void EnsureFieldsOptional(JsonElement element, string[] allowed, string path, List<CharacterDiagnostic> d)
+    {
+        if (element.ValueKind != JsonValueKind.Object) { d.Add(Error("package.field.object", path, "Object is required.")); return; }
+        var set = new HashSet<string>(allowed, StringComparer.Ordinal); var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var p in element.EnumerateObject()) { if (!set.Contains(p.Name)) d.Add(Error("package.field.unknown", path + "." + p.Name, "Unknown field.")); if (!seen.Add(p.Name)) d.Add(Error("package.field.duplicate", path + "." + p.Name, "Duplicate field.")); }
+    }
 
     private sealed class BindingData
     {
@@ -545,7 +555,7 @@ public static class CharacterPackageAssembler
         public readonly Dictionary<string, BindingItem> BySemantic = new(StringComparer.Ordinal); public readonly Dictionary<string, BindingItem> ByPose = new(StringComparer.Ordinal);
     }
     private readonly record struct BindingItem(string SemanticId, string PoseTrackId, int FrameCount);
-    private sealed class PoseData { public readonly HashSet<string> Names = new(StringComparer.Ordinal); public readonly Dictionary<string, int> FrameCounts = new(StringComparer.Ordinal); }
+    private sealed class PoseData { public readonly HashSet<string> BoneNames = new(StringComparer.Ordinal); public readonly HashSet<string> Names = new(StringComparer.Ordinal); public readonly Dictionary<string, int> FrameCounts = new(StringComparer.Ordinal); }
     private sealed class ManifestData
     {
         public string PackageId = ""; public string Version = ""; public string Creator = ""; public string License = ""; public string Attribution = ""; public ushort AuthoringSchemaVersion; public ushort CookedSchemaVersion; public string RuntimeApiMin = ""; public string RuntimeApiMax = ""; public string SourceHash = ""; public string CookedContentHash = ""; public string PackageHash = "";

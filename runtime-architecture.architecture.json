@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SlopArena Runtime Architecture",
+    "output": "runtime-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Binoui/SlopArena.git",
+      "revision": "7226e3e6f1d76f50055f753f2e5b2ae50aa85652"
+    },
+    "views": [
+      {
+        "id": "authoritative-match",
+        "label": "Authoritative match",
+        "focus": ["players", "unity-client", "match-instance", "shared-sim"],
+        "note": "Follow input to authoritative simulation and state/events back to the client."
+      },
+      {
+        "id": "match-start",
+        "label": "Match startup",
+        "focus": ["master-server", "control-api", "orchestrator", "catalog", "cooked-content"],
+        "note": "See control-plane startup and fail-closed content admission."
+      },
+      {
+        "id": "content-boundary",
+        "label": "Cooked content boundary",
+        "focus": ["unity-client", "catalog", "cooked-content", "shared-sim"],
+        "note": "Trace immutable cooked packages into the pinned match catalog."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "players",
+      "type": "external",
+      "label": "Players",
+      "sublabel": "Keyboard / mouse input",
+      "tag": "untrusted input",
+      "sources": [{"path": "docs/systems/netcode-architecture.md", "line": 69, "end_line": 87, "label": "input path"}],
+      "pos": [40, 330],
+      "size": [150, 70]
+    },
+    {
+      "id": "unity-client",
+      "type": "frontend",
+      "label": "Unity Client",
+      "sublabel": "Input · network · presentation",
+      "tag": "client",
+      "sources": [{"path": "docs/architecture-overview.md", "line": 80, "end_line": 82, "label": "Unity boundary"}],
+      "pos": [250, 330],
+      "size": [190, 70]
+    },
+    {
+      "id": "master-server",
+      "type": "external",
+      "label": "Master Server",
+      "sublabel": "Lobby / match metadata",
+      "tag": "separate repo",
+      "sources": [{"path": "docs/systems/netcode-architecture.md", "line": 11, "end_line": 24, "label": "control plane"}],
+      "pos": [250, 100],
+      "size": [190, 70]
+    },
+    {
+      "id": "control-api",
+      "type": "backend",
+      "label": "Match Control Server",
+      "sublabel": "TCP + POST /match/start",
+      "tag": "GameServer",
+      "sources": [{"path": "src/Server/MatchControlServer.cs", "label": "control endpoint"}],
+      "pos": [510, 100],
+      "size": [205, 70]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "Match Orchestrator",
+      "sublabel": "Ports · active matches",
+      "tag": "GameServer",
+      "sources": [{"path": "src/Server/MultiMatchOrchestrator.cs", "label": "match lifecycle"}],
+      "pos": [800, 100],
+      "size": [195, 70]
+    },
+    {
+      "id": "match-instance",
+      "type": "backend",
+      "label": "Match Instance",
+      "sublabel": "60 Hz UDP tick loop",
+      "tag": "server authority",
+      "sources": [{"path": "src/Server/MatchInstance.cs", "label": "authoritative loop"}],
+      "pos": [520, 330],
+      "size": [205, 70]
+    },
+    {
+      "id": "shared-sim",
+      "type": "backend",
+      "label": "Shared ServerSimulation",
+      "sublabel": "Deterministic gameplay authority",
+      "tag": "server + client shared code",
+      "sources": [{"path": "src/Shared/ServerSimulation.cs", "label": "simulation"}, {"path": "docs/architecture-overview.md", "line": 52, "end_line": 69, "label": "runtime flow"}],
+      "pos": [800, 330],
+      "size": [225, 70]
+    },
+    {
+      "id": "catalog",
+      "type": "security",
+      "label": "Match Content Catalog",
+      "sublabel": "Pinned IDs · versions · hashes",
+      "tag": "fail-closed admission",
+      "sources": [{"path": "src/Shared/MatchContentCatalog.cs", "label": "content contract"}, {"path": "src/Server/MatchContentCatalogProvider.cs", "label": "server admission"}],
+      "pos": [1110, 330],
+      "size": [215, 70]
+    },
+    {
+      "id": "cooked-content",
+      "type": "database",
+      "label": "Cooked Content Store",
+      "sublabel": "Immutable runtime packages",
+      "tag": "content-cooked/",
+      "sources": [{"path": "docs/architecture-overview.md", "line": 25, "end_line": 46, "label": "cook boundary"}],
+      "pos": [1110, 100],
+      "size": [215, 70]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Client trust boundary",
+      "wraps": ["players", "unity-client"],
+      "pad": 26
+    },
+    {
+      "kind": "security-group",
+      "label": "Authoritative GameServer boundary",
+      "wraps": ["control-api", "orchestrator", "match-instance", "shared-sim", "catalog"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "Runtime content boundary",
+      "wraps": ["cooked-content", "catalog"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {"id": "player-input", "from": "players", "to": "unity-client", "label": "input", "variant": "emphasis"},
+    {"id": "client-to-match", "from": "unity-client", "to": "match-instance", "label": "UDP InputState", "variant": "emphasis", "fromSide": "right", "toSide": "left"},
+    {"id": "match-to-client", "from": "match-instance", "to": "unity-client", "label": "authoritative state + events", "variant": "emphasis", "labelDy": -48},
+    {"id": "match-simulates", "from": "match-instance", "to": "shared-sim", "label": "Tick(inputs)", "variant": "emphasis", "labelDy": -48},
+    {"id": "master-control", "from": "master-server", "to": "control-api", "label": "match start / lobby", "variant": "security", "labelDy": 70},
+    {"id": "control-orchestrates", "from": "control-api", "to": "orchestrator", "label": "spawn match", "variant": "emphasis", "labelDy": 48},
+    {"id": "orchestrator-instance", "from": "orchestrator", "to": "match-instance", "label": "allocate + host", "variant": "emphasis", "fromSide": "bottom", "toSide": "top"},
+    {"id": "catalog-content", "from": "catalog", "to": "cooked-content", "label": "verify exact hashes", "variant": "security", "fromSide": "top", "toSide": "bottom"},
+    {"id": "sim-catalog", "from": "shared-sim", "to": "catalog", "label": "load admitted package set", "variant": "security", "labelDy": -48}
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary runtime path",
+      "items": [
+        "Unity polls InputSystem and sends InputState over UDP.",
+        "Each MatchInstance drains inputs, advances ServerSimulation at 60 Hz, and broadcasts state/events.",
+        "Unity renders authoritative state; it does not decide damage, timing, or match admission."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Content and determinism",
+      "items": [
+        "CharacterPackages are compiled and Unity assets/poses are cooked into content-cooked/.",
+        "The Match Content Catalog pins package IDs, versions, dependencies, capability versions, and hashes.",
+        "Missing, stale, incompatible, or hash-mismatched content fails closed."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "External dependencies",
+      "items": [
+        "Master Server owns lobby, server browser, character selection, match start, and results metadata.",
+        "Unity supplies presentation, animation, camera, UI, VFX, audio, and transport adapters.",
+        "GameServer hosts matches; Shared code is the gameplay authority boundary."
+      ]
+    }
+  ]
+}

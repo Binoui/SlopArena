@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "PvP Network Request Sequence",
+    "output": "pvp-network-sequence.html",
+    "viewBox": [980, 520],
+    "column_fit": "spread",
+    "views": [
+      {"id": "input-roundtrip", "label": "Input round trip", "focus": ["client", "bridge", "transport", "match"], "note": "Follow input from the Unity client to the server match and back as state."},
+      {"id": "server-resolution", "label": "Server resolution", "focus": ["match", "simulation"], "note": "Focus on the authoritative Shared simulation tick."},
+      {"id": "presentation", "label": "Presentation boundary", "focus": ["simulation", "match", "renderer", "client"], "note": "Separate authoritative state/events from Unity presentation."}
+    ]
+  },
+  "participants": [
+    {"id": "client", "type": "frontend", "label": "Unity Client", "sublabel": "InputSystem + UI"},
+    {"id": "bridge", "type": "frontend", "label": "Network Bridge", "sublabel": "prediction / rollback"},
+    {"id": "transport", "type": "cloud", "label": "UDP Transport", "sublabel": "InputState packets"},
+    {"id": "match", "type": "backend", "label": "MatchInstance", "sublabel": "authoritative tick loop"},
+    {"id": "simulation", "type": "security", "label": "SharedSimulation", "sublabel": "60 Hz gameplay authority"},
+    {"id": "renderer", "type": "frontend", "label": "PlayerRenderer", "sublabel": "semantic presentation"}
+  ],
+  "segments": [
+    {"from": 150, "to": 245, "label": "Input"},
+    {"from": 265, "to": 415, "label": "Authoritative tick"},
+    {"from": 395, "to": 475, "label": "State + presentation"}
+  ],
+  "messages": [
+    {"id": "poll-input", "from": "client", "to": "bridge", "y": 175, "label": "poll InputSystem", "variant": "default"},
+    {"id": "send-input", "from": "bridge", "to": "transport", "y": 215, "label": "InputState + tick", "variant": "emphasis"},
+    {"id": "relay-input", "from": "transport", "to": "match", "y": 255, "label": "UDP relay", "variant": "emphasis"},
+    {"id": "tick-simulation", "from": "match", "to": "simulation", "y": 295, "label": "Tick(inputs)", "variant": "security"},
+    {"id": "combat-state", "from": "simulation", "to": "match", "y": 335, "label": "state + events", "variant": "return"},
+    {"id": "receive-state", "from": "transport", "to": "bridge", "y": 375, "label": "state + tick echo", "variant": "return"},
+    {"id": "reconcile", "from": "bridge", "to": "client", "y": 405, "label": "reconcile view", "variant": "return"},
+    {"id": "render-state", "from": "renderer", "to": "client", "y": 435, "label": "render state", "variant": "return"}
+  ],
+  "activations": [
+    {"participant": "bridge", "from": 170, "to": 455, "type": "frontend"},
+    {"participant": "transport", "from": 210, "to": 435, "type": "cloud"},
+    {"participant": "match", "from": 250, "to": 400, "type": "backend"},
+    {"participant": "simulation", "from": 290, "to": 345, "type": "security"},
+    {"participant": "renderer", "from": 450, "to": 485, "type": "frontend"}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "Round-trip contract", "items": ["The client sends InputState with a tick identifier over UDP.", "MatchInstance relays valid input into the authoritative SharedSimulation tick.", "Returned state includes the tick echo used for reconciliation."]},
+    {"dot": "rose", "title": "Authority boundary", "items": ["SharedSimulation owns movement, ability execution, combat resolution, damage, and knockback.", "Prediction and rollback are client tracking mechanisms, not gameplay authority.", "A client result cannot override server state."]},
+    {"dot": "violet", "title": "Presentation boundary", "items": ["PlayerRenderer consumes semantic events and authoritative state.", "Animation, VFX, audio, and UI remain presentation concerns.", "The server does not depend on Unity rendering callbacks."]}
+  ]
+}

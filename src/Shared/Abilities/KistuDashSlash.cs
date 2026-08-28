@@ -25,6 +25,7 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuDashSlash : ServerAbility
 {
+    private readonly KistuDashSlashCapabilityParameters _parameters;
     private enum Phase { Aim, Dash }
 
     private Phase _phase;
@@ -32,6 +33,12 @@ public sealed class KistuDashSlash : ServerAbility
     private float _dashYaw;
     private bool _hitboxSpawned;
 
+    public KistuDashSlash(KistuDashSlashCapabilityParameters parameters)
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+    public KistuDashSlash(CookedKistuDashSlashCapabilityParameters parameters)
+        : this(new KistuDashSlashCapabilityParameters(parameters.DashDistance, parameters.DashDurationTicks, parameters.MaxAimTicks))
+    {
+    }
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         _phase = Phase.Aim;
@@ -52,46 +59,27 @@ public sealed class KistuDashSlash : ServerAbility
 
         if (_phase == Phase.Aim)
         {
-            // Cache the mouse aim on real aim frames only. On the release frame the client
-            // sends camera yaw instead of the mouse aim (InputController default), so caching
-            // unconditionally would snap the dash to the camera.
             if (input.IsAiming)
             {
                 _dashYaw = s.AimYaw;
-                // Face the chosen direction while aiming so the dash starts oriented correctly
-                // (deliberate exception to input-only facing, scoped to this ability).
                 s.FacingYaw = s.AimYaw;
             }
-
-            ushort maxAimTicks = (ushort)GetParam(def, "max_aim_ticks", 180f);
-            if (!input.IsAiming || _phaseTicks >= maxAimTicks)
+            if (!input.IsAiming || _phaseTicks >= _parameters.MaxAimTicks)
                 StartDash(ref s, def);
             return;
         }
 
-        // ── Dash phase ──
-        float dashDuration = GetParam(def, "dash_duration_ticks", 16f);
-        float dashDistance = GetParam(def, "dash_distance", 5f);
-        // Momentum-preserve (issue #115): attacking applies no ground friction, so the
-        // integrated displacement is exactly speed × duration — no friction compensation.
-        float speed = dashDuration > 0f
-            ? dashDistance / (dashDuration * Simulation.TickDt)
+        float speed = _parameters.DashDurationTicks > 0
+            ? _parameters.DashDistance / (_parameters.DashDurationTicks * Simulation.TickDt)
             : 0f;
         s.VX = MathF.Sin(_dashYaw) * speed;
         s.VZ = MathF.Cos(_dashYaw) * speed;
-
-        // Single sweep hitbox, spawned once at dash start: it travels glued to the character
-        // and SpellResolver deactivates it after its FIRST victim — one hit per dash, unlike
-        // per-tick respawns which would re-hit a knockback-carried target every tick.
         if (!_hitboxSpawned)
         {
-            SpawnDashHitbox(ref s, def, speed, (ushort)dashDuration);
+            SpawnDashHitbox(ref s, def, speed, _parameters.DashDurationTicks);
             _hitboxSpawned = true;
         }
-
-        // End AFTER the last full velocity tick (strict >) so the dash covers a full
-        // dashDuration ticks of travel, not dashDuration - 1.
-        if (_phaseTicks > dashDuration)
+        if (_phaseTicks > _parameters.DashDurationTicks)
             EndAbility(ref s);
     }
 
@@ -105,10 +93,8 @@ public sealed class KistuDashSlash : ServerAbility
         s.IsAiming = false;
         AnimIndex = 0;
 
-        ushort dashDuration = (ushort)GetParam(def, "dash_duration_ticks", 16f);
-        // One tick longer than the dash: TickTimers decrements the lock before TickAbilities
-        // runs, so a lock of exactly dashDuration would hit 0 on the last dash tick and let a
-        // held dash key cancel the final frame (NilusEventHorizon documents the same pattern).
+        ushort dashDuration = _parameters.DashDurationTicks;
+        // Keep the lock one tick longer than the dash so the final velocity tick cannot be IASA-cancelled.
         s.AnimLockTicks = (ushort)(dashDuration + 1);
     }
 
@@ -120,11 +106,13 @@ public sealed class KistuDashSlash : ServerAbility
     private void SpawnDashHitbox(ref CharacterState s, CharacterDefinition def, float followSpeed, ushort durationTicks)
     {
         var spec = def.GetSlotAbility(Slot, false);
-        if (spec?.Stages is not { Length: > 0 }) return;
-        var stage = spec.Stages[0];
-        if (stage.HitboxEvents == null || stage.HitboxEvents.Length == 0) return;
-        var evt = stage.HitboxEvents[0];
-
+        HitboxEvent evt = spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
+            ? spec.Stages[0].HitboxEvents[0]
+            : new HitboxEvent
+            {
+                Shape = HitboxShape.Capsule, Radius = 0.5f, OffY = 0.7f, OffZ = 0.5f, EndOffY = 0.7f, EndOffZ = 1.3f,
+                Damage = 9f, Knockback = new KnockbackData { Profile = KnockbackProfile.Medium }, StunTicks = 16, Interruptible = true
+            };
         float cos = MathF.Cos(_dashYaw);
         float sin = MathF.Sin(_dashYaw);
 
@@ -174,6 +162,12 @@ public sealed class KistuDashSlash : ServerAbility
     /// </summary>
     public override void OnEnd(ref CharacterState s)
     {
+        s.VX = 0f;
+        s.VZ = 0f;
+    }
+    public override void OnCancel(ref CharacterState s)
+    {
+        s.IsAiming = false;
         s.VX = 0f;
         s.VZ = 0f;
     }

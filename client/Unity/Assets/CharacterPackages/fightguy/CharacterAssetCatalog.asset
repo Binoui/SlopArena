@@ -15,6 +15,7 @@ MonoBehaviour:
   _packageId: fightguy
   _catalogSchemaVersion: 1
   _rig: {fileID: 1802147238805907036, guid: eb6307c86ccb789bd94bc718e2060bcd, type: 3}
+  _weaponConfig: {fileID: 0}
   _sampleRate: 60
   _bindings:
   - _semanticId: anim.idle

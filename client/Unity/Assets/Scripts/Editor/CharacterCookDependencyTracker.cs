@@ -96,6 +96,7 @@ internal static class CharacterCookDependencyTracker
         canonical.Append("package=").Append(CanonicalJson(packageJson)).Append('\n');
         canonical.Append("character=").Append(CanonicalJson(characterJson)).Append('\n');
         canonical.Append("rig=").Append(GlobalObjectId.GetGlobalObjectIdSlow(catalog.Rig)).Append('\n');
+        canonical.Append("weapon-config=").Append(catalog.WeaponConfig == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(catalog.WeaponConfig).ToString()).Append('\n');
         foreach (var animation in animations.OrderBy(x => x.SemanticId, StringComparer.Ordinal))
         {
             canonical.Append("catalog-animation=").Append(animation.SemanticId).Append('|')

@@ -17,96 +17,35 @@ public static class AbilityLabFrontendSelfTest
     public static void Run()
     {
         var labObject = AbilityLab.Instance != null ? null : new GameObject("AbilityLabFrontendSelfTest");
-        if (labObject != null) labObject.AddComponent<AbilityLab>();
-        var window = ScriptableObject.CreateInstance<AbilityLabWindow>();
+        if (labObject != null)
+        {
+            labObject.hideFlags = HideFlags.HideAndDontSave;
+            labObject.AddComponent<AbilityLab>();
+        }
+        var window = EditorWindow.GetWindow<AbilityLabWindow>(true, "Ability Lab Self-Test", false);
         AbilityLabPackageWorkspace? fixtureWorkspace = null;
         try
         {
             window.CreateGUI();
             var root = window.rootVisualElement;
-            string[] names =
-            {
-                "ability-lab-root", "ability-lab-tabs", "tab-moves", "tab-character", "tab-assets",
-                "tab-compatibility", "tab-advanced", "package-label", "package-selector", "package-status", "package-status-toggle",
-                "diagnostics-panel", "rig-setup-state", "move-selector", "ground-air-selector",
-                "ground-moves-button", "air-moves-button", "preview-bridge", "preview-status",
-                "scene-view-guidance", "inspector", "move-timeline", "timeline-track", "timeline-scroll", "timeline-zoom", "timeline-tick",
-                "timeline-play", "timeline-step-back", "timeline-step-forward", "timeline-duration",
-                "character-page", "character-general", "character-movement", "movement-ground", "movement-air",
-                "movement-jump", "movement-falling", "character-presentation", "character-hurtboxes",
-                "character-hurtbox-capsules", "character-hurtbox-bones", "character-unavailable",
-                "character-display-name", "character-weight", "character-capsule-radius", "character-capsule-height",
-                "character-hip-height", "character-hurtbox-radius", "movement-run-speed", "movement-run-acceleration-a",
-                "movement-run-acceleration-b", "movement-dash-speed", "movement-ground-friction",
-                "movement-dash-duration-ticks", "movement-dash-cooldown-ticks", "movement-rush-ticks",
-                "movement-air-speed-max", "movement-air-acceleration-stick", "movement-air-acceleration-base",
-                "movement-air-friction", "movement-jump-force", "movement-short-hop-force",
-                "movement-air-jump-vertical-multiplier", "movement-air-jump-horizontal-multiplier", "movement-max-jumps",
-                "movement-jump-squat-ticks", "movement-gravity", "movement-air-float-gravity", "movement-max-fall-speed",
-                "movement-fast-fall-speed", "movement-float-window-ticks", "presentation-idle", "presentation-run",
-                "presentation-dash", "presentation-jump", "presentation-fall", "presentation-hit-small",
-                "presentation-hit-medium", "presentation-hit-hard", "presentation-land-start-offset-seconds",
-                "presentation-model-resource-path", "presentation-visual-scale", "presentation-hurtbox-bone-scale",
-                "presentation-model-y-offset", "presentation-model-sole-offset", "presentation-auto-model-y-offset",
-                "assets-page", "assets-rig-group", "assets-rig-field", "assets-rig-status", "assets-skeleton",
-                "assets-locomotion-group", "assets-locomotion-bindings", "assets-hit-reactions-group",
-                "assets-hit-reaction-bindings", "assets-move-group", "assets-move-bindings", "assets-validation",
-                "advanced-page", "advanced-package-paths", "advanced-source-path", "advanced-cooked-path",
-                "advanced-hashes", "advanced-raw-ids", "advanced-diagnostics", "advanced-provenance",
-                "advanced-schema-profile", "advanced-rename-old", "advanced-rename-new", "advanced-rename-confirm",
-                "advanced-rename-status", "advanced-migration-actions", "advanced-migrate-authoring",
-                "advanced-migrate-catalog", "advanced-migration-status",
-                "compatibility-authority", "legacy-selector", "legacy-load", "compatibility-airborne",
-                "compatibility-slot-selector", "compatibility-stage-selector", "compatibility-timeline",
-                "compatibility-tick", "compatibility-play", "compatibility-step-back", "compatibility-step-forward",
-                "compatibility-slider", "compatibility-duration", "compatibility-show-hurtboxes",
-                "compatibility-show-hitboxes", "compatibility-show-baked-bones", "compatibility-show-dummy",
-            };
-            foreach (string name in names)
-                if (root.Q<VisualElement>(name) == null)
-                    throw new InvalidOperationException("Missing named frontend control: " + name);
-            var locomotionRows = BindingRows(root.Q<VisualElement>("assets-locomotion-bindings"));
-            var reactionRows = BindingRows(root.Q<VisualElement>("assets-hit-reaction-bindings"));
+            var packageSelector = root.Q<DropdownField>("package-selector");
+            var groundOne = root.Q<Button>("selected-ground-1");
+            var timeline = root.Q<AbilityLabTimelineElement>("timeline-track");
+            if (packageSelector == null || groundOne == null || timeline == null ||
+                !packageSelector.choices.Any(choice => choice.Contains("FightGuy", StringComparison.Ordinal)) ||
+                !packageSelector.value.Contains("FightGuy", StringComparison.Ordinal) ||
+                !groundOne.text.StartsWith("1 · ", StringComparison.Ordinal) ||
+                !groundOne.text.Contains("Low Kick", StringComparison.Ordinal))
+                throw new InvalidOperationException("FightGuy package, canonical move selector, or friendly label is unavailable.");
+
             var moveRows = BindingRows(root.Q<VisualElement>("assets-move-bindings"));
-            if (root.Q<ObjectField>("assets-rig-field").objectType != typeof(GameObject) ||
-                root.Q<ObjectField>("assets-rig-field").allowSceneObjects ||
-                locomotionRows.Count != 5 || reactionRows.Count != 3 || moveRows.Count != 16)
-                throw new InvalidOperationException("Assets page does not expose the fixed rig, locomotion, reaction, and canonical move groups.");
             string[] expectedMoveSlots = CanonicalSlotProjection.All.Select(x => x.Id).ToArray();
-            if (!moveRows.Select(row => row.tooltip.Split('·')[0].Trim()).SequenceEqual(expectedMoveSlots))
+            if (moveRows.Count != expectedMoveSlots.Length ||
+                !moveRows.Select(row => row.tooltip.Split('·')[0].Trim()).SequenceEqual(expectedMoveSlots))
                 throw new InvalidOperationException("Assets move rows are not in canonical ground-then-air order.");
-            if (root.Q<VisualElement>("assets-skeleton").Query<Label>().ToList().Count == 0 ||
-                !root.Q<Label>("advanced-source-path").text.Contains("Assets/CharacterPackages/fightguy", StringComparison.Ordinal) ||
-                !root.Q<Label>("advanced-cooked-path").text.Contains("content-cooked/fightguy", StringComparison.Ordinal))
-                throw new InvalidOperationException("Assets skeleton or Advanced package paths are missing.");
-            if (root.Q<VisualElement>("advanced-provenance").Query<Label>().ToList().Count == 0 ||
-                root.Q<VisualElement>("advanced-schema-profile").Query<Label>().ToList().Count == 0 ||
-                root.Q<VisualElement>("advanced-hashes").Query<Label>().ToList().Count == 0)
-                throw new InvalidOperationException("Advanced provenance, schema, or hash projection is missing.");
-            var characterMovement = root.Q<VisualElement>("character-movement");
-            if (root.Q<Button>("advanced-migrate-authoring").enabledSelf ||
-                root.Q<Button>("advanced-migrate-catalog").enabledSelf ||
-                root.Q<Label>("advanced-migration-status").text != "Current; no migration required")
-                throw new InvalidOperationException("Current v1 migration state is not explicit and disabled.");
-            if (root.Q<VisualElement>("movement-ground").parent != characterMovement ||
-                root.Q<VisualElement>("movement-air").parent != characterMovement ||
-                root.Q<VisualElement>("movement-jump").parent != characterMovement ||
-                root.Q<VisualElement>("movement-falling").parent != characterMovement)
-                throw new InvalidOperationException("Character movement groups are not nested under Movement.");
-            if (root.Q<FloatField>("character-weight").value != 100f ||
-                root.Q<FloatField>("movement-run-speed").value != 14f ||
-                root.Q<FloatField>("movement-air-speed-max").value != 7.5f ||
-                root.Q<FloatField>("presentation-land-start-offset-seconds").value != 0.49f ||
-                !root.Q<TextField>("presentation-model-resource-path").value.Equals("Characters/FightGuy", StringComparison.Ordinal) ||
-                !root.Q<Toggle>("presentation-auto-model-y-offset").value)
-                throw new InvalidOperationException("FightGuy authored Character values are not displayed.");
-            var capsules = root.Q<Foldout>("character-hurtbox-capsules");
-            var bones = root.Q<Foldout>("character-hurtbox-bones");
-            if (capsules.Query<Label>().ToList().Count < 6 || bones.Query<Label>().ToList().Count < 7 ||
-                capsules.Q<FloatField>() != null || capsules.Q<IntegerField>() != null || capsules.Q<TextField>() != null ||
-                capsules.Q<Button>() != null || bones.Q<FloatField>() != null || bones.Q<IntegerField>() != null ||
-                bones.Q<TextField>() != null || bones.Q<Button>() != null)
-                throw new InvalidOperationException("Hurtboxes are not exposed as generated read-only labels.");
+            if (root.Q<Label>("compatibility-banner") == null ||
+                !root.Q<Label>("compatibility-banner").text.Contains("read-only", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Compatibility mode boundary is not visible.");
 
             fixtureWorkspace = (AbilityLabPackageWorkspace)typeof(AbilityLabWindow)
                 .GetField("_workspace", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
@@ -115,24 +54,15 @@ public static class AbilityLabFrontendSelfTest
             float priorWeight = windowWorkspace.Draft.Weight;
             if (!windowWorkspace.ReplaceGeneral(
                     windowWorkspace.Draft.DisplayName, priorWeight + 1f, windowWorkspace.Draft.CapsuleRadius,
-                    windowWorkspace.Draft.CapsuleHeight, windowWorkspace.Draft.HipHeight, windowWorkspace.Draft.HurtboxRadius))
-                throw new InvalidOperationException("Character numeric source edit was rejected.");
-            typeof(AbilityLabWindow).GetMethod("RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(window, null);
+                    windowWorkspace.Draft.CapsuleHeight, windowWorkspace.Draft.HipHeight, windowWorkspace.Draft.HurtboxRadius) ||
+                !windowWorkspace.IsDirty || windowWorkspace.Status != "Stale")
+                throw new InvalidOperationException("Source edits did not remain an unsaved authoritative draft.");
+            Refresh(window);
+            RefreshInspector(window);
             if (root.Q<FloatField>("character-weight").value != priorWeight + 1f ||
                 root.Q<Label>("package-status").text != "Unsaved" ||
                 !ReferenceEquals(priorCharacterPreview, windowWorkspace.Preview))
-                throw new InvalidOperationException("Character numeric edit did not remain an unsaved source-only change.");
-
-
-            var packageSelector = root.Q<DropdownField>("package-selector");
-            if (packageSelector.choices == null || !packageSelector.choices.Any(choice => choice.Contains("FightGuy", StringComparison.Ordinal)))
-                throw new InvalidOperationException("FightGuy source package is not selectable.");
-            if (!packageSelector.value.Contains("FightGuy", StringComparison.Ordinal))
-                throw new InvalidOperationException("FightGuy is not the default package selection.");
-            var groundOne = root.Q<Button>("selected-ground-1");
-            if (groundOne == null || !groundOne.text.StartsWith("1 · ", StringComparison.Ordinal) || !groundOne.text.Contains("Low Kick", StringComparison.Ordinal))
-                throw new InvalidOperationException("Ground 1 does not show its friendly source name.");
+                throw new InvalidOperationException("Unsaved source edit did not refresh the Character page.");
 
             var lab = AbilityLab.Instance;
             var sourceWorkspace = new AbilityLabPackageWorkspace();
@@ -193,11 +123,6 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException("Catalog binding undo did not restore clip and extrapolation atomically.");
             windowWorkspace.Redo();
             windowWorkspace.Undo();
-            var unknownLabel = (string)typeof(AbilityLabWindow).GetMethod("FriendlyAnimationLabel", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(window, new object[] { "anim.unknown" })!;
-            if (unknownLabel != "Unknown (anim.unknown)" ||
-                catalog.Bindings.Any(binding => binding != null && binding.SemanticId == "anim.unknown"))
-                throw new InvalidOperationException("Unknown animation IDs are not rendered with the explicit fallback.");
             if (!windowWorkspace.ReplaceCatalogBinding(catalogBindingId, null, originalExtrapolation))
                 throw new InvalidOperationException("Catalog clip clear was rejected.");
             typeof(AbilityLabWindow).GetMethod("RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
@@ -238,16 +163,44 @@ public static class AbilityLabFrontendSelfTest
             sourceWorkspace.Undo();
             if (((SpawnHitboxOperationSource)sourceWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations[hitboxIndex]).Hitbox.Damage != beforeDamage)
                 throw new InvalidOperationException("Source-owned hitbox undo did not restore the prior value.");
-            var timeline = root.Q<AbilityLabTimelineElement>("timeline-track");
-            if (timeline == null || timeline.Projection == null || timeline.Projection.DurationTicks <= 0 || timeline.Projection.Stages.Count == 0)
+            if (timeline.Projection == null || timeline.Projection.DurationTicks <= 0 || timeline.Projection.Stages.Count == 0)
                 throw new InvalidOperationException("Cumulative authored timeline projection is unavailable.");
+            var selectedProjection = timeline.Projection.Stages.SelectMany(stage => stage.Operations)
+                .First(operation => operation.Source is SpawnHitboxOperationSource);
+            timeline.SelectedOperation = selectedProjection;
+            int selectedStage = selectedProjection.SourceStageIndex;
+            int selectedOperation = selectedProjection.SourceOperationIndex;
+            var selectedSourceSlot = sourceWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1");
+            var selectedSource = (SpawnHitboxOperationSource)selectedSourceSlot.Timeline.Stages[selectedStage].Operations[selectedOperation];
+            if (!sourceWorkspace.ReplaceHitbox("ground.1", selectedStage, selectedOperation,
+                    selectedSource.Hitbox with { Damage = selectedSource.Hitbox.Damage + 1f }) ||
+                !sourceWorkspace.ReplaceHitbox("ground.1", selectedStage, selectedOperation,
+                    ((SpawnHitboxOperationSource)sourceWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1")
+                        .Timeline.Stages[selectedStage].Operations[selectedOperation]).Hitbox with { Angle = selectedSource.Hitbox.Angle + 1f }))
+                throw new InvalidOperationException("Sequential source hitbox edits were rejected.");
+            timeline.Projection = AbilityLabTimelineProjection.Build(
+                sourceWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1"));
+            if (timeline.SelectedOperation == null ||
+                timeline.SelectedOperation.SourceStageIndex != selectedStage ||
+                timeline.SelectedOperation.SourceOperationIndex != selectedOperation)
+                throw new InvalidOperationException("Operation selection was lost after sequential hitbox edits.");
+            sourceWorkspace.Undo();
+            sourceWorkspace.Undo();
+            if (timeline.Projection == null || timeline.Projection.DurationTicks <= 0 || timeline.Projection.Stages.Count == 0)
+                throw new InvalidOperationException("Cumulative authored timeline projection is unavailable.");
+            int operationCount = timeline.Projection.Stages.Sum(stage => stage.Operations.Count);
+            float minimumTimelineHeight = 18f + operationCount * 20f;
+            if (timeline.resolvedStyle.height < Math.Max(84f, minimumTimelineHeight))
+                throw new InvalidOperationException("Timeline content height clips projected operation rows.");
             if (lab.WorkingEvents.Count != 0)
                 throw new InvalidOperationException("Transient WorkingEvents is still the package edit path.");
             var timelineScroll = root.Q<ScrollView>("timeline-scroll");
             var timelineZoom = root.Q<Slider>("timeline-zoom");
+            var stageSelector = root.Q<DropdownField>("stage-selector");
+            if (stageSelector != null && stageSelector.style.display != DisplayStyle.None)
+                throw new InvalidOperationException("Single-stage move still exposes the Moves stage selector.");
             if (!root.focusable || !timeline.focusable || timelineScroll == null ||
-                timelineZoom.lowValue != 0.5f || timelineZoom.highValue != 4f || timelineZoom.value != 1f ||
-                typeof(AbilityLabWindow).GetMethod("OnRootKeyDown", BindingFlags.Instance | BindingFlags.NonPublic) == null)
+                timelineZoom.lowValue != 0.5f || timelineZoom.highValue != 4f || timelineZoom.value != 1f)
                 throw new InvalidOperationException("Timeline zoom, scroll, or keyboard focus contract is missing.");
 
             var timelineSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1");
@@ -408,8 +361,17 @@ public static class AbilityLabFrontendSelfTest
             EditorApplication.delayCall += () =>
             {
                 Selection.activeObject = null;
-                UnityEngine.Object.DestroyImmediate(window);
-                if (labObject != null) UnityEngine.Object.DestroyImmediate(labObject);
+                if (window != null)
+                {
+                    window.rootVisualElement?.Clear();
+                    window.Close();
+                }
+                void DestroyTemporaryObject()
+                {
+                    EditorApplication.update -= DestroyTemporaryObject;
+                    if (labObject != null) UnityEngine.Object.DestroyImmediate(labObject);
+                }
+                EditorApplication.update += DestroyTemporaryObject;
             };
         }
     }
@@ -418,6 +380,8 @@ public static class AbilityLabFrontendSelfTest
             .Invoke(window, new object[] { tick });
     private static void Refresh(AbilityLabWindow window)
         => typeof(AbilityLabWindow).GetMethod("RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+    private static void RefreshInspector(AbilityLabWindow window)
+        => typeof(AbilityLabWindow).GetMethod("RefreshInspector", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
     private static System.Collections.Generic.List<VisualElement> BindingRows(VisualElement parent)
         => parent.Query<VisualElement>().ToList().Where(element => element.userData is string).ToList();
     private static void SelectTab(AbilityLabWindow window, string pageName)

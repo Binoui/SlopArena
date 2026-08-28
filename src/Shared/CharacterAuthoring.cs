@@ -32,6 +32,7 @@ public sealed record CharacterAuthoringDocument(
     float HurtboxRadius,
     IReadOnlyList<HurtboxCapsuleSource> HurtboxCapsules,
     IReadOnlyList<HurtboxBoneSource> HurtboxBoneDefs,
+    IReadOnlyList<string> AttachmentBoneIds,
     IReadOnlyList<string> PresentationIds,
     IReadOnlyList<CapabilityRequirementSource> CapabilityRequirements,
     IReadOnlyList<CharacterSlotSource> Slots,
@@ -96,7 +97,6 @@ public sealed record HurtboxBoneSource(
     float Radius);
 
 public sealed record CapabilityRequirementSource(string CapabilityId, string CapabilityVersion);
-
 public sealed record CharacterSlotSource(
     string Id,
     string Name,
@@ -107,8 +107,10 @@ public sealed record CharacterSlotSource(
     ushort CooldownTicks,
     bool IsRecoveryMove,
     bool PreserveMomentumOnStart,
-    CharacterTimelineSource Timeline);
+    CharacterTimelineSource Timeline,
+    ChargePoolSource? ChargePool = null);
 
+public sealed record ChargePoolSource(int MaxCharges, ushort RegenTicks);
 public sealed record CharacterAliasSource(string From, string To);
 
 public sealed record CharacterTimelineSource(IReadOnlyList<CharacterStageSource> Stages);
@@ -182,7 +184,6 @@ public sealed record HitboxSource(
     ushort DurationTicks,
     bool Interruptible,
     byte HitGroup);
-
 public sealed record ProjectileSource(
     float LaunchOffsetX,
     float LaunchOffsetY,
@@ -195,7 +196,8 @@ public sealed record ProjectileSource(
     float BaseKnockback,
     float KnockbackGrowth,
     ushort StunTicks,
-    ushort MaxFlightTicks);
+    ushort MaxFlightTicks,
+    float YawOffsetDegrees = 0f);
 
 public abstract record TypedCapabilityParameters;
 
@@ -246,6 +248,21 @@ public sealed record DragonBeamCapabilityParameters(
     float KnockbackGrowth,
     ushort StunTicks,
     ushort HitboxDurationTicks) : TypedCapabilityParameters;
+
+public sealed record KistuDashSlashCapabilityParameters(
+    float DashDistance,
+    ushort DashDurationTicks,
+    ushort MaxAimTicks) : TypedCapabilityParameters;
+
+public sealed record KistuRisingSlashCapabilityParameters(
+    float RiseSpeed,
+    ushort RiseTicks,
+    float HomingRange,
+    float HomingSpeed) : TypedCapabilityParameters;
+
+public sealed record KistuBladeFlurryCapabilityParameters(
+    float ForwardSpeed,
+    ushort MoveTicks) : TypedCapabilityParameters;
 
 public enum AuthoringAbilityBehavior : byte
 {

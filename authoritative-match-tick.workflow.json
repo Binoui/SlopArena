@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Authoritative Match Tick",
+    "output": "authoritative-match-tick.html",
+    "quality_profile": "showcase",
+    "viewBox": [1200, 590],
+    "views": [
+      {"id": "tick-path", "label": "60 Hz tick path", "focus": ["poll", "send", "drain", "simulate", "broadcast", "render"], "note": "Follow one input tick from Unity polling through authoritative state rendering."},
+      {"id": "combat-resolution", "label": "Combat resolution", "focus": ["simulate", "broadcast"], "note": "Focus on Shared simulation and server-owned combat results."},
+      {"id": "timeout-path", "label": "Timeout handling", "focus": ["drain", "timeout", "stop"], "note": "See how input silence exits the match loop."}
+    ]
+  },
+  "lanes": [
+    {"id": "client", "label": "Unity Client"},
+    {"id": "transport", "label": "UDP Transport"},
+    {"id": "server", "label": "GameServer + Shared Simulation"},
+    {"id": "exceptions", "label": "Timeout / Stop", "variant": "exception"}
+  ],
+  "phases": [
+    {"id": "input", "label": "Input", "fromCol": 0, "toCol": 1, "variant": "emphasis"},
+    {"id": "authoritative", "label": "Authoritative tick", "fromCol": 2, "toCol": 4, "variant": "emphasis"},
+    {"id": "output-phase", "label": "Output", "fromCol": 5, "toCol": 5, "variant": "dashed"}
+  ],
+  "groups": [
+    {"id": "server-authority", "label": "Server owns gameplay truth", "lane": "server", "fromCol": 2, "toCol": 4, "variant": "security"},
+    {"id": "stop-path", "label": "Fail closed on silence", "lane": "exceptions", "fromCol": 3, "toCol": 5, "variant": "security"}
+  ],
+  "mainPath": ["poll", "send", "drain", "simulate", "broadcast", "render"],
+  "nodes": [
+    {"id": "poll", "lane": "client", "col": 0, "type": "frontend", "label": "Poll Input", "sublabel": "Unity InputSystem", "tag": "FixedUpdate"},
+    {"id": "send", "lane": "transport", "col": 1, "type": "cloud", "label": "Send Input", "sublabel": "UDP packet", "tag": "client → server"},
+    {"id": "drain", "lane": "server", "col": 2, "type": "backend", "label": "Drain Queues", "sublabel": "last valid input", "tag": "per player slot"},
+    {"id": "simulate", "lane": "server", "col": 3, "type": "backend", "label": "Simulate Tick", "sublabel": "movement + combat", "tag": "60 Hz authority"},
+    {"id": "broadcast", "lane": "server", "col": 5, "type": "backend", "label": "Broadcast State", "sublabel": "all entity states", "tag": "server → clients", "width": 110},
+    {"id": "render", "lane": "client", "col": 5, "type": "frontend", "label": "Render State", "sublabel": "render UI", "tag": "authoritative view"},
+    {"id": "timeout", "lane": "exceptions", "col": 3, "type": "security", "label": "Check Timeout", "sublabel": "5 s silence", "tag": "stop match"},
+    {"id": "stop", "lane": "exceptions", "col": 5, "type": "external", "label": "Stop Match", "sublabel": "stopped", "tag": "terminal"}
+  ],
+  "edges": [
+    {"id": "poll-send", "from": "poll", "to": "send", "label": "InputState", "variant": "emphasis", "role": "main"},
+    {"id": "send-drain", "from": "send", "to": "drain", "label": "UDP", "variant": "emphasis", "role": "main"},
+    {"id": "drain-simulate", "from": "drain", "to": "simulate", "label": "inputs", "variant": "emphasis", "role": "main"},
+    {"id": "simulate-broadcast", "from": "simulate", "to": "broadcast", "label": "CharacterState + events", "variant": "emphasis", "role": "main", "labelDy": 58},
+    {"id": "broadcast-render", "from": "broadcast", "to": "render", "label": "authoritative state", "variant": "emphasis", "role": "main", "labelDy": 20},
+    {"id": "drain-timeout", "from": "drain", "to": "timeout", "label": "silence check", "variant": "security", "role": "branch", "fromSide": "bottom", "toSide": "top", "labelDy": 40},
+    {"id": "timeout-stop", "from": "timeout", "to": "stop", "label": "5 s silence", "variant": "security", "role": "error", "route": "outside-right", "fromSide": "right", "toSide": "right", "labelDy": -40}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "Primary tick contract", "items": ["Unity polls input during FixedUpdate and sends an InputState packet.", "MatchInstance drains the latest valid input per player slot.", "The server broadcasts state; clients render it without deciding gameplay results."]},
+    {"dot": "rose", "title": "Authority boundary", "items": ["Shared ServerSimulation owns movement, abilities, hitboxes, damage, knockback, and hitstun.", "SpellResolver resolves hitbox and hurtbox interactions on the server path.", "The same Shared code is consumed by server and client tracks where applicable."]},
+    {"dot": "amber", "title": "Operational stop", "items": ["Five seconds of input silence stops the match loop.", "Timeout is a terminal exception path, not a client-side correction.", "State output includes the authoritative tick and entity results."]}
+  ]
+}

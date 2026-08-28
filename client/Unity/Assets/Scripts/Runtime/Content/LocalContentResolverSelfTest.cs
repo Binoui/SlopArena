@@ -22,9 +22,10 @@ public static class LocalContentResolverSelfTest
         {
             Directory.SetCurrentDirectory(Path.GetTempPath());
             var resolver = LocalContentResolver.CreateDefault();
-            if (!Path.IsPathRooted(resolver.ProjectRoot) || resolver.ContentRoots.Any(root => !Path.IsPathRooted(root)))
-                throw new InvalidOperationException("Local resolver returned an unrooted path.");
-
+            var playerResolver = LocalContentResolver.CreateForMode(LocalContentMode.Player);
+            if (!Path.IsPathRooted(resolver.ProjectRoot) || resolver.ContentRoots.Any(root => !Path.IsPathRooted(root)) ||
+                playerResolver.ContentRoots.Count != 1 || !Path.IsPathRooted(playerResolver.ContentRoots[0]))
+                throw new InvalidOperationException("Local resolver returned an invalid development/player root policy.");
             var roster = resolver.ResolveRoster();
             if (!roster.Success || roster.Roster == null)
                 throw new InvalidOperationException("Valid rooted cooked roster could not be resolved: " + Format(roster));

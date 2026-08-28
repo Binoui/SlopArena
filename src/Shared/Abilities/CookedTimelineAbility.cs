@@ -163,10 +163,11 @@ public sealed class CookedTimelineAbility : ServerAbility
 
     private void SpawnCookedProjectile(ref CharacterState s, CookedProjectile projectile)
     {
+        float aimYaw = s.AimYaw + projectile.YawOffsetDegrees * MathF.PI / 180f;
         float cosPitch = MathF.Cos(s.AimPitch);
-        float dirX = cosPitch * MathF.Sin(s.AimYaw);
+        float dirX = cosPitch * MathF.Sin(aimYaw);
         float dirY = MathF.Sin(s.AimPitch);
-        float dirZ = cosPitch * MathF.Cos(s.AimYaw);
+        float dirZ = cosPitch * MathF.Cos(aimYaw);
         float cosYaw = MathF.Cos(s.FacingYaw);
         float sinYaw = MathF.Sin(s.FacingYaw);
         float offsetX = projectile.LaunchOffsetX * cosYaw + projectile.LaunchOffsetZ * sinYaw;

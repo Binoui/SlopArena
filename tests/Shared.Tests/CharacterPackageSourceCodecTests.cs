@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -32,6 +33,48 @@ public sealed class CharacterPackageSourceCodecTests
         Assert.True(second.IsValid);
         Assert.Equal(CharacterPackageSourceCodec.SerializeManifest(first.Source.Manifest), CharacterPackageSourceCodec.SerializeManifest(second.Source!.Manifest));
         Assert.Equal(CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character), CharacterPackageSourceCodec.SerializeCharacter(second.Source.Character));
+    }
+
+    [Fact]
+    public void FloatSerializationIsInvariantShortestRoundTrip()
+    {
+        var minimal = CharacterPackageSourceCodec.CreateMinimal("test-character", "Test", "Binoui", "MIT", "SlopArena");
+        var character = minimal.Character with
+        {
+            Weight = 0.35f,
+            Movement = minimal.Character.Movement with
+            {
+                RunSpeed = 1.7f,
+                AirSpeedMax = 0.8f,
+                AirAccelStick = 0.85f,
+                Gravity = 1.2345678f,
+            },
+            Presentation = minimal.Character.Presentation with { LandStartOffsetSeconds = 0.49f },
+        };
+
+        var priorCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
+            var json = CharacterPackageSourceCodec.SerializeCharacter(character);
+            Assert.Contains("\"weight\": 0.35", json);
+            Assert.Contains("\"runSpeed\": 1.7", json);
+            Assert.Contains("\"airSpeedMax\": 0.8", json);
+            Assert.Contains("\"gravity\": 1.2345678", json);
+            Assert.Contains("\"landStartOffsetSeconds\": 0.49", json);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = priorCulture;
+        }
+    }
+
+    [Fact]
+    public void UnchangedAuthoredSourceIsByteStable()
+    {
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        Assert.Equal(Fixture("character.json"), CharacterPackageSourceCodec.SerializeCharacter(parsed.Source!.Character));
     }
 
     [Fact]

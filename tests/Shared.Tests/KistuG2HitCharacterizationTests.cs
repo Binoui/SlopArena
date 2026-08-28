@@ -68,7 +68,7 @@ public sealed class KistuG2HitCharacterizationTests
                 }
             }
 
-            int bakedFrame = targetTick * baked!.FrameCountFor("kistu_g_2") / stage.DurationTicks;
+            int bakedFrame = targetTick * baked!.FrameCountFor("anim.kistu.g2") / stage.DurationTicks;
             record.AppendLine($"{targetTick},{bakedFrame},{targetX:F3},{targetY:F3},{targetZ:F3}," +
                               $"{hx:F3},{hy:F3},{hz:F3},{tx:F3},{ty:F3},{tz:F3},{firstHitTick},{damage}");
             Assert.True(firstHitTick >= 0,

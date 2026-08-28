@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {"title": "Cooked Ability Execution", "output": "cooked-ability-execution.html", "viewBox": [1200, 620], "quality_profile": "showcase", "views": [{"id": "ability-path", "label": "Ability execution", "focus": ["input", "timeline", "resolve", "state", "events"], "note": "Follow a canonical input slot into deterministic runtime operations and gameplay state."}, {"id": "combat-effects", "label": "Combat effects", "focus": ["timeline", "resolve", "state", "events"], "note": "Focus on hitbox resolution and server-owned combat outcomes."}]},
+  "lanes": [{"id": "input", "label": "Input"}, {"id": "ability", "label": "Cooked Ability"}, {"id": "engine", "label": "Shared Engine"}, {"id": "output", "label": "State + Presentation"}],
+  "phases": [{"id": "select", "label": "Select", "fromCol": 0, "toCol": 1, "variant": "emphasis"}, {"id": "execute", "label": "Execute", "fromCol": 2, "toCol": 4, "variant": "emphasis"}, {"id": "resolve", "label": "Resolve", "fromCol": 5, "toCol": 5, "variant": "dashed"}],
+  "groups": [{"id": "timeline-runtime", "label": "Deterministic runtime", "lane": "ability", "fromCol": 1, "toCol": 4, "variant": "emphasis"}],
+  "mainPath": ["input", "timeline", "operations", "resolve", "state", "events"],
+  "nodes": [
+    {"id": "input", "lane": "input", "col": 0, "type": "frontend", "label": "Input Slot", "sublabel": "canonical grid", "tag": "1/2/3/4/A/E/R/F", "width": 90},
+    {"id": "timeline", "lane": "ability", "col": 1, "type": "backend", "label": "Timeline", "sublabel": "typed ops", "tag": "immutable", "width": 90},
+    {"id": "operations", "lane": "engine", "col": 2, "type": "backend", "label": "Execute Ops", "sublabel": "movement + hitbox", "tag": "tick-driven", "width": 90},
+    {"id": "resolve", "lane": "engine", "col": 3, "type": "security", "label": "Resolve", "sublabel": "SpellResolver", "tag": "authority", "width": 90},
+    {"id": "state", "lane": "output", "col": 4, "type": "backend", "label": "Apply State", "sublabel": "damage + stun", "tag": "SharedSimulation", "width": 90},
+    {"id": "events", "lane": "output", "col": 5, "type": "frontend", "label": "Events", "sublabel": "Unity presents", "tag": "semantic", "width": 90}
+  ],
+  "edges": [
+    {"id": "input-timeline", "from": "input", "to": "timeline", "label": "resolve slot", "variant": "emphasis", "role": "main"},
+    {"id": "timeline-operations", "from": "timeline", "to": "operations", "label": "current tick", "variant": "emphasis", "role": "main"},
+    {"id": "operations-resolve", "from": "operations", "to": "resolve", "label": "hitbox query", "variant": "security", "role": "main", "labelDy": 58},
+    {"id": "resolve-state", "from": "resolve", "to": "state", "label": "hit result", "variant": "emphasis", "role": "main"},
+    {"id": "state-events", "from": "state", "to": "events", "label": "state + events", "variant": "emphasis", "role": "main", "labelDy": 58}
+  ],
+  "cards": [
+    {"dot": "violet", "title": "Cooked contract", "items": ["Physical controls resolve to canonical grounded or aerial slots.", "Slots select immutable ordered typed operations.", "Legacy ServerAbility remains a compatibility seam, not the new authoring model."]},
+    {"dot": "rose", "title": "Combat authority", "items": ["SpellResolver and SharedSimulation own hit results and gameplay state.", "Engine primitives apply damage, knockback, hitstun, hitstop, locks, and events.", "Client presentation cannot change the resolved result."]},
+    {"dot": "amber", "title": "Lifecycle ownership", "items": ["Interruptions are evaluated by the ability lifecycle.", "Cancellation releases timing locks and prevents later operations.", "Animation callbacks do not own gameplay timing."]}
+  ]
+}

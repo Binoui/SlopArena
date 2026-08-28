@@ -8,6 +8,7 @@
 .toolbar {
     flex-direction: row;
     align-items: center;
+    flex-shrink: 0;
     min-height: 34px;
     padding-left: 8px;
     padding-right: 8px;
@@ -21,8 +22,8 @@
 .package-status-toggle { min-width: 90px; }
 .package-status { min-width: 76px; -unity-text-align: middle-center; }
 .save-button { -unity-font-style: bold; }
-.tabs { flex-direction: row; padding-left: 8px; padding-top: 5px; padding-bottom: 4px; background-color: rgb(38, 38, 43); }
-.tab-button { margin-right: 4px; }
+.tabs { flex-direction: row; flex-shrink: 0; padding-left: 8px; padding-top: 5px; padding-bottom: 4px; background-color: rgb(38, 38, 43); }
+.tab-button { margin-right: 4px; flex-shrink: 0; }
 .page { flex-grow: 1; min-height: 0; }
 .split-view { flex-grow: 1; min-height: 190px; }
 .move-selector { min-width: 180px; padding: 8px; background-color: rgb(36, 36, 41); }

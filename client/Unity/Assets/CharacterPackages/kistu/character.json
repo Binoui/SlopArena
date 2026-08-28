@@ -1,0 +1,827 @@
+{
+  "authoringSchemaVersion": 1,
+  "displayName": "Kistu",
+  "weight": 100,
+  "movement": {
+    "runSpeed": 15,
+    "runAccelerationA": 20,
+    "runAccelerationB": 12,
+    "dashSpeed": 24,
+    "airSpeedMax": 8.5,
+    "airAccelStick": 18,
+    "airAccelBase": 3.6,
+    "jumpForce": 13,
+    "shortHopForce": 7.8,
+    "airJumpVMultiplier": 0.8,
+    "airJumpHMultiplier": 0.85,
+    "gravity": 36,
+    "airFloatGravity": 0,
+    "dashDurationTicks": 16,
+    "dashCooldownTicks": 44,
+    "groundFriction": 8,
+    "airFriction": 6,
+    "maxFallSpeed": 48,
+    "fastFallSpeed": 58,
+    "maxJumps": 2,
+    "jumpSquatTicks": 4,
+    "floatWindowTicks": 35,
+    "rushTicks": 10
+  },
+  "presentation": {
+    "idle": "anim.kistu.idle",
+    "run": "anim.kistu.run",
+    "dash": "anim.kistu.dash",
+    "jump": "anim.kistu.jump",
+    "fall": "anim.kistu.fall",
+    "hitSmall": "anim.kistu.hit-small",
+    "hitMedium": "anim.kistu.hit-medium",
+    "hitHard": "anim.kistu.hit-hard",
+    "landStartOffsetSeconds": 0.49,
+    "modelResourcePath": "Characters/Kistu",
+    "visualScale": 1,
+    "hurtboxBoneScale": 0.85,
+    "modelYOffset": 0,
+    "modelSoleOffset": 0,
+    "autoModelYOffset": true
+  },
+  "capsuleRadius": 0.35,
+  "capsuleHeight": 1.7,
+  "hipHeight": 0.82,
+  "hurtboxRadius": 1,
+  "hurtboxCapsules": [
+    {
+      "startX": 0,
+      "startY": 0.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 0.9,
+      "endZ": 0,
+      "radius": 0.3
+    },
+    {
+      "startX": 0,
+      "startY": 1.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 1.2,
+      "endZ": 0,
+      "radius": 0.22
+    },
+    {
+      "startX": 0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": 0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": -0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": -0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": 0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": 0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    },
+    {
+      "startX": -0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": -0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "hurtboxBoneDefs": [
+    {
+      "boneId": "bone.head",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.22
+    },
+    {
+      "boneId": "bone.spine2",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.hips",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.right-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.left-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.right-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.left-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "attachmentBoneIds": [
+    "_weapon_tip",
+    "_weapon_hilt"
+  ],
+  "presentationIds": [],
+  "capabilityRequirements": [
+    {
+      "capabilityId": "slop.internal.kistu.dash-slash.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.kistu.rising-slash.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.kistu.blade-flurry.v1",
+      "capabilityVersion": "1"
+    }
+  ],
+  "slots": [
+    {
+      "id": "ground.1",
+      "name": "Quick Slash",
+      "description": "Quick Slash",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 21,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.g1"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 4,
+                  "angle": 30,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 14,
+                  "durationTicks": 6,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.2",
+      "name": "Double Slash",
+      "description": "Double Slash",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 34,
+            "iasaTicks": 30,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.g2"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 8,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 3,
+                  "angle": 25,
+                  "baseKnockback": 3,
+                  "knockbackGrowth": 16,
+                  "stunTicks": 10,
+                  "durationTicks": 6,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.3",
+      "name": "Up Slash",
+      "description": "Up Slash",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 32,
+            "iasaTicks": 28,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.g3"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 8,
+                  "angle": 80,
+                  "baseKnockback": 6,
+                  "knockbackGrowth": 24,
+                  "stunTicks": 18,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.4",
+      "name": "Heavy Down Slash",
+      "description": "Heavy Down Slash",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 44,
+            "iasaTicks": 39,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.g4"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 18,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": null,
+                  "damage": 12,
+                  "angle": 8,
+                  "baseKnockback": 8,
+                  "knockbackGrowth": 32,
+                  "stunTicks": 22,
+                  "durationTicks": 14,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.1",
+      "name": "Air Slash",
+      "description": "Air Slash",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 26,
+            "iasaTicks": 22,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 15,
+            "animationIds": [
+              "anim.kistu.a1"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 5,
+                  "angle": 30,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 14,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.2",
+      "name": "Reverse Slash",
+      "description": "Reverse Slash",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 20,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 4,
+            "autoCancelAfterTicks": 14,
+            "animationIds": [
+              "anim.kistu.a2"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 4,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 7,
+                  "angle": 40,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 24,
+                  "stunTicks": 16,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.3",
+      "name": "Air Up Slash",
+      "description": "Air Up Slash",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 26,
+            "iasaTicks": 22,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 3,
+            "autoCancelAfterTicks": 14,
+            "animationIds": [
+              "anim.kistu.a3"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 3,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 7,
+                  "angle": 78,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 22,
+                  "stunTicks": 16,
+                  "durationTicks": 6,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.4",
+      "name": "Air Heavy Down Slash",
+      "description": "Air Heavy Down Slash",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 34,
+            "iasaTicks": 29,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 22,
+            "animationIds": [
+              "anim.kistu.a4"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 8,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 10,
+                  "angle": -65,
+                  "baseKnockback": 6,
+                  "knockbackGrowth": 26,
+                  "stunTicks": 20,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.A",
+      "name": "Shuriken Toss",
+      "description": "Shuriken Toss",
+      "iconId": "icon.a",
+      "behavior": "aimedProjectile",
+      "aimMode": "cameraForward3D",
+      "cooldownTicks": 120,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 16,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.shuriken"
+            ],
+            "operations": [
+              {
+                "kind": "setAimState",
+                "tick": 0,
+                "unit": "ticks",
+                "aimState": "cameraForward3D"
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": 0
+                }
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": -15
+                }
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": 15
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.E",
+      "name": "Dash Slash",
+      "description": "Dash Slash",
+      "iconId": "icon.e",
+      "behavior": "directionalDash",
+      "aimMode": "groundVector",
+      "cooldownTicks": 90,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 197,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.e"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.kistu.dash-slash.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "dashDistance": 5,
+                  "dashDurationTicks": 16,
+                  "maxAimTicks": 180
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.R",
+      "name": "Rising Slash",
+      "description": "Rising Slash",
+      "iconId": "icon.r",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.r"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.kistu.rising-slash.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "riseSpeed": 8,
+                  "riseTicks": 8,
+                  "homingRange": 7,
+                  "homingSpeed": 10
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "chargePool": {
+        "maxCharges": 2,
+        "regenTicks": 240
+      }
+    },
+    {
+      "id": "ground.F",
+      "name": "Blade Flurry",
+      "description": "Blade Flurry",
+      "iconId": "icon.f",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "cooldownTicks": 540,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 64,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "animationIds": [
+              "anim.kistu.f"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.kistu.blade-flurry.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "forwardSpeed": 7,
+                  "moveTicks": 40
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "aliases": [
+    {
+      "from": "air.A",
+      "to": "ground.A"
+    },
+    {
+      "from": "air.E",
+      "to": "ground.E"
+    },
+    {
+      "from": "air.R",
+      "to": "ground.R"
+    },
+    {
+      "from": "air.F",
+      "to": "ground.F"
+    }
+  ]
+}

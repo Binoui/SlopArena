@@ -12,8 +12,19 @@ namespace SlopArena.Client.Animation
             out GameObject rig,
             out string error)
         {
+            return TryResolve(entry, out animationCatalog, out rig, out _, out error);
+        }
+
+        public static bool TryResolve(
+            MatchContentEntry entry,
+            out CharacterAnimationCatalog animationCatalog,
+            out GameObject rig,
+            out SlopArena.Client.Entities.WeaponAttachConfig weaponConfig,
+            out string error)
+        {
             animationCatalog = null;
             rig = null;
+            weaponConfig = null;
             error = "";
 
             if (entry == null)
@@ -22,7 +33,7 @@ namespace SlopArena.Client.Animation
                 return false;
             }
 
-            return TryResolve(entry.Identity, entry.CookedCharacterPackage, out animationCatalog, out rig, out error);
+            return TryResolve(entry.Identity, entry.CookedCharacterPackage, out animationCatalog, out rig, out weaponConfig, out error);
         }
 
         public static bool TryResolve(
@@ -32,8 +43,20 @@ namespace SlopArena.Client.Animation
             out GameObject rig,
             out string error)
         {
+            return TryResolve(identity, package, out animationCatalog, out rig, out _, out error);
+        }
+
+        public static bool TryResolve(
+            MatchContentIdentity identity,
+            CookedCharacterPackage package,
+            out CharacterAnimationCatalog animationCatalog,
+            out GameObject rig,
+            out SlopArena.Client.Entities.WeaponAttachConfig weaponConfig,
+            out string error)
+        {
             animationCatalog = null;
             rig = null;
+            weaponConfig = null;
             error = "";
 
             if (identity == null)
@@ -98,6 +121,7 @@ namespace SlopArena.Client.Animation
 
             animationCatalog = match;
             rig = match.Rig;
+            weaponConfig = match.WeaponConfig;
             return true;
         }
         private static bool IsSha256(string value)

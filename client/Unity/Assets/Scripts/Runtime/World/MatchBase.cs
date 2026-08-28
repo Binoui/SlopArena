@@ -94,8 +94,9 @@ namespace SlopArena.Client.World
             var def = entry.Definition;
             CharacterAnimationCatalog animationCatalog = null;
             GameObject rig = null;
+            WeaponAttachConfig cookedWeaponConfig = null;
             if (entry.CookedCharacterPackage != null &&
-                !CookedCharacterClientAssetResolver.TryResolve(entry, out animationCatalog, out rig, out var error))
+                !CookedCharacterClientAssetResolver.TryResolve(entry, out animationCatalog, out rig, out cookedWeaponConfig, out var error))
             {
                 Debug.LogError($"[{GetType().Name}] Cooked client assets failed for {entry.Identity.PackageId}: {error}");
                 return false;
@@ -115,9 +116,11 @@ namespace SlopArena.Client.World
                 renderer.SetAnimationConfig(_playerAnimConfig);
             renderer.LoadModel(def, rig ?? (local ? _playerModelPrefab : null));
 
-            var weaponConfig = local && _playerWeaponConfig != null
-                ? _playerWeaponConfig
-                : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
+            var weaponConfig = entry.CookedCharacterPackage != null
+                ? cookedWeaponConfig
+                : local && _playerWeaponConfig != null
+                    ? _playerWeaponConfig
+                    : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
             renderer.GetComponent<WeaponAttach>()?.Init(renderer, weaponConfig);
             return true;
         }

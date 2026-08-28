@@ -62,6 +62,7 @@ public sealed class CookedCharacterDefinition
     public float HurtboxRadius { get; }
     public IReadOnlyList<CookedHurtboxCapsule> HurtboxCapsules { get; }
     public IReadOnlyList<CookedHurtboxBone> HurtboxBoneDefs { get; }
+    public IReadOnlyList<string> AttachmentBoneIds { get; }
     public IReadOnlyList<string> PresentationIds { get; }
     public IReadOnlyList<CookedCapabilityRequirement> CapabilityRequirements { get; }
     public IReadOnlyList<CookedSlotDefinition> Slots { get; }
@@ -77,6 +78,7 @@ public sealed class CookedCharacterDefinition
         float hurtboxRadius,
         IReadOnlyList<CookedHurtboxCapsule> hurtboxCapsules,
         IReadOnlyList<CookedHurtboxBone> hurtboxBoneDefs,
+        IReadOnlyList<string> attachmentBoneIds,
         IReadOnlyList<string> presentationIds,
         IReadOnlyList<CookedCapabilityRequirement> capabilityRequirements,
         IReadOnlyList<CookedSlotDefinition> slots)
@@ -91,6 +93,7 @@ public sealed class CookedCharacterDefinition
         HurtboxRadius = hurtboxRadius;
         HurtboxCapsules = Copy(hurtboxCapsules);
         HurtboxBoneDefs = Copy(hurtboxBoneDefs);
+        AttachmentBoneIds = Copy(attachmentBoneIds);
         PresentationIds = Copy(presentationIds);
         CapabilityRequirements = Copy(capabilityRequirements);
         Slots = Copy(slots);
@@ -157,9 +160,7 @@ public sealed record CookedHurtboxBone(
     float OffsetY,
     float OffsetZ,
     float Radius);
-
 public sealed record CookedCapabilityRequirement(string CapabilityId, string CapabilityVersion);
-
 public sealed class CookedSlotDefinition
 {
     public int Ordinal { get; }
@@ -173,6 +174,7 @@ public sealed class CookedSlotDefinition
     public ushort CooldownTicks { get; }
     public bool IsRecoveryMove { get; }
     public bool PreserveMomentumOnStart { get; }
+    public CookedChargePool? ChargePool { get; }
     public CookedTimeline Timeline { get; }
 
     public CookedSlotDefinition(
@@ -187,7 +189,8 @@ public sealed class CookedSlotDefinition
         ushort cooldownTicks,
         bool isRecoveryMove,
         bool preserveMomentumOnStart,
-        CookedTimeline timeline)
+        CookedTimeline timeline,
+        CookedChargePool? chargePool = null)
     {
         Ordinal = ordinal;
         Id = id;
@@ -201,8 +204,11 @@ public sealed class CookedSlotDefinition
         IsRecoveryMove = isRecoveryMove;
         PreserveMomentumOnStart = preserveMomentumOnStart;
         Timeline = timeline;
+        ChargePool = chargePool;
     }
 }
+
+public sealed record CookedChargePool(int MaxCharges, ushort RegenTicks);
 
 public sealed class CookedTimeline
 {
@@ -329,7 +335,8 @@ public sealed record CookedProjectile(
     float BaseKnockback,
     float KnockbackGrowth,
     ushort StunTicks,
-    ushort MaxFlightTicks);
+    ushort MaxFlightTicks,
+    float YawOffsetDegrees = 0f);
 
 public sealed class CookedSetAimStateOperation : CookedTimelineOperation
 {
@@ -384,6 +391,20 @@ public sealed record CookedDragonBeamCapabilityParameters(
     ushort DurationTicks, ushort FireTick, float LaunchOffsetY, float BeamRange, float BeamRadius,
     float Damage, float KnockbackAngle, float KnockbackBase, float KnockbackGrowth, ushort StunTicks,
     ushort HitboxDurationTicks) : CookedCapabilityParameters;
+public sealed record CookedKistuDashSlashCapabilityParameters(
+    float DashDistance,
+    ushort DashDurationTicks,
+    ushort MaxAimTicks) : CookedCapabilityParameters;
+
+public sealed record CookedKistuRisingSlashCapabilityParameters(
+    float RiseSpeed,
+    ushort RiseTicks,
+    float HomingRange,
+    float HomingSpeed) : CookedCapabilityParameters;
+
+public sealed record CookedKistuBladeFlurryCapabilityParameters(
+    float ForwardSpeed,
+    ushort MoveTicks) : CookedCapabilityParameters;
 
 public sealed record CookedBudget(
     int SlotCount,

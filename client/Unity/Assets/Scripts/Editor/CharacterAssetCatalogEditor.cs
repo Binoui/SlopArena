@@ -32,7 +32,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
             EditorGUILayout.PropertyField(serialized.FindProperty("_packageId"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_catalogSchemaVersion"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_rig"));
-            EditorGUILayout.PropertyField(serialized.FindProperty("_sampleRate"));
+            EditorGUILayout.PropertyField(serialized.FindProperty("_weaponConfig"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_bindings"), true);
             if (serialized.ApplyModifiedProperties())
             {
@@ -86,7 +86,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
             };
             return;
         }
-        var profile = _catalog.PackageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+        var profile = _catalog.PackageId == "fightguy" || _catalog.PackageId == "kistu" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
         CharacterCompileResult compiled = CharacterPackageCompiler.Compile(
             File.ReadAllText(manifestPath), File.ReadAllText(characterPath), profile);
         _diagnostics = compiled.Diagnostics.ToList();

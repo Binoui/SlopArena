@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
-using SlopArena.Client.Animation;
+using SlopArena.Client.Entities;
 
 internal static class DeterministicPoseTrackBaker
 {
@@ -31,7 +31,7 @@ internal static class DeterministicPoseTrackBaker
         public byte[] Bytes = Array.Empty<byte>();
     }
 
-    internal static byte[] Bake(GameObject rig, IReadOnlyList<SampledAnimation> animations, int sampleRate)
+    internal static byte[] Bake(GameObject rig, IReadOnlyList<SampledAnimation> animations, int sampleRate, WeaponAttachConfig weaponConfig = null)
     {
         if (sampleRate != 60) throw new InvalidOperationException("Sample rate must be exactly 60 Hz.");
         if (rig == null) throw new InvalidOperationException("Rig is missing.");
@@ -47,7 +47,7 @@ internal static class DeterministicPoseTrackBaker
             var animator = temp.GetComponent<Animator>();
             if (animator == null) throw new InvalidOperationException("Cloned rig has no Animator.");
             var transforms = new Transform[RequiredBones.Length];
-            var names = new string[RequiredBones.Length];
+            var names = new string[RequiredBones.Length + (weaponConfig == null ? 0 : 2)];
             for (int i = 0; i < RequiredBones.Length; i++)
             {
                 transforms[i] = animator.GetBoneTransform(RequiredBones[i]);
@@ -55,7 +55,40 @@ internal static class DeterministicPoseTrackBaker
                     throw new InvalidOperationException($"Required humanoid bone is missing: {RequiredBones[i]}.");
                 names[i] = transforms[i].name;
             }
+            WeaponEntry weaponEntry = null;
+            Vector3 tipLocal = new Vector3(0f, 0f, 1.5f);
+            Vector3 hiltLocal = Vector3.zero;
+            if (weaponConfig != null)
+            {
+                weaponEntry = Array.Find(weaponConfig.Entries ?? Array.Empty<WeaponEntry>(), x => x != null && x.BoneName == "mixamorig:RightHand");
+                if (weaponEntry == null) throw new InvalidOperationException("Weapon config has no mixamorig:RightHand entry.");
+                if (weaponEntry.Prefab == null) throw new InvalidOperationException("Weapon config right-hand prefab is missing.");
+                var vertices = new List<Vector3>();
+                foreach (var meshFilter in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
+                {
+                    if (meshFilter.sharedMesh == null) continue;
+                    Matrix4x4 toPrefab = weaponEntry.Prefab.transform.worldToLocalMatrix * meshFilter.transform.localToWorldMatrix;
+                    foreach (var vertex in meshFilter.sharedMesh.vertices)
+                        vertices.Add(toPrefab.MultiplyPoint3x4(vertex));
+                }
+                if (vertices.Count == 0) throw new InvalidOperationException("Weapon prefab has no mesh vertices.");
+                Vector3 min = vertices[0], max = vertices[0];
+                foreach (var vertex in vertices) { min = Vector3.Min(min, vertex); max = Vector3.Max(max, vertex); }
+                Vector3 extent = max - min;
+                Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
+                    : extent.y >= extent.z ? Vector3.up : Vector3.forward;
+                float tipProjection = float.MinValue, hiltProjection = float.MaxValue;
+                foreach (var vertex in vertices)
+                {
+                    float projection = Vector3.Dot(vertex, axis);
+                    if (projection > tipProjection) { tipProjection = projection; tipLocal = vertex; }
+                    if (projection < hiltProjection) { hiltProjection = projection; hiltLocal = vertex; }
+                }
+                names[RequiredBones.Length] = "_weapon_tip";
+                names[RequiredBones.Length + 1] = "_weapon_hilt";
+            }
             var hips = transforms[2];
+            var rightHand = transforms[3];
             using var stream = new MemoryStream();
             WriteUInt32(stream, 0x4C454B53u);
             WriteUInt32(stream, 1u);
@@ -77,6 +110,13 @@ internal static class DeterministicPoseTrackBaker
                     {
                         Vector3 position = transforms[bone].position - hipsPosition;
                         WriteFiniteVector(stream, position, animation.SemanticId, frame, names[bone]);
+                    }
+                    if (weaponEntry != null)
+                    {
+                        Vector3 bladePosition = rightHand.TransformPoint(weaponEntry.PositionOffset);
+                        Quaternion bladeRotation = rightHand.rotation * Quaternion.Euler(weaponEntry.RotationOffset);
+                        WriteFiniteVector(stream, bladePosition + bladeRotation * tipLocal - hipsPosition, animation.SemanticId, frame, "_weapon_tip");
+                        WriteFiniteVector(stream, bladePosition + bladeRotation * hiltLocal - hipsPosition, animation.SemanticId, frame, "_weapon_hilt");
                     }
                 }
             }

@@ -32,6 +32,9 @@ public readonly struct AbilityLabTimelineDrag
 
 public sealed class AbilityLabTimelineElement : VisualElement
 {
+    private const float AxisHeight = 18f;
+    private const float RowHeight = 20f;
+    private const float MinimumHeight = 84f;
     private readonly List<(AbilityLabOperationProjection Operation, Rect Rect)> _hitRects = new();
     private AbilityLabTimelineProjection _projection = null!;
     private int _currentTick;
@@ -56,6 +59,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
         set
         {
             _projection = value;
+            UpdateGeometry();
             ResolveSelectedOperation();
             MarkDirtyRepaint();
         }
@@ -246,6 +250,14 @@ public sealed class AbilityLabTimelineElement : VisualElement
         if (_pointerId >= 0 && PointerCaptureHelper.HasPointerCapture(this, _pointerId)) PointerCaptureHelper.ReleasePointer(this, _pointerId);
         _pointerId = -1;
     }
+    private void UpdateGeometry()
+    {
+        int operationCount = 0;
+        if (_projection?.Stages != null)
+            foreach (var stage in _projection.Stages)
+                operationCount += stage.Operations?.Count ?? 0;
+        style.height = Mathf.Max(MinimumHeight, AxisHeight + operationCount * RowHeight);
+    }
 
     private void GenerateVisualContent(MeshGenerationContext context)
     {
@@ -253,8 +265,8 @@ public sealed class AbilityLabTimelineElement : VisualElement
         if (_projection == null || _projection.DurationTicks <= 0 || contentRect.width <= 0) return;
         var painter = context.painter2D;
         float width = contentRect.width;
-        float axisHeight = 18f;
-        float rowHeight = 20f;
+        float axisHeight = AxisHeight;
+        float rowHeight = RowHeight;
         painter.strokeColor = new Color(0.45f, 0.45f, 0.5f);
         painter.lineWidth = 1f;
         for (int i = 0; i < _projection.Stages.Count; i++)
@@ -287,8 +299,12 @@ public sealed class AbilityLabTimelineElement : VisualElement
                 ? Mathf.Clamp01((stage.StartTick + tick + duration) / (float)_projection.DurationTicks) * width
                 : start;
             float y = axisHeight + row * rowHeight;
-            var rowRect = new Rect(0, y, width, rowHeight - 2f);
-            _hitRects.Add((operation, rowRect));
+            var renderedRect = operation.Kind == CookedOperationKind.SpawnHitbox
+                ? new Rect(start, y + 4f, Mathf.Max(2f, end - start), 10f)
+                : new Rect(start - 4f, y + 5f, 8f, 8f);
+            _hitRects.Add((operation, operation.Kind == CookedOperationKind.SpawnHitbox
+                ? new Rect(renderedRect.xMin - 2f, renderedRect.yMin - 2f, renderedRect.width + 4f, renderedRect.height + 4f)
+                : renderedRect));
             var color = operation.Kind == CookedOperationKind.SpawnHitbox
                 ? new Color(1f, 0.45f, 0.12f)
                 : new Color(0.35f, 0.7f, 1f);

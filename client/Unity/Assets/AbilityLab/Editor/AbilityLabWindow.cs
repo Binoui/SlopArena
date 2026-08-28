@@ -1286,6 +1286,7 @@ public sealed class AbilityLabWindow : EditorWindow
             _timelineDuration.text = "Duration —";
             _timelineSlider.SetEnabled(false);
             _timelinePlay.SetEnabled(false);
+            _stageSelector.style.display = DisplayStyle.None;
             _stageSelector.SetEnabled(false);
             _timelineTrack.Projection = _timelineProjection ?? EmptyTimeline();
             _timelineTrack.CurrentTick = 0;
@@ -1365,8 +1366,16 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void UpdateStageSelector()
     {
-        if (_timelineProjection == null || _timelineProjection.Stages.Count == 0) return;
+        if (_timelineProjection == null || _timelineProjection.Stages.Count <= 1)
+        {
+            _stageSelector.style.display = DisplayStyle.None;
+            _stageSelector.SetEnabled(false);
+            _stageSelector.choices = new List<string>();
+            _stageSelector.SetValueWithoutNotify("");
+            return;
+        }
         var choices = _timelineProjection.Stages.Select(stage => $"Stage {stage.SourceStageIndex + 1}").ToList();
+        _stageSelector.style.display = DisplayStyle.Flex;
         _stageSelector.choices = choices;
         _stageSelector.SetValueWithoutNotify(choices[Mathf.Clamp(_lab!.StageIndex, 0, choices.Count - 1)]);
         _stageSelector.SetEnabled(true);
@@ -1482,14 +1491,21 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshInspector()
     {
         _inspector.Clear();
-        _inspector.Add(_stageSelector);
         if (_lab == null || !_workspace.HasPackage ||
             !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot) ||
             _lab.StageIndex < 0 || _lab.StageIndex >= slot.Timeline.Stages.Count)
         {
+            _stageSelector.style.display = DisplayStyle.None;
+            _stageSelector.SetEnabled(false);
             _inspector.Add(new Label("Select a cooked package and move."));
             return;
         }
+
+        bool multiStage = slot.Timeline.Stages.Count > 1;
+        _stageSelector.style.display = multiStage ? DisplayStyle.Flex : DisplayStyle.None;
+        _stageSelector.SetEnabled(multiStage);
+        if (multiStage)
+            _inspector.Add(_stageSelector);
 
         var stage = slot.Timeline.Stages[_lab.StageIndex];
         var moveGroup = new Foldout { text = $"Move · {slot.Name}", value = true };
@@ -1560,15 +1576,19 @@ public sealed class AbilityLabWindow : EditorWindow
     private void CommitHitbox(Func<HitboxSource, HitboxSource> edit)
     {
         if (_updatingControls || _lab == null || _selectedOperation?.Source is not SpawnHitboxOperationSource original) return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
         _updatingControls = true;
+        bool accepted;
         try
         {
-            _workspace.ReplaceHitbox(_lab.SelectedSlotId, stageIndex: _selectedOperation.SourceStageIndex,
-                operationIndex: _selectedOperation.SourceOperationIndex, hitbox: edit(original.Hitbox));
+            accepted = _workspace.ReplaceHitbox(_lab.SelectedSlotId, stageIndex, operationIndex, edit(original.Hitbox));
         }
         finally { _updatingControls = false; }
-        _selectedOperation = null;
+        if (!accepted) return;
         UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
         RefreshInspector();
         SceneView.RepaintAll();
     }

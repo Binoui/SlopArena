@@ -18,6 +18,7 @@ internal static class CharacterAnimationCatalogGenerator
             throw new InvalidOperationException($"Invalid rig global object ID: {rigObjectIdText}");
         var rig = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(rigObjectId) as GameObject;
         if (rig == null) throw new InvalidOperationException($"Could not resolve rig global object ID: {rigObjectIdText}");
+        var weaponConfig = ResolveWeaponConfig(root);
         var entries = new List<CharacterAnimationCatalog.AnimationEntry>();
         foreach (JsonElement element in root.GetProperty("animations").EnumerateArray())
         {
@@ -43,8 +44,21 @@ internal static class CharacterAnimationCatalogGenerator
         catalog.SampleRate = root.GetProperty("sampleRate").GetInt32();
         catalog.SourceHash = root.GetProperty("sourceHash").GetString() ?? "";
         catalog.Rig = rig;
+        catalog.WeaponConfig = weaponConfig;
         catalog.Animations = entries.ToArray();
         return catalog;
+    }
+    private static SlopArena.Client.Entities.WeaponAttachConfig ResolveWeaponConfig(JsonElement root)
+    {
+        if (!root.TryGetProperty("weaponConfigGlobalObjectId", out var property) ||
+            string.IsNullOrEmpty(property.GetString()))
+            return null;
+        string text = property.GetString() ?? "";
+        if (!GlobalObjectId.TryParse(text, out GlobalObjectId objectId))
+            throw new InvalidOperationException($"Invalid weapon config global object ID: {text}");
+        var config = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(objectId) as SlopArena.Client.Entities.WeaponAttachConfig;
+        if (config == null) throw new InvalidOperationException($"Could not resolve weapon config global object ID: {text}");
+        return config;
     }
 
     internal static string Generate(byte[] bindingBytes, string outputAssetPath)

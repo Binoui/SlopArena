@@ -26,11 +26,13 @@ public sealed class MatchContentCatalogProvider
         catalog = null; handleMap = null; error = null;
         try
         {
-            var fightGuy = _manifest.Resolve(CharacterClass.FightGuy);
-            if (fightGuy == null) { error = "Built-in roster has no FightGuy entry."; return false; }
-            string directory = Path.Combine(_cookedRoot, fightGuy.PackageId);
-            var loaded = CookedCharacterPackageLoader.LoadDirectory(directory, fightGuy.Requirement);
-            var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal) { [fightGuy.PackageId] = loaded };
+            var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal);
+            foreach (var rosterEntry in _manifest.Entries)
+            {
+                if (rosterEntry.Requirement.Version == "legacy-1") continue;
+                string directory = Path.Combine(_cookedRoot, rosterEntry.PackageId);
+                packages[rosterEntry.PackageId] = CookedCharacterPackageLoader.LoadDirectory(directory, rosterEntry.Requirement);
+            }
             var result = new MatchContentCatalogBuilder().Build(_manifest, packages, new LegacyCharacterCatalogAdapter());
             if (!result.IsValid || result.Catalog == null)
             {

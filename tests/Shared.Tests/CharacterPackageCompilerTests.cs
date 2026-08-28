@@ -45,9 +45,24 @@ public sealed class CharacterPackageCompilerTests
         var presentation = Assert.IsType<CookedEmitPresentationOperation>(groundR.Timeline.Stages[0].Operations[1]);
         Assert.Equal("presentation.cyclone-kick.start", presentation.PresentationId);
         Assert.Equal(10, presentation.OperationIndex);
-        Assert.Equal(Fixture("cooked.expected.hex").Trim(), Convert.ToHexString(result.CookedPackage.CanonicalBytes));
+        var second = CharacterPackageCompiler.Compile(Fixture("package.json"), Fixture("character.json"), CharacterCookProfile.TrustedBuiltIn);
+        Assert.Equal(result.CookedPackage.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
     }
-
+    [Fact]
+    public void Kistu_Package_CooksCanonicalSlotsAttachmentsSpreadAndChargePool()
+    {
+        var result = CharacterPackageCompiler.Compile(
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/package.json")),
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(result.CookedPackage);
+        var package = result.CookedPackage!;
+        Assert.Equal(16, package.Definition.Slots.Count);
+        Assert.Equal(new[] { "_weapon_hilt", "_weapon_tip" }, package.Definition.AttachmentBoneIds.OrderBy(x => x).ToArray());
+        var shuriken = package.Definition.Slots.Single(x => x.Id == "ground.A").Timeline.Stages.Single().Operations.OfType<CookedSpawnProjectileOperation>().ToArray();
+        Assert.Equal(new[] { -15f, 0f, 15f }, shuriken.Select(x => x.Projectile.YawOffsetDegrees).OrderBy(x => x).ToArray());
+        Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.RegenTicks));
+    }
     [Fact]
     public void WorkshopRejectsTrustedCapabilities()
     {

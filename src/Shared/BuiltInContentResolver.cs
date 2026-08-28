@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace SlopArena.Shared;
 
@@ -13,10 +14,15 @@ public static class BuiltInContentResolver
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(cookedRoot, "roster", "manifest.json"));
         var roster = manifest.Resolve(selector) ?? throw new InvalidDataException($"Roster selector '{selector}' is not available.");
         var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal);
-        var fightGuy = manifest.Resolve(CharacterClass.FightGuy) ?? throw new InvalidDataException("Roster has no FightGuy package.");
-        var loaded = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(cookedRoot, fightGuy.PackageId), fightGuy.Requirement);
-        if (!loaded.IsValid) throw new InvalidDataException(string.Join("; ", loaded.Diagnostics.Select(x => $"{x.Code}:{x.Message}")));
-        packages[fightGuy.PackageId] = loaded;
+        foreach (var rosterEntry in manifest.Entries)
+        {
+            if (rosterEntry.Requirement.Version == "legacy-1") continue;
+            var loaded = CookedCharacterPackageLoader.LoadDirectory(
+                Path.Combine(cookedRoot, rosterEntry.PackageId), rosterEntry.Requirement);
+            if (!loaded.IsValid)
+                throw new InvalidDataException(string.Join("; ", loaded.Diagnostics.Select(x => $"{x.Code}:{x.Message}")));
+            packages[rosterEntry.PackageId] = loaded;
+        }
         var result = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
         if (!result.IsValid || result.Catalog == null) throw new InvalidDataException(string.Join("; ", result.Diagnostics.Select(x => $"{x.Code}:{x.Message}")));
         return result.Catalog.Resolve(selector) ?? throw new InvalidDataException($"Catalog selector '{selector}' is unavailable.");
@@ -24,16 +30,30 @@ public static class BuiltInContentResolver
 
     private static string ResolveRoot(string root)
     {
-        string RelativeManifest(string basePath) => Path.Combine(basePath, root, "roster", "manifest.json");
-        string RelativePackage(string basePath) => Path.Combine(basePath, root, "fightguy", "manifest.json");
-        if (Path.IsPathRooted(root) && File.Exists(Path.Combine(root, "roster", "manifest.json"))) return root;
+        bool Ready(string basePath)
+        {
+            string manifestPath = Path.Combine(basePath, root, "roster", "manifest.json");
+            if (!File.Exists(manifestPath)) return false;
+            try
+            {
+                var manifest = BuiltInRosterManifestCodec.Load(manifestPath);
+                foreach (var entry in manifest.Entries)
+                    if (entry.Requirement.Version != "legacy-1" &&
+                        !File.Exists(Path.Combine(basePath, root, entry.PackageId, "manifest.json")))
+                        return false;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        if (Path.IsPathRooted(root) && Ready("")) return root;
         var current = new DirectoryInfo(Directory.GetCurrentDirectory());
         for (int i = 0; i < 10 && current != null; i++, current = current.Parent)
-            if (File.Exists(RelativeManifest(current.FullName)) && File.Exists(RelativePackage(current.FullName)))
+            if (Ready(current.FullName))
                 return Path.Combine(current.FullName, root);
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         for (int i = 0; i < 10 && directory != null; i++, directory = directory.Parent)
-            if (File.Exists(RelativeManifest(directory.FullName)) && File.Exists(RelativePackage(directory.FullName)))
+            if (Ready(directory.FullName))
                 return Path.Combine(directory.FullName, root);
         return root;
     }

@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e24271275a4fc0af82df0240843b6bf, type: 3}
+  m_Name: CharacterAssetCatalog
+  m_EditorClassIdentifier: 
+  _packageId: kistu
+  _catalogSchemaVersion: 1
+  _rig: {fileID: 6878323076211461345, guid: 22ec19e8e18d8d821a51fb314824606b, type: 3}
+  _weaponConfig: {fileID: 11400000, guid: 4e8a42d1f2c34b8aa3d1f9d4be57c610, type: 2}
+  _sampleRate: 60
+  _bindings:
+  - _semanticId: anim.kistu.idle
+    _clip: {fileID: 7400000, guid: 8ccf52ec0972f0f8f8bacdcbea538cbf, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.idle
+  - _semanticId: anim.kistu.run
+    _clip: {fileID: 7400000, guid: f460b4e334f59bc9ab8b8bcc12743b75, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.run
+  - _semanticId: anim.kistu.dash
+    _clip: {fileID: 7400000, guid: bb89e4b61e13e48ac944e8e29df27fa1, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.dash
+  - _semanticId: anim.kistu.jump
+    _clip: {fileID: 1827226128182048838, guid: 5cfebe60ac2cf1354b9275f716e2ac9c, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.jump
+  - _semanticId: anim.kistu.fall
+    _clip: {fileID: 1827226128182048838, guid: 3fd85fce516651489a02bfbb8456ffdf, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.fall
+  - _semanticId: anim.kistu.hit-small
+    _clip: {fileID: 7400000, guid: 2c20e3646ca4bc0e1a62bc32373e9000, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.hit-small
+  - _semanticId: anim.kistu.hit-medium
+    _clip: {fileID: 7400000, guid: 44833e4cdd42997d2bce91c985a58a6a, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.hit-medium
+  - _semanticId: anim.kistu.hit-hard
+    _clip: {fileID: 7400000, guid: 3f3fbde2c4e4181669da0484ea7f2a8f, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.hit-hard
+  - _semanticId: anim.kistu.g1
+    _clip: {fileID: 7400000, guid: 4e19647e0b6f4a95a9c095972e17037c, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.g1
+  - _semanticId: anim.kistu.g2
+    _clip: {fileID: 7400000, guid: c373f78fb169761e88123a7e4bb79e87, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.g2
+  - _semanticId: anim.kistu.g3
+    _clip: {fileID: 7400000, guid: 4cca1ea500278a6ebafdc0912dbef47b, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.g3
+  - _semanticId: anim.kistu.g4
+    _clip: {fileID: 7400000, guid: 3244bf07d135262598e18cb08d499786, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.g4
+  - _semanticId: anim.kistu.a1
+    _clip: {fileID: 7400000, guid: 43a6eb59e651238c19b81cd42115426f, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.a1
+  - _semanticId: anim.kistu.a2
+    _clip: {fileID: 1827226128182048838, guid: 51d235237d7dfe04183d966dd22e2418, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.a2
+  - _semanticId: anim.kistu.a3
+    _clip: {fileID: 7400000, guid: 7dfa09206a30e2456a951e8afa182157, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.a3
+  - _semanticId: anim.kistu.a4
+    _clip: {fileID: 7400000, guid: cec8fbbf21b5d59e18bea1b429dbade5, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.a4
+  - _semanticId: anim.kistu.shuriken
+    _clip: {fileID: 7400000, guid: 1966962176211a095b15f2e46f03eb5d, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.shuriken
+  - _semanticId: anim.kistu.e
+    _clip: {fileID: 7400000, guid: 595b2d297475f037ba0165501ac600d3, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.e
+  - _semanticId: anim.kistu.r
+    _clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.r
+  - _semanticId: anim.kistu.f
+    _clip: {fileID: 7400000, guid: bdb392334e0abf1fe8f9c4027f78265e, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.kistu.f

@@ -189,7 +189,7 @@ namespace SlopArena.Client.Entities
             if (_animancer == null)
                 _animancer = instance.AddComponent<AnimancerComponent>();
 
-            if (def.Class == CharacterClass.FightGuy)
+            if (def.Class == CharacterClass.FightGuy && _animationCatalog == null)
             {
                 Debug.LogError("[PlayerRenderer] FightGuy requires generated cooked animation assets.");
                 return;

@@ -346,7 +346,7 @@ namespace SlopArena.Shared
                 return false;
 
             // Resolve animation name based on current state
-            if (state.State == ActionState.Dashing) targetAnim = "dash";
+            if (state.State == ActionState.Dashing) targetAnim = def.DashAnim;
             else if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
             {
                 bool airborne = !state.IsGrounded;
@@ -360,9 +360,9 @@ namespace SlopArena.Shared
                 2 => def.HitHardAnim,
                 _ => def.HitSmallAnim,
             };
-            else if (!state.IsGrounded) targetAnim = state.VY > 0 ? "jump" : "fall";
-            else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = "run";
-            else targetAnim = "idle";
+            else if (!state.IsGrounded) targetAnim = state.VY > 0 ? def.JumpAnim : def.FallAnim;
+            else if ((state.VX * state.VX) + (state.VZ * state.VZ) > 1f) targetAnim = def.RunAnim;
+            else targetAnim = def.IdleAnim;
 
             int animIdx = baked.FindAnimIndex(targetAnim);
             if (animIdx < 0) { targetAnim = "idle"; animIdx = baked.FindAnimIndex(targetAnim); }
@@ -618,10 +618,9 @@ namespace SlopArena.Shared
                 if (input.ActiveSlot == AbilitySlots.F && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
                     continue;
 
-				// ── Charge-stock gate: abilities that declare a "max_charges" param are
-				// limited by a refundable charge pool (Kistu Rising Slash) rather than a flat
-				// cooldown. Blocked when the pool is exhausted. ──
-				int maxCharges = cookedSlot == null && spec!.Params != null && spec.Params.TryGetValue("max_charges", out var mc) ? (int)mc : 0;
+                // Cooked slots use their typed charge pool; legacy slots retain their parameter compatibility.
+                int maxCharges = cookedSlot?.ChargePool?.MaxCharges
+                    ?? (spec?.Params != null && spec.Params.TryGetValue("max_charges", out var mc) ? (int)mc : 0);
 				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
 				{
 					// Consume the input so SimulateTick doesn't start a data-driven attack.
@@ -672,16 +671,17 @@ namespace SlopArena.Shared
 				}
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
 
-				// Spend a charge from the pool (refunded on hit by the ability's OnHitEntity).
-				if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))
-				{
-					afterState.ChargeStockSpent++;
-					ushort regenPeriod = (ushort)(spec.Params.TryGetValue("charge_regen_ticks", out var rg) ? rg : 180f);
-					afterState.ChargeStockRegenPeriod = regenPeriod;
-					if (afterState.ChargeStockRegenTicks == 0)
-						afterState.ChargeStockRegenTicks = regenPeriod;
-					_states[id] = afterState;
-				}
+                // Spend a charge from the cooked or legacy pool; capabilities refund valid hits.
+                if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))
+                {
+                    afterState.ChargeStockSpent++;
+                    ushort regenPeriod = cookedSlot?.ChargePool?.RegenTicks
+                        ?? (ushort)(spec?.Params != null && spec.Params.TryGetValue("charge_regen_ticks", out var rg) ? rg : 180f);
+                    afterState.ChargeStockRegenPeriod = regenPeriod;
+                    if (afterState.ChargeStockRegenTicks == 0)
+                        afterState.ChargeStockRegenTicks = regenPeriod;
+                    _states[id] = afterState;
+                }
 
 				// Consume input so SimulateTick doesn't also try to start an attack
 				var consumedInput = input;

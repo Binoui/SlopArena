@@ -28,6 +28,15 @@ public static class InternalCapabilityRegistry
             case "slop.internal.fightguy.dragon-beam.v1" when parameters is CookedDragonBeamCapabilityParameters beam:
                 capability = new FightGuyDragonBeam(beam);
                 return true;
+            case "slop.internal.kistu.dash-slash.v1" when parameters is CookedKistuDashSlashCapabilityParameters dash:
+                capability = new KistuDashSlash(dash);
+                return true;
+            case "slop.internal.kistu.rising-slash.v1" when parameters is CookedKistuRisingSlashCapabilityParameters rising:
+                capability = new KistuRisingSlash(rising);
+                return true;
+            case "slop.internal.kistu.blade-flurry.v1" when parameters is CookedKistuBladeFlurryCapabilityParameters flurry:
+                capability = new KistuUltFlurry(flurry);
+                return true;
             default:
                 return false;
         }

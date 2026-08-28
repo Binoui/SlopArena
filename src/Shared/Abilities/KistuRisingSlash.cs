@@ -18,8 +18,16 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuRisingSlash : ServerAbility
 {
+    private readonly KistuRisingSlashCapabilityParameters _parameters;
     private ushort _ticks;
     private ushort _duration;
+
+    public KistuRisingSlash(KistuRisingSlashCapabilityParameters parameters)
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+    public KistuRisingSlash(CookedKistuRisingSlashCapabilityParameters parameters)
+        : this(new KistuRisingSlashCapabilityParameters(parameters.RiseSpeed, parameters.RiseTicks, parameters.HomingRange, parameters.HomingSpeed))
+    {
+    }
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
@@ -31,8 +39,7 @@ public sealed class KistuRisingSlash : ServerAbility
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
 
-        float riseSpeed = GetParam(def, "rise_speed", 16f);
-        SetVelocity(ref s, 0f, riseSpeed, 0f);
+        SetVelocity(ref s, 0f, _parameters.RiseSpeed, 0f);
         s.IsGrounded = false; // launch off the ground so the rise isn't clamped
 
         var spec = def.GetSlotAbility(Slot, airborne: false);
@@ -44,15 +51,15 @@ public sealed class KistuRisingSlash : ServerAbility
     {
         _ticks++;
 
-        float riseSpeed = GetParam(def, "rise_speed", 16f);
-        ushort riseTicks = (ushort)GetParam(def, "rise_ticks", 18f);
+        float riseSpeed = _parameters.RiseSpeed;
+        ushort riseTicks = _parameters.RiseTicks;
 
         // Vertical rise for the rise window, then hold (gravity resumes when the ability ends).
         s.VY = _ticks <= riseTicks ? riseSpeed : 0f;
 
         // Horizontal homing toward the nearest enemy in range.
-        float homingRange = GetParam(def, "homing_range", 7f);
-        float homingSpeed = GetParam(def, "homing_speed", 10f);
+        float homingRange = _parameters.HomingRange;
+        float homingSpeed = _parameters.HomingSpeed;
         ulong closest = FindClosestEnemy(ref s, homingRange, out float cdx, out float cdz, out float cdist);
         if (closest != 0 && cdist > 0.1f)
         {
@@ -65,16 +72,21 @@ public sealed class KistuRisingSlash : ServerAbility
             s.VZ = 0f;
         }
 
-        // Spawn the launcher hitbox from the spec (authored in KistuData).
         var spec = def.GetSlotAbility(Slot, airborne: false);
-        if (spec?.Stages is { Length: > 0 })
-        {
-            foreach (var evt in spec.Stages[0].HitboxEvents)
+        var events = spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
+            ? spec.Stages[0].HitboxEvents
+            : new[]
             {
-                if (evt.TriggerTick == _ticks)
-                    SpawnHitbox(ref s, evt);
-            }
-        }
+                new HitboxEvent
+                {
+                    TriggerTick = 5, DurationTicks = 8, Shape = HitboxShape.Sphere, Radius = 0.9f, OffY = 1f, OffZ = 0.6f,
+                    Damage = 7f, Knockback = new KnockbackData { Profile = KnockbackProfile.Custom, Angle = 30, BaseKnockback = 7f, KnockbackGrowth = 5f },
+                    StunTicks = 22, Interruptible = true
+                }
+            };
+        foreach (var evt in events)
+            if (evt.TriggerTick == _ticks)
+                SpawnHitbox(ref s, evt);
 
         if (_ticks >= _duration)
             EndAbility(ref s);
@@ -93,6 +105,12 @@ public sealed class KistuRisingSlash : ServerAbility
             if (attacker.ChargeStockSpent == 0)
                 attacker.ChargeStockRegenTicks = 0;
         }
+    }
+    public override void OnCancel(ref CharacterState s)
+    {
+        s.VX = 0f;
+        s.VY = 0f;
+        s.VZ = 0f;
     }
 
     private ulong FindClosestEnemy(ref CharacterState s, float range, out float dx, out float dz, out float dist)

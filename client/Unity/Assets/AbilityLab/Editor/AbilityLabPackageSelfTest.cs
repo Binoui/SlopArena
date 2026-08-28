@@ -28,7 +28,9 @@ public static class AbilityLabPackageSelfTest
             if (!workspace.ReloadPackage()) throw new InvalidOperationException("Package reload failed.");
 
             var resolver = LocalContentResolver.CreateDefault();
-            string repositoryCookedRoot = resolver.ContentRoots.Last();
+            if (resolver.ContentRoots.Count < 1 || !resolver.ContentRoots[0].EndsWith("content-cooked", StringComparison.Ordinal))
+                throw new InvalidOperationException("Development resolver did not expose a rooted cooked content directory first.");
+            string repositoryCookedRoot = resolver.ContentRoots[0];
             string cookedRoot = Path.Combine(repositoryCookedRoot, "fightguy");
             string[] cookedFiles =
             {

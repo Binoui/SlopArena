@@ -252,27 +252,21 @@ namespace SlopArena.Client
                     return false;
                 }
 
-                var fightGuy = rosterResolution.Roster.Resolve(Shared.CharacterClass.FightGuy);
-                if (fightGuy == null)
+                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult>();
+                foreach (var rosterEntry in rosterResolution.Roster.Entries)
                 {
-                    failure = "Local cooked roster has no FightGuy package.";
-                    return false;
-                }
+                    if (rosterEntry.Requirement.Version == "legacy-1") continue;
+                    var packageResolution = resolver.ResolveCookedPackage(rosterEntry.PackageId);
+                    if (!packageResolution.Success || packageResolution.Requirement == null)
+                    {
+                        failure = FormatDiagnostics(packageResolution.Diagnostics);
+                        return false;
+                    }
 
-                var packageResolution = resolver.ResolveCookedPackage(fightGuy.PackageId);
-                if (!packageResolution.Success || packageResolution.Requirement == null)
-                {
-                    failure = FormatDiagnostics(packageResolution.Diagnostics);
-                    return false;
+                    packages[rosterEntry.PackageId] = Shared.CookedCharacterPackageLoader.LoadDirectory(
+                        System.IO.Path.Combine(packageResolution.RootPath, rosterEntry.PackageId),
+                        rosterEntry.Requirement);
                 }
-
-                var loaded = Shared.CookedCharacterPackageLoader.LoadDirectory(
-                    System.IO.Path.Combine(packageResolution.RootPath, fightGuy.PackageId),
-                    packageResolution.Requirement);
-                var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult>
-                {
-                    [fightGuy.PackageId] = loaded
-                };
                 var built = new Shared.MatchContentCatalogBuilder().Build(
                     rosterResolution.Roster,
                     packages,

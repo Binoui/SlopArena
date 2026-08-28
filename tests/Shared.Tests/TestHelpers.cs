@@ -383,6 +383,7 @@ public static class TestHelpers
             ModelResourcePath = src.ModelResourcePath,
             LandStartOffset = src.LandStartOffset,
             HurtboxBoneScale = src.HurtboxBoneScale,
+            CookedSlots = null,
         };
     }
 
@@ -393,8 +394,8 @@ public static class TestHelpers
     /// </summary>
     public static BakedAnimationData? LoadBakedData(CharacterDefinition def)
     {
-        if (def.Class == CharacterClass.FightGuy)
-            return BuiltInContentResolver.Resolve(CharacterClass.FightGuy).BakedAnimation;
+        if (def.CookedSlots != null)
+            return BuiltInContentResolver.Resolve(def.Class).BakedAnimation;
         if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
         string relative = def.BakedDataPath.Replace("res://", "");
         // Test runs from tests/Shared.Tests/bin/Debug/net8.0/

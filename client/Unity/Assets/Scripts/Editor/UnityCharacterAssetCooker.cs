@@ -161,13 +161,26 @@ public static class UnityCharacterAssetCooker
                     PoseTrackId = x.PoseTrackId,
                     Clip = x.Clip,
                     FrameCount = x.FrameCount,
-                }).ToArray(), SampleRate);
+                }).ToArray(), SampleRate, catalog.WeaponConfig);
         }
         catch (Exception ex)
         {
             diagnostics.Add(Error("asset-catalog.rig.incompatible", "catalog.rig", ex.Message));
             return Failure(diagnostics, compiled.CookedPackage, dependencies, sourceHash);
         }
+        try
+        {
+            var baked = BakedAnimationData.LoadFromBin(poseBytes);
+            foreach (string attachmentId in compiled.CookedPackage.Definition.AttachmentBoneIds)
+                if (Array.IndexOf(baked.BoneNames, attachmentId) < 0)
+                    diagnostics.Add(Error("asset-catalog.attachment.missing", "character.attachmentBoneIds", $"Attachment '{attachmentId}' is missing from the baked pose payload."));
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("asset-catalog.pose.invalid", "poses.bin", ex.Message));
+        }
+        if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
+            return Failure(diagnostics, compiled.CookedPackage, dependencies, sourceHash);
 
         byte[] bindings = CharacterBindingWriter.Write(catalog, definitions, sourceHash);
         return new CharacterAssetCookResult
@@ -366,6 +379,8 @@ public static class UnityCharacterAssetCooker
                     if (animator.GetBoneTransform(bone) == null)
                         diagnostics.Add(Error("asset-catalog.bone.missing", $"catalog.rig.{bone}", $"Required humanoid bone is missing: {bone}."));
         }
+        if (packageId == "kistu")
+            ValidateWeaponConfig(catalog, diagnostics);
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var seenTracks = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
@@ -407,6 +422,23 @@ public static class UnityCharacterAssetCooker
         foreach (var required in requiredIds)
             if (!seenIds.Contains(required.Id))
                 diagnostics.Add(Error("reference.animation.unresolved", required.Path, $"Animation ID '{required.Id}' is not bound by the catalog."));
+    }
+
+    private static void ValidateWeaponConfig(CharacterAssetCatalog catalog, List<CharacterDiagnostic> diagnostics)
+    {
+        if (catalog.WeaponConfig == null)
+        {
+            diagnostics.Add(Error("asset-catalog.weapon.missing", "catalog.weaponConfig", "Kistu requires a package-owned weapon config."));
+            return;
+        }
+        var entry = Array.Find(catalog.WeaponConfig.Entries ?? Array.Empty<SlopArena.Client.Entities.WeaponEntry>(),
+            x => x != null && x.BoneName == "mixamorig:RightHand");
+        if (entry == null)
+            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig", "Kistu weapon config requires a mixamorig:RightHand entry."));
+        else if (entry.Prefab == null)
+            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig.entries", "Kistu weapon entry prefab is missing."));
+        else if (GlobalObjectId.GetGlobalObjectIdSlow(catalog.WeaponConfig).ToString().Length == 0)
+            diagnostics.Add(Error("asset-catalog.weapon.unresolved", "catalog.weaponConfig", "Kistu weapon config has no stable Unity global object ID."));
     }
 
     private static List<(string Id, string Path)> RequiredIds(CookedCharacterPackage package)

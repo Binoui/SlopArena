@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 using SlopArena.Shared;
-
+using SlopArena.Client.Entities;
 namespace SlopArena.Client.Animation
 {
     [CreateAssetMenu(fileName = "CharacterAssetCatalog", menuName = "SlopArena/Character Asset Catalog")]
@@ -12,12 +12,14 @@ namespace SlopArena.Client.Animation
         [SerializeField] private string _packageId = "";
         [SerializeField] private ushort _catalogSchemaVersion = SchemaVersion;
         [SerializeField] private GameObject _rig;
+        [SerializeField] private WeaponAttachConfig _weaponConfig;
         [SerializeField] private int _sampleRate = 60;
         [SerializeField] private AnimationBinding[] _bindings = Array.Empty<AnimationBinding>();
 
         public string PackageId { get => _packageId; set => _packageId = value; }
         public ushort CatalogSchemaVersion { get => _catalogSchemaVersion; set => _catalogSchemaVersion = value; }
         public GameObject Rig { get => _rig; set => _rig = value; }
+        public WeaponAttachConfig WeaponConfig { get => _weaponConfig; set => _weaponConfig = value; }
         public int SampleRate { get => _sampleRate; set => _sampleRate = value; }
         public AnimationBinding[] Bindings { get => _bindings ?? Array.Empty<AnimationBinding>(); set => _bindings = value ?? Array.Empty<AnimationBinding>(); }
 

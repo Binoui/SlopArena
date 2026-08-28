@@ -23,6 +23,7 @@ internal static class CharacterBindingWriter
         Property(json, "sampleRate", UnityCharacterAssetCooker.SampleRate);
         Property(json, "sourceHash", sourceHash);
         Property(json, "rigGlobalObjectId", UnityEditor.GlobalObjectId.GetGlobalObjectIdSlow(catalog.Rig).ToString());
+        Property(json, "weaponConfigGlobalObjectId", catalog.WeaponConfig == null ? "" : UnityEditor.GlobalObjectId.GetGlobalObjectIdSlow(catalog.WeaponConfig).ToString());
         json.Append("\"animations\":[");
         bool first = true;
         foreach (var animation in animations.OrderBy(x => x.SemanticId, StringComparer.Ordinal))

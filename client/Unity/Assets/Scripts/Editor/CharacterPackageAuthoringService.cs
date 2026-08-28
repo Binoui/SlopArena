@@ -394,15 +394,18 @@ public sealed class CharacterPackageAuthoringService
         FileSnapshot previousGenerated = SnapshotFile(generatedAssetPath, projectRoot);
         bool hadCanonical = Directory.Exists(canonicalDirectory);
         bool canonicalInstalled = false;
+        bool rosterUpdated = false;
 
         try
         {
             Directory.CreateDirectory(packageParent);
             if (Directory.Exists(temporaryDirectory)) Directory.Delete(temporaryDirectory, true);
-            if (package.PackageId == "fightguy")
+            if (previousRoster != null)
             {
-                if (previousRoster == null) throw new InvalidDataException("Cooked roster manifest is missing.");
-                WriteDurably(rosterTemporary, UpdateFightGuyRoster(previousRoster, assembled));
+                var priorManifest = BuiltInRosterManifestCodec.ParseCooked(Encoding.UTF8.GetString(previousRoster));
+                rosterUpdated = priorManifest.TryGetByPackageId(package.PackageId, out _);
+                if (rosterUpdated)
+                    WriteDurably(rosterTemporary, UpdateRoster(previousRoster, assembled, package.PackageId));
             }
             Directory.CreateDirectory(temporaryDirectory);
             WriteDurably(Path.Combine(temporaryDirectory, CharacterPackageAssembler.ManifestPath), assembled.ManifestBytes);
@@ -421,7 +424,7 @@ public sealed class CharacterPackageAuthoringService
             WriteDurably(finalBinding, assembled.BindingBytes);
             string generatedTemp = CharacterAnimationCatalogGenerator.Generate(assembled.BindingBytes, generatedAssetPath);
             CharacterAnimationCatalogGenerator.ReplaceTemporary(generatedTemp, generatedAssetPath);
-            if (package.PackageId == "fightguy")
+            if (rosterUpdated)
             {
                 if (File.Exists(rosterPath)) File.Replace(rosterTemporary, rosterPath, rosterBackup, true);
                 else File.Move(rosterTemporary, rosterPath);
@@ -445,7 +448,7 @@ public sealed class CharacterPackageAuthoringService
                 RestoreFile(finalBinding, previousBinding);
                 RestoreGeneratedAsset(generatedAssetPath, previousGenerated, projectRoot);
                 RestoreFile(statusPath, previousStatus);
-                if (package.PackageId == "fightguy")
+                if (rosterUpdated)
                 {
                     RestoreFile(rosterPath, previousRoster);
                     if (File.Exists(rosterTemporary)) File.Delete(rosterTemporary);
@@ -601,7 +604,7 @@ public sealed class CharacterPackageAuthoringService
 
 
     private CharacterCookProfile ProfileFor(string packageId)
-        => packageId == "fightguy" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+        => packageId == "fightguy" || packageId == "kistu" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
 
     private string CharacterPackagesFullRoot() => Path.Combine(_projectRoot, CharacterPackagesRoot.Replace('/', Path.DirectorySeparatorChar));
     private string PackageRootFor(string packageId) => CharacterPackagesRoot + "/" + packageId;
@@ -651,15 +654,15 @@ public sealed class CharacterPackageAuthoringService
         File.WriteAllText(path, JsonUtility.ToJson(status, true));
     }
 
-    private static byte[] UpdateFightGuyRoster(byte[] priorBytes, CharacterPackageAssemblyResult assembled)
+    private static byte[] UpdateRoster(byte[] priorBytes, CharacterPackageAssemblyResult assembled, string packageId)
     {
         var manifest = BuiltInRosterManifestCodec.ParseCooked(Encoding.UTF8.GetString(priorBytes));
         using var document = JsonDocument.Parse(assembled.ManifestBytes);
         string version = document.RootElement.GetProperty("version").GetString() ?? "";
-        var entries = manifest.Entries.Select(x => x.Selector == CharacterClass.FightGuy
+        var entries = manifest.Entries.Select(x => x.PackageId == packageId
             ? new BuiltInRosterEntry(x.Selector, x.PackageId, new MatchContentPackageRequirement(x.PackageId, version, assembled.CookedContentHash, assembled.PackageHash))
             : x).ToArray();
-        if (!entries.Any(x => x.Selector == CharacterClass.FightGuy)) throw new InvalidDataException("FightGuy roster requirement is missing.");
+        if (!entries.Any(x => x.PackageId == packageId)) throw new InvalidDataException($"Roster package requirement for '{packageId}' is missing.");
         return Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(new BuiltInRosterManifest(manifest.SchemaVersion, entries)));
     }
 

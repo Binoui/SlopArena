@@ -17,7 +17,7 @@ public sealed class MatchContentCatalogTests
         var result = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), roster.Requirement);
         Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         Assert.Equal("fightguy", result.Identity.PackageId);
-        Assert.Equal("d0fe631f57433ad4faef6e0e368f4c6faafea6b83f41f18118e5910a97300f7e", result.Identity.CookedContentHash);
+        Assert.Equal("08dd4df2185af704b3d563656fb930c2d2d18e8fe394b5ff520df1d926592ef4", result.Identity.CookedContentHash);
         Assert.Equal(16, result.Package!.Definition.Slots.Count);
         Assert.NotNull(result.BakedAnimation);
     }
@@ -40,12 +40,24 @@ public sealed class MatchContentCatalogTests
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
         var fightGuy = manifest.Resolve(CharacterClass.FightGuy)!;
         var loaded = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), fightGuy.Requirement);
-        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded }, new LegacyCharacterCatalogAdapter());
-        Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
+        var kistu = manifest.Resolve(CharacterClass.Kistu)!;
+        var loadedKistu = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/kistu"), kistu.Requirement);
+        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded, ["kistu"] = loadedKistu }, new LegacyCharacterCatalogAdapter());
         var catalog = result.Catalog!;
         Assert.NotNull(catalog);
         Assert.Equal(4, catalog.Entries.Count);
         Assert.Equal(1, catalog.ResolvePackage("fightguy")!.Handle.Value);
+    }
+
+    [Fact]
+    public void MissingCookedKistuPackage_FailsClosed()
+    {
+        var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
+        var fightGuy = manifest.Resolve(CharacterClass.FightGuy)!;
+        var loaded = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), fightGuy.Requirement);
+        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded }, new LegacyCharacterCatalogAdapter());
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Diagnostics, x => x.Code == "catalog.package.missing" && x.Path == "kistu");
     }
 
     [Fact]

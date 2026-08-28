@@ -19,11 +19,11 @@ public sealed class KistuServerPoseRecordingTests
         var spec = def.Slot2!;
         var stage = Assert.Single(spec.Stages);
         var evt = stage.HitboxEvents[0];
-        int frameCount = baked!.FrameCountFor("kistu_g_2");
+        int frameCount = baked!.FrameCountFor("anim.kistu.g2");
         Assert.Equal(72, frameCount);
 
         var output = new StringBuilder();
-        output.AppendLine("move=g2 hit=1 source=kistu_g_2 durationTicks=34 bakeFps=60");
+        output.AppendLine("move=g2 hit=1 source=anim.kistu.g2 durationTicks=34 bakeFps=60");
         output.AppendLine("tick,bakedFrame,hiltX,hiltY,hiltZ,tipX,tipY,tipZ,bladeY");
 
         float triggerBladeY = 0f;

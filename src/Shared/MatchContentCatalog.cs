@@ -130,17 +130,8 @@ public sealed class MatchContentCatalogBuilder
                 if (byPackage.ContainsKey(roster.PackageId)) diagnostics.Add(Error("catalog.package.duplicate", roster.PackageId, "Duplicate package ID."));
                 continue;
             }
-            if (roster.Selector == CharacterClass.FightGuy)
-            {
-                if (cookedPackages == null || !cookedPackages.TryGetValue(roster.PackageId, out var loaded) || loaded == null || !loaded.IsValid || loaded.Package == null)
-                {
-                    diagnostics.Add(Error("catalog.package.missing", roster.PackageId, "Cooked package is missing or invalid."));
-                    continue;
-                }
-                if (!IdentityMatches(roster.Requirement, loaded.Identity, roster.PackageId, diagnostics)) continue;
-                byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), roster.Selector, loaded.Identity, loaded.Package.Definition.DisplayName, loaded.ToCharacterDefinition(roster.Selector), loaded.BakedAnimation, loaded.Package);
-            }
-            else
+            if (roster.Requirement == null) continue;
+            if (roster.Requirement.Version == "legacy-1")
             {
                 if (legacyAdapter == null) { diagnostics.Add(Error("catalog.legacy.adapter-missing", roster.PackageId, "Legacy adapter is required.")); continue; }
                 if (!legacyAdapter.TrySnapshot(roster.Selector, out var snapshot, out var snapshotDiagnostics))
@@ -150,6 +141,16 @@ public sealed class MatchContentCatalogBuilder
                 }
                 if (!IdentityMatches(roster.Requirement, snapshot.Identity, roster.PackageId, diagnostics)) continue;
                 byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), snapshot.LegacySelector, snapshot.Identity, snapshot.DisplayName, snapshot.Definition, snapshot.BakedAnimation);
+            }
+            else
+            {
+                if (cookedPackages == null || !cookedPackages.TryGetValue(roster.PackageId, out var loaded) || loaded == null || !loaded.IsValid || loaded.Package == null)
+                {
+                    diagnostics.Add(Error("catalog.package.missing", roster.PackageId, "Cooked package is missing or invalid."));
+                    continue;
+                }
+                if (!IdentityMatches(roster.Requirement, loaded.Identity, roster.PackageId, diagnostics)) continue;
+                byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), roster.Selector, loaded.Identity, loaded.Package.Definition.DisplayName, loaded.ToCharacterDefinition(roster.Selector), loaded.BakedAnimation, loaded.Package);
             }
         }
         if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error)) return new(null, diagnostics);

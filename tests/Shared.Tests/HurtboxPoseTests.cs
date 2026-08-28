@@ -102,6 +102,67 @@ public class HurtboxPoseTests
     }
 
     [Fact]
+    public void SimTick_UsesCookedPresentationIdsForLocomotionHurtboxes()
+    {
+        var def = new CharacterDefinition
+        {
+            Movement = new MovementStats
+            {
+                RunSpeed = 14f, RunAccelerationA = 20f, RunAccelerationB = 12f,
+                GroundFriction = 8f, AirFriction = 6f, Gravity = 36f,
+                MaxFallSpeed = 48f, MaxJumps = 2, JumpSquatTicks = 4,
+            },
+            CapsuleHeight = 1.5f,
+            HipHeight = 0.5f,
+            HurtboxBoneScale = 1.0f,
+            IdleAnim = "anim.idle",
+            RunAnim = "anim.run",
+            HurtboxCapsules = new[] { new HurtboxCapsule(0, 0, 0, 0, 0, 0, 0.9f) },
+            HurtboxBoneDefs = new[] { new HurtboxBoneDef("mixamorig:Hips", 0, 0, 0, 0.2f) },
+        };
+        var baked = new BakedAnimationData
+        {
+            BoneNames = new[] { "mixamorig:Hips" },
+            Animations = new[]
+            {
+                new BakedAnimationData.BakedAnim
+                {
+                    Name = "anim.idle",
+                    FrameCount = 1,
+                    Frames = new[] { new[] { 0f, 0f, 0f } },
+                },
+                new BakedAnimationData.BakedAnim
+                {
+                    Name = "anim.run",
+                    FrameCount = 1,
+                    Frames = new[] { new[] { 0.4f, 0f, 0f } },
+                },
+            },
+        };
+
+        var idleSim = TestHelpers.MakeSim();
+        idleSim.RegisterEntity(1, def, new CharacterState
+        {
+            PX = 0f, PY = 0.75f, PZ = 0f, IsGrounded = true,
+            JumpsLeft = def.Movement.MaxJumps,
+        }, baked);
+        TestHelpers.TickDefault(idleSim, 1);
+        Assert.Equal(0.2f, Assert.Single(idleSim.GetLastEntityData()).Radius, 5);
+
+        var runSim = TestHelpers.MakeSim();
+        runSim.RegisterEntity(1, def, new CharacterState
+        {
+            PX = 0f, PY = 0.75f, PZ = 0f, IsGrounded = true,
+            JumpsLeft = def.Movement.MaxJumps,
+        }, baked);
+        runSim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new InputState { MoveY = 1f },
+        });
+        Assert.Equal(0.2f, Assert.Single(runSim.GetLastEntityData()).Radius, 5);
+    }
+
+    [Fact]
     public void UnifiedPose_AppliesOffsetRotatedByFacing()
     {
         var def = new CharacterDefinition
