@@ -71,7 +71,7 @@ Immutable content-cooked package
 
 The server and client consume the same cooked deterministic representation. Runtime matches pin package IDs, versions, hashes, dependencies, and capability versions in an immutable Match Content Catalog. Raw authoring JSON is cook input, not a runtime contract.
 
-Explore the [interactive runtime architecture diagram](runtime-architecture.html) for component relationships, trust boundaries, and the primary runtime path.
+Explore the [interactive runtime architecture diagram](docs/generated/runtime-architecture.html) for component relationships, trust boundaries, and the primary runtime path.
 
 The longer-term direction is cautious Workshop/package support: creators compose approved deterministic primitives and package-owned assets; they do not ship arbitrary simulation code, native plugins, or direct Unity-path dependencies. See [ADR-0022](docs/adr/0022-workshop-first-content-architecture.md) through [ADR-0030](docs/adr/0030-ability-lab-canonical-slot-projection.md).
 
