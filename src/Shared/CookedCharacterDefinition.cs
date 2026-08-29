@@ -175,6 +175,7 @@ public sealed class CookedSlotDefinition
     public bool IsRecoveryMove { get; }
     public bool PreserveMomentumOnStart { get; }
     public CookedChargePool? ChargePool { get; }
+    public AuthoringAimMovementMode AimMovement { get; }
     public CookedTimeline Timeline { get; }
 
     public CookedSlotDefinition(
@@ -190,7 +191,8 @@ public sealed class CookedSlotDefinition
         bool isRecoveryMove,
         bool preserveMomentumOnStart,
         CookedTimeline timeline,
-        CookedChargePool? chargePool = null)
+        CookedChargePool? chargePool = null,
+        AuthoringAimMovementMode aimMovement = AuthoringAimMovementMode.Fixed)
     {
         Ordinal = ordinal;
         Id = id;
@@ -205,6 +207,7 @@ public sealed class CookedSlotDefinition
         PreserveMomentumOnStart = preserveMomentumOnStart;
         Timeline = timeline;
         ChargePool = chargePool;
+        AimMovement = aimMovement;
     }
 }
 
@@ -405,6 +408,19 @@ public sealed record CookedKistuRisingSlashCapabilityParameters(
 public sealed record CookedKistuBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : CookedCapabilityParameters;
+public sealed record CookedBonkTargetedJumpSlamCapabilityParameters(
+    ushort MaxAimTicks,
+    ushort MaxFlightTicks,
+    float MinRange,
+    float MaxRange,
+    float LaunchVerticalSpeed,
+    float SlamRadius,
+    float SlamDamage,
+    float SlamAngle,
+    float SlamBaseKnockback,
+    float SlamKnockbackGrowth,
+    ushort SlamStunTicks,
+    ushort SlamDurationTicks) : CookedCapabilityParameters;
 
 public sealed record CookedBudget(
     int SlotCount,

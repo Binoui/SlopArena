@@ -64,6 +64,25 @@ public sealed class CharacterPackageCompilerTests
         Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.RegenTicks));
     }
     [Fact]
+    public void BonkAndKistu_EAimMovementPolicies_CookMobile()
+    {
+        var bonk = CharacterPackageCompiler.Compile(
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json")),
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(bonk.CookedPackage);
+        Assert.Equal(AuthoringAimMovementMode.Mobile, bonk.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
+        Assert.Equal(AuthoringAimMovementMode.Mobile, bonk.CookedPackage.Definition.Slots.Single(x => x.Id == "air.E").AimMovement);
+
+        var kistu = CharacterPackageCompiler.Compile(
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/package.json")),
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(kistu.CookedPackage);
+        Assert.Equal(AuthoringAimMovementMode.Mobile, kistu.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
+    }
+
+    [Fact]
     public void WorkshopRejectsTrustedCapabilities()
     {
         var result = CharacterPackageCompiler.Compile(Fixture("package.json"), Fixture("character.json"), CharacterCookProfile.Workshop);

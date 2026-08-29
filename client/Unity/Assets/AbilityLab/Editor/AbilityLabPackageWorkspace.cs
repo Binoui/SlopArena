@@ -40,29 +40,17 @@ public sealed class AbilityLabPackageWorkspace
 
     public bool NewPackage(string packageId, string displayName, string creator = "Binoui", string license = "MIT", string attribution = "SlopArena")
     {
-        if (!MatchContentCatalogBuilder.IsStablePackageId(packageId)) return Fail("id.invalid", "packageId", "Package ID must be a stable lowercase identifier.");
-        string root = "Assets/CharacterPackages/" + packageId;
-        string full = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), root);
-        if (Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any()) return Fail("package.exists", root, "Package folder already exists and is not empty.");
-        try
+        var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
+        CharacterPackageCreateResult result = service.NewPackage(packageId, displayName, creator, license, attribution);
+        if (!result.Success)
         {
-            Directory.CreateDirectory(full);
-            var source = CharacterPackageSourceCodec.CreateMinimal(packageId, displayName, creator, license, attribution);
-            WriteAtomic(Path.Combine(full, "package.json"), Encoding.UTF8.GetBytes(CharacterPackageSourceCodec.SerializeManifest(source.Manifest)));
-            WriteAtomic(Path.Combine(full, "character.json"), Encoding.UTF8.GetBytes(CharacterPackageSourceCodec.SerializeCharacter(source.Character)));
-            var catalog = ScriptableObject.CreateInstance<CharacterAssetCatalog>();
-            catalog.PackageId = packageId; catalog.CatalogSchemaVersion = CharacterAssetCatalog.SchemaVersion; catalog.SampleRate = UnityCharacterAssetCooker.SampleRate; catalog.Rig = null; catalog.Bindings = Array.Empty<CharacterAssetCatalog.AnimationBinding>();
-            AssetDatabase.CreateAsset(catalog, root + "/CharacterAssetCatalog.asset");
-            AssetDatabase.SaveAssets(); AssetDatabase.Refresh();
-            return OpenPackage(root);
+            SetDiagnostics((result.Diagnostics ?? Array.Empty<CharacterPackageDiagnosticResult>())
+                .Select(x => new CharacterDiagnostic(
+                    x.Severity == "error" ? CharacterDiagnosticSeverity.Error : CharacterDiagnosticSeverity.Warning,
+                    x.Code, x.Path, x.Message)), "Failed");
+            return false;
         }
-        catch (Exception ex)
-        {
-            AssetDatabase.DeleteAsset(root + "/CharacterAssetCatalog.asset");
-            if (Directory.Exists(full)) Directory.Delete(full, true);
-            _diagnostics.Clear(); _diagnostics.Add(UnityCharacterAssetCooker.Error("package.create.failed", root, ex.Message));
-            Status = "Failed"; return false;
-        }
+        return OpenPackage(result.SourcePath);
     }
 
     public bool OpenPackage(string packageRoot)
@@ -228,37 +216,35 @@ public sealed class AbilityLabPackageWorkspace
     public bool ReplaceCatalogBinding(string semanticId, AnimationClip clip, ExtrapolationMode extrapolation)
     {
         if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
-        var bindings = Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>();
-        var existing = bindings.FirstOrDefault(x => x != null && x.SemanticId == semanticId);
-        if (existing == null)
-            return Fail("asset-catalog.binding.missing", semanticId ?? "catalog.bindings", "Catalog binding does not exist; automatic binding creation is not supported.");
-
         WorkspaceSnapshot prior = CaptureSnapshot();
-        try
+        CharacterPackageAuthoringService service = new(UnityCharacterAssetCooker.ProjectRoot());
+        CharacterPackageBindingResult result = clip == null
+            ? service.Unbind(PackageRoot, semanticId)
+            : service.Bind(PackageRoot, semanticId, AssetDatabase.GetAssetPath(clip), extrapolation);
+        if (!result.Success)
         {
-            UnityEditor.Undo.RecordObject(Catalog, "Replace character catalog binding");
-            existing.Clip = clip;
-            existing.Extrapolation = extrapolation;
-            EditorUtility.SetDirty(Catalog);
-            AssetDatabase.SaveAssets();
-            PushUndo(prior);
-            MarkCatalogEdited();
-            SceneView.RepaintAll();
-            return true;
+            SetDiagnostics((result.Diagnostics ?? Array.Empty<CharacterPackageDiagnosticResult>())
+                .Select(x => new CharacterDiagnostic(
+                    x.Severity == "error" ? CharacterDiagnosticSeverity.Error : CharacterDiagnosticSeverity.Warning,
+                    x.Code, x.Path, x.Message)), "Failed");
+            return false;
         }
-        catch (Exception ex)
-        {
-            RestoreSnapshot(prior, false);
-            return Fail("edit.catalog.failed", $"catalog.bindings[{semanticId}]", ex.Message);
-        }
+        Catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(PackageRoot + "/CharacterAssetCatalog.asset");
+        PushUndo(prior);
+        LoadedCatalogFingerprint = CharacterPackageAuthoringService.ComputeCatalogFingerprint(Catalog);
+        IsDirty = true;
+        SetDiagnosticsWithoutNotify(Array.Empty<CharacterDiagnostic>(), "Stale");
+        SceneView.RepaintAll();
+        return true;
     }
 
     private void MarkCatalogEdited()
     {
-        LoadedCatalogFingerprint = ComputeCatalogFingerprint();
+        LoadedCatalogFingerprint = CharacterPackageAuthoringService.ComputeCatalogFingerprint(Catalog);
         IsDirty = true;
         SetDiagnosticsWithoutNotify(_diagnostics, "Stale");
     }
+
     public bool TryResolveCanonicalSlot(string canonicalSlotId, out int explicitSourceSlotIndex, out CharacterSlotSource sourceSlot)
     {
         explicitSourceSlotIndex = -1;
@@ -339,6 +325,20 @@ public sealed class AbilityLabPackageWorkspace
         if (operations[operationIndex] is not SpawnHitboxOperationSource original)
             return Fail("edit.operation.type", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}].operations[{operationIndex}]", "Selected operation is not a hitbox operation.");
         return ReplaceOperation(slotIndex, stageIndex, operationIndex, original with { Hitbox = hitbox });
+    }
+    public bool AddHitbox(string canonicalSlotId, int stageIndex)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        var hitbox = new HitboxSource(
+            AuthoringHitboxShape.Sphere, 0.5f,
+            0f, 0f, 0f, 0f, 0f, 0f,
+            "bone.hips", null,
+            1f, 45f, 5f, 80f, 8, 1, false, 0);
+        return AddOperation(slotIndex, stageIndex, new SpawnHitboxOperationSource(0, AuthoringUnit.Meters, hitbox));
     }
 
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
@@ -485,24 +485,7 @@ public sealed class AbilityLabPackageWorkspace
     }
     private string ToFull(string path) => Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), path);
     private string ComputeDiskHash() => HashFiles(File.ReadAllBytes(ToFull(PackageRoot + "/package.json")), File.ReadAllBytes(ToFull(PackageRoot + "/character.json")));
-    private string ComputeCatalogFingerprint()
-    {
-        if (Catalog == null) return "";
-        var builder = new StringBuilder();
-        builder.Append(Catalog.PackageId).Append('\n')
-            .Append(Catalog.CatalogSchemaVersion).Append('\n')
-            .Append(Catalog.SampleRate).Append('\n')
-            .Append(Catalog.Rig == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(Catalog.Rig).ToString()).Append('\n');
-        foreach (var binding in Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
-        {
-            builder.Append(binding?.SemanticId ?? "").Append('|')
-                .Append(binding?.PoseTrackId ?? "").Append('|')
-                .Append(binding == null || binding.Clip == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString()).Append('|')
-                .Append(binding?.Extrapolation.ToString() ?? "").Append('\n');
-        }
-        using var hash = SHA256.Create();
-        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", "").ToLowerInvariant();
-    }
+    private string ComputeCatalogFingerprint() => CharacterPackageAuthoringService.ComputeCatalogFingerprint(Catalog);
     internal static string HashFiles(byte[] package, byte[] character)
     {
         using var hash = SHA256.Create();
@@ -515,7 +498,6 @@ public sealed class AbilityLabPackageWorkspace
         writer.Flush();
         return BitConverter.ToString(hash.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
     }
-    private static void WriteAtomic(string path, byte[] bytes) { string temp = path + ".tmp-" + Guid.NewGuid().ToString("N"); File.WriteAllBytes(temp, bytes); if (File.Exists(path)) File.Replace(temp, path, path + ".previous", true); else File.Move(temp, path); }
     private static void ReplaceSources(string packagePath, string characterPath, byte[] package, byte[] character)
     {
         string packageTemp = packagePath + ".tmp-" + Guid.NewGuid().ToString("N");

@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
     <ui:VisualElement name="root" class="screen char-select-screen">
-        <ui:Label name="roster-meta" text="4 FIGHTERS // 1 PLAYER" class="char-select-meta" />
+        <ui:Label name="roster-meta" text="5 FIGHTERS // 1 PLAYER" class="char-select-meta" />
         <ui:VisualElement name="char-grid" class="char-grid" />
         <ui:VisualElement name="selection-copy" class="selection-copy">
             <ui:Label name="char-name" text="—" class="char-name" />

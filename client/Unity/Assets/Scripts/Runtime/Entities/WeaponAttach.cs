@@ -111,6 +111,17 @@ namespace SlopArena.Client.Entities
             foreach (var b in _skin.bones)
                 if (b != null && b.name == boneName)
                     return b;
+
+            // Package configs may use the canonical Humanoid alias while a rig
+            // exposes an imported bone name such as Bonk's hand_r.
+            if (boneName == "mixamorig:RightHand")
+            {
+                var animator = _skin.GetComponentInParent<Animator>();
+                var humanoidHand = animator?.GetBoneTransform(HumanBodyBones.RightHand);
+                if (humanoidHand != null)
+                    return humanoidHand;
+            }
+
             Debug.LogWarning($"[WeaponAttach] Bone '{boneName}' not found on {_owner.name}");
             return null;
         }

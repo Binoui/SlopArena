@@ -234,6 +234,7 @@ public static partial class CharacterRegistry
                 CooldownTicks = 90,
                 Behavior = AbilityBehavior.DirectionalDash,
                 AimMode = AimMode.GroundVector,
+                AimMovement = AimMovementMode.Mobile,
                 Stages = new AttackStage[]
                 {
                     // Dash stage: the ability spawns a fresh hitbox at the character's position

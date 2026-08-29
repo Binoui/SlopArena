@@ -16,7 +16,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
     [MenuItem("Tools/SlopArena/Character Asset Catalog")]
     public static void ShowWindow() => GetWindow<CharacterAssetCatalogEditor>("Character Asset Catalog");
 
-    private void OnEnable() => _status = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).ReadStatus("fightguy");
+    private void OnEnable() { }
 
     private void OnGUI()
     {
@@ -62,7 +62,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
         EditorGUILayout.LabelField("Cooked content hash", _status.CookedContentHash);
         EditorGUILayout.LabelField("Package hash", _status.PackageHash);
         if (_status.State == "Stale" || _status.State == "Failed")
-            EditorGUILayout.HelpBox($"FightGuy package status: {_status.State}. Recook before shipping.", _status.State == "Failed" ? MessageType.Error : MessageType.Warning);
+            EditorGUILayout.HelpBox($"{_catalog.PackageId} package status: {_status.State}. Recook before shipping.", _status.State == "Failed" ? MessageType.Error : MessageType.Warning);
         _scroll = EditorGUILayout.BeginScrollView(_scroll);
         foreach (var diagnostic in _diagnostics)
             EditorGUILayout.HelpBox($"{diagnostic.Code} [{diagnostic.Path}] {diagnostic.Message}", MessageType.Error);
@@ -86,7 +86,7 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
             };
             return;
         }
-        var profile = _catalog.PackageId == "fightguy" || _catalog.PackageId == "kistu" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+        var profile = CharacterPackageAuthoringService.ProfileFor(_catalog.PackageId);
         CharacterCompileResult compiled = CharacterPackageCompiler.Compile(
             File.ReadAllText(manifestPath), File.ReadAllText(characterPath), profile);
         _diagnostics = compiled.Diagnostics.ToList();

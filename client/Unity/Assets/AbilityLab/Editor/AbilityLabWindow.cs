@@ -43,6 +43,7 @@ public sealed class AbilityLabWindow : EditorWindow
     }
 
     private AbilityLab? _lab;
+    private bool _ownsLab;
     private AbilityLabPackageWorkspace _workspace = new();
     private AbilityLabPackagePreviewResult? _preview;
     private readonly List<PackageOption> _packages = new();
@@ -67,15 +68,15 @@ public sealed class AbilityLabWindow : EditorWindow
     private Toggle _compatibilityShowDummy = null!;
     private readonly List<CharacterClass> _compatibilityCharacters = new();
     private string _activePage = "moves-page";
-    private Label _packageStatus = null!;
     private Button _packageStatusToggle = null!;
     private ScrollView _diagnosticsPanel = null!;
-    private Label _rigSetupState = null!;
     private VisualElement _moveSelector = null!;
+    private VisualElement _moveList = null!;
     private VisualElement _groundAirSelector = null!;
     private Button _groundMovesButton = null!;
     private Button _airMovesButton = null!;
-    private Label _previewStatus = null!;
+    private Label _previewSummary = null!;
+    private Button _createLabRig = null!;
     private Label _sceneViewGuidance = null!;
     private VisualElement _inspector = null!;
     private Label _timelineTick = null!;
@@ -137,7 +138,11 @@ public sealed class AbilityLabWindow : EditorWindow
     public static void Open() => GetWindow<AbilityLabWindow>("Ability Lab");
 
     private void OnEnable() => SceneView.duringSceneGui += OnSceneGUI;
-    private void OnDisable() => SceneView.duringSceneGui -= OnSceneGUI;
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGUI;
+        DestroyOwnedLab();
+    }
 
     public void CreateGUI()
     {
@@ -183,15 +188,15 @@ public sealed class AbilityLabWindow : EditorWindow
     private void BindElements()
     {
         _packageSelector = Required<DropdownField>("package-selector");
-        _packageStatus = Required<Label>("package-status");
         _packageStatusToggle = Required<Button>("package-status-toggle");
         _diagnosticsPanel = Required<ScrollView>("diagnostics-panel");
-        _rigSetupState = Required<Label>("rig-setup-state");
         _moveSelector = Required<VisualElement>("move-selector");
+        _moveList = Required<VisualElement>("move-list");
         _groundAirSelector = Required<VisualElement>("ground-air-selector");
         _groundMovesButton = Required<Button>("ground-moves-button");
         _airMovesButton = Required<Button>("air-moves-button");
-        _previewStatus = Required<Label>("preview-status");
+        _previewSummary = Required<Label>("preview-summary");
+        _createLabRig = Required<Button>("create-lab-rig");
         _sceneViewGuidance = Required<Label>("scene-view-guidance");
         _inspector = Required<VisualElement>("inspector");
         _timelineTick = Required<Label>("timeline-tick");
@@ -302,7 +307,6 @@ public sealed class AbilityLabWindow : EditorWindow
         Required<Label>("package-label").style.display = display;
         _packageSelector.style.display = display;
         _packageStatusToggle.style.display = display;
-        _packageStatus.style.display = display;
         Required<Button>("toolbar-undo").style.display = display;
         Required<Button>("toolbar-redo").style.display = display;
         Required<Button>("toolbar-save").style.display =
@@ -318,11 +322,14 @@ public sealed class AbilityLabWindow : EditorWindow
             OpenPackage(option.PackageId);
         });
         _packageStatusToggle.clicked += () =>
+        {
+            if (_diagnosticsPanel.childCount == 0) return;
             _diagnosticsPanel.style.display = _diagnosticsPanel.style.display == DisplayStyle.None ? DisplayStyle.Flex : DisplayStyle.None;
+        };
         Required<Button>("toolbar-undo").clicked += () => { _workspace.Undo(); RefreshAll(); };
         Required<Button>("toolbar-redo").clicked += () => { _workspace.Redo(); RefreshAll(); };
         Required<Button>("toolbar-save").clicked += () => { _workspace.SavePackage(); RefreshAll(); };
-        Required<Button>("create-lab-rig").clicked += CreateOrSelectLabRig;
+        _createLabRig.clicked += CreateOrSelectLabRig;
         DiscoverCompatibilityCharacters();
         _legacyLoad.clicked += () =>
         {
@@ -903,9 +910,7 @@ public sealed class AbilityLabWindow : EditorWindow
     }
     private void RefreshWorkspaceControls()
     {
-        _packageStatus.text = PackageStatus();
-        _packageStatusToggle.text = _packageStatus.text;
-        Required<Label>("package-display").text = _workspace.HasPackage ? $"{_workspace.Draft.DisplayName} · {_workspace.PackageId}" : "No package selected";
+        _packageStatusToggle.text = PackageStatus();
         Required<Button>("toolbar-undo").SetEnabled(_workspace.CanUndo);
         Required<Button>("toolbar-redo").SetEnabled(_workspace.CanRedo);
         SetPackageControlsVisible(_activePage != "compatibility-page");
@@ -928,8 +933,7 @@ public sealed class AbilityLabWindow : EditorWindow
             return;
         if (_preview != null && _preview.IsAvailable)
         {
-            _previewStatus.text = "Authoritative cooked package preview";
-            _sceneViewGuidance.text = "Edit Mode preview: scrub the stopped timeline to update the rig, baked bones, hurtboxes, and hitboxes in SceneView.";
+            _sceneViewGuidance.text = "Scrub the stopped timeline to update SceneView.";
             string priorSlot = _lab?.SelectedSlotId ?? CanonicalSlotProjection.All[0].Id;
             if (_lab != null && _lab.SelectedPackageId != _preview.Identity.PackageId)
             {
@@ -946,10 +950,10 @@ public sealed class AbilityLabWindow : EditorWindow
         }
         else
         {
-            _previewStatus.text = "Preview unavailable";
-            _sceneViewGuidance.text = "Select a verified cooked package. Legacy characters are available only in Compatibility.";
-            _moveSelector.Clear();
+            _sceneViewGuidance.text = "Select a verified cooked package.";
+            _moveList.Clear();
         }
+        RefreshRigState();
     }
     private bool IsLoadedLegacy()
         => _lab != null && !_lab.IsPackagePreview &&
@@ -1040,7 +1044,7 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void BuildMoveButtons(bool airborne)
     {
-        _moveSelector.Clear();
+        _moveList.Clear();
         foreach (var address in CanonicalSlotProjection.All.Where(slot => slot.IsAirborne == airborne))
         {
             string sourceName = _workspace.TryResolveCanonicalSlot(address.Id, out _, out var sourceSlot)
@@ -1060,7 +1064,7 @@ public sealed class AbilityLabWindow : EditorWindow
             button.name = address.Id == "ground.1" ? "selected-ground-1" : address.Id;
             button.AddToClassList("move-slot");
             if (_lab?.SelectedSlotId == address.Id) button.AddToClassList("move-slot-selected");
-            _moveSelector.Add(button);
+            _moveList.Add(button);
         }
     }
 
@@ -1109,19 +1113,24 @@ public sealed class AbilityLabWindow : EditorWindow
             {
                 if (!_workspace.TryResolveCanonicalSlot(address.Id, out _, out var sourceSlot))
                 {
-                    var unknown = BuildBindingRow(address.Id, $"Unknown ({address.Id})", null);
+                    var unknown = BuildBindingRow(address.Id, $"{address.InputLabel} · Unknown ({address.Id})", null);
                     unknown.tooltip = address.Id;
                     _assetsMoveBindings.Add(unknown);
                     continue;
                 }
+                bool disambiguate = sourceSlot.Timeline.Stages.Count > 1 ||
+                    sourceSlot.Timeline.Stages.Any(stage => (stage.AnimationIds?.Count ?? 0) > 1);
                 for (int stageIndex = 0; stageIndex < sourceSlot.Timeline.Stages.Count; stageIndex++)
                 {
                     var stage = sourceSlot.Timeline.Stages[stageIndex];
                     for (int animationIndex = 0; animationIndex < (stage.AnimationIds ?? Array.Empty<string>()).Count; animationIndex++)
                     {
                         string semanticId = stage.AnimationIds[animationIndex];
-                        var row = BuildBindingRow(semanticId, $"Stage {stageIndex + 1} · Animation {animationIndex + 1}", FindBinding(semanticId));
-                        row.tooltip = $"{address.Id} · source stage {stageIndex} · animation {animationIndex}";
+                        string label = $"{address.InputLabel} · {FriendlyMoveLabel(address, sourceSlot)}";
+                        if (disambiguate)
+                            label += $" · Stage {stageIndex + 1} · Animation {animationIndex + 1}";
+                        var row = BuildBindingRow(semanticId, label, FindBinding(semanticId));
+                        row.tooltip = $"{address.Id} · stage {stageIndex + 1} · animation {animationIndex + 1}";
                         _assetsMoveBindings.Add(row);
                     }
                 }
@@ -1137,15 +1146,24 @@ public sealed class AbilityLabWindow : EditorWindow
     {
         var row = new VisualElement { userData = semanticId ?? "" };
         row.AddToClassList("asset-binding-row");
-        row.Add(new Label($"{label} · {FriendlyAnimationLabel(semanticId)}"));
-        var clip = new ObjectField("Clip")
+        var name = new Label(label);
+        name.AddToClassList("asset-binding-label");
+        name.tooltip = semanticId ?? "";
+        row.Add(name);
+        var clip = new ObjectField
         {
             objectType = typeof(AnimationClip),
             allowSceneObjects = false,
+            tooltip = semanticId ?? "",
         };
+        clip.AddToClassList("asset-binding-clip");
         clip.SetValueWithoutNotify(binding?.Clip);
         clip.SetEnabled(binding != null);
-        var extrapolation = new EnumField("Extrapolation", binding?.Extrapolation ?? ExtrapolationMode.None);
+        var extrapolation = new EnumField(binding?.Extrapolation ?? ExtrapolationMode.None)
+        {
+            tooltip = semanticId ?? "",
+        };
+        extrapolation.AddToClassList("asset-binding-extrapolation");
         extrapolation.SetEnabled(binding != null);
         clip.RegisterValueChangedCallback(evt =>
         {
@@ -1257,24 +1275,23 @@ public sealed class AbilityLabWindow : EditorWindow
             .GroupBy(x => $"{x.Severity}|{x.Code}|{x.Path}|{x.Message}", StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
-        if (unique.Count == 0) _diagnosticsPanel.Add(new Label("No diagnostics."));
         foreach (var diagnostic in unique)
             _diagnosticsPanel.Add(new Label($"{diagnostic.Code} · {diagnostic.Path}\n{diagnostic.Message}"));
+        _diagnosticsPanel.style.display = unique.Count > 0 && _activePage != "compatibility-page"
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
     }
 
     private void RefreshRigState()
     {
         _lab = FindLab();
-        if (_lab == null)
-        {
-            _rigSetupState.text = "No Ability Lab scene rig. Create Lab Rig to select or create the scene component.";
-            return;
-        }
-        _rigSetupState.text = _preview != null && !_preview.IsAvailable
-            ? "Ability Lab rig ready; package preview unavailable. No legacy fallback is active."
-            : _preview != null && _preview.IsAvailable
-                ? "Ability Lab rig ready; verified package rig is active."
-                : "Ability Lab rig ready; select a package to preview.";
+        bool previewAvailable = _preview?.IsAvailable == true;
+        bool rigReady = _lab != null;
+        _previewSummary.text = $"Preview: {(previewAvailable ? "Cooked" : "Unavailable")} · Rig {(rigReady ? "ready" : "needed")}";
+        _previewSummary.tooltip = _workspace.HasPackage
+            ? $"{_workspace.Draft.DisplayName} · {_workspace.PackageId}"
+            : "No package selected";
+        _createLabRig.style.display = rigReady ? DisplayStyle.None : DisplayStyle.Flex;
     }
 
     private void UpdateTimelineControls()
@@ -1304,7 +1321,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _timelinePlay.SetEnabled(true);
         _timelinePlay.text = _lab.Playing ? "Pause" : "Play";
         _timelineTick.text = $"Tick {cumulativeTick}";
-        _timelineDuration.text = $"Duration {duration} ticks · {cumulativeTick / (float)AbilityLab.TickRate:0.00}s";
+        _timelineDuration.text = $"Duration {duration} ticks · {duration / (float)AbilityLab.TickRate:0.00}s";
         if (!ReferenceEquals(_timelineTrack.Projection, _timelineProjection))
             _timelineTrack.Projection = _timelineProjection;
         _timelineTrack.CurrentTick = cumulativeTick;
@@ -1535,6 +1552,20 @@ public sealed class AbilityLabWindow : EditorWindow
             });
             moveGroup.Add(field);
         }
+        var addHitbox = new Button(() =>
+        {
+            if (_lab == null || !_workspace.AddHitbox(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            UpdateTimelineControls();
+            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _timelineTrack.SelectedOperation = _selectedOperation;
+            RefreshInspector();
+            SceneView.RepaintAll();
+        })
+        {
+            text = "Add hitbox"
+        };
+        addHitbox.tooltip = "Add a default hitbox to this move stage.";
+        moveGroup.Add(addHitbox);
         _inspector.Add(moveGroup);
 
         var selected = _selectedOperation;
@@ -1673,15 +1704,38 @@ public sealed class AbilityLabWindow : EditorWindow
         _lab = FindLab();
         if (_lab == null)
         {
-            var go = new GameObject("AbilityLab");
+            var go = new GameObject("AbilityLab") { hideFlags = HideFlags.HideAndDontSave };
             _lab = go.AddComponent<AbilityLab>();
+            _ownsLab = true;
         }
         _lab.EnsureCamera();
         Selection.activeGameObject = _lab.gameObject;
         RefreshAll();
     }
 
-    private AbilityLab? FindLab() => AbilityLab.Instance != null ? AbilityLab.Instance : FindObjectOfType<AbilityLab>();
+    private void DestroyOwnedLab()
+    {
+        if (!_ownsLab || _lab == null)
+        {
+            _ownsLab = false;
+            return;
+        }
+
+        GameObject labObject = _lab.gameObject;
+        _lab = null;
+        _ownsLab = false;
+        if (labObject != null)
+            DestroyImmediate(labObject);
+    }
+
+    private AbilityLab? FindLab()
+    {
+        var lab = AbilityLab.Instance != null ? AbilityLab.Instance : FindObjectOfType<AbilityLab>();
+        if (lab != null && lab.gameObject.name == "AbilityLab" &&
+            (lab.gameObject.hideFlags & HideFlags.HideAndDontSave) != 0)
+            _ownsLab = true;
+        return lab;
+    }
 
     private void OnSceneGUI(SceneView sceneView)
     {

@@ -21,13 +21,13 @@
                 <ui:Label text="AWKWARD FIGHTERS. &#10;QUESTIONNABLE IDEAS." class="menu-tagline" />
             </ui:VisualElement>
             <ui:VisualElement name="status-area" class="menu-status">
-                <ui:Label name="online-count" text="4 CHARACTERS" class="menu-status-pill menu-status-pill--online" />
+                <ui:Label name="online-count" text="5 CHARACTERS" class="menu-status-pill menu-status-pill--online" />
                 <ui:Label name="lbl-host-status" class="menu-status-pill menu-status-pill--host" style="display: none;" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="center" class="menu-hero" />
         <ui:VisualElement name="roster-panel" class="menu-roster">
-            <ui:Label text="LIVE ROSTER // 4 CHARACTERS" enable-rich-text="false" class="menu-roster-header" />
+            <ui:Label text="LIVE ROSTER // 5 CHARACTERS" enable-rich-text="false" class="menu-roster-header" />
             <ui:VisualElement class="menu-roster-card menu-roster-card--orange">
                 <ui:VisualElement class="menu-portrait menu-portrait--fightguy" />
                 <ui:VisualElement class="menu-roster-copy">

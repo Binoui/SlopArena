@@ -17,6 +17,85 @@ public static class SlopArenaCharacterCommands
         MainThreadRequired = true,
         Tags = new[] { "authoring/character" })]
     public static CharacterPackageCookResult Cook(
-        [CliArg("target", "Package ID or package root inside Assets/CharacterPackages.", Required = true)] string target)
-        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(target);
+        [CliArg("target", "Package ID or package root inside Assets/CharacterPackages.", Required = true)] string target,
+        [CliArg("dry-run", "Validate and plan without writing cooked outputs.", Required = false, DefaultValue = false)] bool dryRun = false)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook(target, dryRun);
+
+    [CliCommand(
+        "sloparena.character.create",
+        "Create an empty Character Package and asset catalog.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterPackageCreateResult Create(
+        [CliArg("package-id", "Stable package ID.", Required = true)] string packageId,
+        [CliArg("display-name", "Character display name.", Required = true)] string displayName,
+        [CliArg("creator", "Creator name.", Required = false)] string creator,
+        [CliArg("license", "License identifier.", Required = false)] string license,
+        [CliArg("attribution", "Attribution text.", Required = false)] string attribution)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot())
+            .NewPackage(packageId, displayName, creator ?? "Binoui", license ?? "MIT", attribution ?? "SlopArena");
+
+    [CliCommand(
+        "sloparena.character.bind",
+        "Persist a typed AnimationClip binding in a Character Package catalog.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterPackageBindingResult Bind(
+        [CliArg("target", "Package ID or package root.", Required = true)] string target,
+        [CliArg("semantic-id", "Catalog semantic animation ID.", Required = true)] string semanticId,
+        [CliArg("asset-path", "Project-relative AnimationClip asset path.", Required = true)] string assetPath)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Bind(target, semanticId, assetPath);
+
+    [CliCommand(
+        "sloparena.character.unbind",
+        "Clear a typed AnimationClip binding in a Character Package catalog.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterPackageBindingResult Unbind(
+        [CliArg("target", "Package ID or package root.", Required = true)] string target,
+        [CliArg("semantic-id", "Catalog semantic animation ID.", Required = true)] string semanticId)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Unbind(target, semanticId);
+
+    [CliCommand(
+        "sloparena.character.verify",
+        "Verify source, catalog, cooked artifact, hashes, and dependencies without mutation.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterPackageVerificationResult Verify(
+        [CliArg("target", "Package ID or package root.", Required = true)] string target)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Verify(target);
+
+    [CliCommand(
+        "sloparena.character.assets",
+        "Discover compatible typed animation assets for a package semantic ID.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterPackageAssetDiscoveryResult Assets(
+        [CliArg("target", "Package ID or package root.", Required = true)] string target,
+        [CliArg("semantic-id", "Catalog semantic animation ID.", Required = true)] string semanticId)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).DiscoverAssets(target, semanticId);
+
+    [CliCommand(
+        "sloparena.character.roster.admit",
+        "Explicitly admit a verified cooked package to the built-in roster.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterRosterAdmissionResult AdmitRoster(
+        [CliArg("package-id", "Stable package ID.", Required = true)] string packageId,
+        [CliArg("selector", "CharacterClass roster selector.", Required = true)] string selector,
+        [CliArg("version", "Verified package version.", Required = false)] string version,
+        [CliArg("cooked-hash", "Verified cooked content hash.", Required = false)] string cookedHash,
+        [CliArg("package-hash", "Verified package hash.", Required = false)] string packageHash)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot())
+            .AdmitRoster(packageId, selector, version, cookedHash, packageHash);
+
+    [CliCommand(
+        "sloparena.character.roster.refresh",
+        "Refresh the pinned requirement for an already-admitted cooked package.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/character" })]
+    public static CharacterRosterAdmissionResult RefreshRoster(
+        [CliArg("package-id", "Admitted package ID.", Required = true)] string packageId)
+        => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot())
+            .RefreshRoster(packageId);
 }

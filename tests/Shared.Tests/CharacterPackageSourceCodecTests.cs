@@ -34,6 +34,30 @@ public sealed class CharacterPackageSourceCodecTests
         Assert.Equal(CharacterPackageSourceCodec.SerializeManifest(first.Source.Manifest), CharacterPackageSourceCodec.SerializeManifest(second.Source!.Manifest));
         Assert.Equal(CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character), CharacterPackageSourceCodec.SerializeCharacter(second.Source.Character));
     }
+    [Fact]
+    public void AimMovementPolicy_RoundTripsAndMissingDefaultsToFixed()
+    {
+        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(missing.IsValid, string.Join("\n", missing.Diagnostics));
+        Assert.All(missing.Source!.Character.Slots, slot =>
+            Assert.Equal(AuthoringAimMovementMode.Fixed, slot.AimMovement));
+
+        const string marker = "\"aimMode\": \"none\",\n      \"cooldownTicks\"";
+        string mobileJson = Fixture("character.json").Replace(
+            marker,
+            "\"aimMode\": \"none\",\n      \"aimMovement\": \"mobile\",\n      \"cooldownTicks\"",
+            StringComparison.Ordinal);
+        var mobile = CharacterPackageSourceCodec.Load(Fixture("package.json"), mobileJson);
+        Assert.True(mobile.IsValid, string.Join("\n", mobile.Diagnostics));
+        Assert.Equal(AuthoringAimMovementMode.Mobile, mobile.Source!.Character.Slots[0].AimMovement);
+        Assert.Contains("\"aimMovement\": \"mobile\"", CharacterPackageSourceCodec.SerializeCharacter(mobile.Source.Character));
+
+        var unknown = CharacterPackageSourceCodec.Load(
+            Fixture("package.json"),
+            mobileJson.Replace("\"aimMovement\": \"mobile\"", "\"aimMovement\": \"unknown\"", StringComparison.Ordinal));
+        Assert.Contains(unknown.Diagnostics, x => x.Code == "enum.unknown");
+    }
+
 
     [Fact]
     public void FloatSerializationIsInvariantShortestRoundTrip()
@@ -70,11 +94,14 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
-    public void UnchangedAuthoredSourceIsByteStable()
+    public void AuthoredSourceRoundTripIsByteStable()
     {
         var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
         Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
-        Assert.Equal(Fixture("character.json"), CharacterPackageSourceCodec.SerializeCharacter(parsed.Source!.Character));
+        var serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source!.Character);
+        var reparsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
+        Assert.True(reparsed.IsValid, string.Join("\n", reparsed.Diagnostics));
+        Assert.Equal(serialized, CharacterPackageSourceCodec.SerializeCharacter(reparsed.Source!.Character));
     }
 
     [Fact]
@@ -85,6 +112,25 @@ public sealed class CharacterPackageSourceCodecTests
         Assert.Empty(source.Character.CapabilityRequirements);
         Assert.All(source.Character.Slots, x => Assert.Empty(x.Timeline.Stages));
         Assert.DoesNotContain("FightGuy", CharacterPackageSourceCodec.SerializeCharacter(source.Character));
+    }
+
+    [Fact]
+    public void AuthoringReadyTemplateHasUsableDefaultsAndIndependentMoveAnimations()
+    {
+        var source = CharacterPackageSourceCodec.CreateAuthoringReady("test-character", "Test Character", "Binoui", "MIT", "SlopArena");
+        Assert.Equal(100f, source.Character.Weight);
+        Assert.Equal(14f, source.Character.Movement.RunSpeed);
+        Assert.Equal(1.7f, source.Character.CapsuleHeight);
+        Assert.Equal(7, source.Character.HurtboxBoneDefs.Count);
+        Assert.All(source.Character.Slots, slot =>
+        {
+            Assert.Single(slot.Timeline.Stages);
+            Assert.Equal(30, slot.Timeline.Stages[0].DurationTicks);
+            Assert.Single(slot.Timeline.Stages[0].AnimationIds);
+            Assert.Empty(slot.Timeline.Stages[0].Operations);
+        });
+        Assert.Equal(source.Character.Slots.Count,
+            source.Character.Slots.SelectMany(slot => slot.Timeline.Stages).SelectMany(stage => stage.AnimationIds).Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]

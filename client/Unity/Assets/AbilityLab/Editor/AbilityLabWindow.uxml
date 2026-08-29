@@ -4,7 +4,6 @@
       <ui:Label name="package-label" text="Package:" class="toolbar-label" />
       <ui:DropdownField name="package-selector" class="package-selector" />
       <ui:Button name="package-status-toggle" text="No package" class="package-status-toggle" />
-      <ui:Label name="package-status" text="No package" class="package-status" />
       <ui:Button name="toolbar-undo" text="Undo" />
       <ui:Button name="toolbar-redo" text="Redo" />
       <ui:Button name="toolbar-save" text="SAVE + COOK" class="save-button" />
@@ -20,17 +19,17 @@
     <ui:Label name="compatibility-banner" text="Compatibility mode is read-only and uses the legacy authority. Package SAVE + COOK is unavailable here." class="legacy-banner" />
     <ui:VisualElement name="moves-page" class="page">
       <ui:TwoPaneSplitView name="moves-split" fixed-pane-initial-dimension="220" orientation="Horizontal" class="split-view">
-        <ui:VisualElement name="move-selector" class="move-selector" />
-        <ui:VisualElement name="moves-content" class="moves-content">
+        <ui:VisualElement name="move-selector" class="move-selector">
           <ui:VisualElement name="ground-air-selector" class="ground-air-selector">
             <ui:Button name="ground-moves-button" text="Ground" class="ground-air-button" />
             <ui:Button name="air-moves-button" text="Air" class="ground-air-button" />
           </ui:VisualElement>
-          <ui:TwoPaneSplitView name="preview-inspector-split" fixed-pane-initial-dimension="330" orientation="Horizontal" class="split-view">
+          <ui:VisualElement name="move-list" class="move-list" />
+        </ui:VisualElement>
+        <ui:VisualElement name="moves-content" class="moves-content">
+          <ui:TwoPaneSplitView name="preview-inspector-split" fixed-pane-initial-dimension="260" orientation="Horizontal" class="split-view preview-inspector-split">
             <ui:VisualElement name="preview-bridge" class="preview-bridge">
-              <ui:Label name="package-display" text="No package selected" class="package-display" />
-              <ui:Label name="preview-status" text="Preview unavailable" class="preview-status" />
-              <ui:Label name="rig-setup-state" text="No Ability Lab scene rig." class="rig-setup-state" />
+              <ui:Label name="preview-summary" text="Preview: Unavailable · Rig needed" class="preview-summary" />
               <ui:Button name="create-lab-rig" text="Create Lab Rig" />
               <ui:Label name="scene-view-guidance" text="Select a verified cooked package." class="scene-view-guidance" />
             </ui:VisualElement>
@@ -57,6 +56,7 @@
     </ui:VisualElement>
     <ui:ScrollView name="character-page" class="page character-page">
       <ui:Label text="Character" class="page-title" />
+      <ui:VisualElement name="character-content" class="character-content">
       <ui:Foldout name="character-general" text="General" value="true" class="character-group">
         <ui:TextField name="character-display-name" label="Display name" />
         <ui:FloatField name="character-weight" label="Weight" />
@@ -66,6 +66,7 @@
         <ui:FloatField name="character-hurtbox-radius" label="Hurtbox radius" />
       </ui:Foldout>
       <ui:Foldout name="character-movement" text="Movement" value="true" class="character-group">
+        <ui:VisualElement name="movement-groups" class="movement-groups">
         <ui:Foldout name="movement-ground" text="Ground" value="true" class="movement-group">
           <ui:FloatField name="movement-run-speed" label="Run speed" />
           <ui:FloatField name="movement-run-acceleration-a" label="Run acceleration A" />
@@ -97,6 +98,7 @@
           <ui:FloatField name="movement-fast-fall-speed" label="Fast-fall speed" />
           <ui:IntegerField name="movement-float-window-ticks" label="Float-window ticks" />
         </ui:Foldout>
+        </ui:VisualElement>
       </ui:Foldout>
       <ui:Foldout name="character-presentation" text="Presentation" value="true" class="character-group">
         <ui:DropdownField name="presentation-idle" label="Idle" />
@@ -120,6 +122,7 @@
         <ui:Foldout name="character-hurtbox-bones" text="Bones" value="true" class="hurtbox-group" />
       </ui:Foldout>
       <ui:Label name="character-unavailable" text="Character source unavailable." class="character-unavailable" />
+      </ui:VisualElement>
     </ui:ScrollView>
     <ui:ScrollView name="assets-page" class="page assets-page">
       <ui:Label text="Assets" class="page-title" />

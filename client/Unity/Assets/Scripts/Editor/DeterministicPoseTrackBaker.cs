@@ -56,13 +56,17 @@ internal static class DeterministicPoseTrackBaker
                 names[i] = transforms[i].name;
             }
             WeaponEntry weaponEntry = null;
+            Transform weaponBone = null;
             Vector3 tipLocal = new Vector3(0f, 0f, 1.5f);
             Vector3 hiltLocal = Vector3.zero;
             if (weaponConfig != null)
             {
-                weaponEntry = Array.Find(weaponConfig.Entries ?? Array.Empty<WeaponEntry>(), x => x != null && x.BoneName == "mixamorig:RightHand");
-                if (weaponEntry == null) throw new InvalidOperationException("Weapon config has no mixamorig:RightHand entry.");
-                if (weaponEntry.Prefab == null) throw new InvalidOperationException("Weapon config right-hand prefab is missing.");
+                weaponEntry = Array.Find(weaponConfig.Entries ?? Array.Empty<WeaponEntry>(), x => x != null);
+                if (weaponEntry == null) throw new InvalidOperationException("Weapon config has no entries.");
+                weaponBone = Array.Find(temp.GetComponentsInChildren<Transform>(true),
+                    x => x.name == weaponEntry.BoneName);
+                if (weaponBone == null) throw new InvalidOperationException($"Weapon config bone is missing: {weaponEntry.BoneName}.");
+                if (weaponEntry.Prefab == null) throw new InvalidOperationException($"Weapon prefab is missing for bone {weaponEntry.BoneName}.");
                 var vertices = new List<Vector3>();
                 foreach (var meshFilter in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
                 {
@@ -88,7 +92,6 @@ internal static class DeterministicPoseTrackBaker
                 names[RequiredBones.Length + 1] = "_weapon_hilt";
             }
             var hips = transforms[2];
-            var rightHand = transforms[3];
             using var stream = new MemoryStream();
             WriteUInt32(stream, 0x4C454B53u);
             WriteUInt32(stream, 1u);
@@ -113,8 +116,8 @@ internal static class DeterministicPoseTrackBaker
                     }
                     if (weaponEntry != null)
                     {
-                        Vector3 bladePosition = rightHand.TransformPoint(weaponEntry.PositionOffset);
-                        Quaternion bladeRotation = rightHand.rotation * Quaternion.Euler(weaponEntry.RotationOffset);
+                        Vector3 bladePosition = weaponBone.TransformPoint(weaponEntry.PositionOffset);
+                        Quaternion bladeRotation = weaponBone.rotation * Quaternion.Euler(weaponEntry.RotationOffset);
                         WriteFiniteVector(stream, bladePosition + bladeRotation * tipLocal - hipsPosition, animation.SemanticId, frame, "_weapon_tip");
                         WriteFiniteVector(stream, bladePosition + bladeRotation * hiltLocal - hipsPosition, animation.SemanticId, frame, "_weapon_hilt");
                     }

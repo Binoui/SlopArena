@@ -12,6 +12,7 @@ namespace SlopArena.Shared
         Manki,
         FightGuy,
         Kistu,
+        Bonk,
         Nilus
     }
 
@@ -205,6 +206,17 @@ namespace SlopArena.Shared
             };
             return index >= 0 && index < CookedSlots.Count ? CookedSlots[index] : null;
         }
+        /// <summary>Resolve the explicit aim movement policy for a wire slot.</summary>
+        public AimMovementMode GetAimMovementMode(byte wireSlot, bool airborne)
+        {
+            if (wireSlot == AbilitySlots.None)
+                return AimMovementMode.Fixed;
+            var cooked = GetCookedSlotAbility(wireSlot, airborne);
+            if (cooked != null)
+                return cooked.AimMovement == AuthoringAimMovementMode.Mobile ? AimMovementMode.Mobile : AimMovementMode.Fixed;
+            return GetSlotAbility(wireSlot - 1, airborne)?.AimMovement ?? AimMovementMode.Fixed;
+        }
+
 
 
         /// <summary>

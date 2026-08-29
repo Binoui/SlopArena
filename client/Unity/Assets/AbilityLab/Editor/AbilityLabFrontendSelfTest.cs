@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Reflection;
 using System.Linq;
@@ -16,6 +17,7 @@ public static class AbilityLabFrontendSelfTest
     [MenuItem("Tools/SlopArena/Tests/Ability Lab Frontend")]
     public static void Run()
     {
+        CleanupOrphanedFixture();
         var labObject = AbilityLab.Instance != null ? null : new GameObject("AbilityLabFrontendSelfTest");
         if (labObject != null)
         {
@@ -31,21 +33,30 @@ public static class AbilityLabFrontendSelfTest
             var packageSelector = root.Q<DropdownField>("package-selector");
             var groundOne = root.Q<Button>("selected-ground-1");
             var timeline = root.Q<AbilityLabTimelineElement>("timeline-track");
+            var moveSelector = root.Q<VisualElement>("move-selector");
+            var moveList = root.Q<VisualElement>("move-list");
+            var groundAirSelector = root.Q<VisualElement>("ground-air-selector");
+            var diagnosticsPanel = root.Q<ScrollView>("diagnostics-panel");
+            var rowLabels = timeline?.Query<Label>().ToList()
+                .Where(label => label.ClassListContains("timeline-row-label"))
+                .Select(label => label.text)
+                .ToList() ?? new List<string>();
             if (packageSelector == null || groundOne == null || timeline == null ||
+                moveSelector == null || moveList == null || groundAirSelector == null || diagnosticsPanel == null ||
+                !ReferenceEquals(groundAirSelector.parent, moveSelector) ||
+                !ReferenceEquals(moveList.parent, moveSelector) ||
+                moveList.childCount != 8 ||
+                diagnosticsPanel.Query<Label>().ToList().Any(label => label.text == "No diagnostics.") ||
+                (diagnosticsPanel.childCount == 0 && diagnosticsPanel.style.display != DisplayStyle.None) ||
                 !packageSelector.choices.Any(choice => choice.Contains("FightGuy", StringComparison.Ordinal)) ||
                 !packageSelector.value.Contains("FightGuy", StringComparison.Ordinal) ||
                 !groundOne.text.StartsWith("1 · ", StringComparison.Ordinal) ||
-                !groundOne.text.Contains("Low Kick", StringComparison.Ordinal))
-                throw new InvalidOperationException("FightGuy package, canonical move selector, or friendly label is unavailable.");
-
-            var moveRows = BindingRows(root.Q<VisualElement>("assets-move-bindings"));
-            string[] expectedMoveSlots = CanonicalSlotProjection.All.Select(x => x.Id).ToArray();
-            if (moveRows.Count != expectedMoveSlots.Length ||
-                !moveRows.Select(row => row.tooltip.Split('·')[0].Trim()).SequenceEqual(expectedMoveSlots))
-                throw new InvalidOperationException("Assets move rows are not in canonical ground-then-air order.");
-            if (root.Q<Label>("compatibility-banner") == null ||
-                !root.Q<Label>("compatibility-banner").text.Contains("read-only", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Compatibility mode boundary is not visible.");
+                !groundOne.text.Contains("Low Kick", StringComparison.Ordinal) ||
+                rowLabels.Count == 0 ||
+                !rowLabels.Any(label => label == "Hitbox" || label == "Projectile" || label == "Presentation" ||
+                    label == "Capability" || label == "Velocity" || label == "Aim" || label == "Complete") ||
+                rowLabels.Any(label => label.Contains("Operation", StringComparison.Ordinal) || label.Contains("Source", StringComparison.Ordinal)))
+                throw new InvalidOperationException("FightGuy package, compact move selector, diagnostics collapse, or friendly timeline labels are unavailable.");
 
             fixtureWorkspace = (AbilityLabPackageWorkspace)typeof(AbilityLabWindow)
                 .GetField("_workspace", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
@@ -60,11 +71,16 @@ public static class AbilityLabFrontendSelfTest
             Refresh(window);
             RefreshInspector(window);
             if (root.Q<FloatField>("character-weight").value != priorWeight + 1f ||
-                root.Q<Label>("package-status").text != "Unsaved" ||
+                root.Q<Button>("package-status-toggle").text != "Unsaved" ||
+                root.Q<Label>("package-status") != null ||
                 !ReferenceEquals(priorCharacterPreview, windowWorkspace.Preview))
                 throw new InvalidOperationException("Unsaved source edit did not refresh the Character page.");
 
             var lab = AbilityLab.Instance;
+            if (!lab.IsPackagePreview || lab.ShowHurtboxes || !lab.ShowHitboxes || lab.ShowBakedBones || lab.ShowDummy)
+                throw new InvalidOperationException("Package preview debug defaults are not readable.");
+            if (root.Q<Label>("preview-summary").text != "Preview: Cooked · Rig ready")
+                throw new InvalidOperationException("Compact preview summary did not report cooked package and rig state.");
             var sourceWorkspace = new AbilityLabPackageWorkspace();
             if (!sourceWorkspace.OpenPackage("Assets/CharacterPackages/fightguy") ||
                 !sourceWorkspace.TryResolveCanonicalSlot("air.A", out _, out var airSource) ||
@@ -96,6 +112,31 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException(
                     $"Character and Moves animation labels do not preserve semantic IDs. move={moveValue} expectedMove={expectedMoveValue} idle={idleValue} expectedIdle={expectedIdleValue} rawIdle={windowWorkspace.Draft.Presentation.Idle}");
             var catalog = windowWorkspace.Catalog;
+            var moveFields = root.Q<VisualElement>("assets-move-bindings").Query<ObjectField>().ToList();
+            var moveRowsBySemanticId = moveFields
+                .GroupBy(field => (string)field.parent.userData, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            if (moveRowsBySemanticId.Count < 2 || moveRowsBySemanticId.Count > moveFields.Count ||
+                moveFields.Any(field => !(field.parent?.userData is string) || string.IsNullOrEmpty((string)field.parent.userData)))
+                throw new InvalidOperationException("Move animation ObjectFields do not have stable semantic binding keys.");
+            var beforeMoveClips = catalog.Bindings
+                .Where(binding => binding != null)
+                .ToDictionary(binding => binding.SemanticId, binding => binding.Clip, StringComparer.Ordinal);
+            var firstMove = moveRowsBySemanticId.First();
+            var replacementMove = moveRowsBySemanticId.Values
+                .Select(field => field.value as AnimationClip)
+                .FirstOrDefault(clip => clip != null && clip != firstMove.Value.value);
+            if (replacementMove == null)
+                throw new InvalidOperationException("Move animation regression fixture has no distinct replacement clip.");
+            firstMove.Value.SendEvent(ChangeEvent<AnimationClip>.GetPooled(firstMove.Value.value as AnimationClip, replacementMove));
+            if (beforeMoveClips.Any(pair =>
+            {
+                var current = catalog.Bindings.First(binding => binding != null && binding.SemanticId == pair.Key);
+                return pair.Key != firstMove.Key && current.Clip != pair.Value;
+            }))
+                throw new InvalidOperationException("Dragging one Move Animations field changed every move binding.");
+            windowWorkspace.ReplaceCatalogBinding(firstMove.Key, beforeMoveClips[firstMove.Key], ExtrapolationMode.None);
+            typeof(AbilityLabWindow).GetMethod("RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
             var originalRig = catalog.Rig;
             var catalogBinding = catalog.Bindings.First(binding => binding != null);
             string catalogBindingId = catalogBinding.SemanticId;
@@ -112,11 +153,19 @@ public static class AbilityLabFrontendSelfTest
             Refresh(window);
             if (catalog.Rig != originalRig || root.Q<ObjectField>("assets-rig-field").value != originalRig)
                 throw new InvalidOperationException("Catalog rig undo did not restore the catalog and ObjectField together.");
+            var moveBindingClipsBefore = catalog.Bindings
+                .Where(binding => binding != null)
+                .ToDictionary(binding => binding.SemanticId, binding => binding.Clip, StringComparer.Ordinal);
             var replacementBinding = catalog.Bindings.First(binding => binding != null && binding.SemanticId != catalogBindingId);
             if (!windowWorkspace.ReplaceCatalogBinding(catalogBindingId, replacementBinding.Clip, ExtrapolationMode.Continuous) ||
                 catalog.Bindings.First(binding => binding != null && binding.SemanticId == catalogBindingId).Clip != replacementBinding.Clip ||
-                catalog.Bindings.First(binding => binding != null && binding.SemanticId == catalogBindingId).Extrapolation != ExtrapolationMode.Continuous)
-                throw new InvalidOperationException("Catalog clip/extrapolation replacement was rejected.");
+                catalog.Bindings.First(binding => binding != null && binding.SemanticId == catalogBindingId).Extrapolation != ExtrapolationMode.Continuous ||
+                moveBindingClipsBefore.Any(pair =>
+                {
+                    var current = catalog.Bindings.First(binding => binding != null && binding.SemanticId == pair.Key);
+                    return current.Clip != pair.Value && pair.Key != catalogBindingId;
+                }))
+                throw new InvalidOperationException("Catalog clip replacement mutated unrelated move-animation bindings.");
             windowWorkspace.Undo();
             var restoredBinding = catalog.Bindings.First(binding => binding != null && binding.SemanticId == catalogBindingId);
             if (restoredBinding.Clip != originalClip || restoredBinding.Extrapolation != originalExtrapolation)
@@ -188,6 +237,9 @@ public static class AbilityLabFrontendSelfTest
             sourceWorkspace.Undo();
             if (timeline.Projection == null || timeline.Projection.DurationTicks <= 0 || timeline.Projection.Stages.Count == 0)
                 throw new InvalidOperationException("Cumulative authored timeline projection is unavailable.");
+            string expectedDuration = $"Duration {timeline.Projection.DurationTicks} ticks · {timeline.Projection.DurationTicks / (float)AbilityLab.TickRate:0.00}s";
+            if (root.Q<Label>("timeline-duration").text != expectedDuration)
+                throw new InvalidOperationException("Timeline duration does not report total authored runtime.");
             int operationCount = timeline.Projection.Stages.Sum(stage => stage.Operations.Count);
             float minimumTimelineHeight = 18f + operationCount * 20f;
             if (timeline.resolvedStyle.height < Math.Max(84f, minimumTimelineHeight))
@@ -299,7 +351,6 @@ public static class AbilityLabFrontendSelfTest
             SelectTab(window, "compatibility-page");
             if (root.Q<DropdownField>("package-selector").style.display != DisplayStyle.None ||
                 root.Q<Button>("package-status-toggle").style.display != DisplayStyle.None ||
-                root.Q<Label>("package-status").style.display != DisplayStyle.None ||
                 root.Q<Button>("toolbar-undo").style.display != DisplayStyle.None ||
                 root.Q<Button>("toolbar-redo").style.display != DisplayStyle.None ||
                 root.Q<Button>("toolbar-save").style.display != DisplayStyle.None ||
@@ -318,6 +369,12 @@ public static class AbilityLabFrontendSelfTest
                 if (lab.Character != CharacterClass.Manki || lab.Renderer == null ||
                     !authority.text.Contains("Compatibility Preview · Manki · Legacy authority · Read-only", StringComparison.Ordinal))
                     throw new InvalidOperationException("Manki compatibility preview did not load through the rooted resolver.");
+                if (!root.Q<Toggle>("compatibility-show-hurtboxes").enabledSelf ||
+                    !root.Q<Toggle>("compatibility-show-hitboxes").enabledSelf ||
+                    !root.Q<Toggle>("compatibility-show-baked-bones").enabledSelf ||
+                    !root.Q<Toggle>("compatibility-show-dummy").enabledSelf ||
+                    !lab.ShowHurtboxes || !lab.ShowHitboxes || lab.ShowBakedBones || lab.ShowDummy)
+                    throw new InvalidOperationException("Compatibility preview debug toggles are not exposed with legacy defaults.");
 
                 if (!lab.TryGetStage(out var stage) || stage.DurationTicks < 2)
                     throw new InvalidOperationException("Loaded legacy stage is not scrub-able.");
@@ -358,23 +415,32 @@ public static class AbilityLabFrontendSelfTest
         }
         finally
         {
-            EditorApplication.delayCall += () =>
+            Selection.activeObject = null;
+            if (window != null)
             {
-                Selection.activeObject = null;
-                if (window != null)
-                {
-                    window.rootVisualElement?.Clear();
-                    window.Close();
-                }
-                void DestroyTemporaryObject()
-                {
-                    EditorApplication.update -= DestroyTemporaryObject;
-                    if (labObject != null) UnityEngine.Object.DestroyImmediate(labObject);
-                }
-                EditorApplication.update += DestroyTemporaryObject;
-            };
+                window.rootVisualElement?.Clear();
+                window.Close();
+            }
+            if (labObject != null)
+            {
+                if (Application.isPlaying)
+                    UnityEngine.Object.Destroy(labObject);
+                else
+                    UnityEngine.Object.DestroyImmediate(labObject);
+            }
         }
     }
+    private static void CleanupOrphanedFixture()
+    {
+        foreach (var lab in Resources.FindObjectsOfTypeAll<AbilityLab>())
+        {
+            if (lab == null || lab.gameObject.name != "AbilityLabFrontendSelfTest" ||
+                EditorUtility.IsPersistent(lab.gameObject))
+                continue;
+            UnityEngine.Object.DestroyImmediate(lab.gameObject);
+        }
+    }
+
     private static void ApplyTick(AbilityLabWindow window, int tick)
         => typeof(AbilityLabWindow).GetMethod("ApplyCumulativeTick", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(window, new object[] { tick });

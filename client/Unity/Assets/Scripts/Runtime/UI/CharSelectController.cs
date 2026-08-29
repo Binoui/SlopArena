@@ -67,6 +67,7 @@ namespace SlopArena.Client.UI
             { CharacterClass.FightGuy, "DISCIPLINE / BLUE-WHITE KI" },
             { CharacterClass.Manki, "MISCHIEF / EXPLOSIVES" },
             { CharacterClass.Kistu, "BLADE / PRECISION" },
+            { CharacterClass.Bonk, "BLADE / HEAVY IMPACT" },
             { CharacterClass.Nilus, "NATURE / CONTROL" },
         };
 

@@ -34,8 +34,10 @@ public sealed class AbilityLabTimelineElement : VisualElement
 {
     private const float AxisHeight = 18f;
     private const float RowHeight = 20f;
+    private const float LabelColumnWidth = 90f;
     private const float MinimumHeight = 84f;
     private readonly List<(AbilityLabOperationProjection Operation, Rect Rect)> _hitRects = new();
+    private readonly VisualElement _rowLabels = new();
     private AbilityLabTimelineProjection _projection = null!;
     private int _currentTick;
     private AbilityLabOperationProjection? _selectedOperation;
@@ -50,16 +52,16 @@ public sealed class AbilityLabTimelineElement : VisualElement
     private int _dragStartDuration;
     private int _pendingTick;
     private int _pendingDuration;
-
     public new class UxmlFactory : UxmlFactory<AbilityLabTimelineElement, UxmlTraits> { }
-
     public AbilityLabTimelineProjection Projection
     {
         get => _projection;
         set
         {
+            if (ReferenceEquals(_projection, value)) return;
             _projection = value;
             UpdateGeometry();
+            RebuildRowLabels();
             ResolveSelectedOperation();
             MarkDirtyRepaint();
         }
@@ -90,6 +92,10 @@ public sealed class AbilityLabTimelineElement : VisualElement
     public AbilityLabTimelineElement()
     {
         focusable = true;
+        _rowLabels.name = "timeline-row-labels";
+        _rowLabels.AddToClassList("timeline-row-labels");
+        _rowLabels.pickingMode = PickingMode.Ignore;
+        Add(_rowLabels);
         generateVisualContent += GenerateVisualContent;
         RegisterCallback<PointerDownEvent>(OnPointerDown);
         RegisterCallback<PointerMoveEvent>(OnPointerMove);
@@ -190,10 +196,11 @@ public sealed class AbilityLabTimelineElement : VisualElement
 
     private void ProposeDrag(float x)
     {
-        if (!_dragging || _dragOperation == null || _projection == null || _projection.DurationTicks <= 0 || contentRect.width <= 0) return;
+        float plotWidth = PlotWidth;
+        if (!_dragging || _dragOperation == null || _projection == null || _projection.DurationTicks <= 0 || plotWidth <= 0) return;
         if (_dragOperation.SourceStageIndex < 0 || _dragOperation.SourceStageIndex >= _projection.Stages.Count) return;
         var stage = _projection.Stages[_dragOperation.SourceStageIndex];
-        int cumulativeTick = AbilityLabTimelineProjection.SnapTick(x / contentRect.width, _projection.DurationTicks);
+        int cumulativeTick = AbilityLabTimelineProjection.SnapTick(Mathf.Clamp01((x - LabelColumnWidth) / plotWidth), _projection.DurationTicks);
         int localTick = cumulativeTick - stage.StartTick;
         if (_dragMode == TimelineDragMode.ResizeHitboxEnd)
         {
@@ -212,8 +219,9 @@ public sealed class AbilityLabTimelineElement : VisualElement
 
     private void Scrub(float x)
     {
-        if (_projection == null || _projection.DurationTicks <= 0 || contentRect.width <= 0) return;
-        int tick = AbilityLabTimelineProjection.SnapTick(x / contentRect.width, _projection.DurationTicks);
+        float plotWidth = PlotWidth;
+        if (_projection == null || _projection.DurationTicks <= 0 || plotWidth <= 0) return;
+        int tick = AbilityLabTimelineProjection.SnapTick(Mathf.Clamp01((x - LabelColumnWidth) / plotWidth), _projection.DurationTicks);
         CurrentTick = tick;
         TickScrubbed?.Invoke(tick);
     }
@@ -224,13 +232,53 @@ public sealed class AbilityLabTimelineElement : VisualElement
             if (_hitRects[i].Rect.Contains(point)) return _hitRects[i].Operation;
         return null;
     }
+    private float PlotWidth => Mathf.Max(0f, contentRect.width - LabelColumnWidth);
 
     private bool IsHitboxEndHandle(AbilityLabOperationProjection operation, float x)
     {
         if (operation.Source is not SpawnHitboxOperationSource) return false;
-        float endX = Mathf.Clamp01(operation.EndTick / (float)_projection.DurationTicks) * contentRect.width;
+        float endX = LabelColumnWidth + Mathf.Clamp01(operation.EndTick / (float)_projection.DurationTicks) * PlotWidth;
         return Mathf.Abs(x - endX) <= 7f;
     }
+    private void RebuildRowLabels()
+    {
+        _rowLabels.Clear();
+        if (_projection?.Stages == null) return;
+        var counts = new Dictionary<CookedOperationKind, int>();
+        foreach (var stage in _projection.Stages)
+        foreach (var operation in stage.Operations)
+            counts[operation.Kind] = counts.TryGetValue(operation.Kind, out int count) ? count + 1 : 1;
+
+        var occurrences = new Dictionary<CookedOperationKind, int>();
+        int row = 0;
+        foreach (var stage in _projection.Stages)
+        foreach (var operation in stage.Operations)
+        {
+            int occurrence = occurrences.TryGetValue(operation.Kind, out int count) ? count + 1 : 1;
+            occurrences[operation.Kind] = occurrence;
+            string name = operation.Kind switch
+            {
+                CookedOperationKind.SpawnHitbox => "Hitbox",
+                CookedOperationKind.SpawnProjectile => "Projectile",
+                CookedOperationKind.EmitPresentation => "Presentation",
+                CookedOperationKind.StartCapability => "Capability",
+                CookedOperationKind.SetVelocity => "Velocity",
+                CookedOperationKind.SetAimState => "Aim",
+                CookedOperationKind.CompleteTimeline => "Complete",
+                _ => operation.Summary,
+            };
+            if ((operation.Kind == CookedOperationKind.SpawnHitbox || operation.Kind == CookedOperationKind.SpawnProjectile) &&
+                counts[operation.Kind] > 1)
+                name += $" {occurrence}";
+            var label = new Label(name);
+            label.AddToClassList("timeline-row-label");
+            label.pickingMode = PickingMode.Ignore;
+            label.style.top = AxisHeight + row * RowHeight;
+            _rowLabels.Add(label);
+            row++;
+        }
+    }
+
 
     private void ResolveSelectedOperation()
     {
@@ -262,9 +310,9 @@ public sealed class AbilityLabTimelineElement : VisualElement
     private void GenerateVisualContent(MeshGenerationContext context)
     {
         _hitRects.Clear();
-        if (_projection == null || _projection.DurationTicks <= 0 || contentRect.width <= 0) return;
+        float width = PlotWidth;
+        if (_projection == null || _projection.DurationTicks <= 0 || width <= 0) return;
         var painter = context.painter2D;
-        float width = contentRect.width;
         float axisHeight = AxisHeight;
         float rowHeight = RowHeight;
         painter.strokeColor = new Color(0.45f, 0.45f, 0.5f);
@@ -272,15 +320,15 @@ public sealed class AbilityLabTimelineElement : VisualElement
         for (int i = 0; i < _projection.Stages.Count; i++)
         {
             var stage = _projection.Stages[i];
-            float x = stage.StartTick / (float)_projection.DurationTicks * width;
+            float x = LabelColumnWidth + stage.StartTick / (float)_projection.DurationTicks * width;
             DrawLine(painter, new Vector2(x, 0), new Vector2(x, contentRect.height), new Color(0.5f, 0.5f, 0.55f));
             if (i == _projection.Stages.Count - 1)
             {
-                float endX = stage.EndTick / (float)_projection.DurationTicks * width;
+                float endX = LabelColumnWidth + stage.EndTick / (float)_projection.DurationTicks * width;
                 DrawLine(painter, new Vector2(endX, 0), new Vector2(endX, contentRect.height), new Color(0.5f, 0.5f, 0.55f));
             }
         }
-        float currentX = _currentTick / (float)_projection.DurationTicks * width;
+        float currentX = LabelColumnWidth + _currentTick / (float)_projection.DurationTicks * width;
         DrawLine(painter, new Vector2(currentX, 0), new Vector2(currentX, contentRect.height), new Color(1f, 1f, 0.35f));
 
         int row = 0;
@@ -294,9 +342,9 @@ public sealed class AbilityLabTimelineElement : VisualElement
                 tick = _pendingTick;
                 duration = _pendingDuration;
             }
-            float start = Mathf.Clamp01((stage.StartTick + tick) / (float)_projection.DurationTicks) * width;
+            float start = LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick) / (float)_projection.DurationTicks) * width;
             float end = operation.Source is SpawnHitboxOperationSource
-                ? Mathf.Clamp01((stage.StartTick + tick + duration) / (float)_projection.DurationTicks) * width
+                ? LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick + duration) / (float)_projection.DurationTicks) * width
                 : start;
             float y = axisHeight + row * rowHeight;
             var renderedRect = operation.Kind == CookedOperationKind.SpawnHitbox

@@ -517,10 +517,10 @@ namespace SlopArena.Shared
 
             // 7. ProcessNormalMovement (idle + aiming — attacks handle velocity via LungeForce.
             // Aiming keeps walk/run unlocked so the player can reposition while aiming.)
-            // Fixed-stance aim holds process no inputs: momentum bleeds via friction, but the
-            // player cannot steer, dash, or jump. Mobile aim (Kistu's DirectionalDash) keeps control.
+            // Fixed-policy aim holds process no inputs: momentum bleeds via friction, but the
+            // player cannot steer, dash, or jump. Mobile-policy aim keeps normal movement control.
             bool fixedAim = s.State == ActionState.Aiming && s.AttackSlot > 0
-                && def.GetSlotAbility(s.AttackSlot - 1, !s.IsGrounded)?.Behavior is AbilityBehavior.AimedProjectile or AbilityBehavior.Projectile;
+                && def.GetAimMovementMode(s.AttackSlot, !s.IsGrounded) == AimMovementMode.Fixed;
             // Landing lag (issue #125): "no input, no movement" — the stick cannot steer
             // during the lock, even once the aerial has ended and the state is Idle.
             if (s.LandingLagTicks == 0 && (s.State == ActionState.Idle || s.State == ActionState.Aiming || s.State == ActionState.Run))

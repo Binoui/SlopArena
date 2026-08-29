@@ -11,6 +11,7 @@ public sealed class CookedTimelineAbility : ServerAbility
     private int _stageIndex;
     private int _operationCursor;
     private bool _completed;
+    private bool _unlimitedAimHold;
 
     public CookedTimelineAbility(CookedSlotDefinition slot, string[] animationNames)
     {
@@ -24,6 +25,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _stageTick = 0;
         _operationCursor = 0;
         _completed = false;
+        _unlimitedAimHold = false;
         s.State = ActionState.Attacking;
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
@@ -40,13 +42,23 @@ public sealed class CookedTimelineAbility : ServerAbility
         if (_completed)
             return;
 
-        _stageTick++;
+        bool wasAiming = _unlimitedAimHold && s.State == ActionState.Aiming;
+        if (!wasAiming)
+            _stageTick++;
         ExecuteOperations(ref s, def);
         if (_completed)
             return;
 
         for (var i = 0; i < _capabilities.Count; i++)
             _capabilities[i].Tick(ref s, ref input, def);
+
+        // Bonk's zero MaxAimTicks is an explicit unlimited hold sentinel. Do not
+        // let the authored action-stage timeout terminate that hold; restart stage
+        // time when the capability transitions into its release/action phase.
+        if (wasAiming && s.State != ActionState.Aiming)
+            _stageTick = 0;
+        if (wasAiming)
+            return;
 
         if (_stageTick >= CurrentStage.DurationTicks)
         {
@@ -210,6 +222,9 @@ public sealed class CookedTimelineAbility : ServerAbility
         capability.Cooldown = Cooldown;
         capability.AirborneAtStart = AirborneAtStart;
         capability.AnimationNames = AnimationNames;
+        if (operation.Parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk
+            && bonk.MaxAimTicks == 0)
+            _unlimitedAimHold = true;
         capability.PresentationSink = PresentationSink;
         _capabilities.Add(capability);
         capability.OnStart(ref s, def);

@@ -6,6 +6,7 @@ using System.Text;
 using UnityEditor;
 using SlopArena.Client.Animation;
 using SlopArena.Shared;
+using SlopArena.Client.Tools;
 
 public static class CharacterPackageAuthoringSelfTest
 {
@@ -31,6 +32,18 @@ public static class CharacterPackageAuthoringSelfTest
         Require(directCook.Success, "Direct FightGuy cook failed.");
         Require(!string.IsNullOrEmpty(directCook.SourceHash) && !string.IsNullOrEmpty(directCook.CookedContentHash) && !string.IsNullOrEmpty(directCook.PackageHash),
             "Successful cook did not return hashes.");
+        CharacterPackageCookResult dryRun = service.Cook("fightguy", true);
+        Require(dryRun.Success && dryRun.DryRun && dryRun.Assembly != null && dryRun.ExpectedOutputs.Count > 0,
+            "Dry-run did not return a complete non-mutating cook plan.");
+        CharacterPackageVerificationResult verified = service.Verify("fightguy");
+        Require(verified.Success && verified.Plan != null && verified.Plan.DryRun && verified.Inspection.Rostered,
+            "Read-only package verification did not pass without changing roster state.");
+        CharacterPackageBindingResult foreign = service.Bind(
+            "bonk",
+            "anim.run",
+            "Assets/CharacterPackages/fightguy/Animations/fightguy_run.anim");
+        Require(!foreign.Success && foreign.Dependency != null && foreign.Dependency.Classification == "foreign",
+            "Foreign package binding was not rejected by the domain boundary.");
 
         CharacterPackageInspectionResult commandInspect = SlopArenaCharacterCommands.Inspect("fightguy");
         Require(commandInspect.Success && commandInspect.PackageId == directCook.PackageId && commandInspect.SourceHash == directCook.SourceHash,
@@ -85,8 +98,82 @@ public static class CharacterPackageAuthoringSelfTest
             CharacterPackageCookResult restored = service.Cook("fightguy");
             Require(restored.Success, "Could not restore FightGuy after authoring self-test.");
         }
-
+        RunBonkProbeSelfTest();
+        RunPackageGenericPostprocessorSelfTest();
+        RunIsolatedPackageBoundarySelfTest();
         UnityEngine.Debug.Log("[SlopArena] Character package authoring self-test passed.");
+    }
+
+    private static void RunIsolatedPackageBoundarySelfTest()
+    {
+        string packageId = "authoring-test-" + DateTime.UtcNow.Ticks.ToString("x");
+        var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
+        CharacterPackageCreateResult created = service.NewPackage(packageId, "Authoring Test");
+        Require(created.Success, "Isolated package creation failed.");
+        try
+        {
+            CharacterPackageInspectionResult inspection = service.Inspect(packageId);
+            Require(inspection.Success && inspection.PackageId == packageId && !inspection.Rostered &&
+                inspection.Slots.Count == CanonicalSlotProjection.All.Count,
+                "New package did not open as an unrostered canonical package.");
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset("Assets/CharacterPackages/" + packageId);
+            AssetDatabase.Refresh();
+        }
+    }
+
+    private static void RunBonkProbeSelfTest()
+    {
+        var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
+        CharacterPackageInspectionResult inspection = service.Inspect("bonk");
+        Require(inspection.Success && inspection.PackageId == "bonk" && inspection.DisplayName == "Bonk",
+            "Bonk package was not discovered by ID.");
+        Require(inspection.Status == "valid" && !inspection.DirtyOrStale &&
+            inspection.Slots.Count == CanonicalSlotProjection.All.Count &&
+            inspection.Slots.All(slot => slot.Present && slot.StageCount == 1),
+            "Bonk probe did not resolve valid canonical package content.");
+        Require(!inspection.Diagnostics.Any(x => x.Code == "asset-catalog.clip.missing"),
+            "Bonk shared semantic bindings unexpectedly reported missing clips.");
+        var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>("Assets/CharacterPackages/bonk/CharacterAssetCatalog.asset");
+        var moveBindings = catalog.Bindings.Where(binding => binding != null && binding.SemanticId.StartsWith("anim.bonk.", StringComparison.Ordinal)).ToList();
+        Require(moveBindings.Count == CanonicalSlotProjection.All.Count && moveBindings.Select(binding => binding.SemanticId).Distinct(StringComparer.Ordinal).Count() == moveBindings.Count,
+            "Bonk move slots do not have independent semantic IDs.");
+        var beforeMoveClips = moveBindings.ToDictionary(binding => binding.SemanticId, binding => binding.Clip, StringComparer.Ordinal);
+        Require(service.Bind("bonk", "anim.bonk.a1", "Assets/Art/Characters/bonk/Animations/bonk_a_3.FBX").Success &&
+            moveBindings.Where(binding => binding.SemanticId != "anim.bonk.a1").All(binding => binding.Clip == beforeMoveClips[binding.SemanticId]),
+            "Bonk move binding replacement changed unrelated moves.");
+        Require(service.Bind("bonk", "anim.bonk.a1", "Assets/Art/Characters/bonk/Animations/bonk_a_1.FBX").Success,
+            "Bonk move binding fixture could not be restored.");
+        CharacterPackageCookResult cook = service.Cook("bonk");
+        Require(cook.Success && !string.IsNullOrEmpty(cook.CookedContentHash) && !string.IsNullOrEmpty(cook.PackageHash),
+            "Bonk probe did not cook with independent move bindings.");
+        var preview = AbilityLabPackagePreviewLoader.Load("bonk");
+        Require(preview.IsAvailable && preview.Identity != null && preview.Identity.PackageId == "bonk",
+            "Cooked Bonk package preview did not load.");
+    }
+
+    private static void RunPackageGenericPostprocessorSelfTest()
+    {
+        var affected = CharacterCookAssetPostprocessor.FindAffectedPackages(new[]
+        {
+            "Assets/CharacterPackages/bonk/package.json",
+            "Assets/CharacterPackages/bonk/character.json",
+            "Assets/CharacterPackages/bonk/CharacterAssetCatalog.asset",
+            "Assets/CharacterPackages/bonk/CharacterAssetCatalog.asset.meta",
+        });
+        Require(affected.Contains("bonk") && !affected.Contains("fightguy"),
+            "Package-local dependency detection was not package-specific.");
+        CharacterCookAssetPostprocessor.ResetQueueRequestCount();
+        CharacterCookAssetPostprocessor.QueueRecook(new[] { "bonk" });
+        CharacterCookAssetPostprocessor.QueueRecook(new[] { "bonk" });
+        Require(CharacterCookAssetPostprocessor.QueueRequestCount == 1 &&
+            CharacterCookAssetPostprocessor.PendingPackages.Contains("bonk"),
+            "Repeated package recook requests were not coalesced.");
+        CharacterCookAssetPostprocessor.ResetQueueRequestCount();
+        Require(new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Cook("bonk").Success,
+            "Could not restore Bonk after queue coalescing assertion.");
     }
 
     private static string MakeInvalidCharacter(string manifestJson, string characterJson)

@@ -37,6 +37,9 @@ public static class InternalCapabilityRegistry
             case "slop.internal.kistu.blade-flurry.v1" when parameters is CookedKistuBladeFlurryCapabilityParameters flurry:
                 capability = new KistuUltFlurry(flurry);
                 return true;
+            case "slop.internal.bonk.targeted-jump-slam.v1" when parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk:
+                capability = new BonkTargetedJumpSlam(bonk);
+                return true;
             default:
                 return false;
         }

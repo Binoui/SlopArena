@@ -21,6 +21,154 @@ public sealed class CharacterPackageAuthoringService
         if (string.IsNullOrWhiteSpace(projectRoot)) throw new ArgumentException("Project root is required.", nameof(projectRoot));
         _projectRoot = Path.GetFullPath(projectRoot);
     }
+    private static CharacterAssetCatalog.AnimationBinding[] CreateStarterBindings(CharacterAuthoringDocument character)
+    {
+        var ids = new[]
+        {
+            character.Presentation.Idle, character.Presentation.Run, character.Presentation.Dash,
+            character.Presentation.Jump, character.Presentation.Fall, character.Presentation.HitSmall,
+            character.Presentation.HitMedium, character.Presentation.HitHard,
+        }.Concat((character.Slots ?? Array.Empty<CharacterSlotSource>())
+            .SelectMany(slot => slot.Timeline?.Stages ?? Array.Empty<CharacterStageSource>())
+            .SelectMany(stage => stage.AnimationIds ?? Array.Empty<string>()))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal);
+        return ids.Select(id => new CharacterAssetCatalog.AnimationBinding
+        {
+            SemanticId = id,
+            PoseTrackId = id,
+        }).ToArray();
+    }
+
+    public CharacterPackageCreateResult NewPackage(
+        string packageId,
+        string displayName,
+        string creator = "Binoui",
+        string license = "MIT",
+        string attribution = "SlopArena")
+    {
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (!MatchContentCatalogBuilder.IsStablePackageId(packageId))
+            return CharacterPackageCreateResult.Failure(null, null, null, new[] { Error("id.invalid", "packageId", "Package ID must be a stable lowercase identifier.") });
+
+        string root = CharacterPackagesRoot + "/" + packageId;
+        string fullRoot = Path.Combine(_projectRoot, root.Replace('/', Path.DirectorySeparatorChar));
+        if (Directory.Exists(fullRoot) && Directory.EnumerateFileSystemEntries(fullRoot).Any())
+            return CharacterPackageCreateResult.Failure(packageId, root, root + "/CharacterAssetCatalog.asset",
+                new[] { Error("package.exists", root, "Package folder already exists and is not empty.") });
+
+        bool createdRoot = !Directory.Exists(fullRoot);
+        string catalogPath = root + "/CharacterAssetCatalog.asset";
+        try
+        {
+            Directory.CreateDirectory(fullRoot);
+            CharacterPackageSource source = CharacterPackageSourceCodec.CreateAuthoringReady(packageId, displayName, creator, license, attribution);
+            WriteDurably(Path.Combine(fullRoot, "package.json"), Encoding.UTF8.GetBytes(CharacterPackageSourceCodec.SerializeManifest(source.Manifest)));
+            WriteDurably(Path.Combine(fullRoot, "character.json"), Encoding.UTF8.GetBytes(CharacterPackageSourceCodec.SerializeCharacter(source.Character)));
+            var catalog = ScriptableObject.CreateInstance<CharacterAssetCatalog>();
+            catalog.PackageId = packageId;
+            catalog.CatalogSchemaVersion = CharacterAssetCatalog.SchemaVersion;
+            catalog.SampleRate = UnityCharacterAssetCooker.SampleRate;
+            catalog.Rig = null;
+            catalog.Bindings = CreateStarterBindings(source.Character);
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            if (!AssetDatabase.IsValidFolder(root))
+            {
+                string parent = "Assets/CharacterPackages";
+                AssetDatabase.CreateFolder(parent, packageId);
+            }
+            AssetDatabase.CreateAsset(catalog, catalogPath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            if (AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(catalogPath) == null)
+                throw new InvalidOperationException("Unity did not import the new CharacterAssetCatalog asset.");
+            return CharacterPackageCreateResult.Successful(packageId, root, catalogPath);
+        }
+        catch (Exception ex)
+        {
+            AssetDatabase.DeleteAsset(catalogPath);
+            foreach (string file in new[] { "package.json", "character.json" })
+            {
+                string path = Path.Combine(fullRoot, file);
+                if (File.Exists(path)) File.Delete(path);
+            }
+            if (createdRoot && Directory.Exists(fullRoot)) Directory.Delete(fullRoot, true);
+            diagnostics.Add(Error("package.create.failed", root, ex.Message));
+            return CharacterPackageCreateResult.Failure(packageId, root, catalogPath, diagnostics);
+        }
+    }
+
+    public CharacterPackageBindingResult Bind(string target, string semanticId, string assetPath, ExtrapolationMode? extrapolation = null)
+    {
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (!TryResolve(target, diagnostics, out var package))
+            return CharacterPackageBindingResult.Failure(package?.PackageId, package?.ProjectRelativeRoot, semanticId, assetPath, diagnostics);
+        if (package.Catalog == null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, assetPath,
+                diagnostics.Concat(new[] { Error("asset-catalog.missing", package.ProjectRelativeRoot + "/CharacterAssetCatalog.asset", "Character asset catalog is required.") }));
+        if (string.IsNullOrWhiteSpace(semanticId))
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, assetPath,
+                diagnostics.Concat(new[] { Error("binding.semantic-id.missing", "semanticId", "Semantic ID is required.") }));
+        var binding = (package.Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .FirstOrDefault(x => x != null && StringEquals(x.SemanticId, semanticId));
+        if (binding == null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, assetPath,
+                diagnostics.Concat(new[] { Error("binding.semantic-id.missing", semanticId, "Catalog binding does not exist; automatic binding creation is not supported.") }));
+
+        string normalizedPath = NormalizeProjectAssetPath(assetPath);
+        AnimationClip clip = string.IsNullOrEmpty(normalizedPath) ? null : AssetDatabase.LoadAssetAtPath<AnimationClip>(normalizedPath);
+        if (clip == null && !string.IsNullOrEmpty(normalizedPath))
+            clip = AssetDatabase.LoadAllAssetsAtPath(normalizedPath).OfType<AnimationClip>().FirstOrDefault();
+        if (clip == null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, normalizedPath,
+                diagnostics.Concat(new[] { Error("binding.asset.invalid", normalizedPath, "Asset path does not resolve to an AnimationClip or animation subasset.") }));
+
+        CharacterPackageDependencyInfo classification = ClassifyDependency(package.ProjectRelativeRoot, normalizedPath);
+        if (classification.Classification == "foreign")
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, normalizedPath,
+                diagnostics.Concat(new[] { Error("asset-catalog.dependency.foreign", normalizedPath, "Binding references an asset outside the target package and approved shared registry.") }),
+                classification);
+
+        binding.Clip = clip;
+        if (extrapolation.HasValue) binding.Extrapolation = extrapolation.Value;
+        if (!PersistCatalog(package.ProjectRelativeRoot, package.Catalog, out var persistedCatalog, out _, out var persistDiagnostics))
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, normalizedPath,
+                diagnostics.Concat(persistDiagnostics), classification);
+        var persistedBinding = (persistedCatalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .FirstOrDefault(x => x != null && StringEquals(x.SemanticId, semanticId));
+        if (persistedBinding == null || persistedBinding.Clip == null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, normalizedPath,
+                diagnostics.Concat(new[] { Error("binding.persist.failed", normalizedPath, "Catalog binding did not round-trip after persistence.") }), classification);
+        return CharacterPackageBindingResult.Successful(package.PackageId, package.ProjectRelativeRoot, semanticId, normalizedPath, classification, persistedBinding);
+    }
+
+    public CharacterPackageBindingResult Unbind(string target, string semanticId)
+    {
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (!TryResolve(target, diagnostics, out var package))
+            return CharacterPackageBindingResult.Failure(package?.PackageId, package?.ProjectRelativeRoot, semanticId, "", diagnostics);
+        var binding = (package.Catalog?.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .FirstOrDefault(x => x != null && StringEquals(x.SemanticId, semanticId));
+        if (binding == null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, "",
+                diagnostics.Concat(new[] { Error("binding.semantic-id.missing", semanticId, "Catalog binding does not exist; automatic binding creation is not supported.") }));
+        string priorPath = binding.Clip == null ? "" : NormalizeProjectAssetPath(AssetDatabase.GetAssetPath(binding.Clip));
+        CharacterPackageDependencyInfo priorClassification = string.IsNullOrEmpty(priorPath)
+            ? CharacterPackageDependencyInfo.Missing("")
+            : ClassifyDependency(package.ProjectRelativeRoot, priorPath);
+        binding.Clip = null;
+        if (!PersistCatalog(package.ProjectRelativeRoot, package.Catalog, out var persistedCatalog, out _, out var persistDiagnostics))
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, priorPath,
+                diagnostics.Concat(persistDiagnostics), priorClassification);
+        var persistedBinding = (persistedCatalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .FirstOrDefault(x => x != null && StringEquals(x.SemanticId, semanticId));
+        if (persistedBinding == null || persistedBinding.Clip != null)
+            return CharacterPackageBindingResult.Failure(package.PackageId, package.ProjectRelativeRoot, semanticId, "",
+                diagnostics.Concat(new[] { Error("binding.persist.failed", semanticId, "Catalog unbind did not round-trip after persistence.") }),
+                CharacterPackageDependencyInfo.Missing(""));
+        return CharacterPackageBindingResult.Successful(package.PackageId, package.ProjectRelativeRoot, semanticId, "", CharacterPackageDependencyInfo.Missing(""), persistedBinding);
+    }
 
     public CharacterPackageInspectionResult Inspect(string target)
     {
@@ -98,6 +246,8 @@ public sealed class CharacterPackageAuthoringService
                 artifact.Manifest,
                 ProfileFor(package.PackageId),
                 cookStatus);
+        (bool rostered, string selector) roster = ReadRosterState(package.PackageId);
+        bool previewReady = artifact.Manifest != null && !artifact.IsInvalid && !artifact.IsMissing;
         return CharacterPackageInspectionResult.CreateSuccess(
             package.PackageId,
             package.DisplayName,
@@ -113,18 +263,174 @@ public sealed class CharacterPackageAuthoringService
             diagnostics,
             package.Source,
             package.Catalog,
-            provenance);
+            provenance,
+            roster.rostered,
+            roster.selector,
+            previewReady);
+    }
+    public CharacterPackageVerificationResult Verify(string target)
+    {
+        CharacterPackageInspectionResult inspection = Inspect(target);
+        var diagnostics = new List<CharacterDiagnostic>(inspection.RawDiagnostics ?? Array.Empty<CharacterDiagnostic>());
+        if (!inspection.Success)
+            return CharacterPackageVerificationResult.Failure(inspection.PackageId, diagnostics, inspection, null);
+
+        CharacterPackageCookResult plan = Cook(target, true);
+        AddUnique(diagnostics, plan.RawDiagnostics);
+        if (!StringEquals(inspection.Status, "valid"))
+            diagnostics.Add(Error("verify.cooked.invalid", inspection.SourcePath ?? target, "Package inspection is not a verified, current cooked artifact."));
+        if (plan.Success && !StringEquals(plan.CookedContentHash, inspection.CookedContentHash))
+            diagnostics.Add(Error("verify.cooked.mismatch", inspection.SourcePath ?? target, "Deterministic cook output does not match the installed cooked artifact."));
+        if (plan.Success && !StringEquals(plan.PackageHash, inspection.PackageHash))
+            diagnostics.Add(Error("verify.package.mismatch", inspection.SourcePath ?? target, "Deterministic package hash does not match the installed cooked artifact."));
+        bool success = diagnostics.All(x => x.Severity != CharacterDiagnosticSeverity.Error);
+        return CharacterPackageVerificationResult.Create(success, inspection.PackageId, diagnostics, inspection, plan);
     }
 
-    public CharacterPackageCookResult Cook(string target)
+
+    public CharacterPackageAssetDiscoveryResult DiscoverAssets(string target, string semanticId)
     {
         var diagnostics = new List<CharacterDiagnostic>();
         if (!TryResolve(target, diagnostics, out var package))
-            return CharacterPackageCookResult.CreateFailure(null, null, null, null, null, diagnostics, null);
+            return CharacterPackageAssetDiscoveryResult.Failure(semanticId, diagnostics);
+        if (package.Catalog == null || !(package.Catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+            .Any(x => x != null && StringEquals(x.SemanticId, semanticId)))
+        {
+            diagnostics.Add(Error("binding.semantic-id.missing", semanticId ?? "semanticId", "Catalog binding does not exist; discovery is scoped to declared semantic IDs."));
+            return CharacterPackageAssetDiscoveryResult.Failure(semanticId, diagnostics);
+        }
+        var candidates = new List<CharacterPackageAssetCandidate>();
+        foreach (string guid in AssetDatabase.FindAssets("t:AnimationClip"))
+        {
+            string path = NormalizeProjectAssetPath(AssetDatabase.GUIDToAssetPath(guid));
+            if (string.IsNullOrEmpty(path)) continue;
+            CharacterPackageDependencyInfo dependency = ClassifyDependency(package.ProjectRelativeRoot, path);
+            AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(path).OfType<AnimationClip>().ToArray();
+            if (clips.Length == 0)
+            {
+                candidates.Add(new CharacterPackageAssetCandidate(path, "", "missing", dependency.SourcePackageId, "No AnimationClip subasset found."));
+                continue;
+            }
+            foreach (AnimationClip clip in clips)
+            {
+                bool accepted = dependency.Classification == "package" || dependency.Classification == "shared-approved";
+                string rejection = accepted ? "" : dependency.Classification == "foreign" ? "Asset belongs to a foreign package or unapproved project location." : "Asset is not an approved animation source.";
+                candidates.Add(new CharacterPackageAssetCandidate(path, clip.name, dependency.Classification, dependency.SourcePackageId, rejection));
+            }
+        }
+        return CharacterPackageAssetDiscoveryResult.Successful(semanticId, candidates
+            .OrderBy(x => x.Path, StringComparer.Ordinal)
+            .ThenBy(x => x.Name, StringComparer.Ordinal));
+    }
+    public CharacterRosterAdmissionResult AdmitRoster(
+        string packageId,
+        string selectorName,
+        string version = "",
+        string cookedHash = "",
+        string packageHash = "")
+    {
+        CharacterPackageVerificationResult verification = Verify(packageId);
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (verification.Diagnostics != null)
+            diagnostics.AddRange(verification.Diagnostics.Select(x => new CharacterDiagnostic(
+                x.Severity == "error" ? CharacterDiagnosticSeverity.Error : CharacterDiagnosticSeverity.Warning,
+                x.Code, x.Path, x.Message)));
+        if (!verification.Success)
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+        if (!Enum.TryParse(selectorName, true, out CharacterClass selector) || selector == CharacterClass.None)
+        {
+            diagnostics.Add(Error("roster.selector.invalid", "selector", "Roster selector must be a supported CharacterClass value."));
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+        }
+
+        string verifiedVersion = verification.Inspection?.Provenance?.Version ?? "";
+        string verifiedCookedHash = verification.Plan?.CookedContentHash ?? "";
+        string verifiedPackageHash = verification.Plan?.PackageHash ?? "";
+        version = string.IsNullOrEmpty(version) ? verifiedVersion : version;
+        cookedHash = string.IsNullOrEmpty(cookedHash) ? verifiedCookedHash : cookedHash;
+        packageHash = string.IsNullOrEmpty(packageHash) ? verifiedPackageHash : packageHash;
+        if (!StringEquals(version, verifiedVersion) || !StringEquals(cookedHash, verifiedCookedHash) || !StringEquals(packageHash, verifiedPackageHash))
+        {
+            diagnostics.Add(Error("roster.requirement.mismatch", packageId, "Roster admission hashes/version do not match the verified cooked artifact."));
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+        }
+
+        string rosterPath = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
+        try
+        {
+            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(rosterPath));
+            if (manifest.TryGetByPackageId(packageId, out _))
+                diagnostics.Add(Error("roster.package.exists", packageId, "Package is already admitted to the roster."));
+            if (manifest.TryGetBySelector(selector, out _))
+                diagnostics.Add(Error("roster.selector.exists", selector.ToString(), "Roster selector is already assigned."));
+            if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
+                return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+            var entries = manifest.Entries.Concat(new[]
+            {
+                new BuiltInRosterEntry(selector, packageId, new MatchContentPackageRequirement(packageId, version, cookedHash, packageHash))
+            }).ToArray();
+            WriteDurably(rosterPath, Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(
+                new BuiltInRosterManifest(manifest.SchemaVersion, entries))));
+            return CharacterRosterAdmissionResult.Successful(packageId, selector.ToString());
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("roster.admit.failed", rosterPath, ex.Message));
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+        }
+    }
+    public CharacterRosterAdmissionResult RefreshRoster(string packageId)
+    {
+        CharacterPackageVerificationResult verification = Verify(packageId);
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (verification.Diagnostics != null)
+            diagnostics.AddRange(verification.Diagnostics.Select(x => new CharacterDiagnostic(
+                x.Severity == "error" ? CharacterDiagnosticSeverity.Error : CharacterDiagnosticSeverity.Warning,
+                x.Code, x.Path, x.Message)));
+        if (!verification.Success)
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+
+        string rosterPath = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
+        try
+        {
+            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(rosterPath));
+            if (!manifest.TryGetByPackageId(packageId, out var existing))
+                return CharacterRosterAdmissionResult.Failure(packageId, new[] { Error("roster.package.missing", packageId, "Package is not admitted to the roster.") });
+
+            var requirement = new MatchContentPackageRequirement(
+                packageId,
+                verification.Inspection?.Provenance?.Version ?? "",
+                verification.Plan?.CookedContentHash ?? "",
+                verification.Plan?.PackageHash ?? "");
+            var entries = manifest.Entries
+                .Select(x => x.PackageId == packageId
+                    ? new BuiltInRosterEntry(x.Selector, x.PackageId, requirement)
+                    : x)
+                .ToArray();
+            WriteDurably(rosterPath, Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(
+                new BuiltInRosterManifest(manifest.SchemaVersion, entries))));
+            return CharacterRosterAdmissionResult.Successful(packageId, existing.Selector.ToString());
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("roster.refresh.failed", rosterPath, ex.Message));
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
+        }
+    }
+
+
+    public CharacterPackageCookResult Cook(string target) => Cook(target, false);
+
+    public CharacterPackageCookResult Cook(string target, bool dryRun)
+    {
+        var diagnostics = new List<CharacterDiagnostic>();
+        if (!TryResolve(target, diagnostics, out var package))
+            return CharacterPackageCookResult.CreateFailure(null, null, null, null, null, diagnostics, null, dryRun, Array.Empty<string>());
 
         AddUnique(diagnostics, package.Diagnostics);
+        string[] expectedOutputs = ExpectedOutputPaths(package.PackageId);
         if (package.Source == null || package.Catalog == null || diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
 
         byte[] packageBytesBefore;
         byte[] characterBytesBefore;
@@ -136,7 +442,7 @@ public sealed class CharacterPackageAuthoringService
         catch (Exception ex)
         {
             diagnostics.Add(Error("source.read.failed", package.ProjectRelativeRoot, ex.Message));
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
         }
 
         CharacterAssetCookResult cooked;
@@ -151,28 +457,32 @@ public sealed class CharacterPackageAuthoringService
         catch (Exception ex)
         {
             diagnostics.Add(Error("asset-catalog.schema", "cook", ex.Message));
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
         }
 
         AddUnique(diagnostics, cooked.Diagnostics);
         if (cooked.CookedPackage == null || cooked.HasErrors)
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null, dryRun, expectedOutputs);
 
         CharacterPackageAssemblyResult assembly = CharacterPackageAssembler.Assemble(UnityCharacterAssetCooker.BuildPackageInput(cooked));
         AddUnique(diagnostics, assembly.Diagnostics);
         if (!assembly.IsValid)
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, dryRun, expectedOutputs);
 
         if (!InputsUnchanged(package, packageBytesBefore, characterBytesBefore, cooked.SourceHash, out var conflictDiagnostics))
         {
             AddUnique(diagnostics, conflictDiagnostics);
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, dryRun, expectedOutputs);
         }
+
+        if (dryRun)
+            return CharacterPackageCookResult.CreateSuccess(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId),
+                assembly.SourceHash, assembly.CookedContentHash, assembly.PackageHash, diagnostics, assembly, true, expectedOutputs);
 
         if (!Publish(package, cooked, assembly, out var publishDiagnostics))
         {
             AddUnique(diagnostics, publishDiagnostics);
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, false, expectedOutputs);
         }
 
         return CharacterPackageCookResult.CreateSuccess(
@@ -183,7 +493,25 @@ public sealed class CharacterPackageAuthoringService
             assembly.CookedContentHash,
             assembly.PackageHash,
             diagnostics,
-            assembly);
+            assembly,
+            false,
+            expectedOutputs);
+    }
+
+    private string[] ExpectedOutputPaths(string packageId)
+    {
+        CharacterCookOutput output = CharacterCookOutput.For(packageId);
+        return new[]
+        {
+            CookedPath(packageId) + "/" + CharacterPackageAssembler.ManifestPath,
+            CookedPath(packageId) + "/" + CharacterPackageAssembler.RuntimePath,
+            CookedPath(packageId) + "/" + CharacterPackageAssembler.PosePath,
+            CookedPath(packageId) + "/" + CharacterPackageAssembler.BindingPath,
+            output.IntermediateDirectory + "/" + output.PoseFileName,
+            output.IntermediateDirectory + "/" + output.BindingFileName,
+            output.IntermediateDirectory + "/" + output.StatusFileName,
+            output.GeneratedAssetPath,
+        };
     }
 
     public CharacterCookStatus ReadStatus(string packageId)
@@ -226,6 +554,23 @@ public sealed class CharacterPackageAuthoringService
             new CharacterCookStatusDiagnostic { Severity = "warning", Code = "asset-catalog.stale", Path = "catalog", Message = "A package dependency changed; recook is queued." }
         };
         WriteStatus(status, packageId);
+    }
+
+    private (bool rostered, string selector) ReadRosterState(string packageId)
+    {
+        string path = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
+        try
+        {
+            if (!File.Exists(path)) return (false, "");
+            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(path));
+            return manifest.TryGetByPackageId(packageId, out var entry)
+                ? (true, entry.Selector.ToString())
+                : (false, "");
+        }
+        catch
+        {
+            return (false, "");
+        }
     }
 
     private bool TryResolve(string target, List<CharacterDiagnostic> diagnostics, out PackageContext package)
@@ -273,6 +618,105 @@ public sealed class CharacterPackageAuthoringService
 
         package = LoadContext(fullRoot, diagnostics);
         return true;
+    }
+
+    internal static string NormalizeProjectAssetPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "";
+        string normalized = path.Replace('\\', '/');
+        if (Path.IsPathRooted(normalized))
+        {
+            string root = UnityCharacterAssetCooker.ProjectRoot().Replace('\\', '/').TrimEnd('/') + "/";
+            normalized = normalized.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+                ? normalized.Substring(root.Length)
+                : "";
+        }
+        return normalized.StartsWith("Assets/", StringComparison.Ordinal) ? normalized : "";
+    }
+
+    internal static CharacterPackageDependencyInfo ClassifyDependency(string packageRoot, string assetPath)
+    {
+        string normalized = NormalizeProjectAssetPath(assetPath);
+        if (string.IsNullOrEmpty(normalized))
+            return CharacterPackageDependencyInfo.Missing(normalized);
+        string packageRootNormalized = packageRoot.Replace('\\', '/').TrimEnd('/');
+        string packageId = packageRootNormalized.Substring("Assets/CharacterPackages/".Length);
+        if (normalized.StartsWith(packageRootNormalized + "/", StringComparison.Ordinal)
+            || CharacterPackageAssetOwnershipRegistry.IsOwnedBy(packageId, normalized))
+            return CharacterPackageDependencyInfo.Package(normalized, packageId);
+        if (CharacterSharedAssetRegistry.IsApproved(normalized, out string reason, out string version))
+            return CharacterPackageDependencyInfo.Shared(normalized, reason, version);
+        if (normalized.StartsWith("Assets/CharacterPackages/", StringComparison.Ordinal))
+        {
+            string remainder = normalized.Substring("Assets/CharacterPackages/".Length);
+            string sourcePackage = remainder.Split('/')[0];
+            return CharacterPackageDependencyInfo.Foreign(normalized, sourcePackage);
+        }
+        if (CharacterPackageAssetOwnershipRegistry.TryGetOwner(normalized, out string foreignPackage))
+            return CharacterPackageDependencyInfo.Foreign(normalized, foreignPackage);
+        return CharacterPackageDependencyInfo.Foreign(normalized, "");
+    }
+
+    internal static bool PersistCatalog(
+        string packageRoot,
+        CharacterAssetCatalog catalog,
+        out CharacterAssetCatalog persistedCatalog,
+        out string fingerprint,
+        out IReadOnlyList<CharacterDiagnostic> diagnostics)
+    {
+        var errors = new List<CharacterDiagnostic>();
+        persistedCatalog = catalog;
+        fingerprint = "";
+        if (catalog == null)
+        {
+            errors.Add(Error("asset-catalog.missing", packageRoot + "/CharacterAssetCatalog.asset", "Character asset catalog is required."));
+            diagnostics = errors;
+            return false;
+        }
+        try
+        {
+            string catalogPath = NormalizeProjectAssetPath(packageRoot + "/CharacterAssetCatalog.asset");
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            if (!string.IsNullOrEmpty(catalogPath))
+                AssetDatabase.ImportAsset(catalogPath, ImportAssetOptions.ForceSynchronousImport);
+            persistedCatalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>(catalogPath);
+            if (persistedCatalog == null)
+            {
+                errors.Add(Error("asset-catalog.persist.failed", catalogPath, "Catalog could not be reloaded after persistence."));
+                diagnostics = errors;
+                return false;
+            }
+            fingerprint = ComputeCatalogFingerprint(persistedCatalog);
+            diagnostics = errors;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errors.Add(Error("asset-catalog.persist.failed", packageRoot, ex.Message));
+            diagnostics = errors;
+            return false;
+        }
+    }
+
+    internal static string ComputeCatalogFingerprint(CharacterAssetCatalog catalog)
+    {
+        if (catalog == null) return "";
+        var builder = new StringBuilder();
+        builder.Append(catalog.PackageId).Append('\n')
+            .Append(catalog.CatalogSchemaVersion).Append('\n')
+            .Append(catalog.SampleRate).Append('\n')
+            .Append(catalog.Rig == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(catalog.Rig).ToString()).Append('\n');
+        foreach (var binding in catalog.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+        {
+            builder.Append(binding?.SemanticId ?? "").Append('|')
+                .Append(binding?.PoseTrackId ?? "").Append('|')
+                .Append(binding == null || binding.Clip == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString()).Append('|')
+                .Append(binding?.Extrapolation.ToString() ?? "").Append('\n');
+        }
+        using var hash = SHA256.Create();
+        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", "").ToLowerInvariant();
     }
 
     private PackageContext LoadContext(string fullRoot, List<CharacterDiagnostic> diagnostics)
@@ -375,9 +819,6 @@ public sealed class CharacterPackageAuthoringService
         var errors = new List<CharacterDiagnostic>();
         string projectRoot = _projectRoot;
         string repositoryRoot = RepositoryRoot();
-        string rosterPath = Path.Combine(repositoryRoot, "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
-        string rosterTemporary = rosterPath + ".tmp-" + Guid.NewGuid().ToString("N");
-        string rosterBackup = rosterPath + ".previous";
         string canonicalDirectory = Path.Combine(repositoryRoot, "content-cooked", package.PackageId);
         string packageParent = Path.GetDirectoryName(canonicalDirectory)!;
         string temporaryDirectory = Path.Combine(packageParent, "." + package.PackageId + ".tmp-" + Guid.NewGuid().ToString("N"));
@@ -387,26 +828,17 @@ public sealed class CharacterPackageAuthoringService
         string generatedAssetPath = CharacterCookOutput.For(package.PackageId).GeneratedAssetPath;
         string temporaryAssetPath = CharacterAnimationCatalogGenerator.TemporaryPath(generatedAssetPath);
         string statusPath = Path.Combine(projectRoot, CharacterCookOutput.For(package.PackageId).IntermediateDirectory, CharacterCookOutput.For(package.PackageId).StatusFileName);
-        byte[] previousRoster = Snapshot(rosterPath);
         byte[] previousPose = Snapshot(finalPose);
         byte[] previousBinding = Snapshot(finalBinding);
         byte[] previousStatus = Snapshot(statusPath);
         FileSnapshot previousGenerated = SnapshotFile(generatedAssetPath, projectRoot);
         bool hadCanonical = Directory.Exists(canonicalDirectory);
         bool canonicalInstalled = false;
-        bool rosterUpdated = false;
 
         try
         {
             Directory.CreateDirectory(packageParent);
             if (Directory.Exists(temporaryDirectory)) Directory.Delete(temporaryDirectory, true);
-            if (previousRoster != null)
-            {
-                var priorManifest = BuiltInRosterManifestCodec.ParseCooked(Encoding.UTF8.GetString(previousRoster));
-                rosterUpdated = priorManifest.TryGetByPackageId(package.PackageId, out _);
-                if (rosterUpdated)
-                    WriteDurably(rosterTemporary, UpdateRoster(previousRoster, assembled, package.PackageId));
-            }
             Directory.CreateDirectory(temporaryDirectory);
             WriteDurably(Path.Combine(temporaryDirectory, CharacterPackageAssembler.ManifestPath), assembled.ManifestBytes);
             WriteDurably(Path.Combine(temporaryDirectory, CharacterPackageAssembler.RuntimePath), assembled.RuntimeBytes);
@@ -424,15 +856,8 @@ public sealed class CharacterPackageAuthoringService
             WriteDurably(finalBinding, assembled.BindingBytes);
             string generatedTemp = CharacterAnimationCatalogGenerator.Generate(assembled.BindingBytes, generatedAssetPath);
             CharacterAnimationCatalogGenerator.ReplaceTemporary(generatedTemp, generatedAssetPath);
-            if (rosterUpdated)
-            {
-                if (File.Exists(rosterPath)) File.Replace(rosterTemporary, rosterPath, rosterBackup, true);
-                else File.Move(rosterTemporary, rosterPath);
-            }
             WriteSuccessStatus(result, assembled, package.PackageId);
             if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, true);
-            if (File.Exists(rosterTemporary)) File.Delete(rosterTemporary);
-            if (File.Exists(rosterBackup)) File.Delete(rosterBackup);
             diagnostics = errors;
             return true;
         }
@@ -448,12 +873,6 @@ public sealed class CharacterPackageAuthoringService
                 RestoreFile(finalBinding, previousBinding);
                 RestoreGeneratedAsset(generatedAssetPath, previousGenerated, projectRoot);
                 RestoreFile(statusPath, previousStatus);
-                if (rosterUpdated)
-                {
-                    RestoreFile(rosterPath, previousRoster);
-                    if (File.Exists(rosterTemporary)) File.Delete(rosterTemporary);
-                    if (File.Exists(rosterBackup)) File.Delete(rosterBackup);
-                }
                 if (canonicalInstalled && Directory.Exists(canonicalDirectory)) Directory.Delete(canonicalDirectory, true);
                 if (hadCanonical && Directory.Exists(backupDirectory)) Directory.Move(backupDirectory, canonicalDirectory);
                 else if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, true);
@@ -467,7 +886,6 @@ public sealed class CharacterPackageAuthoringService
         }
         finally
         {
-            if (File.Exists(rosterTemporary)) File.Delete(rosterTemporary);
             if (Directory.Exists(temporaryDirectory)) Directory.Delete(temporaryDirectory, true);
         }
     }
@@ -603,8 +1021,8 @@ public sealed class CharacterPackageAuthoringService
         => parent.TryGetProperty(name, out var value) && value.TryGetUInt16(out ushort result) ? result : (ushort)0;
 
 
-    private CharacterCookProfile ProfileFor(string packageId)
-        => packageId == "fightguy" || packageId == "kistu" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+    internal static CharacterCookProfile ProfileFor(string packageId)
+        => packageId == "fightguy" || packageId == "kistu" || packageId == "bonk" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
 
     private string CharacterPackagesFullRoot() => Path.Combine(_projectRoot, CharacterPackagesRoot.Replace('/', Path.DirectorySeparatorChar));
     private string PackageRootFor(string packageId) => CharacterPackagesRoot + "/" + packageId;
@@ -654,17 +1072,6 @@ public sealed class CharacterPackageAuthoringService
         File.WriteAllText(path, JsonUtility.ToJson(status, true));
     }
 
-    private static byte[] UpdateRoster(byte[] priorBytes, CharacterPackageAssemblyResult assembled, string packageId)
-    {
-        var manifest = BuiltInRosterManifestCodec.ParseCooked(Encoding.UTF8.GetString(priorBytes));
-        using var document = JsonDocument.Parse(assembled.ManifestBytes);
-        string version = document.RootElement.GetProperty("version").GetString() ?? "";
-        var entries = manifest.Entries.Select(x => x.PackageId == packageId
-            ? new BuiltInRosterEntry(x.Selector, x.PackageId, new MatchContentPackageRequirement(x.PackageId, version, assembled.CookedContentHash, assembled.PackageHash))
-            : x).ToArray();
-        if (!entries.Any(x => x.PackageId == packageId)) throw new InvalidDataException($"Roster package requirement for '{packageId}' is missing.");
-        return Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(new BuiltInRosterManifest(manifest.SchemaVersion, entries)));
-    }
 
     private static Dictionary<string, byte[]> ReadPackageFiles(string directory)
         => new[]
@@ -723,6 +1130,11 @@ public sealed class CharacterPackageAuthoringService
             DependencyHash = record.DependencyHash,
             MetaHash = record.MetaHash,
             ImporterSettings = record.ImporterSettings,
+            Classification = record.Classification,
+            SourcePackageId = record.SourcePackageId,
+            SourcePath = record.SourcePath,
+            ApprovalReason = record.ApprovalReason,
+            ApprovalVersion = record.ApprovalVersion,
         };
 
     private static CharacterCookStatusPayload ToStatusPayload(CharacterPackagePayloadInfo payload)
@@ -811,6 +1223,137 @@ internal sealed class CharacterPackageManifestProjection
     public readonly List<CharacterPackageDiagnosticResult> Warnings = new();
 }
 
+public sealed class CharacterPackageDependencyInfo
+{
+    [JsonProperty("classification")] public string Classification { get; }
+    [JsonProperty("sourcePackageId")] public string SourcePackageId { get; }
+    [JsonProperty("sourcePath")] public string SourcePath { get; }
+    [JsonProperty("approvalReason")] public string ApprovalReason { get; }
+    [JsonProperty("approvalVersion")] public string ApprovalVersion { get; }
+
+    private CharacterPackageDependencyInfo(string classification, string sourcePackageId, string sourcePath, string approvalReason, string approvalVersion)
+    {
+        Classification = classification;
+        SourcePackageId = sourcePackageId;
+        SourcePath = sourcePath;
+        ApprovalReason = approvalReason;
+        ApprovalVersion = approvalVersion;
+    }
+
+    internal static CharacterPackageDependencyInfo Package(string path, string packageId)
+        => new("package", packageId, path, "", "");
+    internal static CharacterPackageDependencyInfo Shared(string path, string reason, string version)
+        => new("shared-approved", "", path, reason, version);
+    internal static CharacterPackageDependencyInfo Foreign(string path, string packageId)
+        => new("foreign", packageId, path, "", "");
+    internal static CharacterPackageDependencyInfo Missing(string path)
+        => new("missing", "", path ?? "", "", "");
+}
+
+public static class CharacterSharedAssetRegistry
+{
+    public const string ApprovedRoot = "Assets/Art/Characters/shared/";
+    public const string RegistryVersion = "1";
+
+    public static bool IsApproved(string projectRelativePath, out string reason, out string version)
+    {
+        string normalized = (projectRelativePath ?? "").Replace('\\', '/');
+        bool approved = normalized.StartsWith(ApprovedRoot, StringComparison.Ordinal)
+            && (normalized.EndsWith(".anim", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase));
+        reason = approved ? "project-owned shared presentation asset registry" : "";
+        version = approved ? RegistryVersion : "";
+        return approved;
+    }
+}
+public static class CharacterPackageAssetOwnershipRegistry
+{
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> PackageOwnedRoots =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
+            ["kistu"] = new[] { "Assets/Art/Characters/kistu/", "Assets/Resources/Characters/Kistu.prefab" },
+            ["bonk"] = new[] { "Assets/Art/Characters/bonk/" },
+        };
+
+    public static bool IsOwnedBy(string packageId, string projectRelativePath)
+    {
+        string normalized = (projectRelativePath ?? "").Replace('\\', '/');
+        return PackageOwnedRoots.TryGetValue(packageId ?? "", out var roots)
+            && roots.Any(root => normalized.StartsWith(root, StringComparison.Ordinal));
+    }
+
+    public static bool TryGetOwner(string projectRelativePath, out string packageId)
+    {
+        string normalized = (projectRelativePath ?? "").Replace('\\', '/');
+        foreach (var entry in PackageOwnedRoots)
+            if (entry.Value.Any(root => normalized.StartsWith(root, StringComparison.Ordinal)))
+            {
+                packageId = entry.Key;
+                return true;
+            }
+        packageId = "";
+        return false;
+    }
+
+
+}
+
+public sealed class CharacterPackageCreateResult
+{
+    [JsonProperty("success")] public bool Success { get; }
+    [JsonProperty("packageId")] public string PackageId { get; }
+    [JsonProperty("sourcePath")] public string SourcePath { get; }
+    [JsonProperty("catalogPath")] public string CatalogPath { get; }
+    [JsonProperty("diagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+
+    private CharacterPackageCreateResult(bool success, string packageId, string sourcePath, string catalogPath, IEnumerable<CharacterDiagnostic> diagnostics)
+    {
+        Success = success;
+        PackageId = packageId;
+        SourcePath = sourcePath;
+        CatalogPath = catalogPath;
+        Diagnostics = CharacterPackageDiagnosticResult.From(diagnostics);
+    }
+
+    internal static CharacterPackageCreateResult Successful(string packageId, string sourcePath, string catalogPath)
+        => new(true, packageId, sourcePath, catalogPath, Array.Empty<CharacterDiagnostic>());
+    internal static CharacterPackageCreateResult Failure(string packageId, string sourcePath, string catalogPath, IEnumerable<CharacterDiagnostic> diagnostics)
+        => new(false, packageId, sourcePath, catalogPath, diagnostics);
+}
+
+public sealed class CharacterPackageBindingResult
+{
+    [JsonProperty("success")] public bool Success { get; }
+    [JsonProperty("packageId")] public string PackageId { get; }
+    [JsonProperty("sourcePath")] public string SourcePath { get; }
+    [JsonProperty("semanticId")] public string SemanticId { get; }
+
+    [JsonProperty("assetPath")] public string AssetPath { get; }
+    [JsonProperty("persisted")] public bool Persisted { get; }
+    [JsonProperty("dependency")] public CharacterPackageDependencyInfo Dependency { get; }
+    [JsonProperty("diagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+    internal CharacterAssetCatalog.AnimationBinding Binding { get; }
+
+    private CharacterPackageBindingResult(bool success, string packageId, string sourcePath, string semanticId, string assetPath, bool persisted, CharacterPackageDependencyInfo dependency, IEnumerable<CharacterDiagnostic> diagnostics, CharacterAssetCatalog.AnimationBinding binding)
+    {
+        Success = success;
+        PackageId = packageId;
+        SourcePath = sourcePath;
+        SemanticId = semanticId;
+        AssetPath = assetPath;
+        Persisted = persisted;
+        Dependency = dependency;
+        Diagnostics = CharacterPackageDiagnosticResult.From(diagnostics);
+        Binding = binding;
+    }
+
+    internal static CharacterPackageBindingResult Successful(string packageId, string sourcePath, string semanticId, string assetPath, CharacterPackageDependencyInfo dependency, CharacterAssetCatalog.AnimationBinding binding)
+        => new(true, packageId, sourcePath, semanticId, assetPath, true, dependency, Array.Empty<CharacterDiagnostic>(), binding);
+    internal static CharacterPackageBindingResult Failure(string packageId, string sourcePath, string semanticId, string assetPath, IEnumerable<CharacterDiagnostic> diagnostics, CharacterPackageDependencyInfo dependency = null)
+        => new(false, packageId, sourcePath, semanticId, assetPath, false, dependency, diagnostics, null);
+}
+
 public sealed class CharacterPackageProvenance
 {
     [JsonProperty("packagePath")] public string PackagePath { get; }
@@ -890,6 +1433,11 @@ public sealed class CharacterPackageProvenance
 public sealed class CharacterPackageUnityDependency
 {
     [JsonProperty("kind")] public string Kind { get; }
+    [JsonProperty("classification")] public string Classification { get; }
+    [JsonProperty("sourcePackageId")] public string SourcePackageId { get; }
+    [JsonProperty("sourcePath")] public string SourcePath { get; }
+    [JsonProperty("approvalReason")] public string ApprovalReason { get; }
+    [JsonProperty("approvalVersion")] public string ApprovalVersion { get; }
     [JsonProperty("identity")] public string Identity { get; }
     [JsonProperty("guid")] public string Guid { get; }
     [JsonProperty("dependencyHash")] public string DependencyHash { get; }
@@ -899,12 +1447,18 @@ public sealed class CharacterPackageUnityDependency
     internal CharacterPackageUnityDependency(CharacterCookStatusDependency dependency)
     {
         Kind = dependency?.Kind ?? "";
+        Classification = dependency?.Classification ?? "";
+        SourcePackageId = dependency?.SourcePackageId ?? "";
+        SourcePath = dependency?.SourcePath ?? "";
+        ApprovalReason = dependency?.ApprovalReason ?? "";
+        ApprovalVersion = dependency?.ApprovalVersion ?? "";
         Identity = dependency?.Identity ?? "";
         Guid = dependency?.Guid ?? "";
         DependencyHash = dependency?.DependencyHash ?? "";
         MetaHash = dependency?.MetaHash ?? "";
         ImporterSettings = dependency?.ImporterSettings ?? "";
     }
+
 }
 
 public sealed class CharacterPackageInspectionResult
@@ -913,6 +1467,8 @@ public sealed class CharacterPackageInspectionResult
     [JsonProperty("packageId", NullValueHandling = NullValueHandling.Include)] public string PackageId { get; }
     [JsonProperty("displayName", NullValueHandling = NullValueHandling.Include)] public string DisplayName { get; }
     [JsonProperty("sourcePath", NullValueHandling = NullValueHandling.Include)] public string SourcePath { get; }
+    [JsonProperty("catalogPath", NullValueHandling = NullValueHandling.Include)] public string CatalogPath
+        => string.IsNullOrEmpty(SourcePath) ? null : SourcePath + "/CharacterAssetCatalog.asset";
     [JsonProperty("status", NullValueHandling = NullValueHandling.Include)] public string Status { get; }
     [JsonProperty("dirtyOrStale", NullValueHandling = NullValueHandling.Include)] public bool DirtyOrStale { get; }
     [JsonProperty("sourceHash", NullValueHandling = NullValueHandling.Include)] public string SourceHash { get; }
@@ -923,6 +1479,9 @@ public sealed class CharacterPackageInspectionResult
     [JsonProperty("slots", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<CharacterPackageSlotSummary> Slots { get; }
     [JsonProperty("diagnostics", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
     [JsonProperty("provenance", NullValueHandling = NullValueHandling.Include)] public CharacterPackageProvenance Provenance { get; }
+    [JsonProperty("rostered")] public bool Rostered { get; }
+    [JsonProperty("rosterSelector")] public string RosterSelector { get; }
+    [JsonProperty("previewReady")] public bool PreviewReady { get; }
     internal CharacterPackageSource Source { get; }
     internal CharacterAssetCatalog Catalog { get; }
     internal IReadOnlyList<CharacterDiagnostic> RawDiagnostics { get; }
@@ -944,7 +1503,10 @@ public sealed class CharacterPackageInspectionResult
         CharacterPackageSource source,
         CharacterAssetCatalog catalog,
         IReadOnlyList<CharacterDiagnostic> rawDiagnostics,
-        CharacterPackageProvenance provenance)
+        CharacterPackageProvenance provenance,
+        bool rostered,
+        string rosterSelector,
+        bool previewReady)
     {
         Success = success;
         PackageId = packageId;
@@ -962,6 +1524,9 @@ public sealed class CharacterPackageInspectionResult
         Provenance = provenance;
         Source = source;
         Catalog = catalog;
+        Rostered = rostered;
+        RosterSelector = rosterSelector;
+        PreviewReady = previewReady;
         RawDiagnostics = rawDiagnostics;
     }
 
@@ -980,7 +1545,10 @@ public sealed class CharacterPackageInspectionResult
         IReadOnlyList<CharacterDiagnostic> diagnostics,
         CharacterPackageSource source,
         CharacterAssetCatalog catalog,
-        CharacterPackageProvenance provenance)
+        CharacterPackageProvenance provenance,
+        bool rostered = false,
+        string rosterSelector = "",
+        bool previewReady = false)
         => new CharacterPackageInspectionResult(
             true,
             packageId,
@@ -997,8 +1565,11 @@ public sealed class CharacterPackageInspectionResult
             CharacterPackageDiagnosticResult.From(diagnostics),
             source,
             catalog,
-            diagnostics.ToArray(),
-            provenance);
+            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>(),
+            provenance,
+            rostered,
+            rosterSelector,
+            previewReady);
 
     internal static CharacterPackageInspectionResult CreateFailure(IReadOnlyList<CharacterDiagnostic> diagnostics)
         => new CharacterPackageInspectionResult(
@@ -1012,21 +1583,110 @@ public sealed class CharacterPackageInspectionResult
             null,
             null,
             null,
-            null,
+            Array.Empty<CharacterPackageStaleReason>(),
             Array.Empty<CharacterPackageSlotSummary>(),
             CharacterPackageDiagnosticResult.From(diagnostics),
             null,
             null,
             diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>(),
-            null);
+            null,
+            false,
+            "",
+            false);
+}
+
+public sealed class CharacterRosterAdmissionResult
+{
+    [JsonProperty("success")] public bool Success { get; }
+    [JsonProperty("packageId")] public string PackageId { get; }
+    [JsonProperty("selector")] public string Selector { get; }
+    [JsonProperty("diagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+
+    private CharacterRosterAdmissionResult(bool success, string packageId, string selector, IEnumerable<CharacterDiagnostic> diagnostics)
+    {
+        Success = success;
+        PackageId = packageId;
+        Selector = selector;
+        Diagnostics = CharacterPackageDiagnosticResult.From(diagnostics);
+    }
+
+    internal static CharacterRosterAdmissionResult Successful(string packageId, string selector)
+        => new(true, packageId, selector, Array.Empty<CharacterDiagnostic>());
+    internal static CharacterRosterAdmissionResult Failure(string packageId, IEnumerable<CharacterDiagnostic> diagnostics)
+        => new(false, packageId, "", diagnostics);
+}
+
+public sealed class CharacterPackageAssetCandidate
+{
+    [JsonProperty("path")] public string Path { get; }
+    [JsonProperty("name")] public string Name { get; }
+    [JsonProperty("classification")] public string Classification { get; }
+    [JsonProperty("sourcePackageId")] public string SourcePackageId { get; }
+    [JsonProperty("rejectionReason")] public string RejectionReason { get; }
+    [JsonProperty("accepted")] public bool Accepted => string.IsNullOrEmpty(RejectionReason);
+
+    public CharacterPackageAssetCandidate(string path, string name, string classification, string sourcePackageId, string rejectionReason)
+    {
+        Path = path;
+        Name = name;
+        Classification = classification;
+        SourcePackageId = sourcePackageId;
+        RejectionReason = rejectionReason;
+    }
+}
+
+public sealed class CharacterPackageAssetDiscoveryResult
+{
+    [JsonProperty("success")] public bool Success { get; }
+    [JsonProperty("semanticId")] public string SemanticId { get; }
+    [JsonProperty("candidates")] public IReadOnlyList<CharacterPackageAssetCandidate> Candidates { get; }
+    [JsonProperty("diagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+
+    private CharacterPackageAssetDiscoveryResult(bool success, string semanticId, IEnumerable<CharacterPackageAssetCandidate> candidates, IEnumerable<CharacterDiagnostic> diagnostics)
+    {
+        Success = success;
+        SemanticId = semanticId;
+        Candidates = (candidates ?? Array.Empty<CharacterPackageAssetCandidate>()).ToArray();
+        Diagnostics = CharacterPackageDiagnosticResult.From(diagnostics);
+    }
+
+    internal static CharacterPackageAssetDiscoveryResult Successful(string semanticId, IEnumerable<CharacterPackageAssetCandidate> candidates)
+        => new(true, semanticId, candidates, Array.Empty<CharacterDiagnostic>());
+    internal static CharacterPackageAssetDiscoveryResult Failure(string semanticId, IEnumerable<CharacterDiagnostic> diagnostics)
+        => new(false, semanticId, Array.Empty<CharacterPackageAssetCandidate>(), diagnostics);
+}
+
+public sealed class CharacterPackageVerificationResult
+{
+    [JsonProperty("success")] public bool Success { get; }
+    [JsonProperty("packageId")] public string PackageId { get; }
+    [JsonProperty("diagnostics")] public IReadOnlyList<CharacterPackageDiagnosticResult> Diagnostics { get; }
+    [JsonProperty("inspection")] public CharacterPackageInspectionResult Inspection { get; }
+    [JsonProperty("plan")] public CharacterPackageCookResult Plan { get; }
+
+    private CharacterPackageVerificationResult(bool success, string packageId, IEnumerable<CharacterDiagnostic> diagnostics, CharacterPackageInspectionResult inspection, CharacterPackageCookResult plan)
+    {
+        Success = success;
+        PackageId = packageId;
+        Diagnostics = CharacterPackageDiagnosticResult.From(diagnostics);
+        Inspection = inspection;
+        Plan = plan;
+    }
+
+    internal static CharacterPackageVerificationResult Create(bool success, string packageId, IEnumerable<CharacterDiagnostic> diagnostics, CharacterPackageInspectionResult inspection, CharacterPackageCookResult plan)
+        => new(success, packageId, diagnostics, inspection, plan);
+    internal static CharacterPackageVerificationResult Failure(string packageId, IEnumerable<CharacterDiagnostic> diagnostics, CharacterPackageInspectionResult inspection, CharacterPackageCookResult plan)
+        => new(false, packageId, diagnostics, inspection, plan);
 }
 
 public sealed class CharacterPackageCookResult
 {
     [JsonProperty("success", NullValueHandling = NullValueHandling.Include)] public bool Success { get; }
+    [JsonProperty("dryRun", NullValueHandling = NullValueHandling.Include)] public bool DryRun { get; }
     [JsonProperty("packageId", NullValueHandling = NullValueHandling.Include)] public string PackageId { get; }
     [JsonProperty("sourcePath", NullValueHandling = NullValueHandling.Include)] public string SourcePath { get; }
     [JsonProperty("cookedPath", NullValueHandling = NullValueHandling.Include)] public string CookedPath { get; }
+    [JsonProperty("expectedOutputs", NullValueHandling = NullValueHandling.Include)] public IReadOnlyList<string> ExpectedOutputs { get; }
     [JsonProperty("sourceHash", NullValueHandling = NullValueHandling.Include)] public string SourceHash { get; }
     [JsonProperty("cookedSourceHash", NullValueHandling = NullValueHandling.Include)] public string CookedSourceHash { get; }
     [JsonProperty("cookedContentHash", NullValueHandling = NullValueHandling.Include)] public string CookedContentHash { get; }
@@ -1044,21 +1704,25 @@ public sealed class CharacterPackageCookResult
         string cookedSourceHash,
         string cookedContentHash,
         string packageHash,
-        IReadOnlyList<CharacterPackageDiagnosticResult> diagnostics,
+        IEnumerable<CharacterPackageDiagnosticResult> diagnostics,
         CharacterPackageAssemblyResult assembly,
-        IReadOnlyList<CharacterDiagnostic> rawDiagnostics)
+        IReadOnlyList<CharacterDiagnostic> rawDiagnostics,
+        bool dryRun,
+        IEnumerable<string> expectedOutputs)
     {
         Success = success;
+        DryRun = dryRun;
         PackageId = packageId;
         SourcePath = sourcePath;
         CookedPath = cookedPath;
+        ExpectedOutputs = (expectedOutputs ?? Array.Empty<string>()).ToArray();
         SourceHash = string.IsNullOrEmpty(sourceHash) ? null : sourceHash;
         CookedSourceHash = string.IsNullOrEmpty(cookedSourceHash) ? null : cookedSourceHash;
         CookedContentHash = string.IsNullOrEmpty(cookedContentHash) ? null : cookedContentHash;
         PackageHash = string.IsNullOrEmpty(packageHash) ? null : packageHash;
-        Diagnostics = diagnostics;
+        Diagnostics = (diagnostics ?? Array.Empty<CharacterPackageDiagnosticResult>()).ToArray();
         Assembly = assembly;
-        RawDiagnostics = rawDiagnostics;
+        RawDiagnostics = rawDiagnostics ?? Array.Empty<CharacterDiagnostic>();
     }
 
     internal static CharacterPackageCookResult CreateSuccess(
@@ -1069,7 +1733,9 @@ public sealed class CharacterPackageCookResult
         string cookedContentHash,
         string packageHash,
         IReadOnlyList<CharacterDiagnostic> diagnostics,
-        CharacterPackageAssemblyResult assembly)
+        CharacterPackageAssemblyResult assembly,
+        bool dryRun = false,
+        IReadOnlyList<string> expectedOutputs = null)
         => new CharacterPackageCookResult(
             true,
             packageId,
@@ -1081,7 +1747,9 @@ public sealed class CharacterPackageCookResult
             packageHash,
             CharacterPackageDiagnosticResult.From(diagnostics),
             assembly,
-            diagnostics.ToArray());
+            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>(),
+            dryRun,
+            expectedOutputs);
 
     internal static CharacterPackageCookResult CreateFailure(
         string packageId,
@@ -1090,7 +1758,9 @@ public sealed class CharacterPackageCookResult
         string sourceHash,
         string packageHash,
         IReadOnlyList<CharacterDiagnostic> diagnostics,
-        CharacterPackageAssemblyResult assembly)
+        CharacterPackageAssemblyResult assembly,
+        bool dryRun = false,
+        IReadOnlyList<string> expectedOutputs = null)
         => new CharacterPackageCookResult(
             false,
             packageId,
@@ -1102,7 +1772,9 @@ public sealed class CharacterPackageCookResult
             packageHash,
             CharacterPackageDiagnosticResult.From(diagnostics),
             assembly,
-            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>());
+            diagnostics?.ToArray() ?? Array.Empty<CharacterDiagnostic>(),
+            dryRun,
+            expectedOutputs);
 }
 
 public sealed class CharacterPackageStaleReason
@@ -1185,8 +1857,12 @@ public sealed class CharacterCookStatusDependency
     public string DependencyHash = "";
     public string MetaHash = "";
     public string ImporterSettings = "";
+    public string Classification = "";
+    public string SourcePackageId = "";
+    public string SourcePath = "";
+    public string ApprovalReason = "";
+    public string ApprovalVersion = "";
 }
-
 [Serializable]
 public sealed class CharacterCookStatusPayload
 {

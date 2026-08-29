@@ -479,8 +479,8 @@ namespace SlopArena.Client.Entities
             CharacterClass.Manki => new Color(1f, 0.36f, 0.08f, 0.95f),
             CharacterClass.FightGuy => new Color(0.28f, 0.72f, 1f, 0.95f),
             CharacterClass.Kistu => new Color(0.76f, 0.9f, 1f, 0.95f),
+            CharacterClass.Bonk => new Color(0.96f, 0.58f, 0.18f, 0.95f),
             CharacterClass.Nilus => new Color(0.72f, 0.36f, 1f, 0.95f),
-            _ => Color.white,
         };
 
         private void UpdateDashFeedback(CharacterState state, Vector3 position)
@@ -876,11 +876,10 @@ namespace SlopArena.Client.Entities
             // ── Non-combat: ground/air state machine ──
             if (!isCombat)
             {
-                // Fixed-stance aim holds (AimedProjectile/Projectile behaviors) play the
-                // aim-loop once on entering the hold; mobile aimers (Kistu) fall through
-                // to locomotion below.
+                // Fixed-policy aim holds play the aim-loop once on entering the hold; mobile
+                // policy aimers fall through to locomotion below.
                 bool fixedAimHold = state.State == ActionState.Aiming && state.AttackSlot > 0 && _charDef != null
-                    && _charDef.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded)?.Behavior is AbilityBehavior.AimedProjectile or AbilityBehavior.Projectile;
+                    && _charDef.GetAimMovementMode(state.AttackSlot, !state.IsGrounded) == AimMovementMode.Fixed;
                 if (fixedAimHold)
                 {
                     if (state.State != _lastAnimState)

@@ -169,7 +169,7 @@ public sealed class MatchContentCatalogBuilder
 
     private static void ValidateManifest(BuiltInRosterManifest manifest, List<CharacterDiagnostic> d)
     {
-        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Nilus };
+        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk, CharacterClass.Nilus };
         foreach (var selector in required)
             if (manifest.Resolve(selector) == null) d.Add(Error("catalog.selector.missing", selector.ToString(), "Built-in roster selector is missing."));
         foreach (var entry in manifest.Entries)
@@ -307,7 +307,7 @@ public static class BuiltInRosterManifestCodec
 
     private static CharacterClass ParseSelector(string value) => value switch
     {
-        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Kistu" => CharacterClass.Kistu, "Nilus" => CharacterClass.Nilus,
+        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Kistu" => CharacterClass.Kistu, "Bonk" => CharacterClass.Bonk, "Nilus" => CharacterClass.Nilus,
         _ => throw new InvalidDataException("Unknown roster selector.")
     };
     private static Dictionary<string, JsonElement> ParseObject(string json, string path)
@@ -349,6 +349,7 @@ internal static class MatchContentInternals
     private static void CopyAbility(AbilitySpec? source, AbilitySpec? target)
     {
         if (source == null || target == null) return;
+        target.AimMovement = source.AimMovement;
         target.ChargeHoldTicks = source.ChargeHoldTicks;
         target.AnimSpeed = source.AnimSpeed;
         target.SpecialEffectKeys = source.SpecialEffectKeys == null ? null : (string[])source.SpecialEffectKeys.Clone();

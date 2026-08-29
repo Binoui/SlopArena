@@ -691,6 +691,7 @@
       "iconId": "icon.e",
       "behavior": "directionalDash",
       "aimMode": "groundVector",
+      "aimMovement": "mobile",
       "cooldownTicks": 90,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -733,6 +734,10 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "chargePool": {
+        "maxCharges": 2,
+        "regenTicks": 240
+      },
       "timeline": {
         "stages": [
           {
@@ -761,10 +766,6 @@
             ]
           }
         ]
-      },
-      "chargePool": {
-        "maxCharges": 2,
-        "regenTicks": 240
       }
     },
     {

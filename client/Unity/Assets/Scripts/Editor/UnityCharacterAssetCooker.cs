@@ -46,6 +46,11 @@ public sealed class CharacterCookDependencyRecord
     public string DependencyHash = "";
     public string MetaHash = "";
     public string ImporterSettings = "";
+    public string Classification = "";
+    public string SourcePackageId = "";
+    public string SourcePath = "";
+    public string ApprovalReason = "";
+    public string ApprovalVersion = "";
 }
 
 public sealed class CharacterCookAnimationDefinition
@@ -120,6 +125,7 @@ public static class UnityCharacterAssetCooker
         string packageId = ReadPackageId(packageJson);
         PackageMetadata packageMetadata = ReadPackageMetadata(packageJson, characterJson, diagnostics);
         ValidateCatalog(catalog, packageId, compiled.CookedPackage, diagnostics, out var requiredIds);
+        ValidateDependencyClassifications(packageRoot, catalog, diagnostics);
         if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
             return Failure(diagnostics, compiled.CookedPackage);
 
@@ -257,6 +263,7 @@ public static class UnityCharacterAssetCooker
                 return false;
             }
             ValidateCatalog(catalog, ReadPackageId(packageJson), compiled.CookedPackage, errors, out var requiredIds);
+            ValidateDependencyClassifications(packageRoot, catalog, errors);
             if (errors.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
             {
                 diagnostics = errors;
@@ -379,7 +386,7 @@ public static class UnityCharacterAssetCooker
                     if (animator.GetBoneTransform(bone) == null)
                         diagnostics.Add(Error("asset-catalog.bone.missing", $"catalog.rig.{bone}", $"Required humanoid bone is missing: {bone}."));
         }
-        if (packageId == "kistu")
+        if (catalog.WeaponConfig != null)
             ValidateWeaponConfig(catalog, diagnostics);
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var seenTracks = new HashSet<string>(StringComparer.Ordinal);
@@ -417,6 +424,7 @@ public static class UnityCharacterAssetCooker
             }
         }
         var requiredSet = new HashSet<string>(requiredIds.Select(x => x.Id), StringComparer.Ordinal);
+
         foreach (string id in seenIds)
             if (!requiredSet.Contains(id)) diagnostics.Add(Error("asset-catalog.id.orphan", $"catalog.bindings[{id}]", "Binding is not referenced by the canonical document."));
         foreach (var required in requiredIds)
@@ -424,21 +432,49 @@ public static class UnityCharacterAssetCooker
                 diagnostics.Add(Error("reference.animation.unresolved", required.Path, $"Animation ID '{required.Id}' is not bound by the catalog."));
     }
 
+    private static void ValidateDependencyClassifications(
+        string packageRoot,
+        CharacterAssetCatalog catalog,
+        List<CharacterDiagnostic> diagnostics)
+    {
+        ValidateDependency(packageRoot, catalog?.Rig == null ? "" : NormalizeProjectPath(AssetDatabase.GetAssetPath(catalog.Rig)), "catalog.rig", diagnostics);
+        if (catalog?.WeaponConfig != null)
+            ValidateDependency(packageRoot, NormalizeProjectPath(AssetDatabase.GetAssetPath(catalog.WeaponConfig)), "catalog.weaponConfig", diagnostics);
+        foreach (var binding in catalog?.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
+        {
+            string path = binding?.Clip == null ? "" : NormalizeProjectPath(AssetDatabase.GetAssetPath(binding.Clip));
+            ValidateDependency(packageRoot, path, $"catalog.bindings[{binding?.SemanticId ?? ""}].clip", diagnostics);
+        }
+    }
+
+    private static void ValidateDependency(
+        string packageRoot,
+        string assetPath,
+        string diagnosticPath,
+        List<CharacterDiagnostic> diagnostics)
+    {
+        CharacterPackageDependencyInfo dependency = CharacterPackageAuthoringService.ClassifyDependency(packageRoot, assetPath);
+        if (dependency.Classification == "foreign")
+            diagnostics.Add(Error("asset-catalog.dependency.foreign", diagnosticPath, $"Dependency '{assetPath}' is foreign to the target package and is not approved shared content."));
+    }
+
     private static void ValidateWeaponConfig(CharacterAssetCatalog catalog, List<CharacterDiagnostic> diagnostics)
     {
         if (catalog.WeaponConfig == null)
+            return;
+        var entry = Array.Find(catalog.WeaponConfig.Entries ?? Array.Empty<SlopArena.Client.Entities.WeaponEntry>(),
+            x => x != null);
+        if (entry == null)
         {
-            diagnostics.Add(Error("asset-catalog.weapon.missing", "catalog.weaponConfig", "Kistu requires a package-owned weapon config."));
+            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig", "Weapon config has no entries."));
             return;
         }
-        var entry = Array.Find(catalog.WeaponConfig.Entries ?? Array.Empty<SlopArena.Client.Entities.WeaponEntry>(),
-            x => x != null && x.BoneName == "mixamorig:RightHand");
-        if (entry == null)
-            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig", "Kistu weapon config requires a mixamorig:RightHand entry."));
-        else if (entry.Prefab == null)
-            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig.entries", "Kistu weapon entry prefab is missing."));
-        else if (GlobalObjectId.GetGlobalObjectIdSlow(catalog.WeaponConfig).ToString().Length == 0)
-            diagnostics.Add(Error("asset-catalog.weapon.unresolved", "catalog.weaponConfig", "Kistu weapon config has no stable Unity global object ID."));
+        if (entry.Prefab == null)
+            diagnostics.Add(Error("asset-catalog.weapon.invalid", "catalog.weaponConfig.entries", "Weapon entry prefab is missing."));
+        if (catalog.Rig == null || !catalog.Rig.GetComponentsInChildren<Transform>(true).Any(x => x.name == entry.BoneName))
+            diagnostics.Add(Error("asset-catalog.rig.incompatible", "catalog.rig", $"Weapon config bone is missing: {entry.BoneName}."));
+        if (GlobalObjectId.GetGlobalObjectIdSlow(catalog.WeaponConfig).ToString().Length == 0)
+            diagnostics.Add(Error("asset-catalog.weapon.unresolved", "catalog.weaponConfig", "Weapon config has no stable Unity global object ID."));
     }
 
     private static List<(string Id, string Path)> RequiredIds(CookedCharacterPackage package)

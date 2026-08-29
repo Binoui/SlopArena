@@ -49,6 +49,7 @@ New packages live under `client/Unity/Assets/CharacterPackages/<package>/`. Cook
 | Character | Status | Reference |
 | --- | --- | --- |
 | FightGuy | Cooked package; reference vertical slice | [FightGuy](characters/fightguy.md) |
+| Bonk | Pipeline probe; not rostered | [Bonk](characters/bonk.md) |
 | Manki | Legacy compatibility implementation | [Manki](characters/manki.md) |
 | Kistu | Legacy compatibility implementation | [Kistu](characters/kistu.md) |
 | Nilus | Legacy compatibility implementation | [Nilus](characters/nilus.md) |
@@ -77,6 +78,7 @@ The current package and creator-content direction is defined by these accepted r
 - [ADR-0028: Built-in content compatibility](adr/0028-built-in-content-compatibility.md)
 - [ADR-0029: Character authoring and cooking](adr/0029-character-authoring-and-cooking.md)
 - [ADR-0030: Ability Lab canonical slot projection](adr/0030-ability-lab-canonical-slot-projection.md)
+- [ADR-0031: Character asset dependency classification](adr/0031-character-asset-dependency-classification.md)
 
 Older accepted ADRs remain the decision record for the mechanics they cover. If a living guide conflicts with an accepted ADR or current code, update the living guide; do not rewrite the historical decision.
 

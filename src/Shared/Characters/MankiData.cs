@@ -123,8 +123,9 @@ public static partial class CharacterRegistry
                 IconName = "q",
                 Behavior = AbilityBehavior.AimedProjectile,
                 AimMode = AimMode.GroundCursor,
+                AimMovement = AimMovementMode.Mobile,
                 CooldownTicks = 300,
-                ChargeHoldTicks = 180,         // 3s max aim
+                ChargeHoldTicks = 0,             // unlimited aim; release is the sole transition
                 Stages = new AttackStage[]
                 {
                     new() { DurationTicks = 60, 

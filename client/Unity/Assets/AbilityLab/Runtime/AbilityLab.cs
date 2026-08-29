@@ -46,7 +46,7 @@ namespace SlopArena.Client.Tools
         public bool Playing { get; set; }
         public float PlaySpeed { get; set; } = 1f;
         public float FacingYaw { get; set; }
-        public bool ShowHurtboxes { get; set; } = true;
+        public bool ShowHurtboxes { get; set; }
         public bool ShowHitboxes { get; set; } = true;
         public bool ShowBakedBones { get; set; }
         public bool ShowDummy { get; set; }
@@ -106,7 +106,13 @@ namespace SlopArena.Client.Tools
             Instance = this;
             EnsureCamera();
         }
-        private void OnDestroy() { if (Instance == this) Instance = null; }
+
+        private void OnDestroy()
+        {
+            DestroyRenderer();
+            DestroyPreviewCatalog();
+            if (Instance == this) Instance = null;
+        }
 
         // ── Lifecycle ──
 
@@ -269,10 +275,13 @@ namespace SlopArena.Client.Tools
             WorkingHitstopOverrides = new Dictionary<string, float>();
             AuthoritativePreview = false;
             PreviewStatus = $"Compatibility Preview · {Character} · Legacy authority · Read-only";
+            ShowHurtboxes = true;
+            ShowHitboxes = true;
+            ShowBakedBones = false;
+            ShowDummy = false;
             _sourceDocument = null;
             DestroyPreviewCatalog();
             _previewRig = null;
-            SpawnRenderer();
 
             Airborne = false;
             SlotIndex = SlotIndices[0];
@@ -338,6 +347,10 @@ namespace SlopArena.Client.Tools
             DisplayDef = definition;
             AuthoritativePreview = false;
             PreviewStatus = "Non-authoritative draft";
+            ShowHurtboxes = false;
+            ShowHitboxes = true;
+            ShowBakedBones = false;
+            ShowDummy = false;
             SpawnRenderer();
             Airborne = false; SlotIndex = SlotIndices[0]; StageIndex = 0; Tick = 0; Playing = false;
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
@@ -365,6 +378,10 @@ namespace SlopArena.Client.Tools
             DisplayDef = definition;
             AuthoritativePreview = true;
             PreviewStatus = "Authoritative";
+            ShowHurtboxes = false;
+            ShowHitboxes = true;
+            ShowBakedBones = false;
+            ShowDummy = false;
             SpawnRenderer();
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
             WorkingHitstopOverrides = new Dictionary<string, float>();
@@ -516,14 +533,21 @@ namespace SlopArena.Client.Tools
         }
 
         /// <summary>
-        /// Attach the character's weapon prop (Resources/WeaponConfigs/&lt;Class&gt;.asset) to the
-        /// preview model so blade reach is visible while tuning hitboxes. No-op without a config.
+        /// Attach the selected package's configured weapon prop to the preview model.
+        /// Package mode reads the generated catalog binding; legacy compatibility mode
+        /// retains the CharacterClass resource fallback.
         /// </summary>
-        private static WeaponAttach AttachWeapon(PlayerRenderer renderer, CharacterDefinition def)
+        private WeaponAttach AttachWeapon(PlayerRenderer renderer, CharacterDefinition def)
         {
             var attach = renderer.GetComponent<WeaponAttach>();
             if (attach == null) attach = renderer.gameObject.AddComponent<WeaponAttach>();
-            attach.Init(renderer, Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}"));
+
+            WeaponAttachConfig config = _previewAnimationCatalog != null
+                ? _previewAnimationCatalog.WeaponConfig
+                : def != null && def.Class != CharacterClass.None
+                    ? Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}")
+                    : null;
+            attach.Init(renderer, config);
             return attach;
         }
 

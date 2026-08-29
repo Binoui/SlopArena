@@ -108,7 +108,8 @@ public sealed record CharacterSlotSource(
     bool IsRecoveryMove,
     bool PreserveMomentumOnStart,
     CharacterTimelineSource Timeline,
-    ChargePoolSource? ChargePool = null);
+    ChargePoolSource? ChargePool = null,
+    AuthoringAimMovementMode AimMovement = AuthoringAimMovementMode.Fixed);
 
 public sealed record ChargePoolSource(int MaxCharges, ushort RegenTicks);
 public sealed record CharacterAliasSource(string From, string To);
@@ -263,6 +264,19 @@ public sealed record KistuRisingSlashCapabilityParameters(
 public sealed record KistuBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : TypedCapabilityParameters;
+public sealed record BonkTargetedJumpSlamCapabilityParameters(
+    ushort MaxAimTicks,
+    ushort MaxFlightTicks,
+    float MinRange,
+    float MaxRange,
+    float LaunchVerticalSpeed,
+    float SlamRadius,
+    float SlamDamage,
+    float SlamAngle,
+    float SlamBaseKnockback,
+    float SlamKnockbackGrowth,
+    ushort SlamStunTicks,
+    ushort SlamDurationTicks) : TypedCapabilityParameters;
 
 public enum AuthoringAbilityBehavior : byte
 {
@@ -283,6 +297,12 @@ public enum AuthoringAimMode : byte
     CameraForward3D = 2,
     GroundVector = 3,
 }
+public enum AuthoringAimMovementMode : byte
+{
+    Fixed = 0,
+    Mobile = 1,
+}
+
 
 public enum AuthoringHitboxShape : byte
 {

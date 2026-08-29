@@ -37,6 +37,7 @@ internal static class CharacterCookDependencyTracker
             if (!string.IsNullOrEmpty(animation.ClipAssetPath))
                 foreach (string dependency in AssetDatabase.GetDependencies(animation.ClipAssetPath, true))
                     paths.Add(UnityCharacterAssetCooker.NormalizeProjectPath(dependency));
+            CharacterPackageDependencyInfo classification = CharacterPackageAuthoringService.ClassifyDependency(packageRoot, animation.ClipAssetPath);
             records.Add(new CharacterCookDependencyRecord
             {
                 Kind = "clip-object",
@@ -44,12 +45,17 @@ internal static class CharacterCookDependencyTracker
                 Guid = animation.ClipGlobalObjectId,
                 DependencyHash = animation.ClipAssetGuid,
                 MetaHash = animation.ClipAssetPath,
+                Classification = classification.Classification,
+                SourcePackageId = classification.SourcePackageId,
+                SourcePath = classification.SourcePath,
+                ApprovalReason = classification.ApprovalReason,
+                ApprovalVersion = classification.ApprovalVersion,
             });
         }
         foreach (string path in paths.OrderBy(x => x, StringComparer.Ordinal))
         {
             if (path == catalogPath) continue;
-            AddAsset(records, "asset", path);
+            AddAsset(records, "asset", path, packageRoot);
             if (Path.GetExtension(path).Equals(".fbx", StringComparison.OrdinalIgnoreCase))
             {
                 var importer = AssetImporter.GetAtPath(path) as ModelImporter;
@@ -135,10 +141,11 @@ internal static class CharacterCookDependencyTracker
             MetaHash = File.Exists(full + ".meta") ? Sha256(File.ReadAllBytes(full + ".meta")) : "",
         });
     }
-    private static void AddAsset(List<CharacterCookDependencyRecord> records, string kind, string projectPath)
+    private static void AddAsset(List<CharacterCookDependencyRecord> records, string kind, string projectPath, string packageRoot)
     {
         string normalized = projectPath.Replace('\\', '/');
         string full = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), normalized);
+        CharacterPackageDependencyInfo classification = CharacterPackageAuthoringService.ClassifyDependency(packageRoot, normalized);
         records.Add(new CharacterCookDependencyRecord
         {
             Kind = kind,
@@ -146,6 +153,11 @@ internal static class CharacterCookDependencyTracker
             Guid = AssetDatabase.AssetPathToGUID(normalized),
             DependencyHash = AssetDatabase.GetAssetDependencyHash(normalized).ToString(),
             MetaHash = File.Exists(full + ".meta") ? Sha256(File.ReadAllBytes(full + ".meta")) : "",
+            Classification = classification.Classification,
+            SourcePackageId = classification.SourcePackageId,
+            SourcePath = classification.SourcePath,
+            ApprovalReason = classification.ApprovalReason,
+            ApprovalVersion = classification.ApprovalVersion,
         });
     }
 

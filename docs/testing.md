@@ -38,7 +38,28 @@ unity command --project-path client/Unity \
   sloparena.character.cook --target <package> --format json
 ```
 
-Require a successful semantic result, a valid inspect status, `dirtyOrStale: false`, and matching source/cooked/package hashes. A failed cook must preserve the last valid artifact; verify that no invalid draft was promoted. Check the generated runtime package under `content-cooked/<package>/` and the exact roster requirement when the package is built-in.
+For a rostered package, require a successful semantic result, valid inspect status,
+`dirtyOrStale: false`, and matching source/cooked/package hashes. For a source-only probe,
+require successful package resolution plus structured diagnostics and semantic cook failure
+only when the probe intentionally has unresolved bindings. A failed cook must preserve the
+last valid artifact; with no prior artifact, verify the cooked directory remains absent.
+Check `content-cooked/<package>/` and the exact roster requirement only when the package is
+built-in.
+
+### Bonk pipeline probe evidence
+
+The Bonk probe is not gameplay coverage. Record:
+
+- inspect `success: true`, `packageId: bonk`, and sixteen canonical slots;
+- cook semantic `success: true` with the shared dash/hit bindings;
+- cooked payload hashes and preservation of `content-cooked/bonk/` after any later failure;
+- package-specific stale tracking after Bonk source/catalog/dependency notifications;
+- one queue request for repeated notifications, with unrelated package statuses unchanged;
+- Unity recompile status and current console errors.
+
+`KitScenario` golden tests begin only after an approved Bonk kit and successful cooked
+package exist. The probe deliberately has no damage, timing, recovery, or capability
+contract to golden-test.
 
 The maintained FightGuy check is:
 

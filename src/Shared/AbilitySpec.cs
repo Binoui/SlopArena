@@ -17,6 +17,12 @@ namespace SlopArena.Shared
         /// <summary>Camera locked; mouse delta rotates a ground direction vector around the character (Kistu E).</summary>
         GroundVector,    // Camera frozen; mouse delta → AimYaw, fixed distance
     }
+    public enum AimMovementMode : byte
+    {
+        Fixed = 0,
+        Mobile = 1,
+    }
+
 
     public enum AbilityBehavior : byte
     {
@@ -45,6 +51,7 @@ namespace SlopArena.Shared
     {
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public AimMode AimMode = AimMode.None;
+        public AimMovementMode AimMovement = AimMovementMode.Fixed;
         public string Name = "";
         public string Description = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>

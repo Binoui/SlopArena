@@ -34,7 +34,7 @@ public static class CookedCharacterRuntimeAdapter
     {
         foreach (var slot in slots)
         {
-            var ability = new AbilitySpec { Name = slot.Name, Description = slot.Description, IconName = slot.IconId, CooldownTicks = slot.CooldownTicks, IsRecoveryMove = slot.IsRecoveryMove, PreserveMomentumOnStart = slot.PreserveMomentumOnStart, Behavior = (AbilityBehavior)slot.Behavior, AimMode = (AimMode)slot.AimMode, AnimationNames = slot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray(), Stages = slot.Timeline.Stages.Select(ToAttackStage).ToArray() };
+            var ability = new AbilitySpec { Name = slot.Name, Description = slot.Description, IconName = slot.IconId, CooldownTicks = slot.CooldownTicks, IsRecoveryMove = slot.IsRecoveryMove, PreserveMomentumOnStart = slot.PreserveMomentumOnStart, Behavior = (AbilityBehavior)slot.Behavior, AimMode = (AimMode)slot.AimMode, AimMovement = slot.AimMovement == AuthoringAimMovementMode.Mobile ? AimMovementMode.Mobile : AimMovementMode.Fixed, AnimationNames = slot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray(), Stages = slot.Timeline.Stages.Select(ToAttackStage).ToArray() };
             if (!slot.IsAir) SetGroundAbility(def, slot.Ordinal, ability); else SetAirAbility(def, slot.Ordinal - 8, ability);
         }
     }

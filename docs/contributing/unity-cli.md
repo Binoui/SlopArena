@@ -76,6 +76,31 @@ unity command --project-path client/Unity \
   sloparena.character.cook --target fightguy --format json
 ```
 
+The authoring boundary also exposes read-only planning and typed catalog operations:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.character.cook --target bonk --dry-run --format json
+unity command --project-path client/Unity \
+  sloparena.character.verify --target bonk --format json
+unity command --project-path client/Unity \
+  sloparena.character.bind --target bonk --semantic-id anim.run \
+  --asset-path Assets/CharacterPackages/bonk/Animations/bonk_run.anim --format json
+unity command --project-path client/Unity \
+  sloparena.character.unbind --target bonk --semantic-id anim.run --format json
+unity command --project-path client/Unity \
+  sloparena.character.roster.refresh --package-id bonk --format json
+unity command --project-path client/Unity \
+  sloparena.character.assets --target bonk --semantic-id anim.run --format json
+```
+
+`cook --dry-run` returns the predicted hashes and output paths without writing
+canonical cooked artifacts, generated catalogs, or cook status. Roster admission is
+explicit through `sloparena.character.roster.admit` and requires a passing verification.
+After an admitted package is recooked, `sloparena.character.roster.refresh` explicitly
+repins its existing roster entry to the newly verified version and hashes. It does not
+admit a new package or change the selector.
+
 Pipeline wraps the typed command result under `data.result`. Inspect returns the
 canonical 16-slot summary, source/cooked hashes, status, stale reasons, and existing
 compiler/cooker diagnostics. Cook returns source, cooked-content, and package hashes

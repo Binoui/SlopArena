@@ -63,33 +63,32 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
+        Assert.Equal(AimMovementMode.Mobile, Def.GetAimMovementMode(AbilitySlots.Slot1, airborne: false));
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1);
         Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)3, t0.AttackSlot);
     }
 
-    // ── Q hold: Aiming stance — friction-only movement, blocked cancel, auto-release ──
+    // ── Q hold: mobile aim — movement stays available, action transitions stay locked ──
 
     [Fact]
-    public void MankiQ_AirborneHold_AppliesAirDrag()
+    public void MankiQ_MobileHold_AllowsMovement()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = 20f; // well above ground — stays airborne for the whole hold
-        state.IsGrounded = false;
-        state.VZ = 5f;
+        state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
-        for (int i = 0; i < 60; i++)
+        float startZ = state.PZ;
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
+        for (int i = 0; i < 300; i++)
             sim.Tick(new() { { 1, aim } });
 
         var s = sim.GetState(1);
-        // Manki AirFriction=6 m/s² (linear): VZ decays 5 → 0 within 50 ticks.
-        // Guards the fixed-aim friction-only path in ProcessNormalMovement.
-        TestHelpers.AssertNear(0f, s.VZ, 0.1f);
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)0, s.ComboStage);
+        Assert.NotNull(sim.GetActiveAbility(1));
+        Assert.True(s.PZ > startZ, $"mobile aim should move normally: start={startZ}, end={s.PZ}");
     }
 
     [Fact]
@@ -100,13 +99,13 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
         sim.Tick(new() { { 1, aim } });
         for (int i = 0; i < 9; i++)
             sim.Tick(new() { { 1, aim } });
 
-        // Past the 8-tick lock: dash/jump stay blocked while the hold owns movement.
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 3, IsAiming = true, Jump = true, Dash = true } } });
+        // Aim keeps normal movement steering, but ActionState.Aiming still owns jump/dash.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 3, IsAiming = true, MoveY = 1f, Jump = true, Dash = true } } });
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)3, s.AttackSlot);
@@ -115,22 +114,26 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
-    public void MankiQ_HoldPastChargeCap_AutoReleases()
+    public void MankiQ_HoldBeyondChargeCap_RemainsAimingUntilRelease()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true);
-        for (int i = 0; i < 185; i++)
+        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
+        for (int i = 0; i < 300; i++)
             sim.Tick(new() { { 1, aim } });
 
-        var s = sim.GetState(1);
-        // ChargeHoldTicks=180: the hold auto-releases into the Attacking throw phase.
-        // Guards the charge-clamp gate extension to the Aiming state.
-        Assert.Equal((byte)1, s.ComboStage);
-        Assert.Equal(ActionState.Attacking, s.State);
+        var held = sim.GetState(1);
+        Assert.Equal(ActionState.Aiming, held.State);
+        Assert.Equal((byte)0, held.ComboStage);
+        Assert.NotNull(sim.GetActiveAbility(1));
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 3, aiming: false) } });
+        var released = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, released.State);
+        Assert.Equal((byte)1, released.ComboStage);
     }
 
     // ══════════════════════════════════════════════════════════════════

@@ -1,0 +1,112 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e24271275a4fc0af82df0240843b6bf, type: 3}
+  m_Name: CharacterAssetCatalog
+  m_EditorClassIdentifier: 
+  _packageId: bonk
+  _catalogSchemaVersion: 1
+  _rig: {fileID: 100110, guid: d48fbbab624b9bf7c9fe01372205a79a, type: 3}
+  _weaponConfig: {fileID: 11400000, guid: e39ce81cb942475ddadbde1245b85bd5, type: 2}
+  _sampleRate: 60
+  _bindings:
+  - _semanticId: anim.idle
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.idle
+  - _semanticId: anim.run
+    _clip: {fileID: 7400000, guid: 119276cc04387a9e385a895171856dac, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.run
+  - _semanticId: anim.dash
+    _clip: {fileID: 7400000, guid: bb89e4b61e13e48ac944e8e29df27fa1, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.dash
+  - _semanticId: anim.jump
+    _clip: {fileID: 7400000, guid: 7335c181ca660db0ca7692057b084efb, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.jump
+  - _semanticId: anim.fall
+    _clip: {fileID: 7400000, guid: 970d37ba3d492f5b6999e9a169b7eed0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.fall
+  - _semanticId: anim.hit-light
+    _clip: {fileID: 7400000, guid: 2c20e3646ca4bc0e1a62bc32373e9000, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-light
+  - _semanticId: anim.hit-medium
+    _clip: {fileID: 7400000, guid: 44833e4cdd42997d2bce91c985a58a6a, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-medium
+  - _semanticId: anim.hit-hard
+    _clip: {fileID: 7400000, guid: 3f3fbde2c4e4181669da0484ea7f2a8f, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.hit-hard
+  - _semanticId: anim.bonk.g1
+    _clip: {fileID: 7400000, guid: 0f18c70933529f77d8e61bf9fba09b67, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.g1
+  - _semanticId: anim.bonk.g2
+    _clip: {fileID: 7400000, guid: 6fed0ce783af60849b6d6d039ad801e5, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.g2
+  - _semanticId: anim.bonk.g3
+    _clip: {fileID: 7400000, guid: 0ee17c0c798a942d8abc01a71e40e004, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.g3
+  - _semanticId: anim.bonk.g4
+    _clip: {fileID: 7400000, guid: 3a8d8da0178c15238b66bc1e200ad0c7, type: 2}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.g4
+  - _semanticId: anim.bonk.ga
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.ga
+  - _semanticId: anim.bonk.ge
+    _clip: {fileID: 7400000, guid: 077331672ec1814afa7b0c8ae3453219, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.ge
+  - _semanticId: anim.bonk.gr
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.gr
+  - _semanticId: anim.bonk.gf
+    _clip: {fileID: 7400000, guid: 31238d9bd388bf207becd2aff83bb11d, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.gf
+  - _semanticId: anim.bonk.a1
+    _clip: {fileID: 7400000, guid: 568e6e0466efcb265a2a71242d7d4676, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.a1
+  - _semanticId: anim.bonk.a2
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.a2
+  - _semanticId: anim.bonk.a3
+    _clip: {fileID: 7400000, guid: e62f3eb01003687b6a7187a100268320, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.a3
+  - _semanticId: anim.bonk.a4
+    _clip: {fileID: 7400000, guid: b30efc1ea06bbc05c9d4c52d855be0c1, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.a4
+  - _semanticId: anim.bonk.aa
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.aa
+  - _semanticId: anim.bonk.ar
+    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.ar
+  - _semanticId: anim.bonk.af
+    _clip: {fileID: 7400000, guid: 31238d9bd388bf207becd2aff83bb11d, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.bonk.af

@@ -12,13 +12,13 @@ namespace SlopArena.Shared.Abilities
     ///     only cancels DOWNWARD VY and re-opens the zero-g float window (AirTimeTicks=0),
     ///     so without zeroing VY here an aim cast mid-jump-rise would climb through the
     ///     float.
-    ///     Simulation's movement gate treats Aiming + AimedProjectile/Projectile behavior
-    ///     as a fixed stance (friction only, no input control).
+    ///     Simulation's movement gate reads the explicit aim movement policy. Fixed-policy
+    ///     holds bleed momentum through friction; mobile-policy holds retain normal movement.
     ///   - Aim phase: 8-tick debounce, optional mid-hold anim swap, manual release
-    ///     (!IsAiming) or auto-release at the hold cap. The cap reads the SPEC's
-    ///     ChargeHoldTicks — the same field Simulation.cs clamps s.ChargeTicks
-    ///     against — so the auto-release can't drift from the clamp (see the original
-    ///     NilusVoidRift note for why a Param would).
+    ///     (!IsAiming) or auto-release at the positive hold cap. A cap of zero is unlimited.
+    ///     The cap reads the SPEC's ChargeHoldTicks — the same field Simulation.cs clamps
+    ///     s.ChargeTicks against — so the auto-release can't drift from the clamp
+    ///     (see the original NilusVoidRift note for why a Param would).
     ///   - Throw phase: fire once at throw_trigger_tick (IsAiming=false) in the
     ///     Attacking state (action phase, mirroring KistuDashSlash's Aiming → Attacking
     ///     dash transition), end at throw_duration.
@@ -58,8 +58,8 @@ namespace SlopArena.Shared.Abilities
         {
             _fired = false;
 
-            // Hold = aim stance: Simulation gates movement (fixed-stance friction only)
-            // and charge clamping on Aiming + AimedProjectile behavior.
+            // Hold = aim stance: the explicit policy controls normal movement while
+            // ActionState.Aiming continues to block jump, dash, and other activations.
             s.State = ActionState.Aiming;
             s.AttackSlot = (byte)(Slot + 1);
             AnimIndex = 0;
