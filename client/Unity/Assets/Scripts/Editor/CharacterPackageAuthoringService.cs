@@ -423,14 +423,103 @@ public sealed class CharacterPackageAuthoringService
 
     public CharacterPackageCookResult Cook(string target, bool dryRun)
     {
-        var diagnostics = new List<CharacterDiagnostic>();
-        if (!TryResolve(target, diagnostics, out var package))
-            return CharacterPackageCookResult.CreateFailure(null, null, null, null, null, diagnostics, null, dryRun, Array.Empty<string>());
+        if (!TryPrepareCook(target, out var package, out var cooked, out var assembly, out var diagnostics))
+        {
+            return CharacterPackageCookResult.CreateFailure(
+                package?.PackageId,
+                package?.ProjectRelativeRoot,
+                package == null ? null : CookedPath(package.PackageId),
+                cooked?.SourceHash,
+                assembly?.PackageHash,
+                diagnostics,
+                assembly,
+                dryRun,
+                package == null ? Array.Empty<string>() : ExpectedOutputPaths(package.PackageId));
+        }
+
+        string cookedPath = CookedPath(package.PackageId);
+        string[] expectedOutputs = ExpectedOutputPaths(package.PackageId);
+        if (dryRun)
+            return CharacterPackageCookResult.CreateSuccess(package.PackageId, package.ProjectRelativeRoot, cookedPath,
+                assembly.SourceHash, assembly.CookedContentHash, assembly.PackageHash, diagnostics, assembly, true, expectedOutputs);
+
+        if (!Publish(package, cooked, assembly, out var publishDiagnostics))
+        {
+            AddUnique(diagnostics, publishDiagnostics);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, cookedPath,
+                cooked.SourceHash, assembly.PackageHash, diagnostics, assembly, false, expectedOutputs);
+        }
+
+        return CharacterPackageCookResult.CreateSuccess(
+            package.PackageId,
+            package.ProjectRelativeRoot,
+            cookedPath,
+            assembly.SourceHash,
+            assembly.CookedContentHash,
+            assembly.PackageHash,
+            diagnostics,
+            assembly,
+            false,
+            expectedOutputs);
+    }
+
+    public bool TryCompileForEditorPlay(
+        string target,
+        out CookedCharacterPackageLoadResult package,
+        out CharacterAnimationCatalog animationCatalog,
+        out IReadOnlyList<CharacterDiagnostic> diagnostics)
+    {
+        package = null;
+        animationCatalog = null;
+        if (!TryPrepareCook(target, out _, out _, out var assembly, out var preparationDiagnostics))
+        {
+            diagnostics = preparationDiagnostics;
+            return false;
+        }
+
+        var allDiagnostics = new List<CharacterDiagnostic>(preparationDiagnostics);
+        CookedCharacterPackageLoadResult loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
+        AddUnique(allDiagnostics, loaded.Diagnostics);
+        if (!loaded.IsValid || loaded.Package == null)
+        {
+            diagnostics = allDiagnostics;
+            return false;
+        }
+
+        try
+        {
+            animationCatalog = CharacterAnimationCatalogGenerator.Create(assembly.BindingBytes);
+        }
+        catch (Exception ex)
+        {
+            allDiagnostics.Add(Error("asset-catalog.binding.invalid", "bindings.json", ex.Message));
+            diagnostics = allDiagnostics;
+            return false;
+        }
+
+        package = loaded;
+        diagnostics = allDiagnostics;
+        return true;
+    }
+
+    private bool TryPrepareCook(
+        string target,
+        out PackageContext package,
+        out CharacterAssetCookResult cooked,
+        out CharacterPackageAssemblyResult assembly,
+        out List<CharacterDiagnostic> diagnostics)
+    {
+        package = null;
+        cooked = null;
+        assembly = null;
+        diagnostics = new List<CharacterDiagnostic>();
+        if (!TryResolve(target, diagnostics, out package))
+            return false;
 
         AddUnique(diagnostics, package.Diagnostics);
-        string[] expectedOutputs = ExpectedOutputPaths(package.PackageId);
-        if (package.Source == null || package.Catalog == null || diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
+        if (package.Source == null || package.Catalog == null ||
+            diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error))
+            return false;
 
         byte[] packageBytesBefore;
         byte[] characterBytesBefore;
@@ -442,10 +531,9 @@ public sealed class CharacterPackageAuthoringService
         catch (Exception ex)
         {
             diagnostics.Add(Error("source.read.failed", package.ProjectRelativeRoot, ex.Message));
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
+            return false;
         }
 
-        CharacterAssetCookResult cooked;
         try
         {
             cooked = UnityCharacterAssetCooker.Cook(
@@ -457,45 +545,33 @@ public sealed class CharacterPackageAuthoringService
         catch (Exception ex)
         {
             diagnostics.Add(Error("asset-catalog.schema", "cook", ex.Message));
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), null, null, diagnostics, null, dryRun, expectedOutputs);
+            return false;
         }
 
         AddUnique(diagnostics, cooked.Diagnostics);
         if (cooked.CookedPackage == null || cooked.HasErrors)
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, null, dryRun, expectedOutputs);
+            return false;
 
-        CharacterPackageAssemblyResult assembly = CharacterPackageAssembler.Assemble(UnityCharacterAssetCooker.BuildPackageInput(cooked));
-        AddUnique(diagnostics, assembly.Diagnostics);
+        try
+        {
+            assembly = CharacterPackageAssembler.Assemble(UnityCharacterAssetCooker.BuildPackageInput(cooked));
+            AddUnique(diagnostics, assembly.Diagnostics);
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(Error("package.assembly.failed", "assembly", ex.Message));
+            return false;
+        }
         if (!assembly.IsValid)
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, dryRun, expectedOutputs);
+            return false;
 
         if (!InputsUnchanged(package, packageBytesBefore, characterBytesBefore, cooked.SourceHash, out var conflictDiagnostics))
         {
             AddUnique(diagnostics, conflictDiagnostics);
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, dryRun, expectedOutputs);
+            return false;
         }
 
-        if (dryRun)
-            return CharacterPackageCookResult.CreateSuccess(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId),
-                assembly.SourceHash, assembly.CookedContentHash, assembly.PackageHash, diagnostics, assembly, true, expectedOutputs);
-
-        if (!Publish(package, cooked, assembly, out var publishDiagnostics))
-        {
-            AddUnique(diagnostics, publishDiagnostics);
-            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, CookedPath(package.PackageId), cooked.SourceHash, null, diagnostics, assembly, false, expectedOutputs);
-        }
-
-        return CharacterPackageCookResult.CreateSuccess(
-            package.PackageId,
-            package.ProjectRelativeRoot,
-            CookedPath(package.PackageId),
-            assembly.SourceHash,
-            assembly.CookedContentHash,
-            assembly.PackageHash,
-            diagnostics,
-            assembly,
-            false,
-            expectedOutputs);
+        return true;
     }
 
     private string[] ExpectedOutputPaths(string packageId)

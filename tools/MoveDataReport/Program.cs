@@ -11,6 +11,7 @@ using SlopArena.Shared;
 // Issue #149: the tuning A/B diff tool (SlopArena.AbDiffReport) reuses this tool's analysis
 // engine (BuildReport / true-combo graph / DI escape) without duplicating it.
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SlopArena.AbDiffReport")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Shared.Tests")]
 
 namespace SlopArena.MoveDataReport;
 
@@ -22,7 +23,7 @@ namespace SlopArena.MoveDataReport;
 /// (frame-adv heatmap, knockback-shape gallery, KO/blast-clearance).
 ///
 /// Usage: dotnet run --project tools/MoveDataReport -- [character] [--pcts 0,30,60] [--out path]
-///        [--json report.json] [--html report.html] [--combos]
+///        [--json report.json] [--html report.html] [--combos] [--example]
 /// Character: fightguy (default) | manki | kistu | nilus.
 /// Default markdown output: docs/generated/{character}-move-data.md.
 /// Kill % / blast clearance: on a Crossroads-style 60x60 proxy (top +20, sides ±40, bottom -10).
@@ -39,9 +40,21 @@ internal static class Program
         float Apex, int ActionableTick, int? LandedTick);
 
     // ── JSON / HTML report model ────────────────────────────────────────────
-    internal sealed record TrajPoint(int Tick, float Height, float Travel, float Vy, float Vx, char Phase);
+    internal sealed record InitialStateData(float PositionX, float PositionY, float PositionZ,
+        bool IsGrounded, string ActionState, float FacingYawDegrees);
+    internal sealed record ReportMetadata(string Character, int[] RequestedPercents, string DamagePercentBasis,
+        string VictimCharacter, float VictimWeight, InitialStateData VictimInitialState,
+        int TickRateHz, string DiMode, string TerminationRule);
+    internal sealed record TrajPoint(int Tick, float Height, float Travel, float Vy, float Vx, char Phase,
+        float PositionX, float PositionY, float PositionZ, float VelocityX, float VelocityY, float VelocityZ,
+        bool InHitstun);
     internal sealed record TrajectoryData(int Pct, float Kv, ushort Hitstop, ushort Stun, int Adv, int? AdvL,
-        float Rise, float Drift, float Apex, float MaxTravel, int ActionableTick, int? LandedTick, string? KillLine, TrajPoint[] Points);
+        float Rise, float Drift, float Apex, int? ApexTick, float MaxTravel, int ActionableTick,
+        int? HitstunExpiryTick, float? HitstunExpiryPositionX, float? HitstunExpiryPositionY,
+        float? HitstunExpiryPositionZ, float? HitstunExpiryHorizontalDistance, float? HitstunExpiryHeight,
+        int? LandedTick, string? KillLine, string Termination, int AuthoredAngle,
+        float LaunchVelocityX, float LaunchVelocityY, float LaunchVelocityZ,
+        float InitialHorizontalVelocity, float InitialVerticalVelocity, TrajPoint[] Points);
     internal sealed record FrameDataData(int Trigger, int ActiveStart, int ActiveEnd, float Damage, int Angle,
         float BaseKb, float Growth, ushort Stun, int Iasa, int LandingLag, int AcBefore, int AcAfter, int Duration,
         string Profile, bool Adaptive);
@@ -50,7 +63,7 @@ internal static class Program
         int? KillPct, string? KillLine, ClearanceData Clearance, TrajectoryData[] Trajectories, DiEscapeData[] DiEscape);
     internal sealed record ArenaData(float? KillHeight, float? KillTop, float? KillMinX, float? KillMaxX,
         float? KillMinZ, float? KillMaxZ, string Note);
-    internal sealed record ReportData(string Character, string GeneratedAt, int[] Percents,
+    internal sealed record ReportData(string Character, string GeneratedAt, ReportMetadata Metadata, int[] Percents,
         ArenaData ReportArena, ArenaData KillArena, MoveData[] Moves,
         ComboStarterData[] TrueCombos, ComboDensityData[] ComboDensity,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReachData? Reach);
@@ -129,7 +142,8 @@ internal static class Program
         int? trajSlot = ParseTraj(args);
         int[] pcts = ParsePcts(args) ?? (trajSlot.HasValue
             ? new[] { 0, 10, 20, 30, 40, 50, 60 }   // --traj: 10% steps, low-% range
-            : new[] { 0, 30, 60, 90, 120, 150 });
+            : new[] { 0, 30, 60, 90, 120 });
+        bool example = args.Contains("--example");
         string? outPath = ParseOut(args) ?? $"docs/generated/{which}-move-data.md";
 
         var entry = ResolveEntry(which);
@@ -137,6 +151,12 @@ internal static class Program
         var routes = RoutesFor(which);
 
         var hits = CollectHits(def);
+        if (example)
+        {
+            var representative = hits.FirstOrDefault(h => !h.Slot.Air && h.Slot.Slot == 2 && h.HitIndex == 0)
+                ?? hits.FirstOrDefault();
+            hits = representative == null ? new List<HitSpec>() : new List<HitSpec> { representative };
+        }
 
         // Cooked FightGuy poses come from the admitted catalog entry; legacy characters
         // retain their path-based baked data until their package migration.
@@ -254,7 +274,7 @@ internal static class Program
         // direct ApplyKnockback call. Run BOTH paths and compare — a drift here means the
         // game behaves differently from this report (the 2026-08-14 x87 float bug was
         // exactly this divergence, invisible to .NET: every hit took the unscaled force path).
-        var parity = ComputeParity(def, hits, runs, baked);
+        var parity = ComputeParity(def, hits, runs, pcts, baked);
         foreach (var p in parity)
             if (!p.Ok)
                 Console.Error.WriteLine($"PARITY DIVERGENCE: {p.Label}@{p.Pct}% direct KV {p.DirectKv:F2} vs pipeline {p.PipeKv:F2}");
@@ -786,11 +806,11 @@ internal static class Program
     /// must match the tool here; divergence means the report doesn't describe the game.
     /// </summary>
     internal static List<ParityResult> ComputeParity(CharacterDefinition def, List<HitSpec> hits,
-        Dictionary<(SlotRef, int, int), RunResult> runs, BakedAnimationData? baked)
+        Dictionary<(SlotRef, int, int), RunResult> runs, int[] pcts, BakedAnimationData? baked)
     {
         var result = new List<ParityResult>();
         foreach (var h in hits.Where(x => x.HitIndex == 0 && !x.Adaptive))
-        foreach (var pct in new[] { 0, pctsDefault[^1] })
+        foreach (var pct in new[] { pcts[0], pcts[^1] })
         {
             var direct = runs[(h.Slot, 0, pct)];
             var spawn = CalibrateStarter(def, h.Slot, baked);
@@ -867,8 +887,6 @@ internal static class Program
         }
         return null;
     }
-
-    internal static readonly int[] pctsDefault = { 0, 30, 60, 90, 120, 150 };
 
     internal static string? ParseArg(string[] args, string name)
     {
@@ -1666,10 +1684,12 @@ internal static class Program
 
     internal static TrajPoint PointAt(CharacterState s, int tick, float groundY)
     {
-        float vy = s.HitstunTicks > 0 ? s.KVY : s.VY;
-        float vz = s.HitstunTicks > 0 ? s.KVZ : s.VZ;
-        char phase = s.IsGrounded ? 'G' : s.HitstunTicks > 0 ? 'H' : 'F';
-        return new TrajPoint(tick, s.PY - groundY, s.PZ, vy, vz, phase);
+        bool inHitstun = s.HitstunTicks > 0;
+        float vy = inHitstun ? s.KVY : s.VY;
+        float vz = inHitstun ? s.KVZ : s.VZ;
+        char phase = s.IsGrounded ? 'G' : inHitstun ? 'H' : 'F';
+        return new TrajPoint(tick, s.PY - groundY, s.PZ, vy, vz, phase,
+            s.PX, s.PY, s.PZ, inHitstun ? s.KVX : s.VX, vy, vz, inHitstun);
     }
 
     /// <summary>Launch a grounded victim with the hitbox's knockback, step the sim until it lands OR
@@ -1691,37 +1711,65 @@ internal static class Program
         Simulation.ApplyKnockback(ref state, 0f, 1f, h.LaunchAngle,
             h.BaseKb, h.GrowthKb,
             h.Hit.Damage, h.Hit.StunTicks, def.Weight);
-        float kv = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
+        float launchX = state.KVX, launchY = state.KVY, launchZ = state.KVZ;
+        float kv = MathF.Sqrt(launchX * launchX + launchY * launchY + launchZ * launchZ);
         ushort stun = state.HitstunTicks;
         ushort hitstop = ServerSimulation.ComputeHitstopTicks(h.Hit.Damage, null);
         sim.RegisterEntity(1, def, state);
         var inputs = new Dictionary<ulong, InputState> { [1] = default };
 
-        float maxPy = state.PY;
-        float maxTravel = 0f;
         int actionable = -1;
+        int? expiryTick = null;
+        float? expiryX = null, expiryY = null, expiryZ = null;
+        float? expiryDistance = null, expiryHeight = null;
         int? landed = null; string? killLine = null;
-        float rise = 0f, drift = 0f;
-        var pts = new List<TrajPoint>();
+        string termination = "simulation-cap";
+        var pts = new List<TrajPoint> { PointAt(state, 0, groundY) };
         for (int t = 0; t < MaxTicks; t++)
         {
             sim.Tick(inputs);
             var s = sim.GetState(1);
             killLine = BlastLine(s, detect);
-            if (killLine != null) { pts.Add(PointAt(s, t + 1, groundY)); break; }
-            if (s.PY > maxPy) maxPy = s.PY;
-            if (s.PZ > maxTravel) maxTravel = s.PZ;
-            if (actionable < 0 && s.HitstunTicks == 0) { actionable = t + 1; rise = s.PY - groundY; drift = s.PZ; }
-            if (actionable >= 0 && s.IsGrounded) { pts.Add(PointAt(s, t + 1, groundY)); landed = t + 1; break; }
+            if (killLine != null)
+            {
+                pts.Add(PointAt(s, t + 1, groundY));
+                termination = "blast-line";
+                break;
+            }
+            if (expiryTick == null && s.HitstunTicks == 0)
+            {
+                actionable = t + 1;
+                expiryTick = actionable;
+                expiryX = s.PX; expiryY = s.PY; expiryZ = s.PZ;
+                expiryDistance = MathF.Sqrt(s.PX * s.PX + s.PZ * s.PZ);
+                expiryHeight = s.PY - groundY;
+            }
+            if (actionable >= 0 && s.IsGrounded)
+            {
+                pts.Add(PointAt(s, t + 1, groundY));
+                landed = t + 1;
+                termination = "landing";
+                break;
+            }
             pts.Add(PointAt(s, t + 1, groundY));
-            if (pts.Count >= 1200) break; // safety cap
+            if (pts.Count >= 1200)
+            {
+                termination = "sample-cap";
+                break;
+            }
         }
+        var apex = pts.Count == 0 ? null : pts.OrderByDescending(p => p.Height).First();
+        float maxTravel = pts.Count == 0 ? 0f : pts.Max(p => p.Travel);
         int unlock = h.Stage.IasaTicks > 0 ? h.Stage.IasaTicks : h.Stage.DurationTicks;
         int adv = stun - Math.Max(0, unlock - h.Hit.TriggerTick);
         int? advL = h.Slot.Air ? adv - h.Stage.LandingLagTicks : null;
-        return new TrajectoryData(pct, kv, hitstop, stun, adv, advL, rise, drift,
-            maxPy - groundY, maxTravel, actionable, landed, killLine, pts.ToArray());
+        return new TrajectoryData(pct, kv, hitstop, stun, adv, advL,
+            expiryHeight ?? 0f, expiryDistance ?? 0f, apex?.Height ?? 0f, apex?.Tick, maxTravel, actionable,
+            expiryTick, expiryX, expiryY, expiryZ, expiryDistance, expiryHeight,
+            landed, killLine, termination, h.LaunchAngle, launchX, launchY, launchZ,
+            MathF.Sqrt(launchX * launchX + launchZ * launchZ), launchY, pts.ToArray());
     }
+
 
     /// <summary>3D angle between two vectors, in degrees.</summary>
     internal static float AngleBetween(float ax, float ay, float az, float bx, float by, float bz)
@@ -1898,8 +1946,15 @@ internal static class Program
                 BuildFrameData(h), kill?.Pct, kill?.Line, ClearanceOf(def, trajs[^1], killDetect), trajs.ToArray(),
                 diEscape != null ? diEscape[(h.Slot, h.HitIndex)] : Array.Empty<DiEscapeData>()));
         }
+        float groundY = def.CapsuleHeight * 0.5f;
+        var metadata = new ReportMetadata(def.DisplayName, pcts,
+            "requested bucket is pre-hit damage; launch uses bucket plus this hit's damage",
+            def.DisplayName, def.Weight,
+            new InitialStateData(0f, groundY, 0f, true, ActionState.Idle.ToString(), 0f),
+            60, di ? "neutral baseline plus held-DI variants" : "neutral (no DI/SDI)",
+            "first of landing, report-arena blast-line crossing, 1200 sampled points, or 2400 simulation ticks");
         return new ReportData(def.DisplayName, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture),
-            pcts, ToArenaData(reportDetect, "trajectory / landing arena (flat 200x200)"),
+            metadata, pcts, ToArenaData(reportDetect, "trajectory / landing arena (flat 200x200)"),
             ToArenaData(killDetect, "kill-% proxy (flat 60x60, Crossroads-style, -10)"), moves.ToArray(),
             graph, density, reachData);
     }
@@ -2104,10 +2159,15 @@ internal static class Program
         sb.AppendLine(".di-figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px 28px;align-items:start;}.di-fig{min-width:0;width:auto;text-align:left;}svg.di{width:100%;height:auto;display:block;background:#fafbfc;}.di-title{font-size:13px;font-weight:600;margin-bottom:4px;}.di-fig figcaption{font-size:11px;color:#555;margin-top:4px;text-align:left;}select{margin-left:6px;font-size:13px;}.swatch{display:inline-block;width:12px;height:5px;border-radius:2px;margin:0 4px 0 10px;vertical-align:middle;}");
         sb.AppendLine("</style></head><body>");
 
+        var meta = r.Metadata;
         sb.AppendLine($"<h1>{Escape(r.Character)} move data</h1>");
         sb.AppendLine($"<div class=\"meta\">Generated {Escape(r.GeneratedAt)} &middot; real ServerSimulation (ADR-0019). " +
-            "No DI/SDI input, hitstop reported not simulated, hit connects on first active frame.<br>" +
-            $"Trajectories: {Escape(r.ReportArena.Note)}. " +
+            $"Victim: {Escape(meta.VictimCharacter)}, weight {F(meta.VictimWeight)}, initial state " +
+            $"({F(meta.VictimInitialState.PositionX)}, {F(meta.VictimInitialState.PositionY)}, {F(meta.VictimInitialState.PositionZ)}), " +
+            $"{Escape(meta.VictimInitialState.ActionState)}, grounded {meta.VictimInitialState.IsGrounded}. " +
+            $"Buckets: {string.Join(", ", meta.RequestedPercents)}% pre-hit; tick rate {meta.TickRateHz} Hz; " +
+            $"DI: {Escape(meta.DiMode)}.<br>" +
+            $"Trajectories: {Escape(r.ReportArena.Note)}. Termination: {Escape(meta.TerminationRule)}. " +
             $"Kill %: {Escape(r.KillArena.Note)} &mdash; top {Blast(r.KillArena.KillTop)}, side &plusmn;{Blast(r.KillArena.KillMaxX)}, " +
             $"bottom {Blast(r.KillArena.KillHeight)}. Center launch, victim passive.</div>");
 

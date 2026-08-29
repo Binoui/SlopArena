@@ -34,7 +34,9 @@ For the FightGuy slice, Ability Lab edits the complete gameplay document except 
 
 Ability Lab records the source hash it loaded. If the file changes externally, save is blocked until the creator reloads; last-writer-wins and automatic source merging are rejected. Saving always persists the draft, then automatically validates and cooks if possible. An invalid draft remains editable while the last valid cooked artifact remains unchanged.
 
-A valid draft is cooked in memory and previewed through the same immutable runtime definition and ability interpreter as the game and GameServer. An invalid draft may show a clearly non-authoritative visual editing pose only. Older authoring schemas require an explicit, previewable migration command; neither Ability Lab nor runtime silently rewrites them.
+Ability Lab's authoritative persisted preview still requires SAVE + COOK. A valid Editor Training or Solo Play launch separately compiles the current authoring source and semantic assets in memory into the same immutable runtime definition, cooked package, baked animation payload, and client catalog types. Invalid source blocks match start and never falls back to `content-cooked`; Ability Lab may retain its last-valid preview only with a visible Stale Cook diagnostic.
+
+Older authoring schemas require an explicit, previewable migration command; neither Ability Lab nor runtime silently rewrites them.
 
 ### Authoring and runtime schemas
 
@@ -52,7 +54,7 @@ The cooked Character Package contains:
 - private client binding payloads; and
 - diagnostics and compatibility metadata required by the accepted package ADRs.
 
-The canonical generated package is committed under a dedicated tree such as `content-cooked/<package-id>/`. StreamingAssets and release directories are staging outputs only. Unity generates a runtime catalog `ScriptableObject` from the canonical client payload as a non-authoritative, regenerable project cache.
+The canonical generated package is committed under a dedicated tree such as `content-cooked/<package-id>/`. StreamingAssets and release directories are staging outputs only. Unity generates a runtime catalog `ScriptableObject` from the canonical client payload as a non-authoritative, regenerable project cache. Editor Training and Solo Play may instead hold a `DontSave` semantic catalog created from the current source in memory.
 
 The source hash covers every transitive authoring input that can affect cooked bytes: source manifests, Character document, asset catalog, referenced clips and rigs, import settings, and cooker/toolchain version. Cooking is deterministic and replaces the prior artifact atomically. Errors block replacement; warnings permit cooking and are recorded in the manifest. Any dependency edit automatically triggers a debounced recook.
 
@@ -76,7 +78,7 @@ The GameServer resolves packages before match start, assigns compact match-local
 
 `CharacterClass.FightGuy` remains temporarily as a protocol/UI selector only. A source Built-In Roster Manifest maps that selector to a stable package ID; its cooked form pins the exact bundled version and hash. During the FightGuy-only slice, a catalog builder loads cooked FightGuy and snapshots legacy Manki, Kistu, and Nilus definitions into immutable entries. Only that builder touches the legacy registry; simulation and rendering do not branch between content systems.
 
-Missing, invalid, stale, incompatible, or hash-mismatched content never falls back to C# or a similar capability. Release builds, CI admission, and online matches fail closed. Editor and local development runtimes may deliberately run the last valid cook, but must show a persistent **Stale Cook** banner containing the source hash, cooked source hash, and cook error. A console message alone is insufficient.
+Missing, invalid, stale, incompatible, or hash-mismatched content never falls back to C# or a similar capability. Invalid Editor Training/Solo Play source fails closed without using a persisted cooked package. Release builds, CI admission, PvP, Player, Workshop, and online matches use persisted deterministic packages and fail closed. Ability Lab may show the last valid cook only with a persistent **Stale Cook** banner containing the source hash, cooked source hash, and cook error; a console message alone is insufficient.
 
 ## Migration
 

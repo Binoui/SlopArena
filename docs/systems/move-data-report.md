@@ -14,19 +14,30 @@ combo matrix/probes are experimental diagnostics, deliberately separated from th
 ## Usage
 
 ```bash
-scripts/move-data.sh <char> [--pcts 0,30,60,90,120,150] [--out docs/generated/<char>-move-data.md]
-scripts/move-data.sh <char> --json report.json --html report.html   # visual report
-scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
-scripts/move-data.sh <char> --reach --html report.html              # + authored hitbox reach chart
+scripts/move-data.sh fightguy --pcts 0,30,60,90,120 \
+  --out docs/generated/fightguy-move-data.md
+scripts/move-data.sh fightguy --pcts 0,30,60,90,120 \
+  --html docs/generated/fightguy-move-data.html
+scripts/move-data.sh fightguy --pcts 0,30,60,90,120 \
+  --json /tmp/fightguy-move-data.json
+scripts/move-data.sh fightguy --example --pcts 0,60,120 \
+  --json docs/generated/fightguy-move-data.example.json
 ```
 
 - `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports until their
   kits are Melee-converted to Custom-knockback normals.
 - Default markdown output: `docs/generated/<char>-move-data.md`.
+- `--example` limits JSON/HTML collection to the representative grounded g2 first hit. Use it only for a
+  small committed schema fixture; normal reports still collect every normal hit.
 - Collection: every `HitboxEvent` from slots 1–4 + air 1–4 (first stage only), **regardless of knockback
   profile**. Launch resolves as: Custom/Adaptive use their authored base/growth (Adaptive's authored angle
   is used as a representative), named profiles resolve from the `KnockbackProfile` table. Frame data is
   always exact.
+
+For an exact regeneration, run the markdown and HTML commands separately because JSON/HTML output exits
+after writing its requested report. Full JSON is intentionally ignored; regenerate it at a temporary path
+or another ignored location. `generatedAt` is wall-clock metadata, so deterministic comparisons must remove
+that field; scenario ordering, values, and samples are otherwise stable.
 
 ## Visual report (`--json` / `--html`)
 
@@ -36,7 +47,8 @@ committing; the `.html` and `.md` renderings of the same data are small enough t
 `docs/generated/`.
 
 ```bash
-scripts/move-data.sh kistu --json docs/generated/kistu-move-data.json --html docs/generated/kistu-move-data.html
+scripts/move-data.sh kistu --json /tmp/kistu-move-data.json
+scripts/move-data.sh kistu --html docs/generated/kistu-move-data.html
 ```
 
 - **`--json`** — structured report: per-move frame data, per-tick trajectory arcs, adv per move×%, kill% +
@@ -48,6 +60,24 @@ scripts/move-data.sh kistu --json docs/generated/kistu-move-data.json --html doc
      red apex dot, KV / apex / stun caption. The "shape" the trajectory table hides in numbers.
   3. **KO & blast clearance** — kill % (lowest victim % crossing a blast line, binary search 0→250%) plus
      progress bars for how close each move gets to the top / side blast line at the highest simulated %.
+
+### JSON contract
+
+`metadata` identifies the report character, requested pre-hit buckets, representative victim character
+and `CharacterDefinition.Weight`, the grounded idle origin state, 60 Hz tick rate, DI mode, and the
+termination rule. Each trajectory also carries its authored angle, actual launch velocity XYZ and
+horizontal/vertical components, hitstun-expiry tick and position/distance/height, apex tick, landing
+tick, and a termination reason. Each `points` row contains the tick, absolute position XYZ, effective
+velocity XYZ, and `inHitstun`, plus the existing height/travel/phase display fields. Nullable expiry,
+apex, and landing fields remain null when the trajectory reaches a cap instead.
+
+### Standard trajectory scenario
+
+FightGuy reports use FightGuy as both attacker and representative victim, with `CharacterDefinition.Weight
+= 100`. The victim starts at `(0, CapsuleHeight/2, 0) = (0, 0.85, 0)` in `Idle`, grounded, facing yaw
+`0`, with no movement or DI/SDI input. Buckets `0,30,60,90,120` are pre-hit damage; the launch uses the
+bucket after the hit's damage is added. Hitstop is reported but not stepped. A run ends at landing, a
+report-arena blast-line crossing, 1200 sampled points, or 2400 simulation ticks.
 
 ### Kill-% geometry
 

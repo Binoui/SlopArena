@@ -17,15 +17,19 @@ SceneView guidance. Package authoring and cooking remain in `AbilityLabPackageWo
 4. The rooted resolver checks staged `Application.streamingAssetsPath/content-cooked` first,
    then the repository `content-cooked` directory. It never depends on the process working
    directory.
-5. Authoritative preview requires a verified cooked manifest, runtime definition, pose
+5. Authoritative persisted preview requires a verified cooked manifest, runtime definition, pose
    payload, generated animation catalog, and rig. Missing or invalid content shows
    `Preview unavailable` with structured code, path, and message diagnostics. It never
    falls back to FightGuy or legacy content. A source-only package such as Bonk is therefore
    discoverable but has no authoritative preview.
 6. With a valid package preview, scrub the stopped timeline at tick `0` or later. Edit Mode
    refreshes the existing renderer, baked bones, hurtboxes, and hitboxes in SceneView.
-7. `SAVE + COOK` is the only persistence and cook path. A failed cook returns semantic
-   failure and preserves the last valid artifact, generated cache, and status.
+7. `SAVE + COOK` remains the only persistence path and the only way to produce authoritative
+   persisted preview/package output. A failed cook returns semantic failure and preserves the
+   last valid artifact, generated cache, and status.
+8. Editor Training and Solo Play have a separate `edit → Play` path. They compile the current
+   source and semantic assets in memory into the existing cooked runtime/catalog types. Invalid
+   source blocks match start; it never falls back to a persisted cooked package.
 
 The compact toolbar status has this precedence: `No package → Unsaved → Cooking… → Cook
 failed → Stale → Cooked`. Clicking status opens the structured diagnostics panel. Hashes and

@@ -14,6 +14,16 @@ namespace SlopArena.Client
     /// </summary>
     public static class ClientSession
     {
+#if UNITY_EDITOR
+        public delegate bool LocalMatchCatalogProvider(out Shared.MatchContentCatalog? catalog, out string? failure);
+        private static LocalMatchCatalogProvider? editorDevelopmentContentProvider;
+
+        public static void RegisterEditorDevelopmentContentProvider(LocalMatchCatalogProvider provider)
+        {
+            editorDevelopmentContentProvider = provider ?? throw new ArgumentNullException(nameof(provider));
+        }
+#endif
+
         /// <summary>Master server base URL (release default; dev overrides via scene inspector).</summary>
         public static string MasterServerUrl = "https://sloparena.barakaslurp.fr";
 
@@ -236,9 +246,26 @@ namespace SlopArena.Client
             MatchContentHandleMap = new Shared.MatchContentHandleMap(Shared.MatchContentHandleMap.CurrentSchemaVersion, records);
         }
         public static bool TryBuildLocalMatchCatalog(out Shared.MatchContentCatalog? catalog, out string? failure)
-            => TryBuildLocalMatchCatalogCore(out catalog, out failure);
+        {
+#if UNITY_EDITOR
+            if (UnityEngine.Application.isEditor)
+            {
+                if (editorDevelopmentContentProvider == null)
+                {
+                    catalog = null;
+                    failure = "content.development.provider-missing (provider): Editor development content provider is not registered.";
+                    return false;
+                }
+                return editorDevelopmentContentProvider(out catalog, out failure);
+            }
+#endif
+            return TryBuildPersistedLocalMatchCatalogCore(out catalog, out failure);
+        }
 
-        private static bool TryBuildLocalMatchCatalogCore(out Shared.MatchContentCatalog? catalog, out string? failure)
+        public static bool TryBuildPersistedLocalMatchCatalog(out Shared.MatchContentCatalog? catalog, out string? failure)
+            => TryBuildPersistedLocalMatchCatalogCore(out catalog, out failure);
+
+        private static bool TryBuildPersistedLocalMatchCatalogCore(out Shared.MatchContentCatalog? catalog, out string? failure)
         {
             catalog = null;
             failure = null;
@@ -294,7 +321,7 @@ namespace SlopArena.Client
         {
             catalog = null;
             failure = null;
-            if (!TryBuildLocalMatchCatalogCore(out var builtCatalog, out failure) || builtCatalog == null)
+            if (!TryBuildPersistedLocalMatchCatalogCore(out var builtCatalog, out failure) || builtCatalog == null)
                 return false;
 
             if (received == null || received.Entries.Count != builtCatalog.Entries.Count)

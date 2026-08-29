@@ -71,13 +71,22 @@ scripts/verify-fightguy-package.sh
 
 After Unity-facing changes:
 
-1. confirm the Unity Pipeline is reachable;
-2. recompile the Editor and inspect current console errors;
-3. open the affected package in Ability Lab;
-4. preview a valid cooked draft and confirm slot identity, timing, hitboxes, and presentation;
-5. open Training and exercise movement, the changed move, collision, interruption, and landing behavior.
+1. Confirm the Unity Pipeline is reachable, recompile the Editor, and inspect current console errors.
+2. Run `EditorDevelopmentContentSelfTest.Run()` (or the named menu item). A valid
+   `character.json` edit must change the next Editor Training catalog without changing
+   `content-cooked` or the generated animation catalog bytes. An invalid operation must report
+   `value.out-of-range` at `character.operation.tick` with its code, path, and message, block
+   the local catalog, and never use the old persisted package.
+3. Confirm `TryBuildPersistedLocalMatchCatalog` still loads the exact persisted roster
+   requirement and hashes. Keep the existing `content-cooked` package/release verification.
+4. Open the affected package in Ability Lab, preview a valid persisted cooked draft, then open
+   Training and exercise movement, the changed move, collision, interruption, and landing
+   behavior. For the Editor `edit → Play` path, observe the changed source behavior and
+   semantic animation/rig without running a publishing cook.
 
-The authoritative preview is the cooked Shared path. Ability Lab may show a clearly non-authoritative editing pose for invalid drafts, but Training and matches must never silently use invalid or stale content.
+The authoritative preview is the cooked Shared path. Ability Lab may show a clearly
+non-authoritative editing pose for invalid drafts, but Training and matches must never silently
+use invalid or stale content.
 
 ## 5. Local GameServer/PvP
 
