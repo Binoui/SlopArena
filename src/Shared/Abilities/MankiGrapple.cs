@@ -15,6 +15,7 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public sealed class MankiGrapple : ServerAbility
     {
+        private readonly CookedMankiGrappleCapabilityParameters? _parameters;
         private enum GrapplePhase { Aiming, Firing, Reeling }
 
         private GrapplePhase _phase;
@@ -32,6 +33,23 @@ namespace SlopArena.Shared.Abilities
         private float _hitboxRadius;
         private float _grappleDamage;
 
+        public MankiGrapple() { }
+        public MankiGrapple(CookedMankiGrappleCapabilityParameters parameters)
+            => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        public MankiGrapple(MankiGrappleCapabilityParameters parameters)
+            : this(parameters != null ? new CookedMankiGrappleCapabilityParameters(
+                parameters.FireTriggerTick,
+                parameters.TetherSpeed,
+                parameters.HitboxRadius,
+                parameters.MaxFlightTicks,
+                parameters.MaxRange,
+                parameters.ReelSpeed,
+                parameters.ArrivalThreshold,
+                parameters.Damage,
+                parameters.StunTicks,
+                parameters.KbAngle,
+                parameters.CastDuration) : throw new ArgumentNullException(nameof(parameters))) { }
+
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _phase = GrapplePhase.Aiming;
@@ -39,14 +57,26 @@ namespace SlopArena.Shared.Abilities
             _anchorEntityId = 0;
             _ownerEntityId = s.EntityId;
 
-            _fireTriggerTick = (ushort)GetParam(def, "fire_trigger_tick", 8f);
-            _maxFlightTicks = (ushort)GetParam(def, "max_flight_ticks", 30f);
-            _tetherSpeed = GetParam(def, "tether_speed", 40f);
-            _reelSpeed = GetParam(def, "reel_speed", 25f);
-            _arrivalThreshold = GetParam(def, "arrival_threshold", 0.5f);
-            _hitboxRadius = GetParam(def, "hitbox_radius", 0.3f);
-            _grappleDamage = GetParam(def, "damage", 3f);
-
+            if (_parameters != null)
+            {
+                _fireTriggerTick = _parameters.FireTriggerTick;
+                _maxFlightTicks = _parameters.MaxFlightTicks;
+                _tetherSpeed = _parameters.TetherSpeed;
+                _reelSpeed = _parameters.ReelSpeed;
+                _arrivalThreshold = _parameters.ArrivalThreshold;
+                _hitboxRadius = _parameters.HitboxRadius;
+                _grappleDamage = _parameters.Damage;
+            }
+            else
+            {
+                _fireTriggerTick = (ushort)GetParam(def, "fire_trigger_tick", 8f);
+                _maxFlightTicks = (ushort)GetParam(def, "max_flight_ticks", 30f);
+                _tetherSpeed = GetParam(def, "tether_speed", 40f);
+                _reelSpeed = GetParam(def, "reel_speed", 25f);
+                _arrivalThreshold = GetParam(def, "arrival_threshold", 0.5f);
+                _hitboxRadius = GetParam(def, "hitbox_radius", 0.3f);
+                _grappleDamage = GetParam(def, "damage", 3f);
+            }
             // Hold = aim stance (fixed-stance friction in Simulation's movement gate).
             s.State = ActionState.Aiming;
             s.AttackSlot = (byte)(Slot + 1);

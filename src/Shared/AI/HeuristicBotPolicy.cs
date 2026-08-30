@@ -93,7 +93,7 @@ public sealed class HeuristicBotPolicy
 
         // Far targets are always approached. Movement remains normalized and uses world X/Z,
         // matching Simulation.ProcessNormalMovement's input contract.
-        float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
+        float rangeScale = 2f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
         float perceivedMaxReach = MaxConnectReach(self, def) * rangeScale;
         bool inRange = dist <= perceivedMaxReach;
         if (!inRange)

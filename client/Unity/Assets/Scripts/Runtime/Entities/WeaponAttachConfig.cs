@@ -10,7 +10,7 @@ namespace SlopArena.Client.Entities
     [System.Serializable]
     public class WeaponEntry
     {
-        [Tooltip("AttackSlot value that makes this weapon visible (1-6). 0 = always visible.")]
+        [Tooltip("AttackSlot value that makes this weapon visible (0 = always visible; otherwise the CharacterState AttackSlot wire value, e.g. 11 = A).")]
         public byte AttackSlot;
 
         [Tooltip("Exact bone name from the SkinnedMeshRenderer (e.g. mixamorig:RightHand).")]
@@ -24,6 +24,8 @@ namespace SlopArena.Client.Entities
 
         [Tooltip("Rotation in the attached bone's local bind space.")]
         public Vector3 RotationOffset;
+        [Tooltip("Hide the prop this many ticks after the attack starts (0 = keep for the whole attack).")]
+        public int HideAfterTicks;
 
     }
 

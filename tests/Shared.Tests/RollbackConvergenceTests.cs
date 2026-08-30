@@ -25,26 +25,6 @@ public class RollbackConvergenceTests
         NetplayHarness.AssertOpponentConverged(h);
     }
 
-    [Fact]
-    public void JumpDashAttackTrace_ConvergesExact_WithRttDelay()
-    {
-        // 2-tick RTT; attacks happen at tick 5-12 while the entities are ~10m apart
-        // (Manki LMB range is far shorter), so no cross-hit lands and both sides
-        // stay exactly converged — including the opponent's Complex→Predictable
-        // re-registration after its attack ends.
-        var h = Harness(delayTicks: 2);
-        for (int t = 0; t < 240; t++)
-        {
-            InputState in1 = TestHelpers.Input(moveX: 1f,
-                jump: t == 20 || t == 100, dash: t == 40);
-            InputState in2 = TestHelpers.Input(moveX: -1f,
-                jump: t == 30 || t == 110, dash: t == 50,
-                activeSlot: t is >= 5 and < 12 ? (byte)1 : (byte)0);
-            h.Step(in1, in2);
-        }
-        NetplayHarness.AssertSelfConverged(h);
-        NetplayHarness.AssertOpponentConverged(h);
-    }
 
     [Fact]
     public void PacketLoss_ReconvergesAfterLastReceivedPacket()

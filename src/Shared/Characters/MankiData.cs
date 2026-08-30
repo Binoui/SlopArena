@@ -123,7 +123,7 @@ public static partial class CharacterRegistry
                 IconName = "q",
                 Behavior = AbilityBehavior.AimedProjectile,
                 AimMode = AimMode.GroundCursor,
-                AimMovement = AimMovementMode.Mobile,
+                AimMovement = AimMovementMode.Fixed,
                 CooldownTicks = 300,
                 ChargeHoldTicks = 0,             // unlimited aim; release is the sole transition
                 Stages = new AttackStage[]
@@ -164,6 +164,7 @@ public static partial class CharacterRegistry
                 IconName = "e",
                 Behavior = AbilityBehavior.Projectile,
                 AimMode = AimMode.CameraForward3D,
+                AimMovement = AimMovementMode.Fixed,
                 CooldownTicks = 210,
                 Stages = new AttackStage[]
                 {
@@ -196,6 +197,7 @@ public static partial class CharacterRegistry
                 IconName = "r",
                 Behavior = AbilityBehavior.Projectile,
                 AimMode = AimMode.CameraForward3D,
+                AimMovement = AimMovementMode.Fixed,
                 CooldownTicks = 240,
                 Stages = new AttackStage[]
                 {

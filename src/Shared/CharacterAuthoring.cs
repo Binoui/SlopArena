@@ -109,7 +109,8 @@ public sealed record CharacterSlotSource(
     bool PreserveMomentumOnStart,
     CharacterTimelineSource Timeline,
     ChargePoolSource? ChargePool = null,
-    AuthoringAimMovementMode AimMovement = AuthoringAimMovementMode.Fixed);
+    AuthoringAimMovementMode AimMovement = AuthoringAimMovementMode.Fixed,
+    string? AimAnimationId = null);
 
 public sealed record ChargePoolSource(int MaxCharges, ushort RegenTicks);
 public sealed record CharacterAliasSource(string From, string To);
@@ -277,6 +278,54 @@ public sealed record BonkTargetedJumpSlamCapabilityParameters(
     float SlamKnockbackGrowth,
     ushort SlamStunTicks,
     ushort SlamDurationTicks) : TypedCapabilityParameters;
+public sealed record MankiRoundBombCapabilityParameters(
+    ushort ThrowTriggerTick,
+    float MaxRange,
+    float LaunchAngle,
+    float Gravity,
+    float HitboxRadius,
+    float Damage,
+    ushort StunTicks,
+    ushort MaxFlightTicks,
+    float KbAngle,
+    float ExplosionDamage,
+    float ExplosionRadius,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks,
+    float ExplosionKbAngle) : TypedCapabilityParameters;
+public sealed record MankiGrappleCapabilityParameters(
+    ushort FireTriggerTick,
+    float TetherSpeed,
+    float HitboxRadius,
+    ushort MaxFlightTicks,
+    float MaxRange,
+    float ReelSpeed,
+    float ArrivalThreshold,
+    float Damage,
+    ushort StunTicks,
+    float KbAngle,
+    ushort CastDuration) : TypedCapabilityParameters;
+public sealed record MankiBazookaCapabilityParameters(
+    ushort FireTriggerTick,
+    float ProjectileSpeed,
+    float HitboxRadius,
+    float Damage,
+    float Gravity,
+    ushort MaxFlightTicks,
+    ushort StunTicks,
+    float ExplosionRadius,
+    float KbAngle,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks,
+    float ExplosionKbAngle,
+    ushort CastDuration,
+    ushort RecoveryDuration) : TypedCapabilityParameters;
+public sealed record MankiOverclockCapabilityParameters(
+    ushort DurationTicks) : TypedCapabilityParameters;
 
 public enum AuthoringAbilityBehavior : byte
 {

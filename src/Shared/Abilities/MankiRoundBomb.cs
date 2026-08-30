@@ -7,11 +7,33 @@ namespace SlopArena.Shared.Abilities
     /// explodes on impact. The hold/aim/throw lifecycle lives in
     /// <see cref="AimHoldAbility"/>; this class only builds the projectile from spec Params.
     /// </summary>
-    public sealed class MankiRoundBomb : AimHoldAbility
+    public sealed class MankiRoundBomb : AimHoldAbility, IAimHoldCapability
     {
+        private readonly CookedMankiRoundBombCapabilityParameters? _parameters;
         private float _cachedAimDistance;
         private float _cachedAimYaw;
 
+        public MankiRoundBomb() { }
+        public MankiRoundBomb(CookedMankiRoundBombCapabilityParameters parameters)
+            => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        public MankiRoundBomb(MankiRoundBombCapabilityParameters parameters)
+            : this(parameters != null ? new CookedMankiRoundBombCapabilityParameters(
+                parameters.ThrowTriggerTick,
+                parameters.MaxRange,
+                parameters.LaunchAngle,
+                parameters.Gravity,
+                parameters.HitboxRadius,
+                parameters.Damage,
+                parameters.StunTicks,
+                parameters.MaxFlightTicks,
+                parameters.KbAngle,
+                parameters.ExplosionDamage,
+                parameters.ExplosionRadius,
+                parameters.ExplosionKbBase,
+                parameters.ExplosionKbGrowth,
+                parameters.ExplosionStunTicks,
+                parameters.ExplosionDurationTicks,
+                parameters.ExplosionKbAngle) : throw new ArgumentNullException(nameof(parameters))) { }
         protected override byte GetReleaseAnimIndex(CharacterDefinition def) => 1;  // spell_q_attack
 
         protected override void OnAimStart(ref CharacterState s, CharacterDefinition def)
@@ -24,6 +46,16 @@ namespace SlopArena.Shared.Abilities
                     $"[MankiQ] OnStart slot={Slot} animLock={s.AnimLockTicks} airborne={!s.IsGrounded}");
         }
 
+        protected override void OnAimTick(ref CharacterState s, CharacterDefinition def)
+        {
+            // Track the cursor while held — the throw uses the aim at RELEASE. The
+            // release tick's input carries zeroed AimDistance (the client's release
+            // context only forwards the last yaw), so OnRelease must not be the only
+            // place the distance is captured.
+            _cachedAimDistance = s.AimTargetDistance;
+            _cachedAimYaw = s.AimYaw;
+        }
+
         protected override void OnRelease(ref CharacterState s, CharacterDefinition def)
         {
             if (Simulation.OnDebugLog != null)
@@ -31,8 +63,6 @@ namespace SlopArena.Shared.Abilities
                     $"[MankiQ] Release -> throw! ticks={s.AttackElapsedTicks} " +
                     $"aiming={s.IsAiming} charge={s.ChargeTicks}/{GetMaxHoldTicks(def)} " +
                     $"aimDist={s.AimTargetDistance:F2} aimYaw={s.AimYaw:F2}");
-            _cachedAimDistance = s.AimTargetDistance;
-            _cachedAimYaw = s.AimYaw;
         }
 
         protected override void OnFire(ref CharacterState s, CharacterDefinition def)
@@ -41,9 +71,10 @@ namespace SlopArena.Shared.Abilities
                 Simulation.OnDebugLog.Invoke(
                     $"[MankiQ] Projectile spawned! dist={_cachedAimDistance:F2} yaw={_cachedAimYaw:F2}rad");
 
-            float D = Math.Clamp(_cachedAimDistance, 0.5f, GetParam(def, "max_range", 12f));
-            float launchAngleDeg = GetParam(def, "launch_angle", 30f);
-            float g = GetParam(def, "gravity", 30f);
+            float maxRange = _parameters?.MaxRange ?? GetParam(def, "max_range", 12f);
+            float D = Math.Clamp(_cachedAimDistance, 0.5f, maxRange);
+            float launchAngleDeg = _parameters?.LaunchAngle ?? GetParam(def, "launch_angle", 30f);
+            float g = _parameters?.Gravity ?? GetParam(def, "gravity", 30f);
             float launchOffsetY = GetParam(def, "launch_offset_y", 1.2f);
             float dY = -def.CapsuleHeight * 0.5f - launchOffsetY;
 
@@ -54,15 +85,21 @@ namespace SlopArena.Shared.Abilities
             float aimCos = MathF.Cos(_cachedAimYaw);
             float aimSin = MathF.Sin(_cachedAimYaw);
 
-            float projRadius = GetParam(def, "hitbox_radius", 0.6f);
-            float projDamage = GetParam(def, "damage", 8f);
+            float projRadius = _parameters?.HitboxRadius ?? GetParam(def, "hitbox_radius", 0.6f);
+            float projDamage = _parameters?.Damage ?? GetParam(def, "damage", 8f);
             ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
             float kbBase = GetParam(def, "knockback_base", 4f);
             float kbGrowth = GetParam(def, "knockback_growth", 6f);
-            float explosionKbBase = GetParam(def, "explosion_kb_base", 2.4f);
-            float explosionKbGrowth = GetParam(def, "explosion_kb_growth", 3.6f);
-            float kbAngle = GetParam(def, "kb_angle", 30f);
-            float explosionKbAngle = GetParam(def, "explosion_kb_angle", 30f);
+            float explosionKbBase = _parameters?.ExplosionKbBase ?? GetParam(def, "explosion_kb_base", 2.4f);
+            float explosionKbGrowth = _parameters?.ExplosionKbGrowth ?? GetParam(def, "explosion_kb_growth", 3.6f);
+            float kbAngle = _parameters?.KbAngle ?? GetParam(def, "kb_angle", 30f);
+            float explosionKbAngle = _parameters?.ExplosionKbAngle ?? GetParam(def, "explosion_kb_angle", 30f);
+            float explosionRadius = _parameters?.ExplosionRadius ?? GetParam(def, "explosion_radius", 3f);
+            float explosionDamage = _parameters?.ExplosionDamage ?? GetParam(def, "explosion_damage", 25f);
+            ushort stunTicks = _parameters?.StunTicks ?? (ushort)GetParam(def, "stun_ticks", 14f);
+            ushort maxFlightTicks = _parameters?.MaxFlightTicks ?? (ushort)GetParam(def, "max_flight_ticks", 90f);
+            ushort explosionStunTicks = _parameters?.ExplosionStunTicks ?? (ushort)GetParam(def, "explosion_stun_ticks", 20f);
+            ushort explosionDurationTicks = _parameters?.ExplosionDurationTicks ?? (ushort)GetParam(def, "explosion_duration_ticks", 6f);
 
             Resolver.Spawn(new Hitbox
             {
@@ -78,17 +115,17 @@ namespace SlopArena.Shared.Abilities
                 Damage = projDamage,
                 BaseKnockback = kbBase, KnockbackGrowth = kbGrowth,
                 KnockbackAngle = (sbyte)kbAngle,
-                StunTicks = (ushort)GetParam(def, "stun_ticks", 14f),
-                DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 90f),
+                DurationTicks = maxFlightTicks,
                 OwnerId = s.EntityId,
+                AttackSlot = (byte)(Slot + 1),
                 Gravity = g,
                 Explosion = new ProjectileExplosion
                 {
-                    Radius = GetParam(def, "explosion_radius", 3f),
-                    Damage = GetParam(def, "explosion_damage", 25f),
+                    Radius = explosionRadius,
+                    Damage = explosionDamage,
                     Knockback = new() { Profile = KnockbackProfile.Custom, Angle = (sbyte)explosionKbAngle, BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth },
-                    StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
-                    DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
+                    StunTicks = explosionStunTicks,
+                    DurationTicks = explosionDurationTicks,
                 },
             });
         }

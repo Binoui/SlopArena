@@ -52,6 +52,13 @@ namespace SlopArena.Shared
         public AbilityBehavior Behavior = AbilityBehavior.MeleeCombo;
         public AimMode AimMode = AimMode.None;
         public AimMovementMode AimMovement = AimMovementMode.Fixed;
+        /// <summary>
+        /// Semantic id of the aim-loop clip played while holding an aimed ability
+        /// (cooked AimedProjectile slots). Null = no authored aim loop — the
+        /// presentation falls back to the slot's first animation (fixed policy)
+        /// or locomotion (mobile policy).
+        /// </summary>
+        public string? AimAnimationId;
         public string Name = "";
         public string Description = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>

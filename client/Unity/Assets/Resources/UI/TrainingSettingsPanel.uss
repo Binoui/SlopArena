@@ -1,0 +1,86 @@
+.ts-panel {
+    width: 300px;
+    padding: 14px 16px 16px 16px;
+    flex-direction: column;
+    background-color: rgba(13, 13, 20, 0.94);
+    border-bottom-width: 5px;
+    border-bottom-color: #e05c2a;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.ts-title {
+    font-size: 20px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: #fffcee;
+    margin-bottom: 12px;
+}
+
+.ts-toggle {
+    font-size: 14px;
+    color: #fffcee;
+    margin-bottom: 12px;
+}
+
+.ts-label {
+    font-size: 13px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    color: rgba(240, 238, 232, 0.86);
+    margin-bottom: 4px;
+}
+
+.ts-dmg {
+    flex-grow: 1;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.ts-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.ts-btn-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.ts-wrap {
+    flex-wrap: wrap;
+}
+
+.ts-btn {
+    height: 30px;
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    color: #fffcee;
+    background-color: #24202b;
+    border-bottom-width: 3px;
+    border-bottom-color: #625c6b;
+    -unity-text-align: middle-center;
+}
+
+.ts-btn:hover {
+    background-color: #35303f;
+}
+
+.ts-btn:disabled {
+    opacity: 0.35;
+}
+
+.ts-mode-btn.active {
+    background-color: #3b6fe0;
+    border-bottom-color: #2c4fb0;
+}

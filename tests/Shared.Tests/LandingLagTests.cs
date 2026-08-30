@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -11,11 +12,9 @@ namespace SlopArena.Shared.Tests;
 /// &lt;= AutoCancelBeforeTicks or &gt;= AutoCancelAfterTicks → no lag, act immediately).
 /// All-zero fields preserve the pre-issue behavior (landing never locks).
 ///
-/// Physics used by the scenarios: the test aerial runs 40 ticks and (unless the test sets a
-/// lunge) declares LungeForce 0 — StageChainAbility's lunge write would zero VY on
-/// activation, so a lunging aerial hovers during the zero-gravity float window instead of
-/// falling. With lunge 0 the character falls straight down at a constant -10 m/s (float
-/// gravity 0 for the first 35 air ticks): a start height of 1.4 m lands at stage-elapsed 8
+/// Physics used by the scenarios: the test aerial runs 40 ticks. With no lunge operations,
+/// the initial -10 m/s VY remains unchanged and the character falls straight down during
+/// the zero-gravity float window. A start height of 1.4 m lands at stage-elapsed 8
 /// (mid active window → lag), 4.7 m lands at stage-elapsed 28 (inside the 6..32 mid window →
 /// lag; with the late window at 26 the same landing auto-cancels). The lock outlives the
 /// aerial (18 ticks from a t27 landing expires at t45, 6 ticks after the move ends at t39),
@@ -24,69 +23,87 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class LandingLagTests : KitScenarioTests
 {
-    private const ushort AirLmbDuration = 40;
-    private const ushort AirLmbLag = 18;
-    private const ushort AirLmbBefore = 6;
-    private const ushort AirLmbAfter = 32;
+    private const ushort AirSlot1Duration = 40;
+    private const ushort AirSlot1Lag = 18;
+    private const ushort AirSlot1Before = 6;
+    private const ushort AirSlot1After = 32;
     /// <summary>Fall speed for the scenarios: -10 m/s at 60 Hz = 1/6 m per tick.</summary>
     private const float FallSpeed = -10f;
 
-    private static CharacterDefinition MakeDef(ushort lag, ushort before, ushort after,
-        float lunge = 0f, float airFloatGravity = 0f)
+    private static CookedSlotDefinition AirSlot1(
+        ushort landingLagTicks,
+        ushort autoCancelBeforeTicks,
+        ushort autoCancelAfterTicks,
+        float lunge)
+        => new(
+            8,
+            "air.1",
+            true,
+            "Test Aerial",
+            "Test Aerial",
+            "icon.test",
+            AuthoringAbilityBehavior.MeleeCombo,
+            AuthoringAimMode.None,
+            0,
+            false,
+            false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(
+                    AirSlot1Duration,
+                    0,
+                    landingLagTicks,
+                    autoCancelBeforeTicks,
+                    autoCancelAfterTicks,
+                    Array.Empty<string>(),
+                    LungeOperations(lunge)),
+            }));
+
+    private static CookedTimelineOperation[] LungeOperations(float speed)
+        => speed == 0f
+            ? Array.Empty<CookedTimelineOperation>()
+            : Enumerable.Range(0, 7)
+                .Select(tick => (CookedTimelineOperation)new CookedSetVelocityOperation(
+                    (ushort)tick,
+                    AuthoringUnit.MetersPerSecond,
+                    AuthoringVelocityMode.Absolute,
+                    0f,
+                    0f,
+                    speed))
+                .ToArray();
+
+    private static CharacterDefinition MakeDef(
+        ushort lag,
+        ushort before,
+        ushort after,
+        float lunge = 0f,
+        float airFloatGravity = 0f)
     {
         var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
         if (airFloatGravity != 0f)
             def.Movement = def.Movement with { AirFloatGravity = airFloatGravity };
-        def.AirLMB = new AbilitySpec
-        {
-            Name = "Test Aerial",
-            CooldownTicks = 0,
-            AnimationNames = new[] { "test_aerial" },
-            Params = new() { ["lunge_duration"] = 10f },
-            Stages = new[]
-            {
-                new AttackStage
-                {
-                    DurationTicks = AirLmbDuration,
-                    LandingLagTicks = lag,
-                    AutoCancelBeforeTicks = before,
-                    AutoCancelAfterTicks = after,
-                    LungeForce = lunge,
-                    HitboxEvents = Array.Empty<HitboxEvent>(),
-                },
-            },
-        };
-        // GetParam reads the GROUND spec's params (airborne:false), so the lunge window
-        // lives on LMB — the spec the air ability actually reads for "lunge_duration".
-        def.LMB = new AbilitySpec
-        {
-            Name = "Test Ground",
-            CooldownTicks = 0,
-            AnimationNames = new[] { "test_ground" },
-            Params = new() { ["lunge_duration"] = 6f },
-            Stages = new[] { new AttackStage { DurationTicks = 1 } },
-        };
+        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        slots[8] = AirSlot1(lag, before, after, lunge);
+        def.CookedSlots = slots;
         return def;
     }
 
     /// <summary>Mid-window landing: lag 18, auto-cancel 6..32, no lunge (clean vertical fall).</summary>
-    private static readonly CharacterDefinition LagDef = MakeDef(AirLmbLag, AirLmbBefore, AirLmbAfter);
+    private static readonly CharacterDefinition LagDef = MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After);
     /// <summary>Late-window landing: auto-cancel from 26, so a stage-elapsed-28 landing is clean.</summary>
-    private static readonly CharacterDefinition CleanLateDef = MakeDef(AirLmbLag, AirLmbBefore, 26);
+    private static readonly CharacterDefinition CleanLateDef = MakeDef(AirSlot1Lag, AirSlot1Before, 26);
     /// <summary>Default-off control: every field zero — current behavior, landing never locks.</summary>
     private static readonly CharacterDefinition ZeroDef = MakeDef(0, 0, 0);
     /// <summary>
-    /// Freeze control: lunging aerial (4 m/s — StageChainAbility re-applies it each tick of
-    /// its lunge window and its lunge write zeroes VY on top of that, so full float gravity
-    /// is needed for the fall to resume after activation) starting 0.4 m up. The lunge
-    /// window (6 ticks — GetParam reads the ground spec's lunge_duration) keeps the fall
-    /// crawling at 0.01 m/tick, so touchdown lands at stage-elapsed 13 with the residual
-    /// VZ = 4 drift still live — the lock must zero it the instant it applies.
+    /// Freeze control: the cooked aerial writes 4 m/s forward velocity through tick 6,
+    /// resetting VY each time, so full float gravity is needed for the fall to resume.
+    /// Starting 0.4 m up lands at stage-elapsed 13 with residual VZ = 4 drift still live;
+    /// the lock must zero it the instant it applies.
     /// </summary>
     private static readonly CharacterDefinition FreezeDef =
-        MakeDef(AirLmbLag, AirLmbBefore, AirLmbAfter, lunge: 4f, airFloatGravity: 36f);
+        MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After, lunge: 4f, airFloatGravity: 36f);
 
-    private static float Gpy => TestHelpers.GroundPY(TestHelpers.KistuDef); // legacy fixture ground
+    private static float Gpy => TestHelpers.GroundPY(TestHelpers.KistuDef);
 
     /// <summary>Airborne falling start: heightAbove above ground, straight down, no horizontal input.</summary>
     private static CharacterState FallingStart(float heightAbove)
@@ -107,47 +124,20 @@ public class LandingLagTests : KitScenarioTests
         return states;
     }
 
-    private static InputState LmbAt(int tick) => tick == 0
-        ? new InputState { ActiveSlot = AbilitySlots.Lmb }
+    private static InputState Slot1At(int tick) => tick == 0
+        ? new InputState { ActiveSlot = AbilitySlots.Slot1 }
         : default;
 
     // ── Goldens: clean-land vs lag-land on the same aerial ──
 
     /// <summary>
-    /// FightGuy's air normals (AirSlot1-4) instantiate as AirLmbCombo (AbilityFactory), which
-    /// the landing-lag startedAirborne check already covers — so a mid-window landing must
-    /// apply the air spec's LandingLagTicks. This guards the factory mapping + the check.
+    /// The canonical cooked air.1 slot carries its own landing metadata. A mid-window
+    /// landing must apply that stage's LandingLagTicks through CookedTimelineAbility.
     /// </summary>
     [Fact]
     public void AirSlot1_LandingMidWindow_AppliesLandingLag()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
-        def.AirSlot1 = new AbilitySpec
-        {
-            Name = "Test Aerial Slot1",
-            CooldownTicks = 0,
-            AnimationNames = new[] { "test_aerial" },
-            Stages = new[]
-            {
-                new AttackStage
-                {
-                    DurationTicks = AirLmbDuration,       // 40
-                    LandingLagTicks = AirLmbLag,          // 18
-                    AutoCancelBeforeTicks = AirLmbBefore, // 6
-                    AutoCancelAfterTicks = AirLmbAfter,   // 32
-                    LungeForce = 0f,
-                    HitboxEvents = Array.Empty<HitboxEvent>(),
-                },
-            },
-        };
-        def.Slot1 = new AbilitySpec
-        {
-            Name = "Test Ground Slot1",
-            CooldownTicks = 0,
-            AnimationNames = new[] { "test_ground" },
-            Stages = new[] { new AttackStage { DurationTicks = 1 } },
-        };
-
+        var def = MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After);
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         sim.RegisterEntity(1, def, FallingStart(4.7f), TestHelpers.LoadBakedData(def));
         var states = new List<CharacterState>();
@@ -163,7 +153,7 @@ public class LandingLagTests : KitScenarioTests
         foreach (var s in states)
             if (s.IsGrounded && s.LandingLagTicks > 0) { appliedLag = true; break; }
         Assert.True(appliedLag,
-            "AirSlot1 (AirLmbCombo) should apply its air spec's landing lag on a mid-window landing");
+            "Cooked air.1 should apply its stage landing lag on a mid-window landing");
     }
 
     /// <summary>
@@ -182,7 +172,7 @@ public class LandingLagTests : KitScenarioTests
             Def = LagDef,
             Setup = () => FallingStart(4.7f),
             Inputs = new InputSequence()
-                .Press(0, AbilitySlots.Lmb)
+                .Press(0, AbilitySlots.Slot1)
                 .Set(30, new InputState { Jump = true }),
             Assert = _ => { },
             SnapshotTick = 33,   // mid-lag, aerial still active: jump press dropped
@@ -204,7 +194,7 @@ public class LandingLagTests : KitScenarioTests
             Def = CleanLateDef,
             Setup = () => FallingStart(4.7f),
             Inputs = new InputSequence()
-                .Press(0, AbilitySlots.Lmb)
+                .Press(0, AbilitySlots.Slot1)
                 .Set(30, new InputState { Jump = true }),
             Assert = _ => { },
             SnapshotTick = 33,   // jumped at t30 → JumpSquat
@@ -222,7 +212,7 @@ public class LandingLagTests : KitScenarioTests
     [Fact]
     public void LandingMidAerial_AppliesLag_FreezesMovement()
     {
-        var states = Run(LagDef, 1.4f, LmbAt);
+        var states = Run(LagDef, 1.4f, Slot1At);
 
         // Landed at t7 (elapsed 8 — mid window), full 18-tick lock applied.
         Assert.Equal((ushort)18, states[7].LandingLagTicks);
@@ -244,7 +234,7 @@ public class LandingLagTests : KitScenarioTests
     [Fact]
     public void LandingMidAerial_LagFreezesResidualLungeVelocity()
     {
-        var states = Run(FreezeDef, 0.4f, LmbAt);
+        var states = Run(FreezeDef, 0.4f, Slot1At);
 
         // Landed at t12 (elapsed 13 — mid window), full 18-tick lock applied.
         Assert.True(states[12].IsGrounded);
@@ -273,7 +263,7 @@ public class LandingLagTests : KitScenarioTests
     {
         var states = Run(LagDef, 4.7f, tick => tick switch
         {
-            0 => new InputState { ActiveSlot = AbilitySlots.Lmb },
+            0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
             41 => new InputState { Jump = true },
             42 => new InputState { Dash = true },
             46 => new InputState { Jump = true },
@@ -298,7 +288,7 @@ public class LandingLagTests : KitScenarioTests
     {
         var states = Run(ZeroDef, 4.7f, tick => tick switch
         {
-            0 => new InputState { ActiveSlot = AbilitySlots.Lmb },
+            0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
             41 => new InputState { Jump = true },
             _ => default,
         });
@@ -317,7 +307,7 @@ public class LandingLagTests : KitScenarioTests
     public void LandingInAutoCancelEarlyWindow_NoLag_ActsImmediately()
     {
         var states = Run(LagDef, 4.7f, tick => tick == 23
-            ? new InputState { ActiveSlot = AbilitySlots.Lmb }
+            ? new InputState { ActiveSlot = AbilitySlots.Slot1 }
             : default);
 
         Assert.True(states[27].IsGrounded);
@@ -337,7 +327,7 @@ public class LandingLagTests : KitScenarioTests
     {
         var states = Run(CleanLateDef, 4.7f, tick => tick switch
         {
-            0 => new InputState { ActiveSlot = AbilitySlots.Lmb },
+            0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
             30 => new InputState { Jump = true },
             _ => default,
         });
@@ -350,7 +340,7 @@ public class LandingLagTests : KitScenarioTests
 
     /// <summary>
     /// Ability inputs are hard-blocked inside the lock and never buffered through it: a
-    /// Slot1 press at t41 (lag live, anim lock gone) is dropped — no second attack follows,
+    /// Slot2 press at t41 (lag live, anim lock gone) is dropped — no second attack follows,
     /// and no buffered re-trigger fires when the lag expires.
     /// </summary>
     [Fact]
@@ -358,8 +348,8 @@ public class LandingLagTests : KitScenarioTests
     {
         var states = Run(LagDef, 4.7f, tick => tick switch
         {
-            0 => new InputState { ActiveSlot = AbilitySlots.Lmb },
-            41 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
+            0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
+            41 => new InputState { ActiveSlot = AbilitySlots.Slot2 },
             _ => default,
         });
 
@@ -379,7 +369,7 @@ public class LandingLagTests : KitScenarioTests
     {
         var states = Run(LagDef, 4.7f, tick => tick switch
         {
-            0 => new InputState { ActiveSlot = AbilitySlots.Lmb },
+            0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
             >= 40 => new InputState { MoveX = 1f },
             _ => default,
         });

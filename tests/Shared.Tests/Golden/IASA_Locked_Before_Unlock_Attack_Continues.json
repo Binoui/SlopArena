@@ -6,7 +6,7 @@
     "PY": 0.85,
     "PZ": 0.95000017,
     "VZ": 3,
-    "AttackSlot": 1,
+    "AttackSlot": 3,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

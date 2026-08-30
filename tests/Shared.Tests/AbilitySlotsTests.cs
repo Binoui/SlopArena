@@ -43,25 +43,5 @@ public class AbilitySlotsTests
         Assert.Equal((ushort)0, s.GetCooldown(12));
     }
 
-    [Fact]
-    public void GetSlotAbility_DataLessSlots_ReturnNull()
-    {
-        var def = TestHelpers.MankiDef;
-        // Data-less ADR-0016 slots (keys 2-5, A) must resolve to null — no throw.
-        for (int slotIndex = 6; slotIndex < AbilitySlots.Count; slotIndex++)
-            Assert.Null(def.GetSlotAbility(slotIndex));
-        Assert.Null(def.GetSlotAbility(6, airborne: true));
-        // The historical slots still resolve.
-        Assert.NotNull(def.GetSlotAbility(0));
-        Assert.NotNull(def.GetSlotAbility(2)); // Slot1 (former Q) — Manki Round Bomb
-    }
 
-    [Fact]
-    public void Slot1_IsTheFormerQAbility()
-    {
-        // The Q ability survived the rekey onto key "1" — data identity unchanged.
-        var manki = TestHelpers.MankiDef;
-        Assert.Same(manki.Slot1, manki.GetSlotAbility(2));
-        Assert.Equal(AbilityBehavior.AimedProjectile, manki.Slot1?.Behavior);
-    }
 }

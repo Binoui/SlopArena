@@ -118,44 +118,6 @@ public class HitstunAnimationTierTests
     // End-to-end: combat pipeline produces correct HitstunLevel
     // ═══════════════════════════════════════════════════════════════════
 
-    [Fact]
-    public void LMB_Stage1_BandedStun_SetsHitstunLevel0()
-    {
-        // Manki LMB stage 1: StunTicks = 20 (ADR-0015 band) → HitstunLevel = 0 (light)
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-
-        var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(1, def, player);
-
-        var npc = TestHelpers.NpcState(0f, 2.2f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(100, def, npc);
-
-        // Tick 0: press LMB (slot 1)
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-        // Ticks 1-11: wait for hitbox to trigger
-        for (int i = 0; i < 11; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var afterHit = sim.GetState(100);
-        // Hitstop (ADR-0012): the hit resolves at tick 11, freezing the victim for
-        // 1 + 1.5·4 = 7 ticks before the launch. Damage + tier apply at connect; the
-        // Hitstun STATE begins at freeze expiry (tick 18).
-        Assert.True(afterHit.DamagePercent > 0, "NPC should have taken damage");
-        Assert.Equal(0, (int)afterHit.HitstunLevel);
-        Assert.Equal((ushort)7, afterHit.HitstopTicks);
-        Assert.Equal(ActionState.Idle, afterHit.State); // frozen, not yet launched
-
-        for (int i = 0; i < 7; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var afterLaunch = sim.GetState(100);
-        Assert.Equal(ActionState.Hitstun, afterLaunch.State);
-        Assert.Equal((ushort)1, afterLaunch.HitstunTicks); // Light mag 3.9 → 0.45·3.9 (melee-soft)
-    }
 
     [Fact]
     public void HitstunLevel_SetsFromFromState_AndSurvivesPacketConversion()

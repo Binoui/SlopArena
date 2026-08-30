@@ -1,0 +1,34 @@
+{
+  "Scenario": "Manki A4 Air Smash Hit Confirm",
+  "TickCount": 120,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 9,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "FacingYaw": -3.1415927,
+    "PY": 3,
+    "PZ": 1,
+    "DamagePercent": 13,
+    "HitstopTicks": 7,
+    "AirTimeTicks": 20,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "FacingYaw": -3.1415927,
+    "PY": 0.75,
+    "PZ": 8.249408,
+    "DamagePercent": 13,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

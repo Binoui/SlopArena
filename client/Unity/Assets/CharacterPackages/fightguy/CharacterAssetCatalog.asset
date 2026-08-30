@@ -86,6 +86,10 @@ MonoBehaviour:
     _clip: {fileID: 3094330708855449807, guid: e40302a18e6c6e526bf471320e9fd420, type: 3}
     _extrapolation: 2
     _poseTrackId: anim.ki-shot
+  - _semanticId: anim.ki-shot-loop
+    _clip: {fileID: 3094330708855449807, guid: 579ec584c5beef4bf8c560f408b7f1a4, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.ki-shot-loop
   - _semanticId: anim.rising-dragon
     _clip: {fileID: 7400000, guid: 5f606dcec44be2d9e95dd0ccf2556208, type: 2}
     _extrapolation: 0

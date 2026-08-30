@@ -17,7 +17,7 @@ public sealed class MatchContentCatalogTests
         var result = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), roster.Requirement);
         Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         Assert.Equal("fightguy", result.Identity.PackageId);
-        Assert.Equal("08dd4df2185af704b3d563656fb930c2d2d18e8fe394b5ff520df1d926592ef4", result.Identity.CookedContentHash);
+        Assert.Equal("b9eafc397bff604af5adb0f585e9bcd91da25988a5a1c42927472b0580f803d9", result.Identity.CookedContentHash);
         Assert.Equal(16, result.Package!.Definition.Slots.Count);
         Assert.NotNull(result.BakedAnimation);
     }
@@ -39,14 +39,36 @@ public sealed class MatchContentCatalogTests
     {
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
         var fightGuy = manifest.Resolve(CharacterClass.FightGuy)!;
-        var loaded = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), fightGuy.Requirement);
+        var loadedFightGuy = CookedCharacterPackageLoader.LoadDirectory(
+            Path.Combine(Root, "content-cooked/fightguy"),
+            fightGuy.Requirement);
         var kistu = manifest.Resolve(CharacterClass.Kistu)!;
-        var loadedKistu = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/kistu"), kistu.Requirement);
-        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded, ["kistu"] = loadedKistu }, new LegacyCharacterCatalogAdapter());
+        var loadedKistu = CookedCharacterPackageLoader.LoadDirectory(
+            Path.Combine(Root, "content-cooked/kistu"),
+            kistu.Requirement);
+        var bonk = manifest.Resolve(CharacterClass.Bonk)!;
+        var loadedBonk = CookedCharacterPackageLoader.LoadDirectory(
+            Path.Combine(Root, "content-cooked/bonk"),
+            bonk.Requirement);
+        var manki = manifest.Resolve(CharacterClass.Manki)!;
+        var loadedManki = CookedCharacterPackageLoader.LoadDirectory(
+            Path.Combine(Root, "content-cooked/manki"),
+            manki.Requirement);
+        var result = new MatchContentCatalogBuilder().Build(
+            manifest,
+            new Dictionary<string, CookedCharacterPackageLoadResult>
+            {
+                ["fightguy"] = loadedFightGuy,
+                ["kistu"] = loadedKistu,
+                ["bonk"] = loadedBonk,
+                ["manki"] = loadedManki,
+            },
+            new LegacyCharacterCatalogAdapter());
+        Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         var catalog = result.Catalog!;
         Assert.NotNull(catalog);
         Assert.Equal(4, catalog.Entries.Count);
-        Assert.Equal(1, catalog.ResolvePackage("fightguy")!.Handle.Value);
+        Assert.Equal(2, catalog.ResolvePackage("fightguy")!.Handle.Value);
     }
 
     [Fact]

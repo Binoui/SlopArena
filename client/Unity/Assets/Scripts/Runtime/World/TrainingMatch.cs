@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
@@ -16,15 +17,17 @@ namespace SlopArena.Client.World
 {
     public enum NpcAiMode
     {
-        Attack,
-        Heuristic,
-        Idle
+        Heuristic = 1,
+        Idle = 2
     }
     
     public class TrainingMatch : MatchBase
     {
         [Header("Entities (NPC)")]
         [SerializeField] private PlayerRenderer _npcRenderer;
+        // ^ Optional scene-placed renderer for the FIRST NPC (id 100, offline-scene dummy).
+        // Runtime-created GameObjects back every slot; this seed keeps the serialized
+        // scene wiring (SlopArenaSceneSetup) and the editor capture harness intact.
 
         [Header("Characters (Player)")]
         [SerializeField] private CharacterClass _playerClassOverride;
@@ -38,7 +41,7 @@ namespace SlopArena.Client.World
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
         [SerializeField] private ProjectileVFXManager _projectileVFX;
-        [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Heuristic;
+        [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Idle;
         [SerializeField, Range(1, 9)] private int _npcCpuLevel = 5;
 
         [Header("Hitboxes")]
@@ -48,12 +51,12 @@ namespace SlopArena.Client.World
         protected override ISimulationBridge Bridge => _bridge;
 
         private uint _tick;
-        // Heuristic-bot state (issue #148): persistent policy memory + a per-match random seed
-        // so every training fight differs. The NPC's def is needed for ForwardReach/cooldown lookups.
-        private readonly BotMemory _npcMemory = new();
-        private readonly HeuristicBotPolicy _npcPolicy = new(); // stateless; state lives in _npcMemory + _npcRng
-        private System.Random _npcRng;   // System.Random (UnityEngine.Random shadows the bare name)
-        private CharacterDefinition _npcDef;
+        // Heuristic-bot policy is stateless; per-NPC state (memory, rng, def) lives in NpcSlot.
+        private readonly HeuristicBotPolicy _npcPolicy = new();
+        private readonly List<NpcSlot> _npcs = new();
+        private int _nextNpcId = 101; // first NPC keeps entity id 100 (capture harness + Solo)
+        private MatchContentEntry _npcEntry;
+        private int _selectedNpcIndex;
 #if UNITY_EDITOR
         // Launch-contract sentinel: logs the applied launch once per hit so the game can
         // be checked against tools/MoveDataReport (fightguy --parity). A mismatch here
@@ -63,6 +66,18 @@ namespace SlopArena.Client.World
 #endif
         private ArenaDefinition _arenaDef;
         private const ulong NpcEntityId = 100;
+        private TargetIndicator _lockIndicator;
+        private TrainingSettingsPanel _settingsPanel;
+        private sealed class NpcSlot
+        {
+            public ulong Id;
+            public PlayerRenderer Renderer;
+            public CharacterDefinition Def;
+            public BotMemory Memory = new();
+            public System.Random Rng;
+            public float SpawnX;
+            public float SpawnZ;
+        }
         private ushort _soloCountdownTicks;
         private ushort _lastSoloPlayerDeaths;
         private ushort _lastSoloNpcDeaths;
@@ -78,6 +93,69 @@ namespace SlopArena.Client.World
         public IReadOnlyList<SpellResolver.HitResult> CaptureLastTickHits => _bridge.LastTickHits;
         public void SetCaptureInput(InputState input) => _captureInputOverride = input;
         public void ClearCaptureInput() => _captureInputOverride = null;
+        // ── Training settings panel (issue #187): Training-mode-only public surface ──
+
+        public int NpcCount => _npcs.Count;
+        public int SelectedNpcIndex => _selectedNpcIndex;
+        public NpcAiMode CurrentNpcMode => _npcAiMode;
+        public ulong SelectedNpcId => _npcs.Count > 0 ? _npcs[_selectedNpcIndex].Id : 0ul;
+        public ulong GetNpcIdAt(int index) => _npcs[index].Id;
+
+        public void SelectNpc(int index)
+        {
+            if (_npcs.Count == 0) return;
+            _selectedNpcIndex = Math.Clamp(index, 0, _npcs.Count - 1);
+        }
+
+        public void SetNoCooldowns(bool on)
+            => _bridge.InternalSim.NoCooldownsEntityId = on ? PlayerEntityId : null;
+
+        public void SetNpcMode(NpcAiMode mode) => _npcAiMode = mode;
+
+        public float GetSelectedNpcDamage()
+            => _npcs.Count > 0 ? _bridge.GetState(SelectedNpcId).DamagePercent : 0f;
+
+        public void SetSelectedNpcDamage(float percent)
+        {
+            if (_npcs.Count == 0) return;
+            // DamagePercent is 0-999; clamp+round so repeated +10 can't overflow the ushort.
+            var state = _bridge.GetState(SelectedNpcId);
+            state.DamagePercent = (ushort)Mathf.Clamp(Mathf.RoundToInt(percent), 0, 999);
+            _bridge.InternalSim.SetState(SelectedNpcId, state);
+        }
+
+        public void AddNpc()
+        {
+            if (_npcEntry == null || _bridge == null) return;
+            var slot = new NpcSlot
+            {
+                Id = (ulong)_nextNpcId++,
+                Rng = new System.Random(),
+                Memory = new BotMemory(),
+                Def = _npcEntry.Definition,
+                SpawnX = _npcs.Count * 2f,
+                SpawnZ = 0f,
+            };
+            slot.Memory.DifficultyLevel = Mathf.Clamp(_npcCpuLevel, 1, 9);
+            if (!SpawnNpcSlot(slot))
+                return;
+            _npcs.Add(slot);
+            RebuildRosterVisuals();
+            _settingsPanel?.RefreshRoster();
+        }
+
+        public void DeleteSelectedNpc()
+        {
+            if (_npcs.Count <= 1) return;
+            var slot = _npcs[_selectedNpcIndex];
+            _bridge.InternalSim.RemoveEntity(slot.Id);
+            if (slot.Renderer != null)
+                Destroy(slot.Renderer.gameObject);
+            _npcs.RemoveAt(_selectedNpcIndex);
+            _selectedNpcIndex = Math.Clamp(_selectedNpcIndex, 0, _npcs.Count - 1);
+            RebuildRosterVisuals();
+            _settingsPanel?.RefreshRoster();
+        }
         protected override void OnMatchStart()
         {
             string arenaName = string.IsNullOrEmpty(_arenaNameOverride) ? MatchConfig.ArenaName : _arenaNameOverride;
@@ -131,22 +209,12 @@ namespace SlopArena.Client.World
             var playerDef = playerEntry.Definition;
             _playerDef = playerDef;
             var npcDef = npcEntry.Definition;
-            _npcRng = new System.Random();
-            _npcMemory.Reset();
-            _npcMemory.DifficultyLevel = Mathf.Clamp(
-                solo ? MatchConfig.SoloCpuLevel : _npcCpuLevel, 1, 9);
+            _npcEntry = npcEntry;
 
             // Shared player renderer + HUD setup. The training NPC is not in
             // MatchConfig.Opponents (PvP-only roster), so hand it to the HUD
             // explicitly — otherwise its damage % has no overhead panel.
             if (!SetupPlayerRenderer(playerEntry, arena))
-                return;
-            SetupHUD(playerDef, new[]
-            {
-                new HUDManager.HudPlayer(NpcEntityId, "P2", npcClass, isLocal: false),
-            });
-            // NPC renderer
-            if (_npcRenderer != null && !SetupRenderer(_npcRenderer, npcEntry, arena, NpcEntityId, false))
                 return;
 
             // Player spawn
@@ -157,31 +225,76 @@ namespace SlopArena.Client.World
                 FacingYaw = pSpawn.Yaw,
                 JumpsLeft = playerDef.Movement.MaxJumps,
             }, playerEntry.BakedAnimation);
-
-            // NPC spawn at fixed position
-            float npcX = 0f;
-            float npcZ = 0f;
-            _bridge.RegisterEntity(NpcEntityId, npcDef, new CharacterState
-            {
-                PX = npcX, PY = 5f, PZ = npcZ,
-                FacingYaw = Mathf.PI,
-                JumpsLeft = npcDef.Movement.MaxJumps,
-            }, npcEntry.BakedAnimation);
-
-            // Position renderers
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
-            if (_npcRenderer != null)
-                _npcRenderer.transform.position = new Vector3(npcX, 5f, npcZ);
-            // Set NPC respawn position (yaw preserves the old SpawnPoints[0] facing)
-            _bridge.SetRespawnPosition(NpcEntityId, npcX, 5f, npcZ,
-                arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0].Yaw : 0f);
+
+            // First NPC keeps entity id 100 at the fixed spawn (capture harness + Solo).
+            var first = new NpcSlot
+            {
+                Id = NpcEntityId,
+                Renderer = _npcRenderer, // scene-placed dummy when present
+                Def = npcDef,
+                SpawnX = 0f,
+                SpawnZ = 0f,
+                Rng = new System.Random(),
+            };
+            first.Memory.DifficultyLevel = Mathf.Clamp(
+                solo ? MatchConfig.SoloCpuLevel : _npcCpuLevel, 1, 9);
+            if (!SpawnNpcSlot(first))
+                return;
+            _npcs.Add(first);
+
+            SetupHUD(playerDef, HudExtraPlayers());
 
             // Shared camera + aim setup
             SetupCamera();
             if (solo)
                 _hudManager?.ShowMatchCallout("READY", 2f);
             SetupAimHandler(playerDef);
-            SetupLockIndicator(new[] { _playerRenderer, _npcRenderer }, arena);
+            SetupLockIndicator(_npcs.Select(n => n.Renderer).ToArray(), arena);
+            _lockIndicator = FindFirstObjectByType<TargetIndicator>();
+            // Training settings — Training mode only, never Solo/PvP. Attached to the
+            // pause menu's left side; it shows while paused (sim frozen by the pause menu).
+            if (MatchConfig.Mode == GameMode.Training)
+            {
+                var panel = gameObject.AddComponent<TrainingSettingsPanel>();
+                panel.Init(this, _pauseMenu);
+                _settingsPanel = panel;
+            }
+        }
+
+        /// <summary>Rebuild the HUD and lock indicator after the NPC roster changes.</summary>
+        private void RebuildRosterVisuals()
+        {
+            SetupHUD(_playerDef, HudExtraPlayers());
+            if (_lockIndicator != null)
+                Destroy(_lockIndicator.gameObject);
+            SetupLockIndicator(_npcs.Select(n => n.Renderer).ToArray(), _arenaDef);
+            _lockIndicator = FindFirstObjectByType<TargetIndicator>();
+        }
+
+        private List<HUDManager.HudPlayer> HudExtraPlayers()
+        {
+            var list = new List<HUDManager.HudPlayer>(_npcs.Count);
+            foreach (var slot in _npcs)
+                list.Add(new HUDManager.HudPlayer(slot.Id, $"P{slot.Id}", slot.Def.Class, isLocal: false));
+            return list;
+        }
+
+        private bool SpawnNpcSlot(NpcSlot slot)
+        {
+            if (slot.Renderer == null)
+                slot.Renderer = new GameObject($"Npc{slot.Id}").AddComponent<PlayerRenderer>();
+            if (!SetupRenderer(slot.Renderer, _npcEntry, _arenaDef, slot.Id, false))
+                return false;
+            slot.Renderer.transform.position = new Vector3(slot.SpawnX, 5f, slot.SpawnZ);
+            _bridge.RegisterEntity(slot.Id, slot.Def, new CharacterState
+            {
+                PX = slot.SpawnX, PY = 5f, PZ = slot.SpawnZ,
+                FacingYaw = Mathf.PI,
+                JumpsLeft = slot.Def.Movement.MaxJumps,
+            }, _npcEntry.BakedAnimation);
+            _bridge.SetRespawnPosition(slot.Id, slot.SpawnX, 5f, slot.SpawnZ, Mathf.PI);
+            return true;
         }
 
         private void Update()
@@ -203,6 +316,8 @@ namespace SlopArena.Client.World
         {
             if (_bridge == null || _playerRenderer == null) return;
 
+            // The sim is frozen while the pause menu (and thus settings) is open, so no
+            // neutral-input branch is needed here — FixedUpdate doesn't run under pause.
             // Poll done in Update() — keep FixedUpdate clean
             byte slot = _inputController.ConsumePendingSlotPress();
 
@@ -222,7 +337,7 @@ namespace SlopArena.Client.World
 
             // ── Build input ──
             byte targetEntityId = PickScreenTarget(
-                _npcRenderer != null ? new[] { _npcRenderer } : System.Array.Empty<PlayerRenderer>(),
+                _npcs.Select(n => n.Renderer).ToArray(),
                 _mainCamera ??= _cameraMount?.RenderCamera ?? UnityEngine.Camera.main);
 
             var (input, _, _) = _inputController.BuildInputState(
@@ -236,29 +351,36 @@ namespace SlopArena.Client.World
             if (_captureInputOverride.HasValue)
                 input = _captureInputOverride.Value;
 
-            // NPC AI
-            var npcState = _bridge.GetState(NpcEntityId);
+            // NPC AI — one input per slot
             var playerState = _bridge.GetState(PlayerEntityId);
-            var npcInput = BuildNpcInput(npcState, playerState, _tick);
+            var tickInputs = new Dictionary<ulong, InputState>(_npcs.Count + 1)
+            {
+                { PlayerEntityId, input }
+            };
+            foreach (var npc in _npcs)
+            {
+                tickInputs[npc.Id] = BuildNpcInput(
+                    _bridge.GetState(npc.Id), playerState, npc);
+            }
 
             // Tick
-            _bridge.Tick(new Dictionary<ulong, InputState>
-            {
-                { PlayerEntityId, input },
-                { NpcEntityId, npcInput }
-            });
+            _bridge.Tick(tickInputs);
+
             // Feed only authoritative resolver hits and the pre-tick target snapshot back to
             // the runner-owned bot memory. AttackSlot is persistent and is never used here.
-            _npcMemory.LastAttackConnected = false;
-            foreach (var hit in _bridge.LastTickHits)
+            foreach (var npc in _npcs)
             {
-                if (hit.OwnerEntityId == NpcEntityId)
+                npc.Memory.LastAttackConnected = false;
+                foreach (var hit in _bridge.LastTickHits)
                 {
-                    _npcMemory.LastAttackConnected = true;
-                    break;
+                    if (hit.OwnerEntityId == npc.Id)
+                    {
+                        npc.Memory.LastAttackConnected = true;
+                        break;
+                    }
                 }
+                npc.Memory.LastTargetWasAttacking = IsThreatening(playerState);
             }
-            _npcMemory.LastTargetWasAttacking = IsThreatening(playerState);
 
             _projectileVFX?.OnTick();
             _combatFeedback.OnTick();
@@ -272,7 +394,7 @@ namespace SlopArena.Client.World
             }
 
 #if UNITY_EDITOR
-            var hitState = _bridge.GetState(NpcEntityId);
+            var hitState = _bridge.GetState(_npcs.Count > 0 ? _npcs[0].Id : NpcEntityId);
             if (hitState.HitstunTicks > 0)
                 Debug.Log($"[Combat] NPC hit! damage={hitState.DamagePercent:F1} hitstun={hitState.HitstunTicks}");
 
@@ -288,12 +410,15 @@ namespace SlopArena.Client.World
 
             // Apply states
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
-            if (_npcRenderer != null)
-                _npcRenderer.ApplyServerState(_bridge.GetState(NpcEntityId));
+            foreach (var npc in _npcs)
+            {
+                if (npc.Renderer != null)
+                    npc.Renderer.ApplyServerState(_bridge.GetState(npc.Id));
+            }
             if (MatchConfig.Mode == GameMode.Solo)
             {
                 var soloPlayer = _bridge.GetState(PlayerEntityId);
-                var soloNpc = _bridge.GetState(NpcEntityId);
+                var soloNpc = _bridge.GetState(_npcs.Count > 0 ? _npcs[0].Id : NpcEntityId);
                 if (soloPlayer.Deaths > _lastSoloPlayerDeaths)
                 {
                     _lastSoloPlayerDeaths = soloPlayer.Deaths;
@@ -373,11 +498,14 @@ namespace SlopArena.Client.World
         {
             if (_cameraMount == null) return;
             var local = _bridge.GetState(PlayerEntityId);
-            if (local.LockOn && local.TargetEntityId != 0 && _npcRenderer != null
-                && _npcRenderer.EntityId == local.TargetEntityId)
+            foreach (var npc in _npcs)
             {
-                _cameraMount.SetLockFocus(_playerRenderer.transform, _npcRenderer.transform.position);
-                return;
+                if (npc.Renderer != null && npc.Id == local.TargetEntityId)
+                {
+                    var midpoint = (_playerRenderer.transform.position + npc.Renderer.transform.position) * 0.5f;
+                    _cameraMount.SetLockFocus(_playerRenderer.transform, midpoint);
+                    return;
+                }
             }
             _cameraMount.ClearLockFocus(_playerRenderer.transform);
         }
@@ -395,13 +523,13 @@ namespace SlopArena.Client.World
         /// Computes world-space direction toward player.
         /// Server auto-sets FacingYaw from movement velocity.
         /// </summary>
-        private InputState BuildNpcInput(CharacterState npcState, CharacterState playerState, ulong tick)
+        private InputState BuildNpcInput(CharacterState npcState, CharacterState playerState, NpcSlot slot)
         {
             return _npcAiMode switch
             {
                 NpcAiMode.Idle => BuildIdleInput(),
-                NpcAiMode.Heuristic => BuildHeuristicInput(npcState, playerState),
-                _ => BuildAttackInput(npcState, playerState, tick),
+                NpcAiMode.Heuristic => BuildHeuristicInput(npcState, playerState, slot),
+                _ => BuildIdleInput(),
             };
         }
 
@@ -411,11 +539,16 @@ namespace SlopArena.Client.World
         /// existing input-injection / rendering / respawn plumbing applies unchanged. Seeded
         /// randomly per match; idle until the match has initialized the NPC def.
         /// </summary>
-        private InputState BuildHeuristicInput(CharacterState npcState, CharacterState playerState)
+        private InputState BuildHeuristicInput(CharacterState npcState, CharacterState playerState, NpcSlot slot)
         {
-            if (_npcDef == null) return BuildIdleInput();
-            _npcRng ??= new System.Random();
-            return _npcPolicy.Decide(in npcState, in playerState, _npcDef, _npcRng, _npcMemory);
+            if (slot.Def == null) return BuildIdleInput();
+            slot.Rng ??= new System.Random();
+            return _npcAiMode switch
+            {
+                NpcAiMode.Idle => BuildIdleInput(),
+                NpcAiMode.Heuristic => BuildHeuristicInput(npcState, playerState, slot),
+                _ => BuildIdleInput(),
+            };
         }
 
         private static InputState BuildIdleInput()
@@ -429,36 +562,6 @@ namespace SlopArena.Client.World
             };
         }
 
-        private static InputState BuildAttackInput(CharacterState npcState, CharacterState playerState, ulong tick)
-        {
-            // Direction from NPC to player (XZ plane, world space)
-            float dx = playerState.PX - npcState.PX;
-            float dz = playerState.PZ - npcState.PZ;
-            float distSq = dx * dx + dz * dz;
-            float dist = MathF.Sqrt(distSq);
-
-            // Speed: full >3m, stop inside 2m, half-speed in between
-            float speed = distSq > 9f ? 1f : (distSq < 4f ? 0f : 0.5f);
-
-            // Decompose toward-player direction into world-space MoveX (sin) and MoveY (cos)
-            float aimYaw = dist > 0.001f ? MathF.Atan2(dx, dz) : 0f;
-            float moveX = MathF.Sin(aimYaw) * speed;
-            float moveY = MathF.Cos(aimYaw) * speed;
-
-            // Periodically attack (every ~2 seconds = 120 ticks)
-            byte slot = (tick % 120 < 3) ? (byte)1 : (byte)0;
-
-            // Jump if player is on higher platform
-            bool jump = playerState.PY > npcState.PY + 1.5f && tick % 60 == 0;
-
-            return new InputState
-            {
-                MoveX = moveX,
-                MoveY = moveY,
-                ActiveSlot = slot,
-                Jump = jump,
-            };
-        }
 
         private void OnDrawGizmos()
         {

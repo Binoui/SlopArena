@@ -18,6 +18,7 @@ public static class AbilityFactory
         return characterClass switch
         {
             CharacterClass.Manki => CreateMankiAbility(slot, airborne),
+            CharacterClass.Nilus => CreateNilusAbility(slot, airborne),
             CharacterClass.FightGuy => null,
             _ => null,
         };

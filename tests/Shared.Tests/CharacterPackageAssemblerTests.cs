@@ -104,8 +104,11 @@ public sealed class CharacterPackageAssemblerTests
             package.Definition.Presentation.HitMedium, package.Definition.Presentation.HitHard,
         };
         foreach (var slot in package.Definition.Slots)
+        {
+            if (!string.IsNullOrEmpty(slot.AimAnimationId)) names.Add(slot.AimAnimationId);
             foreach (var stage in slot.Timeline.Stages)
                 foreach (string id in stage.AnimationIds) names.Add(id);
+        }
 
         var binding = new StringBuilder("{\"packageId\":\"fightguy\",\"catalogSchemaVersion\":1,\"bindingSchemaVersion\":1,\"poseFormat\":\"SKEL\",\"poseVersion\":1,\"sampleRate\":60,\"sourceHash\":\"");
         binding.Append(sourceHash).Append("\",\"rigGlobalObjectId\":\"rig\",\"animations\":[");

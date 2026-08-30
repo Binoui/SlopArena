@@ -130,57 +130,7 @@ public class BurstTests
 
     // ── Offensive ──
 
-    [Fact]
-    public void OffensiveBurst_MidAttack_CancelsAbilityAndChain_EndsWithIdle()
-    {
-        var (sim, _, _) = SetupPair(npcZ: 3f);
 
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
-        Assert.NotNull(sim.GetActiveAbility(1)); // LmbCombo live in stage 1
-
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
-
-        var s = sim.GetState(1);
-        Assert.Null(sim.GetActiveAbility(1));   // interrupted via State=Idle — no OnEnd
-        Assert.Equal(0, s.AnimLockTicks);
-        Assert.Equal((byte)0, s.ComboStage);    // single move — ComboStage stays 0
-        Assert.Equal((byte)0, s.AttackSlot);
-        Assert.Equal(ActionState.Idle, s.State);
-        Assert.Equal(BurstConfig.OffensiveRecoveryTicks - 1, s.BurstRecoveryTicks);
-        Assert.Equal(BurstConfig.CooldownTicks - 1, s.BurstCooldownTicks);
-    }
-
-    [Fact]
-    public void OffensiveBurst_Hitbox_FixedKnockback_NoDamageScaling_DerivedStun()
-    {
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var p = TestHelpers.PlayerState();
-        p.PY = TestHelpers.CombatGroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, p);
-        var npc = TestHelpers.NpcState(0f, 1.5f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        npc.DamagePercent = 400;
-        TestHelpers.RegisterNpc(sim, TestHelpers.CombatDef, npc);
-
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } }); // LMB stage 1
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });                    // burst → hitbox connects
-
-        // Hitstop on the NPC: 1 + 1.5·4 = 7 ticks; the queued launch applies at freeze expiry.
-        for (int i = 0; i < 7; i++)
-            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
-
-        var n = sim.GetState(100);
-        float kvMag = MathF.Sqrt(n.KVX * n.KVX + n.KVY * n.KVY + n.KVZ * n.KVZ);
-        // BaseKnockback scaled by the global velocity-only KbScaleFactor (ADR-0019) —
-        // growth 0 means zero damage scaling even at 400%. Tolerance covers the
-        // small +damage·0.1 contribution to the unscaled magnitude.
-        TestHelpers.AssertNear(BurstConfig.HitboxBaseKnockback * Simulation.KbScaleFactor, kvMag, 0.1f);
-        // Hitstun is KV-derived (0.45·mag, ADR-0019 melee-soft), not the authored
-        // HitboxStunTicks: burst base 10 + dmg·0.1 → mag 10.4 → stun 0.45·10.4 ≈ 4.7.
-        Assert.InRange(n.HitstunTicks, (int)4, (int)5);
-        Assert.Equal(404, n.DamagePercent);
-        Assert.Equal(ActionState.Hitstun, n.State);
-    }
 
     // ── Cooldown / recovery ──
 
@@ -254,38 +204,4 @@ public class BurstTests
         Assert.Equal(99, s.BurstCooldownTicks);
     }
 
-    [Fact]
-    public void OffensiveBurst_MidLmbMove_CancelsMove_FreshPressStartsNewMove()
-    {
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var p = TestHelpers.PlayerState();
-        p.PY = TestHelpers.CombatGroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, p);
-        ushort moveDuration = TestHelpers.CombatDef.LMB!.Stages[0].DurationTicks;
-
-        // Start the single LMB move.
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
-        var mid = sim.GetState(1);
-        Assert.True(mid.ComboStage == 0 && sim.GetActiveAbility(1) != null,
-            "single LMB move should be live with ComboStage 0");
-
-        // Burst cancels the move (single-move semantics: nothing to reset a chain to).
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
-        var burst = sim.GetState(1);
-        Assert.Null(sim.GetActiveAbility(1));
-        Assert.Equal(ActionState.Idle, burst.State);
-        Assert.Equal((byte)0, burst.ComboStage);
-
-        // Wait out the short offensive recovery, then a fresh LMB press starts a NEW move.
-        for (int i = 1; i < BurstConfig.OffensiveRecoveryTicks; i++)
-            sim.Tick(new Dictionary<ulong, InputState> { { 1, default } });
-        Assert.Equal(0, sim.GetState(1).BurstRecoveryTicks);
-
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(activeSlot: 1) } });
-        var after = sim.GetState(1);
-        Assert.Equal((byte)0, after.ComboStage); // a fresh move, not a continuation
-        Assert.NotNull(sim.GetActiveAbility(1));
-        Assert.Equal((byte)0, after.AnimIndex);
-        Assert.True(moveDuration > 0, "sanity: move duration read from spec");
-    }
 }

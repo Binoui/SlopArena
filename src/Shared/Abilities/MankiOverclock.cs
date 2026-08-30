@@ -9,22 +9,29 @@ namespace SlopArena.Shared.Abilities;
 /// ticked down by Simulation.TickTimers.
 /// While active: attacks gain +3 damage and +0.5 radius (via ServerAbility.ApplyBuffBonuses).
 /// </summary>
-    public sealed class MankiOverclock : ServerAbility
+public sealed class MankiOverclock : ServerAbility
+{
+    private readonly CookedMankiOverclockCapabilityParameters? _parameters;
+    private ushort _totalDuration;
+
+    public MankiOverclock() { }
+    public MankiOverclock(CookedMankiOverclockCapabilityParameters parameters)
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+    public MankiOverclock(MankiOverclockCapabilityParameters parameters)
+        : this(parameters != null ? new CookedMankiOverclockCapabilityParameters(parameters.DurationTicks) : throw new ArgumentNullException(nameof(parameters))) { }
+
+    public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
-        private ushort _totalDuration;
+        ushort duration = _parameters?.DurationTicks ?? (ushort)GetParam(def, "duration_ticks", 480f);
 
-        public override void OnStart(ref CharacterState s, CharacterDefinition def)
-        {
-            ushort duration = (ushort)GetParam(def, "duration_ticks", 480f);
-
-            s.BuffActiveFlags |= (byte)BuffType.Overclock;
-            s.BuffRemainingTicks = duration;
-            _totalDuration = 30;  // injection animation lock
-            s.AnimLockTicks = _totalDuration;
-            AnimIndex = 0;
-            s.State = ActionState.Attacking;
-            s.AttackSlot = (byte)(Slot + 1);
-        }
+        s.BuffActiveFlags |= (byte)BuffType.Overclock;
+        s.BuffRemainingTicks = duration;
+        _totalDuration = 30;  // injection animation lock
+        s.AnimLockTicks = _totalDuration;
+        AnimIndex = 0;
+        s.State = ActionState.Attacking;
+        s.AttackSlot = (byte)(Slot + 1);
+    }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {

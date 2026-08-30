@@ -30,6 +30,7 @@ namespace SlopArena.Client.Combat
         /// <summary>Cached aim values — persist after key release so server gets right direction during fire delay.</summary>
         private float _lastAimYawRad;
         private float _lastAimPitchRad;
+        private ushort _lastAimDistanceCm;
         private byte _lastAimingSlot;
         /// <summary>
         /// GroundVector aim: screen-space offset of a hidden cursor anchored at the character's
@@ -162,6 +163,7 @@ namespace SlopArena.Client.Combat
                 _aimIndicator.SetAiming(true);
                 _aimIndicator.UpdateAim();
                 var (yawRad, distCm) = _aimIndicator.GetAimInput();
+                _lastAimDistanceCm = distCm ?? 0;
                 ctx = new AimContext
                 {
                     IsAiming      = true,
@@ -202,6 +204,7 @@ namespace SlopArena.Client.Combat
                 _aimIndicator.SetAiming(true);
                 _aimIndicator.SetVectorAim(_lastAimYawRad);
                 var (yawRad2, distCm2) = _aimIndicator.GetAimInput();
+                _lastAimDistanceCm = distCm2 ?? 0;
                 ctx = new AimContext
                 {
                     IsAiming      = true,
@@ -238,12 +241,14 @@ namespace SlopArena.Client.Combat
                 else if (_lastAimingSlot > 0 && playerState.State is (ActionState.Attacking or ActionState.Aiming)
                     && playerState.AttackSlot == (byte)(_lastAimingSlot + 1))
                 {
-                    // Key released but server hasn't fired yet — send last known aim direction
+                    // Key released but server hasn't fired yet — send last known aim
+                    // direction AND distance (the sim caches both for the throw).
                     ctx = new AimContext
                     {
-                        IsAiming    = false,
-                        AimYawRad   = _lastAimYawRad,
-                        AimPitchRad = _lastAimPitchRad,
+                        IsAiming       = false,
+                        AimYawRad      = _lastAimYawRad,
+                        AimPitchRad    = _lastAimPitchRad,
+                        AimDistanceCm  = _lastAimDistanceCm,
                     };
                 }
             }

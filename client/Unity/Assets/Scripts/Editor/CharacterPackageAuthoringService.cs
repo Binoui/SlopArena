@@ -1098,7 +1098,7 @@ public sealed class CharacterPackageAuthoringService
 
 
     internal static CharacterCookProfile ProfileFor(string packageId)
-        => packageId == "fightguy" || packageId == "kistu" || packageId == "bonk" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+        => packageId == "fightguy" || packageId == "kistu" || packageId == "bonk" || packageId == "manki" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
 
     private string CharacterPackagesFullRoot() => Path.Combine(_projectRoot, CharacterPackagesRoot.Replace('/', Path.DirectorySeparatorChar));
     private string PackageRootFor(string packageId) => CharacterPackagesRoot + "/" + packageId;
@@ -1350,6 +1350,7 @@ public static class CharacterPackageAssetOwnershipRegistry
             ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
             ["kistu"] = new[] { "Assets/Art/Characters/kistu/", "Assets/Resources/Characters/Kistu.prefab" },
             ["bonk"] = new[] { "Assets/Art/Characters/bonk/" },
+            ["manki"] = new[] { "Assets/Art/Characters/manki/", "Assets/Resources/Characters/Manki.prefab" },
         };
 
     public static bool IsOwnedBy(string packageId, string projectRelativePath)

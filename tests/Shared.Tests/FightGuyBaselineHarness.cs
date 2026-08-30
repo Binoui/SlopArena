@@ -196,7 +196,10 @@ internal static class FightGuyBaseline
         sim.Resolver.OnHitboxRemoved += OnHitboxRemoved;
         try
         {
-            for (int tick = 0; tick < 100; tick++)
+            // Window sized so every populated slot's natural completion AND its
+            // hitbox/projectile removal land inside the trace. Ki Shot's aim-hold
+            // (release-to-fire) pushes its projectile removal to ~tick 107.
+            for (int tick = 0; tick < 120; tick++)
             {
                 currentTick = (uint)(tick + 1);
 
@@ -640,8 +643,8 @@ public sealed class FightGuyBaselineHarnessTests
     private static void AssertNaturalTrace(
         FightGuyTrace trace, CharacterDefinition definition, FightGuyTraceScenario scenario)
     {
-        Assert.Equal(101, trace.Ticks.Count);
-        Assert.Equal(101, trace.Ticks.Count(t => t.States.Any(s => s.EntityId == 1)));
+        Assert.Equal(121, trace.Ticks.Count);
+        Assert.Equal(121, trace.Ticks.Count(t => t.States.Any(s => s.EntityId == 1)));
         Assert.Contains(trace.Ticks, t => t.ActiveHitboxes.Count > 0);
         Assert.Contains(trace.RemovedHitboxes, h => h.Hitbox.OwnerId == 1);
 

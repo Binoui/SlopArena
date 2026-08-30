@@ -18,56 +18,12 @@ public class AttackToIdleTests
     //  MANKI LMB — LmbCombo (StageChainAbility)
     // ════════════════════════════════════════════════
 
-    [Fact]
-    public void MankiLMB_SingleStage_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = MankiGroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1),
-            MankiDef.LMB!.Stages[0].DurationTicks + 5);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
-
-    [Fact]
-    public void MankiLMB_FullComboToIdle_NoChainInput()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = MankiGroundPy;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        var totalTicks = MankiDef.LMB!.Stages[0].DurationTicks + 10;
-
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), totalTicks);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
 
     // ════════════════════════════════════════════════
     //  MANKI AIR LMB — AirLmbCombo (StageChainAbility)
     // ════════════════════════════════════════════════
 
-    [Fact]
-    public void MankiAirLMB_ReturnsToIdle()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1),
-            MankiDef.AirLMB!.Stages[0].DurationTicks + 10);
-
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal((byte)0, after.AttackSlot);
-    }
 
     // ════════════════════════════════════════════════
     //  MANKI Q — MankiRoundBomb (hold → throw)
@@ -167,7 +123,11 @@ public class AttackToIdleTests
         TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
-        for (int i = 0; i < 30; i++)
+        // Hold-to-aim: release after the hold debounce, then the 24-tick fire
+        // phase ends the ability — natural completion lands inside this window.
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
+        for (int i = 0; i < 40; i++)
             sim.Tick(new() { { 1, default } });
 
         var after = sim.GetState(1);

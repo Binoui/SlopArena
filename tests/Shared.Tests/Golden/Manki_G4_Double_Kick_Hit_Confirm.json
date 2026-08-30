@@ -1,0 +1,35 @@
+{
+  "Scenario": "Manki G4 Double Kick Hit Confirm",
+  "TickCount": 100,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.75,
+    "AttackSlot": 9,
+    "HitstopTicks": 7,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcSnap": {
+    "FacingYaw": -3.1415927,
+    "PY": 0.75,
+    "PZ": 0.8,
+    "DamagePercent": 14,
+    "HitstopTicks": 7,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "FacingYaw": -3.1415927,
+    "PY": 0.96289265,
+    "PZ": 8.198687,
+    "VY": -8.182001,
+    "DamagePercent": 14,
+    "AirTimeTicks": 55,
+    "JumpsLeft": 2
+  }
+}

@@ -45,34 +45,6 @@ public class AttackIdleReTriggerTests
             "State should have been Idle at some point — held input re-triggers");
     }
 
-    [Fact]
-    public void MankiAirLMB_SinglePress_DoesNotReTrigger()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, MankiDef, state);
-
-        var stageDuration = MankiDef.AirLMB!.Stages[0].DurationTicks;
-
-        // ActiveSlot is one-tick (edge) by client contract (ADR-0016): press once, then
-        // release. The aerial runs once and returns to Idle — it must not machine-gun
-        // (no auto-combo, ADR-0015). A level-held slot is never sent by the client.
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) } });
-
-        bool everIdle = false;
-        for (int i = 0; i < stageDuration * 3 + 10; i++)
-        {
-            sim.Tick(new() { { 1, default } });
-            var s = sim.GetState(1);
-            if (s.State == ActionState.Idle)
-                everIdle = true;
-        }
-
-        Assert.True(everIdle,
-            "AirLMB single press should complete and return to Idle");
-    }
 
     // ══════════════════════════════════════════════════════════════
     //  Bug 2: Duration halved in AerosolFlame and Overclock

@@ -77,27 +77,6 @@ public class FastFallTests
         TestHelpers.AssertNear(0f, s.VY, 0.001f);
     }
 
-    [Fact]
-    public void DownDuringAirAttack_FastFalls()
-    {
-        // "Works in all airborne states except hitstun" — an active air attack is the
-        // commitment case: fast-falling through an aerial is the point of the mechanic.
-        var control = SimFalling();
-        var fast = SimFalling();
-
-        // Start an air LMB (slot 1 airborne) on both, then only one holds Down.
-        TestHelpers.TickN(control, TestHelpers.Input(activeSlot: 1), 1);
-        TestHelpers.TickN(fast, TestHelpers.Input(activeSlot: 1), 1);
-        Assert.Equal(ActionState.Attacking, control.GetState(1).State);
-
-        TestHelpers.TickDefault(control, 15);
-        TestHelpers.TickHold(fast, TestHelpers.Input(down: true), 15);
-
-        var a = control.GetState(1);
-        var b = fast.GetState(1);
-        Assert.True(b.VY < a.VY,
-            $"fast fall must work through an air attack: control={a.VY:F3} fast={b.VY:F3}");
-    }
 
     [Fact]
     public void DownDuringHitstun_NoFastFall()

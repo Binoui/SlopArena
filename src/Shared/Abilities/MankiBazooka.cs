@@ -16,10 +16,32 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public sealed class MankiBazooka : ServerAbility
     {
+        private readonly CookedMankiBazookaCapabilityParameters? _parameters;
         private enum BazookaPhase { Aiming, Firing, Recovery }
         private BazookaPhase _phase;
         private bool _projectileSpawned;
 
+        public MankiBazooka() { }
+        public MankiBazooka(CookedMankiBazookaCapabilityParameters parameters)
+            => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        public MankiBazooka(MankiBazookaCapabilityParameters parameters)
+            : this(parameters != null ? new CookedMankiBazookaCapabilityParameters(
+                parameters.FireTriggerTick,
+                parameters.ProjectileSpeed,
+                parameters.HitboxRadius,
+                parameters.Damage,
+                parameters.Gravity,
+                parameters.MaxFlightTicks,
+                parameters.StunTicks,
+                parameters.ExplosionRadius,
+                parameters.KbAngle,
+                parameters.ExplosionKbBase,
+                parameters.ExplosionKbGrowth,
+                parameters.ExplosionStunTicks,
+                parameters.ExplosionDurationTicks,
+                parameters.ExplosionKbAngle,
+                parameters.CastDuration,
+                parameters.RecoveryDuration) : throw new ArgumentNullException(nameof(parameters))) { }
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _phase = BazookaPhase.Aiming;
@@ -74,14 +96,14 @@ namespace SlopArena.Shared.Abilities
                 s.AttackElapsedTicks = 0;
                 AnimIndex = 1;      // spell_r_attack
                 s.ComboStage = 1;   // renderer switches loop -> attack clip
-                s.AnimLockTicks = (ushort)GetParam(def, "cast_duration", 20f);
+                s.AnimLockTicks = _parameters?.CastDuration ?? (ushort)GetParam(def, "cast_duration", 20f);
             }
         }
 
         private void TickFiring(ref CharacterState s, CharacterDefinition def)
         {
-            ushort fireTriggerTick = (ushort)GetParam(def, "fire_trigger_tick", 6f);
-            ushort castDuration = (ushort)GetParam(def, "cast_duration", 20f);
+            ushort fireTriggerTick = _parameters?.FireTriggerTick ?? (ushort)GetParam(def, "fire_trigger_tick", 6f);
+            ushort castDuration = _parameters?.CastDuration ?? (ushort)GetParam(def, "cast_duration", 20f);
 
             if (!_projectileSpawned && s.AttackElapsedTicks >= fireTriggerTick)
             {
@@ -93,13 +115,13 @@ namespace SlopArena.Shared.Abilities
             {
                 _phase = BazookaPhase.Recovery;
                 s.AttackElapsedTicks = 0;
-                s.AnimLockTicks = (ushort)GetParam(def, "recovery_duration", 15f);
+                s.AnimLockTicks = _parameters?.RecoveryDuration ?? (ushort)GetParam(def, "recovery_duration", 15f);
             }
         }
 
         private void TickRecovery(ref CharacterState s, CharacterDefinition def)
         {
-            ushort recoveryDuration = (ushort)GetParam(def, "recovery_duration", 15f);
+            ushort recoveryDuration = _parameters?.RecoveryDuration ?? (ushort)GetParam(def, "recovery_duration", 15f);
             if (s.AttackElapsedTicks >= recoveryDuration)
             {
                 EndAbility(ref s);
@@ -108,7 +130,7 @@ namespace SlopArena.Shared.Abilities
 
         private void SpawnRocket(ref CharacterState s, CharacterDefinition def)
         {
-            float speed = GetParam(def, "projectile_speed", 40f);
+            float speed = _parameters?.ProjectileSpeed ?? GetParam(def, "projectile_speed", 40f);
             float pitch = s.AimPitch;
             float yaw = s.AimYaw;
 
@@ -121,9 +143,24 @@ namespace SlopArena.Shared.Abilities
                 Simulation.OnDebugLog.Invoke(
                     $"[MankiBazooka] Firing! pitch={pitch:F3}({pitch*(180f/MathF.PI):F1}°) yaw={yaw:F3}({yaw*(180f/MathF.PI):F1}°) vy={vy:F2} vz={vz:F2}");
 
-            float radius = GetParam(def, "hitbox_radius", 0.6f);
-            float damage = GetParam(def, "damage", 15f);
+            float radius = _parameters?.HitboxRadius ?? GetParam(def, "hitbox_radius", 0.6f);
+            float damage = _parameters?.Damage ?? GetParam(def, "damage", 15f);
             ApplyBuffBonuses(ref s, ref damage, ref radius);
+
+            float kbBase = GetParam(def, "knockback_base", 6f);
+            float kbGrowth = GetParam(def, "knockback_growth", 9f);
+            float kbAngle = _parameters?.KbAngle ?? GetParam(def, "kb_angle", 25f);
+            ushort stunTicks = _parameters?.StunTicks ?? (ushort)GetParam(def, "stun_ticks", 25f);
+            ushort maxFlightTicks = _parameters?.MaxFlightTicks ?? (ushort)GetParam(def, "max_flight_ticks", 45f);
+            float gravity = _parameters?.Gravity ?? GetParam(def, "gravity", 15f);
+
+            float explosionRadius = _parameters?.ExplosionRadius ?? GetParam(def, "explosion_radius", 3f);
+            float explosionDamage = GetParam(def, "explosion_damage", 10f);
+            float explosionKbAngle = _parameters?.ExplosionKbAngle ?? GetParam(def, "explosion_kb_angle", 25f);
+            float explosionKbBase = _parameters?.ExplosionKbBase ?? GetParam(def, "explosion_kb_base", 6f);
+            float explosionKbGrowth = _parameters?.ExplosionKbGrowth ?? GetParam(def, "explosion_kb_growth", 9f);
+            ushort explosionStunTicks = _parameters?.ExplosionStunTicks ?? (ushort)GetParam(def, "explosion_stun_ticks", 20f);
+            ushort explosionDurationTicks = _parameters?.ExplosionDurationTicks ?? (ushort)GetParam(def, "explosion_duration_ticks", 6f);
 
             Resolver.Spawn(new Hitbox
             {
@@ -135,20 +172,21 @@ namespace SlopArena.Shared.Abilities
                 Shape = HitboxShape.Sphere,
                 EndX = s.PX, EndY = s.PY, EndZ = s.PZ,
                 Damage = damage,
-                BaseKnockback = GetParam(def, "knockback_base", 6f),
-                KnockbackGrowth = GetParam(def, "knockback_growth", 9f),
-                KnockbackAngle = (sbyte)GetParam(def, "kb_angle", 25f),
-                StunTicks = (ushort)GetParam(def, "stun_ticks", 25f),
-                DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 45f),
+                BaseKnockback = kbBase,
+                KnockbackGrowth = kbGrowth,
+                KnockbackAngle = (sbyte)kbAngle,
+                StunTicks = stunTicks,
+                DurationTicks = maxFlightTicks,
                 OwnerId = s.EntityId,
-                Gravity = GetParam(def, "gravity", 15f),
+                AttackSlot = (byte)(Slot + 1),
+                Gravity = gravity,
                 Explosion = new ProjectileExplosion
                 {
-                    Radius = GetParam(def, "explosion_radius", 3f),
-                    Damage = GetParam(def, "explosion_damage", 10f),
-                    Knockback = new() { Profile = KnockbackProfile.Custom, Angle = (sbyte)GetParam(def, "explosion_kb_angle", 25f), BaseKnockback = GetParam(def, "explosion_kb_base", 6f), KnockbackGrowth = GetParam(def, "explosion_kb_growth", 9f) },
-                    StunTicks = (ushort)GetParam(def, "explosion_stun_ticks", 20f),
-                    DurationTicks = (ushort)GetParam(def, "explosion_duration_ticks", 6f),
+                    Radius = explosionRadius,
+                    Damage = explosionDamage,
+                    Knockback = new() { Profile = KnockbackProfile.Custom, Angle = (sbyte)explosionKbAngle, BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth },
+                    StunTicks = explosionStunTicks,
+                    DurationTicks = explosionDurationTicks,
                     CanHitOwner = true,
                 },
             });

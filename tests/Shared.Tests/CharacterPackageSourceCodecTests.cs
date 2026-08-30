@@ -25,6 +25,28 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
+    public void AimAnimationId_RoundTripsOnAimedSlots()
+    {
+        var fg = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(fg.IsValid, string.Join("\n", fg.Diagnostics));
+        Assert.Equal("anim.ki-shot-loop", fg.Source!.Character.Slots.Single(s => s.Id == "ground.A").AimAnimationId);
+
+        string mk = FindRepoFile("client/Unity/Assets/CharacterPackages/manki/character.json");
+        var manki = CharacterPackageSourceCodec.Load(
+            File.ReadAllText(Path.Combine(Path.GetDirectoryName(mk)!, "package.json")),
+            File.ReadAllText(mk));
+        Assert.True(manki.IsValid, string.Join("\n", manki.Diagnostics));
+        Assert.Equal("anim.manki.ga-loop", manki.Source!.Character.Slots.Single(s => s.Id == "ground.A").AimAnimationId);
+
+        // Serialized round-trip preserves the field.
+        var re = CharacterPackageSourceCodec.Load(
+            CharacterPackageSourceCodec.SerializeManifest(fg.Source.Manifest),
+            CharacterPackageSourceCodec.SerializeCharacter(fg.Source.Character));
+        Assert.True(re.IsValid);
+        Assert.Equal("anim.ki-shot-loop", re.Source!.Character.Slots.Single(s => s.Id == "ground.A").AimAnimationId);
+    }
+
+    [Fact]
     public void FightGuy_RoundTripsDeterministically()
     {
         var first = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));

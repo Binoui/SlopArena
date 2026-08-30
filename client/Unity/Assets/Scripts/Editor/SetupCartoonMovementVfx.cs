@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using SlopArena.Client.Combat;
+using SlopArena.Shared;
 using UnityEngine;
 
 namespace SlopArena.Client.Editor
@@ -22,7 +25,9 @@ namespace SlopArena.Client.Editor
             string ringSource = FindPrefab("CFXR Water Ripples");
             string groundSource = FindPrefab("CFXR2 Ground Hit");
             string smashSource = FindPrefab("CFXR Hit A (Red) + Text") ?? FindPrefab("CFXR _SMASH_");
-            if (poofSource == null || windSource == null || ringSource == null || groundSource == null)
+            string fireExplosionSource = FindPrefab("CFXR3 Fire Explosion A (no smoke)");
+            if (poofSource == null || windSource == null || ringSource == null || groundSource == null
+                || fireExplosionSource == null)
                 throw new InvalidOperationException(
                     "Cartoon FX Remaster Free is missing. Import it from the Unity Asset Store first.");
 
@@ -35,6 +40,7 @@ namespace SlopArena.Client.Editor
             if (smashSource != null)
                 Copy(smashSource, "MatchTextSmash");
             TunePoof();
+            CopyAndConfigureMankiExplosion(fireExplosionSource);
             TuneWind();
             TuneRing();
             TuneGroundRing();
@@ -175,6 +181,76 @@ namespace SlopArena.Client.Editor
                 main.startLifetime = new ParticleSystem.MinMaxCurve(0.18f, 0.25f);
                 main.startColor = new Color(0.72f, 0.84f, 0.96f, 0.85f);
             });
+        }
+
+        private static void CopyAndConfigureMankiExplosion(string source)
+        {
+            const string name = "MankiQExplosionFire";
+            Copy(source, name);
+            string path = $"{Destination}/{name}.prefab";
+            EditPrefab(name, root =>
+            {
+                if (PrefabUtility.IsPartOfPrefabInstance(root))
+                    PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+
+                Shader shader = Shader.Find("SlopArena/Particles/CFXR3 Fire Explosion");
+                if (shader == null)
+                    throw new InvalidOperationException("SlopArena CFXR3 fire explosion shader was not found.");
+
+                var materials = new Dictionary<int, Material>();
+                foreach (ParticleSystemRenderer renderer in root.GetComponentsInChildren<ParticleSystemRenderer>(true))
+                {
+                    Material[] sourceMaterials = renderer.sharedMaterials;
+                    var replacementMaterials = new Material[sourceMaterials.Length];
+                    for (int i = 0; i < sourceMaterials.Length; i++)
+                    {
+                        Material sourceMaterial = sourceMaterials[i];
+                        if (sourceMaterial == null)
+                            continue;
+
+                        int key = sourceMaterial.GetInstanceID();
+                        if (!materials.TryGetValue(key, out Material replacement))
+                        {
+                            replacement = new Material(sourceMaterial)
+                            {
+                                name = $"MankiQExplosionFire_{materials.Count}"
+                            };
+                            replacement.shader = shader;
+                            string materialPath = $"{Destination}/{replacement.name}.mat";
+                            AssetDatabase.DeleteAsset(materialPath);
+                            AssetDatabase.CreateAsset(replacement, materialPath);
+                            materials.Add(key, replacement);
+                        }
+                        replacementMaterials[i] = replacement;
+                    }
+                    renderer.sharedMaterials = replacementMaterials;
+                }
+            });
+
+            ProjectileVFXConfig config = Resources.Load<ProjectileVFXConfig>("VFXConfigs/ProjectileVisuals");
+            if (config == null)
+                throw new InvalidOperationException("Resources/VFXConfigs/ProjectileVisuals.asset was not found.");
+
+            SerializedObject serializedConfig = new SerializedObject(config);
+            SerializedProperty overrides = serializedConfig.FindProperty("ExplosionOverrides");
+            for (int i = overrides.arraySize - 1; i >= 0; i--)
+            {
+                SerializedProperty entry = overrides.GetArrayElementAtIndex(i);
+                if (entry.FindPropertyRelative("Character").intValue == (int)CharacterClass.Manki
+                    && entry.FindPropertyRelative("AttackSlot").intValue == AbilitySlots.Slot1)
+                    overrides.DeleteArrayElementAtIndex(i);
+            }
+
+            int index = overrides.arraySize;
+            overrides.InsertArrayElementAtIndex(index);
+            SerializedProperty added = overrides.GetArrayElementAtIndex(index);
+            added.FindPropertyRelative("Character").intValue = (int)CharacterClass.Manki;
+            added.FindPropertyRelative("AttackSlot").intValue = AbilitySlots.Slot1;
+            added.FindPropertyRelative("Prefab").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            added.FindPropertyRelative("Scale").floatValue = 1f;
+            serializedConfig.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
         }
 
         private static void EditPrefab(string name, Action<GameObject> edit)

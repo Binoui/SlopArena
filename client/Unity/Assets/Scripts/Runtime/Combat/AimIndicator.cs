@@ -125,9 +125,13 @@ namespace SlopArena.Client.Combat
             _vectorMode = enabled;
             _vectorDistance = distance;
             _vectorWidth = width;
-            if (_arcLine != null) _arcLine.enabled = false;
-            if (_groundRing != null) _groundRing.gameObject.SetActive(false);
-            if (_dashBand != null) _dashBand.gameObject.SetActive(false);
+            // Respect the active aim state: this runs every frame while aiming (the
+            // GroundCursor/GroundVector branches call it before SetAiming, which
+            // early-returns once already aiming). Unconditionally hiding here would
+            // make the indicator flash for one frame then vanish.
+            if (_arcLine != null) _arcLine.enabled = _isAiming && !enabled;
+            if (_groundRing != null) _groundRing.gameObject.SetActive(_isAiming);
+            if (_dashBand != null) _dashBand.gameObject.SetActive(_isAiming && enabled);
         }
 
         /// <summary>
@@ -173,7 +177,14 @@ namespace SlopArena.Client.Combat
             var unityCam = _camera != null ? _camera : UnityEngine.Camera.main;
             if (unityCam == null) return;
 
-            var mouseRay = unityCam.ScreenPointToRay(UnityEngine.Input.mousePosition);
+            // Active Input Handling is "Input System Package (New)" only
+            // (ProjectSettings activeInputHandler = 2): the legacy Input.mousePosition
+            // is always (0,0), which pins the cursor to the bottom-left screen corner.
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            Vector2 mousePos = mouse != null
+                ? mouse.position.ReadValue()
+                : UnityEngine.Input.mousePosition;
+            var mouseRay = unityCam.ScreenPointToRay(mousePos);
 
             float groundY = 0f;
             bool foundGround = false;

@@ -176,6 +176,7 @@ public sealed class CookedSlotDefinition
     public bool PreserveMomentumOnStart { get; }
     public CookedChargePool? ChargePool { get; }
     public AuthoringAimMovementMode AimMovement { get; }
+    public string? AimAnimationId { get; }
     public CookedTimeline Timeline { get; }
 
     public CookedSlotDefinition(
@@ -192,7 +193,8 @@ public sealed class CookedSlotDefinition
         bool preserveMomentumOnStart,
         CookedTimeline timeline,
         CookedChargePool? chargePool = null,
-        AuthoringAimMovementMode aimMovement = AuthoringAimMovementMode.Fixed)
+        AuthoringAimMovementMode aimMovement = AuthoringAimMovementMode.Fixed,
+        string? aimAnimationId = null)
     {
         Ordinal = ordinal;
         Id = id;
@@ -208,6 +210,7 @@ public sealed class CookedSlotDefinition
         Timeline = timeline;
         ChargePool = chargePool;
         AimMovement = aimMovement;
+        AimAnimationId = aimAnimationId;
     }
 }
 
@@ -421,6 +424,54 @@ public sealed record CookedBonkTargetedJumpSlamCapabilityParameters(
     float SlamKnockbackGrowth,
     ushort SlamStunTicks,
     ushort SlamDurationTicks) : CookedCapabilityParameters;
+public sealed record CookedMankiRoundBombCapabilityParameters(
+    ushort ThrowTriggerTick,
+    float MaxRange,
+    float LaunchAngle,
+    float Gravity,
+    float HitboxRadius,
+    float Damage,
+    ushort StunTicks,
+    ushort MaxFlightTicks,
+    float KbAngle,
+    float ExplosionDamage,
+    float ExplosionRadius,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks,
+    float ExplosionKbAngle) : CookedCapabilityParameters;
+public sealed record CookedMankiGrappleCapabilityParameters(
+    ushort FireTriggerTick,
+    float TetherSpeed,
+    float HitboxRadius,
+    ushort MaxFlightTicks,
+    float MaxRange,
+    float ReelSpeed,
+    float ArrivalThreshold,
+    float Damage,
+    ushort StunTicks,
+    float KbAngle,
+    ushort CastDuration) : CookedCapabilityParameters;
+public sealed record CookedMankiBazookaCapabilityParameters(
+    ushort FireTriggerTick,
+    float ProjectileSpeed,
+    float HitboxRadius,
+    float Damage,
+    float Gravity,
+    ushort MaxFlightTicks,
+    ushort StunTicks,
+    float ExplosionRadius,
+    float KbAngle,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks,
+    float ExplosionKbAngle,
+    ushort CastDuration,
+    ushort RecoveryDuration) : CookedCapabilityParameters;
+public sealed record CookedMankiOverclockCapabilityParameters(
+    ushort DurationTicks) : CookedCapabilityParameters;
 
 public sealed record CookedBudget(
     int SlotCount,

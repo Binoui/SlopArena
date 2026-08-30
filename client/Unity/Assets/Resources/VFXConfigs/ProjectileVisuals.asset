@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2be929fa476e12fe8b6cb6bf9c8ec5f, type: 3}
+  m_Name: ProjectileVisuals
+  m_EditorClassIdentifier: 
+  ExplosionPrefab: {fileID: 6234428247096128038, guid: 14f315e2bc084d80caee66c5c47b51dc, type: 3}
+  ExplosionScale: 1
+  ProjectileEntries:
+  - Character: 1
+    AttackSlot: 11
+    Airborne: 0
+    Prefab: {fileID: 5710766023260875415, guid: 8b8f86038b7ad386590bec0fb8fec3d3, type: 3}
+    Scale: 0.5
+  - Character: 1
+    AttackSlot: 11
+    Airborne: 1
+    Prefab: {fileID: 5710766023260875415, guid: 8b8f86038b7ad386590bec0fb8fec3d3, type: 3}
+    Scale: 0.5
+  ExplosionOverrides:
+  - Character: 1
+    AttackSlot: 3
+    Prefab: {fileID: 7145732324326374393, guid: d4a044c8c6fbc6855b7fa70ac424fa23, type: 3}
+    Scale: 0.5

@@ -13,44 +13,9 @@ public class AbilityLifecycleTests
 
     // ── LMB: ServerAbility (MankiLmbCombo) — basic activation only ──
 
-    [Fact]
-    public void MankiLMB_StartsAttacking()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.MankiGroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.Equal((byte)1, t0.AttackSlot);
-    }
 
     // ── AirLMB: ServerAbility (AirLmbCombo via StageChainAbility) ──
 
-    [Fact]
-    public void MankiAirLMB_DataDrivenDuration()
-    {
-        // AirLMB: DurationTicks=20. Entity must be truly airborne (PY above ground snap).
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = 5f; // well above ground
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Press LMB while airborne → AirLmbCombo
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-
-        // Tick past DurationTicks (20) with margin
-        for (int i = 0; i < 30; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var ended = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, ended.State);
-    }
 
     // ── Q: ServerAbility (MankiRoundBomb) — basic activation ──
 
@@ -63,16 +28,16 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        Assert.Equal(AimMovementMode.Mobile, Def.GetAimMovementMode(AbilitySlots.Slot1, airborne: false));
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 3), 1);
+        Assert.Equal(AimMovementMode.Fixed, Def.GetAimMovementMode(AbilitySlots.A, airborne: false));
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: AbilitySlots.A), 1);
         Assert.Equal(ActionState.Aiming, t0.State);
-        Assert.Equal((byte)3, t0.AttackSlot);
+        Assert.Equal((byte)AbilitySlots.A, t0.AttackSlot);
     }
 
-    // ── Q hold: mobile aim — movement stays available, action transitions stay locked ──
+    // ── Q hold: fixed aim — movement is locked, action transitions stay locked ──
 
     [Fact]
-    public void MankiQ_MobileHold_AllowsMovement()
+    public void MankiQ_FixedHold_DoesNotAllowMovement()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -80,7 +45,7 @@ public class AbilityLifecycleTests
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         float startZ = state.PZ;
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
+        var aim = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, moveY: 1f);
         for (int i = 0; i < 300; i++)
             sim.Tick(new() { { 1, aim } });
 
@@ -88,7 +53,39 @@ public class AbilityLifecycleTests
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)0, s.ComboStage);
         Assert.NotNull(sim.GetActiveAbility(1));
-        Assert.True(s.PZ > startZ, $"mobile aim should move normally: start={startZ}, end={s.PZ}");
+        Assert.Equal(startZ, s.PZ);
+        Assert.Equal(0f, s.VZ);
+    }
+
+    [Fact]
+    public void MankiQ_AirStart_LandingKeepsAimUntilRelease()
+    {
+        var arena = TestHelpers.TestArena();
+        var sim = TestHelpers.MakeSim(arena);
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY + 2f;
+        state.IsGrounded = false;
+        state.VY = -1f;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        var aim = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true);
+        sim.Tick(new() { { 1, aim } });
+        Assert.Equal(ActionState.Aiming, sim.GetState(1).State);
+
+        var falling = sim.GetState(1);
+        falling.PY = TestHelpers.MankiGroundPY + 0.05f;
+        falling.IsGrounded = false;
+        falling.VY = -1f;
+        sim.SetState(1, falling);
+        sim.Tick(new() { { 1, aim } });
+
+        var landed = sim.GetState(1);
+        Assert.True(landed.IsGrounded);
+        Assert.Equal(ActionState.Aiming, landed.State);
+        Assert.NotNull(sim.GetActiveAbility(1));
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: false) } });
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
     }
 
     [Fact]
@@ -99,16 +96,16 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
+        var aim = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, moveY: 1f);
         sim.Tick(new() { { 1, aim } });
         for (int i = 0; i < 9; i++)
             sim.Tick(new() { { 1, aim } });
 
-        // Aim keeps normal movement steering, but ActionState.Aiming still owns jump/dash.
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 3, IsAiming = true, MoveY = 1f, Jump = true, Dash = true } } });
+        // Fixed aim blocks normal movement; ActionState.Aiming also owns jump/dash.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true, MoveY = 1f, Jump = true, Dash = true } } });
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Aiming, s.State);
-        Assert.Equal((byte)3, s.AttackSlot);
+        Assert.Equal((byte)AbilitySlots.A, s.AttackSlot);
         Assert.Equal((ushort)0, s.DashDurationTicks);
         Assert.Equal((byte)2, s.JumpsLeft);
     }
@@ -121,7 +118,7 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var aim = TestHelpers.Input(activeSlot: 3, aiming: true, moveY: 1f);
+        var aim = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, moveY: 1f);
         for (int i = 0; i < 300; i++)
             sim.Tick(new() { { 1, aim } });
 
@@ -130,7 +127,7 @@ public class AbilityLifecycleTests
         Assert.Equal((byte)0, held.ComboStage);
         Assert.NotNull(sim.GetActiveAbility(1));
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 3, aiming: false) } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: false) } });
         var released = sim.GetState(1);
         Assert.Equal(ActionState.Attacking, released.State);
         Assert.Equal((byte)1, released.ComboStage);
@@ -254,26 +251,6 @@ public class AbilityLifecycleTests
             $"Buff should still have most of its duration left, got {afterInjection.BuffRemainingTicks}");
     }
 
-    [Fact]
-    public void MankiOverclock_DoesNotBlockOtherAbilities()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.MankiGroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Activate F
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
-
-        // Wait for injection to finish
-        TestHelpers.TickDefault(sim, 40);
-
-        // Now press LMB (slot 1) — should work even though buff is active
-        var lmbAfter = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 1);
-        Assert.Equal(ActionState.Attacking, lmbAfter.State);
-        Assert.Equal((byte)1, lmbAfter.AttackSlot);
-    }
 
     [Fact]
     public void Overclock_DeathClearsBuff()

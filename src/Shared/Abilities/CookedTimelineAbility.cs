@@ -220,10 +220,11 @@ public sealed class CookedTimelineAbility : ServerAbility
         capability.Arena = Arena;
         capability.Slot = Slot;
         capability.Cooldown = Cooldown;
-        capability.AirborneAtStart = AirborneAtStart;
         capability.AnimationNames = AnimationNames;
-        if (operation.Parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk
-            && bonk.MaxAimTicks == 0)
+        // Aim-hold capabilities own their hold/release lifecycle: freeze the stage
+        // clock while they hold ActionState.Aiming so an authored stage timeout can
+        // never cancel the aim, and resume (stage time reset) on their release.
+        if (capability is IAimHoldCapability)
             _unlimitedAimHold = true;
         capability.PresentationSink = PresentationSink;
         _capabilities.Add(capability);

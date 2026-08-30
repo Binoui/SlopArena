@@ -13,7 +13,7 @@ namespace SlopArena.Client.UI
     /// Character select screen (issue #34). Two modes:
     /// <list type="bullet">
     /// <item><b>Training</b> — single-player: pick a character, click SELECT,
-    /// go to StageSelect. Unchanged from the original flow.</item>
+    /// launch the training scene directly.</item>
     /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
     /// lock in, and the host starts the match when everyone is locked in (min 2).
     /// Uses the shared <see cref="ClientSession.ActiveLobby"/> connection.</item>
@@ -131,7 +131,8 @@ namespace SlopArena.Client.UI
             root.Q<Button>("btn-select").clicked += () =>
             {
                 MatchConfig.PlayerClass = _selected;
-                SceneManager.LoadScene("StageSelect");
+                MatchConfig.ArenaName = "training";
+                SceneManager.LoadScene("Arena_Offline");
             };
 
             root.Q<Button>("btn-back").clicked += () =>

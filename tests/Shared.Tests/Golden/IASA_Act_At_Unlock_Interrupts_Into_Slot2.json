@@ -1,12 +1,12 @@
 {
-  "Scenario": "IASA Act At Unlock Interrupts Into Slot1",
+  "Scenario": "IASA Act At Unlock Interrupts Into Slot2",
   "TickCount": 60,
   "PlayerSnap": {
     "State": 4,
     "PY": 0.85,
     "PZ": 1.0500001,
     "VZ": 5,
-    "AttackSlot": 3,
+    "AttackSlot": 7,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

@@ -67,7 +67,9 @@ namespace SlopArena.Client.Entities
             if (_owner == null || _entries == null) return;
 
             byte slot = _owner.CurrentAttackSlot;
-            bool isAttacking = _owner.CurrentActionState == ActionState.Attacking;
+            ActionState action = _owner.CurrentActionState;
+            bool isAttacking = action == ActionState.Attacking;
+            bool isAiming = action == ActionState.Aiming;
 
             for (int i = 0; i < _entries.Length; i++)
             {
@@ -75,9 +77,13 @@ namespace SlopArena.Client.Entities
                 if (go == null) continue;
 
                 byte entrySlot = _entries[i].AttackSlot;
-                bool visible = entrySlot == 0
-                    ? true                              // always-on weapon
-                    : isAttacking && slot == entrySlot;
+                // HideAfterTicks hides the prop once the ATTACK has run its ticks (the
+                // "leaves the hand" moment); during the aim hold the prop stays visible
+                // for the whole hold regardless of elapsed ticks.
+                bool withinHold = _entries[i].HideAfterTicks <= 0
+                    || !isAttacking
+                    || _owner.CurrentAttackElapsedTicks < _entries[i].HideAfterTicks;
+                bool visible = (entrySlot == 0 ? true : (isAttacking || isAiming) && slot == entrySlot) && withinHold;
 
                 if (go.activeSelf != visible)
                     go.SetActive(visible);

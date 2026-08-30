@@ -117,7 +117,7 @@ namespace SlopArena.Client.World
             renderer.LoadModel(def, rig ?? (local ? _playerModelPrefab : null));
 
             var weaponConfig = entry.CookedCharacterPackage != null
-                ? cookedWeaponConfig
+                ? (cookedWeaponConfig ?? Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}"))
                 : local && _playerWeaponConfig != null
                     ? _playerWeaponConfig
                     : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");

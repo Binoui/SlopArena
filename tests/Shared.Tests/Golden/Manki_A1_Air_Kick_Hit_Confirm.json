@@ -1,0 +1,34 @@
+{
+  "Scenario": "Manki A1 Air Kick Hit Confirm",
+  "TickCount": 90,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 2,
+    "AttackSlot": 3,
+    "HitstopTicks": 4,
+    "AirTimeTicks": 6,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "FacingYaw": -3.1415927,
+    "PY": 3,
+    "PZ": 1,
+    "DamagePercent": 4,
+    "HitstopTicks": 4,
+    "AirTimeTicks": 6,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "NpcFinal": {
+    "FacingYaw": -3.1415927,
+    "PY": 0.75,
+    "PZ": 1.0158464,
+    "DamagePercent": 4,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

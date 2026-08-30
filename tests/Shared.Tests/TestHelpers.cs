@@ -12,7 +12,23 @@ public static class TestHelpers
 
     public static CharacterDefinition KistuDef => BuiltInContentResolver.Resolve(CharacterClass.Kistu).Definition;
 
-    public static CharacterDefinition NilusDef => BuiltInContentResolver.Resolve(CharacterClass.Nilus).Definition;
+    public static CharacterDefinition NilusDef => ResolveDef(CharacterClass.Nilus);
+
+    /// <summary>
+    /// Resolve a built-in character definition. Cooked roster characters resolve
+    /// through <see cref="BuiltInContentResolver"/>; legacy characters not admitted
+    /// to the roster (e.g. Nilus, disabled until finished) resolve through the
+    /// <see cref="LegacyCharacterCatalogAdapter"/> snapshot instead.
+    /// </summary>
+    public static CharacterDefinition ResolveDef(CharacterClass selector)
+    {
+        if (selector == CharacterClass.Nilus)
+        {
+            var snapshot = new LegacyCharacterCatalogAdapter().Snapshot(selector);
+            return snapshot.Definition;
+        }
+        return BuiltInContentResolver.Resolve(selector).Definition;
+    }
 
     /// <summary>
     /// Create a player state at (x, z). PY defaults to 0 — physics tests

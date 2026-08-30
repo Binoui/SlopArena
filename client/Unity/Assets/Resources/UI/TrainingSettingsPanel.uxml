@@ -1,0 +1,20 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Resources/UI/TrainingSettingsPanel.uss?fileID=7433441132597879392&amp;guid=5a0a03e2b9a0899dfb6eb2ef33b6b3fb&amp;type=3#TrainingSettingsPanel" />
+    <ui:VisualElement name="ts-panel" class="ts-panel">
+        <ui:Label name="ts-title" class="ts-title" text="TRAINING SETTINGS" />
+        <ui:Toggle name="no-cd-toggle" class="ts-toggle" label="No ability cooldowns (player)" />
+        <ui:Label name="npc-mode-label" class="ts-label" text="NPC MODE: HEURISTIC" />
+        <ui:VisualElement name="mode-buttons" class="ts-btn-row">
+            <ui:Button name="mode-heuristic" class="ts-btn ts-mode-btn" text="HEURISTIC" />
+            <ui:Button name="mode-idle" class="ts-btn ts-mode-btn" text="IDLE" />
+        </ui:VisualElement>
+        <ui:VisualElement name="dmg-row" class="ts-row">
+            <ui:Label name="npc-damage-label" class="ts-label ts-dmg" text="NPC -%" />
+            <ui:Button name="dmg-minus" class="ts-btn" text="-10" />
+            <ui:Button name="dmg-plus" class="ts-btn" text="+10" />
+            <ui:Button name="dmg-reset" class="ts-btn" text="RESET 0" />
+        </ui:VisualElement>
+        <ui:Label name="roster-title" class="ts-label" text="NPCS" />
+        <ui:VisualElement name="roster-row" class="ts-btn-row ts-wrap" />
+    </ui:VisualElement>
+</ui:UXML>

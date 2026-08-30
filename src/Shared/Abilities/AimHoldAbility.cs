@@ -48,6 +48,13 @@ namespace SlopArena.Shared.Abilities
         /// <summary>Called at the very start (after boilerplate). Reset per-cast fields here.</summary>
         protected virtual void OnAimStart(ref CharacterState s, CharacterDefinition def) { }
 
+        /// <summary>
+        /// Called each tick while the aim is held (input.IsAiming). Subclasses use
+        /// this to track the live aim (cursor/camera) so the throw uses the aim at
+        /// RELEASE — the release tick's input may carry zeroed aim values.
+        /// </summary>
+        protected virtual void OnAimTick(ref CharacterState s, CharacterDefinition def) { }
+
         /// <summary>Called once when the hold releases. Cache aim (yaw/pitch/distance) here.</summary>
         protected virtual void OnRelease(ref CharacterState s, CharacterDefinition def) { }
 
@@ -79,6 +86,8 @@ namespace SlopArena.Shared.Abilities
             // ── Aim phase ──
             if (s.ComboStage == 0)
             {
+                if (input.IsAiming)
+                    OnAimTick(ref s, def);
                 if (s.AttackElapsedTicks > 8)
                 {
                     int mid = GetMidHoldAnimIndex(def);

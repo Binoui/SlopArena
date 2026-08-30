@@ -112,10 +112,12 @@ public class Kit117SlotSemanticsTests
         var sim = TestHelpers.MakeSim();
         TestHelpers.RegisterPlayer(sim, Def, AirborneState());
 
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
+        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11, aiming: true), 1);
+        // Hold-to-aim: the press opens the aim stance (air and ground share the
+        // ground spec); release fires.
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)11, t0.AttackSlot);
-        Assert.False(t0.IsAiming);
+        Assert.True(t0.IsAiming);
     }
 
     // ── E-slot Rising Dragon ──
@@ -306,9 +308,12 @@ public class Kit117SlotSemanticsTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Fire Ki Shot with a single non-aiming A press.
+        // Fire Ki Shot: press, hold, release (the hold debounce + release startup
+        // shift natural completion past the old 30-tick window).
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
-        for (int i = 0; i < 30; i++)
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
+        for (int i = 0; i < 40; i++)
             sim.Tick(new() { { 1, default } });
 
         ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);

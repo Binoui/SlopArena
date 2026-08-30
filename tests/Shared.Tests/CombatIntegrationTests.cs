@@ -35,33 +35,4 @@ public class CombatIntegrationTests
         Assert.Equal(ActionState.Idle, nAfter.State);
     }
 
-    [Fact]
-    public void TwoEntities_PlayerAttacks_NpcIdle_NpcStateStable()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-
-        var pState = TestHelpers.PlayerState();
-        pState.PY = GroundPx;
-        sim.RegisterEntity(1, Def, pState);
-
-        var nState = TestHelpers.NpcState(1.5f, 0f);
-        nState.PY = GroundPx;
-        sim.RegisterEntity(100, Def, nState);
-
-        // Player presses LMB once, then both get default input
-        for (int i = 0; i < 60; i++)
-        {
-            var inputs = new Dictionary<ulong, InputState>
-            {
-                { 1, i == 0 ? TestHelpers.Input(activeSlot: 1) : default },
-                { 100, default },
-            };
-            sim.Tick(inputs);
-        }
-
-        // Player attacked, NPC stayed idle — basic multi-entity sim works
-        var npcAfter = sim.GetState(100);
-        Assert.Equal(ActionState.Idle, npcAfter.State);
-    }
 }

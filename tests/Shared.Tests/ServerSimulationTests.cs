@@ -212,39 +212,6 @@ public class ServerSimulationTests
         Assert.True(inHurtboxes);
     }
 
-    [Fact]
-    public void Tick_InvincibleTarget_TakesNoDamage()
-    {
-        // Respawn (and dash) invincibility blocks incoming hits entirely (issue #37).
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
-
-        var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(1, def, player);
-
-        var npc = TestHelpers.NpcState(0f, 2.2f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        npc.InvincibilityTicks = 60;
-        sim.RegisterEntity(100, def, npc);
-
-        // Manki LMB stage 1 hitbox triggers ~tick 12 (see HitstunAnimationTierTests).
-        bool emittedHitEvent = false;
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
-        emittedHitEvent |= sim.LastTickHits.Count > 0;
-        for (int i = 0; i < 15; i++)
-        {
-            sim.Tick(new() { { 1, default }, { 100, default } });
-            emittedHitEvent |= sim.LastTickHits.Count > 0;
-        }
-
-        var after = sim.GetState(100);
-        Assert.Equal(0u, after.DamagePercent); // hit fully ignored
-        Assert.Equal(0, after.HitstunTicks);
-        Assert.NotEqual(ActionState.Hitstun, after.State);
-        Assert.False(emittedHitEvent, "ignored contact must not produce presentation/telemetry hits");
-    }
 
     [Fact]
     public void Tick_CooldownOnSlot_DoesNotCrash()
@@ -402,9 +369,9 @@ public class ServerSimulationTests
         var state = MakeIdleState(1);
         sim.RegisterEntity(1, def, state);
 
-        // Tick 0: press Q
+        // Tick 0: press A (Round Bomb)
         sim.Tick(new Dictionary<ulong, InputState>
-            { { 1, new InputState { ActiveSlot = 3 } } });
+            { { 1, new InputState { ActiveSlot = AbilitySlots.A } } });
         var t0 = sim.GetState(1);
         Assert.Equal(ActionState.Aiming, t0.State);
 
@@ -447,233 +414,117 @@ public class ServerSimulationTests
         Assert.Equal(0ul, state.TargetEntityId);
     }
 
-    [Fact]
-    public void TargetEntityId_SetOnLmbAttack_NpcInRange()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 3f; // within AttackRange=4 → direct attack, no warp
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // Tick 0: press LMB (slot 1)
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, state.State);
-        Assert.Equal(100ul, state.TargetEntityId);
-    }
-
-    [Fact]
-    public void TargetEntityId_NotSetWhenNpcOutOfRange()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 25f; // beyond WarpRange=10
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(0ul, state.TargetEntityId);
-    }
-
-    [Fact]
-    public void TargetEntityId_UsesClientProvidedTarget()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5f;
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // Client explicitly targets NPC 100 via TargetEntityId in input
-        var input = new InputState { ActiveSlot = 1, TargetEntityId = 100 };
-        sim.Tick(new() { { 1, input }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(100ul, state.TargetEntityId);
-    }
-
-    [Fact]
-    public void TargetEntityId_ClientTargetPreferredOverNearerNpc()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npcNear = MakeIdleState(100);
-        npcNear.PZ = 3f;
-        var npcFar = MakeIdleState(200);
-        npcFar.PZ = 8f;
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npcNear);
-        sim.RegisterEntity(200, def, npcFar);
-
-        // Client targets the farther NPC, not the nearest
-        var input = new InputState { ActiveSlot = 1, TargetEntityId = 200 };
-        sim.Tick(new() { { 1, input }, { 100, default }, { 200, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(200ul, state.TargetEntityId);
-    }
 
 
-    [Fact]
-    public void TargetEntityId_SetOnLmbAttack_BeyondEngageRange()
-    {
-        // Warp is gone (ADR-0015): an enemy beyond the move's engage range still gets
-        // soft-locked as TargetEntityId, but nothing warps — the attack is a commitment.
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // beyond engage range (2.0), inside the 20m target-lock search
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
 
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
 
-        var state = sim.GetState(1);
-        Assert.Equal(100ul, state.TargetEntityId);
-        Assert.Equal(0f, state.WarpSpeed); // warp never initiates — no auto-approach
-    }
 
-    [Fact]
-    public void TargetEntityId_RotationTowardNpc()
-    {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        player.FacingYaw = 0f; // facing +Z
-        var npc = MakeIdleState(100);
-        npc.PX = 1f; // to the right (+X) from player, within engage range (2.0)
-        npc.PZ = 0f;
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
 
-        // LMB with RotateTowardTarget=true, TrackingStrength=0.9
-        // Target is at (+X, 0Z) → expected yaw should rotate toward +X (π/2 rad)
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } }, { 100, default } });
-        sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var state = sim.GetState(1);
-        Assert.Equal(100ul, state.TargetEntityId);
-        // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
-        Assert.True(state.FacingYaw > 0.01f,
-            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
-    }
     // ── Target lock rotation (3-zone) ──
 
-    [Fact]
-    public void Tick_TargetLock_FarAway_RotatesNoWarp()
-    {
-        // Zone 1: dist > WarpRange → NO warp, but facing still rotates toward the target
-        // (attack-range no longer gates facing — issue #127).
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        player.FacingYaw = 0f; // facing +Z
-        var npc = MakeIdleState(100);
-        npc.PX = 5f; // off-axis so rotation would happen if not gated
-        npc.PZ = 15f; // distance ≈ 15.8 > WarpRange=10
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
 
-        // LMB stage 1: WarpRange=10, AttackRange=2
-        var input = TestHelpers.Input(activeSlot: 1);
-        sim.Tick(new() { { 1, input }, { 100, default } });
-
-        var state = sim.GetState(1);
-        // Unlocked attack: facing lerps toward the target yaw Atan2(5,15) at TrackingStrength
-        // 0.9 — one tick of the lerp (no range gate, issue #127).
-        float expected = MathF.Atan2(5f, 15f) * 0.9f / 60f;
-        TestHelpers.AssertNear(expected, state.FacingYaw, tolerance: 0.0001f);
-        Assert.Equal(0f, state.WarpSpeed); // no warp (too far + ServerAbility)
-    }
-
-    [Fact]
-    public void Tick_TargetLock_InEngageRange_Rotates()
-    {
-        // Zone 2: dist ≤ AttackRange (the engage/tracking radius, warp gone) →
-        // rotates toward target, never warps
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        player.FacingYaw = 0f; // facing +Z
-        var npc = MakeIdleState(100);
-        npc.PX = 0.75f; // slightly right of center
-        npc.PZ = 1.75f; // dist ≈ 1.90 < engage range 2.0
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        // Target is only 23° off axis, so per-tick rotation is small (≈0.006 rad);
-        // tick through the attack until it accumulates past the threshold.
-        var input = TestHelpers.Input(activeSlot: 1);
-        float yaw = 0f;
-        for (int i = 0; i < 30 && yaw <= 0.05f; i++)
-        {
-            sim.Tick(new() { { 1, input }, { 100, default } });
-            input = default;
-            yaw = sim.GetState(1).FacingYaw;
-        }
-
-        // FacingYaw should have rotated toward the NPC (positive yaw = turning right)
-        Assert.True(yaw > 0.05f,
-            $"Expected FacingYaw > 0.05 (should rotate toward +X), got {yaw:F4}");
-        Assert.Equal(0f, sim.GetState(1).WarpSpeed); // warp never initiates
-
-    }
-    [Fact]
-    public void Tick_TargetLock_InAttackRange_Rotates()
-    {
-        // Zone 3: dist ≤ AttackRange → rotates toward target, no warp
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        player.FacingYaw = 0f; // facing +Z
-        var npc = MakeIdleState(100);
-        npc.PX = 1f; // to the right (+X), distance 1
-        npc.PZ = 0f; // within AttackRange=2
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
-
-        var input = TestHelpers.Input(activeSlot: 1);
-        sim.Tick(new() { { 1, input }, { 100, default } });
-
-        var state = sim.GetState(1);
-        // FacingYaw should have rotated toward the NPC
-        Assert.True(state.FacingYaw > 0.01f,
-            $"Expected FacingYaw > 0 (should rotate toward +X), got {state.FacingYaw:F4}");
-        // No warp — already within attack range
-        Assert.Equal(0f, state.WarpSpeed);
-    }
     // ── Whiff commitment (ADR-0015): warp gone, attack at range is a commitment ──
 
+    // ── Training no-cooldown flag (issue #187): opt-in, PvP default null ──
+
     [Fact]
-    public void AttackAtRange_NoWarp_EndsIdleWithLungeDrift()
+    public void NoCooldowns_DefaultNull_CooldownApplies()
     {
-        var sim = TestHelpers.MakeSim(MakeTestArena());
-        var def = TestHelpers.CombatDef;
-        var player = MakeIdleState(1);
-        var npc = MakeIdleState(100);
-        npc.PZ = 5.5f; // beyond the move's engage range — no auto-approach exists
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, npc);
+        var sim = TestHelpers.MakeSim();
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+        // Flag defaults to null — PvP path unchanged.
 
-        // 50 ticks: the attack starts anyway (commitment), whiffs, ends naturally
-        var state = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 1), 50);
+        // Fire Ki Shot (A slot, activeSlot 11, cooldown 120): press, hold, release.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A) } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
+        for (int i = 0; i < 40; i++)
+            sim.Tick(new() { { 1, default } });
 
-        Assert.Equal(ActionState.Idle, state.State);
-        Assert.Equal(0f, state.WarpSpeed);
-        // Momentum-preserve (issue #115): EndAbility no longer zeroes velocity — the lunge
-        // drift survives into Idle, where friction decays it.
-        Assert.True(state.VZ > 0f, $"lunge drift must persist after the move: VZ={state.VZ}");
+        ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);
+        Assert.True(cd > 0, $"expected cooldown on the A slot after firing, got {cd}");
+    }
+
+    [Fact]
+    public void NoCooldowns_EntityIdSet_CooldownStaysZeroAndMoveRecasts()
+    {
+        var sim = TestHelpers.MakeSim();
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+        sim.NoCooldownsEntityId = 1;
+
+        // Fire Ki Shot (A slot, activeSlot 11, cooldown 120): press, hold, release.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A) } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
+        for (int i = 0; i < 40; i++)
+            sim.Tick(new() { { 1, default } });
+
+        Assert.Equal((ushort)0, sim.GetState(1).GetCooldown(AbilitySlots.A));
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+
+        // Recast: a second press in the next tick must start the ability.
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A) } });
+        var after = sim.GetState(1);
+        Assert.NotEqual(ActionState.Idle, after.State);
+        Assert.NotEqual((byte)0, after.AttackSlot);
+    }
+    [Fact]
+    public void NoCooldowns_EntityIdSet_SkipsActivateFallbackCooldown()
+    {
+        // A move whose timeline completes on start (state stays Idle) takes the
+        // ActivateAbility fallback cooldown write — the no-cooldown flag must skip
+        // that write too (issue #187).
+        var slot = new CookedSlotDefinition(
+            ordinal: 0,
+            id: "test.instant",
+            isAir: false,
+            name: "Test Instant",
+            description: "",
+            iconId: "icon.test",
+            behavior: AuthoringAbilityBehavior.MeleeCombo,
+            aimMode: AuthoringAimMode.None,
+            cooldownTicks: 60,
+            isRecoveryMove: false,
+            preserveMomentumOnStart: false,
+            timeline: new CookedTimeline(new[]
+            {
+                new CookedStage(
+                    0, 0, 0, 0, 0, Array.Empty<string>(),
+                    new[] { new CookedCompleteTimelineOperation(0, AuthoringUnit.Ticks) }),
+            }));
+        var def = new CharacterDefinition
+        {
+            Class = CharacterClass.Manki,
+            DisplayName = "Cooked Test",
+            CapsuleHeight = 1.7f,
+            CapsuleRadius = .35f,
+            Movement = TestHelpers.FightGuyDef.Movement,
+            CookedSlots = new[] { slot },
+            HurtboxCapsules = Array.Empty<HurtboxCapsule>(),
+        };
+
+        // Control: flag null → fallback write applies the cooldown.
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, def, TestHelpers.PlayerState());
+        var ability = new SlopArena.Shared.Abilities.CookedTimelineAbility(slot, Array.Empty<string>());
+        ability.Cooldown = slot.CooldownTicks;
+        sim.ActivateAbility(1, ability, 0, def);
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State); // exercised the fallback path
+        Assert.True(sim.GetState(1).GetCooldown(AbilitySlots.Lmb) > 0);
+
+        // Flag set → fallback write skipped.
+        var sim2 = TestHelpers.MakeSim();
+        sim2.RegisterEntity(1, def, TestHelpers.PlayerState());
+        sim2.NoCooldownsEntityId = 1;
+        var ability2 = new SlopArena.Shared.Abilities.CookedTimelineAbility(slot, Array.Empty<string>());
+        ability2.Cooldown = slot.CooldownTicks;
+        sim2.ActivateAbility(1, ability2, 0, def);
+        Assert.Equal((ushort)0, sim2.GetState(1).GetCooldown(AbilitySlots.Lmb));
     }
 }

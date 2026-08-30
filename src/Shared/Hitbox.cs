@@ -49,6 +49,9 @@ namespace SlopArena.Shared
         public ushort StunTicks;
         public ulong OwnerId;
 
+        /// <summary>Originating attack slot for presentation routing (0 = unspecified).</summary>
+        public byte AttackSlot;
+
         public bool Active;
 
         /// <summary>

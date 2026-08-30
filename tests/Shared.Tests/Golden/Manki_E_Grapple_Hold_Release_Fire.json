@@ -1,0 +1,18 @@
+{
+  "Scenario": "Manki E Grapple Hold Release Fire",
+  "TickCount": 110,
+  "PlayerSnap": {
+    "State": 4,
+    "PY": 0.75,
+    "ComboStage": 1,
+    "AttackSlot": 4,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  },
+  "PlayerFinal": {
+    "PY": 0.75,
+    "Cooldown3": 151,
+    "JumpsLeft": 2,
+    "IsGrounded": true
+  }
+}

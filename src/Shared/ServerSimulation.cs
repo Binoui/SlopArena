@@ -35,6 +35,9 @@ namespace SlopArena.Shared
 		private readonly ArenaCollision.BlastLines _blastLines;
 		/// <summary>Ticks of invincibility granted on respawn (60 = 1s at 60Hz). Issue #37.</summary>
 		public ushort RespawnInvincibilityTicks { get; set; } = 60;
+	/// <summary>Training-only opt-in: when set, this entity's slot cooldowns are never
+	/// applied and never gate ability start. Null = normal cooldowns (PvP default).</summary>
+	public ulong? NoCooldownsEntityId;
 
 		/// <param name="rule">Win-condition rule (elimination + match end). Defaults to stock mode, 3 stocks.</param>
 		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null)
@@ -100,6 +103,7 @@ namespace SlopArena.Shared
 		}
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
+		public CharacterDefinition GetDefinition(ulong id) => _defs.TryGetValue(id, out var d) ? d : null;
 		public void SetState(ulong id, CharacterState state) => _states[id] = state;
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
@@ -148,7 +152,7 @@ namespace SlopArena.Shared
 			state.AnimIndex = ability.AnimIndex;
 			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 			{
-				if (ability.Slot < AbilitySlots.Count)
+				if (ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != entityId)
 					state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
 				_states[entityId] = state;
 				return;
@@ -238,7 +242,7 @@ namespace SlopArena.Shared
 					
 					// Apply cooldown (all 11 slots — issue #117; the old < 6 gate skipped
 					// slots 6-10 entirely, so Ki Shot on the Q slot would never cooldown)
-					if (ability.Slot < AbilitySlots.Count)
+					if (ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
 					{
 						state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
 						if (Simulation.OnDebugLog != null)
@@ -410,10 +414,10 @@ namespace SlopArena.Shared
 		/// when an AIR-STARTED ability (<see cref="ServerAbility.AirborneAtStart"/>) is still
 		/// active when the character lands, the aerial ENDS on the landing frame and — unless
 		/// the landing fell in an auto-cancel window — a no-input/no-movement lock applies for
-		/// the stage's <c>LandingLagTicks</c>. The termination is unconditional for aerials
-		/// (LandingLagTicks == 0 still ENDS the move, just with no lock): otherwise a grounded
-		/// aerial keeps the character in Attacking on the floor, which skips
-		/// ProcessNormalMovement's friction and lets a lunge move (Cyclone) drive the
+		/// the stage's <c>LandingLagTicks</c>. An airborne aim hold is the exception: it remains
+		/// active across landing so the player can release and throw from the ground.
+		/// Otherwise a grounded aerial keeps the character in Attacking on the floor, which
+		/// skips ProcessNormalMovement's friction and lets a lunge move (Cyclone) drive the
 		/// character across the stage with only dash to stop it.
 		///
 		/// Detection: airborne at tick start + grounded after SimulateTick = a landing.
@@ -441,6 +445,8 @@ namespace SlopArena.Shared
 			// Only AIR-started moves terminate on landing (drift fix). A ground move launched
 			// and landed mid-move keeps its ground behavior — no termination.
 			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
+			// Aim holds own release timing and remain active across an air-to-ground transition.
+			if (state.State == ActionState.Aiming && activeAbility is IAimHoldCapability) return;
 
 			var cooked = def.GetCookedSlotAbility(state.AttackSlot, airborne: true);
 			ushort landingLagTicks;
@@ -558,7 +564,7 @@ namespace SlopArena.Shared
 				}
 
 				ushort cooldown = state.GetCooldown(input.ActiveSlot);
-				if (cooldown > 0)
+				if (cooldown > 0 && id != NoCooldownsEntityId)
 				{
 					if (Simulation.OnDebugLog != null)
 						Simulation.OnDebugLog.Invoke(
@@ -650,7 +656,7 @@ namespace SlopArena.Shared
 
 					currentAbility.OnCancel(ref state);
 					_activeAbilities.Remove(id);
-					if (currentAbility.Slot < AbilitySlots.Count)
+					if (currentAbility.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
 						state.SetCooldown((byte)(currentAbility.Slot + 1), currentAbility.Cooldown);
 					state.AttackSlot = 0;
 					state.ComboStage = 0;

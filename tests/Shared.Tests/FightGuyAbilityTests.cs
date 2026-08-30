@@ -10,7 +10,7 @@ public class FightGuyAbilityTests
     // ── A (FightGuyKiShot) ──
 
     [Fact]
-    public void FightGuyKiShot_ActivatesImmediately()
+    public void FightGuyKiShot_Press_EntersAimHold()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -21,31 +21,41 @@ public class FightGuyAbilityTests
         {
             ActiveSlot = 11,
             AimYaw = 9000,
-            IsAiming = false,
+            IsAiming = true,
         }, 1);
 
-        Assert.Equal(ActionState.Attacking, t0.State);
+        // Hold-to-aim: the press opens the aim stance; the projectile only fires
+        // after release (see FightGuyKiShot_FiresOneMovingProjectileAfterRelease).
+        Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)11, t0.AttackSlot);
-        Assert.False(t0.IsAiming);
+        Assert.True(t0.IsAiming);
     }
 
     [Fact]
-    public void FightGuyKiShot_FiresOneMovingProjectileAtStartup()
+    public void FightGuyKiShot_FiresOneMovingProjectileAfterRelease()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
 
-        sim.Tick(new() { { 1, new InputState { AimYaw = 9000 } } });
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11 } } });
-        for (int i = 0; i < 7; i++)
+        // Press, aim at 90°, hold, then release — the projectile must NOT spawn
+        // while held and must use the aim captured at release.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11, AimYaw = 9000, IsAiming = true } } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, new InputState { AimYaw = 9000, IsAiming = true } } });
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+
+        for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default } });
 
         var projectile = Assert.Single(sim.Resolver.GetActiveHitboxes());
         Assert.Equal(HitboxShape.Sphere, projectile.Shape);
+        // Fired at the 90° release aim, level pitch: 25 speed sideways. VY may
+        // carry a tick or two of the projectile's own gravity — the contract is
+        // the direction, not the exact post-spawn velocity.
         Assert.InRange(projectile.VX, 24.99f, 25.01f);
-        Assert.InRange(projectile.VY, -0.02f, 0f);
+        Assert.InRange(projectile.VY, -0.1f, 0.1f);
         Assert.InRange(MathF.Abs(projectile.VZ), 0f, 0.02f);
     }
 

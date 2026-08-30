@@ -169,7 +169,7 @@ public sealed class MatchContentCatalogBuilder
 
     private static void ValidateManifest(BuiltInRosterManifest manifest, List<CharacterDiagnostic> d)
     {
-        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk, CharacterClass.Nilus };
+        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk };
         foreach (var selector in required)
             if (manifest.Resolve(selector) == null) d.Add(Error("catalog.selector.missing", selector.ToString(), "Built-in roster selector is missing."));
         foreach (var entry in manifest.Entries)

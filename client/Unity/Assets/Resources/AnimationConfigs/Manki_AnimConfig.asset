@@ -16,6 +16,7 @@ MonoBehaviour:
   Run: {fileID: -203655887218126122, guid: fad7b4bf115b05a01bac195213fe6b92, type: 3}
   JumpUp: {fileID: 7400000, guid: 61fa0226c74b9be21a2145fae7221dad, type: 2}
   JumpDown: {fileID: 0}
+  Tumble: {fileID: 0}
   Fall: {fileID: -203655887218126122, guid: 6b8e30a0f65d4483badc8058faf585c4, type: 3}
   Dash: {fileID: 7400000, guid: dbb7cb45dde59540fb65690b86108ee5, type: 2}
   HitSmall: {fileID: -203655887218126122, guid: addc22670e267f37a941fe519d90134e, type: 3}
@@ -55,10 +56,4 @@ MonoBehaviour:
     Extrapolation: 0
   - Name: spell_lmb_air_2
     Clip: {fileID: 7400000, guid: c52e22b4a064153a68103fafa6597e70, type: 2}
-    Extrapolation: 0
-  - Name: spell_rmb_air_loop
-    Clip: {fileID: 7400000, guid: 4cee3718b624abe51a95b8fa5c8e2b7d, type: 2}
-    Extrapolation: 2
-  - Name: spell_rmb_air_attack
-    Clip: {fileID: 7400000, guid: c8b309c1922bea5069c3d0f48bf64fd1, type: 2}
     Extrapolation: 0

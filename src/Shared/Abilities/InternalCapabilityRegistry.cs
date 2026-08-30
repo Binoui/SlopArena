@@ -40,6 +40,18 @@ public static class InternalCapabilityRegistry
             case "slop.internal.bonk.targeted-jump-slam.v1" when parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk:
                 capability = new BonkTargetedJumpSlam(bonk);
                 return true;
+            case "slop.internal.manki.round-bomb.v1" when parameters is CookedMankiRoundBombCapabilityParameters bomb:
+                capability = new MankiRoundBomb(bomb);
+                return true;
+            case "slop.internal.manki.grapple.v1" when parameters is CookedMankiGrappleCapabilityParameters grapple:
+                capability = new MankiGrapple(grapple);
+                return true;
+            case "slop.internal.manki.bazooka.v1" when parameters is CookedMankiBazookaCapabilityParameters bazooka:
+                capability = new MankiBazooka(bazooka);
+                return true;
+            case "slop.internal.manki.overclock.v1" when parameters is CookedMankiOverclockCapabilityParameters overclock:
+                capability = new MankiOverclock(overclock);
+                return true;
             default:
                 return false;
         }

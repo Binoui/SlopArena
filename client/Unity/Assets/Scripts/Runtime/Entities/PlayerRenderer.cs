@@ -243,6 +243,8 @@ namespace SlopArena.Client.Entities
         /// Last applied attack slot (1-6). 0 when not attacking. Read by weapon attach components.
         /// </summary>
         public byte CurrentAttackSlot => _lastAttackSlot;
+        /// <summary>Ticks since the current attack began (0 when not attacking). Read by weapon attach components.</summary>
+        public int CurrentAttackElapsedTicks => _lastState.AttackElapsedTicks;
 
 
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
@@ -583,16 +585,27 @@ namespace SlopArena.Client.Entities
 
             string animName = "spell_lmb_1";
             float animSpeed = 1f;
-            if (spec.AnimationNames != null && comboStage < spec.AnimationNames.Length)
+            if (spec.AnimationNames != null && spec.AnimationNames.Length > 0)
             {
-                animName = spec.GetAnimationName(comboStage);
-                if (_bakedData != null && spec.Stages != null && comboStage < spec.Stages.Length)
+                // Stage index may exceed the authored clip list (single-anim slots wrap —
+                // e.g. Manki A release ComboStage 1, only anim.manki.ga). GetAnimationName
+                // wraps; using the wrapped index keeps the baked-duration lookup consistent.
+                int stageIdx = comboStage % spec.AnimationNames.Length;
+                animName = spec.GetAnimationName(stageIdx);
+                if (_bakedData != null && spec.Stages != null && stageIdx < spec.Stages.Length)
                 {
                     int bakedIdx = _bakedData.FindAnimIndex(animName);
                     if (bakedIdx >= 0)
                     {
                         int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
-                        int durationTicks = spec.Stages[comboStage].DurationTicks;
+                        int durationTicks = spec.Stages[stageIdx].DurationTicks;
+                        // Attack phases never play slower than the clip's authored
+                        // length. A single-stage aim-hold package (Manki A/E/R) carries
+                        // the attack clip in the hold stage (600 ticks), which would
+                        // otherwise stretch a ~50-frame attack over 10 s and read as
+                        // "stuck on the aim loop".
+                        if (comboStage > 0 && durationTicks > frameCount)
+                            durationTicks = frameCount;
                         if (durationTicks > 0)
                             animSpeed = (float)frameCount / durationTicks;
                     }
@@ -876,14 +889,26 @@ namespace SlopArena.Client.Entities
             // ── Non-combat: ground/air state machine ──
             if (!isCombat)
             {
-                // Fixed-policy aim holds play the aim-loop once on entering the hold; mobile
+                // Aim holds: an authored aim-loop (slot.AimAnimationId, e.g. Manki Q /
+                // FightGuy Q) plays while holding, for BOTH movement policies. Without
+                // one, fixed-policy holds play the slot's first animation and mobile
                 // policy aimers fall through to locomotion below.
-                bool fixedAimHold = state.State == ActionState.Aiming && state.AttackSlot > 0 && _charDef != null
+                bool aiming = state.State == ActionState.Aiming && state.AttackSlot > 0 && _charDef != null;
+                var aimSpec = aiming ? _charDef.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded) : null;
+                AnimationClip? loopClip = null;
+                bool aimLoop = aiming && aimSpec?.AimAnimationId != null
+                    && TryGetAnimation(aimSpec.AimAnimationId, out loopClip, out _);
+                bool fixedAimHold = aiming && !aimLoop
                     && _charDef.GetAimMovementMode(state.AttackSlot, !state.IsGrounded) == AimMovementMode.Fixed;
-                if (fixedAimHold)
+                if (aimLoop)
                 {
                     if (state.State != _lastAnimState)
-                        PlayAbilityAnim(state, _charDef.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded), 0);
+                        _animancer.Play(loopClip, 0.1f);
+                }
+                else if (fixedAimHold)
+                {
+                    if (state.State != _lastAnimState)
+                        PlayAbilityAnim(state, aimSpec, 0);
                 }
                 else if (state.State == ActionState.JumpSquat)
                 {

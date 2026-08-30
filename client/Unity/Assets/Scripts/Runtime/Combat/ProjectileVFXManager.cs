@@ -27,13 +27,16 @@ namespace SlopArena.Client.Combat
 
         private ServerSimulation _sim;
         private SpellResolver _resolver;
+        private ProjectileVFXConfig _config;
 
         // Active projectile visuals keyed by stable hash from (ownerId + spawn origin)
         private readonly Dictionary<int, GameObject> _activeVisuals = new();
+        private readonly Dictionary<int, CharacterClass> _activeProjectileClasses = new();
 
         public void SetSimulation(ServerSimulation sim)
         {
             _sim = sim;
+            _config = Resources.Load<ProjectileVFXConfig>("VFXConfigs/ProjectileVisuals");
             _resolver = sim.Resolver;
             if (_resolver != null)
                 _resolver.OnHitboxRemoved += OnHitboxRemoved;
@@ -59,8 +62,10 @@ namespace SlopArena.Client.Combat
 
                 if (!_activeVisuals.TryGetValue(key, out var vis))
                 {
-                    vis = BuildProjectileVisual();
+                    vis = CreateProjectileVisual(hb);
                     _activeVisuals[key] = vis;
+                    _activeProjectileClasses[key] =
+                        _sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None;
                 }
 
                 vis.transform.position = new Vector3(hb.X, hb.Y, hb.Z);
@@ -74,6 +79,7 @@ namespace SlopArena.Client.Combat
                 if (matched.Contains(kv.Key)) continue;
                 (gone ??= new List<int>()).Add(kv.Key);
                 Destroy(kv.Value);
+                _activeProjectileClasses.Remove(kv.Key);
             }
             if (gone != null)
                 foreach (var id in gone) _activeVisuals.Remove(id);
@@ -96,6 +102,35 @@ namespace SlopArena.Client.Combat
             hash = hash * 31 + Mathf.RoundToInt(oy * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oz * 10f);
             return hash;
+        }
+
+        private GameObject CreateProjectileVisual(Hitbox hb)
+        {
+            if (_config != null)
+            {
+                var owner = _sim.GetState(hb.OwnerId);
+                var def = _sim.GetDefinition(hb.OwnerId);
+                var entry = FindProjectileEntry(def?.Class ?? CharacterClass.None, owner.AttackSlot, !owner.IsGrounded);
+                if (entry != null && entry.Prefab != null)
+                {
+                    var go = Instantiate(entry.Prefab);
+                    go.transform.localScale = Vector3.one * entry.Scale;
+                    return go;
+                }
+            }
+            return BuildProjectileVisual();
+        }
+
+        private ProjectileVisualEntry FindProjectileEntry(CharacterClass character, byte attackSlot, bool airborne)
+        {
+            if (_config.ProjectileEntries == null) return null;
+            for (int i = 0; i < _config.ProjectileEntries.Length; i++)
+            {
+                var e = _config.ProjectileEntries[i];
+                if (e.Character == character && e.AttackSlot == attackSlot && e.Airborne == airborne)
+                    return e;
+            }
+            return null;
         }
 
         /// <summary>
@@ -160,9 +195,43 @@ namespace SlopArena.Client.Combat
 
         private void OnHitboxRemoved(Hitbox hb, float lastX, float lastY, float lastZ)
         {
+            if (hb.Explosion.HasValue)
+            {
+                SpawnExplosion(hb, new Vector3(lastX, lastY, lastZ));
+                return;
+            }
             float speedSq = hb.VX * hb.VX + hb.VY * hb.VY + hb.VZ * hb.VZ;
             if (speedSq <= 0.0001f) return;
             SpawnImpact(new Vector3(lastX, lastY, lastZ));
+        }
+
+        private void SpawnExplosion(Hitbox hb, Vector3 position)
+        {
+            GameObject prefab = _config != null ? _config.ExplosionPrefab : null;
+            float scale = _config != null ? _config.ExplosionScale : 1f;
+            float visualScale = hb.Explosion.Value.Radius * scale;
+            var cls = _activeProjectileClasses.TryGetValue(ComputeHitboxKey(hb), out var cachedClass)
+                ? cachedClass
+                : (_sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None);
+            if (_config != null && _config.ExplosionOverrides != null)
+            {
+                for (int i = 0; i < _config.ExplosionOverrides.Length; i++)
+                {
+                    var overrideEntry = _config.ExplosionOverrides[i];
+                    if (overrideEntry.Character == cls
+                        && (overrideEntry.AttackSlot == 0 || overrideEntry.AttackSlot == hb.AttackSlot))
+                    {
+                        prefab = overrideEntry.Prefab;
+                        visualScale = overrideEntry.Scale;
+                        break;
+                    }
+                }
+            }
+            if (prefab == null) { SpawnImpact(position); return; }
+            var go = Instantiate(prefab);
+            go.transform.position = position;
+            go.transform.localScale = Vector3.one * visualScale;
+            Destroy(go, 2.5f);
         }
 
         private void SpawnImpact(Vector3 position)

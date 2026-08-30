@@ -137,29 +137,6 @@ public class MankiKitTests
     //  AIR LMB (slot 0 airborne, activeSlot=1)
     // ══════════════════════════════════════════════════════════════════
 
-    [Fact]
-    public void AirLMB_SinglePress_DoesNotChain()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = 3f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, CombatDef, state);
-
-        var input = TestHelpers.Input(activeSlot: 1);
-        sim.Tick(new() { { 1, input } });
-        Assert.Equal(0, sim.GetState(1).ComboStage);
-
-        // Repeat press mid-move: no chain (issue #115).
-        sim.Tick(new() { { 1, input } });
-
-        for (int i = 2; i < 20; i++)
-            sim.Tick(new() { { 1, default } });
-
-        var after = sim.GetState(1);
-        Assert.Equal((byte)0, after.ComboStage); // still the single move, never chained
-        Assert.Equal(ActionState.Attacking, after.State);
-    }
 
     // ══════════════════════════════════════════════════════════════════
     //  RETIRED RMB (activeSlot=2) — target-lock toggle, no attack

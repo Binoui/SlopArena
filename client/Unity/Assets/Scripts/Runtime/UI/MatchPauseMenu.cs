@@ -23,6 +23,7 @@ namespace SlopArena.Client.UI
         private InputController? _inputController;
         private Action? _onLeaveMatch;
         private VisualElement? _panel;
+        private VisualElement? _leftSection;
 
         /// <summary>True while the pause menu is open (gameplay frozen).</summary>
         public bool IsPaused => _paused;
@@ -74,6 +75,17 @@ namespace SlopArena.Client.UI
                 _panel.style.display = paused ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
+        /// <summary>
+        /// Place an extra section (e.g. the Training settings panel) to the left of the
+        /// pause buttons. PvP never calls this, so the layout stays a centered box there.
+        /// </summary>
+        public void AttachSettingsSection(VisualElement section)
+        {
+            if (_leftSection == null || section == null) return;
+            _leftSection.style.display = DisplayStyle.Flex;
+            _leftSection.Add(section);
+        }
+
         private void BuildPanel(VisualElement root)
         {
             _panel = new VisualElement();
@@ -86,8 +98,18 @@ namespace SlopArena.Client.UI
             _panel.style.justifyContent = Justify.Center;
             _panel.style.backgroundColor = new Color(0f, 0f, 0f, 0.55f);
 
+            // Horizontal row: optional left section (Training settings) + pause box.
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+
+            _leftSection = new VisualElement();
+            _leftSection.style.display = DisplayStyle.None;
+            row.Add(_leftSection);
+
             var box = new VisualElement();
             box.style.width = 300;
+            box.style.marginLeft = 12;
             box.style.backgroundColor = new Color(0.09f, 0.09f, 0.11f, 0.96f);
             box.style.borderTopLeftRadius = 10;
             box.style.borderTopRightRadius = 10;
@@ -110,7 +132,8 @@ namespace SlopArena.Client.UI
             box.Add(MakeButton("LEAVE MATCH", LeaveMatch));
             box.Add(MakeButton("QUIT GAME", QuitGame));
 
-            _panel.Add(box);
+            row.Add(box);
+            _panel.Add(row);
             root.Add(_panel);
             _panel.style.display = DisplayStyle.None;
         }

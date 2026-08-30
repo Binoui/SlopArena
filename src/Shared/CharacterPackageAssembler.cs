@@ -338,8 +338,12 @@ public static class CharacterPackageAssembler
         Add(required, package.Definition.Presentation.HitMedium, d, "character.presentation");
         Add(required, package.Definition.Presentation.HitHard, d, "character.presentation");
         foreach (var slot in package.Definition.Slots)
+        {
+            if (!string.IsNullOrEmpty(slot.AimAnimationId))
+                Add(required, slot.AimAnimationId, d, "character.slots.aimAnimationId");
             foreach (var stage in slot.Timeline.Stages)
                 foreach (string id in stage.AnimationIds) Add(required, id, d, "character.timeline.animationIds");
+        }
         return required;
     }
 
@@ -355,10 +359,14 @@ public static class CharacterPackageAssembler
         }
         if (character.TryGetProperty("slots", out var slots) && slots.ValueKind == JsonValueKind.Array)
             foreach (var slot in slots.EnumerateArray())
+            {
+                if (slot.TryGetProperty("aimAnimationId", out var aim) && aim.ValueKind == JsonValueKind.String)
+                    Add(required, aim.GetString() ?? "", d, "character.slots.aimAnimationId");
                 if (slot.TryGetProperty("timeline", out var timeline) && timeline.TryGetProperty("stages", out var stages) && stages.ValueKind == JsonValueKind.Array)
                     foreach (var stage in stages.EnumerateArray())
                         if (stage.TryGetProperty("animationIds", out var ids) && ids.ValueKind == JsonValueKind.Array)
                             foreach (var id in ids.EnumerateArray()) Add(required, id.GetString() ?? "", d, "character.timeline.animationIds");
+            }
         return required;
     }
 

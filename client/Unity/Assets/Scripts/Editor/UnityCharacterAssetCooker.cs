@@ -495,12 +495,16 @@ public static class UnityCharacterAssetCooker
         Add(p.HitMedium, "character.presentation.hitMedium");
         Add(p.HitHard, "character.presentation.hitHard");
         foreach (var slot in package.Definition.Slots)
+        {
+            if (!string.IsNullOrEmpty(slot.AimAnimationId))
+                Add(slot.AimAnimationId, $"character.slots[{slot.Ordinal}].aimAnimationId");
             for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
                 for (int idIndex = 0; idIndex < slot.Timeline.Stages[stageIndex].AnimationIds.Count; idIndex++)
                 {
                     string id = slot.Timeline.Stages[stageIndex].AnimationIds[idIndex];
                     Add(id, $"character.slots[{slot.Ordinal}].timeline.stages[{stageIndex}].animationIds[{idIndex}]");
                 }
+        }
         return result;
     }
 
