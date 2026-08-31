@@ -4,6 +4,8 @@ This document covers visual direction, asset production, naming, licensing, and 
 
 ## Visual direction
 
+The broader graphic identity for UI, menus, results, web, trailers, Workshop surfaces, and presentation copy is defined by the [SlopArena Visual Language](../design/visual-language.md). This document defines the complementary 3D character and asset conventions.
+
 SlopArena uses Pixel8r2-style 3D pixel art:
 
 - three-tone cell shading with hard highlight, midtone, and shadow bands;
