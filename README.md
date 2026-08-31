@@ -1,33 +1,12 @@
 # SlopArena
 
-SlopArena is an open-source 3D platform fighter inspired by Smash and DKO. Fighters bring distinct hero kits to a shared arena: normals, recovery tools, playmaking specials, and high-commitment power moves.
+**An open-source 3D platform fighter built around expressive movement, knockback, and compact hero-style kits.**
 
-The playable demo is built in **Unity 6** with a pure C# simulation shared by the client and GameServer. The simulation advances at **60 Hz**, keeps gameplay deterministic, and supports client prediction with server reconciliation and rollback.
+SlopArena takes the platform-fighter fundamentals of movement, damage percent, recovery, edge pressure, and launching opponents off the stage, then gives each fighter a small set of distinctive specials and tools to play around.
 
-> **Current state:** FightGuy is the first complete cooked-character vertical slice. Manki, Kistu, and Nilus remain playable through the legacy compatibility path while they are migrated package by package.
+The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-## Quick start
-
-```bash
-git clone https://github.com/Binoui/SlopArena.git
-cd SlopArena
-```
-
-Install Unity `6000.0.78f1` and .NET SDK 8. Open `client/Unity/` in Unity Hub and press Play for the local training flow.
-
-Build the simulation and run its tests from the repository root:
-
-```bash
-dotnet build src/Shared/ --nologo
-dotnet test tests/Shared.Tests/ --nologo
-dotnet build src/Server/ --nologo
-```
-
-Run the headless GameServer locally:
-
-```bash
-dotnet run --project src/Server/
-```
+> **Current state:** SlopArena is in active development. FightGuy is the first complete package-native character vertical slice, while Manki, Kistu, and Nilus remain playable through the legacy compatibility path as they are migrated.
 
 ## The game
 
@@ -50,6 +29,33 @@ Each kit has a canonical **16-entry grid**: grounded and aerial variants for nor
 | **Nilus** | Void-based zoning and control | Legacy compatibility path |
 
 See the [FightGuy package reference](docs/characters/fightguy.md) and the [character roster](docs/README.md#character-roster) for details.
+
+## Development
+
+The game is built in **Unity 6** with a pure C# simulation shared by the client and GameServer. The simulation advances at **60 Hz**, keeps gameplay deterministic, and supports client prediction with server reconciliation and rollback.
+
+### Quick start
+
+```bash
+git clone https://github.com/Binoui/SlopArena.git
+cd SlopArena
+```
+
+Install Unity `6000.0.78f1` and .NET SDK 8. Open `client/Unity/` in Unity Hub and press Play for the local training flow.
+
+Build the simulation and run its tests from the repository root:
+
+```bash
+dotnet build src/Shared/ --nologo
+dotnet test tests/Shared.Tests/ --nologo
+dotnet build src/Server/ --nologo
+```
+
+Run the headless GameServer locally:
+
+```bash
+dotnet run --project src/Server/
+```
 
 ## Architecture in one view
 
