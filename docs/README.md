@@ -33,6 +33,14 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 | [Blast Zones](systems/blast-zones.md) | Void death and arena boundaries |
 | [VFX and Particles](systems/vfx-particles.md) | Presentation effects and visual contracts |
 
+## Visual design
+
+| Document | Use it for |
+| --- | --- |
+| [Visual language](design/visual-language.md) | Graphic identity, UI composition, palette, typography, motion, and presentation voice |
+| [Art and asset conventions](contributing/conventions.md) | 3D character rendering, asset production, naming, licensing, and hygiene |
+| [Visual presentation baseline](visual-baseline.md) | Repeatable gameplay-camera evidence for visual comparisons |
+
 ## Character authoring
 
 | Document | Use it for |
