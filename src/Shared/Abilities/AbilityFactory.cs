@@ -17,24 +17,12 @@ public static class AbilityFactory
     {
         return characterClass switch
         {
-            CharacterClass.Manki => CreateMankiAbility(slot, airborne),
             CharacterClass.Nilus => CreateNilusAbility(slot, airborne),
             CharacterClass.FightGuy => null,
             _ => null,
         };
     }
 
-    private static ServerAbility? CreateMankiAbility(byte slot, bool airborne) => (slot, airborne) switch
-    {
-        (0, false) => new LmbCombo(),          // LMB ground
-        (0, true) => new AirLmbCombo(),        // AirLMB
-
-        (2, _) => new MankiRoundBomb(),        // Slot1 (key "1")
-        (3, _) => new MankiGrapple(),          // E
-        (4, _) => new MankiBazooka(),          // R
-        (5, _) => new MankiOverclock(),        // F
-        _ => null,
-    };
 
 
 

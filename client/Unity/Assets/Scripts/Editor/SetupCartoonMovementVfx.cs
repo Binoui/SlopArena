@@ -237,7 +237,7 @@ namespace SlopArena.Client.Editor
             {
                 SerializedProperty entry = overrides.GetArrayElementAtIndex(i);
                 if (entry.FindPropertyRelative("Character").intValue == (int)CharacterClass.Manki
-                    && entry.FindPropertyRelative("AttackSlot").intValue == AbilitySlots.Slot1)
+                    && entry.FindPropertyRelative("AttackSlot").intValue == AbilitySlots.A)
                     overrides.DeleteArrayElementAtIndex(i);
             }
 
@@ -245,10 +245,10 @@ namespace SlopArena.Client.Editor
             overrides.InsertArrayElementAtIndex(index);
             SerializedProperty added = overrides.GetArrayElementAtIndex(index);
             added.FindPropertyRelative("Character").intValue = (int)CharacterClass.Manki;
-            added.FindPropertyRelative("AttackSlot").intValue = AbilitySlots.Slot1;
+            added.FindPropertyRelative("AttackSlot").intValue = AbilitySlots.A;
             added.FindPropertyRelative("Prefab").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            added.FindPropertyRelative("Scale").floatValue = 1f;
+            added.FindPropertyRelative("Scale").floatValue = 0.2f;
             serializedConfig.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
         }

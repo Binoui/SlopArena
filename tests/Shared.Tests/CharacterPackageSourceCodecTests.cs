@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SlopArena.Shared;
 using Xunit;
 
@@ -59,24 +60,23 @@ public sealed class CharacterPackageSourceCodecTests
     [Fact]
     public void AimMovementPolicy_RoundTripsAndMissingDefaultsToFixed()
     {
-        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        var missingJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)missingJson["slots"]![0]!).Remove("aimMovement");
+        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), missingJson.ToJsonString());
         Assert.True(missing.IsValid, string.Join("\n", missing.Diagnostics));
-        Assert.All(missing.Source!.Character.Slots, slot =>
-            Assert.Equal(AuthoringAimMovementMode.Fixed, slot.AimMovement));
+        Assert.Equal(AuthoringAimMovementMode.Fixed, missing.Source!.Character.Slots[0].AimMovement);
 
-        const string marker = "\"aimMode\": \"none\",\n      \"cooldownTicks\"";
-        string mobileJson = Fixture("character.json").Replace(
-            marker,
-            "\"aimMode\": \"none\",\n      \"aimMovement\": \"mobile\",\n      \"cooldownTicks\"",
-            StringComparison.Ordinal);
-        var mobile = CharacterPackageSourceCodec.Load(Fixture("package.json"), mobileJson);
+        var mobileJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)mobileJson["slots"]![0]!)["aimMovement"] = "mobile";
+        string mobileSource = mobileJson.ToJsonString();
+        var mobile = CharacterPackageSourceCodec.Load(Fixture("package.json"), mobileSource);
         Assert.True(mobile.IsValid, string.Join("\n", mobile.Diagnostics));
         Assert.Equal(AuthoringAimMovementMode.Mobile, mobile.Source!.Character.Slots[0].AimMovement);
         Assert.Contains("\"aimMovement\": \"mobile\"", CharacterPackageSourceCodec.SerializeCharacter(mobile.Source.Character));
 
-        var unknown = CharacterPackageSourceCodec.Load(
-            Fixture("package.json"),
-            mobileJson.Replace("\"aimMovement\": \"mobile\"", "\"aimMovement\": \"unknown\"", StringComparison.Ordinal));
+        var unknownJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)unknownJson["slots"]![0]!)["aimMovement"] = "unknown";
+        var unknown = CharacterPackageSourceCodec.Load(Fixture("package.json"), unknownJson.ToJsonString());
         Assert.Contains(unknown.Diagnostics, x => x.Code == "enum.unknown");
     }
 

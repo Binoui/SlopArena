@@ -516,7 +516,7 @@ namespace SlopArena.Client.Tools
             Renderer = go.AddComponent<PlayerRenderer>();
             ConfigureRenderer(Renderer, DisplayDef, "LabCharacter");
             Renderer.transform.position = BasePosition();
-            if (Application.isPlaying) _weaponAttach = AttachWeapon(Renderer, DisplayDef);
+            _weaponAttach = AttachWeapon(Renderer, DisplayDef);
 
             if (_dummyRenderer != null)
             {
@@ -529,7 +529,7 @@ namespace SlopArena.Client.Tools
             ConfigureRenderer(_dummyRenderer, DisplayDef, "LabDummy");
             PositionDummy();
             _dummyRenderer.gameObject.SetActive(ShowDummy);
-            if (Application.isPlaying) _dummyWeaponAttach = AttachWeapon(_dummyRenderer, DisplayDef);
+            _dummyWeaponAttach = AttachWeapon(_dummyRenderer, DisplayDef);
         }
 
         /// <summary>
@@ -959,6 +959,7 @@ namespace SlopArena.Client.Tools
             }
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
             Renderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
+            _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick);
             if (_dummyRenderer != null)
             {
                 _dummyRenderer.gameObject.SetActive(ShowDummy);

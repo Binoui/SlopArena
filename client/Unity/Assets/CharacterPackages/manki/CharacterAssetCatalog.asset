@@ -15,7 +15,7 @@ MonoBehaviour:
   _packageId: manki
   _catalogSchemaVersion: 1
   _rig: {fileID: 919132149155446097, guid: b9966c3fefcb9e92eb8d1f6a88c31287, type: 3}
-  _weaponConfig: {fileID: 0}
+  _weaponConfig: {fileID: 11400000, guid: f5be594e8b6924d9b8d707e01ac783c2, type: 2}
   _sampleRate: 60
   _bindings:
   - _semanticId: anim.manki.idle

@@ -19,3 +19,9 @@ MonoBehaviour:
     PositionOffset: {x: 0, y: 0.06, z: 0.06}
     RotationOffset: {x: 0, y: 0, z: 0}
     HideAfterTicks: 10
+  - AttackSlot: 5
+    BoneName: mixamorig:RightHand
+    Prefab: {fileID: 8210465015160624024, guid: 2704a55cea0d24252af263e5b3263c82, type: 3}
+    PositionOffset: {x: 0, y: 0.51, z: -0.1}
+    RotationOffset: {x: -20, y: -90, z: 0}
+    HideAfterTicks: 5

@@ -248,7 +248,7 @@ public static class TestHelpers
                 // Use a simple full-body capsule instead of bone-attached hurtboxes
                 HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
                 HurtboxBoneDefs = null,
-                BakedDataPath = "",
+                CookedSlots = src.CookedSlots,
                 IdleAnim = src.IdleAnim,
                 RunAnim = src.RunAnim,
                 DashAnim = src.DashAnim,

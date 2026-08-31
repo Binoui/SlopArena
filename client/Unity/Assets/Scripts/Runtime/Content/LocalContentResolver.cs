@@ -72,7 +72,7 @@ public sealed class LocalContentResolver
     public LocalContentResolution ResolveLegacy(CharacterClass selector)
     {
         if (selector == CharacterClass.None || selector == CharacterClass.FightGuy ||
-            (selector != CharacterClass.Manki && selector != CharacterClass.Kistu && selector != CharacterClass.Nilus))
+            (selector != CharacterClass.Kistu && selector != CharacterClass.Nilus))
             return Failure("content.legacy.selector", selector.ToString(), "Selector is not a legacy compatibility character.");
 
         var rosterResolution = ResolveRoster();

@@ -70,23 +70,28 @@ internal static class DeterministicPoseTrackBaker
                 var vertices = new List<Vector3>();
                 foreach (var meshFilter in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
                 {
-                    if (meshFilter.sharedMesh == null) continue;
+                    var mesh = meshFilter.sharedMesh;
+                    if (mesh == null || !mesh.isReadable) continue;
                     Matrix4x4 toPrefab = weaponEntry.Prefab.transform.worldToLocalMatrix * meshFilter.transform.localToWorldMatrix;
-                    foreach (var vertex in meshFilter.sharedMesh.vertices)
+                    foreach (var vertex in mesh.vertices)
                         vertices.Add(toPrefab.MultiplyPoint3x4(vertex));
                 }
-                if (vertices.Count == 0) throw new InvalidOperationException("Weapon prefab has no mesh vertices.");
-                Vector3 min = vertices[0], max = vertices[0];
-                foreach (var vertex in vertices) { min = Vector3.Min(min, vertex); max = Vector3.Max(max, vertex); }
-                Vector3 extent = max - min;
-                Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
-                    : extent.y >= extent.z ? Vector3.up : Vector3.forward;
-                float tipProjection = float.MinValue, hiltProjection = float.MaxValue;
-                foreach (var vertex in vertices)
+                // Readability is optional for presentation prefabs. Keep deterministic
+                // fallback points when an imported mesh does not expose CPU vertices.
+                if (vertices.Count > 0)
                 {
-                    float projection = Vector3.Dot(vertex, axis);
-                    if (projection > tipProjection) { tipProjection = projection; tipLocal = vertex; }
-                    if (projection < hiltProjection) { hiltProjection = projection; hiltLocal = vertex; }
+                    Vector3 min = vertices[0], max = vertices[0];
+                    foreach (var vertex in vertices) { min = Vector3.Min(min, vertex); max = Vector3.Max(max, vertex); }
+                    Vector3 extent = max - min;
+                    Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
+                        : extent.y >= extent.z ? Vector3.up : Vector3.forward;
+                    float tipProjection = float.MinValue, hiltProjection = float.MaxValue;
+                    foreach (var vertex in vertices)
+                    {
+                        float projection = Vector3.Dot(vertex, axis);
+                        if (projection > tipProjection) { tipProjection = projection; tipLocal = vertex; }
+                        if (projection < hiltProjection) { hiltProjection = projection; hiltLocal = vertex; }
+                    }
                 }
                 names[RequiredBones.Length] = "_weapon_tip";
                 names[RequiredBones.Length + 1] = "_weapon_hilt";

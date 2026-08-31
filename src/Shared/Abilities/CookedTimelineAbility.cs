@@ -18,6 +18,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _slot = slot ?? throw new ArgumentNullException(nameof(slot));
         AnimationNames = animationNames ?? Array.Empty<string>();
     }
+    internal bool IsHoldingAim => _unlimitedAimHold;
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {

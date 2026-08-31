@@ -92,9 +92,10 @@ namespace SlopArena.Client.Combat
         private static int ComputeHitboxKey(in Hitbox hb)
         {
             float tickDt = SlopArena.Shared.Simulation.TickDt;
-            float ox = hb.X - hb.VX * hb.AgeTicks * tickDt;
-            float oy = hb.Y - hb.VY * hb.AgeTicks * tickDt;
-            float oz = hb.Z - hb.VZ * hb.AgeTicks * tickDt;
+            float t = hb.AgeTicks * tickDt;
+            float ox = hb.X - hb.VX * t;
+            float oy = hb.Y - hb.VY * t - 0.5f * hb.Gravity * t * t;
+            float oz = hb.Z - hb.VZ * t;
             // Manual hash combine (System.HashCode unavailable in Unity profile)
             int hash = 17;
             hash = hash * 31 + (int)hb.OwnerId;
@@ -110,7 +111,7 @@ namespace SlopArena.Client.Combat
             {
                 var owner = _sim.GetState(hb.OwnerId);
                 var def = _sim.GetDefinition(hb.OwnerId);
-                var entry = FindProjectileEntry(def?.Class ?? CharacterClass.None, owner.AttackSlot, !owner.IsGrounded);
+                var entry = FindProjectileEntry(def?.Class ?? CharacterClass.None, hb.AttackSlot, !owner.IsGrounded);
                 if (entry != null && entry.Prefab != null)
                 {
                     var go = Instantiate(entry.Prefab);

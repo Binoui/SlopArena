@@ -278,7 +278,6 @@ namespace SlopArena.Shared
 
         public static CharacterDefinition Get(CharacterClass c) => c switch
         {
-            CharacterClass.Manki => BuildManki(),
             CharacterClass.Kistu => BuildKistu(),
             CharacterClass.Nilus => BuildNilus(),
             _ => throw new InvalidDataException(

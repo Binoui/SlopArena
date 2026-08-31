@@ -408,6 +408,7 @@ public class FightGuyAbilityTests
         };
 
         var def = TestHelpers.CloneDef(TestHelpers.BoneHitboxTestDef);
+        def.Class = CharacterClass.Nilus; // use the generic legacy spec path for this isolated geometry test
         def.LMB = entityLMB;
         def.BakedDataPath = ""; // no baked data — entity offset must not need it
 

@@ -85,8 +85,8 @@ public class HitstopTests
         npc.PY = Gpy;
         sim.RegisterEntity(100, def, npc);
 
-        var aimInput = TestHelpers.Input(activeSlot: 3, aiming: true, aimDistance: 500);
-        var releaseInput = new InputState { ActiveSlot = 3, AimDistance = 500, IsAiming = false };
+        var aimInput = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, aimDistance: 500);
+        var releaseInput = new InputState { ActiveSlot = AbilitySlots.A, AimDistance = 500, IsAiming = false };
 
         sim.Tick(new() { { 1, aimInput }, { 100, default } });
         for (int i = 0; i < 8; i++)

@@ -26,12 +26,20 @@ public sealed class MatchContentCatalogTests
     public void LegacyAdapter_SnapshotsAreIndependent()
     {
         var adapter = new LegacyCharacterCatalogAdapter();
-        var first = adapter.Snapshot(CharacterClass.Manki);
-        var second = adapter.Snapshot(CharacterClass.Manki);
+        var first = adapter.Snapshot(CharacterClass.Kistu);
+        var second = adapter.Snapshot(CharacterClass.Kistu);
         Assert.NotSame(first.Definition, second.Definition);
         Assert.Equal(first.Identity, second.Identity);
         first.Definition.DisplayName = "mutated";
         Assert.NotEqual("mutated", second.Definition.DisplayName);
+    }
+
+    [Fact]
+    public void LegacyAdapter_RejectsManki()
+    {
+        var adapter = new LegacyCharacterCatalogAdapter();
+        Assert.False(adapter.TrySnapshot(CharacterClass.Manki, out _, out var diagnostics));
+        Assert.Contains(diagnostics, x => x.Code == "catalog.legacy.selector");
     }
 
     [Fact]

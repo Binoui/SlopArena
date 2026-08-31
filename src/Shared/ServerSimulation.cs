@@ -446,7 +446,9 @@ namespace SlopArena.Shared
 			// and landed mid-move keeps its ground behavior — no termination.
 			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
 			// Aim holds own release timing and remain active across an air-to-ground transition.
-			if (state.State == ActionState.Aiming && activeAbility is IAimHoldCapability) return;
+			if (state.State == ActionState.Aiming &&
+			    (activeAbility is IAimHoldCapability ||
+			     activeAbility is CookedTimelineAbility timelineAbility && timelineAbility.IsHoldingAim)) return;
 
 			var cooked = def.GetCookedSlotAbility(state.AttackSlot, airborne: true);
 			ushort landingLagTicks;

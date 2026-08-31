@@ -11,10 +11,15 @@ namespace SlopArena.Client.Entities
     /// Resources/WeaponConfigs/<CharacterClass>.asset. If config is null the component
     /// is a no-op — characters without weapons need no special handling.
     /// </summary>
+    [ExecuteAlways]
     public class WeaponAttach : MonoBehaviour
     {
         private PlayerRenderer _owner;
         private SkinnedMeshRenderer _skin;
+
+        private bool _previewStateActive;
+        private byte _previewAttackSlot;
+        private int _previewAttackElapsedTicks;
 
         // Parallel arrays indexed by config.Entries[]
         private Transform[] _bones;
@@ -61,15 +66,28 @@ namespace SlopArena.Client.Entities
                 _instances[i].SetActive(false);
             }
         }
+        /// <summary>
+        /// Supplies the Ability Lab's scrubbed attack state without mutating gameplay state.
+        /// Runtime callers leave this disabled.
+        /// </summary>
+        public void SetPreviewState(byte attackSlot, int attackElapsedTicks)
+        {
+            _previewStateActive = true;
+            _previewAttackSlot = attackSlot;
+            _previewAttackElapsedTicks = attackElapsedTicks;
+        }
+
 
         private void Update()
         {
             if (_owner == null || _entries == null) return;
 
-            byte slot = _owner.CurrentAttackSlot;
-            ActionState action = _owner.CurrentActionState;
-            bool isAttacking = action == ActionState.Attacking;
-            bool isAiming = action == ActionState.Aiming;
+            byte slot = _previewStateActive ? _previewAttackSlot : _owner.CurrentAttackSlot;
+            bool isAttacking = _previewStateActive || _owner.CurrentActionState == ActionState.Attacking;
+            bool isAiming = !_previewStateActive && _owner.CurrentActionState == ActionState.Aiming;
+            int elapsedTicks = _previewStateActive
+                ? _previewAttackElapsedTicks
+                : _owner.CurrentAttackElapsedTicks;
 
             for (int i = 0; i < _entries.Length; i++)
             {
@@ -80,9 +98,10 @@ namespace SlopArena.Client.Entities
                 // HideAfterTicks hides the prop once the ATTACK has run its ticks (the
                 // "leaves the hand" moment); during the aim hold the prop stays visible
                 // for the whole hold regardless of elapsed ticks.
-                bool withinHold = _entries[i].HideAfterTicks <= 0
+                bool withinHold = _previewStateActive
+                    || _entries[i].HideAfterTicks <= 0
                     || !isAttacking
-                    || _owner.CurrentAttackElapsedTicks < _entries[i].HideAfterTicks;
+                    || elapsedTicks < _entries[i].HideAfterTicks;
                 bool visible = (entrySlot == 0 ? true : (isAttacking || isAiming) && slot == entrySlot) && withinHold;
 
                 if (go.activeSelf != visible)
@@ -102,13 +121,20 @@ namespace SlopArena.Client.Entities
             if (_instances != null)
             {
                 foreach (var go in _instances)
-                    if (go != null) Destroy(go);
+                {
+                    if (go == null) continue;
+                    if (Application.isPlaying) Destroy(go);
+                    else DestroyImmediate(go);
+                }
             }
             _owner = null;
             _skin = null;
             _bones = null;
             _instances = null;
             _entries = null;
+            _previewStateActive = false;
+            _previewAttackSlot = 0;
+            _previewAttackElapsedTicks = 0;
         }
 
         private Transform FindBone(string boneName)

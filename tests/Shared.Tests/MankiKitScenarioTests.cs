@@ -64,18 +64,18 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
 
         var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
         {
-            ["ground.1"] = (40, 36, 12, 8, .8f, 4, 15, 2, 1.5f, 20, 0, 0, 0),
+            ["ground.1"] = (17, 13, 4, 5, .35f, 4, 8, 4, 20, 14, 0, 0, 0),
             ["ground.2"] = (25, 22, 5, 5, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
             ["ground.3"] = (29, 25, 7, 6, .4f, 7, 55, 5, 24, 18, 0, 0, 0),
             ["ground.4"] = (60, 56, 10, 7, .42f, 14, 28, 9, 42, 26, 0, 0, 0),
-            ["air.1"] = (28, 24, 6, 6, .55f, 4, 15, 2, 1.5f, 18, 9, 5, 19),
+            ["air.1"] = (33, 29, 6, 5, .30f, 3, 55, 5, 24, 12, 9, 5, 23),
             ["air.3"] = (44, 41, 14, 6, .35f, 8, 65, 5, 26, 20, 9, 5, 30),
             ["air.4"] = (54, 50, 20, 7, .4f, 13, 25, 8, 42, 26, 12, 5, 38),
         };
         foreach (var pair in expected)
         {
             var stage = package.Definition.Slots.Single(x => x.Id == pair.Key).Timeline.Stages.Single();
-            var operation = Assert.IsType<CookedSpawnHitboxOperation>(Assert.Single(stage.Operations));
+            var operation = Assert.IsType<CookedSpawnHitboxOperation>(stage.Operations.First());
             var hitbox = operation.Hitbox;
             Assert.Equal(pair.Value.duration, stage.DurationTicks);
             Assert.Equal(pair.Value.iasa, stage.IasaTicks);
@@ -99,12 +99,10 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.All(air2.Operations.OfType<CookedSpawnHitboxOperation>(), op =>
         {
             Assert.Equal(AuthoringHitboxShape.Capsule, op.Hitbox.Shape);
-            Assert.Null(op.Hitbox.StartBoneId);
-            Assert.Null(op.Hitbox.EndBoneId);
+            Assert.Equal("bone.left-foot", op.Hitbox.StartBoneId);
+            Assert.Equal("bone.hips", op.Hitbox.EndBoneId);
             Assert.Equal((byte)1, op.Hitbox.HitGroup);
         });
-        Assert.All(package.Definition.Slots.SelectMany(x => x.Timeline.Stages).SelectMany(x => x.Operations).OfType<CookedSpawnHitboxOperation>(),
-            op => Assert.Null(op.Hitbox.StartBoneId));
 
         AssertSpecial(package, "ground.A", RoundBombCapabilityId, AuthoringAbilityBehavior.AimedProjectile, AuthoringAimMode.GroundCursor, 300,
             p => Assert.IsType<CookedMankiRoundBombCapabilityParameters>(p));
@@ -284,9 +282,9 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
             Assert = _ => { },
-            NpcSetup = () => AirborneNpc(1f),
+            NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)4, npc.DamagePercent),
+            NpcAssert = npc => Assert.Equal((ushort)3, npc.DamagePercent),
             SnapshotTick = 8, // t6–11 active window.
             TotalTicks = 90,
         });
@@ -302,7 +300,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot4),
             Assert = _ => { },
-            NpcSetup = () => AirborneNpc(1f),
+            NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
             NpcDef = Def,
             NpcAssert = npc => Assert.Equal((ushort)13, npc.DamagePercent),
             SnapshotTick = 22, // t20–26 active window.

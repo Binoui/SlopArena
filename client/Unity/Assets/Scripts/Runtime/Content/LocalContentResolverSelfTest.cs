@@ -30,13 +30,18 @@ public static class LocalContentResolverSelfTest
             if (!roster.Success || roster.Roster == null)
                 throw new InvalidOperationException("Valid rooted cooked roster could not be resolved: " + Format(roster));
 
-            foreach (var selector in new[] { CharacterClass.Manki, CharacterClass.Kistu, CharacterClass.Nilus })
+            foreach (var selector in new[] { CharacterClass.Kistu, CharacterClass.Nilus })
             {
                 var legacy = resolver.ResolveLegacy(selector);
                 if (!legacy.Success || legacy.LegacyEntry == null ||
                     legacy.LegacyEntry.LegacySelector != selector)
                     throw new InvalidOperationException($"Valid rooted {selector} legacy snapshot could not be resolved: " + Format(legacy));
             }
+
+            var mankiLegacy = resolver.ResolveLegacy(CharacterClass.Manki);
+            if (mankiLegacy.Success || mankiLegacy.LegacyEntry != null ||
+                !mankiLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
+                throw new InvalidOperationException("Manki legacy resolution did not fail closed.");
 
             var fightGuyLegacy = resolver.ResolveLegacy(CharacterClass.FightGuy);
             if (fightGuyLegacy.Success || fightGuyLegacy.LegacyEntry != null ||
@@ -52,7 +57,7 @@ public static class LocalContentResolverSelfTest
             if (unavailable.Success || unavailable.Roster != null || !unavailable.Diagnostics.Any(d => d.Code == "content.package.missing"))
                 throw new InvalidOperationException("Unavailable package resolved unexpectedly or did not fail closed: " + Format(unavailable));
 
-            Debug.Log("[LocalContentResolverSelfTest] Passed rooted roster, FightGuy, legacy snapshots, unavailable package, and cwd-independence checks.");
+            Debug.Log("[LocalContentResolverSelfTest] Passed rooted roster, cooked Manki, remaining legacy snapshots, unavailable package, and cwd-independence checks.");
 
         }
         finally

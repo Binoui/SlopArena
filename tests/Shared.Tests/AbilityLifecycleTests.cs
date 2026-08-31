@@ -28,7 +28,7 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        Assert.Equal(AimMovementMode.Fixed, Def.GetAimMovementMode(AbilitySlots.A, airborne: false));
+        Assert.Equal(AimMovementMode.Mobile, Def.GetAimMovementMode(AbilitySlots.A, airborne: false));
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: AbilitySlots.A), 1);
         Assert.Equal(ActionState.Aiming, t0.State);
         Assert.Equal((byte)AbilitySlots.A, t0.AttackSlot);
@@ -37,7 +37,7 @@ public class AbilityLifecycleTests
     // ── Q hold: fixed aim — movement is locked, action transitions stay locked ──
 
     [Fact]
-    public void MankiQ_FixedHold_DoesNotAllowMovement()
+    public void MankiQ_MobileHold_AllowsMovement()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -53,8 +53,8 @@ public class AbilityLifecycleTests
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)0, s.ComboStage);
         Assert.NotNull(sim.GetActiveAbility(1));
-        Assert.Equal(startZ, s.PZ);
-        Assert.Equal(0f, s.VZ);
+        Assert.True(s.PZ > startZ, "mobile aim must allow movement");
+        Assert.NotEqual(0f, s.VZ);
     }
 
     [Fact]
@@ -83,6 +83,9 @@ public class AbilityLifecycleTests
         Assert.True(landed.IsGrounded);
         Assert.Equal(ActionState.Aiming, landed.State);
         Assert.NotNull(sim.GetActiveAbility(1));
+        for (int i = 0; i < 7; i++)
+            sim.Tick(new() { { 1, aim } });
+
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: false) } });
         Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
@@ -165,7 +168,7 @@ public class AbilityLifecycleTests
         TestHelpers.RegisterPlayer(sim, Def, state);
 
         var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
-        // Duration is 480 ticks (8s) per MankiData F spec. TickTimers decrements in activation tick → 479.
+        // Duration is 480 ticks (8s) per the cooked Manki package. TickTimers decrements in activation tick → 479.
         Assert.True(after.BuffRemainingTicks >= 478 && after.BuffRemainingTicks <= 480,
             $"Expected buff duration ~479 ticks after activation, got {after.BuffRemainingTicks}");
     }
