@@ -1,21 +1,16 @@
+using System.Collections.Generic;
 using Xunit;
-using SlopArena.Shared.Abilities;
 
 namespace SlopArena.Shared.Tests;
 
+using SlopArena.Shared.Abilities;
+
 /// <summary>
-/// Per-ability lifecycle tests.
-/// All abilities use ServerAbility subclasses — no data-driven path.
+/// Lifecycle contracts for authored abilities.
 /// </summary>
 public class AbilityLifecycleTests
 {
     private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
-
-    // ── LMB: ServerAbility (MankiLmbCombo) — basic activation only ──
-
-
-    // ── AirLMB: ServerAbility (AirLmbCombo via StageChainAbility) ──
-
 
     // ── Q: ServerAbility (MankiRoundBomb) — basic activation ──
 
@@ -419,4 +414,62 @@ public class AbilityLifecycleTests
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);
     }
+    public static IEnumerable<object[]> GroundAbilityCases()
+    {
+        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk })
+        {
+            var def = BuiltInContentResolver.Resolve(character).Definition;
+            for (byte wireSlot = 1; wireSlot <= AbilitySlots.Count; wireSlot++)
+            {
+                if (def.GetCookedSlotAbility(wireSlot, airborne: false) != null)
+                    yield return new object[] { character, wireSlot };
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(GroundAbilityCases))]
+    public void EveryAuthoredGroundAbility_ReleasesAttackState(CharacterClass character, byte wireSlot)
+    {
+        var def = BuiltInContentResolver.Resolve(character).Definition;
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(def);
+        TestHelpers.RegisterPlayer(sim, def, state);
+
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: wireSlot, aiming: true) } });
+        var started = sim.GetState(1);
+        Assert.Equal(wireSlot, started.AttackSlot);
+        Assert.NotEqual(ActionState.Idle, started.State);
+        for (int tick = 0; tick < 600; tick++)
+        {
+            var current = sim.GetState(1);
+            if (current.State == ActionState.Idle && current.AttackSlot == 0)
+                return;
+            sim.Tick(new() { { 1, default } });
+        }
+
+        var final = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, final.State);
+        Assert.Equal((byte)0, final.AttackSlot);
+    }
+
+    [Fact]
+    public void HeldAbilityInput_DoesNotRestartCompletedAbility()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        for (int tick = 0; tick < 120; tick++)
+        {
+            sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.E) } });
+            if (sim.GetState(1).State == ActionState.Idle)
+                return;
+        }
+
+        Assert.Fail("Held ability input restarted the ability instead of releasing it.");
+    }
+
 }

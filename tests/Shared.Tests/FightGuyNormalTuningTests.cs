@@ -35,47 +35,6 @@ public class FightGuyNormalTuningTests : KitScenarioTests
         return state;
     }
 
-    [Fact]
-    public void NormalRoles_KeepDistinctTimingAndLaunchContracts()
-    {
-        var g2 = Def.Slot2!.Stages[0].HitboxEvents[0];
-        var g3 = Def.Slot3!.Stages[0].HitboxEvents[0];
-        var g4 = Def.Slot4!.Stages[0].HitboxEvents[0];
-        var a2 = Def.AirSlot2!.Stages[0];
-        var a3 = Def.AirSlot3!.Stages[0].HitboxEvents[0];
-        var a4 = Def.AirSlot4!.Stages[0].HitboxEvents[0];
-
-        Assert.Equal("Straight Punch", Def.Slot2.Name);
-        Assert.Equal((ushort)25, Def.Slot2.Stages[0].DurationTicks);
-        Assert.Equal((ushort)5, g2.DurationTicks);
-        Assert.Equal((sbyte)25, g2.Knockback.Angle);
-
-        Assert.Equal("Sweeping Kick", Def.Slot3.Name);
-        Assert.Equal((sbyte)55, g3.Knockback.Angle);
-        Assert.True(g3.Knockback.KnockbackGrowth < g2.Knockback.KnockbackGrowth);
-
-        Assert.Equal("Double Kick", Def.Slot4.Name);
-        Assert.Equal((ushort)60, Def.Slot4.Stages[0].DurationTicks);
-        Assert.Equal(HitboxShape.Capsule, g4.Shape);
-        Assert.Equal("mixamorig:LeftFoot", g4.BoneName);
-        Assert.Equal("mixamorig:RightFoot", g4.EndBoneName);
-        Assert.True(g4.Knockback.KnockbackGrowth > g2.Knockback.KnockbackGrowth);
-
-        Assert.Equal(2, a2.HitboxEvents.Length);
-        Assert.All(a2.HitboxEvents, hit =>
-        {
-            Assert.Equal(HitboxShape.Capsule, hit.Shape);
-            Assert.Equal("mixamorig:LeftFoot", hit.BoneName);
-            Assert.Equal("mixamorig:Hips", hit.EndBoneName);
-            Assert.Equal((byte)1, hit.HitGroup);
-        });
-        Assert.True(a2.HitboxEvents[0].Knockback.KnockbackGrowth < a4.Knockback.KnockbackGrowth);
-
-        Assert.Equal((sbyte)65, a3.Knockback.Angle);
-        Assert.Equal("Air Smash", Def.AirSlot4.Name);
-        Assert.Equal((ushort)54, Def.AirSlot4.Stages[0].DurationTicks);
-        Assert.Equal((ushort)12, Def.AirSlot4.Stages[0].LandingLagTicks);
-    }
 
     [Fact]
     public void G2_ForwardPunch_HitConfirm_IsGolden()

@@ -1,6 +1,8 @@
+using System;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
+
 
 /// <summary>ADR-0019 hit-response contract tests.</summary>
 public class ComboInfluenceTests
@@ -174,5 +176,75 @@ public class ComboInfluenceTests
         Assert.Equal(0f, second.KVY);
         Assert.Equal(0f, second.KVZ);
     }
+    [Fact]
+    public void DirectionalInfluence_PerpendicularHold_ReachesTurnCapWithoutChangingMagnitude()
+    {
+        var state = TestHelpers.PlayerState();
+        state.KVZ = 10f;
+        state.DIX = 1f;
+
+        Simulation.ApplyDirectionalInfluence(ref state);
+
+        float magnitude = MathF.Sqrt(state.KVX * state.KVX + state.KVY * state.KVY + state.KVZ * state.KVZ);
+        TestHelpers.AssertNear(10f, magnitude, 0.001f);
+        TestHelpers.AssertNear(10f * MathF.Sin(18f * MathF.PI / 180f), state.KVX, 0.001f);
+        TestHelpers.AssertNear(10f * MathF.Cos(18f * MathF.PI / 180f), state.KVZ, 0.001f);
+    }
+
+    [Fact]
+    public void DirectionalInfluence_AxisHoldDoesNotRotate()
+    {
+        var withLaunch = TestHelpers.PlayerState();
+        withLaunch.KVZ = 10f;
+        withLaunch.DIY = 1f;
+        Simulation.ApplyDirectionalInfluence(ref withLaunch);
+
+        var againstLaunch = TestHelpers.PlayerState();
+        againstLaunch.KVZ = 10f;
+        againstLaunch.DIY = -1f;
+        Simulation.ApplyDirectionalInfluence(ref againstLaunch);
+
+        TestHelpers.AssertNear(0f, withLaunch.KVX, 0.001f);
+        TestHelpers.AssertNear(10f, withLaunch.KVZ, 0.001f);
+        TestHelpers.AssertNear(0f, againstLaunch.KVX, 0.001f);
+        TestHelpers.AssertNear(10f, againstLaunch.KVZ, 0.001f);
+    }
+
+    [Fact]
+    public void DirectionalInfluence_DiagonalHoldUsesSinSquaredCurve()
+    {
+        var state = TestHelpers.PlayerState();
+        state.KVZ = 10f;
+        state.DIX = 1f;
+        state.DIY = 1f;
+
+        Simulation.ApplyDirectionalInfluence(ref state);
+
+        float angle = 9f * MathF.PI / 180f;
+        TestHelpers.AssertNear(10f * MathF.Sin(angle), state.KVX, 0.001f);
+        TestHelpers.AssertNear(10f * MathF.Cos(angle), state.KVZ, 0.001f);
+    }
+
+    [Fact]
+    public void DirectionalInfluence_NeverExceedsTurnCap()
+    {
+        for (int i = 0; i <= 36; i++)
+        {
+            float angle = i * 5f * MathF.PI / 180f;
+            float launchX = 10f * MathF.Sin(angle);
+            float launchZ = 10f * MathF.Cos(angle);
+            var state = TestHelpers.PlayerState();
+            state.KVX = launchX;
+            state.KVZ = launchZ;
+            state.DIX = 1f;
+
+            Simulation.ApplyDirectionalInfluence(ref state);
+
+            float dot = launchX * state.KVX + launchZ * state.KVZ;
+            float actual = MathF.Acos(Math.Clamp(dot / 100f, -1f, 1f)) * 180f / MathF.PI;
+            Assert.True(actual <= 18.01f, $"turn {actual:F2}° exceeds the 18° cap");
+        }
+    }
+
 }
 

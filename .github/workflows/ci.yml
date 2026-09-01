@@ -14,3 +14,4 @@ jobs:
       - run: dotnet build src/Shared/ --nologo
       - run: dotnet test tests/Shared.Tests/ --nologo
       - run: dotnet build src/Server/ --nologo
+      - run: dotnet test tests/Server.Tests/ --nologo
