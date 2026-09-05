@@ -4,15 +4,12 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 
 ## Start here
 
-**Current product goal:** [Playable friends demo reset](plans/2026-09-05-playable-demo-reset.md) — four roster characters, one proven online match path, and player feedback before further platform expansion. This is the execution entry point; older migration plans remain historical records.
+Read these in order:
 
-| Document | Use it for |
-| --- | --- |
-| [Architecture overview](architecture-overview.md) | Repository map, cooked/legacy boundary, and runtime flow |
-| [Testing and verification](testing.md) | Shared, package, Unity, and local PvP verification ladder |
-| [Contributing](../CONTRIBUTING.md) | Contribution rules and required checks |
-| [Project context](../CONTEXT.md) | Canonical domain vocabulary and settled mechanics |
-
+1. [Playable friends demo reset](plans/2026-09-05-playable-demo-reset.md)
+2. [Architecture overview](architecture-overview.md)
+3. [Testing and verification](testing.md)
+4. [Contributing](../CONTRIBUTING.md)
 ## Architecture
 
 | Document | Use it for |
@@ -24,6 +21,8 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 | [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands and live Editor verification |
 
 ## Gameplay systems
+
+Use [Project context](../CONTEXT.md) for canonical gameplay vocabulary and settled mechanics.
 
 | Document | Use it for |
 | --- | --- |
@@ -117,4 +116,5 @@ These documents inform design but do not override the Shared implementation or a
 - `handoffs/` contains dated implementation handoffs.
 - `superpowers/` contains archived plans and specifications.
 
-Read these for context on why a decision exists. Treat a dated plan as historical unless a current task explicitly adopts it. The [FightGuy cooking cutover](plans/2026-08-26-fightguy-character-cooking-cutover.md) is the current migration record for the first cooked slice.
+The [FightGuy cooking cutover](plans/2026-08-26-fightguy-character-cooking-cutover.md) is a
+historical migration record, not current execution work.

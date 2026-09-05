@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check project documentation
+        run: |
+          python3 -m unittest discover -s tools -p 'test_check_docs.py'
+          python3 tools/check_docs.py
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'

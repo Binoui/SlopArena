@@ -50,6 +50,19 @@ air.1     air.2     air.3     air.4     air.A     air.E     air.R     air.F
 ```
 
 Use package slot IDs as persisted identity. Ability Lab labels are projections of that identity. `LMB`, `RMB`, `Q`, and other physical controls are input adapters, not alternate package slots. Ground/air aliases may appear once in authoring and are expanded by the compiler; runtime data is explicit.
+## Verification choice
+
+### Local iteration
+
+Tune source through the transient Editor development catalog and exercise the
+affected Ability Lab or Training path. Local preview is not persisted package
+verification and does not require a publishing cook for every numerical edit.
+
+### Accepted package
+
+Content intended to ship crosses the explicit `inspect` → `cook` → `verify` →
+`roster.refresh` boundary. Require fresh cooked artifacts, matching hashes, and
+exact admitted roster pins before treating it as an accepted package.
 
 ## Workflow
 
@@ -69,9 +82,11 @@ Import the rig and clips through Unity. Bind them in `CharacterAssetCatalog.asse
 
 Use Humanoid for ordinary humanoid fighters when built-in retargeting helps. Custom rigs remain valid when they provide the required package-owned animation data. Keep art and naming rules in [`docs/contributing/conventions.md`](../../../docs/contributing/conventions.md).
 
-### 4. Inspect, cook, and repair
+### 4. Validate source and choose persistence boundary
 
-The supported agent loop is direct source editing plus typed Unity CLI commands:
+For local iteration, resolve the source through the transient development catalog
+and repair structured diagnostics without replacing persisted cooked output. For an
+accepted package, use the typed Unity CLI commands:
 
 ```bash
 unity command --project-path client/Unity \
@@ -80,9 +95,14 @@ unity command --project-path client/Unity \
   sloparena.character.cook --target <package> --format json
 ```
 
-`inspect` reports the canonical 16-slot projection, source/cooked hashes, status, stale reasons, and diagnostics. `cook` validates the Shared source, resolves Unity bindings, bakes poses, writes generated bindings, assembles the immutable package, and reports source, cooked-content, and package hashes.
+`inspect` reports the canonical 16-slot projection, source/cooked hashes, status,
+stale reasons, and diagnostics. Accepted `cook` validates the Shared source, resolves
+Unity bindings, bakes poses, writes generated bindings, assembles the immutable
+package, and reports source, cooked-content, and package hashes.
 
-A semantic failure has a structured result with `success: false`; a failed cook preserves the last valid cooked artifact and status. Repair diagnostics and retry. Do not edit generated runtime output to hide a source or catalog error.
+An accepted semantic failure has a structured result with `success: false`; a failed
+cook preserves the last valid cooked artifact and status. Repair diagnostics and retry.
+Do not edit generated runtime output to hide a source or catalog error.
 
 ### 5. Admit and verify
 
@@ -90,11 +110,16 @@ The package assembler writes an immutable manifest under `content-cooked/<packag
 
 Validation must fail closed for missing or mismatched source, catalog, pose payload, capability, dependency, schema, or hash. A Match Content Catalog pins the verified package set per match; a later recook cannot change a running match.
 
-### 6. Preview through the real path
+## 6. Preview through the real path
 
-Ability Lab edits drafts and previews valid drafts through the in-memory cooked definition and the same interpreter used by Training, PvP, and GameServer. Invalid drafts may show a clearly non-authoritative editing pose only; they must never silently become match content.
+Local iteration previews valid drafts through the transient development catalog and
+the same interpreter used by Training. Accepted packages preview the persisted cooked
+definition after inspect/cook/verify and roster refresh. Invalid drafts may show a
+clearly non-authoritative editing pose only; they must never silently become match content.
 
-Check the package in Ability Lab, then exercise Training. For online content, verify server admission and exact client/server hash agreement. Presentation resolves semantic IDs to generated package bindings and plays through Animancer; presentation never feeds back into simulation.
+For online content, verify server admission and exact client/server hash agreement.
+Presentation resolves semantic IDs to generated package bindings and plays through
+Animancer; presentation never feeds back into simulation.
 
 ## Legacy compatibility
 
@@ -111,10 +136,19 @@ For legacy maintenance, preserve its existing registry and baked-data contracts 
 
 ## Verification checklist
 
+For local iteration:
+
+- source diagnostics are visible and invalid drafts never fall back to stale content;
+- the affected Ability Lab or Training path consumes the transient development catalog;
+- Shared/server authority remains unchanged and presentation is client-only.
+
+For an accepted package:
+
 - source package has one owner for every authored fact;
 - compiler resolves all sixteen slots and rejects invalid IDs, units, references, and budgets;
 - catalog bindings match required semantic IDs and exact imported assets;
-- cook succeeds and replaces the prior artifact atomically;
+- inspect, cook, and verify succeed; the cook replaces the prior artifact atomically;
 - manifest, runtime definition, pose payload, generated bindings, and hashes agree;
-- Ability Lab and Training consume the cooked definition;
+- roster pins refresh only after accepted verification;
+- Ability Lab and Training consume the persisted cooked definition;
 - Shared/server authority remains unchanged and presentation is client-only.

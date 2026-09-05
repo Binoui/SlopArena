@@ -52,8 +52,8 @@ No new abstraction, event bus, registry, content format, or networking rewrite i
 
 | Source | Finding | Proposed action |
 | --- | --- | --- |
-| `.omp/skills/sloparena-build/SKILL.md` vs session-mounted `skill://sloparena-build` | Repository file uses Unity CLI correctly; the mounted copy read during this session still prescribed removed MCP commands. | Repair skill discovery/source precedence; refreshing the wrong repository file will not fix a stale mounted copy. Confirm effective instructions in a fresh session. |
-| `.omp/skills/unity-mcp-gamedev/SKILL.md` | Discoverable retired MCP-named entry repeats the current CLI gate. | Retire from active skill discovery after checking references. Keep historical context outside executable skill routing if needed. |
+| `.omp/skills/sloparena-build/SKILL.md` | Native discovery requires a nonempty `description`; the project skill had correct Unity CLI commands but lacked that metadata. | Add project frontmatter and exclude the conflicting `unity-skills` and retired `unity-mcp-gamedev` names through `.omp/config.yml`; verify from a fresh session. |
+| `.omp/skills/unity-mcp-gamedev/SKILL.md` | Discoverable retired MCP-named entry repeats the current CLI gate. | Remove it from active project skills; preserve historical references elsewhere. |
 | `.agents/skills/unity-skills/skills/unity-cli/SKILL.md` | Explicitly forbids `unity command` / `unity pipeline`, contrary to this project. | Do not activate its operational workflow in SlopArena; prefer repository CLI guidance. Retain useful advisory material on demand. |
 | `.agents/skills/unity-skills`, `.claude/skills/unity-skills` | Ignored local skill installation; the `.claude` entry is a symlink to `.agents`. | Treat as one local install, not duplicate project code. Do not delete user/global tools as repository cleanup. |
 | `.omp/skills/orient/SKILL.md`, `.omp/skills/branch-status/SKILL.md` | Both claim session-start work. | Orient from current goal, current work and relevant contract only; branch inventory on integration/branch requests, not every tuning session. |
@@ -61,7 +61,9 @@ No new abstraction, event bus, registry, content format, or networking rewrite i
 | Character, animation, stage and asset skills | Repeat general verification commands and broad completion requirements. | Link one verification policy; retain only domain-specific cook/bake/asset checks in each skill. |
 | `.omp/skills/sloparena-finish-branch/SKILL.md` | Contains commit/push operations behind explicit permission controls. | Keep on demand and preserve those controls; never make task completion imply a push. |
 
-**Small first cleanup batch:** resolve effective Unity skill routing, retire the obsolete project skill from discovery, narrow overlapping triggers, and express the following three verification modes in one living reference. No framework or skill-manager implementation is proposed.
+The cleanup uses one living verification policy in [`docs/testing.md`](../testing.md):
+local iteration, integrated change, and distributable demo. Project entry points link to
+that policy instead of repeating mandatory cook, build, or session-start instructions.
 
 | Mode | Proof |
 | --- | --- |

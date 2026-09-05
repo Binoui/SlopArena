@@ -1,17 +1,18 @@
 ---
 name: sloparena-build-export
-description: Build, export, and release SlopArena — Shared build, tests, server publish (mini PC deploy), Unity player build, GitHub release, CI status. The three flows: build-release.sh (exe zip), deploy-server.sh (alfred dedicated server), master deploy (manual).
+description: Build/export SlopArena distributables, publish or deploy servers, and operate releases when explicitly requested. Not the general Shared test or Unity compilation workflow.
 ---
 
 # SlopArena Build, Export & Release
 
 ## When to use
 
-- Building or testing the Shared library or the .NET server
-- Publishing the game server for release (zip bundled server, or alfred dedicated server)
-- Building the Unity player (Linux/Windows)
-- Cutting a GitHub release, or checking CI status
-- Answering "how do I ship main to players / to alfred"
+- Packaging the client/server distributable or release zip
+  and release artifacts. General verification follows [`docs/testing.md`](../../../docs/testing.md).
+- Publishing or deploying the dedicated or Master server
+- Building the Unity player as part of a requested release
+- Cutting a GitHub release or checking CI status
+- Answering how to ship main to players or to alfred
 
 ## The three flows (mental model)
 
@@ -25,18 +26,15 @@ src/Server|Shared   → A (bundled server) + B (dedicated server)
 Master repo change  → C only
 ```
 
-## Build & Test Core
+## Core verification reference
 
-```bash
-# Shared library (canonical source of truth) — post-build copies the DLL
-# into client/Unity/Assets/Plugins/SlopArena.Shared/ automatically.
-dotnet build src/Shared/ --nologo
+General Shared, Server, and Unity verification follows [`docs/testing.md`](../../../docs/testing.md).
+Use this skill for release packaging and deployment operations, not ordinary Shared tests
+or Unity compilation.
 
-# Run the current Shared test suite; do not rely on a hardcoded test count.
-dotnet test tests/Shared.Tests/ --nologo
-```
-
-Always build `src/Shared/` after any Shared change so the Unity plugin DLL stays in sync.
+The current admitted roster is Manki, FightGuy, Kistu, and Bonk. The reset plan records a
+reproduced four-package publishing blocker; do not imply that the current FightGuy-only
+release script is roster-complete.
 
 ## Flow A — Release zip (Windows exe)
 

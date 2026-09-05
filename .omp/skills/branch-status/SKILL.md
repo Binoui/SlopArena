@@ -1,6 +1,6 @@
 ---
 name: branch-status
-description: Show status of all local feature branches vs main — commits ahead/behind, last message, open PR if any. Also helps draft a squash-merge PR description. Run at session start or before switching branches.
+description: Show status of all local feature branches vs main — commits ahead/behind, last message, open PR if any. Use only for requested branch inventory, branch switching/integration, or PR drafting.
 disable-model-invocation: false
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: false
 
 Surface the state of all feature branches at a glance and optionally draft a PR.
 
-## Step 1: Print branch summary
+## Requested branch inventory
 
 Run:
 ```bash

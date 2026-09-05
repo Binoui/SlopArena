@@ -9,6 +9,11 @@
 - Do not install dependencies without asking.
 - Implement user-selected numeric values unless they create a correctness issue; suggest once, then follow the decision.
 
+## Current goal
+
+Prioritize the [playable friends demo reset](../docs/plans/2026-09-05-playable-demo-reset.md):
+get first remote feedback on the four admitted characters before expanding platform scope.
+
 ## Current content architecture
 
 New characters are package-native. The editable package is:
@@ -71,32 +76,12 @@ Warp is not a current gameplay contract. Do not add or document Warp-based mecha
 - Preserve server/client Shared equivalence and immutable match content.
 - Use semantic package IDs and canonical slot projection; do not add a second mapping.
 
-### Verification commands
+### Verification
 
-After Shared changes:
-
-```bash
-dotnet build src/Shared/ --nologo
-dotnet test tests/Shared.Tests/ --nologo
-```
-
-After GameServer changes:
-
-```bash
-dotnet build src/Server/ --nologo
-```
-
-After package or Unity changes:
-
-```bash
-unity pipeline list --format json
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target <package> --format json
-```
-
-Require a successful semantic cook, valid inspect status, `dirtyOrStale: false`, and matching hashes. For Unity-facing changes, recompile the Editor, read current console errors, and exercise the affected Ability Lab, Training, or PvP path. See `docs/testing.md` and `docs/contributing/unity-cli.md`.
+Use the three verification modes in [`docs/testing.md`](../docs/testing.md):
+local iteration, integrated change, and distributable demo. Keep focused behavioral
+coverage and the applicable Shared/Server/Unity/package checks; do not force publishing
+cook or unrelated runtime checks for ordinary tuning.
 
 ## Workflow rules
 
@@ -109,7 +94,10 @@ Require a successful semantic cook, valid inspect status, `dirtyOrStale: false`,
 
 ## Agent verification protocol
 
-- Unity is main-repo-only. Worktree agents must not operate the main Editor from another worktree. Use the Unity CLI/Pipeline workflow from `docs/contributing/unity-cli.md`. Headless Shared/server builds and tests are mandatory for corresponding code changes. Unity-facing slices must leave a short Test in Unity checklist in the gitignored root `TESTING-UNITY.md`.
+- Unity is main-repo-only. Worktree agents must not operate the main Editor from another
+  worktree. Use the Unity CLI/Pipeline workflow in [`docs/contributing/unity-cli.md`](../docs/contributing/unity-cli.md).
+- Unity-facing implementation requires a short Test in Unity checklist in the gitignored
+  root `TESTING-UNITY.md`; use the verification mode appropriate to the change.
 
 ## Canonical references
 

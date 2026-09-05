@@ -7,7 +7,9 @@ not generated packet sizes, test totals, or other volatile implementation detail
 """
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -80,11 +82,41 @@ MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
 
 
 def markdown_files() -> list[Path]:
-    ignored_dirs = {"Library", "PackageCache", ".git", ".claude"}
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "--",
+                "*.md",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        diagnostic = getattr(error, "stderr", None) or str(error)
+        raise RuntimeError(
+            f"unable to enumerate project Markdown: {os.fsdecode(diagnostic).strip()}"
+        ) from error
+
+    root = ROOT.resolve()
+    paths = {
+        Path(os.fsdecode(item))
+        for item in result.stdout.split(b"\0")
+        if item
+    }
     return sorted(
-        path.relative_to(ROOT)
-        for path in ROOT.rglob("*.md")
-        if not any(part in ignored_dirs for part in path.parts)
+        path
+        for path in paths
+        if path.suffix == ".md"
+        and (ROOT / path).is_file()
+        and (ROOT / path).resolve().is_relative_to(root)
     )
 
 
@@ -156,7 +188,12 @@ def check_canonical_paths(errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
-    files = markdown_files()
+    try:
+        files = markdown_files()
+    except RuntimeError as error:
+        print("Documentation checks failed:")
+        print(f"- {error}")
+        return 1
     check_links(errors, files)
     check_forbidden_terms(errors, files)
     check_canonical_paths(errors)

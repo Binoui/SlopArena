@@ -5,6 +5,8 @@ disable-model-invocation: true
 ---
 
 # sim-test
+Use [`docs/testing.md`](../../../docs/testing.md) to choose the verification mode that
+requires the Shared suite.
 
 Run the simulation test suite. Always rebuild Shared first so Unity and tests stay in sync.
 

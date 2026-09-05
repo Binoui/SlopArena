@@ -1,4 +1,6 @@
 # EXE Release & Self-Hosted Infrastructure Implementation Plan
+> **Historical execution plan.** Preserved as a dated decision/implementation record, not a current checklist. Current product work follows the [playable friends demo reset](2026-09-05-playable-demo-reset.md). Revalidate historical status claims against current code before reuse.
+
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

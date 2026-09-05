@@ -24,6 +24,9 @@ The repository has three runtime layers:
 
 The generated Shared DLL is copied to `client/Unity/Assets/Plugins/SlopArena.Shared/` by the Shared build.
 
+A clean clone does not include ignored licensed/local art. Supply those assets separately
+for a complete Unity build.
+
 ## Core rules
 
 - The Shared simulation is the gameplay authority. Do not implement gameplay mechanics only in Unity.
@@ -37,6 +40,10 @@ The generated Shared DLL is copied to `client/Unity/Assets/Plugins/SlopArena.Sha
 
 New characters use the package-native workflow. Start with [Adding a Character](docs/characters/adding-a-new-character.md). The editable package lives under `client/Unity/Assets/CharacterPackages/<package>/` and contains:
 
+The current product target is a playable friends demo with Manki, FightGuy, Kistu, and
+Bonk. Package authoring remains technically supported, but a fifth character or the Nilus
+migration is not a demo prerequisite.
+
 - `package.json` for package identity, dependencies, creator, license, and attribution;
 - `character.json` for gameplay semantics and the canonical 16-slot move grid;
 - `CharacterAssetCatalog.asset` for package-local Unity asset bindings.
@@ -45,29 +52,17 @@ Cooked runtime content belongs under `content-cooked/<package>/` and is admitted
 
 ## Verification
 
-After Shared changes:
+Choose the applicable mode in [Testing and verification](docs/testing.md):
 
-```bash
-dotnet build src/Shared/ --nologo
-dotnet test tests/Shared.Tests/ --nologo
-```
+- **Local iteration:** use the Editor development catalog and affected Ability Lab or
+  Training path; do not publish a package for every tuning edit.
+- **Integrated change:** run focused behavioral coverage and the applicable Shared,
+  Server, Unity, or package checks.
+- **Distributable demo:** cook accepted content, verify roster-complete publish outputs,
+  build the client/server, and exercise the packaged join-to-rematch path.
 
-After server changes:
-
-```bash
-dotnet build src/Server/ --nologo
-```
-
-After character package or Unity changes, inspect and cook the package through the Unity CLI:
-
-```bash
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target fightguy --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target fightguy --format json
-```
-
-Use the target package ID for another package. Require a successful semantic cook and a clean inspect status. For Unity-facing changes, recompile the Editor, read current console errors, then exercise the affected Training, Ability Lab, or local PvP path. See [Testing and verification](docs/testing.md) and [Unity CLI](docs/contributing/unity-cli.md).
+Use [Unity CLI](docs/contributing/unity-cli.md) for concrete commands. Preserve the
+Shared/server authority, exact package identity, and fail-closed cook behavior.
 
 ## Pull requests
 

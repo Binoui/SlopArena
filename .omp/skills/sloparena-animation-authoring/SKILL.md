@@ -88,9 +88,18 @@ For Manki:
 - Its binding is in `client/Unity/Assets/CharacterPackages/manki/CharacterAssetCatalog.asset`.
 - Never assume an earlier imported `fileID` remains valid after reimport; read Unity's current importer metadata.
 
-## Cook and verify
+## Preview and accepted package verification
 
-Run the supported Unity CLI flow from the repository root:
+### Local iteration
+
+Preview the imported clip on the actual character prefab and exercise the affected
+Ability Lab or Training path. An imported clip can be tuned through the transient
+development catalog without cooking a publishing package or changing generated
+animation catalogs and roster pins.
+
+### Accepted binding and package
+
+For content intended to ship, run the supported Unity CLI flow from the repository root:
 
 ```bash
 unity pipeline list --format json
@@ -105,10 +114,10 @@ unity command --project-path client/Unity \
   sloparena.character.inspect --target <package> --format json
 ```
 
-Require all of the following:
+Require all of the following for an accepted package:
 
 - Unity Pipeline reachable;
-- recompile reports no failure/errors;
+- recompile reports no failure/errors when code or the Shared plugin changed;
 - current Unity error console is empty;
 - final package inspect reports `status: valid` and `dirtyOrStale: false`;
 - source and cooked-source hashes match;

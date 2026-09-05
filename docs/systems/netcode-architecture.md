@@ -2,9 +2,10 @@
 
 ## 1. Philosophy
 
-**Server-authoritative.** The server is the absolute authority over game state. The client renders the latest server state directly — there is no local simulation, prediction, or rollback in Phase 1 (see §6).
-
-Same architecture as Rivals 2, GGST, SF6.
+**Server-authoritative Shared simulation with client prediction and reconciliation.**
+The GameServer is authoritative. `ServerSimulation` also runs on client tracks so the
+client can predict and reconcile without owning gameplay results. Unity presents the
+track-selected simulation state and semantic events.
 
 ---
 
@@ -52,9 +53,8 @@ Same architecture as Rivals 2, GGST, SF6.
 │                                   ┌─────▼─┴─────┐          │          │
 │                                   │  RENDER     │          │          │
 │                                   │ (Unity)     │          │          │
-│                                   │ latest      │          │          │
-│                                   │ server state│          │          │
-│                                   │ (1-tick lag)│          │          │
+│                                   │  track-selected  │          │          │
+│                                   │  simulation state│          │          │
 │                                   └─────────────┘          │          │
 │                                                             │          │
 │                 Lobby/meta via SignalR ◄────────────────────┘          │
@@ -66,46 +66,32 @@ Same architecture as Rivals 2, GGST, SF6.
 
 ## 3. Data Flow
 
-### 3a. Client FixedUpdate (60Hz) — Send
+### 3a. PvP flow
 
-```
-PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
+`PvPMatch` starts from the admitted match catalog and owns the
+[`RollbackSimulationBridge`](../../client/Unity/Assets/Scripts/Runtime/Simulation/RollbackSimulationBridge.cs).
+Its fixed update:
 
-  1. InputController.Poll() — read Unity InputSystem
-     → BuildInputState()
-       → keyboard/mouse + ActiveSlot
-       → InputState { MoveX, MoveY, flags, ActiveSlot, FacingYaw, AimYaw, AimPitch, AimDistance, TargetEntityId }
+1. Builds `InputState` from the Unity input adapter and the canonical active slot.
+2. Calls `RollbackSimulationBridge.Tick`.
+3. The bridge sends local input through `NetworkClient`, advances the Shared local track,
+   drains entity packets, match-result packets, and presentation-event queues, and exposes
+   selected state and events for rendering.
+4. The bridge routes the self packet to reconciliation and opponent packets to
+   `RollbackSimulator`, which chooses `PredictedTrack` or `RawTrack` by action state.
+5. `PvPMatch` applies bridge-selected state and presentation events to `PlayerRenderer`
+   and other presentation systems.
 
-  2. NetworkSimulationBridge.Tick(inputs)
-     → _tick++ (monotonically increasing per frame)
-     → NetworkClient.SendInput(input, _tick)
-       → Packet: entityId(8) + tick(4) + InputState(20) = 32B
+See [`PvPMatch.cs`](../../client/Unity/Assets/Scripts/Runtime/World/PvPMatch.cs),
+[`RollbackSimulationBridge.cs`](../../client/Unity/Assets/Scripts/Runtime/Simulation/RollbackSimulationBridge.cs),
+and [`RollbackSimulator.cs`](../../src/Shared/Rollback/RollbackSimulator.cs).
 
-  3. No local simulation, no prediction ring buffer
-     → render the latest server state via PlayerRenderer.ApplyServerState()
-       → one-tick display latency is intentional (Phase 1)
-```
+### 3b. Training flow
 
-### 3b. Client FixedUpdate — Render
-
-```
-PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
-
-  1. Receive server states (non-blocking)
-     → NetworkClient.ReceiveStates()
-     → Returns: Dictionary<entityId, (tick, CharacterState)>
-     → Packet per entity: entityId(8) + tick(4) + CharacterStatePacket(109) = 121B
-
-  2. Store into the bridge
-     → NetworkSimulationBridge._latestStates[kv.Key] = kv.Value
-
-  3. Render latest server state
-     → PlayerRenderer.ApplyServerState(state)
-     → NPC states are rendered directly from server state
-       (no prediction — always authoritative)
-
-  4. Update visuals (target ring follow, UI)
-```
+Training uses `LocalSimulationBridge` with the same Shared simulation authority and
+cooked/admitted content boundary. It builds local input, advances the local simulation,
+and exposes state and presentation events to the renderers without a network transport.
+Training does not use `NetworkSimulationBridge`.
 
 ### 3c. MatchInstance Tick Loop (60Hz, per match, own thread)
 
@@ -231,209 +217,113 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(109) + h
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
-**Tick echo:** The server reads each client's tick from the input queue and writes it into the response packet(s). The echoed tick is informational for Phase 1 — the client has no prediction ring buffer to match against (see §6).
+**Tick echo:** The server echoes the consumed client tick so `RollbackSimulationBridge`
+can match the self response to local history for reconciliation. Opponent packets are
+ingested by `RollbackSimulator` into predicted or raw tracks; the tick is not merely
+informational.
 
 ---
 
-## 5. CharacterState internals (Shared)
+## 5. CharacterState and packet roles (Shared)
 
-`CharacterState` (144 bytes in memory, 95 serialized) is the full per-tick state of one entity:
+`CharacterState` is the mutable per-entity Shared simulation state. It is used directly
+by `ServerSimulation` and the rollback tracks; it is not a hand-maintained wire-size
+contract.
 
-| Field               | Type    | Notes                                |
-|---------------------|---------|--------------------------------------|
-| PX, PY, PZ          | float   | World position                       |
-| VX, VY, VZ          | float   | Velocity                             |
-| State               | enum    | ActionState (Idle, Dashing, etc.)    |
-| StateTicks          | ushort  | Remaining ticks in current state     |
-| DamagePercent       | ushort  | 0-999, Smash-style                   |
-| JumpsLeft           | byte    |                                      |
-| AirDodgesLeft       | byte    |                                      |
-| IsGrounded          | bool    |                                      |
-| DashCooldownTicks   | ushort  |                                      |
-| DashDurationTicks   | ushort  | Remaining dash frames                |
-| DashDirX, DashDirZ  | float   | Dash direction vector                |
-| InvincibilityTicks  | ushort  | Post-respawn/dash invincibility      |
-| **AttackSlot**      | **byte**| **Which slot this attack uses (1-11, ADR-0016)**|
-| **AttackElapsedTicks**|**ushort**| **Frames since attack started**    |
-| ComboStage          | byte    | 1-3 for chain combos                 |
-| ComboTimerTicks     | ushort  | Chain window remaining               |
-| AnimLockTicks       | ushort  | Self-lock from attack                |
-| BufferedChain       | byte    | Buffered LMB chains (max 2)          |
-| HeavyHoldTicks      | ushort  | RMB hold time                        |
-| HeavyCharged        | bool    | Hold threshold reached               |
-| ChargeTicks         | ushort  | Aimed charge progress                |
-| KVX, KVY, KVZ       | float   | Knockback velocity (decays separate) |
-| HitstunTicks        | ushort  | Frames frozen before knockback       |
-| DIX, DIY            | float   | Directional influence input          |
-| FacingYaw           | float   | Radians, +Z = 0                      |
-| Cooldown0-5         | ushort  | Per-slot cooldowns (abilities)       |
-| EntityId            | ulong   | 0 = unassigned                       |
-| **TargetEntityId**  | **ulong**| **Soft-lock target (0 = none, set server-side per tick)** |
-| ...                 |         |                                      |
+`CharacterStatePacket` is the explicit serialized state snapshot used for reconciliation
+and opponent ingestion. `ServerEntityPacket` wraps an entity identity, tick, state packet,
+and optional relayed input. Their layouts and codecs are owned by the source files:
 
-Position, velocity, action state, grounded flag, state duration, attack slot, combo stage, facing yaw, match state, buff remaining ticks, buff active flags, and the D10 movement-resource fields (air time, dash duration/direction/cooldown, air dodges/jumps left, invincibility, turnaround, dir-hold, sprinting, last direction, post-knockback airborne flag — ADR-0011, added so PredictedTrack's rebuild-and-replay is byte-identical for Predictable ActionStates) are serialized. The ability-instance-dependent fields (knockback velocity, hitstun ticks, DI, attack-elapsed/combo-timer/anim-lock/charge ticks, buffered chain) stay local-only — Complex ActionStates (Attacking/Hitstun/Warping) are never re-simulated from a snapshot (see §6).
+- [`CharacterState.cs`](../../src/Shared/CharacterState.cs)
+- [`CharacterStatePacket.cs`](../../src/Shared/CharacterStatePacket.cs)
+- [`ServerEntityPacket.cs`](../../src/Shared/ServerEntityPacket.cs)
+
+Snapshots serialize the fields needed to rebuild predictable movement state. Ability
+instance fields such as active hitbox/projectile lists and private lifecycle state are
+not fully reconstructible; complex action states therefore use received state rather than
+client re-simulation.
 
 ---
 
 ## 6. Prediction & Rollback
 
-The client predicts locally via a three-track model (ADR-0011, `docs/plans/2026-08-02-rollback-netcode.md`, implementation in `src/Shared/Rollback/`):
+The client uses the three-track model implemented in
+[`RollbackSimulator`](../../src/Shared/Rollback/RollbackSimulator.cs):
 
-- **LocalTrack** — the self entity's `ServerSimulation` runs continuously from match start, fed the player's true input every tick, never rebuilt from a snapshot. Corrected by patching the wire-serialized fields onto its own history when the server disagrees, replayed forward only across a Predictable-state suffix.
-- **PredictedTrack** — opponents currently in a Predictable `ActionState` (`Idle`/`Dashing`/`JumpSquat`/`AirDodging`) are rebuilt from the confirmed base and replayed forward via the input relay (§4b), holding the last known input at the frontier.
-- **RawTrack** — opponents currently in a Complex `ActionState` (`Attacking`/`Hitstun`/`Warping`) render directly from the latest received packet, unchanged from the original Phase 1 behavior for that entity — the ability-instance layer (`ServerAbility` subclasses' private fields) and `SpellResolver`'s hitbox/projectile list are never serialized, so these states are never re-simulated client-side.
+- **LocalTrack** continuously simulates the self entity with the player's input and
+  reconciles corrections from the server.
+- **PredictedTrack** replays predictable opponents from confirmed state and relayed input.
+- **RawTrack** renders complex or unknown opponents from their latest received state when
+  their private ability state cannot be reconstructed.
 
-See ADR-0011 for the full rationale, including why this is narrower than ADR-0010's original "predict all entities" ambition.
+This is narrower than predicting every remote ability: predictable opponents can be
+replayed, while complex or unknown opponents use received state.
 
 ---
 
 ## 7. ActiveSlot Pipeline
 
-### 7a. Flow
+The gameplay path is:
 
-```
-1. Player presses LMB (slot 1)
-   → InputController.Poll() reads Unity InputSystem (keyboard/mouse)
-
-2. BuildInputState() sets ActiveSlot = 1 on the InputState
-
-3. InputState sent via the bridge
-   → NetworkSimulationBridge.Tick(inputs) → NetworkClient.SendInput(input, _tick)
-   → ServerSimulation edge-detects the slot press (prevAttack / state.AttackSlot)
-
-4. ServerSimulation.Tick → Simulation.SimulateTick()
-   → Edge-detect Attack flag (prevAttack[entity] vs current)
-   → On rising edge: resolve ability from slot
-     → slot 1 = def.LMB → ability definition
-     → state.AttackSlot = 1, state.State = Attacking
-     → state.AttackElapsedTicks = 0
-   → On subsequent ticks (state is Attacking):
-     → state.AttackElapsedTicks++
-     → Check stage timings, chain windows, anim locks
-
-5. Hitbox spawning (post-simulation):
-   → In ServerSimulation.Tick(), after SimulateTick:
-     → If state.State == Attacking && state.AttackSlot > 0:
-       → Look up ability stage: slot → def.LMB → Stages[ComboStage]
-       → For each HitboxEvent:
-         → If AttackElapsedTicks == evt.TriggerTick:
-           → SpellResolver.Spawn(hitbox at entity pos + offset)
+```text
+InputState.ActiveSlot
+  → canonical ground/air slot
+  → admitted character definition
+  → cooked timeline or existing trusted/legacy lifecycle
+  → Shared simulation state and presentation events
+  → bridge-selected presentation
 ```
 
-### 7b. Slot Mapping
+Physical controls are input adapters. They select the canonical slot; they are not a
+second persisted move mapping. The admitted definition comes from the immutable Match
+Content Catalog. New package content executes through cooked timelines; trusted temporary
+capabilities and legacy Nilus implementations retain their existing lifecycle seam.
 
-| ActiveSlot | Key  | Ability     |
-|------------|------|-------------|
-| 0          | —    | None        |
-| 1          | LMB  | Light attack chain |
-| 2          | RMB  | Heavy/charge attack |
-| 3          | Q    | Ability slot 3 |
-| 4          | E    | Ability slot 4 |
-| 5          | R    | Ability slot 5 |
-| 6          | F    | Ability slot 6 |
-
-### 7c. HitboxEvent → SpellResolver.Spawn
-
-Defined in `AttackData.cs`:
-
-```csharp
-public struct HitboxEvent
-{
-    public ushort TriggerTick;    // When to spawn (in the attack sequence)
-    public ushort DurationTicks;  // How long the hitbox stays active
-    public float Radius;
-    public float OffX, OffY, OffZ;  // Local offset from entity center
-    public float Damage;
-    public float BaseKnockback, KnockbackGrowth, KnockbackUpward;
-    public ushort StunTicks;
-    public bool Interruptible;
-}
-```
-
-Hitboxes are spawned at the precise trigger tick (e.g. frame 6 of an attack) and processed by `SpellResolver` each tick during their lifetime. They use pure math (sphere-sphere/capsule collision) — no engine physics queries.
+The Shared simulation owns timing, hitbox/projectile resolution, damage, Knockback,
+Hitstun, interruption, and emitted events. Unity does not resolve collisions or decide
+gameplay results. See [`ServerSimulation.cs`](../../src/Shared/ServerSimulation.cs),
+[`CharacterPackageCompiler.cs`](../../src/Shared/CharacterPackageCompiler.cs), and
+[`hitbox-system.md`](hitbox-system.md).
 
 ---
 
-## 8. Client Animation State
+## 8. Client presentation state
 
-The client does NOT independently drive gameplay state — it only reacts to what the simulation outputs:
+The client does not independently drive gameplay state. `PlayerRenderer` and related
+visual systems consume the bridge-selected simulation output, including local prediction,
+reconciled self state, predicted opponents, raw opponents, and semantic presentation events:
 
-```
-PvPMatch.FixedUpdate() / TrainingMatch.OnMatchFixedUpdate():
-
-  1. First: ApplyServerState(state) was already called by the bridge
-     → state.State, state.StateTicks, position, velocity are set
-
-  2. PlayerRenderer drives Animancer clip playback from the sim state
-     → ActionState changes map to clips (idle/run/jump/fall/dash/hitstun/attack)
-     → Clip speed modulated from server timing (GetAnimSpeedFromDuration)
-     → Clips are played via _animancer.Play()
-
-  3. No input-driven state changes on client!
-     → All state transitions are driven by the server state
-     → Even in training mode, the local sim is the authority
+```text
+PvPMatch / Training
+  → bridge-selected Shared state and events
+  → PlayerRenderer / Animancer / UI / VFX
 ```
 
-This ensures the visual state is always driven by the simulation output, not by stale local input processing.
+Animation, VFX, and audio remain presentation-only. They do not infer gameplay from raw
+input and do not feed results back into Shared simulation.
 
 ---
 
-## 9. Debug Mode (F3)
+## 9. Debug visualization
 
-Hurtboxes and hitboxes are computed server-side. For the F3 display, two approaches:
-
-### 9a. Simple (now)
-Debug mode runs a local simulation *in parallel* purely for visual debugging. The real simulation stays on the server.
-
-### 9b. Clean (once the protocol matures)
-The client sends a `RequestDebug` flag (1 bit in InputState.flags). The server, if it sees the flag, additionally sends:
-```
-[0..7]   magic = 0x44454255  ("DEBU")
-[8..11]  count (uint)
-[...]    For each: position_start, position_end, radius, is_hitbox
-```
-
-Separate packet from the normal state; the client ignores it unless in debug mode.
+Use the existing [Hitbox System](hitbox-system.md) guidance for visualization. Debug
+drawings may display geometry derived from Shared state or received events, but
+visualization does not own collision, hit results, damage, or match authority. No new
+debug wire protocol is defined by this document.
 
 ---
 
-## 10. Implementation Status
+## 10. Implementation references and remaining product work
 
-### Phase 1 — Local prediction ❌ Not implemented
-Deferred to PvP roadmap v2 Phase 7. The client currently renders raw server state (see §6).
-- [ ] PvPMatch.FixedUpdate: keep the NetworkClient for send/receive
-- [ ] Add a local `ServerSimulation` to the match
-- [ ] Each frame: `localSim.Tick(input)` to predict
-- [ ] Apply the predicted state to PlayerRenderer
-- [ ] When the server state arrives: compare, correct if needed
-- [ ] Input buffer (10-frame ring, `_inputBuffer[]`)
-- [ ] Predicted-state buffer (10-frame ring, `_stateBuffer[]`)
-- [ ] Monotonic tick counter (`_sendTick`)
-- [ ] Server echoes the client tick in the response
+The implemented boundaries are:
 
-### Phase 2 — Server-side combat ✅
-- [x] Server handles dash via InputState.Dash
-- [x] Server handles attack via InputState.ActiveSlot
-- [x] Server handles jump via InputState.Jump
-- [x] Full packet serialization (49-byte CharacterStatePacket)
-- [x] ActiveSlot pipeline (slot press → ability resolution → hitbox spawn)
-- [x] HitboxEvent → SpellResolver.Spawn flow
+- Shared deterministic simulation: [`src/Shared/ServerSimulation.cs`](../../src/Shared/ServerSimulation.cs);
+- three-track client rollback: [`src/Shared/Rollback/`](../../src/Shared/Rollback/) and
+  [`RollbackSimulationBridge.cs`](../../client/Unity/Assets/Scripts/Runtime/Simulation/RollbackSimulationBridge.cs);
+- content admission: [`MatchContentCatalog.cs`](../../src/Shared/MatchContentCatalog.cs) and
+  the GameServer match-control/catalog providers under `src/Server/`;
+- transport and packet handling: the Unity `NetworkClient` and Shared packet types.
 
-### Phase 3 — Rollback ❌ Not implemented
-Deferred to PvP roadmap v2 Phase 7.
-- [ ] Client: buffer of sent inputs (last 10 frames)
-- [ ] Client: buffer of predicted states (last 10 frames)
-- [ ] When the server state arrives: mismatch > threshold → re-simulate from the last confirmed state
-- [ ] Tests: simulated UDP delay to stress rollback
-
-### Phase 4 — Bots (separate threads)
-- [ ] Each bot = a thread in ServerApp generating InputState
-- [ ] Thread reads the game states, decides an action, generates input
-- [ ] Send via a thread-safe queue
-- [ ] Scale: 1 thread per bot (typically 4-8 max)
-
-### Phase 5 — Remote server deployment
-- [ ] ServerApp build with `dotnet publish -c Release`
-- [ ] Deployed on a VPS
-- [ ] UDP hole-punching or relay for NAT traversal
-- [ ] Monitoring (latency, packet loss, jitter)
+The [playable friends demo reset](../plans/2026-09-05-playable-demo-reset.md) tracks the
+remaining product work, including roster-complete publishing and remote join-to-rematch
+acceptance. This guide does not claim unexercised remote play as verified.

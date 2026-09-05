@@ -1,4 +1,6 @@
 # SlopArena — PvP Demo Roadmap (v2)
+> **Historical execution plan.** Preserved as a dated decision/implementation record, not a current checklist. Current product work follows the [playable friends demo reset](2026-09-05-playable-demo-reset.md). Revalidate historical status claims against current code before reuse.
+
 
 > **Status:** Rewritten 2026-08-01. Replaces `2026-07-03-pvp-roadmap.md` (archived below as Appendix A).
 > **Goal:** Online PvP demo — 2-4 players, server browser, lobby room, stock mode, over UDP.

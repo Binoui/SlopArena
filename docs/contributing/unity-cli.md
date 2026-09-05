@@ -43,17 +43,21 @@ unity pipeline list --format json
 unity command --project-path client/Unity --detail compact --format json
 ```
 
-The current project exposes 142 self-describing commands, including scene and GameObject
-inspection, serialized fields, assets, prefabs, animation, tests, builds, console logs,
-screenshots, Play mode control, package management, and live C# evaluation.
+The project exposes self-describing commands. Discover current commands with
+`unity command --project-path client/Unity --detail compact --format json`.
 
 
 ## Skill sources
 
-Repository automation guidance lives under `.omp/skills/` and must use the Unity CLI.
-The ignored `client/Unity/.claude/skills/` directory is generated local tooling data from
-the retired UnitySkills/MCP workflow; it is not a project verification source and must not
-override this document.
+- SlopArena operations use repository `.omp/skills/`, `docs/testing.md`, and this
+  document's installed Unity CLI/Pipeline commands.
+- Project skills require explicit `name` and nonempty `description` frontmatter.
+- `.agents/skills/unity-skills` is an ignored local installation; `.claude/skills/unity-skills`
+  points to it. The operational umbrella is excluded for this project because it requires
+  a conflicting REST route. Generic advisory skills remain available.
+- Do not modify `~/.omp/agent/skills`, ignored skill installations, or `skills-lock.json`
+  to repair a project override. Discovery is refreshed by a new OMP session, not by
+  re-reading a stale skill URI in the old session.
 ## Live Editor commands
 
 ```bash
@@ -66,6 +70,7 @@ unity command --project-path client/Unity recompile --format json
 unity command --project-path client/Unity recompile_status --format json
 unity command --project-path client/Unity editor_play --format json
 unity command --project-path client/Unity editor_stop --format json
+```
 
 ## Agent-facing character authoring
 
@@ -121,11 +126,15 @@ unity command --project-path client/Unity \
   | jq -e '.data.result.success'
 ```
 
-The agent workflow is: inspect the package, edit `character.json` or
-`package.json` directly, run the cook command, repair diagnostics, and retry. A
-failed cook does not replace the last valid cooked package, generated assets, or
-persisted cook status.
-```
+Choose the verification mode from [`docs/testing.md`](../testing.md):
+
+- **Local iteration:** edit source or assets, exercise the affected Ability Lab or
+  Training path, and do not cook a publishing package for every tuning change.
+- **Accepted or distributable content:** inspect, cook, verify, and refresh the
+  admitted roster entry when the change is intended to ship.
+
+The commands above remain the concrete Unity CLI reference. A failed cook does not
+replace the last valid cooked package, generated assets, or persisted cook status.
 
 ## Live C# evaluation
 
@@ -159,15 +168,17 @@ Removed from the active project:
 Application dependencies remain, including SignalR and `System.Text.Json` used by the
 client lobby code.
 
-## Verification gate
+## Verification modes
 
-After Unity-facing changes:
+Choose the applicable mode in [`docs/testing.md`](../testing.md):
 
-1. Confirm `unity pipeline list --format json` reports `isReachable: true`.
-2. Run `unity command ... recompile` and poll `recompile_status`.
-3. Read `get_console_logs --severity error` and require zero current errors.
-4. Use `eval` for targeted live state checks.
-5. Use `editor_play` / `editor_stop` for lifecycle checks.
+- **Local iteration:** use the existing Editor development content and exercise
+  the affected Ability Lab or Training path. Recompile when code or the Shared
+  plugin requires it; do not force a recompile for prose or every numeric JSON edit.
+- **Integrated change:** for Unity-facing behavior, confirm Pipeline reachability,
+  recompile when required, read current error logs, and exercise the affected runtime.
+- **Distributable demo:** inspect and cook accepted packages, refresh admitted roster
+  pins, and verify the packaged client/server path.
 
 The standalone CLI and Pipeline package are experimental. If a future Pipeline update
 reintroduces dependency conflicts, keep the project on the last verified version rather

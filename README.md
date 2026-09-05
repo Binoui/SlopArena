@@ -6,7 +6,7 @@ SlopArena takes the platform-fighter fundamentals of movement, damage percent, r
 
 The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-> **Current state:** SlopArena is in active development. FightGuy, Manki, and Kistu are package-native cooked roster characters; Nilus remains playable through the legacy compatibility path while it is migrated.
+> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked roster characters: FightGuy, Manki, Kistu, and Bonk. Nilus remains a legacy compatibility implementation, not a fifth demo character. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
 
 ## The game
 
@@ -23,11 +23,13 @@ Each kit has a canonical **16-entry grid**: grounded and aerial variants for nor
 
 | Fighter | Style | Content status |
 | --- | --- | --- |
-| **FightGuy** | Direct martial-arts fundamentals, projectile, launcher, and beam | Cooked package; reference vertical slice |
+| **FightGuy** | Direct martial-arts fundamentals, projectile, launcher, and beam | Cooked package; rostered |
 | **Manki** | Agile rushdown and explosive space control | Cooked package; rostered |
 | **Kistu** | Sword pressure and counterplay | Cooked package; rostered |
-| **Nilus** | Void-based zoning and control | Legacy compatibility path |
+| **Bonk** | — | Cooked package; rostered |
+| **Nilus** | Void-based zoning and control | Legacy compatibility implementation |
 
+Nilus is compatibility-only and is not a fifth playable demo character.
 See the [FightGuy package reference](docs/characters/fightguy.md) and the [character roster](docs/README.md#character-roster) for details.
 
 ## Development

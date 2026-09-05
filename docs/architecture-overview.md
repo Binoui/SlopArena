@@ -45,7 +45,7 @@ content-cooked/<package>/
 
 FightGuy is the first cooked vertical slice. Its editable source is under `client/Unity/Assets/CharacterPackages/fightguy/`; its canonical runtime package is under `content-cooked/fightguy/`. The generated client catalog is a regenerable presentation cache.
 
-Manki and Kistu are package-native cooked roster characters. Nilus remains behind `LegacyCharacterCatalogAdapter` until migrated. Nilus's C# definition, legacy registry, source path, and baked data are modification-only compatibility. It is not a template for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
+Manki, Kistu, and Bonk are package-native cooked roster characters. Nilus remains behind `LegacyCharacterCatalogAdapter` until migrated. Nilus's C# definition, legacy registry, source path, and baked data are modification-only compatibility. It is not a template for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
 
 ## Runtime flow
 
@@ -63,19 +63,27 @@ Shared ServerSimulation
   └── authoritative CharacterState/events
           │
           ├── Training: LocalSimulationBridge
-          └── PvP: NetworkSimulationBridge + GameServer
+          └── PvP: RollbackSimulationBridge + GameServer
                          │
                          ▼
                PlayerRenderer / UI / VFX
 ```
 
-The GameServer validates and loads the exact package set before simulation starts. Clients verify the same package IDs, versions, dependencies, capability versions, and hashes. A match never observes a later recook.
+The GameServer validates and loads the exact package set before simulation starts. Clients
+verify the same package IDs, versions, dependencies, capability versions, and hashes. A
+match never observes a later recook.
 
 ## Ability boundary
 
-Package abilities are fixed timelines of typed, versioned operations on the canonical 16-entry grid: grounded and aerial variants for `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`. Engine-owned Shared primitives implement movement, hitbox/projectile resolution, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events.
+Package abilities are fixed timelines of typed, versioned operations on the canonical
+16-entry grid: grounded and aerial variants for `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`.
+Engine-owned Shared primitives implement movement, hitbox/projectile resolution, damage,
+Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events.
 
-`CookedTimelineAbility` is the current interpreter. `ServerAbility` and character-specific classes remain for legacy implementations and trusted temporary FightGuy capabilities. They are not a universal new-content authoring API. `AbilityFactory(CharacterClass, slot)` and `MankiData` references in legacy docs must be read only in that compatibility scope.
+`CookedTimelineAbility` is the current interpreter. `ServerAbility` and character-specific
+classes remain for legacy implementations and trusted temporary FightGuy capabilities.
+They are not a universal new-content authoring API. `AbilityFactory(CharacterClass, slot)`
+and `MankiData` references in legacy docs must be read only in that compatibility scope.
 
 ## Unity responsibilities
 
@@ -85,7 +93,7 @@ Unity owns imported assets, package asset catalogs, Ability Lab, input polling, 
 
 ### Package gameplay
 
-Edit the package source, inspect it, cook it through the Unity CLI, then verify the cooked artifact, catalog, hashes, Ability Lab, and Training. See [Adding a Character](characters/adding-a-new-character.md).
+Choose the applicable mode in [Testing and Verification](testing.md): local iteration uses the transient Editor development catalog and affected Ability Lab/Training path; accepted package work uses inspect, cook, verify, and roster refresh before persistence. Do not treat local preview as accepted package verification. See [Adding a Character](characters/adding-a-new-character.md).
 
 ### Shared mechanics
 

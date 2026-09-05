@@ -1,4 +1,6 @@
 # FightGuy Character Authoring/Cooking Cutover
+> **Historical execution plan.** Preserved as a dated decision/implementation record, not a current checklist. Current product work follows the [playable friends demo reset](2026-09-05-playable-demo-reset.md). Revalidate historical status claims against current code before reuse.
+
 
 **Status:** Planned — confirmed 2026-08-26  
 **Decision:** [ADR-0029](../adr/0029-character-authoring-and-cooking.md)  
