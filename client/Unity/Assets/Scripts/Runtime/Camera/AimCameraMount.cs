@@ -4,7 +4,7 @@ using UnityEngine;
 namespace SlopArena.Client.Camera
 {
     /// <summary>
-    /// Owns the dedicated aim camera for CameraForward3D abilities (Bazooka, Grapple).
+    /// Owns the dedicated aim camera for CameraForward3D abilities (Bazooka).
     ///
     /// Attach to the AimCamera GameObject alongside CinemachineCamera only.
     /// Do NOT add CinemachineFollow — position is driven manually via ForceCameraPosition

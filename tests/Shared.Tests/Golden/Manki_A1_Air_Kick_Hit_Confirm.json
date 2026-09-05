@@ -3,12 +3,13 @@
   "TickCount": 90,
   "PlayerSnap": {
     "State": 4,
+    "FacingYaw": 1.5707762,
     "PX": -0.3,
     "PY": 2,
     "PZ": 1.3113417E-08,
     "AttackSlot": 3,
-    "HitstopTicks": 4,
-    "AirTimeTicks": 6,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 8,
     "JumpsLeft": 2
   },
   "NpcSnap": {
@@ -17,24 +18,26 @@
     "PY": 2,
     "PZ": -1.3113417E-08,
     "DamagePercent": 3,
-    "HitstopTicks": 4,
-    "AirTimeTicks": 6,
+    "HitstopTicks": 6,
+    "AirTimeTicks": 8,
     "JumpsLeft": 2
   },
   "PlayerFinal": {
     "State": 10,
+    "FacingYaw": 1.5707964,
     "PX": -0.3,
     "PY": 0.75,
     "PZ": 1.3113417E-08,
     "JumpsLeft": 2
   },
   "NpcFinal": {
-    "State": 10,
     "FacingYaw": -1.5707963,
-    "PX": 1.2898086,
-    "PY": 0.75,
-    "PZ": -3.8703728E-08,
-    "DamagePercent": 3,
+    "PX": 3.1285915,
+    "PY": 3.6645458,
+    "PZ": -8.821367E-08,
+    "VY": -5.23703,
+    "DamagePercent": 8,
+    "AirTimeTicks": 43,
     "JumpsLeft": 2
   }
 }

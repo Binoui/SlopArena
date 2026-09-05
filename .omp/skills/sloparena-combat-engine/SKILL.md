@@ -65,9 +65,9 @@ FightGuy may use versioned `slop.internal.fightguy.*` capabilities while native 
 
 ## Legacy compatibility
 
-`ServerAbility` remains a real Shared compatibility/runtime base. Existing Manki, Kistu, and Nilus implementations, and FightGuy capability adapters, may use its `OnStart`, `Tick`, `OnEnd`, `OnCancel`, `OnHitEntity`, resolver, and presentation sink hooks. `CookedTimelineAbility` also currently derives from it as the interpreter seam.
+`ServerAbility` remains a real Shared compatibility/runtime base. The existing legacy Nilus implementation, built-in capability adapters, and FightGuy capability adapters may use its `OnStart`, `Tick`, `OnEnd`, `OnCancel`, `OnHitEntity`, resolver, and presentation sink hooks. `CookedTimelineAbility` also currently derives from it as the interpreter seam.
 
-This does **not** make polymorphic `ServerAbility` subclasses or `AbilityFactory(CharacterClass, slot)` the universal authoring architecture. New package behavior belongs in cooked timelines and typed/versioned operations. Legacy implementations are modification-only compatibility until migrated. Do not add new global character/slot dispatch, raw authoring loaders, or manual data/config ownership.
+This does **not** make polymorphic `ServerAbility` subclasses or `AbilityFactory(CharacterClass, slot)` the universal authoring architecture. New package behavior belongs in cooked timelines and typed/versioned operations. The legacy Nilus implementation is modification-only compatibility until migrated. Do not add new global character/slot dispatch, raw authoring loaders, or manual data/config ownership.
 
 ## Change checklist
 

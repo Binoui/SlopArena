@@ -119,6 +119,49 @@ public class RehitZoneTests
         Assert.Equal((ushort)5, sim.GetState(100).DamagePercent);
         Assert.Empty(sim.Resolver.GetActiveHitboxes());
     }
+    /// <summary>
+    /// A persistent one-hit capsule must not consume its target eligibility while
+    /// Dash invincibility is active. Once the four invincible resolver ticks end,
+    /// it accepts exactly one hit before the authored lifetime expires.
+    /// </summary>
+    [Fact]
+    public void PersistentHitbox_DashInvincibilityDoesNotConsumeEligibility()
+    {
+        var resolver = new SpellResolver();
+        resolver.Spawn(new Hitbox
+        {
+            X = 0f, Y = 0f, Z = 0f,
+            EndX = 0f, EndY = 1f, EndZ = 0f,
+            Radius = 0.5f,
+            Shape = HitboxShape.Capsule,
+            Damage = 5f,
+            DurationTicks = 8,
+            OwnerId = 1,
+            HitsMultipleOpponents = true,
+        });
+
+        var entities = new System.Collections.Generic.List<SpellResolver.EntityData>
+        {
+            new() { Id = 1, Active = true, PosY = 0.5f, EndY = 0.5f, Radius = 0.3f },
+            new()
+            {
+                Id = 2, Active = true, PosY = 0.5f, EndY = 0.5f, Radius = 0.3f,
+                InvincibilityTicks = 4,
+            },
+        };
+
+        for (int i = 0; i < 4; i++)
+            Assert.Empty(resolver.Tick(entities));
+
+        var target = entities[1];
+        target.InvincibilityTicks = 0;
+        entities[1] = target;
+
+        Assert.Single(resolver.Tick(entities));
+        for (int i = 0; i < 3; i++)
+            Assert.Empty(resolver.Tick(entities));
+    }
+
 
     [Fact]
     public void Interval1_HitsEveryTick()

@@ -47,6 +47,13 @@ The current project exposes 142 self-describing commands, including scene and Ga
 inspection, serialized fields, assets, prefabs, animation, tests, builds, console logs,
 screenshots, Play mode control, package management, and live C# evaluation.
 
+
+## Skill sources
+
+Repository automation guidance lives under `.omp/skills/` and must use the Unity CLI.
+The ignored `client/Unity/.claude/skills/` directory is generated local tooling data from
+the retired UnitySkills/MCP workflow; it is not a project verification source and must not
+override this document.
 ## Live Editor commands
 
 ```bash

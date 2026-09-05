@@ -3,8 +3,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(63)
-/// + hasInput(1) + InputState(19) when the server consumed input that tick.
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(109)
+/// + hasInput(1) + InputState(20) when the server consumed input that tick.
 /// Input relay for client rollback prediction (issue #80, ADR-0010).
 /// </summary>
 public class ServerEntityPacketTests
@@ -27,8 +27,6 @@ public class ServerEntityPacketTests
             AnimIndex = 5,
             FacingYaw = 1.234f,
             MatchState = MatchState.Playing,
-            BuffRemainingTicks = 60,
-            BuffActiveFlags = 0b_0011,
             HitstunLevel = 2,
             AimPitch = -0.5f,
             Deaths = 2,
@@ -177,16 +175,14 @@ public class ServerEntityPacketTests
     [Fact]
     public void SizeConstants_AssertWireLayout()
     {
-        // Downlink max packet size is a wire contract (issue #80, widened per ADR-0011/D10
-        // + hitstop/ADR-0012 + burst/ADR-0014 + slots 6-10/JumpHeldTicks/ADR-0016
-        // + LockOn/ADR-0018 + LedgeRegrabLockTicks/walk-off): 124B base (8 entityId + 4 tick
-        // + 112 CharacterStatePacket) + 1B flag + 20B input.
+        // Downlink max packet size is a wire contract: 8 entityId + 4 tick
+        // + 109 CharacterStatePacket + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(124, ServerEntityPacket.BaseSize);
+        Assert.Equal(121, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(145, ServerEntityPacket.MaxSize);
-        Assert.Equal(125, ServerEntityPacket.NoInputSize);
+        Assert.Equal(142, ServerEntityPacket.MaxSize);
+        Assert.Equal(122, ServerEntityPacket.NoInputSize);
         // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
         // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
         Assert.Equal(20, InputState.Size);

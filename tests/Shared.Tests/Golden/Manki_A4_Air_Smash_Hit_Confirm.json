@@ -3,6 +3,7 @@
   "TickCount": 120,
   "PlayerSnap": {
     "State": 4,
+    "FacingYaw": 1.5707964,
     "PX": -0.3,
     "PY": 2,
     "PZ": 1.3113417E-08,
@@ -23,6 +24,7 @@
   },
   "PlayerFinal": {
     "State": 10,
+    "FacingYaw": 1.5707964,
     "PX": -0.3,
     "PY": 0.75,
     "PZ": 1.3113417E-08,

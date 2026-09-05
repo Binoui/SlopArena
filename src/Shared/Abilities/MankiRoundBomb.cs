@@ -87,7 +87,6 @@ namespace SlopArena.Shared.Abilities
 
             float projRadius = _parameters?.HitboxRadius ?? GetParam(def, "hitbox_radius", 0.6f);
             float projDamage = _parameters?.Damage ?? GetParam(def, "damage", 8f);
-            ApplyBuffBonuses(ref s, ref projDamage, ref projRadius);
             float kbBase = GetParam(def, "knockback_base", 4f);
             float kbGrowth = GetParam(def, "knockback_growth", 6f);
             float explosionKbBase = _parameters?.ExplosionKbBase ?? GetParam(def, "explosion_kb_base", 2.4f);

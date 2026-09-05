@@ -98,7 +98,7 @@ Check the package in Ability Lab, then exercise Training. For online content, ve
 
 ## Legacy compatibility
 
-Manki, Kistu, and Nilus are legacy implementation cases behind `LegacyCharacterCatalogAdapter` until their package migrations. The legacy path is **modification-only compatibility**, not a template for new work.
+Nilus is the remaining legacy implementation case behind `LegacyCharacterCatalogAdapter` until its package migration. The legacy path is **modification-only compatibility**, not a template for new work.
 
 For legacy maintenance, preserve its existing registry and baked-data contracts unless the migration task explicitly changes them. For new work, do not:
 

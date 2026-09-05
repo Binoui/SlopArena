@@ -197,6 +197,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 1.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.low-kick"
             ],
@@ -250,6 +255,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 23,
+            "attackRange": 1.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.double-punch"
             ],
@@ -328,6 +338,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.straight-punch"
             ],
@@ -381,6 +396,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 29,
+            "attackRange": 1.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.floating-kick"
             ],
@@ -459,6 +479,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.sweeping-kick"
             ],
@@ -512,6 +537,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 30,
+            "attackRange": 1.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.high-kick"
             ],
@@ -565,6 +595,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.double-kick"
             ],
@@ -618,6 +651,9 @@
             "landingLagTicks": 12,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 38,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.air-smash"
             ],

@@ -711,13 +711,6 @@ namespace SlopArena.Shared
                 }
             }
 
-            // Buff timer
-            if (s.BuffRemainingTicks > 0)
-            {
-                s.BuffRemainingTicks--;
-                if (s.BuffRemainingTicks == 0)
-                    s.BuffActiveFlags = 0;
-            }
 
             // Status timer
             if (s.StatusRemainingTicks > 0)

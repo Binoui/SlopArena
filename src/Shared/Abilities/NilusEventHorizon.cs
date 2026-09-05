@@ -122,7 +122,6 @@ public sealed class NilusEventHorizon : ServerAbility
             // The blast is the rift's own mouth: there is no separate detonation radius in
             // the spec, and a blast smaller than the drag could not reach what it dragged in.
             float radius = dragRadius;
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             var (kbAngle, kbBase, kbGrowth) = new KnockbackData
             {
@@ -201,7 +200,6 @@ public sealed class NilusEventHorizon : ServerAbility
         // pulse that misses expires immediately instead of lingering into a later tick.
         float pulseDamage = GetParam(def, "drag_damage", 3f);
         float pulseRadius = dragRadius;
-        ApplyBuffBonuses(ref s, ref pulseDamage, ref pulseRadius);
 
         Resolver.Spawn(new Hitbox
         {

@@ -157,19 +157,6 @@ public class CombatPipelineTests
         Assert.Equal(0, (int)npcAfter.HitstunLevel);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // TEST 3: Overclock buff boosts damage
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // Overclock (F, slot 6) grants +3 damage and +0.5 radius to all hitboxes
-    // while the buff is active. Lasts 480 ticks (8s). Injection animation is
-    // 30 ticks, after which the buff persists independently of the ability.
-    //
-    // This test:
-    //   1. Activates Overclock
-    //   2. Waits for injection to finish (40 ticks)
-    //   3. Activates LMB while buff is active
-    //   4. Verifies the hitbox deals boosted damage (4+3=7)
 
     // ═══════════════════════════════════════════════════════════════════
     // EDGE CASE: Mutual combat — two entities attack each other

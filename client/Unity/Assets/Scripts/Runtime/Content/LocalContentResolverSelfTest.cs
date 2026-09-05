@@ -30,13 +30,15 @@ public static class LocalContentResolverSelfTest
             if (!roster.Success || roster.Roster == null)
                 throw new InvalidOperationException("Valid rooted cooked roster could not be resolved: " + Format(roster));
 
-            foreach (var selector in new[] { CharacterClass.Kistu, CharacterClass.Nilus })
-            {
-                var legacy = resolver.ResolveLegacy(selector);
-                if (!legacy.Success || legacy.LegacyEntry == null ||
-                    legacy.LegacyEntry.LegacySelector != selector)
-                    throw new InvalidOperationException($"Valid rooted {selector} legacy snapshot could not be resolved: " + Format(legacy));
-            }
+            var nilusLegacy = resolver.ResolveLegacy(CharacterClass.Nilus);
+            if (!nilusLegacy.Success || nilusLegacy.LegacyEntry == null ||
+                nilusLegacy.LegacyEntry.LegacySelector != CharacterClass.Nilus)
+                throw new InvalidOperationException("Valid rooted Nilus legacy snapshot could not be resolved: " + Format(nilusLegacy));
+
+            var kistuLegacy = resolver.ResolveLegacy(CharacterClass.Kistu);
+            if (kistuLegacy.Success || kistuLegacy.LegacyEntry != null ||
+                !kistuLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
+                throw new InvalidOperationException("Kistu legacy resolution did not fail closed.");
 
             var mankiLegacy = resolver.ResolveLegacy(CharacterClass.Manki);
             if (mankiLegacy.Success || mankiLegacy.LegacyEntry != null ||
@@ -57,7 +59,7 @@ public static class LocalContentResolverSelfTest
             if (unavailable.Success || unavailable.Roster != null || !unavailable.Diagnostics.Any(d => d.Code == "content.package.missing"))
                 throw new InvalidOperationException("Unavailable package resolved unexpectedly or did not fail closed: " + Format(unavailable));
 
-            Debug.Log("[LocalContentResolverSelfTest] Passed rooted roster, cooked Manki, remaining legacy snapshots, unavailable package, and cwd-independence checks.");
+            Debug.Log("[LocalContentResolverSelfTest] Passed rooted roster, cooked packages, remaining Nilus legacy snapshot, unavailable package, and cwd-independence checks.");
 
         }
         finally

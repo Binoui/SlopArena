@@ -75,11 +75,11 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.manki.ga-loop
   - _semanticId: anim.manki.ge
-    _clip: {fileID: -6735769038492794813, guid: df6db2679cfec114592c84fa169bba3d, type: 3}
+    _clip: {fileID: -623603649343465320, guid: e22b1ee000bca18c08984701c3957bf4, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.ge
   - _semanticId: anim.manki.gr
-    _clip: {fileID: 2359611245458126371, guid: c37bf1fea2fbd914e9ff797c1e5557c7, type: 3}
+    _clip: {fileID: 7083634785934937742, guid: c37bf1fea2fbd914e9ff797c1e5557c7, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.gr
   - _semanticId: anim.manki.gf
@@ -102,3 +102,6 @@ MonoBehaviour:
     _clip: {fileID: -203655887218126122, guid: 409aa855fd0381170b05371efe0b7439, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.a4
+  _presentations:
+  - _semanticId: presentation.manki.aerosol-inferno.start
+    _prefab: {fileID: 919132149155446097, guid: c7b6e3a8f5d34b3e9b91c58f6a2e1047, type: 3}

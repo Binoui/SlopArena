@@ -14,7 +14,7 @@ namespace SlopArena.Shared.Abilities
     /// Projectile has gravity + ground collision + explosion with CanHitOwner=true.
     /// Rocket jump: aim at feet → projectile ground-collides near self → explosion.
     /// </summary>
-    public sealed class MankiBazooka : ServerAbility
+    public sealed class MankiBazooka : ServerAbility, IAimHoldCapability
     {
         private readonly CookedMankiBazookaCapabilityParameters? _parameters;
         private enum BazookaPhase { Aiming, Firing, Recovery }
@@ -145,7 +145,6 @@ namespace SlopArena.Shared.Abilities
 
             float radius = _parameters?.HitboxRadius ?? GetParam(def, "hitbox_radius", 0.6f);
             float damage = _parameters?.Damage ?? GetParam(def, "damage", 15f);
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             float kbBase = GetParam(def, "knockback_base", 6f);
             float kbGrowth = GetParam(def, "knockback_growth", 9f);

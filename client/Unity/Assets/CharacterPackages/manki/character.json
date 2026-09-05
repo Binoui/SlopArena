@@ -156,22 +156,20 @@
     }
   ],
   "attachmentBoneIds": [],
-  "presentationIds": [],
+  "presentationIds": [
+    "presentation.manki.aerosol-inferno.start"
+  ],
   "capabilityRequirements": [
     {
       "capabilityId": "slop.internal.manki.round-bomb.v1",
       "capabilityVersion": "1"
     },
     {
-      "capabilityId": "slop.internal.manki.grapple.v1",
+      "capabilityId": "slop.internal.manki.jetpack-boost.v1",
       "capabilityVersion": "1"
     },
     {
       "capabilityId": "slop.internal.manki.bazooka.v1",
-      "capabilityVersion": "1"
-    },
-    {
-      "capabilityId": "slop.internal.manki.overclock.v1",
       "capabilityVersion": "1"
     }
   ],
@@ -195,6 +193,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.9,
             "animationIds": [
               "anim.manki.g1"
             ],
@@ -248,6 +251,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 23,
+            "attackRange": 1.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a1"
             ],
@@ -326,6 +334,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g2"
             ],
@@ -379,6 +390,9 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 29,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a2"
             ],
@@ -457,6 +471,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g3"
             ],
@@ -510,6 +527,9 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 30,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a3"
             ],
@@ -563,6 +583,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g4"
             ],
@@ -616,6 +639,9 @@
             "landingLagTicks": 12,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 38,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a4"
             ],
@@ -693,7 +719,7 @@
                   "explosionDamage": 10,
                   "explosionRadius": 3,
                   "explosionKbBase": 2.4,
-                  "explosionKbGrowth": 3.6,
+                  "explosionKbGrowth": 24,
                   "explosionStunTicks": 18,
                   "explosionDurationTicks": 8,
                   "explosionKbAngle": 30
@@ -706,19 +732,19 @@
     },
     {
       "id": "ground.E",
-      "name": "Grapple Gun",
-      "description": "Fire a grapple hook that pulls Manki toward the hit point",
+      "name": "Jetpack Boost",
+      "description": "Explode upward with a strong vertical boost; drift after reaching the apex.",
       "iconId": "icon.e",
-      "behavior": "projectile",
-      "aimMode": "cameraForward3D",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
       "aimMovement": "fixed",
       "cooldownTicks": 210,
-      "isRecoveryMove": false,
+      "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 600,
+            "durationTicks": 60,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -731,20 +757,19 @@
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",
-                "capabilityId": "slop.internal.manki.grapple.v1",
+                "capabilityId": "slop.internal.manki.jetpack-boost.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "fireTriggerTick": 8,
-                  "tetherSpeed": 40,
-                  "hitboxRadius": 0.3,
-                  "maxFlightTicks": 30,
-                  "maxRange": 15,
-                  "reelSpeed": 25,
-                  "arrivalThreshold": 0.5,
-                  "damage": 3,
-                  "stunTicks": 0,
-                  "kbAngle": 0,
-                  "castDuration": 30
+                  "startupTicks": 3,
+                  "verticalSpeed": 15,
+                  "horizontalSpeed": 3.5,
+                  "explosionRadius": 1.25,
+                  "explosionDamage": 4,
+                  "explosionKbAngle": 75,
+                  "explosionKbBase": 2,
+                  "explosionKbGrowth": 8,
+                  "explosionStunTicks": 8,
+                  "explosionDurationTicks": 4
                 }
               }
             ]
@@ -792,7 +817,7 @@
                   "explosionRadius": 3,
                   "kbAngle": 25,
                   "explosionKbBase": 6,
-                  "explosionKbGrowth": 9,
+                  "explosionKbGrowth": 42,
                   "explosionStunTicks": 22,
                   "explosionDurationTicks": 6,
                   "explosionKbAngle": 25,
@@ -807,10 +832,10 @@
     },
     {
       "id": "ground.F",
-      "name": "Overclock",
-      "description": "Briefly overclock speed and attack power",
+      "name": "Aerosol Inferno",
+      "description": "Shake and point an aerosol can, then project a forward fire column",
       "iconId": "icon.f",
-      "behavior": "selfBuff",
+      "behavior": "areaDenial",
       "aimMode": "none",
       "aimMovement": "fixed",
       "cooldownTicks": 600,
@@ -819,7 +844,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 30,
+            "durationTicks": 52,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -829,13 +854,34 @@
             ],
             "operations": [
               {
-                "kind": "startCapability",
-                "tick": 0,
+                "kind": "emitPresentation",
+                "tick": 18,
                 "unit": "ticks",
-                "capabilityId": "slop.internal.manki.overclock.v1",
-                "capabilityVersion": "1",
-                "parameters": {
-                  "durationTicks": 480
+                "presentationId": "presentation.manki.aerosol-inferno.start"
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 18,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 1.25,
+                  "offsetX": 0,
+                  "offsetY": 0.25,
+                  "offsetZ": 1.25,
+                  "endOffsetX": 0,
+                  "endOffsetY": 4.5,
+                  "endOffsetZ": 1.25,
+                  "startBoneId": null,
+                  "endBoneId": null,
+                  "damage": 15,
+                  "angle": 55,
+                  "baseKnockback": 12,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 30,
+                  "durationTicks": 28,
+                  "interruptible": true,
+                  "hitGroup": 1
                 }
               }
             ]

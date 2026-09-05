@@ -13,6 +13,9 @@ public static class CharacterPackageAuthoringSelfTest
     public static void RunFightGuyAuthoringSelfTest()
     {
         var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
+        string rosterPath = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), "..", "..", "content-cooked/roster/manifest.json");
+        BuiltInRosterManifest rosterBefore = BuiltInRosterManifestCodec.Load(rosterPath);
+        BuiltInRosterEntry fightGuyBefore = rosterBefore.Resolve(CharacterClass.FightGuy)!;
         CharacterPackageInspectionResult initial = service.Inspect("fightguy");
         Require(initial.Success, "FightGuy inspection failed.");
         Require(initial.PackageId == "fightguy", "Inspection returned the wrong package ID.");
@@ -32,9 +35,19 @@ public static class CharacterPackageAuthoringSelfTest
         Require(directCook.Success, "Direct FightGuy cook failed.");
         Require(!string.IsNullOrEmpty(directCook.SourceHash) && !string.IsNullOrEmpty(directCook.CookedContentHash) && !string.IsNullOrEmpty(directCook.PackageHash),
             "Successful cook did not return hashes.");
+        BuiltInRosterEntry fightGuyAfter = BuiltInRosterManifestCodec.Load(rosterPath).Resolve(CharacterClass.FightGuy)!;
+        Require(fightGuyAfter.Selector == fightGuyBefore.Selector &&
+            fightGuyAfter.Requirement.PackageId == "fightguy" &&
+            fightGuyAfter.Requirement.Version == fightGuyBefore.Requirement.Version &&
+            fightGuyAfter.Requirement.CookedContentHash == directCook.CookedContentHash &&
+            fightGuyAfter.Requirement.PackageHash == directCook.PackageHash,
+            "Admitted FightGuy cook did not refresh its roster requirement while preserving the selector.");
+        byte[] rosterBeforeDryRun = File.ReadAllBytes(rosterPath);
         CharacterPackageCookResult dryRun = service.Cook("fightguy", true);
         Require(dryRun.Success && dryRun.DryRun && dryRun.Assembly != null && dryRun.ExpectedOutputs.Count > 0,
             "Dry-run did not return a complete non-mutating cook plan.");
+        Require(File.ReadAllBytes(rosterPath).SequenceEqual(rosterBeforeDryRun),
+            "Dry-run changed the roster manifest.");
         CharacterPackageVerificationResult verified = service.Verify("fightguy");
         Require(verified.Success && verified.Plan != null && verified.Plan.DryRun && verified.Inspection.Rostered,
             "Read-only package verification did not pass without changing roster state.");

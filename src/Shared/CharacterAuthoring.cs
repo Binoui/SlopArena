@@ -124,7 +124,12 @@ public sealed record CharacterStageSource(
     ushort AutoCancelBeforeTicks,
     ushort AutoCancelAfterTicks,
     IReadOnlyList<string> AnimationIds,
-    IReadOnlyList<CharacterTimelineOperationSource> Operations);
+    IReadOnlyList<CharacterTimelineOperationSource> Operations,
+    float AttackRange = 0f,
+    float WarpRange = 0f,
+    bool UseTargetLock = false,
+    bool RotateTowardTarget = false,
+    float TrackingStrength = 0f);
 
 public abstract record CharacterTimelineOperationSource(ushort Tick, AuthoringUnit Unit);
 
@@ -295,18 +300,17 @@ public sealed record MankiRoundBombCapabilityParameters(
     ushort ExplosionStunTicks,
     ushort ExplosionDurationTicks,
     float ExplosionKbAngle) : TypedCapabilityParameters;
-public sealed record MankiGrappleCapabilityParameters(
-    ushort FireTriggerTick,
-    float TetherSpeed,
-    float HitboxRadius,
-    ushort MaxFlightTicks,
-    float MaxRange,
-    float ReelSpeed,
-    float ArrivalThreshold,
-    float Damage,
-    ushort StunTicks,
-    float KbAngle,
-    ushort CastDuration) : TypedCapabilityParameters;
+public sealed record MankiJetpackBoostCapabilityParameters(
+    ushort StartupTicks,
+    float VerticalSpeed,
+    float HorizontalSpeed,
+    float ExplosionRadius,
+    float ExplosionDamage,
+    float ExplosionKbAngle,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks) : TypedCapabilityParameters;
 public sealed record MankiBazookaCapabilityParameters(
     ushort FireTriggerTick,
     float ProjectileSpeed,
@@ -324,8 +328,6 @@ public sealed record MankiBazookaCapabilityParameters(
     float ExplosionKbAngle,
     ushort CastDuration,
     ushort RecoveryDuration) : TypedCapabilityParameters;
-public sealed record MankiOverclockCapabilityParameters(
-    ushort DurationTicks) : TypedCapabilityParameters;
 
 public enum AuthoringAbilityBehavior : byte
 {

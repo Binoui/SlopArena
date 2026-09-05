@@ -4,6 +4,8 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 
 ## Start here
 
+**Current product goal:** [Playable friends demo reset](plans/2026-09-05-playable-demo-reset.md) — four roster characters, one proven online match path, and player feedback before further platform expansion. This is the execution entry point; older migration plans remain historical records.
+
 | Document | Use it for |
 | --- | --- |
 | [Architecture overview](architecture-overview.md) | Repository map, cooked/legacy boundary, and runtime flow |
@@ -38,6 +40,7 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 | Document | Use it for |
 | --- | --- |
 | [Visual language](design/visual-language.md) | Graphic identity, UI composition, palette, typography, motion, and presentation voice |
+| [Stage concepts](design/stage-concepts.md) | Gameplay-first PVP stage concepts, readability, topology, and background hierarchy |
 | [Art and asset conventions](contributing/conventions.md) | 3D character rendering, asset production, naming, licensing, and hygiene |
 | [Visual presentation baseline](visual-baseline.md) | Repeatable gameplay-camera evidence for visual comparisons |
 
@@ -57,12 +60,13 @@ New packages live under `client/Unity/Assets/CharacterPackages/<package>/`. Cook
 | Character | Status | Reference |
 | --- | --- | --- |
 | FightGuy | Cooked package; reference vertical slice | [FightGuy](characters/fightguy.md) |
-| Bonk | Pipeline probe; not rostered | [Bonk](characters/bonk.md) |
-| Manki | Legacy compatibility implementation | [Manki](characters/manki.md) |
-| Kistu | Legacy compatibility implementation | [Kistu](characters/kistu.md) |
+| Bonk | Cooked package; rostered | [Bonk](characters/bonk.md) |
+| Manki | Cooked package; rostered | [Manki](characters/manki.md) |
+| Kistu | Cooked package; rostered | [Kistu](characters/kistu.md) |
 | Nilus | Legacy compatibility implementation | [Nilus](characters/nilus.md) |
 
-The Manki, Kistu, and Nilus pages are modification-only implementation records. Their legacy details must not be copied into new package work.
+The Nilus page is a modification-only legacy implementation record. Its legacy details
+must not be copied into new package work.
 
 ## Contributing
 
@@ -101,6 +105,8 @@ The `research/` directory contains design analysis and external references, incl
 - [Melee/netcode impact](research/melee-model-netcode-impact.md)
 - [DKO mechanics](research/dko-mechanics.md)
 - [DKO character kits](research/dko-character-kits.md)
+
+- [Stage authoring POC debrief](research/stage-authoring-poc-debrief.md) — imported-asset lessons and recommendations for a future stage-authoring skill.
 
 These documents inform design but do not override the Shared implementation or accepted ADRs.
 

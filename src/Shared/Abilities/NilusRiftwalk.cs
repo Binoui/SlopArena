@@ -50,8 +50,8 @@ namespace SlopArena.Shared.Abilities;
 /// for any Idle entity, so E handed air control back on tick 5 and undid the blink's own
 /// VX = VZ = 0. It also put burst_tick = 4 exactly ON the end tick, surviving only because
 /// the burst block sits textually above the end check. With the cached duration the full
-/// 8-tick window the data declares is real. KistuUltFlurry.cs:53 is the in-repo model;
-/// KistuRisingSlash and KistuCounter still carry the trap.
+/// 8-tick window the data declares is real. KistuUltFlurry.cs:53 is the in-repo model for the cached form;
+/// this ability still carries the trap.
 ///
 /// Params: blink_distance, burst_tick, burst_radius, burst_damage, burst_stun_ticks.
 /// </summary>
@@ -116,7 +116,6 @@ public sealed class NilusRiftwalk : ServerAbility
 
             float damage = GetParam(def, "burst_damage", 4f);
             float radius = GetParam(def, "burst_radius", 1.6f);
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             var (kbAngle, kbBase, kbGrowth) = new KnockbackData { Profile = KnockbackProfile.Light }.Resolve();
 

@@ -44,7 +44,6 @@ internal record EntitySnapshot
     public ushort Cooldown3 { get; init; }
     public ushort Cooldown4 { get; init; }
     public ushort Cooldown5 { get; init; }
-    public ushort BuffRemainingTicks { get; init; }
     public byte JumpsLeft { get; init; }
     public bool IsGrounded { get; init; }
     public ushort InvincibilityTicks { get; init; }
@@ -71,7 +70,6 @@ internal record EntitySnapshot
         Cooldown3 = s.Cooldown3,
         Cooldown4 = s.Cooldown4,
         Cooldown5 = s.Cooldown5,
-        BuffRemainingTicks = s.BuffRemainingTicks,
         JumpsLeft = s.JumpsLeft,
         IsGrounded = s.IsGrounded,
         InvincibilityTicks = s.InvincibilityTicks,

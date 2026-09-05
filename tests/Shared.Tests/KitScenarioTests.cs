@@ -105,7 +105,6 @@ public abstract class KitScenarioTests
         Assert.Equal(expected.Cooldown3, actual.Cooldown3);
         Assert.Equal(expected.Cooldown4, actual.Cooldown4);
         Assert.Equal(expected.Cooldown5, actual.Cooldown5);
-        Assert.Equal(expected.BuffRemainingTicks, actual.BuffRemainingTicks);
         Assert.Equal(expected.JumpsLeft, actual.JumpsLeft);
         Assert.Equal(expected.IsGrounded, actual.IsGrounded);
         Assert.Equal(expected.InvincibilityTicks, actual.InvincibilityTicks);

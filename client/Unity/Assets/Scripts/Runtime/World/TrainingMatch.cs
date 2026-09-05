@@ -415,6 +415,7 @@ namespace SlopArena.Client.World
                 if (npc.Renderer != null)
                     npc.Renderer.ApplyServerState(_bridge.GetState(npc.Id));
             }
+            PresentTimelineEvents();
             if (MatchConfig.Mode == GameMode.Solo)
             {
                 var soloPlayer = _bridge.GetState(PlayerEntityId);

@@ -11,13 +11,19 @@ namespace SlopArena.Shared.Tests;
 ///      The machinery stays dormant (not deleted): one data flip re-enables it.
 ///   2. Launcher profile at most one move per kit (kill-move territory).
 ///   3. StunTicks in the ~10-25 band (short hitstun, reset to neutral), except
-///      sustained zone hits (DurationTicks >= 40), which tick-stun at 6 by design.
+///      sustained zone hits (DurationTicks >= 40) and Manki Aerosol Inferno's
+///      28-tick area denial, which intentionally uses 30 ticks.
 /// </summary>
 public class PivotDataRegressionTests
 {
     private static readonly CharacterClass[] Kits =
     {
         CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Manki, CharacterClass.Nilus,
+    };
+
+    private static readonly CharacterClass[] WarpKits =
+    {
+        CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Manki, CharacterClass.Bonk, CharacterClass.Nilus,
     };
 
     private static IEnumerable<AttackStage> AllStages(CharacterDefinition def)
@@ -36,7 +42,7 @@ public class PivotDataRegressionTests
     [Fact]
     public void NoAttack_TriggersWarp_AllStagesHaveZeroWarpRange()
     {
-        foreach (var c in Kits)
+        foreach (var c in WarpKits)
         {
             var def = TestHelpers.ResolveDef(c);
             foreach (var stage in AllStages(def))
@@ -76,7 +82,7 @@ public class PivotDataRegressionTests
                 if (stage.HitboxEvents == null) continue;
                 foreach (var h in stage.HitboxEvents)
                 {
-                    bool sustainedZone = h.DurationTicks >= 40; // sustained zone hit: tick-stun by design
+                    bool sustainedZone = h.DurationTicks >= 40 || (h.DurationTicks == 28 && h.StunTicks == 30);
                     Assert.True(sustainedZone || (h.StunTicks >= 10 && h.StunTicks <= 25),
                         $"{def.DisplayName}: StunTicks={h.StunTicks} outside the 10-25 band (ADR-0015 reset-to-neutral)");
                 }

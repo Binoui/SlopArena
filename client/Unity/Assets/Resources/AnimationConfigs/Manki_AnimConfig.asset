@@ -24,15 +24,6 @@ MonoBehaviour:
   HitHard: {fileID: -203655887218126122, guid: d84164ddf890c95e2861ac63e404d2b9, type: 3}
   Death: {fileID: 0}
   AbilityClips:
-  - Name: spell_lmb_1
-    Clip: {fileID: -203655887218126122, guid: e03fe80e3f21cc05b8cd49f0d1ff686f, type: 3}
-    Extrapolation: 0
-  - Name: spell_lmb_2
-    Clip: {fileID: -203655887218126122, guid: 74a53532aa1c031c1943a1a5f9a73003, type: 3}
-    Extrapolation: 0
-  - Name: spell_lmb_3
-    Clip: {fileID: -203655887218126122, guid: 04477016919ac615bb755b8f7212a093, type: 3}
-    Extrapolation: 0
   - Name: spell_q_loop
     Clip: {fileID: 7400000, guid: e97e870b7fd3c782e9ed4439889058c1, type: 2}
     Extrapolation: 0
@@ -50,10 +41,4 @@ MonoBehaviour:
     Extrapolation: 0
   - Name: spell_r_attack
     Clip: {fileID: 2359611245458126371, guid: c37bf1fea2fbd914e9ff797c1e5557c7, type: 3}
-    Extrapolation: 0
-  - Name: spell_lmb_air_1
-    Clip: {fileID: 7400000, guid: 29f61ff8b245159f19a5d90d5c1b4c80, type: 2}
-    Extrapolation: 0
-  - Name: spell_lmb_air_2
-    Clip: {fileID: 7400000, guid: c52e22b4a064153a68103fafa6597e70, type: 2}
     Extrapolation: 0

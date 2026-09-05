@@ -36,10 +36,10 @@
 ### 2.1 Wire stack
 
 - **Client → server**: `entityId(8) + tick(4) + InputState(20)` = 32 B. `InputState.Size = 8+1+1+2+2+2+2+1+1` (`src/Shared/InputState.cs:62`).
-- **Server → client per entity**: `entityId(8) + tick(4) + CharacterStatePacket(113) + hasInput(1) + InputState(20)` = 125 B base / 126 B no-input / 146 B with relayed input (`src/Shared/ServerEntityPacket.cs:35-41`; `BaseSize = 8 + 4 + CharacterStatePacket.Size`).
-- **CharacterStatePacket.Size = 113**, offsets 0–112 fully packed with no padding (`src/Shared/CharacterStatePacket.cs:79-81` const comment; `Serialize` writes through `buffer[112]` at `:206-316`). Size is **locked by a test**: `Assert.Equal(113, CharacterStatePacket.Size)` (`tests/Shared.Tests/CharacterStatePacketTests.cs:113-129`), and `Assert.Equal(125, ServerEntityPacket.BaseSize)` (`tests/Shared.Tests/ServerEntityPacketTests.cs:178-185`). Any addition = a deliberate bump of the constant + both tests + the size comments.
-- **No version field exists.** The established growth pattern is append-at-end: 63 base → D10 movement-resource fields (ADR-0011) → hitstop (ADR-0012) → burst (ADR-0014) → cooldowns 6–10 + JumpHeldTicks (ADR-0016) → LockOn (ADR-0018) (`CharacterStatePacket.cs:79` comment). Old/new layout can't be mixed on the wire, but there are no released clients and both sides ship together — a size bump is the convention, not a protocol revision.
-- **Doc drift (flag for ADR #142)**: `ServerEntityPacket.cs:22,38-39` comments say "145 bytes"/"125 bytes" and `docs/systems/netcode-architecture.md:137,177` say "up to 145B"/"112 bytes" — all off by one since LockOn (ADR-0018) grew the CSP 112→113. Code + tests say 146/126/125/113; `.omp/AGENTS.md` ("up to 146 bytes per entity") is correct.
+- **Server → client per entity**: `entityId(8) + tick(4) + CharacterStatePacket(109) + hasInput(1) + InputState(20)` = 121 B envelope base / 122 B no-input / 142 B with relayed input (`src/Shared/ServerEntityPacket.cs`; `BaseSize = 8 + 4 + CharacterStatePacket.Size`).
+- **CharacterStatePacket.Size = 109**, offsets 0–108 fully packed with no padding (`src/Shared/CharacterStatePacket.cs`; `Serialize` writes through `buffer[108]`). Size is locked by the packet regression tests. Any addition is a deliberate bump of the constant, tests, and size comments.
+- **No version field exists.** The established growth pattern is append-only and both sides ship together, so a size bump is the protocol convention rather than a versioned layout.
+- **Packet-size contract**: current code and documentation agree on 109-byte `CharacterStatePacket`, 122-byte no-input `ServerEntityPacket`, and 142-byte relayed-input `ServerEntityPacket`.
 
 ### 2.2 What "rollback snapshot" means in this codebase
 

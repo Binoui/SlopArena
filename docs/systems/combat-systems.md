@@ -65,6 +65,8 @@ The client may provide camera-derived aim and target intent. The server validate
 
 Aim indicators and camera movement are visual input aids. They do not bypass server validation or replace Shared simulation.
 
+All roster normals (`ground.1–4` and `air.1–4`) enable target-facing rotation. Specials opt in per move. Shared snaps enabled attacks toward the resolved enemy while locked on; without lock-on, `TrackingStrength` is the fraction of the shortest yaw difference closed per 60 Hz tick, not a per-second rate. Hitstop pauses attack tracking. Unity renders the resulting authoritative facing.
+
 ## Design rules
 
 - Give 3D attacks enough width, height, or depth to compensate for camera perspective, while preserving readable counterplay.

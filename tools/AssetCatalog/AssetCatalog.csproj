@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>SlopArena.AssetCatalog</RootNamespace>
+    <AssemblyName>SlopArena.AssetCatalog</AssemblyName>
+  </PropertyGroup>
+</Project>

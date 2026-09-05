@@ -16,6 +16,7 @@ namespace SlopArena.Client.Animation
         [SerializeField] private GameObject _rig;
         [SerializeField] private SlopArena.Client.Entities.WeaponAttachConfig _weaponConfig;
         [SerializeField] private AnimationEntry[] _animations = Array.Empty<AnimationEntry>();
+        [SerializeField] private PresentationEntry[] _presentations = Array.Empty<PresentationEntry>();
 
         public string PackageId { get => _packageId; set => _packageId = value; }
         public ushort CatalogSchemaVersion { get => _catalogSchemaVersion; set => _catalogSchemaVersion = value; }
@@ -25,6 +26,17 @@ namespace SlopArena.Client.Animation
         public GameObject Rig { get => _rig; set => _rig = value; }
         public SlopArena.Client.Entities.WeaponAttachConfig WeaponConfig { get => _weaponConfig; set => _weaponConfig = value; }
         public AnimationEntry[] Animations { get => _animations ?? Array.Empty<AnimationEntry>(); set => _animations = value ?? Array.Empty<AnimationEntry>(); }
+        public PresentationEntry[] Presentations { get => _presentations ?? Array.Empty<PresentationEntry>(); set => _presentations = value ?? Array.Empty<PresentationEntry>(); }
+
+        [Serializable]
+        public sealed class PresentationEntry
+        {
+            [SerializeField] private string _semanticId = "";
+            [SerializeField] private GameObject _prefab;
+
+            public string SemanticId { get => _semanticId; set => _semanticId = value; }
+            public GameObject Prefab { get => _prefab; set => _prefab = value; }
+        }
 
         [Serializable]
         public sealed class AnimationEntry

@@ -1,0 +1,54 @@
+{
+  "Scenario": "Manki E Jetpack Boost Ignition",
+  "TickCount": 11,
+  "PlayerSnap": {
+    "State": 4,
+    "PX": 0.30780005,
+    "PY": 0.99027777,
+    "PZ": 0.3081489,
+    "VX": 2.4608674,
+    "VY": 14.416667,
+    "VZ": 2.1578562,
+    "AttackSlot": 4,
+    "AirTimeTicks": 31,
+    "JumpsLeft": 2
+  },
+  "NpcSnap": {
+    "State": 2,
+    "FacingYaw": -3.1415927,
+    "PX": -0.027026858,
+    "PY": 0.77933836,
+    "PZ": 0.8060354,
+    "VX": -0.014475684,
+    "VY": 1.7603031,
+    "VZ": 0.49319687,
+    "DamagePercent": 4,
+    "HitstunTicks": 3,
+    "JumpsLeft": 2
+  },
+  "PlayerFinal": {
+    "State": 4,
+    "PX": 0.30780005,
+    "PY": 0.99027777,
+    "PZ": 0.3081489,
+    "VX": 2.4608674,
+    "VY": 14.416667,
+    "VZ": 2.1578562,
+    "AttackSlot": 4,
+    "AirTimeTicks": 31,
+    "JumpsLeft": 2
+  },
+  "NpcFinal": {
+    "State": 2,
+    "FacingYaw": -3.1415927,
+    "PX": -0.027026858,
+    "PY": 0.77933836,
+    "PZ": 0.8060354,
+    "VX": -0.014475684,
+    "VY": 1.7603031,
+    "VZ": 0.49319687,
+    "DamagePercent": 4,
+    "HitstunTicks": 3,
+    "JumpsLeft": 2
+  }
+}

@@ -15,7 +15,7 @@ Entities are registered in the Shared simulation with stable IDs. The same ID is
 - `PvPMatch` supplies local input and receives server packets through the rollback bridge.
 - `PlayerRenderer.ApplyServerState` renders state and semantic events. It does not modify gameplay state.
 
-New character content enters through the immutable Match Content Catalog. FightGuy uses the cooked package path. Manki, Kistu, and Nilus remain legacy definitions behind `LegacyCharacterCatalogAdapter` until migration; their source and registry details are modification-only compatibility.
+New character content enters through the immutable Match Content Catalog. FightGuy, Manki, Kistu, and Bonk use the cooked package path. Nilus remains a legacy definition behind `LegacyCharacterCatalogAdapter` until migration; its source and registry details are modification-only compatibility.
 
 ## Entity identity
 

@@ -339,8 +339,8 @@ public static class AbilityLabFrontendSelfTest
             if (compatibility == null || !compatibility.text.Contains("read-only", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Compatibility legacy-authority banner is missing.");
             var legacySelector = root.Q<DropdownField>("legacy-selector");
-            if (legacySelector == null || !legacySelector.choices.SequenceEqual(new[] { "Manki", "Kistu", "Nilus" }))
-                throw new InvalidOperationException("Compatibility selector must expose exactly Manki, Kistu, and Nilus.");
+            if (legacySelector == null || !legacySelector.choices.SequenceEqual(new[] { "Nilus" }))
+                throw new InvalidOperationException("Compatibility selector must expose exactly Nilus.");
             var authority = root.Q<Label>("compatibility-authority");
             if (authority == null ||
                 !authority.text.Contains("Compatibility Preview", StringComparison.Ordinal) ||

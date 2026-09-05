@@ -52,6 +52,23 @@ internal static class CharacterCookDependencyTracker
                 ApprovalVersion = classification.ApprovalVersion,
             });
         }
+        foreach (var presentation in catalog?.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+        {
+            string path = presentation?.Prefab == null
+                ? ""
+                : UnityCharacterAssetCooker.NormalizeProjectPath(AssetDatabase.GetAssetPath(presentation.Prefab));
+            if (!string.IsNullOrEmpty(path))
+                paths.Add(path);
+            records.Add(new CharacterCookDependencyRecord
+            {
+                Kind = "presentation-object",
+                Identity = presentation?.SemanticId ?? "",
+                Guid = presentation?.Prefab == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(presentation.Prefab).ToString(),
+                DependencyHash = presentation?.Prefab == null ? "" : AssetDatabase.AssetPathToGUID(path),
+                MetaHash = path,
+                Classification = presentation?.Prefab == null ? "missing" : CharacterPackageAuthoringService.ClassifyDependency(packageRoot, path).Classification,
+            });
+        }
         foreach (string path in paths.OrderBy(x => x, StringComparer.Ordinal))
         {
             if (path == catalogPath) continue;
@@ -110,6 +127,9 @@ internal static class CharacterCookDependencyTracker
                 .Append(animation.ClipAssetGuid).Append('|').Append(animation.ClipLengthBits).Append('|')
                 .Append(animation.FrameCount).Append('|').Append((int)animation.Extrapolation).Append('\n');
         }
+        foreach (var presentation in catalog?.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+            canonical.Append("catalog-presentation=").Append(presentation?.SemanticId ?? "").Append('|')
+                .Append(presentation?.Prefab == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(presentation.Prefab).ToString()).Append('\n');
         foreach (var dependency in dependencies)
         {
             canonical.Append("dependency=").Append(dependency.Kind).Append('|').Append(dependency.Identity).Append('|')

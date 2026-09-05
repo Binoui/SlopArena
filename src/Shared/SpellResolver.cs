@@ -64,6 +64,7 @@ namespace SlopArena.Shared
             /// Capsule end (0 = sphere)
             /// </summary>
             public float EndX, EndY, EndZ;
+            public ushort InvincibilityTicks;
             public bool Active;
         }
 
@@ -233,7 +234,7 @@ namespace SlopArena.Shared
                         if (!entity.Active) continue;
                         if (!hb.CanHitOwner && entity.Id == hb.OwnerId) continue;
                         if (hitThisTick.Contains(entity.Id)) continue;
-
+                        if (entity.InvincibilityTicks > 0) continue;
                         bool hit = false;
                         float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
                         float hitX = 0f, hitY = 0f, hitZ = 0f;

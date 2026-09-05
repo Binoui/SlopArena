@@ -58,7 +58,7 @@ FightGuy currently uses explicitly admitted `slop.internal.fightguy.*` capabilit
 
 ## Legacy ServerAbility compatibility
 
-`ServerAbility` remains a concrete Shared lifecycle seam. Existing legacy Manki, Kistu, and Nilus implementations and FightGuy capability adapters may implement:
+`ServerAbility` remains a concrete Shared lifecycle seam. The existing legacy Nilus implementation and built-in capability adapters may implement:
 
 - `OnStart` for activation;
 - `Tick` for per-tick behavior;

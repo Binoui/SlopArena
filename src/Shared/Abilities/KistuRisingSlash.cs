@@ -7,8 +7,8 @@ namespace SlopArena.Shared.Abilities;
 ///
 /// - Rises vertically for "rise_ticks", carrying Kistu up (doubles as vertical recovery).
 /// - Homes horizontally toward the nearest enemy within "homing_range" so it tracks for juggles.
-/// - Spawns its launcher hitbox from the spec's Stages[0].HitboxEvents (authored in KistuData),
-///   like every other slot — the launch angle/damage/knockback live in the spec, not in code.
+/// - Spawns its launcher hitbox from the spec's Stages[0].HitboxEvents (authored in Kistu's
+///   package), like every other slot — the launch angle/damage/knockback live in the spec, not in code.
 /// - Limited by a refundable charge pool (see ServerSimulation charge-stock gate): each cast
 ///   spends one charge; landing a hit refunds it (OnHitEntity) so a connected juggle sustains,
 ///   while whiffing in empty air burns charges — capping recovery to the pool size.

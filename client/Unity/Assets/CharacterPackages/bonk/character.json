@@ -167,6 +167,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g1"
             ],
@@ -219,6 +222,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g2"
             ],
@@ -271,6 +277,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g3"
             ],
@@ -323,6 +332,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g4"
             ],
@@ -628,6 +640,9 @@
             "landingLagTicks": 20,
             "autoCancelBeforeTicks": 15,
             "autoCancelAfterTicks": 34,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a1"
             ],
@@ -680,6 +695,9 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a2"
             ],
@@ -706,6 +724,9 @@
             "landingLagTicks": 22,
             "autoCancelBeforeTicks": 16,
             "autoCancelAfterTicks": 40,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a3"
             ],
@@ -758,6 +779,9 @@
             "landingLagTicks": 24,
             "autoCancelBeforeTicks": 16,
             "autoCancelAfterTicks": 49,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a4"
             ],

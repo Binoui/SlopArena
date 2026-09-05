@@ -306,7 +306,9 @@ namespace SlopArena.Shared
 						{
 							Id = entityId, PosX = wx, PosY = wy, PosZ = wz,
 							Radius = hbd.Radius, Shape = HitboxShape.Sphere,
-							EndX = wx, EndY = wy, EndZ = wz, Active = true,
+							EndX = wx, EndY = wy, EndZ = wz,
+							InvincibilityTicks = state.InvincibilityTicks,
+							Active = true,
 						});
 					}
 				}
@@ -327,7 +329,9 @@ namespace SlopArena.Shared
 					{
 						Id = entityId, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
 						Shape = (sx != ex || sy != ey || sz != ez) ? HitboxShape.Capsule : HitboxShape.Sphere,
-						EndX = ex, EndY = ey, EndZ = ez, Active = true,
+						EndX = ex, EndY = ey, EndZ = ez,
+						InvincibilityTicks = state.InvincibilityTicks,
+						Active = true,
 					});
 				}
 			}
@@ -622,9 +626,6 @@ namespace SlopArena.Shared
 
 				tryDirectAttack:
 
-                // Reject F (Overclock) reactivation while buff already active
-                if (input.ActiveSlot == AbilitySlots.F && (state.BuffActiveFlags & (byte)SlopArena.Shared.BuffType.Overclock) != 0)
-                    continue;
 
                 // Cooked slots use their typed charge pool; legacy slots retain their parameter compatibility.
                 int maxCharges = cookedSlot?.ChargePool?.MaxCharges
@@ -984,7 +985,7 @@ namespace SlopArena.Shared
 									float diff = targetYaw - state.FacingYaw;
 									while (diff > MathF.PI) diff -= 2f * MathF.PI;
 									while (diff < -MathF.PI) diff += 2f * MathF.PI;
-									state.FacingYaw += diff * stage.TrackingStrength * Simulation.TickDt;
+									state.FacingYaw += diff * stage.TrackingStrength;
 								}
 							}
 						}
@@ -1058,7 +1059,7 @@ namespace SlopArena.Shared
 						float diff = targetYaw - state.FacingYaw;
 						while (diff > MathF.PI) diff -= 2f * MathF.PI;
 						while (diff < -MathF.PI) diff += 2f * MathF.PI;
-						state.FacingYaw += diff * attackStage.TrackingStrength * Simulation.TickDt;
+						state.FacingYaw += diff * attackStage.TrackingStrength;
 					}
 				}
 				_states[id] = state;
@@ -1312,13 +1313,11 @@ namespace SlopArena.Shared
 
 			// Spawn explosion hitboxes for all deactivated projectiles this tick
             // NOTE: The ProjectileExplosion config is baked at spawn time, so nothing here
-            // applies Overclock buff bonuses — explosions are secondary effects detached
-            // from the owner's state by the time they resolve. An ability MAY therefore bake
-            // buffed values into the config itself before Resolver.Spawn: NilusVoidRift does
+            // applies owner-state changes — explosions are secondary effects detached from
+            // the owner's state by the time they resolve. An ability MAY therefore bake
+            // values into the config itself before Resolver.Spawn: NilusVoidRift does
             // exactly that (its explosion IS the payload rift), while MankiBazooka and
-            // MankiRoundBomb buff only the direct projectile hit and leave their ground-impact
-            // explosions unbuffed. Buffing an explosion any later would need the owner's buff
-            // flags propagated alongside the projectile and checked at explosion time.
+            // NilusEventHorizon use their authored configs.
 			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
 			{
 				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();

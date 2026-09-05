@@ -231,6 +231,11 @@ public sealed class CookedStage
     public ushort LandingLagTicks { get; }
     public ushort AutoCancelBeforeTicks { get; }
     public ushort AutoCancelAfterTicks { get; }
+    public float AttackRange { get; }
+    public float WarpRange { get; }
+    public bool UseTargetLock { get; }
+    public bool RotateTowardTarget { get; }
+    public float TrackingStrength { get; }
     public IReadOnlyList<string> AnimationIds { get; }
     public IReadOnlyList<CookedTimelineOperation> Operations { get; }
 
@@ -241,13 +246,23 @@ public sealed class CookedStage
         ushort autoCancelBeforeTicks,
         ushort autoCancelAfterTicks,
         IReadOnlyList<string> animationIds,
-        IReadOnlyList<CookedTimelineOperation> operations)
+        IReadOnlyList<CookedTimelineOperation> operations,
+        float attackRange = 0f,
+        float warpRange = 0f,
+        bool useTargetLock = false,
+        bool rotateTowardTarget = false,
+        float trackingStrength = 0f)
     {
         DurationTicks = durationTicks;
         IasaTicks = iasaTicks;
         LandingLagTicks = landingLagTicks;
         AutoCancelBeforeTicks = autoCancelBeforeTicks;
         AutoCancelAfterTicks = autoCancelAfterTicks;
+        AttackRange = attackRange;
+        WarpRange = warpRange;
+        UseTargetLock = useTargetLock;
+        RotateTowardTarget = rotateTowardTarget;
+        TrackingStrength = trackingStrength;
         AnimationIds = new ReadOnlyCollection<string>(new List<string>(animationIds));
         Operations = new ReadOnlyCollection<CookedTimelineOperation>(new List<CookedTimelineOperation>(operations));
     }
@@ -441,18 +456,17 @@ public sealed record CookedMankiRoundBombCapabilityParameters(
     ushort ExplosionStunTicks,
     ushort ExplosionDurationTicks,
     float ExplosionKbAngle) : CookedCapabilityParameters;
-public sealed record CookedMankiGrappleCapabilityParameters(
-    ushort FireTriggerTick,
-    float TetherSpeed,
-    float HitboxRadius,
-    ushort MaxFlightTicks,
-    float MaxRange,
-    float ReelSpeed,
-    float ArrivalThreshold,
-    float Damage,
-    ushort StunTicks,
-    float KbAngle,
-    ushort CastDuration) : CookedCapabilityParameters;
+public sealed record CookedMankiJetpackBoostCapabilityParameters(
+    ushort StartupTicks,
+    float VerticalSpeed,
+    float HorizontalSpeed,
+    float ExplosionRadius,
+    float ExplosionDamage,
+    float ExplosionKbAngle,
+    float ExplosionKbBase,
+    float ExplosionKbGrowth,
+    ushort ExplosionStunTicks,
+    ushort ExplosionDurationTicks) : CookedCapabilityParameters;
 public sealed record CookedMankiBazookaCapabilityParameters(
     ushort FireTriggerTick,
     float ProjectileSpeed,
@@ -470,8 +484,6 @@ public sealed record CookedMankiBazookaCapabilityParameters(
     float ExplosionKbAngle,
     ushort CastDuration,
     ushort RecoveryDuration) : CookedCapabilityParameters;
-public sealed record CookedMankiOverclockCapabilityParameters(
-    ushort DurationTicks) : CookedCapabilityParameters;
 
 public sealed record CookedBudget(
     int SlotCount,

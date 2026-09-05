@@ -1340,7 +1340,7 @@ PrefabInstance:
       objectReference: {fileID: 2800000, guid: 2465661aa146af0ed932e0ff2a876ca9, type: 3}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _arenaNameOverride
-      value: slop_court
+      value: industrial_rooftop
       objectReference: {fileID: 0}
     - target: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}
       propertyPath: _playerClassOverride

@@ -42,6 +42,19 @@ internal static class CharacterBindingWriter
             json.Append('}');
         }
         json.Append(']');
+        json.Append(",\"presentations\":[");
+        first = true;
+        foreach (var presentation in (catalog.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>()).OrderBy(x => x.SemanticId, StringComparer.Ordinal))
+        {
+            if (!first) json.Append(',');
+            first = false;
+            json.Append('{');
+            Property(json, "semanticId", presentation.SemanticId);
+            Property(json, "prefabGlobalObjectId",
+                UnityEditor.GlobalObjectId.GetGlobalObjectIdSlow(presentation.Prefab).ToString(), final: true);
+            json.Append('}');
+        }
+        json.Append(']');
         json.Append('}');
         return Encoding.UTF8.GetBytes(json.ToString());
     }

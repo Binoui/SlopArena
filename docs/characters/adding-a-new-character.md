@@ -105,6 +105,4 @@ source-only probe with invented values.
 
 Do not add `Build<Name>`, registry factories, legacy adapter branches, raw runtime JSON
 loaders, manual animation configs, standalone skeleton ownership, or a second persisted
-slot mapping. Manki, Kistu, and Nilus remain behind `LegacyCharacterCatalogAdapter` until
-their migrations; legacy files are modification-only compatibility, not templates for new
-packages.
+Nilus remains behind `LegacyCharacterCatalogAdapter` until its migration; its legacy files are modification-only compatibility, not templates for new packages.

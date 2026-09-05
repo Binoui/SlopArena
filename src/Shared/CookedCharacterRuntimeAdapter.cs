@@ -43,7 +43,7 @@ public static class CookedCharacterRuntimeAdapter
     private static void SetAirAbility(CharacterDefinition d, int ordinal, AbilitySpec a) { switch (ordinal) { case 0: d.AirSlot1=a; break; case 1: d.AirSlot2=a; break; case 2: d.AirSlot3=a; break; case 3: d.AirSlot4=a; break; case 4: d.AirA=a; break; case 5: d.AirE=a; break; case 6: d.AirR=a; break; case 7: d.AirF=a; break; } }
     private static AttackStage ToAttackStage(CookedStage stage)
     {
-        var result = new AttackStage { DurationTicks=stage.DurationTicks, IasaTicks=stage.IasaTicks, LandingLagTicks=stage.LandingLagTicks, AutoCancelBeforeTicks=stage.AutoCancelBeforeTicks, AutoCancelAfterTicks=stage.AutoCancelAfterTicks, HitboxEvents=Array.Empty<HitboxEvent>() };
+        var result = new AttackStage { DurationTicks=stage.DurationTicks, IasaTicks=stage.IasaTicks, LandingLagTicks=stage.LandingLagTicks, AutoCancelBeforeTicks=stage.AutoCancelBeforeTicks, AutoCancelAfterTicks=stage.AutoCancelAfterTicks, AttackRange=stage.AttackRange, WarpRange=stage.WarpRange, UseTargetLock=stage.UseTargetLock, RotateTowardTarget=stage.RotateTowardTarget, TrackingStrength=stage.TrackingStrength, HitboxEvents=Array.Empty<HitboxEvent>() };
         var events = new List<HitboxEvent>();
         foreach (var operation in stage.Operations)
             if (operation is CookedSpawnHitboxOperation hit)

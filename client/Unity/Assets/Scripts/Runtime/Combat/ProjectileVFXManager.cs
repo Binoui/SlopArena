@@ -114,9 +114,16 @@ namespace SlopArena.Client.Combat
                 var entry = FindProjectileEntry(def?.Class ?? CharacterClass.None, hb.AttackSlot, !owner.IsGrounded);
                 if (entry != null && entry.Prefab != null)
                 {
-                    var go = Instantiate(entry.Prefab);
-                    go.transform.localScale = Vector3.one * entry.Scale;
-                    return go;
+                    try
+                    {
+                        var go = Instantiate(entry.Prefab);
+                        go.transform.localScale = Vector3.one * entry.Scale;
+                        return go;
+                    }
+                    catch (System.InvalidCastException)
+                    {
+                        Debug.LogError($"[ProjectileVFX] Invalid prefab reference for {entry.Character} slot={entry.AttackSlot} airborne={entry.Airborne}; using fallback visual.");
+                    }
                 }
             }
             return BuildProjectileVisual();
@@ -229,12 +236,20 @@ namespace SlopArena.Client.Combat
                 }
             }
             if (prefab == null) { SpawnImpact(position); return; }
-            var go = Instantiate(prefab);
-            go.transform.position = position;
-            go.transform.localScale = Vector3.one * visualScale;
-            Destroy(go, 2.5f);
-        }
+            try
+            {
+                var go = Instantiate(prefab);
+                go.transform.position = position;
+                go.transform.localScale = Vector3.one * visualScale;
+                Destroy(go, 2.5f);
+            }
+            catch (System.InvalidCastException)
+            {
+                Debug.LogError($"[ProjectileVFX] Invalid explosion prefab reference for {cls} slot={hb.AttackSlot}; using fallback impact.");
+                SpawnImpact(position);
+            }
 
+        }
         private void SpawnImpact(Vector3 position)
         {
             // Procedural impact burst — no prefab dependency

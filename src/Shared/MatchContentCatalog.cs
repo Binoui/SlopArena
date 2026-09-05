@@ -198,7 +198,7 @@ public sealed class MatchContentCatalogBuilder
 
 public sealed class LegacyCharacterCatalogAdapter
 {
-    private static readonly CharacterClass[] LegacySelectors = { CharacterClass.Kistu, CharacterClass.Nilus };
+    private static readonly CharacterClass[] LegacySelectors = { CharacterClass.Nilus };
 
     public MatchContentEntry Snapshot(CharacterClass selector)
     {

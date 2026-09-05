@@ -390,32 +390,14 @@ public sealed class CharacterPackageAuthoringService
         if (!verification.Success)
             return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
 
-        string rosterPath = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
-        try
-        {
-            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(rosterPath));
-            if (!manifest.TryGetByPackageId(packageId, out var existing))
-                return CharacterRosterAdmissionResult.Failure(packageId, new[] { Error("roster.package.missing", packageId, "Package is not admitted to the roster.") });
-
-            var requirement = new MatchContentPackageRequirement(
-                packageId,
-                verification.Inspection?.Provenance?.Version ?? "",
-                verification.Plan?.CookedContentHash ?? "",
-                verification.Plan?.PackageHash ?? "");
-            var entries = manifest.Entries
-                .Select(x => x.PackageId == packageId
-                    ? new BuiltInRosterEntry(x.Selector, x.PackageId, requirement)
-                    : x)
-                .ToArray();
-            WriteDurably(rosterPath, Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(
-                new BuiltInRosterManifest(manifest.SchemaVersion, entries))));
-            return CharacterRosterAdmissionResult.Successful(packageId, existing.Selector.ToString());
-        }
-        catch (Exception ex)
-        {
-            diagnostics.Add(Error("roster.refresh.failed", rosterPath, ex.Message));
-            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics);
-        }
+        var requirement = new MatchContentPackageRequirement(
+            packageId,
+            verification.Inspection?.Provenance?.Version ?? "",
+            verification.Plan?.CookedContentHash ?? "",
+            verification.Plan?.PackageHash ?? "");
+        if (!WriteRosterRequirement(packageId, requirement, out var selector, out var refreshDiagnostics))
+            return CharacterRosterAdmissionResult.Failure(packageId, diagnostics.Concat(refreshDiagnostics));
+        return CharacterRosterAdmissionResult.Successful(packageId, selector);
     }
 
 
@@ -450,6 +432,27 @@ public sealed class CharacterPackageAuthoringService
                 cooked.SourceHash, assembly.PackageHash, diagnostics, assembly, false, expectedOutputs);
         }
 
+        if (!TryReadRosterEntry(package.PackageId, out var rosterEntry, out var rosterDiagnostics))
+        {
+            AddUnique(diagnostics, rosterDiagnostics);
+            return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, cookedPath,
+                cooked.SourceHash, assembly.PackageHash, diagnostics, assembly, false, expectedOutputs);
+        }
+        if (rosterEntry != null)
+        {
+            var requirement = new MatchContentPackageRequirement(
+                package.PackageId,
+                package.Source.Manifest.Version,
+                assembly.CookedContentHash,
+                assembly.PackageHash);
+            if (!WriteRosterRequirement(package.PackageId, requirement, out _, out rosterDiagnostics))
+            {
+                AddUnique(diagnostics, rosterDiagnostics);
+                return CharacterPackageCookResult.CreateFailure(package.PackageId, package.ProjectRelativeRoot, cookedPath,
+                    cooked.SourceHash, assembly.PackageHash, diagnostics, assembly, false, expectedOutputs);
+            }
+        }
+
         return CharacterPackageCookResult.CreateSuccess(
             package.PackageId,
             package.ProjectRelativeRoot,
@@ -462,6 +465,8 @@ public sealed class CharacterPackageAuthoringService
             false,
             expectedOutputs);
     }
+
+
 
     public bool TryCompileForEditorPlay(
         string target,
@@ -648,6 +653,63 @@ public sealed class CharacterPackageAuthoringService
             return (false, "");
         }
     }
+    private bool TryReadRosterEntry(string packageId, out BuiltInRosterEntry? entry, out IReadOnlyList<CharacterDiagnostic> diagnostics)
+    {
+        entry = null;
+        string path = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                diagnostics = new[] { Error("roster.read.failed", path, "Roster manifest is missing.") };
+                return false;
+            }
+            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(path));
+            manifest.TryGetByPackageId(packageId, out entry);
+            diagnostics = Array.Empty<CharacterDiagnostic>();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            diagnostics = new[] { Error("roster.read.failed", path, ex.Message) };
+            return false;
+        }
+    }
+
+    private bool WriteRosterRequirement(
+        string packageId,
+        MatchContentPackageRequirement requirement,
+        out string selector,
+        out IReadOnlyList<CharacterDiagnostic> diagnostics)
+    {
+        selector = "";
+        string path = Path.Combine(RepositoryRoot(), "content-cooked", "roster", CharacterPackageAssembler.ManifestPath);
+        try
+        {
+            BuiltInRosterManifest manifest = BuiltInRosterManifestCodec.ParseCooked(File.ReadAllText(path));
+            if (!manifest.TryGetByPackageId(packageId, out var existing))
+            {
+                diagnostics = new[] { Error("roster.package.missing", packageId, "Package is not admitted to the roster.") };
+                return false;
+            }
+            var entries = manifest.Entries
+                .Select(x => x.PackageId == packageId
+                    ? new BuiltInRosterEntry(existing.Selector, existing.PackageId, requirement)
+                    : x)
+                .ToArray();
+            WriteDurably(path, Encoding.UTF8.GetBytes(BuiltInRosterManifestCodec.Serialize(
+                new BuiltInRosterManifest(manifest.SchemaVersion, entries))));
+            selector = existing.Selector.ToString();
+            diagnostics = Array.Empty<CharacterDiagnostic>();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            diagnostics = new[] { Error("roster.refresh.failed", path, ex.Message) };
+            return false;
+        }
+    }
+
 
     private bool TryResolve(string target, List<CharacterDiagnostic> diagnostics, out PackageContext package)
     {
@@ -1350,7 +1412,7 @@ public static class CharacterPackageAssetOwnershipRegistry
             ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
             ["kistu"] = new[] { "Assets/Art/Characters/kistu/", "Assets/Resources/Characters/Kistu.prefab" },
             ["bonk"] = new[] { "Assets/Art/Characters/bonk/" },
-            ["manki"] = new[] { "Assets/Art/Characters/manki/", "Assets/Resources/Characters/Manki.prefab", "Assets/Resources/WeaponConfigs/Manki.asset" },
+            ["manki"] = new[] { "Assets/Art/Characters/manki/", "Assets/CharacterPackages/manki/", "Assets/Resources/Characters/Manki.prefab", "Assets/Resources/WeaponConfigs/Manki.asset" },
         };
 
     public static bool IsOwnedBy(string packageId, string projectRelativePath)

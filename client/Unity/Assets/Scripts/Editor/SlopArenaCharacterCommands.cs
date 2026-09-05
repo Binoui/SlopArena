@@ -98,4 +98,20 @@ public static class SlopArenaCharacterCommands
         [CliArg("package-id", "Admitted package ID.", Required = true)] string packageId)
         => new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot())
             .RefreshRoster(packageId);
+
+    [CliCommand(
+        "sloparena.assets.inspect",
+        "Inspect shortlisted environment prefabs and optionally render local thumbnails.",
+        MainThreadRequired = true,
+        Tags = new[] { "authoring/assets" })]
+    public static object Inspect(
+        [CliArg("workset", "Repository-relative workset JSON path.", Required = true)] string workset,
+        [CliArg("output", "Repository-relative inspection JSON path under .asset-catalog-cache.", Required = true)] string output,
+        [CliArg("render-thumbnails", "Render normalized prefab thumbnails and a contact sheet.", Required = false, DefaultValue = false)] bool renderThumbnails = false,
+        [CliArg("compact", "Return only status counts, diagnostic codes, and evidence paths.", Required = false, DefaultValue = false)] bool compact = false)
+    {
+        AssetCatalogInspectionResult result = new AssetCatalogInspectionService(UnityCharacterAssetCooker.ProjectRoot())
+            .Inspect(workset, output, renderThumbnails);
+        return compact ? (object)result.ToCompact() : result;
+    }
 }

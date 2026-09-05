@@ -187,7 +187,6 @@ public sealed class CookedTimelineAbility : ServerAbility
         float offsetZ = -projectile.LaunchOffsetX * sinYaw + projectile.LaunchOffsetZ * cosYaw;
         float damage = projectile.Damage;
         float radius = projectile.Radius;
-        ApplyBuffBonuses(ref s, ref damage, ref radius);
         Resolver.Spawn(new Hitbox
         {
             X = s.PX + offsetX,

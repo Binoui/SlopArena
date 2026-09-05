@@ -49,7 +49,7 @@ no scene rig, valid rig, and unavailable package preview.
 
 ## Compatibility mode
 
-Manki, Kistu, Nilus, and other unmigrated content remain behind
+Nilus and other unmigrated content remain behind
 `LegacyCharacterCatalogAdapter`. Compatibility is a separate read-only UI shell with a
 persistent legacy-authority banner. It is the only Ability Lab path that may use legacy
 `CharacterClass` selection. Package mode has no package editing controls in Compatibility and

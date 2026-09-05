@@ -67,7 +67,7 @@ Where **Manki** throws objects into space and **Kistu** contests space with a bl
 
 | | Range | Wins neutral by | Kills with |
 |---|---|---|---|
-| Manki | mid/long | throwing threats at you | explosives, Overclock windows |
+| Manki | mid/long | throwing threats at you | explosives, Aerosol Inferno windows |
 | FightGuy | close | mark → pursuit execute | Dragon's Kick on a marked target |
 | Kistu | mid | disjointed reach, juggles | charged spin / spike |
 | **Nilus** | close | denying the retreat, dragging you back | charged Entropy Lance, Event Horizon |
@@ -97,11 +97,11 @@ Riftwalk is both the approach and the only recovery. This is deliberate, and is 
 | **RMB** | Entropy Lance | 9 tap / **15** charged | Medium / Kill *magnitude* at a flatter angle: `Custom{15°, 18, 10}` | 60t | `ChargeAttack`, `ChargeHoldTicks=50`, stage 0 is a 300t hold safety net, then 30t tap / 44t charged. Stun 22 tap / 40 charged. Long thin capsule, 2.2 m, **single-target** — `RehitIntervalTicks` is unset on the HitboxEvent, so `SpellResolver.cs:248-251` deactivates it and breaks after its first victim. **Kill move** |
 | **AirRMB** | Collapse | 10 tap / **14** charged | Spike (−45°) | 0 | `ChargeAttack`, `ChargeHoldTicks=45`, 60t hold stage, then 36t tap / 36t charged. Tap `Stages[1].MoveY = -14`, charged `ChargedStages[0].MoveY = -18` — `AirChargeAttack` drives Nilus down the whole attack, the only class that honours the field. Edgeguard finisher |
 | **Q** | Void Rift | 3 per 0.5s | `{15°, base 2, growth 1}` | 600t | **Signature.** Lobbed void seed (ignores bodies) → grounds → lingering r=3m rift, 4s (240t), damage tick every 30t, 6t stun per tick. 24 total on someone who stands in all of it, *in isolation* — a pulse landing on the same tick as another Nilus hitbox is dropped for a full 30t, so the effective total inside the advertised claw string is below 24 (see Resolution rules). No drag (see Resolution rules) |
-| **E** | Riftwalk | 4 on arrival | Light, r=1.6m, 12t stun | 2 charges, 300t regen | 6m blink, works airborne. Runs its authored **8t** in full: the duration is cached from `Stages[0]` at `OnStart` rather than compared against the `AnimLockTicks` down-counter (that idiom ends an ability at `ceil(N/2)` — `KistuRisingSlash` and `KistuCounter` still carry it and are out of scope here). `burst_tick` 4 therefore sits mid-window, not on the last tick. **Primary recovery** |
+| **E** | Riftwalk | 4 on arrival | Light, r=1.6m, 12t stun | 2 charges, 300t regen | 6m blink, works airborne. Runs its authored **8t** in full: the duration is cached from `Stages[0]` at `OnStart` rather than compared against the `AnimLockTicks` down-counter (that idiom ends an ability at `ceil(N/2)`). `burst_tick` 4 therefore sits mid-window, not on the last tick. **Primary recovery** |
 | **R** | Nether Grasp | 8 | **inward** + 12t stun | 480t | 8m claw capsule (`AttackRange` 9m), **34t** commitment run in full (same cached-duration fix as E). Knockback aimed *at Nilus* pulls the target ~4.1m in. `pull_stun_ticks` asks 20 but `ApplyKnockback` caps hitstun at 12 for this magnitude; the HitboxEvent's own `StunTicks = 20` is inert too, because its knockback magnitude is 0 and the ability's own `ApplyKnockback` call decides. Combo engine |
 | **F** | Event Horizon | 3/pulse + **18** | drag (`drag_force` 3), then **Kill**-class `Custom{40°, 16, 9}`, `detonation_stun_ticks` 40 | 540t | 1.2s telegraph (72t), then a 60t drag pulsing every 10t for 3 (6 pulses = 18), then detonates outward-up on tick 132. Pulses (`RehitIntervalTicks = 1`) and detonation (`= 5`) each damage **every** target inside `drag_radius`, not one arbitrary victim. 36 total on a target that never leaves |
 
-Damage and knockback conventions follow `KistuData.cs` (light chain 3/3/4/6, charged kill 16 with `Custom{15°, 18, 10}`, ult 540t cooldown, charge pools via `Params["max_charges"]` / `["charge_regen_ticks"]`).
+Damage and knockback conventions follow Kistu's package source (light chain 3/3/4/6, charged kill 16 with `Custom{15°, 18, 10}`, ult 540t cooldown, charge pools via `Params["max_charges"]` / `["charge_regen_ticks"]`).
 
 ### Resolution rules
 

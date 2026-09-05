@@ -13,9 +13,9 @@ namespace SlopArena.Shared.Abilities;
 /// VX/VZ from KVX/KVZ on every single hitstun tick (Simulation.cs:470-471). A plain
 /// `target.VZ = …` here is therefore erased before it ever integrates into position —
 /// the target would simply stand still. KVX/KVY/KVZ is the only channel that survives.
-/// It is exactly MankiGrapple's pull with the direction inverted: Grapple reels the
-/// CASTER toward the target (target − attacker), Nether Grasp drags the TARGET toward
-/// the caster (attacker − target).
+/// It is exactly the legacy pull's direction inverted: the old caster-moving
+/// pull went target − attacker; Nether Grasp drags the TARGET toward the caster
+/// (attacker − target).
 ///
 /// This is also why the spec's HitboxEvent carries zero knockback: ResolveHits applies
 /// the hitbox's own knockback first and calls OnHitEntity afterwards
@@ -45,7 +45,7 @@ namespace SlopArena.Shared.Abilities;
 /// Simulation.cs:252) — so Nilus walked freely from tick 18 of a 34-tick commitment, and a
 /// HitboxEvent past tick 17 would have been dropped silently, since the trigger match at
 /// :77 is == rather than >=. KistuUltFlurry.cs:53 is the in-repo model for the cached form;
-/// KistuRisingSlash and KistuCounter still carry the trap.
+/// this ability still carries the trap.
 ///
 /// Params: pull_force, pull_angle, pull_stun_ticks.
 /// </summary>

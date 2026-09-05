@@ -43,6 +43,7 @@ namespace SlopArena.Client.World
         protected bool _showCrosshair;
         protected CharacterDefinition _playerDef = null!;
         protected UnityEngine.Camera _mainCamera;
+        private readonly TimelinePresentationDispatcher _timelinePresentations = new();
         protected MatchPauseMenu _pauseMenu;
 
         /// <summary>True while the in-match pause menu is open (issue #77).</summary>
@@ -59,6 +60,7 @@ namespace SlopArena.Client.World
             gameObject.AddComponent<MatchVisualStyle>().Apply();
         }
         private void FixedUpdate() => OnMatchFixedUpdate();
+        protected virtual void OnDestroy() => _timelinePresentations.Clear();
 
         // ── Leave match (pause menu) ─────────────────────────────────────────
 
@@ -111,6 +113,7 @@ namespace SlopArena.Client.World
             renderer.SetBakedData(entry.BakedAnimation);
             renderer.SetCharacterDefinition(def);
             renderer.SetAnimationCatalog(animationCatalog);
+            _timelinePresentations.Register(entityId, renderer, animationCatalog);
 
             if (local && _playerAnimConfig != null && entry.CookedCharacterPackage == null)
                 renderer.SetAnimationConfig(_playerAnimConfig);
@@ -124,6 +127,8 @@ namespace SlopArena.Client.World
             renderer.GetComponent<WeaponAttach>()?.Init(renderer, weaponConfig);
             return true;
         }
+        protected void PresentTimelineEvents()
+            => _timelinePresentations.Tick(Bridge.LastTickPresentationEvents);
 
         protected void SetupCamera()
         {

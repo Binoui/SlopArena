@@ -3,23 +3,22 @@ using System.Buffers.Binary;
 
 namespace SlopArena.Shared
 {
-    /// <summary>
     /// Downlink per-entity state envelope: the existing broadcast
     /// (entityId + tick + CharacterStatePacket) plus the input-relay section
-    /// (issue #80, ADR-0010): a 1-byte hasInput flag followed by the 19-byte
+    /// (issue #80, ADR-0010): a 1-byte hasInput flag followed by the 20-byte
     /// InputState the server actually consumed for that entity that tick.
     ///
     /// Layout:
     ///   [0..7]   entityId          (8)
     ///   [8..11]  tick              (4)   — _serverTick echo, unchanged reconciliation anchor
-    ///   [12..121] CharacterStatePacket (110)
-    ///   [122]    hasInput          (1)   — 0x01 = relayed InputState follows; 0x00 = no input this tick
-    ///   [123..142] InputState      (20)  — present iff hasInput == 1
+    ///   [12..120] CharacterStatePacket (109)
+    ///   [121]    hasInput          (1)   — 0x01 = relayed InputState follows; 0x00 = no input this tick
+    ///   [122..141] InputState      (20)  — present iff hasInput == 1
     ///
     /// hasInput = 0 reproduces the server's empty-queue path exactly
     /// (Simulation falls back to default(InputState)): the client must omit the
     /// entity from its re-sim inputs dict. The flag is always present, so a
-    /// no-input packet is 123 bytes and a relayed-input packet is 143 bytes.
+    /// no-input packet is 122 bytes and a relayed-input packet is 142 bytes.
     /// </summary>
     public struct ServerEntityPacket
     {
@@ -31,16 +30,16 @@ namespace SlopArena.Shared
         /// <summary>The relayed input (meaningful iff <see cref="HasInput"/>).</summary>
         public InputState Input;
 
-        /// <summary>124 bytes — envelope without the relay section.</summary>
+        /// <summary>121 bytes — envelope without the relay section.</summary>
         public const int BaseSize = 8 + 4 + CharacterStatePacket.Size;
         /// <summary>21 bytes — hasInput flag + InputState.</summary>
         public const int RelaySize = 1 + InputState.Size;
-        /// <summary>145 bytes — full envelope with relayed input.</summary>
+        /// <summary>142 bytes — full envelope with relayed input.</summary>
         public const int MaxSize = BaseSize + RelaySize;
-        /// <summary>125 bytes — envelope with the no-input marker.</summary>
+        /// <summary>122 bytes — envelope with the no-input marker.</summary>
         public const int NoInputSize = BaseSize + 1;
 
-        /// <summary>Encoded length of this packet (125 or 145 bytes).</summary>
+        /// <summary>Encoded length of this packet (122 or 142 bytes).</summary>
         public int WireSize => HasInput ? MaxSize : NoInputSize;
 
         public void Serialize(Span<byte> buffer)
@@ -72,7 +71,7 @@ namespace SlopArena.Shared
             {
                 packet.HasInput = true;
                 // The MaxSize gate IS the truncation handling: a packet short of
-                // 145 bytes with the flag set reads as the no-input marker, keeping
+                // 142 bytes with the flag set reads as the no-input marker, keeping
                 // the invariant that HasInput implies a full, exact relayed input.
                 // (Truncated packets are never emitted by the server.)
                 packet.Input = InputState.Deserialize(buffer.Slice(BaseSize + 1));

@@ -47,7 +47,6 @@ namespace SlopArena.Shared.Abilities
             float startY = s.PY + _parameters.LaunchOffsetY;
             float damage = _parameters.Damage;
             float radius = _parameters.BeamRadius;
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             Resolver.Spawn(new Hitbox
             {

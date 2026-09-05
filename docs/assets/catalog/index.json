@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 2,
+  "catalog": "JustCreate Low Poly Mega Bundle prefab catalog",
+  "format": "JSON Lines; one complete prefab record per line",
+  "entriesFile": "prefabs.jsonl",
+  "packCount": 35,
+  "prefabCount": 9509,
+  "stableId": "Unity asset GUID; unique within sourcePack",
+  "fields": {
+    "id": "Stable Unity asset GUID",
+    "name": "Serialized prefab root name",
+    "path": "Vendor-relative Unity asset path",
+    "sourcePack": "Local source pack name",
+    "category": "Single inferred primary category",
+    "tags": "Inferred free semantic tags",
+    "stageTags": "Inferred stage-composition tags",
+    "metrics": "Cheap serialized metrics; unavailable optional metrics are omitted"
+  },
+  "metricNotes": "Renderer, collider, material, and LOD values come from serialized prefab-local components. Bounds, dimensions, and triangle counts are omitted because computing them would require importing every archived source pack into Unity.",
+  "vocabulary": {
+    "categories": [
+      "barrier",
+      "building",
+      "debris",
+      "food",
+      "furniture",
+      "lighting",
+      "prop",
+      "signage",
+      "structure",
+      "terrain",
+      "utility",
+      "vegetation",
+      "vehicle"
+    ],
+    "tags": [
+      "commercial",
+      "construction",
+      "fantasy",
+      "farm",
+      "festival",
+      "industrial",
+      "market",
+      "nautical",
+      "post-apocalyptic",
+      "residential",
+      "sci-fi",
+      "street",
+      "tropical",
+      "urban"
+    ],
+    "stageTags": [
+      "background",
+      "fighter-height-risk",
+      "foreground",
+      "ground-cover",
+      "landmark-candidate",
+      "large-structure",
+      "midground",
+      "small-clutter",
+      "vertical-silhouette"
+    ]
+  },
+  "categoryDistribution": {
+    "barrier": 1281,
+    "building": 841,
+    "debris": 41,
+    "food": 781,
+    "furniture": 407,
+    "lighting": 162,
+    "prop": 3392,
+    "signage": 88,
+    "structure": 489,
+    "terrain": 788,
+    "utility": 60,
+    "vegetation": 887,
+    "vehicle": 292
+  },
+  "packs": [
+    {
+      "sourcePack": "CartoonCubeWorld",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/CartoonCubeWorld/CartoonCubeWorld_2020.3.0_SRP_v1.01.unitypackage",
+      "prefabCount": 152
+    },
+    {
+      "sourcePack": "CartoonGrass",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/CartoonGrass/CartoonGrass_2021.3_SRP_1.01.unitypackage",
+      "prefabCount": 34
+    },
+    {
+      "sourcePack": "CartoonLowPolyCity",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/CartoonLowPolyCity/CartoonLowPolyCity_2020.3.0_SRP_v1.41.unitypackage",
+      "prefabCount": 126
+    },
+    {
+      "sourcePack": "FantasyForest",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/FantasyForest/FantasyForest_2020.3_SRP_1.01.unitypackage",
+      "prefabCount": 126
+    },
+    {
+      "sourcePack": "FantasyValley",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/FantasyValley/FantasyValley_2020.3_SRP_1.01.unitypackage",
+      "prefabCount": 171
+    },
+    {
+      "sourcePack": "JC_LP_Cars",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/JC_LP_Cars/LP_Cars_2022.3_URP_v1.0.unitypackage",
+      "prefabCount": 111
+    },
+    {
+      "sourcePack": "JC_LP_MedievalCharacters",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/JC_LP_MedievalCharacters/LP_MedievalCharacters_2022.3_URP_v1.0.unitypackage",
+      "prefabCount": 2
+    },
+    {
+      "sourcePack": "LP_CozyInterior_JC",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LP_CozyInterior_JC/LP_CozyInterior_2021.3_SRP_v1.0.unitypackage",
+      "prefabCount": 610
+    },
+    {
+      "sourcePack": "LP_SciFi_Interior",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LP_SciFi_Interior/LP_SciFi_Interior_2021.3_SRP_v1.0.unitypackage",
+      "prefabCount": 298
+    },
+    {
+      "sourcePack": "LowPolyDungeons",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyDungeons/LowPolyDungeons_2020.3.0_SRP_v1.25.unitypackage",
+      "prefabCount": 330
+    },
+    {
+      "sourcePack": "LowPolyFPS",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS/LowPolyFPSMap_2020.3_SRP_v1.02.unitypackage",
+      "prefabCount": 78
+    },
+    {
+      "sourcePack": "LowPolyFPS2",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS2/LowPolyFPS2_2020.3.0_SRP_v1.01.unitypackage",
+      "prefabCount": 108
+    },
+    {
+      "sourcePack": "LowPolyFPS3",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS3/LowPolyFPS3_2020.3.0_SRP_v1.02.unitypackage",
+      "prefabCount": 107
+    },
+    {
+      "sourcePack": "LowPolyFPS4",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS4/LowPolyFPS4_2020.3.0_SRP_v1.0.unitypackage",
+      "prefabCount": 75
+    },
+    {
+      "sourcePack": "LowPolyFPS5",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS5/LowPolyFPS5_2020.3.0_SRP_v1.01.unitypackage",
+      "prefabCount": 137
+    },
+    {
+      "sourcePack": "LowPolyFPS6",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFPS6/LowPolyFPS6_2020.3.0_SRP_v1.0.unitypackage",
+      "prefabCount": 88
+    },
+    {
+      "sourcePack": "LowPolyFantasyArena",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFantasyArena/LowPolyFantasyArena_SRP_2018.3.unitypackage",
+      "prefabCount": 68
+    },
+    {
+      "sourcePack": "LowPolyFantasyArena2",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFantasyArena2/LowPolyFantasyArena2_2020.3.0_SRP_v1.0.unitypackage",
+      "prefabCount": 85
+    },
+    {
+      "sourcePack": "LowPolyFantasyTown",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFantasyTown/CartoonMedievalTown_2020.3_SRP_1.02.unitypackage",
+      "prefabCount": 366
+    },
+    {
+      "sourcePack": "LowPolyFantasyVillage",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFantasyVillage/LowPolyFantasyVillage_1.42_SRP_2020.3.unitypackage",
+      "prefabCount": 219
+    },
+    {
+      "sourcePack": "LowPolyFarm",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyFarm/LowPolyFarm_2020.3_SRP_v1.12.unitypackage",
+      "prefabCount": 272
+    },
+    {
+      "sourcePack": "LowPolyInterior",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyInterior/LowPolyInterior_2020.3_SRP_v1.43.unitypackage",
+      "prefabCount": 404
+    },
+    {
+      "sourcePack": "LowPolyInterior2",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyInterior2/LowPolyInterior2_2020.3_SRP_v1.02.unitypackage",
+      "prefabCount": 2138
+    },
+    {
+      "sourcePack": "LowPolyMegapolis",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyMegapolis/LowPolyMegapolis_1.06_SRP_2020.3.unitypackage",
+      "prefabCount": 536
+    },
+    {
+      "sourcePack": "LowPolyNature (4 seasons)",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyNature (4 seasons)/LowPoly_4S_Nature_2020.3.0_SRP_v1.01.unitypackage",
+      "prefabCount": 248
+    },
+    {
+      "sourcePack": "LowPolyNaturePack",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyNaturePack/LowPolyNaturePack_2020.3.0_SRP_v1.12.unitypackage",
+      "prefabCount": 163
+    },
+    {
+      "sourcePack": "LowPolyOfficeInteriors",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyOfficeInteriors/LowPolyOffice_2020.3.0_SRP_v1.02.unitypackage",
+      "prefabCount": 523
+    },
+    {
+      "sourcePack": "LowPolyPostApocalypticVillage",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyPostApocalypticVillage/LowPolyPostApocalVillage_2021.3_SRP_v1.0.unitypackage",
+      "prefabCount": 263
+    },
+    {
+      "sourcePack": "LowPolyRPGWeapons",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyRPGWeapons/LowPolyRPGWeapons_2020.3.0_SRP_v1.0.unitypackage",
+      "prefabCount": 112
+    },
+    {
+      "sourcePack": "LowPolySciFiCity",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolySciFiCity/LowPolySciFiCity_2021.3_SRP_v1.01.unitypackage",
+      "prefabCount": 301
+    },
+    {
+      "sourcePack": "LowPolyTropicalCity",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyTropicalCity/LowPolyTropicalCity_2020.3.0_SRP_v1.02.unitypackage",
+      "prefabCount": 403
+    },
+    {
+      "sourcePack": "LowPolyWeapons",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyWeapons/LowPolyWeapons_2020.3_SRP_v1.12.unitypackage",
+      "prefabCount": 283
+    },
+    {
+      "sourcePack": "LowPolyWeapons2",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/LowPolyWeapons2/LowPolyWeapons2_2020.3.0_SRP_v1.0.unitypackage",
+      "prefabCount": 247
+    },
+    {
+      "sourcePack": "NatureGradientPack",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/NatureGradientPack/LowPolyNatureGradient_2020.3.0_SRP_v1.42.unitypackage",
+      "prefabCount": 103
+    },
+    {
+      "sourcePack": "TropicalIsland",
+      "sourceArchive": "client/Unity/Assets/LowPolyMegaBundle/TropicalIsland/TropicalEnvironment_2020.3.0_SRP_1.03.unitypackage",
+      "prefabCount": 222
+    }
+  ]
+}

@@ -77,7 +77,6 @@ namespace SlopArena.Shared.Abilities
             float vz = speed * cosPitch * MathF.Cos(_cachedAimYaw);
             float damage = _parameters.Damage;
             float radius = _parameters.HitboxRadius;
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             Resolver.Spawn(new Hitbox
             {

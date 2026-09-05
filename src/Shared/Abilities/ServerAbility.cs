@@ -124,7 +124,6 @@ namespace SlopArena.Shared.Abilities
 
             float damage = evt.Damage;
             float radius = evt.Radius;
-            ApplyBuffBonuses(ref s, ref damage, ref radius);
 
             // Resolve knockback profile to flat values
             var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
@@ -180,19 +179,6 @@ namespace SlopArena.Shared.Abilities
             });
         }
 
-        /// <summary>
-        /// Apply active buff bonuses to damage and radius.
-        /// Call before SpawnHitbox or Resolver.Spawn in any ability.
-        /// Overclock adds +3 damage and +0.5 radius.
-        /// </summary>
-        public static void ApplyBuffBonuses(ref CharacterState s, ref float damage, ref float radius)
-        {
-            if ((s.BuffActiveFlags & (byte)BuffType.Overclock) != 0)
-            {
-                damage += 3f;
-                radius += 0.5f;
-            }
-        }
 
         /// <summary>Set character velocity (world space).</summary>
         protected void SetVelocity(ref CharacterState s, float vx, float vy, float vz)

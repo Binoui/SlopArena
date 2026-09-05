@@ -17,7 +17,7 @@ public sealed class MatchContentCatalogTests
         var result = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), roster.Requirement);
         Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         Assert.Equal("fightguy", result.Identity.PackageId);
-        Assert.Equal("b9eafc397bff604af5adb0f585e9bcd91da25988a5a1c42927472b0580f803d9", result.Identity.CookedContentHash);
+        Assert.Equal(roster.Requirement.CookedContentHash, result.Identity.CookedContentHash);
         Assert.Equal(16, result.Package!.Definition.Slots.Count);
         Assert.NotNull(result.BakedAnimation);
     }
@@ -26,8 +26,8 @@ public sealed class MatchContentCatalogTests
     public void LegacyAdapter_SnapshotsAreIndependent()
     {
         var adapter = new LegacyCharacterCatalogAdapter();
-        var first = adapter.Snapshot(CharacterClass.Kistu);
-        var second = adapter.Snapshot(CharacterClass.Kistu);
+        var first = adapter.Snapshot(CharacterClass.Nilus);
+        var second = adapter.Snapshot(CharacterClass.Nilus);
         Assert.NotSame(first.Definition, second.Definition);
         Assert.Equal(first.Identity, second.Identity);
         first.Definition.DisplayName = "mutated";
@@ -39,6 +39,14 @@ public sealed class MatchContentCatalogTests
     {
         var adapter = new LegacyCharacterCatalogAdapter();
         Assert.False(adapter.TrySnapshot(CharacterClass.Manki, out _, out var diagnostics));
+        Assert.Contains(diagnostics, x => x.Code == "catalog.legacy.selector");
+    }
+
+    [Fact]
+    public void LegacyAdapter_RejectsKistu()
+    {
+        var adapter = new LegacyCharacterCatalogAdapter();
+        Assert.False(adapter.TrySnapshot(CharacterClass.Kistu, out _, out var diagnostics));
         Assert.Contains(diagnostics, x => x.Code == "catalog.legacy.selector");
     }
 

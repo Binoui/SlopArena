@@ -269,11 +269,6 @@ namespace SlopArena.Shared
             }
         }
         /// <summary>
-        /// ── Buff / Self-enhancement ──
-        /// </summary>
-        public ushort BuffRemainingTicks;  // 0 = no active buff
-        public byte BuffActiveFlags;        // bitfield, see BuffType enum
-        /// <summary>
         /// ── Status effects (Marked, Slowed, etc.) ──
         /// </summary>
         public byte StatusFlags;           // bitfield, see StatusType enum

@@ -423,6 +423,7 @@ public static class UnityCharacterAssetCooker
                     diagnostics.Add(Error("asset-catalog.clip.unsupported", $"catalog.bindings[{id}].clip", "Imported clip source is not Humanoid."));
             }
         }
+        ValidatePresentationBindings(catalog, packageId, package, diagnostics);
         var requiredSet = new HashSet<string>(requiredIds.Select(x => x.Id), StringComparer.Ordinal);
 
         foreach (string id in seenIds)
@@ -430,6 +431,46 @@ public static class UnityCharacterAssetCooker
         foreach (var required in requiredIds)
             if (!seenIds.Contains(required.Id))
                 diagnostics.Add(Error("reference.animation.unresolved", required.Path, $"Animation ID '{required.Id}' is not bound by the catalog."));
+    }
+    private static void ValidatePresentationBindings(
+        CharacterAssetCatalog catalog,
+        string packageId,
+        CookedCharacterPackage package,
+        List<CharacterDiagnostic> diagnostics)
+    {
+        if (catalog.Presentations == null || catalog.Presentations.Length == 0)
+            return;
+        var required = new HashSet<string>(package.Definition.PresentationIds ?? Array.Empty<string>(), StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var binding in catalog.Presentations)
+        {
+            string id = binding?.SemanticId ?? "";
+            if (string.IsNullOrWhiteSpace(id) || !id.StartsWith("presentation.", StringComparison.Ordinal))
+            {
+                diagnostics.Add(Error("asset-catalog.presentation.id.invalid", $"catalog.presentations[{id}]", "Presentation semantic ID must use the presentation.* namespace."));
+                continue;
+            }
+            if (!seen.Add(id))
+                diagnostics.Add(Error("asset-catalog.presentation.id.duplicate", $"catalog.presentations[{id}]", "Presentation semantic ID is duplicated."));
+            if (binding.Prefab == null)
+            {
+                diagnostics.Add(Error("asset-catalog.presentation.missing", $"catalog.presentations[{id}].prefab", "Presentation prefab is missing."));
+                continue;
+            }
+            string prefabPath = NormalizeProjectPath(AssetDatabase.GetAssetPath(binding.Prefab));
+            if (!prefabPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                diagnostics.Add(Error("asset-catalog.presentation.invalid", $"catalog.presentations[{id}].prefab", "Presentation binding must reference a prefab."));
+            if (!CharacterPackageAssetOwnershipRegistry.IsOwnedBy(packageId, prefabPath))
+                diagnostics.Add(Error("asset-catalog.presentation.foreign", $"catalog.presentations[{id}].prefab", "Presentation prefab must be owned by the target character package."));
+            if (GlobalObjectId.GetGlobalObjectIdSlow(binding.Prefab).ToString().Length == 0)
+                diagnostics.Add(Error("asset-catalog.presentation.unresolved", $"catalog.presentations[{id}].prefab", "Presentation prefab has no stable Unity global object ID."));
+        }
+        foreach (string id in seen)
+            if (!required.Contains(id))
+                diagnostics.Add(Error("asset-catalog.presentation.orphan", $"catalog.presentations[{id}]", "Presentation binding is not referenced by the canonical document."));
+        foreach (string id in required)
+            if (!seen.Contains(id))
+                diagnostics.Add(Error("reference.presentation.unresolved", "character.presentationIds", $"Presentation ID '{id}' is not bound by the catalog."));
     }
 
     private static void ValidateDependencyClassifications(

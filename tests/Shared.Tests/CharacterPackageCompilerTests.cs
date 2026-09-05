@@ -49,6 +49,37 @@ public sealed class CharacterPackageCompilerTests
         Assert.Equal(result.CookedPackage.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
     }
     [Fact]
+    public void StageTargetingMetadata_SurvivesCompileAndRemainsDeterministic()
+    {
+        CharacterCompileResult result = CompileCharacter(character =>
+        {
+            var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
+            stage["attackRange"] = 3.5;
+            stage["warpRange"] = 4.25;
+            stage["useTargetLock"] = false;
+            stage["rotateTowardTarget"] = true;
+            stage["trackingStrength"] = 0.4;
+        });
+        Assert.NotNull(result.CookedPackage);
+        var stageResult = result.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.1").Timeline.Stages.Single();
+        Assert.Equal(3.5f, stageResult.AttackRange);
+        Assert.Equal(4.25f, stageResult.WarpRange);
+        Assert.False(stageResult.UseTargetLock);
+        Assert.True(stageResult.RotateTowardTarget);
+        Assert.Equal(0.4f, stageResult.TrackingStrength);
+
+        CharacterCompileResult repeated = CompileCharacter(character =>
+        {
+            var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
+            stage["attackRange"] = 3.5;
+            stage["warpRange"] = 4.25;
+            stage["useTargetLock"] = false;
+            stage["rotateTowardTarget"] = true;
+            stage["trackingStrength"] = 0.4;
+        });
+        Assert.Equal(result.CookedPackage.CanonicalBytes, repeated.CookedPackage!.CanonicalBytes);
+    }
+    [Fact]
     public void Kistu_Package_CooksCanonicalSlotsAttachmentsSpreadAndChargePool()
     {
         var result = CharacterPackageCompiler.Compile(

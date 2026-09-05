@@ -29,7 +29,7 @@ public class KnockbackPhysicsDataTests
 
     private static readonly int[] Percents = { 0, 25, 50, 75, 100, 125, 150, 175, 200 };
 
-    // Profiles + a real-world custom move (Kistu charged finisher, KistuData.cs).
+    // Profiles + a real-world custom move (Kistu charged finisher, package source).
     // stunTicks = 60 (engine cap) so hitstun is purely magnitude-derived:
     // hitstun = clamp(8 + magnitude*0.5, 8, 60). Real moves pass lower stun values,
     // which only shorten the constant-velocity phase, never lengthen it.

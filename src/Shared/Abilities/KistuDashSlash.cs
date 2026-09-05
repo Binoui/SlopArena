@@ -123,7 +123,6 @@ public sealed class KistuDashSlash : ServerAbility
 
         float damage = evt.Damage;
         float radius = evt.Radius;
-        ApplyBuffBonuses(ref s, ref damage, ref radius);
 
         var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
 

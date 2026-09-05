@@ -35,10 +35,6 @@ namespace SlopArena.Shared
 
         /// <summary>Match lifecycle state from server.</summary>
         public MatchState MatchState;
-        /// <summary>Buff timer remaining (0 = no active buff). Set by Overclock etc.</summary>
-        public ushort BuffRemainingTicks;
-        /// <summary>Active buff flags bitfield (see BuffType enum).</summary>
-        public byte BuffActiveFlags;
         /// <summary>Hitstun animation tier: 0=small, 1=medium, 2=hard.</summary>
         public byte HitstunLevel;
         /// <summary>Aim pitch in radians, from server authority.</summary>
@@ -77,15 +73,8 @@ namespace SlopArena.Shared
         /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
         public ushort LedgeRegrabLockTicks;
 
-        /// <summary>110 bytes — 63 base + 11 cooldown slots (ADR-0016) + 28 D10 movement-resource
-        /// fields (ADR-0011; −3 for the dropped DirHoldTicks/IsSprinting in ADR-0020) + 2 hitstop
-        /// (ADR-0012) + 4 burst (ADR-0014) + 1 JumpHeldTicks (ADR-0016) + 1 LockOn (ADR-0018)
-        /// + 2 LedgeRegrabLockTicks (walk-off self-grab suppression, on-wire so the rollback
-        /// opponent track reproduces it — off-wire it diverged on replay near a ledge).</summary>
-        public const int Size = 4 + 4 + 4 + 4 + 4 + 4 + 4   // tick + pos + vel (28)
-            + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 1 + 2 + 1 + 1 + 4 + 1 + 2   // 23
-            + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2   // cooldowns (22)
-            + 2 + 2 + 4 + 4 + 2 + 1 + 1 + 2 + 2 + 4 + 4 + 1 + 2 + 2 + 2 + 1 + 1 + 2; // 39
+        /// <summary>109 bytes: fixed state fields, eleven cooldown slots, and rollback resources.</summary>
+        public const int Size = 109;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -107,8 +96,6 @@ namespace SlopArena.Shared
                 FacingYaw = s.FacingYaw,
                 AnimIndex = s.AnimIndex,
                 MatchState = s.MatchState,
-                BuffRemainingTicks = s.BuffRemainingTicks,
-                BuffActiveFlags = s.BuffActiveFlags,
                 HitstunLevel = s.HitstunLevel,
                 AimPitch = s.AimPitch,
                 Deaths = s.Deaths,
@@ -160,11 +147,9 @@ namespace SlopArena.Shared
                 StateTicks = StateDurationFrames,
                 AttackSlot = AttackSlot,
                 ComboStage = ComboStage,
-                FacingYaw = FacingYaw,
                 AnimIndex = AnimIndex,
+                FacingYaw = FacingYaw,
                 MatchState = MatchState,
-                BuffRemainingTicks = BuffRemainingTicks,
-                BuffActiveFlags = BuffActiveFlags,
                 HitstunLevel = HitstunLevel,
                 AimPitch = AimPitch,
                 Deaths = Deaths,
@@ -221,41 +206,39 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(34, 4), BitConverter.SingleToInt32Bits(FacingYaw));
             buffer[38] = (byte)MatchState;
             buffer[39] = AnimIndex;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(40, 2), BuffRemainingTicks);
-            buffer[42] = BuffActiveFlags;
-            buffer[43] = HitstunLevel;
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(44, 4), BitConverter.SingleToInt32Bits(AimPitch));
-            buffer[48] = Deaths;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(49, 2), DamagePercent);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(51, 2), Cooldown0);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(53, 2), Cooldown1);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(55, 2), Cooldown2);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(57, 2), Cooldown3);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(59, 2), Cooldown4);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(61, 2), Cooldown5);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(63, 2), Cooldown6);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(65, 2), Cooldown7);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(67, 2), Cooldown8);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(69, 2), Cooldown9);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(71, 2), Cooldown10);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(73, 2), AirTimeTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(75, 2), DashDurationTicks);
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(77, 4), BitConverter.SingleToInt32Bits(DashDirX));
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(81, 4), BitConverter.SingleToInt32Bits(DashDirZ));
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(85, 2), DashCooldownTicks);
-            buffer[87] = AirDodgesLeft;
-            buffer[88] = JumpsLeft;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(89, 2), InvincibilityTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(91, 2), RushTicks);
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(93, 4), BitConverter.SingleToInt32Bits(LastDirX));
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(97, 4), BitConverter.SingleToInt32Bits(LastDirZ));
-            buffer[101] = WasAirborneDuringKnockback ? (byte)1 : (byte)0;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(102, 2), HitstopTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(104, 2), BurstCooldownTicks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(106, 2), BurstRecoveryTicks);
-            buffer[108] = JumpHeldTicks;
-            buffer[109] = LockOn ? (byte)1 : (byte)0;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(110, 2), LedgeRegrabLockTicks);
+            buffer[40] = HitstunLevel;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(41, 4), BitConverter.SingleToInt32Bits(AimPitch));
+            buffer[45] = Deaths;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(46, 2), DamagePercent);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(48, 2), Cooldown0);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(50, 2), Cooldown1);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(52, 2), Cooldown2);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(54, 2), Cooldown3);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(56, 2), Cooldown4);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(58, 2), Cooldown5);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(60, 2), Cooldown6);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(62, 2), Cooldown7);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(64, 2), Cooldown8);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(66, 2), Cooldown9);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(68, 2), Cooldown10);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(70, 2), AirTimeTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(72, 2), DashDurationTicks);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(74, 4), BitConverter.SingleToInt32Bits(DashDirX));
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(78, 4), BitConverter.SingleToInt32Bits(DashDirZ));
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(82, 2), DashCooldownTicks);
+            buffer[84] = AirDodgesLeft;
+            buffer[85] = JumpsLeft;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(86, 2), InvincibilityTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(88, 2), RushTicks);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(90, 4), BitConverter.SingleToInt32Bits(LastDirX));
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(94, 4), BitConverter.SingleToInt32Bits(LastDirZ));
+            buffer[98] = WasAirborneDuringKnockback ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(99, 2), HitstopTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(101, 2), BurstCooldownTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(103, 2), BurstRecoveryTicks);
+            buffer[105] = JumpHeldTicks;
+            buffer[106] = LockOn ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), LedgeRegrabLockTicks);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -279,41 +262,39 @@ namespace SlopArena.Shared
             packet.FacingYaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(34, 4)));
             packet.MatchState = (MatchState)buffer[38];
             packet.AnimIndex = buffer[39];
-            packet.BuffRemainingTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(40, 2));
-            packet.BuffActiveFlags = buffer[42];
-            packet.HitstunLevel = buffer[43];
-            packet.AimPitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(44, 4)));
-            packet.Deaths = buffer[48];
-            packet.DamagePercent = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(49, 2));
-            packet.Cooldown0 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(51, 2));
-            packet.Cooldown1 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(53, 2));
-            packet.Cooldown2 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(55, 2));
-            packet.Cooldown3 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(57, 2));
-            packet.Cooldown4 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(59, 2));
-            packet.Cooldown5 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(61, 2));
-            packet.Cooldown6 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(63, 2));
-            packet.Cooldown7 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(65, 2));
-            packet.Cooldown8 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(67, 2));
-            packet.Cooldown9 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(69, 2));
-            packet.Cooldown10 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(71, 2));
-            packet.AirTimeTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(73, 2));
-            packet.DashDurationTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(75, 2));
-            packet.DashDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(77, 4)));
-            packet.DashDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(81, 4)));
-            packet.DashCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(85, 2));
-            packet.AirDodgesLeft = buffer[87];
-            packet.JumpsLeft = buffer[88];
-            packet.InvincibilityTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(89, 2));
-            packet.RushTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(91, 2));
-            packet.LastDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(93, 4)));
-            packet.LastDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(97, 4)));
-            packet.WasAirborneDuringKnockback = buffer[101] != 0;
-            packet.HitstopTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(102, 2));
-            packet.BurstCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(104, 2));
-            packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(106, 2));
-            packet.JumpHeldTicks = buffer[108];
-            packet.LockOn = buffer[109] != 0;
-            packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(110, 2));
+            packet.HitstunLevel = buffer[40];
+            packet.AimPitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(41, 4)));
+            packet.Deaths = buffer[45];
+            packet.DamagePercent = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(46, 2));
+            packet.Cooldown0 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(48, 2));
+            packet.Cooldown1 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(50, 2));
+            packet.Cooldown2 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(52, 2));
+            packet.Cooldown3 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(54, 2));
+            packet.Cooldown4 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(56, 2));
+            packet.Cooldown5 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(58, 2));
+            packet.Cooldown6 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(60, 2));
+            packet.Cooldown7 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(62, 2));
+            packet.Cooldown8 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(64, 2));
+            packet.Cooldown9 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(66, 2));
+            packet.Cooldown10 = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(68, 2));
+            packet.AirTimeTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(70, 2));
+            packet.DashDurationTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(72, 2));
+            packet.DashDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(74, 4)));
+            packet.DashDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(78, 4)));
+            packet.DashCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(82, 2));
+            packet.AirDodgesLeft = buffer[84];
+            packet.JumpsLeft = buffer[85];
+            packet.InvincibilityTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(86, 2));
+            packet.RushTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(88, 2));
+            packet.LastDirX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(90, 4)));
+            packet.LastDirZ = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(94, 4)));
+            packet.WasAirborneDuringKnockback = buffer[98] != 0;
+            packet.HitstopTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(99, 2));
+            packet.BurstCooldownTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(101, 2));
+            packet.BurstRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(103, 2));
+            packet.JumpHeldTicks = buffer[105];
+            packet.LockOn = buffer[106] != 0;
+            packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
             return packet;
         }
 
@@ -337,8 +318,6 @@ namespace SlopArena.Shared
             s.AnimIndex = AnimIndex;
             s.FacingYaw = FacingYaw;
             s.MatchState = MatchState;
-            s.BuffRemainingTicks = BuffRemainingTicks;
-            s.BuffActiveFlags = BuffActiveFlags;
             s.HitstunLevel = HitstunLevel;
             s.AimPitch = AimPitch;
             s.Deaths = Deaths;

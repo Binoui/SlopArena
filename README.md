@@ -6,7 +6,7 @@ SlopArena takes the platform-fighter fundamentals of movement, damage percent, r
 
 The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-> **Current state:** SlopArena is in active development. FightGuy is the first complete package-native character vertical slice, while Manki, Kistu, and Nilus remain playable through the legacy compatibility path as they are migrated.
+> **Current state:** SlopArena is in active development. FightGuy, Manki, and Kistu are package-native cooked roster characters; Nilus remains playable through the legacy compatibility path while it is migrated.
 
 ## The game
 
@@ -24,8 +24,8 @@ Each kit has a canonical **16-entry grid**: grounded and aerial variants for nor
 | Fighter | Style | Content status |
 | --- | --- | --- |
 | **FightGuy** | Direct martial-arts fundamentals, projectile, launcher, and beam | Cooked package; reference vertical slice |
-| **Manki** | Agile rushdown and explosive space control | Legacy compatibility path |
-| **Kistu** | Sword pressure and counterplay | Legacy compatibility path |
+| **Manki** | Agile rushdown and explosive space control | Cooked package; rostered |
+| **Kistu** | Sword pressure and counterplay | Cooked package; rostered |
 | **Nilus** | Void-based zoning and control | Legacy compatibility path |
 
 See the [FightGuy package reference](docs/characters/fightguy.md) and the [character roster](docs/README.md#character-roster) for details.

@@ -2,8 +2,8 @@
 id: "manki"
 name: "Manki"
 title: "The Mad Bomber Monkey"
-status: "Alpha Prototype (Ready)"
-archetype: "Hybrid Zoner / Skirmisher. Controls space with bounce bombs, closes gaps with grapple, pokes with FPS bazooka, and commits with high-launch combos."
+status: "Package-native cooked character"
+archetype: "Hybrid Zoner / Recovery Skirmisher. Controls space with bounce bombs, launches from danger with Jetpack Boost, pokes with FPS bazooka, and commits with Aerosol Inferno."
 source_image: "manki_action.png"
 palette:
   fur: "#D84315"
@@ -33,25 +33,24 @@ kit:
     type: "projectile"
     description: "Lob round bomb in arc -> explodes on impact. Poke / zone, aimable air + ground."
   - slot: "E"
-    name: "Grapple Gun"
-    type: "mobility"
-    description: "Fire a tether in aim direction. On enemy hit: reel toward them, 3 damage, no stun. On terrain hit: reel to impact point."
+    name: "Jetpack Boost"
+    type: "recovery"
+    description: "Compress for 3 ticks, then explode upward at 15 m/s with up to 3.5 m/s horizontal launch. Drift returns at the apex."
   - slot: "R"
     name: "Bazooka"
     type: "artillery"
     description: "Fire a rocket in camera direction. Short cast, then fire. Projectile arcs with gravity, explodes on contact. Self-rocket-jump via explosion (4 self-damage)."
   - slot: "F"
-    name: "Overclock"
-    type: "buff"
-    description: "Mad scientist inject. Self-buff 8s: all attacks deal +3 bonus damage and +0.5m larger hitboxes (LMB, RMB, Q)."
+    name: "Aerosol Inferno"
+    type: "area denial"
+    description: "Commit to a forward aerosol inferno zone that catches opponents above and in front of Manki."
 ---
 
 # Manki — Mad Bomber Monkey
-> **Legacy implementation record — modification only.** The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities. This file records the current prototype and is not a template for new kit design. New characters must use `client/Unity/Assets/CharacterPackages/<package>/`.
 
 
-> Status: Implemented (prototype — animations placeholder)
-> Replaces: Narodin (removed)
+> Status: Package-native authoring source cooked and rostered. The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities.
+> Package source: `client/Unity/Assets/CharacterPackages/manki/`; cooked runtime: `content-cooked/manki/`.
 > Inspired by: Ziggs (LoL) × rushdown brawler — pyromaniac mad inventor monkey
 
 ## Concept
@@ -60,13 +59,13 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 
 ## Archetype
 
-**Explosive all-rounder / Grapple-bazooka hybrid** — mobile skirmisher with flexible approach options.
+**Explosive all-rounder / Jetpack-bazooka hybrid** — mobile skirmisher with flexible approach options.
 - Poke with round bombs, zone with aerosol flame, control space with Q pressure
-- Vertical mobility via rocket jump (R at feet), horizontal mobility via grapple (E to walls/enemies)
-- Gameplan: poke with Q → close gap with grapple → ground combo → rocket jump for air follow-up
-- E grapple is a gap closer AND escape tool (reel toward enemy for engage, reel to terrain for disengage)
+- Recover vertically with Jetpack Boost (E), then regain air drift at the apex
+- Gameplan: poke with Q → commit with ground combo → Jetpack Boost to recover → rocket jump for air follow-up
+- E is a 3-tick vulnerable compression followed by one small ignition hitbox; horizontal input is sampled once at ignition
 - R is fast fire-and-forget poke with rocket jump utility; aim at feet for vertical launch, aim at distant enemies for explosive poking
-- F is a "win neutral" steroid, not a single big hit
+- F is a committed area-denial finisher with a tall forward hitbox
 
 ## Palette
 
@@ -87,41 +86,43 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 | **Air LMB** | Air Kick (2 hits) | Two air kicks | 2-hit combo, first kick lunges, second has higher KB |
 | **Air RMB** | Knuckle Spike | Double knuckle punch down (hold to charge) | Two-phase charge: tap = quick spike (10 dmg), hold >45 ticks = charged spike (14 dmg). Downward, high KB |
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
-| **E** | Grapple Gun | Fire tether in aim direction | On enemy hit: reel + 3 dmg no stun. On terrain: reel to point. Gap closer + escape |
+| **E** | Jetpack Boost | Compression → ignition launch | 3 vulnerable startup ticks; 15 m/s vertical, normalized 3.5 m/s horizontal cap; 1.25m ignition sphere, 4 damage, 75° / 2+8 KB, 8 stun, 4 ticks; no ascent steering; air drift returns at apex |
 | **R** | Bazooka | Short cast → fire rocket in camera direction | FPS-style fire-and-forget. Projectile arcs, explodes on impact. Rocket jump (4 self-dmg) |
-| **F** | Overclock | Mad scientist inject — eyes glow red, crackling energy | Self-buff 8s: all attacks deal +3 bonus damage and +0.5m larger hitboxes (LMB, RMB, Q bombs) |
+| **F** | Aerosol Inferno | Aerosol can vents a tall orange flame column | Forward area denial; 15 damage, 55° launch, 30 ticks stun |
 
 ## Design Notes
 - **Air LMB**: Air Kick — 2-hit combo via `AirLmbCombo` (generic `StageChainAbility` subclass, shared by all characters). First kick (16 ticks, 4 dmg, lunge) chains to second kick (18 ticks, 6 dmg, higher KB). Buffer input during stage 1 to chain.
 - **Air RMB**: Knuckle Spike — hold-to-charge via `AirChargeAttack` (shared charge lifecycle, `ChargeHoldTicks=45`). Pressing mid-ascent stops the climb and the charge hovers in place (deliberately unlike air LMB, which keeps momentum). Tap (release before threshold) = the original spike (16 tick startup, 30 total, capsule straight down OffY=-0.5 to -1.5, 10 damage); charged = bigger knuckle (radius 1.0, 14 damage, 40t stun). Spike knockback (downward). Punish tool for reads.
-- **E**: Grapple Gun. Fire a tether in AimYaw/AimPitch direction. On entity hit: anchor to target, 3 flat damage, no knockback/stun, reel toward them at reel speed. On terrain hit: anchor at impact point, reel there. Arrival within 0.5m threshold ends the ability. No hold-to-aim — fires immediately on press. Functions as gap closer (enemy hit) and escape tool (terrain hit).
+- **E**: Jetpack Boost. On activation, Manki compresses for 3 vulnerable ticks while preserving vertical fall velocity and clearing horizontal velocity. On ignition, the authoritative simulation samples the current movement stick, normalizes it when above 0.001 magnitude, and launches at `VY=15` with horizontal speed `3.5` along that direction. A single owner-centered sphere (radius 1.25, damage 4, 75° angle, base 2, growth 8, stun 8, duration 4) resolves the ignition hit. The ascent is unsteerable; gravity is active immediately, and normal air drift/actions return when `VY <= 0`. Cooldown: 210 ticks. The move is a recovery move and aliases `air.E` to `ground.E`.
 - **R**: Bazooka (FPS-style). Short cast (20 ticks), fire a rocket projectile in camera direction (AimYaw/AimPitch). Projectile has gravity (15 m/s²), speed 40 m/s, max flight 45 ticks. Explodes on entity hit or ground contact with 3m AoE. CanHitOwner=true on explosion — aim at feet for rocket jump (4 self-damage, upward knockback). No rise, no hover, no hold-to-aim. 240 tick cooldown (4s).
-- **F**: Overclock. Manki injects himself with a mysterious substance (red can). Glowing red eyes, crackling energy. For 8 seconds, all his attacks deal +3 bonus damage and have +0.5m larger hitboxes. No single big hit, makes his whole kit scarier.
+- **F**: Aerosol Inferno. A tall forward aerosol flame column starts after the commitment window. It is an area-denial finisher, not a self-buff.
 
-## Animation Names (to create)
+## Animation Inventory
 
 | Key | Animation | Maps to |
 |-----|-----------|---------|
-| `attack_1` | Punch | LMB stage 1 |
-| `attack_2` | Roundhouse / leg sweep | LMB stage 2 |
-| `attack_3` | Fire uppercut | LMB stage 3 (launcher) |
-| `spell_lmb_air` | Air kick | Air LMB (both stages) |
-| `spell_rmb_charged` | Shake aerosol | RMB charge hold (AnimIndex=0) |
-| `spell_rmb_attack` | Cone flame jet | RMB release — both normal and charged (AnimIndex=1) |
-| `spell_rmb_air` | Double knuckle spike | Air RMB |
-| `spell_q_start` | Hold round bomb | Q aim (start/loop) |
-| `spell_q_loop` | Hold round bomb | Q aim (loop) |
-| `spell_q_end` | Throw round bomb | Q throw |
-| `spell_e` | Arm thrust / fire | E Grapple Gun |
-| `spell_r` | Bazooka cast | R Bazooka |
-| `spell_f` | Overclock injection | F (ult) |
+| `anim.manki.g1` | Grounded monkey punch | Ground `1` |
+| `anim.manki.a1` | Air kick | Air `1` |
+| `anim.manki.g2` | Straight punch | Ground `2` |
+| `anim.manki.a2` | Air swing | Air `2` |
+| `anim.manki.g3` | Sweeping kick | Ground `3` |
+| `anim.manki.a3` | High kick | Air `3` |
+| `anim.manki.g4` | Double kick | Ground `4` |
+| `anim.manki.a4` | Air smash | Air `4` |
+| `anim.manki.ga` | Round bomb | Ground `A` |
+| `anim.manki.ge` | Jetpack Boost | Ground `E` and Air `E` alias |
+| `anim.manki.gr` | Bazooka | Ground `R` |
+| `anim.manki.gf` | Aerosol Inferno | Ground `F` and Air `F` alias |
 
 ## Files
-- `Shared/Abilities/MankiBazooka.cs` — FPS rocket launcher (R)
-- `Shared/Abilities/MankiGrapple.cs` — Grapple Gun (E)
-- `Shared/Abilities/MankiOverclock.cs` — Self-buff (F)
-- `Shared/Abilities/AirLmbCombo.cs` — Generic air LMB combo (LmbCombo pattern, airborne-only stages)
-- `Shared/CharacterDefinition.cs` — enum + registry entry
+- `client/Unity/Assets/CharacterPackages/manki/package.json` — package identity and license
+- `client/Unity/Assets/CharacterPackages/manki/character.json` — canonical authoring source and 16-slot projection
+- `client/Unity/Assets/CharacterPackages/manki/CharacterAssetCatalog.asset` — Unity presentation bindings
+- `client/Unity/Assets/CharacterPackages/manki/Presentation/MankiAerosolInferno.prefab` — F presentation binding
+- `content-cooked/manki/manifest.json` — cooked package manifest and hashes
+- `content-cooked/manki/character.runtime.json` — normalized runtime definition
+- `content-cooked/manki/poses.bin` — deterministic cooked pose data
+- `content-cooked/manki/client.bindings` — generated client bindings
 
 ## Previous Design
 

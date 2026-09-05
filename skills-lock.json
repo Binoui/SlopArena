@@ -91,6 +91,12 @@
       "skillPath": "skills/engineering/triage/SKILL.md",
       "computedHash": "7c923b6a677cfe689500721f08307e2a4c46797ff169dc55ef6c34a431a0d533"
     },
+    "unity-skills": {
+      "source": "Besty0728/Unity-Skills",
+      "sourceType": "github",
+      "skillPath": "SkillsForUnity/unity-skills~/SKILL.md",
+      "computedHash": "6f824130cf229d2f0746d54df26824493e320eab36898a3f32aa20998c60831e"
+    },
     "wayfinder": {
       "source": "mattpocock/skills",
       "sourceType": "github",

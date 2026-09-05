@@ -77,8 +77,8 @@ public class KistuAbilityTests
         var evt = stage.HitboxEvents[0];
         var baked = TestHelpers.LoadBakedData(Def);
 
-        // Use the final authored capsule pose during its active window. A fixed world position
-        // is not valid for every normal because the baked blade pose moves each tick.
+        // Hold aim on a forward enemy while checking the blade's lateral sweep
+        // against a second enemy at the sampled pose.
         ushort targetTick = (ushort)(evt.TriggerTick + evt.DurationTicks - 1);
         var pose = TestHelpers.PlayerState();
         pose.PY = GroundPY;
@@ -91,9 +91,10 @@ public class KistuAbilityTests
         var npc = TestHelpers.NpcState((hx + tx) * 0.5f, (hz + tz) * 0.5f);
         npc.PY = (hy + ty) * 0.5f;
         sim.RegisterEntity(100, Def, npc, baked);
+        sim.RegisterEntity(101, Def, TestHelpers.NpcState(0f, 5f) with { PY = GroundPY }, baked);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: slot) }, { 100, default } });
-        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, default }, { 100, default } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = slot, TargetEntityId = 101 } }, { 100, default } });
+        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, new InputState { TargetEntityId = 101 } }, { 100, default } });
 
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }

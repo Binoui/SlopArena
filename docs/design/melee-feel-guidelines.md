@@ -137,7 +137,7 @@ Feel guidance:
 
 ## 5. Worked audit: the Kistu normal tier
 
-Applying §1–§2 to Kistu's normals produced the tuning in `KistuData.cs` (2026-08-16):
+Applying §1–§2 to Kistu's normals produced the tuning in the package source (2026-08-16):
 
 | Move | before | after | why |
 |---|---|---|---|

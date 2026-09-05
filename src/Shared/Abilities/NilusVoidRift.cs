@@ -69,7 +69,6 @@ public sealed class NilusVoidRift : AimHoldAbility
 
         float riftDamage = GetParam(def, "rift_damage", 3f);
         float riftRadius = GetParam(def, "rift_radius", 3f);
-        ApplyBuffBonuses(ref s, ref riftDamage, ref riftRadius);
 
         Resolver.Spawn(new Hitbox
         {

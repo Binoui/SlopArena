@@ -71,25 +71,28 @@ public sealed class LocalContentResolver
 
     public LocalContentResolution ResolveLegacy(CharacterClass selector)
     {
-        if (selector == CharacterClass.None || selector == CharacterClass.FightGuy ||
-            (selector != CharacterClass.Kistu && selector != CharacterClass.Nilus))
+        if (selector != CharacterClass.Nilus)
             return Failure("content.legacy.selector", selector.ToString(), "Selector is not a legacy compatibility character.");
 
         var rosterResolution = ResolveRoster();
         if (!rosterResolution.Success || rosterResolution.Roster == null)
             return rosterResolution;
-        if (!rosterResolution.Roster.TryGetBySelector(selector, out var rosterEntry))
-            return Failure("content.legacy.selector", selector.ToString(), "Selector is not available in the rooted roster.");
 
         var adapter = new LegacyCharacterCatalogAdapter();
         if (!adapter.TrySnapshot(selector, out var legacyEntry, out var diagnostics))
             return Failure(diagnostics);
 
+        var identity = legacyEntry.Identity;
+        var requirement = new MatchContentPackageRequirement(
+            identity.PackageId,
+            identity.Version,
+            identity.CookedContentHash,
+            identity.PackageHash);
         return Success(
             rosterResolution.RootPath,
             rosterResolution.ManifestPath,
             rosterResolution.Roster,
-            rosterEntry.Requirement,
+            requirement,
             legacyEntry);
     }
 

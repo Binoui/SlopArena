@@ -270,6 +270,7 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             foreach (var kv in _opponentRenderers)
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
+            PresentTimelineEvents();
 
             UpdateLockCamera();
 

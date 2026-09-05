@@ -255,7 +255,7 @@ public static class CharacterPackageAssembler
             PoseData poses = ParsePoses(input.PoseBytes, d);
             HashSet<string> required = RequiredAnimations(input.CookedPackage, d);
             if (binding == null || poses == null) return;
-            ValidateReferences(required, binding, poses, d);
+            ValidateReferences(required, input.CookedPackage.Definition.PresentationIds, binding, poses, d);
             if (binding.PackageId != input.PackageId || binding.SourceHash != input.SourceHash || binding.BindingSchemaVersion != input.BindingSchemaVersion || binding.PoseFormat != input.PoseFormat || binding.PoseVersion != input.PoseVersion || binding.SampleRate != input.SampleRate)
                 d.Add(Error("package.binding.metadata-mismatch", BindingPath, "Binding metadata does not match assembly input."));
         }
@@ -314,7 +314,7 @@ public static class CharacterPackageAssembler
             if (binding != null && pose != null)
             {
                 HashSet<string> required = RequiredAnimations(root, d);
-                ValidateReferences(required, binding, pose, d);
+                ValidateReferences(required, RequiredPresentations(root, d), binding, pose, d);
                 if (root.GetProperty("character").TryGetProperty("attachmentBoneIds", out var attachmentIds) && attachmentIds.ValueKind == JsonValueKind.Array)
                     foreach (var id in attachmentIds.EnumerateArray())
                         if (id.ValueKind != JsonValueKind.String || !pose.BoneNames.Contains(id.GetString() ?? ""))
@@ -369,8 +369,23 @@ public static class CharacterPackageAssembler
             }
         return required;
     }
+    private static HashSet<string> RequiredPresentations(JsonElement root, List<CharacterDiagnostic> d)
+    {
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        if (root.ValueKind != JsonValueKind.Object || !HasObject(root, "character")) return required;
+        var character = root.GetProperty("character");
+        if (character.TryGetProperty("presentationIds", out var ids) && ids.ValueKind == JsonValueKind.Array)
+            foreach (var id in ids.EnumerateArray())
+                Add(required, id.GetString() ?? "", d, "character.presentationIds");
+        return required;
+    }
 
-    private static void ValidateReferences(HashSet<string> required, BindingData binding, PoseData poses, List<CharacterDiagnostic> d)
+    private static void ValidateReferences(
+        HashSet<string> required,
+        IEnumerable<string> requiredPresentations,
+        BindingData binding,
+        PoseData poses,
+        List<CharacterDiagnostic> d)
     {
         foreach (string id in required)
             if (!binding.BySemantic.ContainsKey(id)) d.Add(Error("package.binding.missing", id, "Required animation binding is missing."));
@@ -382,6 +397,17 @@ public static class CharacterPackageAssembler
         }
         foreach (string name in poses.Names)
             if (!binding.ByPose.ContainsKey(name)) d.Add(Error("package.pose.orphan", name, "poses.bin contains an unreferenced pose track."));
+
+        if (binding.HasPresentations)
+        {
+            var requiredPresentationSet = new HashSet<string>(requiredPresentations, StringComparer.Ordinal);
+            foreach (string id in requiredPresentationSet)
+                if (!binding.Presentations.Contains(id))
+                    d.Add(Error("package.binding.presentation-missing", id, "Required presentation binding is missing."));
+            foreach (string id in binding.Presentations)
+                if (!requiredPresentationSet.Contains(id))
+                    d.Add(Error("package.binding.presentation-orphan", id, "Presentation binding is not required by the cooked definition."));
+        }
     }
 
     private static BindingData? ParseBindings(byte[] bytes, List<CharacterDiagnostic> d)
@@ -391,7 +417,7 @@ public static class CharacterPackageAssembler
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object) { d.Add(Error("package.binding.schema", BindingPath, "Binding payload must be an object.")); return null; }
-            EnsureFieldsOptional(root, new[] { "packageId", "catalogSchemaVersion", "bindingSchemaVersion", "poseFormat", "poseVersion", "sampleRate", "sourceHash", "rigGlobalObjectId", "weaponConfigGlobalObjectId", "animations" }, BindingPath, d);
+            EnsureFieldsOptional(root, new[] { "packageId", "catalogSchemaVersion", "bindingSchemaVersion", "poseFormat", "poseVersion", "sampleRate", "sourceHash", "rigGlobalObjectId", "weaponConfigGlobalObjectId", "animations", "presentations" }, BindingPath, d);
             var result = new BindingData
             {
                 PackageId = GetString(root, "packageId"),
@@ -409,6 +435,20 @@ public static class CharacterPackageAssembler
                 if (string.IsNullOrEmpty(item.SemanticId) || string.IsNullOrEmpty(item.PoseTrackId) || item.FrameCount <= 0) d.Add(Error("package.binding.value", BindingPath, "Binding IDs and frame count are invalid."));
                 if (!result.BySemantic.TryAdd(item.SemanticId, item)) d.Add(Error("package.binding.duplicate", item.SemanticId, "Duplicate semantic animation ID."));
                 if (!result.ByPose.TryAdd(item.PoseTrackId, item)) d.Add(Error("package.binding.duplicate", item.PoseTrackId, "Duplicate pose-track ID."));
+            }
+            if (root.TryGetProperty("presentations", out var presentations) && presentations.ValueKind == JsonValueKind.Array)
+            {
+                result.HasPresentations = presentations.GetArrayLength() > 0;
+                foreach (var element in presentations.EnumerateArray())
+                {
+                    EnsureFields(element, new[] { "semanticId", "prefabGlobalObjectId" }, BindingPath + ".presentations", d);
+                    string id = GetString(element, "semanticId");
+                    string prefabId = GetString(element, "prefabGlobalObjectId");
+                    if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(prefabId))
+                        d.Add(Error("package.binding.value", BindingPath + ".presentations", "Presentation IDs and prefab object IDs are required."));
+                    else if (!result.Presentations.Add(id))
+                        d.Add(Error("package.binding.duplicate", id, "Duplicate semantic presentation ID."));
+                }
             }
             return result;
         }
@@ -548,7 +588,6 @@ public static class CharacterPackageAssembler
         if (element.ValueKind != JsonValueKind.Object) { d.Add(Error("package.field.object", path, "Object is required.")); return; }
         var set = new HashSet<string>(allowed, StringComparer.Ordinal); var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var p in element.EnumerateObject()) { if (!set.Contains(p.Name)) d.Add(Error("package.field.unknown", path + "." + p.Name, "Unknown field.")); if (!seen.Add(p.Name)) d.Add(Error("package.field.duplicate", path + "." + p.Name, "Duplicate field.")); }
-        foreach (string field in allowed) if (!seen.Contains(field)) d.Add(Error("package.field.missing", path + "." + field, "Required field is missing."));
     }
     private static void EnsureFieldsOptional(JsonElement element, string[] allowed, string path, List<CharacterDiagnostic> d)
     {
@@ -559,8 +598,8 @@ public static class CharacterPackageAssembler
 
     private sealed class BindingData
     {
-        public string PackageId = ""; public string SourceHash = ""; public int BindingSchemaVersion; public string PoseFormat = ""; public int PoseVersion; public int SampleRate;
-        public readonly Dictionary<string, BindingItem> BySemantic = new(StringComparer.Ordinal); public readonly Dictionary<string, BindingItem> ByPose = new(StringComparer.Ordinal);
+        public string PackageId = ""; public string SourceHash = ""; public int BindingSchemaVersion; public string PoseFormat = ""; public int PoseVersion; public int SampleRate; public bool HasPresentations;
+        public readonly Dictionary<string, BindingItem> BySemantic = new(StringComparer.Ordinal); public readonly Dictionary<string, BindingItem> ByPose = new(StringComparer.Ordinal); public readonly HashSet<string> Presentations = new(StringComparer.Ordinal);
     }
     private readonly record struct BindingItem(string SemanticId, string PoseTrackId, int FrameCount);
     private sealed class PoseData { public readonly HashSet<string> BoneNames = new(StringComparer.Ordinal); public readonly HashSet<string> Names = new(StringComparer.Ordinal); public readonly Dictionary<string, int> FrameCounts = new(StringComparer.Ordinal); }

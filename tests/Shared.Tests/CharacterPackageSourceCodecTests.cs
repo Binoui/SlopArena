@@ -79,6 +79,49 @@ public sealed class CharacterPackageSourceCodecTests
         var unknown = CharacterPackageSourceCodec.Load(Fixture("package.json"), unknownJson.ToJsonString());
         Assert.Contains(unknown.Diagnostics, x => x.Code == "enum.unknown");
     }
+    [Fact]
+    public void StageTargetingMetadata_RoundTripsAndSerializesExplicitly()
+    {
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        var stage = parsed.Source!.Character.Slots.Single(x => x.Id == "ground.1").Timeline.Stages.Single();
+        Assert.Equal(1.75f, stage.AttackRange);
+        Assert.Equal(0f, stage.WarpRange);
+        Assert.True(stage.UseTargetLock);
+        Assert.True(stage.RotateTowardTarget);
+        Assert.Equal(0.85f, stage.TrackingStrength);
+
+        string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source.Character);
+        Assert.Contains("\"attackRange\": 1.75", serialized);
+        Assert.Contains("\"warpRange\": 0", serialized);
+        Assert.Contains("\"useTargetLock\": true", serialized);
+        Assert.Contains("\"rotateTowardTarget\": true", serialized);
+        Assert.Contains("\"trackingStrength\": 0.85", serialized);
+    }
+
+    [Fact]
+    public void StageTargetingMetadata_MissingDefaultsDisabledAndUnknownFieldsFail()
+    {
+        var json = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        var stage = (JsonObject)json["slots"]![0]!["timeline"]!["stages"]![0]!;
+        stage.Remove("attackRange");
+        stage.Remove("warpRange");
+        stage.Remove("useTargetLock");
+        stage.Remove("rotateTowardTarget");
+        stage.Remove("trackingStrength");
+        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.True(missing.IsValid, string.Join("\n", missing.Diagnostics));
+        var defaults = missing.Source!.Character.Slots[0].Timeline.Stages[0];
+        Assert.Equal(0f, defaults.AttackRange);
+        Assert.Equal(0f, defaults.WarpRange);
+        Assert.False(defaults.UseTargetLock);
+        Assert.False(defaults.RotateTowardTarget);
+        Assert.Equal(0f, defaults.TrackingStrength);
+
+        stage["unknownTargetingField"] = true;
+        var unknown = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.Contains(unknown.Diagnostics, x => x.Code == "field.unknown");
+    }
 
 
     [Fact]

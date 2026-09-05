@@ -22,7 +22,7 @@ client/Unity/Assets/CharacterPackages/<package>/
 
 The Shared compiler and Unity asset cook produce an immutable runtime package under `content-cooked/<package>/` containing the manifest, normalized runtime definition, deterministic pose data, and generated client bindings. The Match Content Catalog pins exact package IDs, versions, dependencies, capability versions, and hashes for each match. Raw authoring JSON is cook input, never the runtime contract.
 
-FightGuy is the first cooked vertical slice. Manki, Kistu, and Nilus remain legacy compatibility definitions behind `LegacyCharacterCatalogAdapter` until migrated. Legacy files are modification-only compatibility, not templates for new packages.
+FightGuy is the first cooked vertical slice. Manki, Kistu, and Bonk are package-native roster characters. Nilus remains a legacy compatibility definition behind `LegacyCharacterCatalogAdapter` until migrated. Legacy Nilus files are modification-only compatibility, not templates for new packages.
 
 Every package resolves the canonical 16-entry grid: grounded and aerial variants of `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`. Physical controls are input adapters. They are not persisted move identity.
 
@@ -39,7 +39,7 @@ Unity client ◄──── UDP ──────────────┘
 
 `ServerSimulation` runs on the GameServer and on client local/prediction tracks. The GameServer remains authoritative. Training uses `LocalSimulationBridge`; PvP uses `RollbackSimulationBridge`, `LocalTrack`, `PredictedTrack`, and `RawTrack` as appropriate. Unity renders state and semantic presentation events through `PlayerRenderer`; it does not decide hit results, damage, timing, or match admission.
 
-The current ability model is cooked fixed timelines with ordered typed/versioned operations. Engine-owned deterministic primitives implement movement, hitboxes, projectiles, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events. `ServerAbility` remains a Shared lifecycle seam for `CookedTimelineAbility`, trusted temporary FightGuy capabilities, and legacy Manki/Kistu/Nilus implementations. It is not the universal new-content authoring model.
+The current ability model is cooked fixed timelines with ordered typed/versioned operations. Engine-owned deterministic primitives implement movement, hitboxes, projectiles, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events. `ServerAbility` remains a Shared lifecycle seam for `CookedTimelineAbility`, trusted temporary built-in capabilities, and legacy Nilus implementations. It is not the universal new-content authoring model.
 
 FightGuy may temporarily use explicitly admitted `slop.internal.*` capabilities. Only the trusted built-in cook profile can resolve them. Workshop/package content cannot grant itself access; every exception requires an owner and migration path.
 
@@ -109,7 +109,7 @@ Require a successful semantic cook, valid inspect status, `dirtyOrStale: false`,
 
 ## Agent verification protocol
 
-Unity is main-repo-only. Worktree agents must not invoke Unity MCP or operate the main Editor from another worktree. Headless Shared/server builds and tests are mandatory for corresponding code changes. Unity-facing slices must leave a short Test in Unity checklist in the gitignored root `TESTING-UNITY.md`.
+- Unity is main-repo-only. Worktree agents must not operate the main Editor from another worktree. Use the Unity CLI/Pipeline workflow from `docs/contributing/unity-cli.md`. Headless Shared/server builds and tests are mandatory for corresponding code changes. Unity-facing slices must leave a short Test in Unity checklist in the gitignored root `TESTING-UNITY.md`.
 
 ## Canonical references
 

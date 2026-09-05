@@ -41,7 +41,7 @@ New characters use the package-native workflow. Start with [Adding a Character](
 - `character.json` for gameplay semantics and the canonical 16-slot move grid;
 - `CharacterAssetCatalog.asset` for package-local Unity asset bindings.
 
-Cooked runtime content belongs under `content-cooked/<package>/` and is admitted through the cooked roster manifest. Do not add a registry factory, raw runtime JSON loader, manual FightGuy animation configuration, or standalone skeleton payload for new work. Manki, Kistu, and Nilus are legacy compatibility cases; do not copy their path into new packages.
+Cooked runtime content belongs under `content-cooked/<package>/` and is admitted through the cooked roster manifest. Do not add a registry factory, raw runtime JSON loader, manual FightGuy animation configuration, or standalone skeleton payload for new work. Nilus is the remaining legacy compatibility case; do not copy its path into new packages.
 
 ## Verification
 

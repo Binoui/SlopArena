@@ -278,7 +278,6 @@ namespace SlopArena.Shared
 
         public static CharacterDefinition Get(CharacterClass c) => c switch
         {
-            CharacterClass.Kistu => BuildKistu(),
             CharacterClass.Nilus => BuildNilus(),
             _ => throw new InvalidDataException(
                 $"Character '{c}' is not provided by the legacy character catalog.")

@@ -193,6 +193,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.kistu.g1"
             ],
@@ -245,6 +250,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
             "animationIds": [
               "anim.kistu.g2"
             ],
@@ -297,6 +307,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.g3"
             ],
@@ -349,6 +364,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 2.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.g4"
             ],
@@ -401,6 +421,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 15,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.a1"
             ],
@@ -453,6 +478,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 4,
             "autoCancelAfterTicks": 14,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.a2"
             ],
@@ -505,6 +535,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 3,
             "autoCancelAfterTicks": 14,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.a3"
             ],
@@ -557,6 +592,11 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 22,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
             "animationIds": [
               "anim.kistu.a4"
             ],

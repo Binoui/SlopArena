@@ -37,6 +37,25 @@ internal static class CharacterAnimationCatalogGenerator
                 Extrapolation = (SlopArena.Shared.ExtrapolationMode)element.GetProperty("extrapolation").GetInt32(),
             });
         }
+        var presentationEntries = new List<CharacterAnimationCatalog.PresentationEntry>();
+        if (root.TryGetProperty("presentations", out JsonElement presentations))
+        {
+            foreach (JsonElement element in presentations.EnumerateArray())
+            {
+                string objectIdText = element.GetProperty("prefabGlobalObjectId").GetString() ?? "";
+                if (!GlobalObjectId.TryParse(objectIdText, out GlobalObjectId objectId))
+                    throw new InvalidOperationException($"Invalid presentation prefab global object ID: {objectIdText}");
+                var prefab = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(objectId) as GameObject;
+                if (prefab == null)
+                    throw new InvalidOperationException($"Could not resolve presentation prefab global object ID: {objectIdText}");
+                presentationEntries.Add(new CharacterAnimationCatalog.PresentationEntry
+                {
+                    SemanticId = element.GetProperty("semanticId").GetString() ?? "",
+                    Prefab = prefab,
+                });
+            }
+        }
+        presentationEntries.Sort((a, b) => StringComparer.Ordinal.Compare(a.SemanticId, b.SemanticId));
         var catalog = ScriptableObject.CreateInstance<CharacterAnimationCatalog>();
         catalog.PackageId = root.GetProperty("packageId").GetString() ?? "";
         catalog.CatalogSchemaVersion = root.GetProperty("catalogSchemaVersion").GetUInt16();
@@ -46,6 +65,7 @@ internal static class CharacterAnimationCatalogGenerator
         catalog.Rig = rig;
         catalog.WeaponConfig = weaponConfig;
         catalog.Animations = entries.ToArray();
+        catalog.Presentations = presentationEntries.ToArray();
         return catalog;
     }
     private static SlopArena.Client.Entities.WeaponAttachConfig ResolveWeaponConfig(JsonElement root)

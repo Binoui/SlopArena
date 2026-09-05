@@ -839,9 +839,7 @@ public sealed class AbilityLabWindow : EditorWindow
         var resolution = SlopArena.Client.LocalContentResolver.CreateDefault().ResolveRoster();
         if (resolution.Success && resolution.Roster != null)
         {
-            foreach (var selector in new[] { CharacterClass.Manki, CharacterClass.Kistu, CharacterClass.Nilus })
-                if (resolution.Roster.Resolve(selector) != null)
-                    _compatibilityCharacters.Add(selector);
+            _compatibilityCharacters.Add(CharacterClass.Nilus);
         }
 
         _legacySelector.choices = _compatibilityCharacters.Select(selector => selector.ToString()).ToList();
@@ -956,8 +954,7 @@ public sealed class AbilityLabWindow : EditorWindow
         RefreshRigState();
     }
     private bool IsLoadedLegacy()
-        => _lab != null && !_lab.IsPackagePreview &&
-           (_lab.Character == CharacterClass.Manki || _lab.Character == CharacterClass.Kistu || _lab.Character == CharacterClass.Nilus);
+        => _lab != null && !_lab.IsPackagePreview && _lab.Character == CharacterClass.Nilus;
 
     private void RefreshCompatibilityControls()
     {

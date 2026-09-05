@@ -47,12 +47,8 @@ kit:
 ---
 
 # Kistu — The Kitsune Blade
-> **Legacy implementation record — modification only.** The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities. This file records the current simulation implementation and is not a template for new kit design. New characters must use `client/Unity/Assets/CharacterPackages/<package>/`.
-> Current design work may refine legacy specials, but new content must use the package compiler, asset catalog, cooked package, and Match Content Catalog path.
-
-
-
-> Status: Implemented in the legacy Shared simulation with placeholder presentation. Model, animation, and VFX migration work is separate; see the linked historical plan when maintaining that path.
+> **Package-native character.** The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities. Authoring source lives under `client/Unity/Assets/CharacterPackages/kistu/`; cooked runtime content is admitted through the Match Content Catalog.
+> Status: Included in the cooked roster. Legacy Shared registry definitions are retired; new changes must use the package compiler, asset catalog, cooked package, and Match Content Catalog path.
 > Inspired by: **Marth** (spacing, reach, punish, counter, exploitable recovery) × **Amaterasu** (DKO — fast agile sword, launcher, air-juggle payoff).
 
 ## Concept
@@ -117,20 +113,14 @@ Kit is fully specified. Remaining items are tuning/art, not design:
 
 ## Animation Needs (soft constraint)
 
-Standard katana motions only — no exotic out-of-the-box motions. All of these are common in stylized katana packs:
-- Ground light combo (multi-slash chain) — LMB
-- 3-hit air slash — Air LMB
-- Charged spin / spinning vertical slice — RMB (hold) + candidate for F
-- Downward falling slash — Air RMB
-- Counter guard + riposte — Q
-- Forward dash slash / lunge — E
-- Rising / uppercut slash — R (the one motion to specifically confirm the pack has)
+- Grounded and aerial normals `1`–`4` — package slots `ground.1`–`ground.4` and `air.1`–`air.4`.
+- `A`, `E`, `R`, and `F` specials — package slots `ground.a`/`air.a`, `ground.e`/`air.e`, `ground.r`/`air.r`, and `ground.f`/`air.f`.
+- Movement, hit reactions, and recovery clips remain presentation bindings; gameplay timing comes from the cooked timeline.
 
-## Files (to create when built)
-- `src/Shared/Characters/KistuData.cs` — character definition (stats, abilities, animation names)
-- `src/Shared/Abilities/KistuRisingSlash.cs` — R (multi-charge, charge-refund-on-hit)
-- `src/Shared/Abilities/KistuCounter.cs` — Q
-- Charged Spin (RMB) + Charged Dash (E) — likely reuse `ChargeAttackAbility.cs`
-- `src/Shared/CharacterDefinition.cs` — enum + registry entry
+## Package files
+- `client/Unity/Assets/CharacterPackages/kistu/package.json` — package identity and attribution.
+- `client/Unity/Assets/CharacterPackages/kistu/character.json` — gameplay semantics and canonical 16-entry grid.
+- `client/Unity/Assets/CharacterPackages/kistu/CharacterAssetCatalog.asset` — package-local Unity bindings.
+- `content-cooked/kistu/` — immutable cooked runtime package admitted by the roster manifest.
 
 See `docs/characters/character-kit-design-principles.md` for design patterns and `docs/systems/combat-systems.md` for universal combat mechanics.

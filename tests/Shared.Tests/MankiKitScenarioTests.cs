@@ -11,14 +11,13 @@ namespace SlopArena.Shared.Tests;
 /// <summary>
 /// Package-native Manki regression coverage: canonical kit compile, cooked artifact
 /// loading with typed capability parameters, and golden snapshots for normals,
-/// aerials, and the four specials (Round Bomb, Grapple, Bazooka, Overclock).
+/// aerials, and the four specials (Round Bomb, Jetpack Boost, Bazooka, Aerosol Inferno).
 /// </summary>
 public sealed class MankiKitScenarioTests : KitScenarioTests
 {
     private const string RoundBombCapabilityId = "slop.internal.manki.round-bomb.v1";
-    private const string GrappleCapabilityId = "slop.internal.manki.grapple.v1";
+    private const string JetpackCapabilityId = "slop.internal.manki.jetpack-boost.v1";
     private const string BazookaCapabilityId = "slop.internal.manki.bazooka.v1";
-    private const string OverclockCapabilityId = "slop.internal.manki.overclock.v1";
 
     private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
     private static float GroundPy => TestHelpers.GroundPY(Def);
@@ -56,12 +55,9 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(first.CookedPackage!.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
 
         var package = first.CookedPackage;
-        Assert.Equal(16, package.Definition.Slots.Count);
-        Assert.Equal(16, package.Budget.SlotCount);
-        Assert.Equal(4, package.Definition.CapabilityRequirements.Count);
-        Assert.Equal(new[] { BazookaCapabilityId, GrappleCapabilityId, OverclockCapabilityId, RoundBombCapabilityId },
+        Assert.Equal(3, package.Definition.CapabilityRequirements.Count);
+        Assert.Equal(new[] { BazookaCapabilityId, JetpackCapabilityId, RoundBombCapabilityId },
             package.Definition.CapabilityRequirements.Select(x => x.CapabilityId).OrderBy(x => x).ToArray());
-
         var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
         {
             ["ground.1"] = (17, 13, 4, 5, .35f, 4, 8, 4, 20, 14, 0, 0, 0),
@@ -106,12 +102,46 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
 
         AssertSpecial(package, "ground.A", RoundBombCapabilityId, AuthoringAbilityBehavior.AimedProjectile, AuthoringAimMode.GroundCursor, 300,
             p => Assert.IsType<CookedMankiRoundBombCapabilityParameters>(p));
-        AssertSpecial(package, "ground.E", GrappleCapabilityId, AuthoringAbilityBehavior.Projectile, AuthoringAimMode.CameraForward3D, 210,
-            p => Assert.IsType<CookedMankiGrappleCapabilityParameters>(p));
+        AssertSpecial(package, "ground.E", JetpackCapabilityId, AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 210,
+            p => Assert.IsType<CookedMankiJetpackBoostCapabilityParameters>(p));
         AssertSpecial(package, "ground.R", BazookaCapabilityId, AuthoringAbilityBehavior.Projectile, AuthoringAimMode.CameraForward3D, 240,
             p => Assert.IsType<CookedMankiBazookaCapabilityParameters>(p));
-        AssertSpecial(package, "ground.F", OverclockCapabilityId, AuthoringAbilityBehavior.SelfBuff, AuthoringAimMode.None, 600,
-            p => Assert.IsType<CookedMankiOverclockCapabilityParameters>(p));
+        var jetpackSlot = package.Definition.Slots.Single(x => x.Id == "ground.E");
+        Assert.True(jetpackSlot.IsRecoveryMove);
+        Assert.False(jetpackSlot.PreserveMomentumOnStart);
+        Assert.Equal((ushort)60, jetpackSlot.Timeline.Stages.Single().DurationTicks);
+        var airJetpack = package.Definition.Slots.Single(x => x.Id == "air.E");
+        Assert.Equal(jetpackSlot.Name, airJetpack.Name);
+        Assert.Equal(jetpackSlot.Description, airJetpack.Description);
+        var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
+        Assert.Equal(AuthoringAbilityBehavior.AreaDenial, aerosol.Behavior);
+        Assert.Equal(AuthoringAimMode.None, aerosol.AimMode);
+        Assert.Equal((ushort)600, aerosol.CooldownTicks);
+        var aerosolStage = Assert.Single(aerosol.Timeline.Stages);
+        Assert.Equal((ushort)52, aerosolStage.DurationTicks);
+        Assert.Equal((ushort)0, aerosolStage.IasaTicks);
+        Assert.Equal(2, aerosolStage.Operations.Count);
+        var presentation = Assert.IsType<CookedEmitPresentationOperation>(aerosolStage.Operations[0]);
+        Assert.Equal((ushort)18, presentation.Tick);
+        Assert.Equal("presentation.manki.aerosol-inferno.start", presentation.PresentationId);
+        var flame = Assert.IsType<CookedSpawnHitboxOperation>(aerosolStage.Operations[1]);
+        Assert.Equal((ushort)18, flame.Tick);
+        Assert.Equal(AuthoringHitboxShape.Capsule, flame.Hitbox.Shape);
+        Assert.Equal(1.25f, flame.Hitbox.Radius);
+        Assert.Equal(0f, flame.Hitbox.OffsetX);
+        Assert.Equal(0.25f, flame.Hitbox.OffsetY);
+        Assert.Equal(1.25f, flame.Hitbox.OffsetZ);
+        Assert.Equal(0f, flame.Hitbox.EndOffsetX);
+        Assert.Equal(4.5f, flame.Hitbox.EndOffsetY);
+        Assert.Equal(1.25f, flame.Hitbox.EndOffsetZ);
+        Assert.Equal(15f, flame.Hitbox.Damage);
+        Assert.Equal(55f, flame.Hitbox.Angle);
+        Assert.Equal(12f, flame.Hitbox.BaseKnockback);
+        Assert.Equal(20f, flame.Hitbox.KnockbackGrowth);
+        Assert.Equal((ushort)30, flame.Hitbox.StunTicks);
+        Assert.Equal((ushort)28, flame.Hitbox.DurationTicks);
+        Assert.True(flame.Hitbox.Interruptible);
+        Assert.Equal((byte)1, flame.Hitbox.HitGroup);
 
         Assert.Empty(package.Definition.Slots.SelectMany(x => x.Timeline.Stages).SelectMany(x => x.Operations).OfType<CookedSetVelocityOperation>());
     }
@@ -173,24 +203,23 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(10f, bomb.ExplosionDamage);
         Assert.Equal(3f, bomb.ExplosionRadius);
         Assert.Equal(2.4f, bomb.ExplosionKbBase);
-        Assert.Equal(3.6f, bomb.ExplosionKbGrowth);
+        Assert.Equal(24f, bomb.ExplosionKbGrowth);
         Assert.Equal((ushort)18, bomb.ExplosionStunTicks);
         Assert.Equal((ushort)8, bomb.ExplosionDurationTicks);
         Assert.Equal(30f, bomb.ExplosionKbAngle);
 
-        var grapple = Assert.IsType<CookedMankiGrappleCapabilityParameters>(
+        var jetpack = Assert.IsType<CookedMankiJetpackBoostCapabilityParameters>(
             Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations)).Parameters);
-        Assert.Equal((ushort)8, grapple.FireTriggerTick);
-        Assert.Equal(40f, grapple.TetherSpeed);
-        Assert.Equal(.3f, grapple.HitboxRadius);
-        Assert.Equal((ushort)30, grapple.MaxFlightTicks);
-        Assert.Equal(15f, grapple.MaxRange);
-        Assert.Equal(25f, grapple.ReelSpeed);
-        Assert.Equal(.5f, grapple.ArrivalThreshold);
-        Assert.Equal(3f, grapple.Damage);
-        Assert.Equal((ushort)0, grapple.StunTicks);
-        Assert.Equal(0f, grapple.KbAngle);
-        Assert.Equal((ushort)30, grapple.CastDuration);
+        Assert.Equal((ushort)3, jetpack.StartupTicks);
+        Assert.Equal(15f, jetpack.VerticalSpeed);
+        Assert.Equal(3.5f, jetpack.HorizontalSpeed);
+        Assert.Equal(1.25f, jetpack.ExplosionRadius);
+        Assert.Equal(4f, jetpack.ExplosionDamage);
+        Assert.Equal(75f, jetpack.ExplosionKbAngle);
+        Assert.Equal(2f, jetpack.ExplosionKbBase);
+        Assert.Equal(8f, jetpack.ExplosionKbGrowth);
+        Assert.Equal((ushort)8, jetpack.ExplosionStunTicks);
+        Assert.Equal((ushort)4, jetpack.ExplosionDurationTicks);
 
         var bazooka = Assert.IsType<CookedMankiBazookaCapabilityParameters>(
             Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.R").Timeline.Stages.Single().Operations)).Parameters);
@@ -204,16 +233,20 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(3f, bazooka.ExplosionRadius);
         Assert.Equal(25f, bazooka.KbAngle);
         Assert.Equal(6f, bazooka.ExplosionKbBase);
-        Assert.Equal(9f, bazooka.ExplosionKbGrowth);
+        Assert.Equal(42f, bazooka.ExplosionKbGrowth);
         Assert.Equal((ushort)22, bazooka.ExplosionStunTicks);
         Assert.Equal((ushort)6, bazooka.ExplosionDurationTicks);
         Assert.Equal(25f, bazooka.ExplosionKbAngle);
         Assert.Equal((ushort)20, bazooka.CastDuration);
         Assert.Equal((ushort)15, bazooka.RecoveryDuration);
 
-        var overclock = Assert.IsType<CookedMankiOverclockCapabilityParameters>(
-            Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.F").Timeline.Stages.Single().Operations)).Parameters);
-        Assert.Equal((ushort)480, overclock.DurationTicks);
+        var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
+        Assert.Equal((ushort)52, aerosol.Timeline.Stages.Single().DurationTicks);
+        var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[0]);
+        Assert.Equal("presentation.manki.aerosol-inferno.start", emit.PresentationId);
+        var flame = Assert.IsType<CookedSpawnHitboxOperation>(aerosol.Timeline.Stages.Single().Operations[1]);
+        Assert.Equal(15f, flame.Hitbox.Damage);
+        Assert.Equal((ushort)28, flame.Hitbox.DurationTicks);
     }
 
     // ── Golden scenarios: normals ──
@@ -284,8 +317,8 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             Assert = _ => { },
             NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)3, npc.DamagePercent),
-            SnapshotTick = 8, // t6–11 active window.
+            NpcAssert = npc => Assert.Equal((ushort)8, npc.DamagePercent), // Tracking connects both authored hits: t6 (3) + t16 (5).
+            SnapshotTick = 8, // First hit's t6–10 active window; final assertion covers both hits.
             TotalTicks = 90,
         });
     }
@@ -326,17 +359,33 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     }
 
     [Fact]
-    public void E_Grapple_HoldReleaseFiresTether_IsGolden()
+    public void E_JetpackBoost_Ignition_IsGolden()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Manki E Grapple Hold Release Fire",
+            Name = "Manki E Jetpack Boost Ignition",
             Def = Def,
             Setup = GroundedPlayer,
-            Inputs = HoldRelease(AbilitySlots.E, aimDistance: 600),
-            Assert = _ => { },
-            SnapshotTick = 32, // release t20 → tether fires t28; tether in flight.
-            TotalTicks = 110,
+            Inputs = new InputSequence()
+                .Set(0, new InputState { ActiveSlot = AbilitySlots.E, MoveX = 0.6f, MoveY = 0.8f })
+                .Set(1, new InputState { MoveX = 0.6f, MoveY = 0.8f })
+                .Set(2, new InputState { MoveX = 0.6f, MoveY = 0.8f })
+                .Set(3, new InputState { MoveX = 0.6f, MoveY = 0.8f }),
+            Assert = player =>
+            {
+                Assert.True(player.PY > GroundPy);
+                Assert.True(player.VY > 0f);
+                Assert.False(player.IsGrounded);
+                Assert.Equal((byte)AbilitySlots.E, player.AttackSlot);
+            },
+            NpcSetup = () => TestHelpers.NpcState(0f, 0.75f) with { PY = GroundPy },
+            NpcAssert = npc =>
+            {
+                Assert.Equal((ushort)4, npc.DamagePercent);
+                Assert.True(npc.KVY > 0f, $"NPC should launch upward, got {npc.KVY}");
+            },
+            SnapshotTick = 10,
+            TotalTicks = 11,
         });
     }
 
@@ -356,16 +405,65 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     }
 
     [Fact]
-    public void F_Overclock_ActivatesBuff_IsGolden()
+    public void F_AerosolInferno_HitsAfterTemporaryInvincibilityWithoutHittingBeyondEndpoint()
+    {
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, Def, GroundedPlayer(), TestHelpers.LoadBakedData(Def));
+        sim.RegisterEntity(100, TestHelpers.CombatDef,
+            TestHelpers.NpcState(0f, 1f) with { PY = GroundPy, FacingYaw = MathF.PI / 2f });
+        sim.RegisterEntity(101, TestHelpers.CombatDef,
+            TestHelpers.NpcState(8f, 8f) with { EntityId = 101, PY = GroundPy });
+
+        for (var tick = 0; tick < 17; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = tick == 0 ? new InputState { ActiveSlot = AbilitySlots.F } : default,
+                [100] = default,
+                [101] = default,
+            });
+            Assert.Equal(0f, sim.GetState(100).DamagePercent);
+            Assert.Equal(0f, sim.GetState(101).DamagePercent);
+        }
+
+        var invincible = sim.GetState(100) with { InvincibilityTicks = 4, VX = 0f, VY = 0f, VZ = 0f };
+        sim.SetState(100, invincible);
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = default,
+            [100] = default,
+            [101] = default,
+        });
+        Assert.Equal(0f, sim.GetState(100).DamagePercent);
+        Assert.Equal(0f, sim.GetState(101).DamagePercent);
+
+        for (var tick = 0; tick < 12; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = default,
+                [100] = default,
+                [101] = default,
+            });
+        }
+
+        Assert.Equal(15f, sim.GetState(100).DamagePercent);
+        Assert.Equal(0f, sim.GetState(101).DamagePercent);
+    }
+
+    [Fact]
+    public void F_AerosolInferno_IsGolden()
     {
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Manki F Overclock Buff",
+            Name = "Manki F Aerosol Inferno",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.F),
-            Assert = final => Assert.True(final.BuffRemainingTicks > 0, "buff must persist after the injection animation"),
-            SnapshotTick = 15, // mid-injection; buff already active.
+            Assert = _ => { },
+            NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
+            NpcAssert = npc => Assert.Equal(15f, npc.DamagePercent),
+            SnapshotTick = 30,
             TotalTicks = 60,
         });
     }

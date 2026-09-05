@@ -40,6 +40,15 @@ Desktop.ini
 .aider*
 .windsurf/
 
+# Local harness configuration
+/.mcp.json
+
+# Blender backups and local preview videos
+*.blend1
+/art/blender/exports/*.mp4
+/art/blender/exports/*.mov
+/art/blender/exports/*.webm
+
 # ==========================================
 # Large binary data (use Git LFS or generate at runtime)
 # ==========================================
@@ -137,6 +146,18 @@ client/Unity/Assets/AnimationPacks.meta
 client/Unity/Assets/JMO\ Assets/
 client/Unity/Assets/JMO\ Assets.meta
 
+# Locally imported JustCreate environment packs (non-redistributable)
+client/Unity/Assets/LowPolyMegaBundle/
+client/Unity/Assets/LowPolyMegaBundle.meta
+client/Unity/Assets/LowPoly*/
+client/Unity/Assets/LowPoly*.meta
+client/Unity/Assets/TropicalEnvironment/
+client/Unity/Assets/TropicalEnvironment.meta
+client/Unity/Assets/ThirdParty/
+client/Unity/Assets/ThirdParty.meta
+client/Unity/Assets/Cartoon*/
+client/Unity/Assets/Cartoon*.meta
+
 # Locally generated Cartoon FX variants (Asset Store source dependency)
 client/Unity/Assets/Resources/VFX/SlopArena/
 client/Unity/Assets/Resources/VFX/SlopArena.meta
@@ -158,9 +179,8 @@ client/Unity/Assets/Resources/Icons/
 
 # Unity Plugins — third-party DLLs (NuGet, Animancer, etc.)
 client/Unity/Assets/Plugins/**/*.dll
-# NuGet DLLs for the Unity-MCP plugin are REQUIRED at compile time (no auto-restore
-# possible while compilation is broken) — track them explicitly.
-!client/Unity/Assets/Plugins/NuGet/*.dll
+# NuGet DLLs required by tracked Unity packages may be explicitly unignored
+# below this rule when Unity cannot restore them automatically.
 client/Unity/Assets/Plugins/**/*.pdb
 client/Unity/Assets/Plugins/**/*.deps.json
 client/Unity/Assets/Plugins/**/*.runtimeconfig.json
@@ -211,6 +231,8 @@ docs/generated/*-move-data.json
 src/Shared/**/*.meta
 
 # Orphan Godot .uid metadata
+/.asset-catalog-cache/
+/.stage-authoring-cache/
 *.uid.meta
 
 # Unity crash dumps
@@ -245,3 +267,6 @@ __pycache__/
 
 # Locally installed agent skills
 /.agents/
+
+# Separate website repository; not a game submodule
+/SlopArena-web/

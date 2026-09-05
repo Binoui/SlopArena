@@ -15,6 +15,7 @@ namespace SlopArena.Client.Animation
         [SerializeField] private WeaponAttachConfig _weaponConfig;
         [SerializeField] private int _sampleRate = 60;
         [SerializeField] private AnimationBinding[] _bindings = Array.Empty<AnimationBinding>();
+        [SerializeField] private PresentationBinding[] _presentations;
 
         public string PackageId { get => _packageId; set => _packageId = value; }
         public ushort CatalogSchemaVersion { get => _catalogSchemaVersion; set => _catalogSchemaVersion = value; }
@@ -22,6 +23,17 @@ namespace SlopArena.Client.Animation
         public WeaponAttachConfig WeaponConfig { get => _weaponConfig; set => _weaponConfig = value; }
         public int SampleRate { get => _sampleRate; set => _sampleRate = value; }
         public AnimationBinding[] Bindings { get => _bindings ?? Array.Empty<AnimationBinding>(); set => _bindings = value ?? Array.Empty<AnimationBinding>(); }
+        public PresentationBinding[] Presentations { get => _presentations; set => _presentations = value; }
+
+        [Serializable]
+        public sealed class PresentationBinding
+        {
+            [SerializeField] private string _semanticId = "";
+            [SerializeField] private GameObject _prefab;
+
+            public string SemanticId { get => _semanticId; set => _semanticId = value; }
+            public GameObject Prefab { get => _prefab; set => _prefab = value; }
+        }
 
         [Serializable]
         public sealed class AnimationBinding

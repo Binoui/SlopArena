@@ -11,9 +11,7 @@ namespace SlopArena.Shared;
 /// Geometry source of truth is <see cref="HitboxGeometry.ResolvePositions"/> — the exact
 /// function <c>ServerAbility.SpawnHitbox</c> uses — with the character standing at the
 /// grounded origin frame: PX = 0, PY = CapsuleHeight/2, PZ = 0, FacingYaw = 0 (forward is
-/// +Z), so feet are at world y=0 and head at y=CapsuleHeight. All active ticks of a hit
-/// are resolved at AttackElapsedTicks = TriggerTick + t. Authored geometry only — no buff
-/// bonuses (ApplyBuffBonuses not applied).
+/// +Z). Attack frames are resolved at AttackElapsedTicks = TriggerTick + t.
 /// </summary>
 public static class MoveReach
 {

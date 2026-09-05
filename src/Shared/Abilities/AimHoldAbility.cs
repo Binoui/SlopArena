@@ -23,10 +23,10 @@ namespace SlopArena.Shared.Abilities
     ///     Attacking state (action phase, mirroring KistuDashSlash's Aiming → Attacking
     ///     dash transition), end at throw_duration.
     ///
-    /// Subclasses only implement the hooks. MankiBazooka / MankiGrapple keep their own
-    /// three-phase FSMs (firing/recovery and reeling don't fit this shape); KistuDashSlash
-    /// is an aim-to-dash, not a projectile, and stays standalone — both carry the same
-    /// ascent-stop inline.
+    /// Subclasses only implement the hooks. MankiBazooka keeps its own
+    /// three-phase FSM (firing/recovery doesn't fit this shape); KistuDashSlash
+    /// is an aim-to-dash, not a projectile, and stays standalone — both carry
+    /// the same ascent-stop inline.
     /// </summary>
     public abstract class AimHoldAbility : ServerAbility
     {

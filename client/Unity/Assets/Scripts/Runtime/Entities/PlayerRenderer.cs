@@ -94,8 +94,14 @@ namespace SlopArena.Client.Entities
         /// </summary>
         private CharacterDefinition? _charDef;
         private GameObject _modelInstance;
+        private bool _reportedModelRootDrift;
+
+        // The simulation owns the entity root. Animation may pose the model,
+        // but must never move that root or accumulate presentation drift.
+        private const float ModelRootDriftWarningDistance = 0.001f;
 
         public void SetCharacterDefinition(CharacterDefinition? def) => _charDef = def;
+
         private ArenaCollision.BlastLines _blastLines;
         private bool _hasBlastLines;
 
@@ -188,6 +194,10 @@ namespace SlopArena.Client.Entities
             _animancer = instance.GetComponent<AnimancerComponent>();
             if (_animancer == null)
                 _animancer = instance.AddComponent<AnimancerComponent>();
+
+            var animator = instance.GetComponentInChildren<Animator>();
+            if (animator != null)
+                animator.applyRootMotion = false;
 
             if (def.Class == CharacterClass.FightGuy && _animationCatalog == null)
             {
@@ -1048,6 +1058,24 @@ namespace SlopArena.Client.Entities
                         _activeExtrapolator.Apply(rootBone, extraTime);
                 }
             }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_modelInstance != null)
+            {
+                float drift = _modelInstance.transform.localPosition.magnitude;
+                if (drift > ModelRootDriftWarningDistance && !_reportedModelRootDrift)
+                {
+                    Debug.LogWarning(
+                        $"[PresentationDrift] {_entityName} model root drifted {drift:F4}m " +
+                        $"from its authoritative renderer root.");
+                    _reportedModelRootDrift = true;
+                }
+                else if (drift <= ModelRootDriftWarningDistance)
+                {
+                    _reportedModelRootDrift = false;
+                }
+            }
+        #endif
         }
 
         private void UpdateAttackAccents(CharacterState state, byte prevComboStage)

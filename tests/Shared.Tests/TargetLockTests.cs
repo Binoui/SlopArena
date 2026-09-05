@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -182,29 +183,100 @@ public class TargetLockTests : KitScenarioTests
         TestHelpers.AssertNear(MathF.PI / 2f, state.FacingYaw, 1e-3f);
     }
 
-    [Fact(Skip = "Phase 7: target-lock metadata is not present in the authoritative cooked slot schema.")]
-    public void Locked_Attack_SteersFacingToTarget()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RosterNormals_GroundAndAir_FaceTarget(bool airborne, bool locked)
     {
-        // While locked, a grounded attack SNAPS facing to the resolved target regardless
-        // of distance — AttackRange no longer gates facing (issue #127). FightGuy's key-1
-        // normal (Slot1 "Low Kick") steers; the NPC sits 5m away (well past the 1.75m
-        // AttackRange) to prove the range gate is gone.
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.FightGuyDef;
-        float gpy = TestHelpers.GroundPY(def);
-        var player = TestHelpers.PlayerState() with { PY = gpy, FacingYaw = MathF.PI };
-        sim.RegisterEntity(1, def, player);
-        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 5f) with { PY = gpy });
+        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+        var roster = BuiltInRosterManifestCodec.Load(Path.Combine(root, "content-cooked/roster/manifest.json"));
+        foreach (var entry in roster.Entries)
+        {
+            var def = TestHelpers.ResolveDef(entry.Selector);
+            // Legacy Nilus has LMB/AirLMB normals, not the package 1–4 grid;
+            // its Slot1 is the move-specific Void Rift special.
+            var slots = entry.Selector == CharacterClass.Nilus
+                ? new[] { AbilitySlots.Lmb }
+                : new[] { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
+            foreach (byte slot in slots)
+                AssertNormalAttackFaces(def, slot, airborne, locked);
+        }
+    }
 
-        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });               // lock on
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.Slot1 } } });  // key-1 normal
-        for (int i = 0; i < 20; i++) sim.Tick(new() { { 1, default } });               // let it snap
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void LegacyNilusNormals_GroundAndAir_FaceTarget(bool airborne, bool locked)
+    {
+        AssertNormalAttackFaces(TestHelpers.NilusDef, AbilitySlots.Lmb, airborne, locked);
+    }
+
+    [Fact]
+    public void FightGuy_NonTargetEnabledSpecials_DoNotAutoFace()
+    {
+        var def = TestHelpers.FightGuyDef;
+        AssertLockedAttackDoesNotFace(def, AbilitySlots.E, 18000);
+        AssertLockedAttackDoesNotFace(def, AbilitySlots.R);
+        AssertLockedAttackDoesNotFace(def, AbilitySlots.F);
+    }
+
+    private static void AssertNormalAttackFaces(CharacterDefinition def, byte activeSlot, bool airborne, bool locked)
+    {
+        var sim = TestHelpers.MakeSim();
+        float gpy = TestHelpers.GroundPY(def);
+        var player = TestHelpers.PlayerState() with
+        {
+            PY = airborne ? 3f : gpy,
+            IsGrounded = !airborne,
+            JumpsLeft = (byte)(airborne ? 0 : 2),
+            FacingYaw = MathF.PI,
+        };
+        sim.RegisterEntity(1, def, player);
+        // Outside normal hit/attack range, behind the initial facing: target rotation
+        // must not depend on connecting a hit or an enemy already being in front.
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 5f) with { PY = gpy });
+        sim.Tick(new() { { 1, new InputState { ToggleLock = locked } } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = activeSlot } } });
 
         var state = sim.GetState(1);
+        string context = $"{def.DisplayName} {(airborne ? "air" : "ground")} slot {activeSlot}, locked={locked}";
+        Assert.True(state.State == ActionState.Attacking, $"{context}: attack did not start.");
+        Assert.Equal(activeSlot, state.AttackSlot);
+        Assert.Equal(locked, state.LockOn);
+        Assert.Equal(100UL, state.TargetEntityId);
+        if (airborne) Assert.False(state.IsGrounded);
+        if (locked)
+        {
+            Assert.True(MathF.Abs(state.FacingYaw) <= 1e-3f, $"{context}: did not snap, yaw={state.FacingYaw}.");
+        }
+        else
+        {
+            // Strong tracking corrects most of the angle on the FIRST tick, not
+            // after dozens of ticks. Multiplying the fraction by TickDt fails this.
+            Assert.True(MathF.Abs(state.FacingYaw) <= MathF.PI * 0.25f,
+                $"{context}: tracking too weak, yaw={state.FacingYaw}.");
+            float strength = def.GetSlotAbility(activeSlot - 1, airborne)!.Stages[0].TrackingStrength;
+            TestHelpers.AssertNear(MathF.PI * (1f - strength), state.FacingYaw, 1e-3f);
+        }
+    }
+
+    private static void AssertLockedAttackDoesNotFace(CharacterDefinition def, byte activeSlot, short aimYaw = 0)
+    {
+        var sim = TestHelpers.MakeSim();
+        float gpy = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, TestHelpers.PlayerState() with { PY = gpy, FacingYaw = MathF.PI });
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 5f) with { PY = gpy });
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
+        sim.Tick(new() { { 1, new InputState { AimYaw = aimYaw } } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = activeSlot, AimYaw = aimYaw } } });
+        sim.Tick(new() { { 1, default } });
+        var state = sim.GetState(1);
         Assert.True(state.LockOn);
-        // Facing snapped from PI to the target at (0,5) (yaw 0) during the attack.
-        TestHelpers.AssertNear(0f, state.FacingYaw, 1e-3f);
+        Assert.True(MathF.Abs(MathF.PI - state.FacingYaw) <= 1e-3f, $"active slot {activeSlot} changed facing to {state.FacingYaw}.");
     }
 
     [Fact]

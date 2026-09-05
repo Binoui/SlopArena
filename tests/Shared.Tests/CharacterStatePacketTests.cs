@@ -24,8 +24,6 @@ public class CharacterStatePacketTests
             AnimIndex = 5,
             FacingYaw = 1.234f,
             MatchState = MatchState.Playing,
-            BuffRemainingTicks = 60,
-            BuffActiveFlags = 0b_0011,
             HitstunLevel = 2,
             AimPitch = -0.5f,
             Deaths = 2,
@@ -76,8 +74,6 @@ public class CharacterStatePacketTests
         Assert.Equal(original.AnimIndex, restored.AnimIndex);
         Assert.Equal(original.FacingYaw, restored.FacingYaw);
         Assert.Equal(original.MatchState, restored.MatchState);
-        Assert.Equal(original.BuffRemainingTicks, restored.BuffRemainingTicks);
-        Assert.Equal(original.BuffActiveFlags, restored.BuffActiveFlags);
         Assert.Equal(original.HitstunLevel, restored.HitstunLevel);
         Assert.Equal(original.AimPitch, restored.AimPitch);
         Assert.Equal(original.Deaths, restored.Deaths);
@@ -108,12 +104,8 @@ public class CharacterStatePacketTests
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 63 bytes base (locked pre-rollback) + 28 bytes of D10 movement-resource fields
-        // (ADR-0011; DirHoldTicks/IsSprinting dropped in ADR-0020, −3) + 2 hitstop (ADR-0012)
-        // + 4 burst (ADR-0014) + 10 cooldown slots 6-10 + 1 JumpHeldTicks (ADR-0016)
-        // + 1 LockOn (ADR-0018) + 2 LedgeRegrabLockTicks (walk-off self-grab suppression) = 112.
-        // Lock the constant: a silent Size change would break every packet on the wire.
-        Assert.Equal(112, CharacterStatePacket.Size);
+        // 109 bytes: the fixed state fields, eleven cooldown slots, and rollback resources.
+        Assert.Equal(109, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

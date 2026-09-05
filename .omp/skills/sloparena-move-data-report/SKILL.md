@@ -98,8 +98,9 @@ scaled nothing while .NET tests were green.
 - `--traj <slot>` — raw per-tick CSV launch trace for one grounded hit.
 - `--shape [step]` — knockback feel surface: sampled arc every ~0.2s per hit per %, phase markers
   (H=hitstun/F=flight/A=apex/G=landed) + one-line KV/stun summary.
-- `--pipe`, `--dll <path>`, `--parity` — internal diagnostics (see `unity-mcp-gamedev` skill for the
-  `--parity` vs in-game launch-contract sentinel check).
+- `--pipe`, `--dll <path>`, `--parity` — internal diagnostics (see
+  `docs/contributing/unity-cli.md` for the Unity CLI/Pipeline parity check and in-game
+  launch-contract sentinel comparison).
 
 ## Caveats (read before trusting a report)
 
@@ -121,8 +122,8 @@ scaled nothing while .NET tests were green.
 
 - User asks for attack duration, active frames, frame advantage, knockback shape/range, or a move-data table.
 - After a balance/timing change to a character's normals — regenerate and read the diff as the changelog.
-- If a report disagrees with in-game feel, run `--parity` and compare with the game's launch-contract
-  sentinel (see `unity-mcp-gamedev` skill).
+- If a report disagrees with in-game feel, run `--parity` and compare with the launch-contract
+  sentinel using the Unity CLI workflow in `docs/contributing/unity-cli.md`.
 
 ## Character normal audit — all eight normals
 
@@ -140,7 +141,7 @@ interactive main session, explain the proposal and wait for approval before edit
   `SpawnHitbox` operation as an independently authored contact, not merely each input label
   as one move.
 - Server simulation is authoritative. Read the package's `character.json` and cooked
-  definition; for legacy Manki/Kistu/Nilus maintenance, use the existing
+definition; for legacy Nilus maintenance, use the existing
   `LegacyCharacterCatalogAdapter` definition. Use `HitboxGeometry.ResolvePositions` /
   `ServerSimulation.BuildEntitiesFromState` geometry and simulation outcomes. Never infer
   gameplay behavior solely from a client animation.

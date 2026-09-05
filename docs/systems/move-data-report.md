@@ -237,8 +237,8 @@ tests were green.
 2. `dotnet build tools/MoveDataReport/ --nologo`.
 3. Run, read the markdown, sanity-check against `docs/characters/<char>.md` / the ability spec.
 4. Commit regenerated `docs/generated/*.md` alongside a behavior change when it should be a changelog
-   artifact. `--parity` divergence with in-game feel → check the launch-contract sentinel (see the
-   `unity-mcp-gamedev` skill).
+   artifact. `--parity` divergence with in-game feel → check the launch-contract sentinel using
+   the Unity CLI/Pipeline workflow in `docs/contributing/unity-cli.md`.
 
 ## Key files
 
