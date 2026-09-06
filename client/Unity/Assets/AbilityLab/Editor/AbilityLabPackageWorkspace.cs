@@ -75,7 +75,7 @@ public sealed class AbilityLabPackageWorkspace
         Catalog = inspection.Catalog;
         _undo.Clear();
         _redo.Clear();
-        AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft), true);
+        AbilityLab.Instance?.SetSourceDocument(new CharacterPackageSource(Manifest, Draft));
         AbilityLab.Instance?.SetPresentationBindings(Catalog.Presentations);
         LoadedDiskHash = ComputeDiskHash();
         LoadedCatalogFingerprint = ComputeCatalogFingerprint();

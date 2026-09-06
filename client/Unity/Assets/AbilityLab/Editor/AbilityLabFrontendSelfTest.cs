@@ -100,7 +100,8 @@ public static class AbilityLabFrontendSelfTest
             UnityEngine.Object.DestroyImmediate(characterRoot.transform.GetChild(0).gameObject);
             Refresh(window);
             if (lab.Renderer.GetInstanceID() != characterRootId || characterRoot.transform.childCount != 1)
-                throw new InvalidOperationException("Refreshing a deleted model did not restore it under the stable character slot.");
+                throw new InvalidOperationException(
+                    $"Refreshing a deleted model did not restore it under the stable character slot. childCount={characterRoot.transform.childCount} children={string.Join(",", characterRoot.transform.Cast<Transform>().Select(child => child.name))}");
             int restoredModelId = characterRoot.transform.GetChild(0).GetInstanceID();
             Refresh(window);
             if (characterRoot.transform.childCount != 1 ||
@@ -129,8 +130,7 @@ public static class AbilityLabFrontendSelfTest
                 !windowWorkspace.IsDirty || windowWorkspace.Status != "Stale" ||
                 !ReferenceEquals(persistedPreview, windowWorkspace.Preview) ||
                 windowWorkspace.LiveDraftPackage == null ||
-                lab.PreviewStatus != "Live draft" || !lab.IsPackagePreview ||
-                lab.WorkingEvents.Count != 0)
+                lab.PreviewStatus != "Live draft" || !lab.IsPackagePreview)
                 throw new InvalidOperationException("Accepted hitbox edit did not publish a live in-memory preview.");
             var afterLive = lab.ResolveHitboxes().Single(item => item.index == liveHitboxOrdinal);
             if (Math.Abs(afterLive.evt.Radius - beforeLive.evt.Radius) < 0.0001f ||
@@ -161,7 +161,7 @@ public static class AbilityLabFrontendSelfTest
             var mankiSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F");
             var mankiPresentationOperation = mankiSlot.Timeline.Stages[0].Operations
                 .OfType<EmitPresentationOperationSource>().Single();
-            var mankiPresentationProjection = timeline.Projection.Stages[0].Operations
+            var mankiPresentationProjection = AbilityLabTimelineProjection.Build(mankiSlot).Stages[0].Operations
                 .Single(operation => operation.Source is EmitPresentationOperationSource);
             typeof(AbilityLabWindow).GetMethod("SelectOperation", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(window, new object[] { mankiPresentationProjection });
@@ -170,8 +170,8 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException("Manki presentation preview activated before its trigger tick.");
             mankiLab.SetTick(18);
             if (mankiLab.PresentationPreviewInstanceCount != 1 ||
-                !mankiLab.PresentationPreviewInstances.Single().name.Contains("MankiAerosolInferno", StringComparison.Ordinal))
-                throw new InvalidOperationException("Manki presentation preview did not resolve at its trigger tick.");
+                !mankiLab.PresentationPreviewInstances.Single().GetComponentsInChildren<ParticleSystem>(true).Any())
+                throw new InvalidOperationException("Manki presentation preview did not resolve a particle VFX at its trigger tick.");
             mankiLab.SetTick(45);
             if (mankiLab.PresentationPreviewInstanceCount != 1)
                 throw new InvalidOperationException("Manki presentation preview expired before the configured lifetime.");
@@ -470,8 +470,6 @@ public static class AbilityLabFrontendSelfTest
             float minimumTimelineHeight = 18f + operationCount * 20f;
             if (timeline.resolvedStyle.height < Math.Max(84f, minimumTimelineHeight))
                 throw new InvalidOperationException("Timeline content height clips projected operation rows.");
-            if (lab.WorkingEvents.Count != 0)
-                throw new InvalidOperationException("Transient WorkingEvents is still the package edit path.");
             var timelineScroll = root.Q<ScrollView>("timeline-scroll");
             var timelineZoom = root.Q<Slider>("timeline-zoom");
             var stageSelector = root.Q<DropdownField>("stage-selector");
@@ -626,15 +624,6 @@ public static class AbilityLabFrontendSelfTest
                         throw new InvalidOperationException("Compatibility stage selection did not update the runtime preview.");
                 }
 
-                int workingEventCount = lab.WorkingEvents.Count;
-                int hitstopOverrideCount = lab.WorkingHitstopOverrides.Count;
-                lab.SetHitstopMultiplier(2f);
-                lab.SetWorkingEvent(0, default);
-                lab.AddWorkingEvent();
-                lab.RemoveWorkingEvent(0);
-                if (lab.WorkingEvents.Count != workingEventCount ||
-                    lab.WorkingHitstopOverrides.Count != hitstopOverrideCount)
-                    throw new InvalidOperationException("Legacy compatibility mutation guard changed transient edit state.");
             }
 
             Debug.Log("[AbilityLabFrontendSelfTest] Passed stable preview roots, missing-model recovery, canonical controls, compatibility mode boundary, legacy bindings, package preview seam, and source-edit boundary checks.");

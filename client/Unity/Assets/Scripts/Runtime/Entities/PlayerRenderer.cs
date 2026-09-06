@@ -198,7 +198,9 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void EnsureModel()
         {
-            if (_modelInstance != null) return;
+            if (_modelInstance != null && _modelInstance.transform.parent == transform && transform.childCount > 0)
+                return;
+            _modelInstance = null;
 
             GameObject prefab = _modelPrefab;
             if (prefab == null && !string.IsNullOrEmpty(_modelResourcePath))

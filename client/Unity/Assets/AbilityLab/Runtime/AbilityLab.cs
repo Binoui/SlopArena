@@ -17,8 +17,6 @@ namespace SlopArena.Client.Tools
     /// the baked skeleton through the same Shared resolvers used by the server.
     ///
     /// Package source ownership, typed DTO editing, hashes, persistence, and cooking live
-    /// in AbilityLabPackageWorkspace. WorkingEvents is only a transient legacy/render
-    /// projection and never writes package source.
     ///
     /// ExecuteAlways: the orbit camera and verified package preview work in edit mode.
     /// Legacy compatibility preview remains play-mode only.
@@ -94,11 +92,6 @@ namespace SlopArena.Client.Tools
             }
         }
         public HurtboxBoneDef[] WorkingDefs { get; private set; } = Array.Empty<HurtboxBoneDef>();
-        /// <summary>Per-(slot, airborne, stage) hitbox event edits (key = "slot:airborne:stage").</summary>
-        public Dictionary<string, HitboxEvent[]> WorkingEvents { get; private set; } = new();
-
-        /// <summary>Per-(slot, airborne) hitstop multiplier edits keyed by content ability name.</summary>
-        public Dictionary<string, float> WorkingHitstopOverrides { get; private set; } = new();
 
 
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
@@ -111,16 +104,10 @@ namespace SlopArena.Client.Tools
         private Vector2 _orbitAngles = new(25f, 0f);
         private float _orbitDistance = 4.5f;
         private Vector3 _orbitPivot;
-        // Undo/redo stores complete source DTOs; WorkingEvents remains a render projection.
-        private const int MaxUndoDepth = 50;
         private CookedCharacterPackage? _liveDraftPackage;
         private CharacterPackageSource? _sourceDocument;
         private CharacterAssetCatalog.PresentationBinding[] _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
         private readonly AbilityLabPresentationPreviewer _presentationPreviewer = new();
-        private readonly Stack<CharacterPackageSource> _undo = new();
-        private readonly Stack<CharacterPackageSource> _redo = new();
-        public bool CanUndo => _undo.Count > 0;
-        public bool CanRedo => _redo.Count > 0;
         public int PresentationPreviewInstanceCount => _presentationPreviewer.ActiveInstanceCount;
         public IReadOnlyCollection<GameObject> PresentationPreviewInstances => _presentationPreviewer.ActiveInstances;
 
@@ -338,8 +325,6 @@ namespace SlopArena.Client.Tools
             Baked = loadedBaked;
             WorkingDefs = loadedWorkingDefs;
             DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
             AuthoritativePreview = false;
             PreviewStatus = $"Compatibility Preview · {Character} · Legacy authority · Read-only";
             ShowHurtboxes = true;
@@ -358,8 +343,6 @@ namespace SlopArena.Client.Tools
             StageIndex = 0;
             Tick = 0;
             Playing = false;
-            _undo.Clear();
-            _redo.Clear();
             RefreshPose();
         }
 
@@ -424,9 +407,6 @@ namespace SlopArena.Client.Tools
             ShowDummy = false;
             SpawnRenderer();
             Airborne = false; SlotIndex = SlotIndices[0]; StageIndex = 0; Tick = 0; Playing = false;
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
-            _undo.Clear(); _redo.Clear();
             RefreshPose();
         }
 
@@ -443,7 +423,10 @@ namespace SlopArena.Client.Tools
             }
 
             if (ReferenceEquals(_liveDraftPackage, package) && IsPackagePreview)
+            {
+                RefreshPose();
                 return;
+            }
 
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
             string priorSlotId = SelectedSlotId;
@@ -483,8 +466,6 @@ namespace SlopArena.Client.Tools
             _packagePreviewAvailable = true;
             _liveDraftPackage = package;
             PreviewStatus = "Live draft";
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
             StageIndex = Mathf.Clamp(priorStage, 0, spec.Stages.Length - 1);
             var stage = spec.Stages[StageIndex];
             Tick = (ushort)Mathf.Clamp(priorTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
@@ -539,9 +520,6 @@ namespace SlopArena.Client.Tools
             ShowBakedBones = false;
             ShowDummy = false;
             SpawnRenderer();
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
-            _undo.Clear(); _redo.Clear();
             SetSlot(CanonicalSlotProjection.All[0]);
         }
 
@@ -560,7 +538,6 @@ namespace SlopArena.Client.Tools
             DisplayDef = null;
             Baked = null;
             WorkingDefs = Array.Empty<HurtboxBoneDef>();
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
             AuthoritativePreview = false;
             _packagePreviewAvailable = false;
             PreviewStatus = "Preview unavailable";
@@ -801,104 +778,14 @@ namespace SlopArena.Client.Tools
             RefreshPose();
         }
 
-        /// <summary>Override key for the current selection ("slot:airborne:stage").</summary>
-        public string CurrentKey => $"{SlotIndex}:{(Airborne ? 1 : 0)}:{StageIndex}";
-        /// <summary>Content ability name used for the current ability's authored parameters.</summary>
-        public string CurrentAbilityProperty => ContentAbilityName(SlotIndex, Airborne);
-
-        private static string ContentAbilityName(int slotIndex, bool airborne) => (slotIndex, airborne) switch
-        {
-            (0, false) => "lmb", (0, true) => "airLmb",
-            (1, false) => "rmb", (1, true) => "airRmb",
-            (2, false) => "slot1", (2, true) => "airSlot1",
-            (3, false) => "e", (3, true) => "airE",
-            (4, false) => "r", (4, true) => "airR",
-            (5, false) => "f", (5, true) => "airF",
-            (6, false) => "slot2", (6, true) => "airSlot2",
-            (7, false) => "slot3", (7, true) => "airSlot3",
-            (8, false) => "slot4", (8, true) => "airSlot4",
-            (9, false) => "slot5", (9, true) => "airSlot5",
-            (10, false) => "a", (10, true) => "airA",
-            _ => throw new ArgumentOutOfRangeException(nameof(slotIndex), slotIndex, "No ability content name for slot"),
-        };
-
-        private static bool TryParseStageKey(string key, out int slotIndex, out bool airborne, out int stageIndex)
-        {
-            slotIndex = -1;
-            airborne = false;
-            stageIndex = -1;
-            string[] parts = key.Split(':');
-            if (parts.Length != 3
-                || !int.TryParse(parts[0], out slotIndex)
-                || (parts[1] != "0" && parts[1] != "1")
-                || !int.TryParse(parts[2], out stageIndex)
-                || slotIndex < 0 || slotIndex > 10 || stageIndex < 0)
-            {
-                slotIndex = -1;
-                stageIndex = -1;
-                return false;
-            }
-            airborne = parts[1] == "1";
-            return true;
-        }
-
-        private static bool TryGetContentAbility(
-            CharacterDefinition definition, string name, out AbilitySpec? ability)
-        {
-            ability = name switch
-            {
-                "lmb" => definition.LMB, "rmb" => definition.RMB,
-                "airLmb" => definition.AirLMB, "airRmb" => definition.AirRMB,
-                "slot1" => definition.Slot1, "airSlot1" => definition.AirSlot1,
-                "e" => definition.E, "airE" => definition.AirE,
-                "r" => definition.R, "airR" => definition.AirR,
-                "f" => definition.F, "airF" => definition.AirF,
-                "slot2" => definition.Slot2, "airSlot2" => definition.AirSlot2,
-                "slot3" => definition.Slot3, "airSlot3" => definition.AirSlot3,
-                "slot4" => definition.Slot4, "airSlot4" => definition.AirSlot4,
-                "slot5" => definition.Slot5, "airSlot5" => definition.AirSlot5,
-                "a" => definition.A, "airA" => definition.AirA,
-                _ => null,
-            };
-            return ability != null;
-        }
-
-        /// <summary>
-        /// Working hitstop override, authored ability parameter, or the simulation default.
-        /// </summary>
-        public float CurrentHitstopMultiplier
-        {
-            get
-            {
-                if (WorkingHitstopOverrides.TryGetValue(CurrentAbilityProperty, out float working))
-                    return working;
-                var spec = CurrentSpec();
-                return spec?.Params != null && spec.Params.TryGetValue("hitstop_multiplier", out float authored)
-                    ? authored : 1f;
-            }
-        }
-
-        public void SetHitstopMultiplier(float multiplier)
-        {
-            if (!IsPackagePreview) return;
-            float value = Mathf.Max(0f, multiplier);
-            if (Mathf.Approximately(value, CurrentHitstopMultiplier)) return;
-            PushSourceUndo();
-            WorkingHitstopOverrides[CurrentAbilityProperty] = value;
-            _trajDirty = "";
-            RefreshPose();
-        }
-
-
-        /// <summary>
-        /// The hitbox events that preview + timeline use: the working override for the
-        /// current (slot, airborne, stage) when present, else the authored stage events.
-        /// </summary>
+        /// <summary>The currently authored hitbox events for the selected stage.</summary>
         public HitboxEvent[] CurrentWorkingEvents()
         {
-            if (WorkingEvents.TryGetValue(CurrentKey, out var events)) return events;
-            return TryGetStage(out var stage) && stage.HitboxEvents != null ? stage.HitboxEvents : Array.Empty<HitboxEvent>();
+            return TryGetStage(out var stage) && stage.HitboxEvents != null
+                ? stage.HitboxEvents
+                : Array.Empty<HitboxEvent>();
         }
+
 
         // ── Pose resolution (the Shared functions the server uses) ──
 
@@ -1091,6 +978,11 @@ namespace SlopArena.Client.Tools
             return null;
         }
 
+        public void SetSourceDocument(CharacterPackageSource source)
+        {
+            _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
+        }
+
         public void SetPresentationBindings(CharacterAssetCatalog.PresentationBinding[] bindings)
         {
             _presentationBindings = bindings ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>();
@@ -1122,6 +1014,8 @@ namespace SlopArena.Client.Tools
                 return;
             }
             _previewRenderer.EnsureModel();
+            if (_previewRenderer.transform.childCount == 0)
+                ConfigureRenderer(_previewRenderer, DisplayDef, "LabCharacter");
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
             _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
             _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick);
@@ -1154,82 +1048,6 @@ namespace SlopArena.Client.Tools
 #endif
         }
 
-        // ── Hitbox event editing (spec #119: add / remove / move / scale) ──
-        public void SetSourceDocument(CharacterPackageSource source, bool clearHistory = false)
-        {
-            _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
-            if (clearHistory) { _undo.Clear(); _redo.Clear(); }
-        }
-
-        private void PushSourceUndo()
-        {
-            if (_sourceDocument == null) return;
-            _undo.Push(_sourceDocument);
-            if (_undo.Count > MaxUndoDepth) _undo.Pop();
-            _redo.Clear();
-        }
-
-        public void UndoEvents()
-        {
-            if (_undo.Count == 0) return;
-            if (_sourceDocument != null) _redo.Push(_sourceDocument);
-            _sourceDocument = _undo.Pop();
-            RefreshPose();
-        }
-        public void SetWorkingEvent(int index, HitboxEvent evt)
-        {
-            if (!IsPackagePreview) return;
-            var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
-            if (index < 0 || index >= events.Length) return;
-            events[index] = evt;
-            WorkingEvents[CurrentKey] = events;
-            RefreshPose();
-        }
-        public void AddWorkingEvent()
-        {
-            if (!IsPackagePreview) return;
-            var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
-            var template = events.Length > 0 ? events[events.Length - 1] : default;
-            var created = new HitboxEvent
-            {
-                TriggerTick = 1,
-                DurationTicks = 10,
-                Shape = HitboxShape.Sphere,
-                Radius = template.Radius > 0f ? template.Radius : 0.4f,
-                OffY = template.OffY,
-                OffZ = template.OffZ > 0f ? template.OffZ : 1.0f,
-                Damage = template.Damage,
-                StunTicks = template.StunTicks,
-                Interruptible = true,
-                Knockback = template.Knockback,
-            };
-            var list = new List<HitboxEvent>(events) { created };
-            PushSourceUndo();
-            WorkingEvents[CurrentKey] = list.ToArray();
-            RefreshPose();
-        }
-
-        public void RemoveWorkingEvent(int index)
-        {
-            if (!IsPackagePreview) return;
-            var events = (HitboxEvent[])CurrentWorkingEvents().Clone();
-            if (index < 0 || index >= events.Length) return;
-            var list = new List<HitboxEvent>(events);
-            list.RemoveAt(index);
-            PushSourceUndo();
-            WorkingEvents[CurrentKey] = list.ToArray();
-            RefreshPose();
-        }
-
-        /// <summary>Discard unsaved edits — the preview reverts to the last-built data.</summary>
-        public void RevertEdits()
-        {
-            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
-            _undo.Clear();
-            _redo.Clear();
-            RefreshPose();
-        }
 
         // ── Rendering (OnRenderObject → visible in Game view AND Scene view) ──
 

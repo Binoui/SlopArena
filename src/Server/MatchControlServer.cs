@@ -81,12 +81,6 @@ namespace SlopArena.Server
         /// human-readable error. The caller is responsible for writing the HTTP
         /// response. Throws on an internal error (orchestrator failure).
         /// </summary>
-        public (int port, string? error) TryStartMatch(string jsonBody)
-        {
-            var result = TryStartMatchWithContent(jsonBody);
-            return (result.port, result.error);
-        }
-
         public (int port, MatchContentHandleMap? content, string? error) TryStartMatchWithContent(string jsonBody)
         {
             MatchStartRequest? req;

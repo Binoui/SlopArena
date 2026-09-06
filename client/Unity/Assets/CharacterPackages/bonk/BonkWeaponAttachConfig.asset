@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Entries:
   - AttackSlot: 0
-    BoneName: hand_r
-    Prefab: {fileID: 100000, guid: 504fa2e6f23e7edd79d71fae0aa64f56, type: 3}
-    PositionOffset: {x: 0, y: 0, z: 0}
-    RotationOffset: {x: 0, y: 90, z: 0}
+    BoneName: mixamorig:RightHand
+    Prefab: {fileID: 2591648499558059746, guid: 55f35709473a3ead9b2717eb185155b9, type: 3}
+    PositionOffset: {x: -0.26, y: 0.13, z: 0.05}
+    RotationOffset: {x: -90, y: 180, z: -45}
+    HideAfterTicks: 0

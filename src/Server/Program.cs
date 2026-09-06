@@ -53,7 +53,7 @@ namespace SlopArena.Server
             {
                 Console.WriteLine("WARNING: Failed to register with master server.");
                 Console.WriteLine("The server will run without master server integration.");
-                Console.WriteLine("Matches can still be assigned programmatically via AssignMatch().");
+                Console.WriteLine("Matches can still be assigned through POST /match/start.");
             }
             else
             {

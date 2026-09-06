@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _packageId: bonk
   _catalogSchemaVersion: 1
-  _rig: {fileID: 100110, guid: d48fbbab624b9bf7c9fe01372205a79a, type: 3}
+  _rig: {fileID: 2885432827554059921, guid: 77650c3385e50499387e656d1abf9631, type: 3}
   _weaponConfig: {fileID: 11400000, guid: e39ce81cb942475ddadbde1245b85bd5, type: 2}
   _sampleRate: 60
   _bindings:
@@ -95,7 +95,7 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.bonk.a3
   - _semanticId: anim.bonk.a4
-    _clip: {fileID: 7400000, guid: b30efc1ea06bbc05c9d4c52d855be0c1, type: 3}
+    _clip: {fileID: 7400000, guid: c0d24fd95e0ffb485b7f88bbdf91c996, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.a4
   - _semanticId: anim.bonk.aa

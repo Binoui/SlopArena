@@ -38,7 +38,7 @@
     "hitHard": "anim.hit-hard",
     "landStartOffsetSeconds": 0.49,
     "modelResourcePath": "",
-    "visualScale": 1,
+    "visualScale": 3,
     "hurtboxBoneScale": 0.85,
     "modelYOffset": 0,
     "modelSoleOffset": 0,
@@ -199,7 +199,8 @@
                   "stunTicks": 12,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -257,7 +258,8 @@
                   "stunTicks": 16,
                   "durationTicks": 12,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -315,7 +317,8 @@
                   "stunTicks": 16,
                   "durationTicks": 12,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -373,7 +376,8 @@
                   "stunTicks": 22,
                   "durationTicks": 13,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -460,6 +464,58 @@
                   "slamKnockbackGrowth": 32,
                   "slamStunTicks": 20,
                   "slamDurationTicks": 6
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 71,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 30,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 90,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.5,
+                  "offsetX": 1,
+                  "offsetY": 0,
+                  "offsetZ": 1,
+                  "endOffsetX": -1,
+                  "endOffsetY": 0,
+                  "endOffsetZ": -1,
+                  "startBoneId": "bone.hips",
+                  "endBoneId": "bone.hips",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 7,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -549,7 +605,8 @@
                   "stunTicks": 8,
                   "durationTicks": 4,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -574,7 +631,8 @@
                   "stunTicks": 8,
                   "durationTicks": 4,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -599,7 +657,8 @@
                   "stunTicks": 8,
                   "durationTicks": 4,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -624,7 +683,8 @@
                   "stunTicks": 8,
                   "durationTicks": 4,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -649,7 +709,8 @@
                   "stunTicks": 20,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -707,7 +768,8 @@
                   "stunTicks": 14,
                   "durationTicks": 16,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -797,7 +859,8 @@
                   "stunTicks": 20,
                   "durationTicks": 10,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -835,7 +898,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 15,
+                "tick": 25,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -855,7 +918,8 @@
                   "stunTicks": 22,
                   "durationTicks": 15,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

@@ -18,16 +18,12 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuRisingSlash : ServerAbility
 {
-    private readonly KistuRisingSlashCapabilityParameters _parameters;
+    private readonly CookedKistuRisingSlashCapabilityParameters _parameters;
     private ushort _ticks;
     private ushort _duration;
 
-    public KistuRisingSlash(KistuRisingSlashCapabilityParameters parameters)
-        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public KistuRisingSlash(CookedKistuRisingSlashCapabilityParameters parameters)
-        : this(new KistuRisingSlashCapabilityParameters(parameters.RiseSpeed, parameters.RiseTicks, parameters.HomingRange, parameters.HomingSpeed))
-    {
-    }
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {

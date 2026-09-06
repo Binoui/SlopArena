@@ -104,4 +104,4 @@ MonoBehaviour:
     _poseTrackId: anim.manki.a4
   _presentations:
   - _semanticId: presentation.manki.aerosol-inferno.start
-    _prefab: {fileID: 919132149155446097, guid: c7b6e3a8f5d34b3e9b91c58f6a2e1047, type: 3}
+    _prefab: {fileID: 2398608829508964987, guid: cb1ad5ee3fc411307aa4e833297bc755, type: 3}

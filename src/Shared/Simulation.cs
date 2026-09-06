@@ -177,10 +177,10 @@ namespace SlopArena.Shared
         /// Current stage's elapsed ticks for an attacking entity. AttackElapsedTicks counts
         /// ticks since the last stage reset; stage-driven moves (StageChainAbility) never
         /// reset it mid-attack, so subtracting prior stages' durations yields the current
-        /// stage's elapsed. Charge abilities reset it at their mid-attack stage transition
-        /// (ChargeAttackAbility/AimHoldAbility), which underflows the subtraction — fall back
-        /// to the raw clock (elapsed since the transition). Shared by the IASA check and the
-        /// landing-lag auto-cancel windows.
+        /// stage's elapsed. Hold-to-aim abilities reset it at their mid-attack stage
+        /// transition, which underflows the subtraction — fall back to the raw clock
+        /// (elapsed since the transition). Shared by the IASA check and the landing-lag
+        /// auto-cancel windows.
         /// </summary>
         internal static int ElapsedInStage(CharacterState state, AbilitySpec? spec)
         {

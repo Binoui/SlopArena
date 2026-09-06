@@ -295,15 +295,6 @@ public static class CharacterPackageSourceCodec
         return ReplaceStage(source, slotIndex, stageIndex, stage with { Operations = operations });
     }
 
-    public static HitboxEvent ToPreviewHitbox(SpawnHitboxOperationSource operation)
-    {
-        if (operation == null) throw new ArgumentNullException(nameof(operation));
-        var h = operation.Hitbox;
-        return new HitboxEvent { TriggerTick = operation.Tick, DurationTicks = h.DurationTicks, Shape = (HitboxShape)h.Shape, Radius = h.Radius, OffX = h.OffsetX, OffY = h.OffsetY, OffZ = h.OffsetZ, EndOffX = h.EndOffsetX, EndOffY = h.EndOffsetY, EndOffZ = h.EndOffsetZ, BoneName = h.StartBoneId, EndBoneName = h.EndBoneId, Damage = h.Damage, Knockback = new KnockbackData { Profile = KnockbackProfile.Custom, Angle = (sbyte)Math.Clamp(h.Angle, -90f, 90f), BaseKnockback = h.BaseKnockback, KnockbackGrowth = h.KnockbackGrowth }, KnockbackDirection = h.KnockbackDirection, StunTicks = h.StunTicks, Interruptible = h.Interruptible, HitGroup = h.HitGroup };
-    }
-    public static SpawnHitboxOperationSource FromPreviewHitbox(HitboxEvent value, AuthoringUnit unit = AuthoringUnit.Meters)
-        => new(value.TriggerTick, unit, new HitboxSource((AuthoringHitboxShape)value.Shape, value.Radius, value.OffX, value.OffY, value.OffZ, value.EndOffX, value.EndOffY, value.EndOffZ, value.BoneName, value.EndBoneName, value.Damage, value.Knockback.Angle, value.Knockback.BaseKnockback, value.Knockback.KnockbackGrowth, value.StunTicks, value.DurationTicks, value.Interruptible, value.HitGroup, value.KnockbackDirection));
-
     public static CharacterSourceEditResult RenameSemanticId(CharacterPackageSource source, string oldId, string newId, IReadOnlyList<CharacterAssetCatalogBindingSnapshot> catalog)
     {
         var error = ValidateRename(source, oldId, newId, catalog);

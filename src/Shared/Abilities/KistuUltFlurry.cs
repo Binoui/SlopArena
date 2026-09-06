@@ -12,15 +12,11 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuUltFlurry : ServerAbility
 {
-    private readonly KistuBladeFlurryCapabilityParameters _parameters;
+    private readonly CookedKistuBladeFlurryCapabilityParameters _parameters;
     private ushort _ticks;
 
-    public KistuUltFlurry(KistuBladeFlurryCapabilityParameters parameters)
-        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public KistuUltFlurry(CookedKistuBladeFlurryCapabilityParameters parameters)
-        : this(new KistuBladeFlurryCapabilityParameters(parameters.ForwardSpeed, parameters.MoveTicks))
-    {
-    }
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         _ticks = 0;

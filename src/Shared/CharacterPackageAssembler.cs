@@ -39,9 +39,6 @@ public sealed class CharacterPackageAssemblyInput
     public byte[] BindingBytes { get; }
     public CookedCharacterPackage CookedPackage { get; }
 
-    public byte[] RuntimeJsonBytes => (byte[])RuntimeBytes.Clone();
-    public byte[] PosesBytes => (byte[])PoseBytes.Clone();
-    public byte[] ClientBindingsBytes => (byte[])BindingBytes.Clone();
 
     public CharacterPackageAssemblyInput(
         string packageId,
@@ -105,9 +102,6 @@ public sealed class CharacterPackageAssemblyResult
     public byte[] RuntimeBytes { get; }
     public byte[] PoseBytes { get; }
     public byte[] BindingBytes { get; }
-    public byte[] RuntimeJsonBytes => (byte[])RuntimeBytes.Clone();
-    public byte[] PosesBytes => (byte[])PoseBytes.Clone();
-    public byte[] ClientBindingsBytes => (byte[])BindingBytes.Clone();
     public string SourceHash { get; }
     public string CookedContentHash { get; }
     public string PackageHash { get; }

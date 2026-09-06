@@ -30,9 +30,6 @@ namespace SlopArena.Server
         public Action<Guid, long>? ReportMatchResult { get; set; }
 
         /// <summary>Assigns a match only after building its match-scoped catalog.</summary>
-        public int AssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks = MatchDefaults.DefaultMaxStocks)
-            => TryAssignMatch(matchId, arenaName, roster, maxStocks, out var port, out _, out _) ? port : -1;
-
         public bool TryAssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks,
             out int port, out MatchContentHandleMap? content, out string? error)
         {

@@ -25,7 +25,7 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuDashSlash : ServerAbility
 {
-    private readonly KistuDashSlashCapabilityParameters _parameters;
+    private readonly CookedKistuDashSlashCapabilityParameters _parameters;
     private enum Phase { Aim, Dash }
 
     private Phase _phase;
@@ -33,12 +33,8 @@ public sealed class KistuDashSlash : ServerAbility
     private float _dashYaw;
     private bool _hitboxSpawned;
 
-    public KistuDashSlash(KistuDashSlashCapabilityParameters parameters)
-        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public KistuDashSlash(CookedKistuDashSlashCapabilityParameters parameters)
-        : this(new KistuDashSlashCapabilityParameters(parameters.DashDistance, parameters.DashDurationTicks, parameters.MaxAimTicks))
-    {
-    }
+        => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         _phase = Phase.Aim;

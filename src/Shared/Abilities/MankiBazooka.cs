@@ -16,32 +16,13 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public sealed class MankiBazooka : ServerAbility, IAimHoldCapability
     {
-        private readonly CookedMankiBazookaCapabilityParameters? _parameters;
+        private readonly CookedMankiBazookaCapabilityParameters _parameters;
         private enum BazookaPhase { Aiming, Firing, Recovery }
         private BazookaPhase _phase;
         private bool _projectileSpawned;
 
-        public MankiBazooka() { }
         public MankiBazooka(CookedMankiBazookaCapabilityParameters parameters)
             => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
-        public MankiBazooka(MankiBazookaCapabilityParameters parameters)
-            : this(parameters != null ? new CookedMankiBazookaCapabilityParameters(
-                parameters.FireTriggerTick,
-                parameters.ProjectileSpeed,
-                parameters.HitboxRadius,
-                parameters.Damage,
-                parameters.Gravity,
-                parameters.MaxFlightTicks,
-                parameters.StunTicks,
-                parameters.ExplosionRadius,
-                parameters.KbAngle,
-                parameters.ExplosionKbBase,
-                parameters.ExplosionKbGrowth,
-                parameters.ExplosionStunTicks,
-                parameters.ExplosionDurationTicks,
-                parameters.ExplosionKbAngle,
-                parameters.CastDuration,
-                parameters.RecoveryDuration) : throw new ArgumentNullException(nameof(parameters))) { }
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
             _phase = BazookaPhase.Aiming;

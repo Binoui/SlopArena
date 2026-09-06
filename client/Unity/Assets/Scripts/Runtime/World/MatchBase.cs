@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Unity.Cinemachine;
 using UnityEngine;
 using SlopArena.Shared;
@@ -262,49 +261,5 @@ namespace SlopArena.Client.World
             }
         }
 
-        // ── Static utilities ────────────────────────────────────────────────
-
-        protected static BakedAnimationData? LoadBakedData(CharacterDefinition def)
-        {
-            if (def.Class == CharacterClass.FightGuy || string.IsNullOrEmpty(def.BakedDataPath)) return null;
-            string? path = BakedContentPaths.ResolveBaked(def.BakedDataPath);
-            if (path == null) return null;
-            try
-            {
-                return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[MatchBase] Failed to load baked data from {path}: {ex.Message}. Falling back to capsule hurtboxes.");
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Apply the Ability Lab hurtbox override (spec #119) when one exists for the
-        /// character: a per-character JSON next to the baked skeleton that fully
-        /// replaces HurtboxBoneDefs. Returns the def unchanged when absent or invalid.
-        /// Keeps local/training hurtboxes identical to the game server's.
-        /// </summary>
-        protected static CharacterDefinition ApplyHurtboxOverride(CharacterDefinition def, BakedAnimationData? baked)
-        {
-            var overridePath = HurtboxOverride.OverridePathFor(def);
-            if (overridePath == null || baked == null) return def;
-            string? sysPath = BakedContentPaths.ResolveBaked(overridePath);
-            if (sysPath == null) return def;
-            try
-            {
-                string json = File.ReadAllText(sysPath);
-                if (!HurtboxOverride.TryParse(json, out _, out var defs) || defs == null) return def;
-                if (!HurtboxOverride.ValidateOrder(defs, baked)) return def;
-                Debug.Log($"[MatchBase] Applied hurtbox override: {sysPath} ({defs.Length} bones)");
-                return HurtboxOverride.Apply(def, defs);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[MatchBase] Failed to apply hurtbox override {sysPath}: {ex.Message} — using C# defs");
-                return def;
-            }
-        }
     }
 }
