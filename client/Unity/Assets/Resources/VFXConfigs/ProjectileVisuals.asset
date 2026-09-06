@@ -37,6 +37,10 @@ MonoBehaviour:
     Scale: 1
   ExplosionOverrides:
   - Character: 1
+    AttackSlot: 4
+    Prefab: {fileID: 2398608829508964987, guid: 9a6ed619d85bd9ebebf28dfb7a372533, type: 3}
+    Scale: 0.45
+  - Character: 1
     AttackSlot: 11
     Prefab: {fileID: 6234428247096128038, guid: 14f315e2bc084d80caee66c5c47b51dc, type: 3}
     Scale: 1

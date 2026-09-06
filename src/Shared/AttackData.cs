@@ -39,6 +39,8 @@ namespace SlopArena.Shared
         /// hand off to a sourspot without hitting the same opponent twice.
         /// </summary>
         public byte HitGroup;
+        /// <summary>Direction of horizontal knockback relative to the hitbox owner.</summary>
+        public AuthoringKnockbackDirection KnockbackDirection;
     }
 
     /// <summary>

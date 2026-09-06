@@ -110,3 +110,4 @@ MonoBehaviour:
     _clip: {fileID: 7400000, guid: 31238d9bd388bf207becd2aff83bb11d, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.bonk.af
+  _presentations: []

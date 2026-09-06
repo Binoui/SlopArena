@@ -24,8 +24,8 @@ The repository has three runtime layers:
 
 The generated Shared DLL is copied to `client/Unity/Assets/Plugins/SlopArena.Shared/` by the Shared build.
 
-A clean clone does not include ignored licensed/local art. Supply those assets separately
-for a complete Unity build.
+A clean clone does not include ignored licensed/local art or stage presentation prefabs.
+Supply those assets separately for a complete Unity build and visible PVP stages.
 
 ## Core rules
 

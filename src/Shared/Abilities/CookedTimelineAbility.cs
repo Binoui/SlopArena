@@ -171,6 +171,7 @@ public sealed class CookedTimelineAbility : ServerAbility
             StunTicks = cooked.StunTicks,
             Interruptible = cooked.Interruptible,
             HitGroup = cooked.HitGroup,
+            KnockbackDirection = cooked.KnockbackDirection,
         });
     }
 

@@ -335,7 +335,8 @@ public sealed record CookedHitbox(
     ushort StunTicks,
     ushort DurationTicks,
     bool Interruptible,
-    byte HitGroup);
+    byte HitGroup,
+    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner);
 
 public sealed class CookedSpawnProjectileOperation : CookedTimelineOperation
 {

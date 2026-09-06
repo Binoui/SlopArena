@@ -12,7 +12,7 @@ namespace SlopArena.Client.World
     /// </summary>
     public sealed class TimelinePresentationDispatcher
     {
-        private const int AerosolInfernoLifetimeTicks = 28;
+        internal const int DefaultPresentationLifetimeTicks = 28;
 
         private readonly Dictionary<ulong, Entry> _entries = new();
         private readonly List<ActivePresentation> _active = new();
@@ -69,7 +69,7 @@ namespace SlopArena.Client.World
                 _active.Add(new ActivePresentation
                 {
                     Instance = instance,
-                    RemainingTicks = AerosolInfernoLifetimeTicks,
+                    RemainingTicks = DefaultPresentationLifetimeTicks,
                 });
             }
         }

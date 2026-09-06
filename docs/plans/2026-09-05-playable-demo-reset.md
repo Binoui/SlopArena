@@ -28,11 +28,15 @@ Only work that unblocks this sequence or fixes observed gameplay belongs before 
 
 ### Release correctness before architecture cleanup
 
-`src/Server/SlopArena.Server.csproj` includes only `content-cooked/fightguy/**` plus the roster. `scripts/build-release.sh` verifies FightGuy and stages only FightGuy into the client and embedded server. `scripts/deploy-server.sh` also verifies only FightGuy. The current roster requires four packages. These paths are statically inconsistent; a successful build alone does not prove a usable distribution.
+The four-package distribution blocker is fixed in the current slice. The server
+project now publishes the complete `content-cooked/**` tree, and both release
+scripts derive required package IDs from the roster manifest and verify all four
+payloads for every admitted package.
 
-**Observed on the integrated baseline:** `dotnet publish src/Server/SlopArena.Server.csproj --no-build --nologo -o <fresh temporary directory>` succeeded, but its roster-required payload check found FightGuy present and all four payload files missing for Manki, Kistu and Bonk. This is reproduced packaging incompleteness, not merely a suspected architectural issue.
-
-**Next coding slice:** make publishing roster-complete, reuse current package verification, and smoke-load the resulting catalog from a clean publish directory. Do not narrow the roster, add fallback content, or weaken admission. Then exercise the actual Windows client and dedicated-server path; the current build script targets a Windows x64 client, not a cross-platform client release.
+**Fresh-publish evidence:** `dotnet publish` now produces the roster manifest plus
+Manki, FightGuy, Kistu, and Bonk payloads in a clean output directory. The remaining
+release gates are the Windows player build, dedicated-server deployment, and the
+packaged join-to-rematch smoke.
 
 ### Keep the useful architecture
 

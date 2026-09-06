@@ -224,7 +224,8 @@
                   "stunTicks": 14,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -282,7 +283,8 @@
                   "stunTicks": 12,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -307,7 +309,8 @@
                   "stunTicks": 16,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -334,6 +337,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -363,7 +368,8 @@
                   "stunTicks": 18,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -390,6 +396,8 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 29,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -419,7 +427,8 @@
                   "stunTicks": 18,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 1
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -444,7 +453,8 @@
                   "stunTicks": 12,
                   "durationTicks": 20,
                   "interruptible": true,
-                  "hitGroup": 1
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -471,6 +481,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -500,7 +512,8 @@
                   "stunTicks": 18,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -527,6 +540,8 @@
             "landingLagTicks": 9,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 30,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -556,7 +571,8 @@
                   "stunTicks": 20,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -583,6 +599,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -612,7 +630,8 @@
                   "stunTicks": 26,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -639,6 +658,8 @@
             "landingLagTicks": 12,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 38,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -668,7 +689,8 @@
                   "stunTicks": 26,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -696,6 +718,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.manki.ga"
             ],
@@ -749,6 +776,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.manki.ge"
             ],
@@ -763,13 +795,13 @@
                   "startupTicks": 3,
                   "verticalSpeed": 15,
                   "horizontalSpeed": 3.5,
-                  "explosionRadius": 1.25,
-                  "explosionDamage": 4,
-                  "explosionKbAngle": 75,
-                  "explosionKbBase": 2,
-                  "explosionKbGrowth": 8,
-                  "explosionStunTicks": 8,
-                  "explosionDurationTicks": 4
+                  "explosionRadius": 1.5,
+                  "explosionDamage": 10,
+                  "explosionKbAngle": 30,
+                  "explosionKbBase": 2.4,
+                  "explosionKbGrowth": 24,
+                  "explosionStunTicks": 18,
+                  "explosionDurationTicks": 8
                 }
               }
             ]
@@ -796,6 +828,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.manki.gr"
             ],
@@ -849,6 +886,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.manki.gf"
             ],
@@ -881,7 +923,8 @@
                   "stunTicks": 30,
                   "durationTicks": 28,
                   "interruptible": true,
-                  "hitGroup": 1
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

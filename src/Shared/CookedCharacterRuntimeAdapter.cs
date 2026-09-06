@@ -48,7 +48,7 @@ public static class CookedCharacterRuntimeAdapter
         foreach (var operation in stage.Operations)
             if (operation is CookedSpawnHitboxOperation hit)
             {
-                var h=hit.Hitbox; events.Add(new HitboxEvent { TriggerTick=hit.Tick, DurationTicks=h.DurationTicks, Shape=(HitboxShape)h.Shape, Radius=h.Radius, OffX=h.OffsetX, OffY=h.OffsetY, OffZ=h.OffsetZ, EndOffX=h.EndOffsetX, EndOffY=h.EndOffsetY, EndOffZ=h.EndOffsetZ, BoneName=RuntimeBoneId(h.StartBoneId), EndBoneName=RuntimeBoneId(h.EndBoneId), Damage=h.Damage, Knockback=new KnockbackData { Profile=KnockbackProfile.Custom, Angle=(sbyte)Math.Clamp(h.Angle,-90,90), BaseKnockback=h.BaseKnockback, KnockbackGrowth=h.KnockbackGrowth }, StunTicks=h.StunTicks, Interruptible=h.Interruptible, HitGroup=h.HitGroup });
+                var h=hit.Hitbox; events.Add(new HitboxEvent { TriggerTick=hit.Tick, DurationTicks=h.DurationTicks, Shape=(HitboxShape)h.Shape, Radius=h.Radius, OffX=h.OffsetX, OffY=h.OffsetY, OffZ=h.OffsetZ, EndOffX=h.EndOffsetX, EndOffY=h.EndOffsetY, EndOffZ=h.EndOffsetZ, BoneName=RuntimeBoneId(h.StartBoneId), EndBoneName=RuntimeBoneId(h.EndBoneId), Damage=h.Damage, Knockback=new KnockbackData { Profile=KnockbackProfile.Custom, Angle=(sbyte)Math.Clamp(h.Angle,-90,90), BaseKnockback=h.BaseKnockback, KnockbackGrowth=h.KnockbackGrowth }, KnockbackDirection=h.KnockbackDirection, StunTicks=h.StunTicks, Interruptible=h.Interruptible, HitGroup=h.HitGroup });
             }
             else if (operation is CookedSetVelocityOperation velocity) { result.MoveX=velocity.X; result.MoveY=velocity.Y; result.MoveZ=velocity.Z; }
         result.HitboxEvents=events.ToArray(); return result;

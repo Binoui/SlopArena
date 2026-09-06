@@ -31,9 +31,9 @@ public sealed class CharacterAssetCatalogEditor : EditorWindow
             serialized.Update();
             EditorGUILayout.PropertyField(serialized.FindProperty("_packageId"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_catalogSchemaVersion"));
-            EditorGUILayout.PropertyField(serialized.FindProperty("_rig"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_weaponConfig"));
             EditorGUILayout.PropertyField(serialized.FindProperty("_bindings"), true);
+            EditorGUILayout.PropertyField(serialized.FindProperty("_presentations"), true);
             if (serialized.ApplyModifiedProperties())
             {
                 EditorUtility.SetDirty(_catalog);

@@ -24,9 +24,22 @@ HOST="${1:-alfred}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/build/minipc"
 COMPOSE="/root/homelab/sloparena/docker-compose.yml"
-
-echo "== Verify committed FightGuy package =="
-dotnet test "$ROOT/tests/Shared.Tests/" --nologo --filter FullyQualifiedName~CommittedFightGuyPackage
+verify_roster_payloads() {
+  local tree="$1"
+  local package_ids
+  test -f "$tree/roster/manifest.json"
+  cmp "$ROOT/content-cooked/roster/manifest.json" "$tree/roster/manifest.json"
+  package_ids="$(jq -er '.entries[].packageId' "$ROOT/content-cooked/roster/manifest.json")"
+  while IFS= read -r package_id; do
+    test -n "$package_id"
+    for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
+      test -f "$tree/$package_id/$package_file"
+    done
+    cmp "$ROOT/content-cooked/$package_id/manifest.json" "$tree/$package_id/manifest.json"
+  done <<< "$package_ids"
+}
+echo "== Verify complete cooked roster =="
+dotnet test "$ROOT/tests/Shared.Tests/" --nologo
 
 echo "== Publish linux-x64 (framework-dependent) =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release \
@@ -34,10 +47,7 @@ dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release \
 # server.json is copied by the csproj (dev defaults, localhost:5000); drop it —
 # the live config on alfred is authoritative and must never be overwritten.
 rm -f "$OUT/server.json"
-for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
-  test -f "$OUT/content-cooked/fightguy/$package_file"
-done
-cmp "$ROOT/content-cooked/fightguy/manifest.json" "$OUT/content-cooked/fightguy/manifest.json"
+verify_roster_payloads "$OUT/content-cooked"
 
 echo "== Prepare target dir =="
 ssh "$HOST" "sudo mkdir -p /srv/sloparena/server && sudo chown alfred:alfred /srv/sloparena/server"

@@ -9,15 +9,30 @@ UNITY="${UNITY_EDITOR:-/home/binoui/Unity/Hub/Editor/6000.0.78f1/Editor/Unity}"
 PROJ="$ROOT/client/Unity"
 REL="$ROOT/build/release/SlopArena-$VERSION"
 SA="$PROJ/Assets/StreamingAssets"
+verify_roster_payloads() {
+  local tree="$1"
+  local package_ids
+  test -f "$tree/roster/manifest.json"
+  cmp "$ROOT/content-cooked/roster/manifest.json" "$tree/roster/manifest.json"
+  package_ids="$(jq -er '.entries[].packageId' "$ROOT/content-cooked/roster/manifest.json")"
+  while IFS= read -r package_id; do
+    test -n "$package_id"
+    for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
+      test -f "$tree/$package_id/$package_file"
+    done
+    cmp "$ROOT/content-cooked/$package_id/manifest.json" "$tree/$package_id/manifest.json"
+  done <<< "$package_ids"
+}
+
+echo "== Verify complete cooked roster =="
+verify_roster_payloads "$ROOT/content-cooked"
+
 
 echo "== Shared build =="
 dotnet build "$ROOT/src/Shared/" --nologo
 
 echo "== Tests =="
 dotnet test "$ROOT/tests/Shared.Tests/" --nologo
-
-echo "== Verify committed FightGuy package =="
-dotnet test "$ROOT/tests/Shared.Tests/" --nologo --filter FullyQualifiedName~CommittedFightGuyPackage
 
 echo "== Self-contained Windows server (embedded host-and-play) =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 --self-contained true -o "$SA/Server"
@@ -26,33 +41,21 @@ dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r win-x64 
 # explicit config path as arg[0], so the shipped file is dead weight AND leaks
 # localhost:5000 into the zip (Task 7.2: must appear NOWHERE). Drop it.
 rm -f "$SA/Server/server.json"
-for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
-  test -f "$SA/Server/content-cooked/fightguy/$package_file"
-done
-cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/Server/content-cooked/fightguy/manifest.json"
+verify_roster_payloads "$SA/Server/content-cooked"
 
 echo "== linux-x64 server for the mini PC =="
 dotnet publish "$ROOT/src/Server/SlopArena.Server.csproj" -c Release -r linux-x64 --self-contained false -o "$ROOT/build/minipc"
 # Same rationale: rsync'ing this onto alfred must not clobber the live
 # server.json (real masterServerUrl + publicIp).
 rm -f "$ROOT/build/minipc/server.json"
-
-for package_file in manifest.json character.runtime.json poses.bin client.bindings; do
-  test -f "$ROOT/build/minipc/content-cooked/fightguy/$package_file"
-done
-cmp "$ROOT/content-cooked/fightguy/manifest.json" "$ROOT/build/minipc/content-cooked/fightguy/manifest.json"
-echo "== Stage baked data (arenas) =="
-mkdir -p "$SA/arenas"
+verify_roster_payloads "$ROOT/build/minipc/content-cooked"
+echo "== Stage canonical cooked roster =="
+mkdir -p "$SA/arenas" "$SA/content-cooked" "$SA/Server/content-cooked"
 cp "$ROOT"/data/arenas/*.arena "$SA/arenas/"
-
-echo "== Stage canonical FightGuy package and roster =="
-mkdir -p "$SA/content-cooked/roster" "$SA/content-cooked/fightguy" "$SA/Server/content-cooked/roster" "$SA/Server/content-cooked/fightguy"
-cp "$ROOT/content-cooked/roster/manifest.json" "$SA/content-cooked/roster/"
-cp "$ROOT/content-cooked/roster/manifest.json" "$SA/Server/content-cooked/roster/"
-cp "$ROOT/content-cooked/fightguy/"* "$SA/content-cooked/fightguy/"
-cp "$ROOT/content-cooked/fightguy/"* "$SA/Server/content-cooked/fightguy/"
-cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/content-cooked/fightguy/manifest.json"
-cmp "$ROOT/content-cooked/fightguy/manifest.json" "$SA/Server/content-cooked/fightguy/manifest.json"
+cp -R "$ROOT/content-cooked/." "$SA/content-cooked/"
+cp -R "$ROOT/content-cooked/." "$SA/Server/content-cooked/"
+verify_roster_payloads "$SA/content-cooked"
+verify_roster_payloads "$SA/Server/content-cooked"
 test ! -e "$SA/content/characters/fightguy/character.json"
 test ! -e "$SA/Server/content/characters/fightguy/character.json"
 test ! -e "$SA/data/fightguy_skeleton.bin"

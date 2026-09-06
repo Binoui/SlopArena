@@ -70,7 +70,7 @@ public sealed class MankiJetpackBoost : ServerAbility
             Shape = HitboxShape.Sphere,
             Radius = _parameters.ExplosionRadius,
             OffX = 0f,
-            OffY = 0f,
+            OffY = -def.CapsuleHeight * 0.5f,
             OffZ = 0f,
             EndOffX = 0f,
             EndOffY = 0f,

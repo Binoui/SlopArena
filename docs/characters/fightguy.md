@@ -32,13 +32,13 @@ semantic clips directly through Animancer.
 
 ## Specials
 
-FightGuy specials are cooked timeline capability bindings:
+FightGuy specials are cooked timeline and capability bindings:
 
 - A: Ki Shot
 - E: Rising Dragon
 - R: Cyclone Kick
-- F: Dragon Beam
+- F: Fist of Fury
 
-The cooked timeline and capability requirement are authoritative. Changes require a
-new deterministic cook, manifest/hash verification, differential tests, and a new
-match/catalog load.
+Fist of Fury uses `fightguy_spell_f_2` for its full two-phase presentation:
+six inward-stunning punches followed by a right-foot knockback finisher.
+The cooked timeline and hitbox direction are authoritative.

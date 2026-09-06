@@ -42,7 +42,7 @@ public static class FightGuyCatalogBootstrap
         Add(bindings, "anim.ki-shot", LoadImportedClip("Assets/Art/Characters/fightguy/Animations/fightguy_spell_q_attack.fbx"));
         Add(bindings, "anim.rising-dragon", "Assets/Art/Characters/fightguy/Animations/fightguy_spell_e.anim");
         Add(bindings, "anim.cyclone-kick", "Assets/Art/Characters/fightguy/Animations/fightguy_spell_r.anim");
-        Add(bindings, "anim.dragon-beam", "Assets/Art/Characters/fightguy/Animations/fightguy_spell_f_2.anim");
+        Add(bindings, "anim.fist-of-fury", "Assets/Art/Characters/fightguy/Animations/fightguy_spell_f_2.anim");
         catalog.Bindings = bindings.ToArray();
         EditorUtility.SetDirty(catalog);
         AssetDatabase.SaveAssets();

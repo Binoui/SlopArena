@@ -83,15 +83,28 @@ namespace SlopArena.Client.Entities
         private Dictionary<string, ParticleSystem> _activeTrails = new();
         private Dictionary<string, AttackAccentTrail> _attackAccentTrails = new();
 
+        /// <summary>Character definition (capsule geometry, weight, baked bones) — set at spawn.</summary>
+        public CharacterDefinition? CharacterDef => _charDef;
+
+        /// <summary>Set the temporary/generated semantic animation catalog for package previews.</summary>
+        public void SetAnimationCatalog(CharacterAnimationCatalog catalog) => _animationCatalog = catalog;
+        /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
+        public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
+
         /// <summary>
         /// Y offset to align the visual model's feet with the collision capsule bottom.
         /// Set from CharacterDefinition.ModelYOffset (≈ -0.52 for Manki).
         /// </summary>
+        public float ModelYOffset
+        {
+            get => _modelYOffset;
+            set => _modelYOffset = value;
+        }
 
-        /// <summary>
-        /// Character definition for ability animation lookups.
-        /// Set from TrainingMatch at spawn.
-        /// </summary>
+        [SerializeField] private GameObject _modelPrefab;
+        [SerializeField] private string _modelResourcePath = "";
+        [SerializeField] private string _modelName = "";
+        [SerializeField] private float _modelVisualScale = 1f;
         private CharacterDefinition? _charDef;
         private GameObject _modelInstance;
         private bool _reportedModelRootDrift;
@@ -132,36 +145,72 @@ namespace SlopArena.Client.Entities
             return position;
         }
 
-        /// <summary>Character definition (capsule geometry, weight, baked bones) — set at spawn.</summary>
-        public CharacterDefinition? CharacterDef => _charDef;
-
-        /// <summary>Set the temporary/generated semantic animation catalog for package previews.</summary>
-        public void SetAnimationCatalog(CharacterAnimationCatalog catalog) => _animationCatalog = catalog;
-        /// <summary>Set animation config from MatchBase (drag-drop), skipping Resources.Load fallback.</summary>
-        public void SetAnimationConfig(CharacterAnimationConfig config) => _charConfig = config;
-
-        public float ModelYOffset
-        {
-            get => _modelYOffset;
-            set => _modelYOffset = value;
-        }
-
         /// <summary>
         /// Load the 3D model for this character from Resources.
-        /// Destroys any existing model child and instantiates the new one.
+        /// Reuses the current model when its source is unchanged and replaces only
+        /// after the requested prefab has been resolved successfully.
         /// Must be called before ApplyServerState.
         /// </summary>
         /// <param name="def">Character definition with ModelResourcePath as fallback.</param>
         /// <param name="prefabOverride">If non-null, use this prefab instead of Resources.Load.</param>
         public void LoadModel(CharacterDefinition def, GameObject prefabOverride = null)
         {
-            if (prefabOverride == null && string.IsNullOrEmpty(def.ModelResourcePath)) return;
+            if (def == null) return;
+            string resourcePath = def.ModelResourcePath ?? "";
+            if (prefabOverride == null && string.IsNullOrEmpty(resourcePath)) return;
+
+            GameObject prefab = prefabOverride != null
+                ? prefabOverride
+                : Resources.Load<GameObject>(resourcePath);
+            if (prefab == null)
+            {
+                Debug.LogError($"[PlayerRenderer] Model not found — override null and Resources/{resourcePath} missing");
+                return;
+            }
+
 #if UNITY_EDITOR
             if (Selection.activeTransform != null && Selection.activeTransform.IsChildOf(transform))
                 Selection.activeObject = gameObject;
 #endif
 
-            // Destroy existing model children
+            bool sourceUnchanged = _modelInstance != null
+                && _modelPrefab == prefab
+                && _modelResourcePath == resourcePath;
+            _modelPrefab = prefab;
+            _modelResourcePath = resourcePath;
+            _modelName = def.Class.ToString();
+            _modelVisualScale = def.VisualScale;
+
+            if (sourceUnchanged)
+            {
+                _modelInstance.name = _modelName;
+                _modelInstance.transform.localScale = Vector3.one * _modelVisualScale;
+                return;
+            }
+
+            ReplaceModel(prefab, _modelName, _modelVisualScale);
+            ConfigureModelAnimation(def);
+        }
+
+        /// <summary>
+        /// Recreate the last successfully selected model only when its instance is missing.
+        /// A missing source is a no-op so the last valid presentation remains untouched.
+        /// </summary>
+        public void EnsureModel()
+        {
+            if (_modelInstance != null) return;
+
+            GameObject prefab = _modelPrefab;
+            if (prefab == null && !string.IsNullOrEmpty(_modelResourcePath))
+                prefab = Resources.Load<GameObject>(_modelResourcePath);
+            if (prefab == null) return;
+
+            _modelPrefab = prefab;
+            ReplaceModel(prefab, _modelName, _modelVisualScale);
+        }
+
+        private void ReplaceModel(GameObject prefab, string modelName, float visualScale)
+        {
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var child = transform.GetChild(i).gameObject;
@@ -171,25 +220,12 @@ namespace SlopArena.Client.Entities
                     DestroyImmediate(child);
             }
 
-            // Use Unity's null-aware operator (!=): a broken/missing reference is
-            // "fake-null" (C#-non-null but Unity-null), and `??` would NOT fall
-            // through to Resources.Load for it — silently skipping the model.
-            var prefab = prefabOverride != null
-                ? prefabOverride
-                : Resources.Load<GameObject>(def.ModelResourcePath);
-            if (prefab == null)
-            {
-                Debug.LogError($"[PlayerRenderer] Model not found — override null and Resources/{def.ModelResourcePath} missing");
-                return;
-            }
-
             var instance = Instantiate(prefab, transform);
-            instance.name = def.Class.ToString();
+            instance.name = modelName;
             _modelInstance = instance;
             instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.identity;
-
-            instance.transform.localScale = Vector3.one * def.VisualScale;
+            instance.transform.localScale = Vector3.one * visualScale;
 
             _animancer = instance.GetComponent<AnimancerComponent>();
             if (_animancer == null)
@@ -198,7 +234,10 @@ namespace SlopArena.Client.Entities
             var animator = instance.GetComponentInChildren<Animator>();
             if (animator != null)
                 animator.applyRootMotion = false;
+        }
 
+        private void ConfigureModelAnimation(CharacterDefinition def)
+        {
             if (def.Class == CharacterClass.FightGuy && _animationCatalog == null)
             {
                 Debug.LogError("[PlayerRenderer] FightGuy requires generated cooked animation assets.");
@@ -208,7 +247,7 @@ namespace SlopArena.Client.Entities
             {
                 string path = $"AnimationConfigs/{def.Class}_AnimConfig";
                 _charConfig = Resources.Load<CharacterAnimationConfig>(path);
-                if (_charConfig == null)
+                if (_charConfig == null && !string.IsNullOrEmpty(def.ModelResourcePath))
                 {
                     string modelClass = def.ModelResourcePath.Substring(
                         def.ModelResourcePath.LastIndexOf('/') + 1);
@@ -349,6 +388,8 @@ namespace SlopArena.Client.Entities
         {
             if (_animancer == null)
                 _animancer = GetComponent<AnimancerComponent>();
+            if (_modelInstance == null && transform.childCount > 0)
+                _modelInstance = transform.GetChild(0).gameObject;
             MovementFeedbackEffect.Prewarm();
         }
 

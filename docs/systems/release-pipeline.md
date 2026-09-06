@@ -33,20 +33,18 @@ scripts/build-release.sh 0.2.0-demo.1
 
 The script builds Shared + tests, publishes the self-contained Windows server
 (embedded host-and-play), publishes the linux-x64 server for the mini PC,
-stages arenas plus the cooked roster manifest and FightGuy package payloads,
+stages the arenas plus every package named by the cooked roster manifest,
 stamps `bundleVersion`, runs the Unity Windows player build,
 then restores `ProjectSettings.asset` and unstages `StreamingAssets/`.
 
-Both client and server staging trees contain:
+Both client and server staging trees contain the roster manifest and all four
+payloads (`manifest.json`, `character.runtime.json`, `poses.bin`, and
+`client.bindings`) for every admitted package: Manki, FightGuy, Kistu, and Bonk.
+The scripts derive package IDs from `content-cooked/roster/manifest.json`;
+they do not maintain a separate character list.
 
-- `content-cooked/roster/manifest.json`
-- `content-cooked/fightguy/manifest.json`
-- `content-cooked/fightguy/character.runtime.json`
-- `content-cooked/fightguy/poses.bin`
-- `content-cooked/fightguy/client.bindings`
-
-Raw FightGuy authoring JSON, manual FightGuy animation configs, and
-`fightguy_skeleton.bin` are not release inputs.
+Raw authoring JSON, manual animation configs, and skeleton source files are not
+release inputs.
 
 > The version stamp is reverted via `git checkout` of ProjectSettings.asset —
 > the script refuses to run if that file has uncommitted changes.

@@ -32,6 +32,8 @@ namespace SlopArena.Client.Combat
         // Active projectile visuals keyed by stable hash from (ownerId + spawn origin)
         private readonly Dictionary<int, GameObject> _activeVisuals = new();
         private readonly Dictionary<int, CharacterClass> _activeProjectileClasses = new();
+        // Static Manki E ignition hitboxes use the same explosion prefab as Q.
+        private readonly HashSet<int> _activeStartupExplosionVisuals = new();
 
         public void SetSimulation(ServerSimulation sim)
         {
@@ -50,26 +52,50 @@ namespace SlopArena.Client.Combat
             var hitboxes = _resolver.GetActiveHitboxes();
             var matched = new HashSet<int>();
 
+            var activeStartupExplosionVisuals = new HashSet<int>();
             for (int i = 0; i < hitboxes.Count; i++)
             {
                 var hb = hitboxes[i];
-                // Projectile discriminator: non-zero velocity (not a static melee hitbox)
                 float speedSq = hb.VX * hb.VX + hb.VY * hb.VY + hb.VZ * hb.VZ;
-                if (speedSq <= 0.0001f) continue;
+                CharacterClass character = _sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None;
 
-                int key = ComputeHitboxKey(hb);
-                matched.Add(key);
+                if (speedSq <= 0.0001f)
+                {
+                    if (character == CharacterClass.Manki && hb.Slot == 3)
+                    {
+                        int key = ComputeStaticHitboxKey(hb);
+                        activeStartupExplosionVisuals.Add(key);
+                        if (_activeStartupExplosionVisuals.Add(key))
+                        {
+                            Hitbox visualHitbox = hb;
+                            visualHitbox.Explosion = new ProjectileExplosion { Radius = hb.Radius };
+                            SpawnExplosion(visualHitbox, new Vector3(hb.X, hb.Y, hb.Z));
+                        }
+                    }
+                    continue;
+                }
 
-                if (!_activeVisuals.TryGetValue(key, out var vis))
+                int projectileKey = ComputeHitboxKey(hb);
+                matched.Add(projectileKey);
+
+                if (!_activeVisuals.TryGetValue(projectileKey, out var vis))
                 {
                     vis = CreateProjectileVisual(hb);
-                    _activeVisuals[key] = vis;
-                    _activeProjectileClasses[key] =
-                        _sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None;
+                    _activeVisuals[projectileKey] = vis;
+                    _activeProjectileClasses[projectileKey] = character;
                 }
 
                 vis.transform.position = new Vector3(hb.X, hb.Y, hb.Z);
             }
+
+            List<int> staleStartup = null;
+            foreach (int key in _activeStartupExplosionVisuals)
+            {
+                if (activeStartupExplosionVisuals.Contains(key)) continue;
+                (staleStartup ??= new List<int>()).Add(key);
+            }
+            if (staleStartup != null)
+                foreach (int key in staleStartup) _activeStartupExplosionVisuals.Remove(key);
 
             // Remove visuals for hitboxes that disappeared (hit, expired, ground-collided)
             // Impact VFX is handled by OnHitboxRemoved callback with the correct removal position.
@@ -102,6 +128,16 @@ namespace SlopArena.Client.Combat
             hash = hash * 31 + Mathf.RoundToInt(ox * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oy * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oz * 10f);
+            return hash;
+        }
+        private static int ComputeStaticHitboxKey(in Hitbox hb)
+        {
+            int hash = 17;
+            hash = hash * 31 + (int)hb.OwnerId;
+            hash = hash * 31 + hb.AttackSlot;
+            hash = hash * 31 + Mathf.RoundToInt(hb.X * 10f);
+            hash = hash * 31 + Mathf.RoundToInt(hb.Y * 10f);
+            hash = hash * 31 + Mathf.RoundToInt(hb.Z * 10f);
             return hash;
         }
 
@@ -221,13 +257,14 @@ namespace SlopArena.Client.Combat
             var cls = _activeProjectileClasses.TryGetValue(ComputeHitboxKey(hb), out var cachedClass)
                 ? cachedClass
                 : (_sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None);
+            byte presentationSlot = hb.AttackSlot != 0 ? hb.AttackSlot : (byte)(hb.Slot + 1);
             if (_config != null && _config.ExplosionOverrides != null)
             {
                 for (int i = 0; i < _config.ExplosionOverrides.Length; i++)
                 {
                     var overrideEntry = _config.ExplosionOverrides[i];
                     if (overrideEntry.Character == cls
-                        && (overrideEntry.AttackSlot == 0 || overrideEntry.AttackSlot == hb.AttackSlot))
+                        && (overrideEntry.AttackSlot == 0 || overrideEntry.AttackSlot == presentationSlot))
                     {
                         prefab = overrideEntry.Prefab;
                         visualScale = overrideEntry.Scale;
@@ -245,7 +282,7 @@ namespace SlopArena.Client.Combat
             }
             catch (System.InvalidCastException)
             {
-                Debug.LogError($"[ProjectileVFX] Invalid explosion prefab reference for {cls} slot={hb.AttackSlot}; using fallback impact.");
+                Debug.LogError($"[ProjectileVFX] Invalid explosion prefab reference for {cls} slot={presentationSlot}; using fallback impact.");
                 SpawnImpact(position);
             }
 

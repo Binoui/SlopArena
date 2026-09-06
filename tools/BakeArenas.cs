@@ -27,7 +27,7 @@ static class BakeArenas
             string path = Path.Combine(outputDir, arena.Name + ".arena");
             ArenaBinaryFormat.SaveToFile(path, arena);
             Console.WriteLine($"Baked: {arena.Name} -> {path}");
-            Console.WriteLine($"  Platforms: {arena.Platforms?.Length ?? 0}  Spawns: {arena.SpawnPoints?.Length ?? 0}");
+            Console.WriteLine($"  Triangles: {arena.CollisionTriangles?.Length ?? 0}  Spawns: {arena.SpawnPoints?.Length ?? 0}");
             count++;
         }
 

@@ -33,6 +33,7 @@ namespace SlopArena.Shared
             public float DirX;
             /// <summary>Launch angle in degrees (-90 to 90).</summary>
             public sbyte KnockbackAngle;
+            public AuthoringKnockbackDirection KnockbackDirection;
             public float DirZ;
             public float BaseKnockback;
             public float KnockbackGrowth;
@@ -301,6 +302,7 @@ namespace SlopArena.Shared
                                 Damage = hb.Damage,
                                 DirX = dirXNorm,
                                 KnockbackAngle = launchAngle,
+                                KnockbackDirection = hb.KnockbackDirection,
                                 DirZ = dirZNorm,
                                 BaseKnockback = hb.BaseKnockback,
                                 KnockbackGrowth = hb.KnockbackGrowth,

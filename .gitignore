@@ -211,6 +211,10 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 *.vfxgraph
 *.shadervariants
 
+# Stage presentation prefabs (local licensed art dependencies)
+client/Unity/Assets/Resources/Stages/*.prefab
+client/Unity/Assets/Resources/Stages/*.prefab.meta
+
 # Auto-generated prefabs from symlinked asset packs (regenerate on clone)
 client/Unity/Assets/Prefabs/Arena_*.prefab
 client/Unity/Assets/Prefabs/Arena_*.prefab.meta

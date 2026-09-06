@@ -98,8 +98,8 @@ MonoBehaviour:
     _clip: {fileID: 7400000, guid: ae32872e5b28602cfb5f3386e41be7d8, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.cyclone-kick
-  - _semanticId: anim.dragon-beam
+  - _semanticId: anim.fist-of-fury
     _clip: {fileID: 7400000, guid: 06b5ae14db42011d2a04c0da717ef035, type: 2}
     _extrapolation: 0
-    _poseTrackId: anim.dragon-beam
+    _poseTrackId: anim.fist-of-fury
   _presentations: []

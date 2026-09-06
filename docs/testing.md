@@ -25,8 +25,8 @@ checker; no Shared build or Unity session is required for this cleanup.
 
 Cook changed accepted packages, verify exact roster identities and all required payloads
 in fresh publish outputs, then build and exercise the packaged client/server
-join-to-rematch path. Link current release operations and the reset plan's reproduced
-packaging blocker; the present FightGuy-only script is not roster-complete.
+join-to-rematch path. The server project and release scripts derive required package IDs
+from the roster manifest and verify all four payloads for each admitted package.
 
 ### Shared build and tests
 

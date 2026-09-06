@@ -174,90 +174,65 @@ public class FightGuyAbilityTests
         Assert.Equal((ushort)7, sim.GetState(101).DamagePercent);
     }
 
-    // ── F (FightGuyDragonBeam) ──
+    // ── F (FightGuy Fist of Fury) ──
 
     [Fact]
-    public void FightGuyDragonBeam_ActivatesAndLocksInPlace()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        state.VX = 10f;
-        state.VZ = 5f;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.Equal((byte)6, t0.AttackSlot);
-        Assert.Equal(0f, t0.VX);
-        Assert.Equal(0f, t0.VZ);
-    }
-
-    [Fact]
-    public void FightGuyDragonBeam_NoHitboxBeforeFireThenSpawnsCapsule()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-
-        for (int i = 0; i < 23; i++)
-            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default } });
-        Assert.Empty(sim.Resolver.GetActiveHitboxes());
-
-        sim.Tick(new() { { 1, default } });
-        var beam = Assert.Single(sim.Resolver.GetActiveHitboxes());
-        Assert.Equal(HitboxShape.Capsule, beam.Shape);
-        Assert.InRange(beam.EndZ - beam.Z, 17.99f, 18.01f);
-        Assert.Equal(0f, beam.VX);
-        Assert.Equal(0f, beam.VY);
-        Assert.Equal(0f, beam.VZ);
-    }
-
-    [Fact]
-    public void FightGuyDragonBeam_HitsOnceWithoutPull()
+    public void FightGuyFistOfFury_PunchesPullAndRehit()
     {
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player, TestHelpers.LoadBakedData(TestHelpers.FightGuyDef));
 
-        var npc = TestHelpers.NpcState(0f, 4f);
-        npc.PY = GroundPY + 2.5f;
-        npc.IsGrounded = false;
-        npc.AirTimeTicks = 100;
+        var npc = TestHelpers.NpcState(0f, 0.9f);
+        npc.PY = GroundPY;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
-        for (int i = 0; i < 23; i++)
-            sim.Tick(new() { { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default }, { 100, default } });
-        float beforeFireZ = sim.GetState(100).PZ;
-
-        for (int i = 0; i < 20; i++)
-            sim.Tick(new() { { 1, default }, { 100, default } });
+        ushort maxHitstun = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            sim.Tick(new()
+            {
+                { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default },
+                { 100, default },
+            });
+            maxHitstun = Math.Max(maxHitstun, sim.GetState(100).HitstunTicks);
+        }
 
         var target = sim.GetState(100);
-        Assert.Equal((ushort)14, target.DamagePercent);
-        Assert.True(target.PZ > beforeFireZ, "Dragon Beam must launch away, not pull toward the caster");
+        Assert.Equal((ushort)12, target.DamagePercent);
+        Assert.True(target.PZ < 0.9f, $"punches must pull inward, got PZ={target.PZ:F3}");
+        Assert.True(maxHitstun > 0, "punches must apply hitstun");
     }
 
     [Fact]
-    public void FightGuyDragonBeam_ActivatesOnGroundAndAir()
+    public void FightGuyFistOfFury_RightFootFinisherLaunchesAway()
     {
-        var groundSim = TestHelpers.MakeSim();
-        var ground = TestHelpers.PlayerState();
-        ground.PY = GroundPY;
-        TestHelpers.RegisterPlayer(groundSim, TestHelpers.FightGuyDef, ground);
-        var groundAfter = TestHelpers.TickN(groundSim, TestHelpers.Input(activeSlot: 6), 28);
-        Assert.Equal(ActionState.Idle, groundAfter.State);
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = GroundPY;
+        player.FacingYaw = 0f;
+        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player, TestHelpers.LoadBakedData(TestHelpers.FightGuyDef));
 
-        var airSim = TestHelpers.MakeSim();
-        var air = TestHelpers.PlayerState();
-        air.PY = GroundPY + 5f;
-        air.IsGrounded = false;
-        air.AirTimeTicks = 100;
-        TestHelpers.RegisterPlayer(airSim, TestHelpers.FightGuyDef, air);
-        var airAfter = TestHelpers.TickN(airSim, TestHelpers.Input(activeSlot: 6), 28);
-        Assert.Equal(ActionState.Idle, airAfter.State);
+        var npc = TestHelpers.NpcState(0f, 0.9f);
+        npc.PY = GroundPY;
+        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+
+        float beforeKickZ = 0f;
+        for (int i = 0; i < 120; i++)
+        {
+            sim.Tick(new()
+            {
+                { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default },
+                { 100, default },
+            });
+            if (i == 80) beforeKickZ = sim.GetState(100).PZ;
+        }
+
+        var target = sim.GetState(100);
+        Assert.Equal((ushort)24, target.DamagePercent);
+        Assert.True(target.PZ > beforeKickZ, $"right-foot finisher must launch away, before={beforeKickZ:F3} after={target.PZ:F3}");
     }
 
     // ── Status ──

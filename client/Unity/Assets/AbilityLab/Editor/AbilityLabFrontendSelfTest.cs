@@ -79,9 +79,201 @@ public static class AbilityLabFrontendSelfTest
             var lab = AbilityLab.Instance;
             if (!lab.IsPackagePreview || lab.ShowHurtboxes || !lab.ShowHitboxes || lab.ShowBakedBones || lab.ShowDummy)
                 throw new InvalidOperationException("Package preview debug defaults are not readable.");
-            if (root.Q<Label>("preview-summary").text != "Preview: Cooked · Rig ready")
-                throw new InvalidOperationException("Compact preview summary did not report cooked package and rig state.");
+            if (root.Q<Label>("preview-summary").text != "Preview: Live draft · Rig ready")
+                throw new InvalidOperationException("Compact preview summary did not report the live draft and rig state.");
+            var characterRoot = lab.Renderer;
+            var dummyRoot = lab.DummyRenderer;
+            if (characterRoot == null || dummyRoot == null)
+                throw new InvalidOperationException("Ability Lab did not bind both stable preview renderer slots.");
+            int characterRootId = characterRoot.GetInstanceID();
+            int dummyRootId = dummyRoot.GetInstanceID();
+            Refresh(window);
+            Refresh(window);
+            if (lab.Renderer.GetInstanceID() != characterRootId ||
+                lab.DummyRenderer.GetInstanceID() != dummyRootId ||
+                lab.transform.Cast<Transform>().Count(child =>
+                    child.name == "LabCharacter" || child.name == "LabDummy") != 2)
+                throw new InvalidOperationException("Repeated preview refresh did not reuse exactly one renderer slot pair.");
+
+            if (characterRoot.transform.childCount != 1)
+                throw new InvalidOperationException("Stable character renderer does not contain exactly one model child.");
+            UnityEngine.Object.DestroyImmediate(characterRoot.transform.GetChild(0).gameObject);
+            Refresh(window);
+            if (lab.Renderer.GetInstanceID() != characterRootId || characterRoot.transform.childCount != 1)
+                throw new InvalidOperationException("Refreshing a deleted model did not restore it under the stable character slot.");
+            int restoredModelId = characterRoot.transform.GetChild(0).GetInstanceID();
+            Refresh(window);
+            if (characterRoot.transform.childCount != 1 ||
+                characterRoot.transform.GetChild(0).GetInstanceID() != restoredModelId)
+                throw new InvalidOperationException("Repeated refresh replaced a valid recovered model.");
             var sourceWorkspace = new AbilityLabPackageWorkspace();
+            lab.SetSlot(CanonicalSlotProjection.All[0]);
+            lab.SetStage(0);
+            var liveSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.1");
+            int liveHitboxOperationIndex = liveSlot.Timeline.Stages[0].Operations
+                .Select((operation, index) => (operation, index))
+                .First(item => item.operation is SpawnHitboxOperationSource).index;
+            var liveSourceHitbox = (SpawnHitboxOperationSource)liveSlot.Timeline.Stages[0].Operations[liveHitboxOperationIndex];
+            int liveHitboxOrdinal = liveSlot.Timeline.Stages[0].Operations
+                .Take(liveHitboxOperationIndex)
+                .Count(operation => operation is SpawnHitboxOperationSource);
+            lab.SetTick(liveSourceHitbox.Tick);
+            var beforeLive = lab.ResolveHitboxes().Single(item => item.index == liveHitboxOrdinal);
+            var persistedPreview = windowWorkspace.Preview;
+            var editedLiveHitbox = liveSourceHitbox.Hitbox with
+            {
+                OffsetZ = liveSourceHitbox.Hitbox.OffsetZ + 0.25f,
+                Radius = liveSourceHitbox.Hitbox.Radius + 0.1f,
+            };
+            if (!windowWorkspace.ReplaceHitbox("ground.1", 0, liveHitboxOperationIndex, editedLiveHitbox) ||
+                !windowWorkspace.IsDirty || windowWorkspace.Status != "Stale" ||
+                !ReferenceEquals(persistedPreview, windowWorkspace.Preview) ||
+                windowWorkspace.LiveDraftPackage == null ||
+                lab.PreviewStatus != "Live draft" || !lab.IsPackagePreview ||
+                lab.WorkingEvents.Count != 0)
+                throw new InvalidOperationException("Accepted hitbox edit did not publish a live in-memory preview.");
+            var afterLive = lab.ResolveHitboxes().Single(item => item.index == liveHitboxOrdinal);
+            if (Math.Abs(afterLive.evt.Radius - beforeLive.evt.Radius) < 0.0001f ||
+                afterLive.start == beforeLive.start && afterLive.end == beforeLive.end)
+                throw new InvalidOperationException("Live hitbox edit did not update event or world endpoint geometry.");
+
+            var invalidLiveHitbox = editedLiveHitbox with { DurationTicks = 0 };
+            if (!windowWorkspace.ReplaceHitbox("ground.1", 0, liveHitboxOperationIndex, invalidLiveHitbox) ||
+                windowWorkspace.Status != "Failed" || !windowWorkspace.LiveDraftInvalid ||
+                windowWorkspace.LiveDraftPackage != null || lab.IsPackagePreview ||
+                !ReferenceEquals(persistedPreview, windowWorkspace.Preview))
+                throw new InvalidOperationException("Compiler-invalid hitbox edit did not block the package preview.");
+            windowWorkspace.Undo();
+            if (windowWorkspace.LiveDraftPackage == null || windowWorkspace.LiveDraftInvalid ||
+                lab.PreviewStatus != "Live draft" || !lab.IsPackagePreview)
+                throw new InvalidOperationException("Undo did not restore the valid live package preview.");
+            var restoredLive = lab.ResolveHitboxes().Single(item => item.index == liveHitboxOrdinal);
+            if (restoredLive.evt.Radius != afterLive.evt.Radius ||
+                restoredLive.start != afterLive.start || restoredLive.end != afterLive.end)
+                throw new InvalidOperationException("Undo did not restore live hitbox geometry.");
+            if (!windowWorkspace.OpenPackage("Assets/CharacterPackages/manki"))
+                throw new InvalidOperationException("Manki package could not be opened for presentation preview tests.");
+            Refresh(window);
+            var mankiLab = AbilityLab.Instance;
+            var mankiAddress = CanonicalSlotProjection.All.First(address => address.Id == "ground.F");
+            mankiLab.SetSlot(mankiAddress);
+            mankiLab.SetStage(0);
+            var mankiSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F");
+            var mankiPresentationOperation = mankiSlot.Timeline.Stages[0].Operations
+                .OfType<EmitPresentationOperationSource>().Single();
+            var mankiPresentationProjection = timeline.Projection.Stages[0].Operations
+                .Single(operation => operation.Source is EmitPresentationOperationSource);
+            typeof(AbilityLabWindow).GetMethod("SelectOperation", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(window, new object[] { mankiPresentationProjection });
+            mankiLab.SetTick(17);
+            if (mankiLab.PresentationPreviewInstanceCount != 0)
+                throw new InvalidOperationException("Manki presentation preview activated before its trigger tick.");
+            mankiLab.SetTick(18);
+            if (mankiLab.PresentationPreviewInstanceCount != 1 ||
+                !mankiLab.PresentationPreviewInstances.Single().name.Contains("MankiAerosolInferno", StringComparison.Ordinal))
+                throw new InvalidOperationException("Manki presentation preview did not resolve at its trigger tick.");
+            mankiLab.SetTick(45);
+            if (mankiLab.PresentationPreviewInstanceCount != 1)
+                throw new InvalidOperationException("Manki presentation preview expired before the configured lifetime.");
+            mankiLab.SetTick(46);
+            if (mankiLab.PresentationPreviewInstanceCount != 0)
+                throw new InvalidOperationException("Manki presentation preview remained active after the configured lifetime.");
+
+            RefreshInspector(window);
+            var presentationStartTick = root.Q<VisualElement>("inspector").Query<IntegerField>().ToList()
+                .FirstOrDefault(field => field.label == "Start tick");
+            if (presentationStartTick == null)
+                throw new InvalidOperationException("Presentation operation does not expose an editable Start tick.");
+            presentationStartTick.value = 19;
+            var retimedPresentation = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F")
+                .Timeline.Stages[0].Operations.OfType<EmitPresentationOperationSource>().Single();
+            if (retimedPresentation.Tick != 19)
+                throw new InvalidOperationException("Presentation Start tick field did not update the source operation.");
+            mankiLab.SetTick(18);
+            if (mankiLab.PresentationPreviewInstanceCount != 0)
+                throw new InvalidOperationException("Presentation preview remained at the old trigger tick after retiming.");
+            mankiLab.SetTick(19);
+            if (mankiLab.PresentationPreviewInstanceCount != 1)
+                throw new InvalidOperationException("Presentation preview did not follow the retimed trigger tick.");
+            windowWorkspace.Undo();
+            Refresh(window);
+            var restoredPresentation = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F")
+                .Timeline.Stages[0].Operations.OfType<EmitPresentationOperationSource>().Single();
+            mankiLab.SetTick(18);
+            if (restoredPresentation.Tick != 18 || mankiLab.PresentationPreviewInstanceCount != 1)
+                throw new InvalidOperationException("Presentation Undo did not restore source timing and visible timing.");
+
+            var mankiCatalog = windowWorkspace.Catalog;
+            var originalPresentationBinding = mankiCatalog.Presentations
+                .First(binding => binding != null && binding.SemanticId == mankiPresentationOperation.PresentationId);
+            var originalPresentationPrefab = originalPresentationBinding.Prefab;
+            string addedPresentationId = "presentation.manki.frontend-self-test";
+            if (!windowWorkspace.AddPresentationAsset(addedPresentationId, originalPresentationPrefab) ||
+                !windowWorkspace.Draft.PresentationIds.Contains(addedPresentationId, StringComparer.Ordinal) ||
+                !mankiCatalog.Presentations.Any(binding => binding != null && binding.SemanticId == addedPresentationId))
+                throw new InvalidOperationException("Adding a package presentation asset did not update source and catalog together.");
+            windowWorkspace.Undo();
+            if (windowWorkspace.Draft.PresentationIds.Contains(addedPresentationId, StringComparer.Ordinal) ||
+                mankiCatalog.Presentations.Any(binding => binding != null && binding.SemanticId == addedPresentationId))
+                throw new InvalidOperationException("Presentation asset Undo did not restore source and catalog.");
+            windowWorkspace.Redo();
+            if (!windowWorkspace.Draft.PresentationIds.Contains(addedPresentationId, StringComparer.Ordinal) ||
+                !mankiCatalog.Presentations.Any(binding => binding != null && binding.SemanticId == addedPresentationId))
+                throw new InvalidOperationException("Presentation asset Redo did not restore source and catalog.");
+            windowWorkspace.Undo();
+            var replacementPresentationPrefab = mankiCatalog.Rig;
+            if (replacementPresentationPrefab == null || replacementPresentationPrefab == originalPresentationPrefab)
+                throw new InvalidOperationException("Manki presentation rebind regression fixture has no distinct prefab.");
+            if (!windowWorkspace.ReplaceCatalogPresentation(
+                    mankiPresentationOperation.PresentationId,
+                    replacementPresentationPrefab) ||
+                mankiCatalog.Presentations.First(binding => binding != null && binding.SemanticId == mankiPresentationOperation.PresentationId).Prefab != replacementPresentationPrefab)
+                throw new InvalidOperationException("Presentation asset rebind did not update the package catalog.");
+            windowWorkspace.Undo();
+            if (mankiCatalog.Presentations.First(binding => binding != null && binding.SemanticId == mankiPresentationOperation.PresentationId).Prefab != originalPresentationPrefab)
+                throw new InvalidOperationException("Presentation asset rebind Undo did not restore its prefab.");
+            windowWorkspace.Redo();
+            if (mankiCatalog.Presentations.First(binding => binding != null && binding.SemanticId == mankiPresentationOperation.PresentationId).Prefab != replacementPresentationPrefab)
+                throw new InvalidOperationException("Presentation asset rebind Redo did not restore its prefab.");
+            windowWorkspace.Undo();
+
+            string renamedPresentationId = "presentation.manki.aerosol-inferno.renamed";
+            bool renamedPresentation = (bool)typeof(AbilityLabWindow).GetMethod("ConfirmAndRenameSemanticId", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(window, new object[] { mankiPresentationOperation.PresentationId, renamedPresentationId, (Func<bool>)(() => true) })!;
+            if (!renamedPresentation ||
+                !windowWorkspace.Draft.PresentationIds.Contains(renamedPresentationId, StringComparer.Ordinal) ||
+                !windowWorkspace.Draft.Slots.SelectMany(slot => slot.Timeline.Stages).SelectMany(stage => stage.Operations)
+                    .OfType<EmitPresentationOperationSource>().Any(operation => operation.PresentationId == renamedPresentationId) ||
+                !mankiCatalog.Presentations.Any(binding => binding != null && binding.SemanticId == renamedPresentationId))
+                throw new InvalidOperationException("Presentation semantic-ID rename did not update source operation and catalog binding.");
+            windowWorkspace.Undo();
+            Refresh(window);
+
+            if (!windowWorkspace.OpenPackage("Assets/CharacterPackages/manki"))
+                throw new InvalidOperationException("Manki package could not be reloaded for fingerprint conflict testing.");
+            Refresh(window);
+            mankiCatalog = windowWorkspace.Catalog;
+            originalPresentationBinding = mankiCatalog.Presentations
+                .First(binding => binding != null && binding.SemanticId == mankiPresentationOperation.PresentationId);
+            originalPresentationPrefab = originalPresentationBinding.Prefab;
+            replacementPresentationPrefab = mankiCatalog.Rig;
+            string fingerprintBefore = CharacterPackageAuthoringService.ComputeCatalogFingerprint(mankiCatalog);
+            originalPresentationBinding.Prefab = replacementPresentationPrefab;
+            string fingerprintAfter = CharacterPackageAuthoringService.ComputeCatalogFingerprint(mankiCatalog);
+            EditorUtility.SetDirty(mankiCatalog);
+            AssetDatabase.SaveAssets();
+            if (fingerprintBefore == fingerprintAfter || windowWorkspace.SavePackage() ||
+                !windowWorkspace.Diagnostics.Any(diagnostic => diagnostic.Code == "workspace.conflict"))
+                throw new InvalidOperationException("External presentation-link mutation did not invalidate the catalog fingerprint.");
+            originalPresentationBinding.Prefab = originalPresentationPrefab;
+            EditorUtility.SetDirty(mankiCatalog);
+            AssetDatabase.SaveAssets();
+            windowWorkspace.ReloadPackage();
+            Refresh(window);
+            if (!windowWorkspace.OpenPackage("Assets/CharacterPackages/fightguy"))
+                throw new InvalidOperationException("FightGuy package could not be restored after Manki presentation tests.");
+            Refresh(window);
+
             if (!sourceWorkspace.OpenPackage("Assets/CharacterPackages/fightguy") ||
                 !sourceWorkspace.TryResolveCanonicalSlot("air.A", out _, out var airSource) ||
                 airSource.Name != "Ki Shot")
@@ -111,6 +303,40 @@ public static class AbilityLabFrontendSelfTest
                 windowWorkspace.Draft.Presentation.Idle != "anim.idle")
                 throw new InvalidOperationException(
                     $"Character and Moves animation labels do not preserve semantic IDs. move={moveValue} expectedMove={expectedMoveValue} idle={idleValue} expectedIdle={expectedIdleValue} rawIdle={windowWorkspace.Draft.Presentation.Idle}");
+            var hitboxProjection = timeline.Projection.Stages
+                .SelectMany(stage => stage.Operations)
+                .First(operation => operation.Source is SpawnHitboxOperationSource);
+            typeof(AbilityLabWindow).GetMethod("SelectOperation", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(window, new object[] { hitboxProjection });
+            var startBoneField = root.Q<VisualElement>("inspector").Query<PopupField<string>>().ToList()
+                .FirstOrDefault(field => field.label == "Start bone");
+            if (startBoneField == null ||
+                !startBoneField.choices.Contains("bone.left-hand", StringComparer.Ordinal) ||
+                startBoneField.choices.Contains("mixamorig:LeftHand", StringComparer.Ordinal))
+                throw new InvalidOperationException("Hitbox bone selector does not expose authoring bone IDs.");
+            startBoneField.value = "bone.left-hand";
+            var editedBone = (SpawnHitboxOperationSource)windowWorkspace.Draft.Slots
+                .First(slot => slot.Id == "ground.1").Timeline.Stages[hitboxProjection.SourceStageIndex]
+                .Operations[hitboxProjection.SourceOperationIndex];
+            if (editedBone.Hitbox.StartBoneId != "bone.left-hand")
+                throw new InvalidOperationException("Selecting a declared hurtbox bone did not update the source hitbox.");
+            windowWorkspace.Undo();
+            Refresh(window);
+
+            var startTickField = root.Q<VisualElement>("inspector").Query<IntegerField>().ToList()
+                .FirstOrDefault(field => field.label == "Start tick");
+            var startTickBefore = ((SpawnHitboxOperationSource)hitboxProjection.Source).Tick;
+            var startTickAfter = startTickBefore > 0 ? startTickBefore - 1 : startTickBefore + 1;
+            if (startTickField == null || startTickAfter == startTickBefore)
+                throw new InvalidOperationException("Selected hitbox does not expose an editable start tick field.");
+            startTickField.value = startTickAfter;
+            var editedStart = (SpawnHitboxOperationSource)windowWorkspace.Draft.Slots
+                .First(slot => slot.Id == "ground.1").Timeline.Stages[hitboxProjection.SourceStageIndex]
+                .Operations[hitboxProjection.SourceOperationIndex];
+            if (editedStart.Tick != startTickAfter)
+                throw new InvalidOperationException("Hitbox start tick field did not update the source timeline.");
+            windowWorkspace.Undo();
+            Refresh(window);
             var catalog = windowWorkspace.Catalog;
             var moveFields = root.Q<VisualElement>("assets-move-bindings").Query<ObjectField>().ToList();
             var moveRowsBySemanticId = moveFields
@@ -411,7 +637,7 @@ public static class AbilityLabFrontendSelfTest
                     throw new InvalidOperationException("Legacy compatibility mutation guard changed transient edit state.");
             }
 
-            Debug.Log("[AbilityLabFrontendSelfTest] Passed canonical controls, compatibility mode boundary, legacy bindings, package preview seam, and source-edit boundary checks.");
+            Debug.Log("[AbilityLabFrontendSelfTest] Passed stable preview roots, missing-model recovery, canonical controls, compatibility mode boundary, legacy bindings, package preview seam, and source-edit boundary checks.");
         }
         finally
         {

@@ -353,14 +353,23 @@ namespace SlopArena.Shared
             if (!_bakedData.TryGetValue(id, out baked!) || def.HurtboxBoneDefs == null || def.HurtboxBoneDefs.Length == 0)
                 return false;
 
-            // Resolve animation name based on current state
             if (state.State == ActionState.Dashing) targetAnim = def.DashAnim;
             else if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
             {
                 bool airborne = !state.IsGrounded;
-                var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                int stageIdx = ability != null ? Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1)) : 0;
-                targetAnim = ability != null && stageIdx >= 0 && stageIdx < ability.AnimationNames.Length ? ability.AnimationNames[stageIdx] : "melee";
+                var cooked = def.GetCookedSlotAbility(state.AttackSlot, airborne);
+                if (cooked != null)
+                {
+                    int stageIdx = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
+                    var stage = cooked.Timeline.Stages[stageIdx];
+                    targetAnim = stage.AnimationIds.Count > 0 ? stage.AnimationIds[0] : "idle";
+                }
+                else
+                {
+                    var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
+                    int stageIdx = ability != null ? Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1)) : 0;
+                    targetAnim = ability != null && stageIdx >= 0 && stageIdx < ability.AnimationNames.Length ? ability.AnimationNames[stageIdx] : "melee";
+                }
             }
             else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
             {
@@ -1146,6 +1155,11 @@ namespace SlopArena.Shared
 						dirZ = aDz / aDist;
 					}
 				}
+                    if (hit.KnockbackDirection == AuthoringKnockbackDirection.TowardOwner)
+                    {
+                        dirX = -dirX;
+                        dirZ = -dirZ;
+                    }
 
 				// Hit-reaction facing: the victim turns to face the attacker (the direction the
 				// hit came from — opposite the launch). Persists through the hitstun flight;

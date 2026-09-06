@@ -5,9 +5,9 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Issue #117 — the 3-state ground/air slot semantics and the FightGuy kit rework:
-///   - all four FightGuy specials have air specs (Dragon Beam; slots E/R/F/A share ground specs)
+///   - all four FightGuy specials have air specs (Fist of Fury; slots E/R/F/A share ground specs)
 ///   - normals 1-4 have DISTINCT air specs (AirSlot1-4 — the air normal pass)
-///   - Air* = ground spec reference = shared (Rising Dragon, Cyclone, Dragon Beam, Ki Shot)
+///   - Air* = ground spec reference = shared (Rising Dragon, Cyclone, Fist of Fury, Ki Shot)
 ///   - the E-slot rising punch: anti-air on the ground, recovery burst in the air
 ///   - cooldowns on slots 6-11 now tick down (TickTimers loop fix)
 /// </summary>
@@ -40,14 +40,14 @@ public class Kit117SlotSemanticsTests
         Assert.NotSame(Def.GetSlotAbility(6, false), Def.GetSlotAbility(6, true));
         Assert.NotSame(Def.GetSlotAbility(7, false), Def.GetSlotAbility(7, true));
         Assert.NotSame(Def.GetSlotAbility(8, false), Def.GetSlotAbility(8, true));
-        Assert.Same(Def.F, Def.GetSlotAbility(5, true));        // Dragon Beam — airborne
+        Assert.Same(Def.F, Def.GetSlotAbility(5, true));        // Fist of Fury — airborne
         Assert.NotNull(Def.GetSlotAbility(2, false));
     }
 
     [Fact(Skip = "Phase 7: legacy shared-slot alias identity is not part of cooked content.")]
     public void GetSlotAbility_SharedAbilitySlots_ResolveInAir()
     {
-        // Rising Dragon / Cyclone / Dragon Beam / Ki Shot share their specs across states.
+        // Rising Dragon / Cyclone / Fist of Fury / Ki Shot share their specs across states.
         Assert.Same(Def.E, Def.GetSlotAbility(3, true));
         Assert.Same(Def.R, Def.GetSlotAbility(4, true));
         Assert.Same(Def.F, Def.GetSlotAbility(5, true));

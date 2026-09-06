@@ -111,6 +111,11 @@ public sealed class AbilityLabWindow : EditorWindow
     private VisualElement _assetsLocomotionBindings = null!;
     private VisualElement _assetsHitReactionBindings = null!;
     private VisualElement _assetsMoveBindings = null!;
+    private VisualElement _assetsPresentationBindings = null!;
+    private TextField _presentationAssetId = null!;
+    private ObjectField _presentationAssetPrefab = null!;
+    private Button _presentationAssetAdd = null!;
+    private Label _presentationAssetStatus = null!;
     private VisualElement _assetsValidation = null!;
     private VisualElement _advancedPackagePaths = null!;
     private Label _advancedSourcePath = null!;
@@ -245,6 +250,11 @@ public sealed class AbilityLabWindow : EditorWindow
         _assetsLocomotionBindings = Required<VisualElement>("assets-locomotion-bindings");
         _assetsHitReactionBindings = Required<VisualElement>("assets-hit-reaction-bindings");
         _assetsMoveBindings = Required<VisualElement>("assets-move-bindings");
+        _assetsPresentationBindings = Required<VisualElement>("assets-presentation-bindings");
+        _presentationAssetId = Required<TextField>("presentation-asset-id");
+        _presentationAssetPrefab = Required<ObjectField>("presentation-asset-prefab");
+        _presentationAssetAdd = Required<Button>("presentation-asset-add");
+        _presentationAssetStatus = Required<Label>("presentation-asset-status");
         _assetsValidation = Required<VisualElement>("assets-validation");
         _advancedPackagePaths = Required<VisualElement>("advanced-package-paths");
         _advancedSourcePath = Required<Label>("advanced-source-path");
@@ -521,6 +531,24 @@ public sealed class AbilityLabWindow : EditorWindow
             _workspace.ReplaceCatalogRig(evt.newValue as GameObject);
             RefreshAll();
         });
+        _presentationAssetPrefab.objectType = typeof(GameObject);
+        _presentationAssetPrefab.allowSceneObjects = false;
+        _presentationAssetAdd.clicked += () =>
+        {
+            if (_updatingControls || !_workspace.HasPackage) return;
+            bool accepted = _workspace.AddPresentationAsset(
+                _presentationAssetId.value,
+                _presentationAssetPrefab.value as GameObject);
+            _presentationAssetStatus.text = accepted
+                ? "Added; save and cook to publish the presentation asset."
+                : _workspace.Diagnostics.LastOrDefault()?.Message ?? "Presentation asset rejected; see diagnostics.";
+            if (accepted)
+            {
+                _presentationAssetId.value = "";
+                _presentationAssetPrefab.value = null;
+            }
+            RefreshAll();
+        };
     }
 
     private void BindAdvancedPage()
@@ -929,17 +957,35 @@ public sealed class AbilityLabWindow : EditorWindow
         _preview = _workspace.Preview;
         if (_activePage == "compatibility-page")
             return;
-        if (_preview != null && _preview.IsAvailable)
+        if (_workspace.LiveDraftPackage != null && _preview?.IsAvailable == true)
         {
-            _sceneViewGuidance.text = "Scrub the stopped timeline to update SceneView.";
+            _sceneViewGuidance.text = "Live draft preview; save and cook to publish.";
+            _lab?.ApplyPackageDraftPreview(_workspace.LiveDraftPackage, _preview);
+            _airborneSelector = _lab?.SelectedSlotId.StartsWith("air.", StringComparison.Ordinal) ?? false;
+            _updatingControls = true;
+            _groundMovesButton.EnableInClassList("ground-air-selected", !_airborneSelector);
+            _airMovesButton.EnableInClassList("ground-air-selected", _airborneSelector);
+            _updatingControls = false;
+            BuildMoveButtons(_airborneSelector);
+        }
+        else if (_workspace.LiveDraftInvalid)
+        {
+            _sceneViewGuidance.text = "Draft invalid; fix diagnostics before previewing hitboxes.";
+            _lab?.MarkPackageDraftInvalid();
+            _moveList.Clear();
+        }
+        else if (_preview != null && _preview.IsAvailable)
+        {
             string priorSlot = _lab?.SelectedSlotId ?? CanonicalSlotProjection.All[0].Id;
-            if (_lab != null && _lab.SelectedPackageId != _preview.Identity.PackageId)
+            bool previewChanged = _lab != null &&
+                (_lab.SelectedPackageId != _preview.Identity.PackageId ||
+                 _lab.SelectedPackageHash != _preview.Identity.PackageHash);
+            if (_lab != null && previewChanged)
             {
                 _lab.ApplyPackagePreview(_preview);
                 if (CanonicalSlotProjection.TryGet(priorSlot, out var priorAddress))
                     _lab.SetSlot(priorAddress);
             }
-            _airborneSelector = _lab?.SelectedSlotId.StartsWith("air.", StringComparison.Ordinal) ?? false;
             _updatingControls = true;
             _groundMovesButton.EnableInClassList("ground-air-selected", !_airborneSelector);
             _airMovesButton.EnableInClassList("ground-air-selected", _airborneSelector);
@@ -1133,6 +1179,13 @@ public sealed class AbilityLabWindow : EditorWindow
                 }
             }
         }
+        _assetsPresentationBindings.Clear();
+        _presentationAssetStatus.text = "";
+        if (available)
+        {
+            foreach (string semanticId in _workspace.Draft.PresentationIds ?? Array.Empty<string>())
+                _assetsPresentationBindings.Add(BuildPresentationBindingRow(semanticId, FindPresentationBinding(semanticId)));
+        }
         RefreshAssetsValidation();
     }
 
@@ -1178,6 +1231,41 @@ public sealed class AbilityLabWindow : EditorWindow
         row.Add(extrapolation);
         return row;
     }
+
+    private VisualElement BuildPresentationBindingRow(
+        string semanticId,
+        CharacterAssetCatalog.PresentationBinding binding)
+    {
+        var row = new VisualElement { userData = semanticId ?? "" };
+        row.AddToClassList("asset-binding-row");
+        var name = new Label(semanticId ?? "");
+        name.AddToClassList("asset-binding-label");
+        name.tooltip = semanticId ?? "";
+        row.Add(name);
+        var prefab = new ObjectField
+        {
+            objectType = typeof(GameObject),
+            allowSceneObjects = false,
+            tooltip = semanticId ?? "",
+        };
+        prefab.AddToClassList("asset-binding-clip");
+        prefab.SetValueWithoutNotify(binding?.Prefab);
+        prefab.SetEnabled(binding != null);
+        prefab.RegisterValueChangedCallback(evt =>
+        {
+            if (_updatingControls || binding == null) return;
+            bool accepted = _workspace.ReplaceCatalogPresentation((string)row.userData, evt.newValue as GameObject);
+            if (!accepted)
+                _presentationAssetStatus.text = _workspace.Diagnostics.LastOrDefault()?.Message ?? "Presentation asset rejected; see diagnostics.";
+            RefreshAll();
+        });
+        row.Add(prefab);
+        return row;
+    }
+
+    private CharacterAssetCatalog.PresentationBinding FindPresentationBinding(string semanticId)
+        => (_workspace.Catalog?.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+            .FirstOrDefault(binding => binding != null && binding.SemanticId == semanticId);
 
     private CharacterAssetCatalog.AnimationBinding FindBinding(string semanticId)
         => (_workspace.Catalog?.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
@@ -1282,9 +1370,10 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshRigState()
     {
         _lab = FindLab();
-        bool previewAvailable = _preview?.IsAvailable == true;
+        bool previewAvailable = _preview?.IsAvailable == true && !_workspace.LiveDraftInvalid;
         bool rigReady = _lab != null;
-        _previewSummary.text = $"Preview: {(previewAvailable ? "Cooked" : "Unavailable")} · Rig {(rigReady ? "ready" : "needed")}";
+        string previewKind = _workspace.LiveDraftPackage != null ? "Live draft" : previewAvailable ? "Cooked" : "Unavailable";
+        _previewSummary.text = $"Preview: {previewKind} · Rig {(rigReady ? "ready" : "needed")}";
         _previewSummary.tooltip = _workspace.HasPackage
             ? $"{_workspace.Draft.DisplayName} · {_workspace.PackageId}"
             : "No package selected";
@@ -1563,17 +1652,66 @@ public sealed class AbilityLabWindow : EditorWindow
         };
         addHitbox.tooltip = "Add a default hitbox to this move stage.";
         moveGroup.Add(addHitbox);
+        var presentationIds = _workspace.Draft.PresentationIds ?? Array.Empty<string>();
+        var addPresentation = new Button(() =>
+        {
+            if (_lab == null || presentationIds.Count == 0 ||
+                !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int sourceSlotIndex, out _))
+                return;
+            string presentationId = presentationIds[0];
+            if (!_workspace.AddOperation(
+                    sourceSlotIndex,
+                    _lab.StageIndex,
+                    new EmitPresentationOperationSource(0, AuthoringUnit.Ticks, presentationId)))
+                return;
+            UpdateTimelineControls();
+            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _timelineTrack.SelectedOperation = _selectedOperation;
+            RefreshInspector();
+            SceneView.RepaintAll();
+        })
+        {
+            text = "Add VFX event"
+        };
+        addPresentation.tooltip = "Add a presentation event using the first declared presentation ID.";
+        addPresentation.SetEnabled(presentationIds.Count > 0);
+        moveGroup.Add(addPresentation);
         _inspector.Add(moveGroup);
-
         var selected = _selectedOperation;
         if (selected?.Source is SpawnHitboxOperationSource)
         {
             var hitbox = ((SpawnHitboxOperationSource)selected.Source).Hitbox;
             var group = new Foldout { text = "Hitbox", value = true };
-            AddHitboxTiming(group, hitbox);
+            AddHitboxTiming(group, selected.Source.Tick, hitbox);
             AddHitboxCombat(group, hitbox);
             AddHitboxShape(group, hitbox);
             AddHitboxAttachment(group, hitbox);
+            _inspector.Add(group);
+        }
+        else if (selected?.Source is EmitPresentationOperationSource presentationOperation)
+        {
+            var group = new Foldout { text = "Presentation", value = true };
+            var ids = (_workspace.Draft.PresentationIds ?? Array.Empty<string>())
+                .Concat(new[] { presentationOperation.PresentationId })
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var choices = BuildAnimationChoices(ids);
+            var labels = choices.Select(choice => choice.Label).ToList();
+            var selectedChoice = choices.FirstOrDefault(choice => choice.SemanticId == presentationOperation.PresentationId);
+            var field = new PopupField<string>(
+                "Presentation",
+                labels,
+                selectedChoice == null ? 0 : labels.IndexOf(selectedChoice.Label));
+            field.RegisterValueChangedCallback(evt =>
+            {
+                var choice = choices.FirstOrDefault(item => item.Label == evt.newValue);
+                if (choice != null)
+                    CommitPresentationOperationId(selected, choice.SemanticId);
+            });
+            group.Add(field);
+            AddDelayedInteger(group, "Start tick", presentationOperation.Tick,
+                value => CommitPresentationOperationStart(selected, value));
             _inspector.Add(group);
         }
         else if (selected != null)
@@ -1581,6 +1719,56 @@ public sealed class AbilityLabWindow : EditorWindow
             _inspector.Add(new Foldout { text = selected.Summary, value = true });
             _inspector.Add(new Label($"Authored range [{selected.StartTick}, {selected.EndTick}) · {selected.Source.Unit}"));
         }
+    }
+
+    private void CommitPresentationOperationId(AbilityLabOperationProjection selected, string semanticId)
+    {
+        if (_updatingControls || _lab == null ||
+            selected.Source is not EmitPresentationOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex,
+                selected.SourceStageIndex,
+                selected.SourceOperationIndex,
+                original with { PresentationId = semanticId });
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void CommitPresentationOperationStart(AbilityLabOperationProjection selected, int startTick)
+    {
+        if (_updatingControls || _lab == null || selected.Source is not EmitPresentationOperationSource)
+            return;
+        CharacterStageSource stage = CurrentStage();
+        startTick = Mathf.Clamp(startTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperationTick(
+                _lab.SelectedSlotId,
+                selected.SourceStageIndex,
+                selected.SourceOperationIndex,
+                startTick);
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
     }
 
     private void CommitStage(Func<CharacterStageSource, CharacterStageSource> edit, int stageIndex)
@@ -1620,10 +1808,32 @@ public sealed class AbilityLabWindow : EditorWindow
         RefreshInspector();
         SceneView.RepaintAll();
     }
+    private void CommitHitboxStart(int startTick)
+    {
+        if (_updatingControls || _lab == null || _selectedOperation?.Source is not SpawnHitboxOperationSource original) return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
+        var stage = CurrentStage();
+        startTick = Mathf.Clamp(startTick, 0, Mathf.Max(0, stage.DurationTicks - original.Hitbox.DurationTicks));
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperationTick(_lab.SelectedSlotId, stageIndex, operationIndex, startTick);
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
 
-    private void AddHitboxTiming(Foldout group, HitboxSource value)
+    private void AddHitboxTiming(Foldout group, int startTick, HitboxSource value)
     {
         var timing = new Foldout { text = "Timing", value = true };
+        AddDelayedInteger(timing, "Start tick", startTick, CommitHitboxStart);
         AddDelayedInteger(timing, "Stun ticks", value.StunTicks, v => CommitHitbox(h => h with { StunTicks = (ushort)Mathf.Clamp(v, 0, ushort.MaxValue) }));
         AddDelayedInteger(timing, "Active duration ticks", value.DurationTicks, v => CommitHitbox(h => h with { DurationTicks = (ushort)Mathf.Clamp(v, 0, ushort.MaxValue) }));
         AddToggle(timing, "Interruptible", value.Interruptible, v => CommitHitbox(h => h with { Interruptible = v }));
@@ -1667,12 +1877,25 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void AddBonePopup(Foldout group, string label, string? value, Action<string?> commit)
     {
-        var choices = new List<string> { "" };
-        choices.AddRange(_lab?.BakedBoneNames ?? Array.Empty<string>());
-        if (!string.IsNullOrEmpty(value) && !choices.Contains(value, StringComparer.Ordinal)) choices.Add(value);
+        var choices = AuthoringBoneChoices();
+        if (!string.IsNullOrEmpty(value) && !choices.Contains(value, StringComparer.Ordinal))
+            choices.Add(value);
         var field = new PopupField<string>(label, choices, choices.IndexOf(value ?? ""));
         field.RegisterValueChangedCallback(evt => commit(string.IsNullOrEmpty(evt.newValue) ? null : evt.newValue));
         group.Add(field);
+    }
+
+    private List<string> AuthoringBoneChoices()
+    {
+        var choices = new List<string> { "" };
+        if (!_workspace.HasPackage) return choices;
+
+        choices.AddRange((_workspace.Draft.HurtboxBoneDefs ?? Array.Empty<HurtboxBoneSource>())
+            .Select(bone => bone.BoneId)
+            .Where(id => !string.IsNullOrEmpty(id) && !choices.Contains(id, StringComparer.Ordinal)));
+        choices.AddRange((_workspace.Draft.AttachmentBoneIds ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrEmpty(id) && !choices.Contains(id, StringComparer.Ordinal)));
+        return choices;
     }
 
     private void AddDelayedFloat(VisualElement parent, string label, float value, Action<float> commit)

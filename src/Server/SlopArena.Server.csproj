@@ -17,14 +17,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\content-cooked\fightguy\**"
-          LinkBase="content-cooked\fightguy"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\content-cooked\roster\manifest.json"
-          Link="content-cooked\roster\manifest.json"
+    <None Include="..\..\content-cooked\**"
+          LinkBase="content-cooked"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

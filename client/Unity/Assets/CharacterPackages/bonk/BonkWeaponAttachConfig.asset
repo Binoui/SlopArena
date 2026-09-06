@@ -17,4 +17,4 @@ MonoBehaviour:
     BoneName: hand_r
     Prefab: {fileID: 100000, guid: 504fa2e6f23e7edd79d71fae0aa64f56, type: 3}
     PositionOffset: {x: 0, y: 0, z: 0}
-    RotationOffset: {x: 0, y: 0, z: 0}
+    RotationOffset: {x: 0, y: 90, z: 0}

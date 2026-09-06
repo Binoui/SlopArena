@@ -190,7 +190,8 @@ public sealed record HitboxSource(
     ushort StunTicks,
     ushort DurationTicks,
     bool Interruptible,
-    byte HitGroup);
+    byte HitGroup,
+    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner);
 public sealed record ProjectileSource(
     float LaunchOffsetX,
     float LaunchOffsetY,
@@ -359,6 +360,11 @@ public enum AuthoringHitboxShape : byte
 {
     Sphere = 0,
     Capsule = 1,
+}
+public enum AuthoringKnockbackDirection : byte
+{
+    AwayFromOwner = 0,
+    TowardOwner = 1,
 }
 
 public enum AuthoringVelocityMode : byte

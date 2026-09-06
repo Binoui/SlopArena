@@ -98,3 +98,4 @@ MonoBehaviour:
     _clip: {fileID: 7400000, guid: bdb392334e0abf1fe8f9c4027f78265e, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.f
+  _presentations: []

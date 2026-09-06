@@ -223,6 +223,27 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
+    public void MankiE_IgnitionHitbox_UsesSmallQExplosionAtFeet()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        float expectedFeetY = state.PY - Def.CapsuleHeight * 0.5f;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 4);
+
+        var hitbox = Assert.Single(sim.Resolver.GetActiveHitboxes());
+        Assert.Equal((byte)3, hitbox.Slot);
+        Assert.Equal(1.5f, hitbox.Radius);
+        Assert.Equal(expectedFeetY, hitbox.Y, 5);
+        Assert.Equal(10f, hitbox.Damage);
+        Assert.Equal(2.4f, hitbox.BaseKnockback);
+        Assert.Equal(24f, hitbox.KnockbackGrowth);
+        Assert.Equal((sbyte)30, hitbox.KnockbackAngle);
+    }
+
+    [Fact]
     public void MankiE_LaunchesThenReturnsToIdleAtApex()
     {
         var sim = TestHelpers.MakeSim();

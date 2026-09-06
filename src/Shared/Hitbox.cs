@@ -46,6 +46,8 @@ namespace SlopArena.Shared
         public float KnockbackGrowth;
         /// <summary>Launch angle in degrees (-90 to 90). Resolved from profile at spawn time.</summary>
         public sbyte KnockbackAngle;
+        /// <summary>Horizontal launch direction relative to the hitbox owner.</summary>
+        public AuthoringKnockbackDirection KnockbackDirection;
         public ushort StunTicks;
         public ulong OwnerId;
 

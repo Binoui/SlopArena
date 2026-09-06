@@ -26,6 +26,7 @@ namespace SlopArena.Client.Entities
         private GameObject[] _instances;
         private WeaponEntry[] _entries;
 
+
         /// <summary>
         /// Initialise (or re-initialise) with a config asset.
         /// Safe to call multiple times (e.g. character swap or model reload).
@@ -46,8 +47,8 @@ namespace SlopArena.Client.Entities
                 Debug.LogWarning($"[WeaponAttach] No SkinnedMeshRenderer under {owner.name}");
                 return;
             }
-
             _entries = config.Entries;
+
             int count = _entries.Length;
             _bones = new Transform[count];
             _instances = new GameObject[count];
@@ -61,7 +62,6 @@ namespace SlopArena.Client.Entities
                     Debug.LogWarning($"[WeaponAttach] Prefab is null for entry {i} ({_entries[i].BoneName})");
                     continue;
                 }
-
                 _instances[i] = Instantiate(_entries[i].Prefab);
                 _instances[i].SetActive(false);
             }
@@ -78,7 +78,7 @@ namespace SlopArena.Client.Entities
         }
 
 
-        private void Update()
+        private void LateUpdate()
         {
             if (_owner == null || _entries == null) return;
 
@@ -139,6 +139,7 @@ namespace SlopArena.Client.Entities
 
         private Transform FindBone(string boneName)
         {
+
             if (_skin == null) return null;
             foreach (var b in _skin.bones)
                 if (b != null && b.name == boneName)
@@ -157,5 +158,7 @@ namespace SlopArena.Client.Entities
             Debug.LogWarning($"[WeaponAttach] Bone '{boneName}' not found on {_owner.name}");
             return null;
         }
+
+
     }
 }

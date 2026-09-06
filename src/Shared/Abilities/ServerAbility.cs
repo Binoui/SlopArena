@@ -162,6 +162,7 @@ namespace SlopArena.Shared.Abilities
                 BaseKnockback = kbBase,
                 KnockbackGrowth = kbGrowth,
                 KnockbackAngle = kbAngle,
+                KnockbackDirection = evt.KnockbackDirection,
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,

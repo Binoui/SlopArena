@@ -853,6 +853,11 @@ public sealed class CharacterPackageAuthoringService
                 .Append(binding == null || binding.Clip == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(binding.Clip).ToString()).Append('|')
                 .Append(binding?.Extrapolation.ToString() ?? "").Append('\n');
         }
+        foreach (var presentation in catalog.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+        {
+            builder.Append(presentation?.SemanticId ?? "").Append('|')
+                .Append(presentation == null || presentation.Prefab == null ? "" : GlobalObjectId.GetGlobalObjectIdSlow(presentation.Prefab).ToString()).Append('\n');
+        }
         using var hash = SHA256.Create();
         return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()))).Replace("-", "").ToLowerInvariant();
     }

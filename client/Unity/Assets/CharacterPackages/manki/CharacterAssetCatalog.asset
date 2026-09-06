@@ -75,7 +75,7 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.manki.ga-loop
   - _semanticId: anim.manki.ge
-    _clip: {fileID: -623603649343465320, guid: e22b1ee000bca18c08984701c3957bf4, type: 3}
+    _clip: {fileID: -203655887218126122, guid: 6b8e30a0f65d4483badc8058faf585c4, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.ge
   - _semanticId: anim.manki.gr

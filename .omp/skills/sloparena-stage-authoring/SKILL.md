@@ -38,6 +38,10 @@ cosmetic rendering, local lighting, presentation only
 `client/Unity/Assets/Resources/Stages/<key>.prefab` is cosmetic. `MatchBase.SpawnStageVisual` loads it dynamically under the runtime Stage root. Unity scene colliders, physics, animation, and presentation must not decide PVP results.
 
 The present stage registry is file-driven, not version/hash-pinned match content. `ArenaRegistry` discovers parseable `.arena` files; Stage Select offers non-training arenas only when a matching Resources prefab and nonempty collision data exist. Do not invent a registry entry, fallback, or version-admission mechanism in this workflow.
+Presentation prefabs under `client/Unity/Assets/Resources/Stages/` are intentionally
+local/ignored because they can depend on licensed art. A complete art checkout must
+supply them separately. Without a matching local prefab, Stage Select hides the stage
+and a direct match can run collision-only with no visual presentation.
 
 ## Design brief prerequisite
 
@@ -99,7 +103,9 @@ data/arenas/slop_court.arena
 
 The key is immutable after acceptance. Change the display name in arena data and the brief, not the key. A new key is a deliberate migration, never a casual file rename.
 
-The runtime Stage Select flow is file-driven. A matching valid `.arena` and Resources prefab are the delivery pair; do not create a separate manual stage-registration path.
+The runtime Stage Select flow is file-driven. A matching valid `.arena` and Resources
+prefab are the delivery pair in a complete art checkout; the presentation prefab is
+intentionally not Git-owned. Do not create a separate manual stage-registration path.
 
 ## Stage brief
 

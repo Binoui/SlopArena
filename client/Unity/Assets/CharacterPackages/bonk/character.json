@@ -156,6 +156,7 @@
       "iconId": "icon.1",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -167,6 +168,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -176,7 +179,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 13,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -194,7 +197,7 @@
                   "baseKnockback": 4,
                   "knockbackGrowth": 20,
                   "stunTicks": 12,
-                  "durationTicks": 11,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -211,6 +214,7 @@
       "iconId": "icon.2",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -222,6 +226,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -266,6 +272,7 @@
       "iconId": "icon.3",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -277,6 +284,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -286,7 +295,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 13,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -321,6 +330,7 @@
       "iconId": "icon.4",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -332,6 +342,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -376,6 +388,7 @@
       "iconId": "icon.a",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -387,6 +400,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.ga"
             ],
@@ -414,6 +432,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.ge"
             ],
@@ -451,6 +474,7 @@
       "iconId": "icon.r",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -462,6 +486,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.gr"
             ],
@@ -477,6 +506,7 @@
       "iconId": "icon.f",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 900,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -488,6 +518,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.gf"
             ],
@@ -629,6 +664,7 @@
       "iconId": "icon.1",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -640,6 +676,8 @@
             "landingLagTicks": 20,
             "autoCancelBeforeTicks": 15,
             "autoCancelAfterTicks": 34,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -649,7 +687,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 18,
+                "tick": 13,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -684,6 +722,7 @@
       "iconId": "icon.2",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -695,6 +734,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -713,6 +754,7 @@
       "iconId": "icon.3",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -724,6 +766,8 @@
             "landingLagTicks": 22,
             "autoCancelBeforeTicks": 16,
             "autoCancelAfterTicks": 40,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -733,7 +777,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 23,
+                "tick": 7,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -751,7 +795,7 @@
                   "baseKnockback": 7,
                   "knockbackGrowth": 30,
                   "stunTicks": 20,
-                  "durationTicks": 17,
+                  "durationTicks": 10,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -768,6 +812,7 @@
       "iconId": "icon.4",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -779,6 +824,8 @@
             "landingLagTicks": 24,
             "autoCancelBeforeTicks": 16,
             "autoCancelAfterTicks": 49,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -788,7 +835,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 28,
+                "tick": 15,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -806,7 +853,7 @@
                   "baseKnockback": 9,
                   "knockbackGrowth": 40,
                   "stunTicks": 22,
-                  "durationTicks": 18,
+                  "durationTicks": 15,
                   "interruptible": true,
                   "hitGroup": 0
                 }
@@ -823,6 +870,7 @@
       "iconId": "icon.a",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -834,6 +882,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.aa"
             ],
@@ -861,6 +914,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.ge"
             ],
@@ -898,6 +956,7 @@
       "iconId": "icon.r",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -909,6 +968,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.ar"
             ],
@@ -924,6 +988,7 @@
       "iconId": "icon.f",
       "behavior": "meleeCombo",
       "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -935,6 +1000,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.bonk.af"
             ],

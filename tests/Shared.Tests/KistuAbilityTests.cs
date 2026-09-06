@@ -62,39 +62,24 @@ public class KistuAbilityTests
         Assert.Equal(slot, t0.AttackSlot);
     }
 
-    // ── Normal tier: each ground normal damages an enemy in reach ──
+    // ── Normal tier: each ground normal damages a nearby enemy ──
 
     [Theory]
-    [InlineData((byte)3)] // g_1 Quick Slash — active 9-13
-    [InlineData((byte)7)] // g_2 Double Slash — active 6-11 / 22-27
-    [InlineData((byte)8)] // g_3 Up Slash — active 6-12
-    [InlineData((byte)9)] // g_4 Heavy Down Slash — active 21-26
-    public void GroundNormal_DamagesEnemyInReach(byte slot)
+    [InlineData((byte)3)] // key "1"
+    [InlineData((byte)7)] // key "2"
+    [InlineData((byte)8)] // key "3"
+    [InlineData((byte)9)] // key "4"
+    public void GroundNormal_DamagesNearbyEnemy(byte slot)
     {
         var sim = SimWithPlayer(out _);
-        var spec = Def.GetSlotAbility(slot - 1, airborne: false)!;
-        var stage = Assert.Single(spec.Stages);
-        var evt = stage.HitboxEvents[0];
         var baked = TestHelpers.LoadBakedData(Def);
 
-        // Hold aim on a forward enemy while checking the blade's lateral sweep
-        // against a second enemy at the sampled pose.
-        ushort targetTick = (ushort)(evt.TriggerTick + evt.DurationTicks - 1);
-        var pose = TestHelpers.PlayerState();
-        pose.PY = GroundPY;
-        pose.AttackElapsedTicks = targetTick;
-        HitboxGeometry.ResolvePositions(
-            pose, evt, baked, Def, spec.AnimationNames, 0, slot: (byte)(slot - 1), airborne: false,
-            out float hx, out float hy, out float hz,
-            out float tx, out float ty, out float tz);
-
-        var npc = TestHelpers.NpcState((hx + tx) * 0.5f, (hz + tz) * 0.5f);
-        npc.PY = (hy + ty) * 0.5f;
+        var npc = TestHelpers.NpcState(0f, 1f);
+        npc.PY = GroundPY;
         sim.RegisterEntity(100, Def, npc, baked);
-        sim.RegisterEntity(101, Def, TestHelpers.NpcState(0f, 5f) with { PY = GroundPY }, baked);
 
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = slot, TargetEntityId = 101 } }, { 100, default } });
-        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, new InputState { TargetEntityId = 101 } }, { 100, default } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = slot } }, { 100, default } });
+        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }

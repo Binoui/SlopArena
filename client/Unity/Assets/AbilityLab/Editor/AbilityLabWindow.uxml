@@ -140,6 +140,13 @@
       <ui:Foldout name="assets-move-group" text="Move animations" value="true" class="asset-group">
         <ui:VisualElement name="assets-move-bindings" />
       </ui:Foldout>
+      <ui:Foldout name="assets-presentation-group" text="Presentation Assets" value="true" class="asset-group">
+        <ui:VisualElement name="assets-presentation-bindings" />
+        <ui:TextField name="presentation-asset-id" label="Presentation ID" />
+        <uie:ObjectField name="presentation-asset-prefab" label="Prefab" object-type="UnityEngine.GameObject" allow-scene-objects="false" />
+        <ui:Button name="presentation-asset-add" text="Add presentation asset" />
+        <ui:Label name="presentation-asset-status" text="" />
+      </ui:Foldout>
       <ui:Foldout name="assets-validation" text="Validation" value="true" class="asset-group" />
     </ui:ScrollView>
     <ui:VisualElement name="compatibility-page" class="page foundation-page">

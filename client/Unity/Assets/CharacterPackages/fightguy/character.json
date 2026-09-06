@@ -171,10 +171,6 @@
     {
       "capabilityId": "slop.internal.fightguy.cyclone-kick.v1",
       "capabilityVersion": "1"
-    },
-    {
-      "capabilityId": "slop.internal.fightguy.dragon-beam.v1",
-      "capabilityVersion": "1"
     }
   ],
   "slots": [
@@ -228,7 +224,8 @@
                   "stunTicks": 14,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -286,7 +283,8 @@
                   "stunTicks": 12,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -311,7 +309,8 @@
                   "stunTicks": 16,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -369,7 +368,8 @@
                   "stunTicks": 18,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -427,7 +427,8 @@
                   "stunTicks": 18,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 1
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -452,7 +453,8 @@
                   "stunTicks": 12,
                   "durationTicks": 20,
                   "interruptible": true,
-                  "hitGroup": 1
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -510,7 +512,8 @@
                   "stunTicks": 18,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -568,7 +571,8 @@
                   "stunTicks": 20,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -595,6 +599,8 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.85,
@@ -624,7 +630,8 @@
                   "stunTicks": 26,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -651,6 +658,8 @@
             "landingLagTicks": 12,
             "autoCancelBeforeTicks": 5,
             "autoCancelAfterTicks": 38,
+            "attackRange": 0,
+            "warpRange": 0,
             "useTargetLock": true,
             "rotateTowardTarget": true,
             "trackingStrength": 0.8,
@@ -680,7 +689,8 @@
                   "stunTicks": 26,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -708,6 +718,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.ki-shot"
             ],
@@ -757,6 +772,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.rising-dragon"
             ],
@@ -795,7 +815,8 @@
                   "stunTicks": 22,
                   "durationTicks": 25,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -820,7 +841,8 @@
                   "stunTicks": 22,
                   "durationTicks": 25,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               },
               {
@@ -845,7 +867,8 @@
                   "stunTicks": 22,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -872,6 +895,11 @@
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.cyclone-kick"
             ],
@@ -912,11 +940,11 @@
     },
     {
       "id": "ground.F",
-      "name": "Dragon Beam",
-      "description": "Dragon Beam",
+      "name": "Fist of Fury",
+      "description": "A rapid punch flurry that drags victims in before a heavy right-foot finisher.",
       "iconId": "icon.f",
-      "behavior": "projectile",
-      "aimMode": "cameraForward3D",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
       "aimMovement": "fixed",
       "cooldownTicks": 1200,
       "isRecoveryMove": false,
@@ -924,33 +952,226 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 28,
+            "durationTicks": 120,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
-              "anim.dragon-beam"
+              "anim.fist-of-fury"
             ],
             "operations": [
               {
-                "kind": "startCapability",
-                "tick": 0,
-                "unit": "ticks",
-                "capabilityId": "slop.internal.fightguy.dragon-beam.v1",
-                "capabilityVersion": "1",
-                "parameters": {
-                  "durationTicks": 28,
-                  "fireTick": 24,
-                  "launchOffsetY": 1.2,
-                  "beamRange": 18,
-                  "beamRadius": 0.45,
-                  "damage": 14,
-                  "knockbackAngle": 20,
-                  "knockbackBase": 18,
-                  "knockbackGrowth": 10,
+                "kind": "spawnHitbox",
+                "tick": 10,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 20,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 28,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 36,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 44,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 4,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 52,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.left-hand",
+                  "endBoneId": null,
+                  "damage": 2,
+                  "angle": 8,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "durationTicks": 4,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "towardOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 85,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.3,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.right-foot",
+                  "endBoneId": null,
+                  "damage": 12,
+                  "angle": 28,
+                  "baseKnockback": 12,
+                  "knockbackGrowth": 36,
                   "stunTicks": 24,
-                  "hitboxDurationTicks": 2
+                  "durationTicks": 12,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 60,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 0.7,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0.3,
+                  "startBoneId": "bone.right-hand",
+                  "endBoneId": null,
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 11,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

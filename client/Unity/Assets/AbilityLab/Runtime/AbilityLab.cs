@@ -36,8 +36,10 @@ namespace SlopArena.Client.Tools
         // ── Selection state ──
         public CharacterClass Character { get; private set; } = CharacterClass.None;
         public string SelectedPackageId { get; private set; } = "";
+        public string SelectedPackageHash { get; private set; } = "";
         public string SelectedSlotId { get; private set; } = "";
-        public bool IsPackagePreview => AuthoritativePreview && !string.IsNullOrEmpty(SelectedPackageId);
+        private bool _packagePreviewAvailable;
+        public bool IsPackagePreview => _packagePreviewAvailable && !string.IsNullOrEmpty(SelectedPackageId);
         public int SlotIndex { get; private set; }
         public bool Airborne { get; private set; }
         public int StageIndex { get; private set; }
@@ -73,7 +75,24 @@ namespace SlopArena.Client.Tools
         public string PreviewStatus { get; private set; } = "Legacy";
         private CharacterAnimationCatalog _previewAnimationCatalog;
         private GameObject _previewRig;
-        public PlayerRenderer Renderer { get; private set; } = null!;
+        [SerializeField] private PlayerRenderer _previewRenderer;
+        [SerializeField] private PlayerRenderer _dummyRenderer;
+        public PlayerRenderer Renderer
+        {
+            get
+            {
+                EnsurePreviewRenderers();
+                return _previewRenderer;
+            }
+        }
+        public PlayerRenderer DummyRenderer
+        {
+            get
+            {
+                EnsurePreviewRenderers();
+                return _dummyRenderer;
+            }
+        }
         public HurtboxBoneDef[] WorkingDefs { get; private set; } = Array.Empty<HurtboxBoneDef>();
         /// <summary>Per-(slot, airborne, stage) hitbox event edits (key = "slot:airborne:stage").</summary>
         public Dictionary<string, HitboxEvent[]> WorkingEvents { get; private set; } = new();
@@ -85,7 +104,6 @@ namespace SlopArena.Client.Tools
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
         private readonly List<(Vector3 pos, char phase)> _trajectory = new();
-        private PlayerRenderer _dummyRenderer = null!;
         private WeaponAttach _weaponAttach;
         private WeaponAttach _dummyWeaponAttach;
         private float _playAccum;
@@ -95,26 +113,74 @@ namespace SlopArena.Client.Tools
         private Vector3 _orbitPivot;
         // Undo/redo stores complete source DTOs; WorkingEvents remains a render projection.
         private const int MaxUndoDepth = 50;
+        private CookedCharacterPackage? _liveDraftPackage;
         private CharacterPackageSource? _sourceDocument;
+        private CharacterAssetCatalog.PresentationBinding[] _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
+        private readonly AbilityLabPresentationPreviewer _presentationPreviewer = new();
         private readonly Stack<CharacterPackageSource> _undo = new();
         private readonly Stack<CharacterPackageSource> _redo = new();
         public bool CanUndo => _undo.Count > 0;
         public bool CanRedo => _redo.Count > 0;
+        public int PresentationPreviewInstanceCount => _presentationPreviewer.ActiveInstanceCount;
+        public IReadOnlyCollection<GameObject> PresentationPreviewInstances => _presentationPreviewer.ActiveInstances;
 
         private void Awake()
         {
             Instance = this;
+            EnsurePreviewRenderers();
             EnsureCamera();
+        }
+
+        private void EnsurePreviewRenderers()
+        {
+            _previewRenderer = EnsurePreviewRenderer(_previewRenderer, "LabCharacter");
+            _dummyRenderer = EnsurePreviewRenderer(_dummyRenderer, "LabDummy");
+        }
+
+        private PlayerRenderer EnsurePreviewRenderer(PlayerRenderer current, string slotName)
+        {
+            if (current != null && current.transform.parent == transform)
+                return current;
+
+            Transform named = transform.Find(slotName);
+            if (named != null)
+            {
+                var namedRenderer = named.GetComponent<PlayerRenderer>();
+                if (namedRenderer != null && namedRenderer != _previewRenderer && namedRenderer != _dummyRenderer)
+                    return namedRenderer;
+                if (namedRenderer == null)
+                    return named.gameObject.AddComponent<PlayerRenderer>();
+            }
+
+            var existing = GetComponentsInChildren<PlayerRenderer>(true)
+                .FirstOrDefault(candidate => candidate != null
+                    && candidate.transform.parent == transform
+                    && candidate != _previewRenderer
+                    && candidate != _dummyRenderer);
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject(slotName);
+            go.transform.SetParent(transform, false);
+            return go.AddComponent<PlayerRenderer>();
         }
 
         private void OnDestroy()
         {
-            DestroyRenderer();
+            _presentationPreviewer.Clear();
+            ReleaseRendererAttachments();
             DestroyPreviewCatalog();
             if (Instance == this) Instance = null;
         }
 
-        // ── Lifecycle ──
+        private void ReleaseRendererAttachments()
+        {
+            _weaponAttach?.Init(null, null);
+            _dummyWeaponAttach?.Init(null, null);
+            _weaponAttach = null;
+            _dummyWeaponAttach = null;
+        }
+
 
         private void Update()
         {
@@ -263,10 +329,11 @@ namespace SlopArena.Client.Tools
             var loadedDef = entry.Definition;
             var loadedBaked = LoadBaked(loadedDef);
             var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
-
             Character = entry.LegacySelector ?? CharacterClass.None;
             SelectedPackageId = "";
+            SelectedPackageHash = "";
             SelectedSlotId = "";
+            _packagePreviewAvailable = false;
             Def = loadedDef;
             Baked = loadedBaked;
             WorkingDefs = loadedWorkingDefs;
@@ -280,8 +347,11 @@ namespace SlopArena.Client.Tools
             ShowBakedBones = false;
             ShowDummy = false;
             _sourceDocument = null;
+            _presentationPreviewer.Clear();
+            _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
             DestroyPreviewCatalog();
             _previewRig = null;
+            SpawnRenderer();
 
             Airborne = false;
             SlotIndex = SlotIndices[0];
@@ -302,13 +372,13 @@ namespace SlopArena.Client.Tools
                 ApplyPreviewUnavailable(result?.Diagnostics ?? Array.Empty<CharacterDiagnostic>());
                 return;
             }
-
             ApplyPackageData(
                 result.Package,
                 result.BakedPoses,
                 result.AnimationCatalog,
                 result.Rig,
-                result.Identity.PackageId);
+                result.Identity.PackageId,
+                result.Identity.PackageHash);
         }
 
         public void ApplyCookedPackagePreview(
@@ -330,7 +400,7 @@ namespace SlopArena.Client.Tools
 
             if (authoritative)
             {
-                ApplyPackageData(package, baked, animationCatalog, rig, package.Metadata.PackageId);
+                ApplyPackageData(package, baked, animationCatalog, rig, package.Metadata.PackageId, "");
                 return;
             }
 
@@ -340,6 +410,7 @@ namespace SlopArena.Client.Tools
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, legacySelector);
             Character = legacySelector;
             SelectedPackageId = "";
+            SelectedPackageHash = "";
             SelectedSlotId = "";
             Def = definition;
             Baked = baked;
@@ -359,17 +430,101 @@ namespace SlopArena.Client.Tools
             RefreshPose();
         }
 
+        public void ApplyPackageDraftPreview(CookedCharacterPackage package, AbilityLabPackagePreviewResult persistedPreview)
+        {
+            if (package == null || persistedPreview == null || !persistedPreview.IsAvailable ||
+                persistedPreview.BakedPoses == null || persistedPreview.AnimationCatalog == null ||
+                persistedPreview.Rig == null || persistedPreview.Identity == null ||
+                package.Metadata == null || package.Definition == null ||
+                package.Metadata.PackageId != persistedPreview.Identity.PackageId)
+            {
+                MarkPackageDraftInvalid();
+                return;
+            }
+
+            if (ReferenceEquals(_liveDraftPackage, package) && IsPackagePreview)
+                return;
+
+            var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
+            string priorSlotId = SelectedSlotId;
+            int priorStage = StageIndex;
+            ushort priorTick = Tick;
+            int priorHitbox = SelectedHitboxEventIndex;
+            if (!CanonicalSlotProjection.TryGet(priorSlotId, out var priorAddress) ||
+                definition.GetSlotAbility(SlotIndices[Array.IndexOf(SlotNames, priorAddress.InputLabel)], priorAddress.IsAirborne) == null)
+                priorAddress = CanonicalSlotProjection.All[0];
+
+            int labelIndex = Array.IndexOf(SlotNames, priorAddress.InputLabel);
+            var spec = definition.GetSlotAbility(SlotIndices[labelIndex], priorAddress.IsAirborne);
+            if (spec?.Stages == null || spec.Stages.Length == 0)
+            {
+                MarkPackageDraftInvalid();
+                return;
+            }
+
+            if (!ReferenceEquals(_previewAnimationCatalog, persistedPreview.AnimationCatalog))
+            {
+                DestroyPreviewCatalog();
+                _previewAnimationCatalog = persistedPreview.AnimationCatalog;
+            }
+            _previewRig = persistedPreview.Rig;
+            Character = CharacterClass.None;
+            SelectedPackageId = package.Metadata.PackageId;
+            SelectedSlotId = priorAddress.Id;
+            Airborne = priorAddress.IsAirborne;
+            SlotIndex = SlotIndices[labelIndex];
+            Def = definition;
+            Baked = persistedPreview.BakedPoses;
+            WorkingDefs = definition.HurtboxBoneDefs != null
+                ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone()
+                : Array.Empty<HurtboxBoneDef>();
+            DisplayDef = definition;
+            AuthoritativePreview = false;
+            _packagePreviewAvailable = true;
+            _liveDraftPackage = package;
+            PreviewStatus = "Live draft";
+            WorkingEvents = new Dictionary<string, HitboxEvent[]>();
+            WorkingHitstopOverrides = new Dictionary<string, float>();
+            StageIndex = Mathf.Clamp(priorStage, 0, spec.Stages.Length - 1);
+            var stage = spec.Stages[StageIndex];
+            Tick = (ushort)Mathf.Clamp(priorTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
+            int hitboxCount = stage.HitboxEvents?.Length ?? 0;
+            SelectedHitboxEventIndex = priorHitbox >= 0 && priorHitbox < hitboxCount ? priorHitbox : -1;
+            if (Renderer == null) SpawnRenderer();
+            else
+            {
+                UpdateRendererDefinition(Renderer, DisplayDef, "LabCharacter");
+                if (_dummyRenderer != null) UpdateRendererDefinition(_dummyRenderer, DisplayDef, "LabDummy");
+            }
+            RefreshPose();
+        }
+        public void MarkPackageDraftInvalid()
+        {
+            _packagePreviewAvailable = false;
+            _liveDraftPackage = null;
+            AuthoritativePreview = false;
+            PreviewStatus = "Draft invalid";
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                EditorApplication.QueuePlayerLoopUpdate();
+                SceneView.RepaintAll();
+            }
+#endif
+        }
         private void ApplyPackageData(
             CookedCharacterPackage package,
             BakedAnimationData baked,
             CharacterAnimationCatalog animationCatalog,
             GameObject rig,
-            string packageId)
+            string packageId,
+            string packageHash)
         {
             DestroyPreviewCatalog();
             _previewAnimationCatalog = animationCatalog;
             _previewRig = rig;
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
+            SelectedPackageHash = packageHash;
             Character = CharacterClass.None;
             SelectedPackageId = packageId;
             Def = definition;
@@ -377,6 +532,7 @@ namespace SlopArena.Client.Tools
             WorkingDefs = definition.HurtboxBoneDefs != null ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
             DisplayDef = definition;
             AuthoritativePreview = true;
+            _packagePreviewAvailable = true;
             PreviewStatus = "Authoritative";
             ShowHurtboxes = false;
             ShowHitboxes = true;
@@ -391,19 +547,22 @@ namespace SlopArena.Client.Tools
 
         public void ApplyPreviewUnavailable(IReadOnlyList<CharacterDiagnostic> diagnostics)
         {
-            DestroyRenderer();
+            _presentationPreviewer.Clear();
+            _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
+            ReleaseRendererAttachments();
             DestroyPreviewCatalog();
             _previewRig = null;
             Character = CharacterClass.None;
             SelectedPackageId = "";
+            SelectedPackageHash = "";
             SelectedSlotId = "";
             Def = null;
             DisplayDef = null;
             Baked = null;
             WorkingDefs = Array.Empty<HurtboxBoneDef>();
             WorkingEvents = new Dictionary<string, HitboxEvent[]>();
-            WorkingHitstopOverrides = new Dictionary<string, float>();
             AuthoritativePreview = false;
+            _packagePreviewAvailable = false;
             PreviewStatus = "Preview unavailable";
             StageIndex = 0;
             Tick = 0;
@@ -423,28 +582,6 @@ namespace SlopArena.Client.Tools
             _previewAnimationCatalog = null;
         }
 
-        private void DestroyRenderer()
-        {
-            if (Renderer != null)
-            {
-                _weaponAttach?.Init(null, null);
-                DestroyPreviewObject(Renderer.gameObject);
-                Renderer = null;
-            }
-            if (_dummyRenderer != null)
-            {
-                _dummyWeaponAttach?.Init(null, null);
-                DestroyPreviewObject(_dummyRenderer.gameObject);
-                _dummyRenderer = null;
-            }
-        }
-
-        private static void DestroyPreviewObject(UnityEngine.Object value)
-        {
-            if (value == null) return;
-            if (Application.isPlaying) UnityEngine.Object.Destroy(value);
-            else UnityEngine.Object.DestroyImmediate(value);
-        }
 
         public void MarkPreviewNonAuthoritative()
         {
@@ -506,26 +643,13 @@ namespace SlopArena.Client.Tools
         private void SpawnRenderer()
         {
             ClearPreviewSelection();
-            if (Renderer != null)
-            {
-                _weaponAttach?.Init(null, null);
-                DestroyPreviewObject(Renderer.gameObject);
-            }
-            var go = new GameObject("LabCharacter");
-            go.transform.SetParent(transform, false);
-            Renderer = go.AddComponent<PlayerRenderer>();
-            ConfigureRenderer(Renderer, DisplayDef, "LabCharacter");
-            Renderer.transform.position = BasePosition();
-            _weaponAttach = AttachWeapon(Renderer, DisplayDef);
+            EnsurePreviewRenderers();
+            if (DisplayDef == null) return;
 
-            if (_dummyRenderer != null)
-            {
-                _dummyWeaponAttach?.Init(null, null);
-                DestroyPreviewObject(_dummyRenderer.gameObject);
-            }
-            var dgo = new GameObject("LabDummy");
-            dgo.transform.SetParent(transform, false);
-            _dummyRenderer = dgo.AddComponent<PlayerRenderer>();
+            ConfigureRenderer(_previewRenderer, DisplayDef, "LabCharacter");
+            _previewRenderer.transform.position = BasePosition();
+            _weaponAttach = AttachWeapon(_previewRenderer, DisplayDef);
+
             ConfigureRenderer(_dummyRenderer, DisplayDef, "LabDummy");
             PositionDummy();
             _dummyRenderer.gameObject.SetActive(ShowDummy);
@@ -563,6 +687,12 @@ namespace SlopArena.Client.Tools
             renderer.SetCharacterDefinition(def);
             renderer.LoadModel(def, _previewRig);
         }
+
+        private void UpdateRendererDefinition(PlayerRenderer renderer, CharacterDefinition def, string name)
+        {
+            ConfigureRenderer(renderer, def, name);
+        }
+
 
         private Vector3 BasePosition() => transform.position + new Vector3(0f, Def.CapsuleHeight * 0.5f, 0f);
         private Vector3 DummyPosition()
@@ -939,6 +1069,37 @@ namespace SlopArena.Client.Tools
 
         // ── Scrub / edit ──
 
+        // Source timeline data remains the package authoring document; the cooked definition does not retain presentation IDs.
+        private CharacterStageSource? CurrentSourceStage()
+        {
+            if (_sourceDocument == null || !IsPackagePreview || string.IsNullOrEmpty(SelectedSlotId))
+                return null;
+
+            string current = SelectedSlotId;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (visited.Add(current))
+            {
+                var slot = _sourceDocument.Character.Slots?.FirstOrDefault(candidate => candidate != null && candidate.Id == current);
+                if (slot != null)
+                    return slot.Timeline?.Stages != null && StageIndex >= 0 && StageIndex < slot.Timeline.Stages.Count
+                        ? slot.Timeline.Stages[StageIndex]
+                        : null;
+                var alias = _sourceDocument.Character.Aliases?.FirstOrDefault(candidate => candidate != null && candidate.From == current);
+                if (alias == null) break;
+                current = alias.To;
+            }
+            return null;
+        }
+
+        public void SetPresentationBindings(CharacterAssetCatalog.PresentationBinding[] bindings)
+        {
+            _presentationBindings = bindings ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>();
+            _presentationPreviewer.SetBindings(_presentationBindings);
+            RefreshPose();
+        }
+
+        public void InvalidatePresentationPreview() => RefreshPose();
+
         /// <summary>
         /// Pose the mesh at the current tick using the game's playback mapping:
         /// clip progress = tick / DurationTicks (equivalent to the server's
@@ -946,22 +1107,27 @@ namespace SlopArena.Client.Tools
         /// </summary>
         public void RefreshPose()
         {
-            if (Renderer == null || Def == null)
+            EnsurePreviewRenderers();
+            if (_previewRenderer == null || Def == null)
             {
+                _presentationPreviewer.Clear();
                 QueueEditorRefresh();
                 return;
             }
             var spec = CurrentSpec();
             if (spec == null || !TryGetStage(out var stage))
             {
+                _presentationPreviewer.Clear();
                 QueueEditorRefresh();
                 return;
             }
+            _previewRenderer.EnsureModel();
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
-            Renderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
+            _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
             _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick);
             if (_dummyRenderer != null)
             {
+                _dummyRenderer.EnsureModel();
                 _dummyRenderer.gameObject.SetActive(ShowDummy);
                 if (ShowDummy)
                 {
@@ -969,6 +1135,11 @@ namespace SlopArena.Client.Tools
                     PositionDummy();
                 }
             }
+            var sourceStage = CurrentSourceStage();
+            if (sourceStage == null)
+                _presentationPreviewer.Clear();
+            else
+                _presentationPreviewer.SetFrame(sourceStage, Tick, _presentationBindings, _previewRenderer.transform);
             QueueEditorRefresh();
         }
 
@@ -987,7 +1158,6 @@ namespace SlopArena.Client.Tools
         public void SetSourceDocument(CharacterPackageSource source, bool clearHistory = false)
         {
             _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
-            SelectedHitboxEventIndex = -1;
             if (clearHistory) { _undo.Clear(); _redo.Clear(); }
         }
 
@@ -1079,7 +1249,8 @@ namespace SlopArena.Client.Tools
 
         private void OnRenderObject()
         {
-            if ((!Application.isPlaying && !IsPackagePreview) || Def == null) return;
+            if (Def == null) return;
+            if (Character == CharacterClass.None ? !IsPackagePreview : !Application.isPlaying) return;
             var mat = LineMat;
             if (mat == null) return;
             mat.SetPass(0);
