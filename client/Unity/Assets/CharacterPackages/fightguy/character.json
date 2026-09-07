@@ -188,7 +188,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 17,
+            "durationTicks": 25,
             "iasaTicks": 13,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -204,7 +204,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 4,
+                "tick": 6,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -613,11 +613,11 @@
                 "tick": 10,
                 "unit": "meters",
                 "hitbox": {
-                  "shape": "capsule",
+                  "shape": "sphere",
                   "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0,
+                  "offsetZ": 0.25,
                   "endOffsetX": 0,
                   "endOffsetY": 0.2,
                   "endOffsetZ": 0.5,
@@ -713,7 +713,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 24,
+            "durationTicks": 45,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -890,7 +890,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 40,
+            "durationTicks": 70,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,

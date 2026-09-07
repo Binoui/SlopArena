@@ -1,8 +1,11 @@
 using SlopArena.Shared;
 using SlopArena.Client.Camera;
+using SlopArena.Client.Entities;
 using SlopArena.Client.Input;
+using SlopArena.Client.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
 namespace SlopArena.Client.Combat
 {
@@ -11,22 +14,33 @@ namespace SlopArena.Client.Combat
     ///   1. Resolves which AbilitySpec is currently active (just-pressed or held during attack)
     ///   2. Transitions CameraMount mode (Normal / FreeCursor / Aiming)
     ///   3. Activates/deactivates AimCameraMount for CameraForward3D abilities
-    ///   4. Updates AimIndicator for GroundCursor abilities
+    ///   4. Computes GroundCursor/GroundVector aim and drives the presentation views
     ///   5. Returns AimContext for InputController.BuildInputState
     ///
     /// TrainingMatch (and future match types) call Init() once then Evaluate() each tick.
-    /// Zero aim logic leaks back to the caller.
+    /// Zero aim logic leaks back to the caller. Aim input is computed here and never
+    /// depends on any indicator being present — views are write-only consumers.
     /// </summary>
     public class AimHandler : MonoBehaviour
     {
-        [SerializeField] private AimIndicator _aimIndicator;
+        [Header("Views (optional — input works without them)")]
+        [SerializeField] private TargetLockIndicator _targetLockIndicator;
+        [SerializeField] private GroundDestinationIndicator _groundDestinationIndicator;
+        [SerializeField] private ProjectileTrajectoryIndicator _trajectoryIndicator;
+
+        [Header("Camera")]
         [SerializeField] private CameraMount _cameraMount;
         [SerializeField] private AimCameraMount _aimCameraMount;
         [SerializeField] private float _aimSensitivity = 0.15f;
 
+        [Header("Ground cursor")]
+        [SerializeField] private float _minRange = 1f;
+        [SerializeField] private float _maxRange = 12f;
+
         private CameraMode _activeMode = CameraMode.Normal;
         private byte _aimingSlot;
         private Transform _characterTransform;
+        private float _capsuleHeight = 1.3f;
         /// <summary>Cached aim values — persist after key release so server gets right direction during fire delay.</summary>
         private float _lastAimYawRad;
         private float _lastAimPitchRad;
@@ -45,27 +59,78 @@ namespace SlopArena.Client.Combat
         /// <summary>True when a CameraForward3D ability is active — caller draws the crosshair.</summary>
         public bool ShowCrosshair { get; private set; }
 
+        // Last computed ground-cursor destination, kept for UpdateTargetPresentation-free
+        // per-tick view driving in Evaluate.
+        private Vector3 _groundAimTarget;
+        private bool _hasGroundAimTarget;
+
         /// <summary>
-        /// Wire camera into AimIndicator once the scene is ready.
+        /// Wire camera into the aim pipeline once the scene is ready.
         /// Call from OnMatchStart after the camera hierarchy exists.
         /// </summary>
         public void Init(CameraMount cameraMount, UnityEngine.Camera renderCamera, Transform characterTransform, float capsuleHeight)
         {
             _cameraMount = cameraMount;
             _characterTransform = characterTransform;
-            if (_aimIndicator != null)
-            {
-                _aimIndicator.SetCamera(renderCamera);
-                _aimIndicator.SetCharacter(characterTransform, capsuleHeight);
-            }
+            _capsuleHeight = capsuleHeight;
+            EnsureViewComponents();
+            if (_targetLockIndicator != null)
+                _targetLockIndicator.Init(null, renderCamera);
             _cameraMount?.SetMode(CameraMode.Normal);
             _activeMode = CameraMode.Normal;
         }
 
         /// <summary>
+        /// Bind the HUD's dedicated targeting root (call after HUD initialization /
+        /// roster rebuild so the indicator tracks the current panel).
+        /// </summary>
+        public void BindTargetPresentation(VisualElement targetingRoot)
+        {
+            EnsureViewComponents();
+            if (_targetLockIndicator != null)
+            {
+                _targetLockIndicator.Init(targetingRoot, _cameraMount?.RenderCamera);
+                _targetLockIndicator.Clear(immediate: true);
+            }
+        }
+
+        /// <summary>Post-tick target presentation for the projected lock arrow.</summary>
+        public void UpdateTargetPresentation(
+            CharacterState localState,
+            PlayerRenderer target,
+            ushort targetDamagePercent)
+        {
+            if (_targetLockIndicator == null) return;
+            _targetLockIndicator.SetTarget(target, localState.LockOn, targetDamagePercent);
+        }
+
+        /// <summary>
+        /// Immediate lifecycle reset (death/stock reset, match end, teardown, re-Init):
+        /// clears every view, restores camera mode, and clears cached aim state.
+        /// Ordinary key release must NOT call this — cached aim feeds the fire delay.
+        /// </summary>
+        public void ResetPresentation()
+        {
+            _targetLockIndicator?.Clear(immediate: true);
+            _groundDestinationIndicator?.Clear();
+            _trajectoryIndicator?.Clear();
+            _aimCameraMount?.Deactivate();
+            _cameraMount?.SetMode(CameraMode.Normal);
+            _activeMode = CameraMode.Normal;
+            _aimingSlot = 0;
+            _lastAimingSlot = 0;
+            _lastAimYawRad = 0f;
+            _lastAimPitchRad = 0f;
+            _lastAimDistanceCm = 0;
+            _aimScreenOffset = Vector2.zero;
+            _hasGroundAimTarget = false;
+            ShowCrosshair = false;
+        }
+
+        /// <summary>
         /// Resolve aim state for this tick.
         /// Figures out the active aimed ability from player state + just-pressed slot,
-        /// drives camera and indicator, returns an AimContext for BuildInputState.
+        /// drives camera and views, returns an AimContext for BuildInputState.
         /// </summary>
         public AimContext Evaluate(
             CharacterState playerState,
@@ -153,16 +218,15 @@ namespace SlopArena.Client.Combat
                 _cameraMount?.SetMode(desired);
                 _activeMode = desired;
             }
+
             // ── 3. Collect aim data ──
             AimContext ctx = AimContext.None;
             bool isCharging = spec != null && spec.Behavior == AbilityBehavior.ChargeAttack;
+            _hasGroundAimTarget = false;
 
-            if (aimMode == AimMode.GroundCursor && _aimIndicator != null)
+            if (aimMode == AimMode.GroundCursor)
             {
-                _aimIndicator.SetVectorMode(false, 0f, 0f);
-                _aimIndicator.SetAiming(true);
-                _aimIndicator.UpdateAim();
-                var (yawRad, distCm) = _aimIndicator.GetAimInput();
+                var (yawRad, distCm, aimTarget) = ComputeGroundCursorAim();
                 _lastAimDistanceCm = distCm ?? 0;
                 ctx = new AimContext
                 {
@@ -170,14 +234,28 @@ namespace SlopArena.Client.Combat
                     AimYawRad     = yawRad,
                     AimDistanceCm = distCm,
                 };
+
+                // Destination reticle + unchanged trajectory preview.
+                if (aimTarget.HasValue)
+                {
+                    _groundDestinationIndicator?.SetDestination(
+                        aimTarget.Value, aimTarget.Value - _characterTransform.position, 0.8f);
+                    _trajectoryIndicator?.SetTrajectory(
+                        _characterTransform.position, _capsuleHeight, yawRad ?? 0f, (distCm ?? 0) * 0.01f);
+                }
+                else
+                {
+                    _groundDestinationIndicator?.Clear();
+                    _trajectoryIndicator?.Clear();
+                }
             }
-            else if (aimMode == AimMode.GroundVector && _aimIndicator != null)
+            else if (aimMode == AimMode.GroundVector)
             {
                 // Screen-space aim: the direction follows the mouse like a hidden cursor
                 // anchored at the character's screen position. Horizontal AND vertical mouse
                 // movement rotate the indicator naturally (1:1 on screen), instead of a raw
                 // yaw delta which only used horizontal input.
-                _aimScreenOffset += Mouse.current.delta.ReadValue();
+                _aimScreenOffset += Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
                 _aimScreenOffset = Vector2.ClampMagnitude(_aimScreenOffset, AimScreenMaxOffset);
                 if (_aimScreenOffset.sqrMagnitude > AimScreenDeadZone * AimScreenDeadZone)
                 {
@@ -200,25 +278,33 @@ namespace SlopArena.Client.Combat
                         dashWidth = spec.Stages[0].HitboxEvents[0].Radius * 2f;
                 }
 
-                _aimIndicator.SetVectorMode(true, dashDistance, dashWidth);
-                _aimIndicator.SetAiming(true);
-                _aimIndicator.SetVectorAim(_lastAimYawRad);
-                var (yawRad2, distCm2) = _aimIndicator.GetAimInput();
-                _lastAimDistanceCm = distCm2 ?? 0;
+                float yaw = _lastAimYawRad;
+                ushort distCm = (ushort)Mathf.Clamp(dashDistance * 100f, 0f, 6500f);
                 ctx = new AimContext
                 {
                     IsAiming      = true,
-                    AimYawRad     = yawRad2,
-                    AimDistanceCm = distCm2,
+                    AimYawRad     = yaw,
+                    AimDistanceCm = distCm,
                 };
+
+                // Reticle at the dash endpoint + short wedge showing travel direction.
+                if (_characterTransform != null)
+                {
+                    Vector3 dir = new(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+                    Vector3 feetY = _characterTransform.position;
+                    Vector3 destination = feetY + dir * dashDistance;
+                    _groundDestinationIndicator?.SetDestination(destination, dir, dashWidth);
+                    _trajectoryIndicator?.Clear();
+                }
             }
             else
             {
-                if (_aimIndicator != null) _aimIndicator.SetAiming(false);
+                _groundDestinationIndicator?.Clear();
+                _trajectoryIndicator?.Clear();
 
                 if (aimMode == AimMode.CameraForward3D && _aimCameraMount != null)
                 {
-                    Vector2 delta = Mouse.current.delta.ReadValue();
+                    Vector2 delta = Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
                     _aimCameraMount.Tick(_characterTransform);
                     _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity);
 
@@ -255,6 +341,93 @@ namespace SlopArena.Client.Combat
 
             ShowCrosshair = aimMode is AimMode.GroundCursor or AimMode.CameraForward3D;
             return ctx;
+        }
+
+        /// <summary>
+        /// GroundCursor aim: project the mouse to the ground, clamp to the local range
+        /// window, return yaw + distance in cm. Replaces the old AimIndicator.UpdateAim
+        /// raycast — identical numerics; the view is no longer in the input path.
+        /// </summary>
+        private (float? yawRad, ushort? distCm, Vector3? aimTarget) ComputeGroundCursorAim()
+        {
+            if (_characterTransform == null) return (null, null, null);
+
+            var unityCam = _cameraMount?.RenderCamera;
+            if (unityCam == null)
+            {
+                var main = UnityEngine.Camera.main;
+                if (main == null) return (null, null, null);
+                unityCam = main;
+            }
+
+            var mouse = Mouse.current;
+            Vector2 mousePos = mouse != null
+                ? mouse.position.ReadValue()
+                : UnityEngine.Input.mousePosition;
+            var mouseRay = unityCam.ScreenPointToRay(mousePos);
+
+            float groundY = 0f;
+            bool foundGround = false;
+            Vector3 aimTarget = default;
+            if (Physics.Raycast(mouseRay, out var hit, 200f))
+            {
+                if (hit.point.y < 1.0f && hit.point.y > -0.5f)
+                {
+                    groundY = hit.point.y;
+                    aimTarget = hit.point;
+                    foundGround = true;
+                }
+            }
+
+            if (!foundGround && mouseRay.direction.y < 0f)
+            {
+                float t = -mouseRay.origin.y / mouseRay.direction.y;
+                aimTarget = mouseRay.origin + mouseRay.direction * t;
+                aimTarget.y = 0f;
+            }
+            else if (!foundGround)
+            {
+                return (null, null, null);
+            }
+
+            Vector3 toTarget = aimTarget - _characterTransform.position;
+            toTarget.y = 0f;
+            float dist = toTarget.magnitude;
+            if (dist < _minRange)
+            {
+                toTarget = toTarget.normalized * _minRange;
+                dist = _minRange;
+            }
+            else if (dist > _maxRange)
+            {
+                toTarget = toTarget.normalized * _maxRange;
+                dist = _maxRange;
+            }
+            aimTarget = _characterTransform.position + toTarget;
+            aimTarget.y = groundY + 0.05f; // slight offset to avoid z-fight with floor
+
+            _groundAimTarget = aimTarget;
+            _hasGroundAimTarget = true;
+            float yaw = Mathf.Atan2(toTarget.x, toTarget.z);
+            ushort distCm = (ushort)Mathf.Clamp(dist * 100f, 0f, 6500f);
+            return (yaw, distCm, aimTarget);
+        }
+
+        /// <summary>
+        /// Ensure the view components exist. The bracket controller lives on this object;
+        /// destination/trajectory are serialized (prefab-authored) when bound, created
+        /// empty otherwise — views stay optional and never gate input.
+        /// </summary>
+        private void EnsureViewComponents()
+        {
+            if (_targetLockIndicator == null)
+                _targetLockIndicator = gameObject.GetComponent<TargetLockIndicator>()
+                    ?? gameObject.AddComponent<TargetLockIndicator>();
+            if (_groundDestinationIndicator == null)
+                _groundDestinationIndicator = gameObject.GetComponentInChildren<GroundDestinationIndicator>();
+            if (_trajectoryIndicator == null)
+                _trajectoryIndicator = gameObject.GetComponentInChildren<ProjectileTrajectoryIndicator>()
+                    ?? FindFirstObjectByType<ProjectileTrajectoryIndicator>();
         }
     }
 }

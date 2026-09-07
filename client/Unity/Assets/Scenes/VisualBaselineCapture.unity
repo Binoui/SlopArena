@@ -617,6 +617,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _uiDocument: {fileID: 1212363337}
+  _textVfx: {fileID: 0}
 --- !u!114 &1212363337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1384,8 +1385,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 593b115fdf84a5606885ad1261b23c54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _maxRange: 12
-  _minRange: 1
 --- !u!114 &2988542345828366013 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 817566539019222757, guid: 6f653977c7842bb4d98d20ece9f13f85, type: 3}

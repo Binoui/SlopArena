@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 5405415605612007285}
   - component: {fileID: 976343793824947930}
   m_Layer: 0
-  m_Name: AimIndicator
+  m_Name: ProjectileTrajectoryIndicator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

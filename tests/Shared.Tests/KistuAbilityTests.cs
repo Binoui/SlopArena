@@ -6,8 +6,7 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Behaviour tests for Kistu's kit. Normal tier (keys 1-4, ground + air) activation and
-/// damage, plus the specials: E dash self-movement and R rising launcher + charge-stock
-/// (spend / block-when-empty / refund-on-hit).
+/// damage, plus the specials: E rising recovery, R directional dash, and F skyfall.
 /// </summary>
 public class KistuAbilityTests
 {
@@ -32,15 +31,15 @@ public class KistuAbilityTests
     [InlineData((byte)7)] // key "2" — Double Slash (normal)
     [InlineData((byte)8)] // key "3" — Up Slash (normal)
     [InlineData((byte)9)] // key "4" — Heavy Down Slash (normal)
-    [InlineData((byte)4)] // E — Dash Slash
-    [InlineData((byte)5)] // R — Rising Slash
-    [InlineData((byte)6)] // F — Blade Flurry
+[InlineData((byte)4)] // E — Rising Slash
+[InlineData((byte)5)] // R — Dash Slash
+[InlineData((byte)6)] // F — Skyfall
     public void GroundSlot_Activates(byte slot)
     {
         var sim = SimWithPlayer(out _);
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: slot, aiming: true), 1);
-        // E (slot 4) is a hold-to-aim ability: it enters the Aiming state instead of Attacking.
-        ActionState expected = slot == 4 ? ActionState.Aiming : ActionState.Attacking;
+        // R (slot 5) is a hold-to-aim ability: it enters the Aiming state instead of Attacking.
+        ActionState expected = slot == 5 ? ActionState.Aiming : ActionState.Attacking;
         Assert.Equal(expected, t0.State);
         Assert.Equal(slot, t0.AttackSlot);
     }
@@ -84,110 +83,80 @@ public class KistuAbilityTests
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }
 
-    // ── E: directional dash — tap and hold both travel the same set distance (no charge) ──
+    // ── R: directional dash — tap and hold both travel the same set distance ──
 
     [Fact]
-    public void E_TapAndHold_TravelSameSetDistance()
+    public void R_TapAndHold_TravelSameSetDistance()
     {
-        // Tap: press and release immediately.
         var tapSim = SimWithPlayer(out _);
-        tapSim.Tick(new() { { 1, new InputState { ActiveSlot = 4, IsAiming = true, AimYaw = 0 } } });
+        tapSim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 0 } } });
         tapSim.Tick(new() { { 1, new InputState { IsAiming = false, AimYaw = 0 } } });
         for (int i = 0; i < 60; i++) tapSim.Tick(new() { { 1, default } });
         float tapPZ = tapSim.GetState(1).PZ;
 
-        // Hold: aim until the max-aim auto-release (180 ticks), then the dash runs.
         var holdSim = SimWithPlayer(out _);
-        holdSim.Tick(new() { { 1, new InputState { ActiveSlot = 4, IsAiming = true, AimYaw = 0 } } });
+        holdSim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 0 } } });
         var hold = new InputState { IsAiming = true, AimYaw = 0 };
-        for (int i = 0; i < 200; i++) holdSim.Tick(new() { { 1, hold } });
+        for (int i = 0; i < 80; i++) holdSim.Tick(new() { { 1, hold } });
         float holdPZ = holdSim.GetState(1).PZ;
 
-        // Set distance: the E dash always covers 5 m, independent of hold time.
         Assert.True(MathF.Abs(tapPZ - 5f) < 0.1f, $"tap dash should cover 5 m, got PZ={tapPZ:F2}");
         Assert.True(MathF.Abs(holdPZ - 5f) < 0.1f, $"hold dash should cover 5 m, got PZ={holdPZ:F2}");
     }
 
-    // ── R: rising slash lifts Kistu off the ground (vertical recovery) ──
+    // ── E: rising slash lifts Kistu off ground as recovery ──
 
     [Fact]
-    public void R_RisesOffGround()
+    public void E_RisesOffGround()
     {
         var sim = SimWithPlayer(out _);
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) } });
         for (int i = 0; i < 10; i++) sim.Tick(new() { { 1, default } });
         var s = sim.GetState(1);
         Assert.False(s.IsGrounded);
         Assert.True(s.PY > GroundPY + 1f, $"expected Kistu to rise above {GroundPY + 1f:F2}, got {s.PY:F2}");
     }
 
-    // ── R: launches a grounded enemy ──
+    // ── E: launches a grounded enemy ──
 
     [Fact]
-    public void R_LaunchesGroundedEnemy()
+    public void E_LaunchesGroundedEnemy()
     {
         var sim = SimWithPlayer(out _);
         var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
         TestHelpers.RegisterNpc(sim, Def, npc);
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
         for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-        Assert.True(sim.GetState(100).DamagePercent > 0, "R should hit and damage the grounded enemy");
+        Assert.True(sim.GetState(100).DamagePercent > 0, "E should hit and damage the grounded enemy");
     }
 
-    // ── R charge-stock: two whiffs exhaust the pool; the third cast is blocked ──
 
     [Fact]
-    public void R_ChargePool_ExhaustsThenBlocks()
-    {
-        var sim = SimWithPlayer(out _);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
-        for (int i = 0; i < 30; i++) sim.Tick(new() { { 1, default } });
-        Assert.Equal((byte)1, sim.GetState(1).ChargeStockSpent);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
-        for (int i = 0; i < 30; i++) sim.Tick(new() { { 1, default } });
-        Assert.Equal((byte)2, sim.GetState(1).ChargeStockSpent);
-
-        // Pool exhausted (max_charges = 2): third cast must not activate or spend more.
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) } });
-        var s = sim.GetState(1);
-        Assert.Equal((byte)2, s.ChargeStockSpent);
-        Assert.NotEqual((byte)5, s.AttackSlot);
-    }
-
-    // ── R charge-stock: landing a hit refunds the spent charge ──
-
-    [Fact]
-    public void R_RefundsChargeOnHit()
+    public void E_RefundsChargeOnHit()
     {
         var sim = SimWithPlayer(out _);
         var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
         TestHelpers.RegisterNpc(sim, Def, npc);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
         for (int i = 0; i < 24; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
-        Assert.True(sim.GetState(100).DamagePercent > 0, "R should have connected");
-        Assert.Equal((byte)0, sim.GetState(1).ChargeStockSpent); // spent 1, refunded 1
+        Assert.True(sim.GetState(100).DamagePercent > 0, "E should have connected");
+        Assert.Equal((byte)0, sim.GetState(1).ChargeStockSpent);
     }
 
-    // ── R charge-stock: refund-to-empty clears the regen timer (no stale partial) ──
-
     [Fact]
-    public void R_RefundToEmpty_ClearsRegenTimer()
+    public void E_RefundToEmpty_ClearsRegenTimer()
     {
         var sim = SimWithPlayer(out _);
         var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
         TestHelpers.RegisterNpc(sim, Def, npc);
 
-        // Spend one charge, then land the hit — refund brings the pool back to full.
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 5) }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
         for (int i = 0; i < 24; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
         var s = sim.GetState(1);
         Assert.Equal((byte)0, s.ChargeStockSpent);
-        // Timer must be cleared (not a stale partial countdown) so the next spend gets a full period.
         Assert.Equal((ushort)0, s.ChargeStockRegenTicks);
     }
 

@@ -265,6 +265,8 @@ namespace SlopArena.Client.World
         /// <summary>Rebuild the HUD and lock indicator after the NPC roster changes.</summary>
         private void RebuildRosterVisuals()
         {
+            // Roster rebuild may destroy the currently marked NPC renderer.
+            _aimHandler?.UpdateTargetPresentation(_bridge.GetState(PlayerEntityId), null, 0);
             SetupHUD(_playerDef, HudExtraPlayers());
             if (_lockIndicator != null)
                 Destroy(_lockIndicator.gameObject);
@@ -416,6 +418,19 @@ namespace SlopArena.Client.World
                     npc.Renderer.ApplyServerState(_bridge.GetState(npc.Id));
             }
             PresentTimelineEvents();
+
+            var targetState = _bridge.GetState(PlayerEntityId);
+            PlayerRenderer targetRenderer = null;
+            if (targetState.TargetEntityId != 0)
+            {
+                foreach (var npc in _npcs)
+                    if (npc.Id == targetState.TargetEntityId)
+                        targetRenderer = npc.Renderer;
+            }
+            ushort targetDamagePercent = targetRenderer != null
+                ? _bridge.GetState(targetState.TargetEntityId).DamagePercent
+                : (ushort)0;
+            _aimHandler?.UpdateTargetPresentation(targetState, targetRenderer, targetDamagePercent);
             if (MatchConfig.Mode == GameMode.Solo)
             {
                 var soloPlayer = _bridge.GetState(PlayerEntityId);
@@ -438,7 +453,10 @@ namespace SlopArena.Client.World
                 var outcome = new StockMatchRule((byte)MatchConfig.MaxStocks)
                     .Evaluate(_bridge.GetAllStates());
                 if (outcome.IsEnded)
+                {
+                    _aimHandler?.ResetPresentation();
                     BuildSoloResults(outcome);
+                }
             }
         }
 

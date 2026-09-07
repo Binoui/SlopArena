@@ -10,7 +10,7 @@ namespace SlopArena.Client.UI
         public static SlopArena.Shared.CharacterClass PlayerClass
             = SlopArena.Shared.CharacterClass.FightGuy;
         public static string PlayerPackageId = "fightguy";
-        public static string ArenaName = "slop_court";
+        public static string ArenaName = "training";
         public static bool IsHost = true;
         public static string ServerIP = "127.0.0.1";
         public static int ServerPort = 9876;
@@ -54,7 +54,7 @@ namespace SlopArena.Client.UI
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloBotClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloCpuLevel = 5;
-            ArenaName = "slop_court";
+            ArenaName = "training";
             IsHost = true;
             ServerIP = "127.0.0.1";
             ServerPort = 9876;

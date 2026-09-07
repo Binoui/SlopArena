@@ -7,23 +7,10 @@ using UnityEngine;
 namespace SlopArena.Client.Combat
 {
     /// <summary>
-    /// Combat spatial-readability indicators, one set per player entity (ADR-0018 /
-    /// issue #127). Driven by a getState func (local sim and rollback bridge alike)
-    /// and the renderers' tracked positions each frame:
-    ///
-    /// 1. Ground-shadow ring — pinned to the arena heightmap surface at the player's XZ,
-    ///    so you can read position even when airborne above you. White by default; red
-    ///    under the local player's lock target (CharacterState.LockOn + TargetEntityId).
-    /// 2. Height tether — a vertical line from the ring up to the lock target's model,
-    ///    shown whenever that target is airborne. Makes the airborne Y/Z height
-    ///    readable throughout a jump, not only during hitstun.
-    /// 3. Launch arc — when any entity is launched (State == Hitstun with knockback
-    ///    velocity), predict its flight to landing through the real flight law
-    ///    (ServerSimulation + the same arena/def the live sim uses) and expose the
-    ///    trajectory as editor gizmos. It is intentionally absent from gameplay.
-    ///
-    /// A ring hides while its player is off the heightmap grid (knocked out of the arena).
-    /// The height tether remains a runtime renderer for the locked target while airborne.
+    /// Neutral spatial floor rings, one per player entity. Pinned to the arena heightmap
+    /// surface so position stays readable while airborne; hidden off-grid. Selection and
+    /// lock feedback moved to TargetLockIndicator (targeting pass 1). The launch
+    /// trajectory remains editor gizmos only, never gameplay.
     /// </summary>
     public class TargetIndicator : MonoBehaviour
     {
@@ -42,12 +29,8 @@ namespace SlopArena.Client.Combat
                 Mesh = mesh;
             }
         }
-
         private const float RingHeightAboveFloor = 0.05f;
         private static readonly Color White = new Color(1f, 1f, 1f, 0.5f);
-        private static readonly Color Red = new Color(1f, 0.2f, 0.15f, 0.7f);
-        private static readonly Color TetherColor = new Color(1f, 0.35f, 0.25f, 0.5f);
-
         /// <summary>Min knockback speed that counts as a launch (State == Hitstun).</summary>
         private const float LaunchSpeedThreshold = 0.05f;
         /// <summary>Max ticks to forward-simulate a launch (mirrors AbilityLab, ~40s).</summary>
@@ -57,23 +40,19 @@ namespace SlopArena.Client.Combat
         private Func<ulong, CharacterState> _getState;
         private ArenaHeightmap _heightmap;
         private ArenaDefinition _arena;
-        private ulong _localPlayerId;
 
         // Per-ring indicator state, indexed identically to _rings.
-        private LineRenderer[] _tetherLines = Array.Empty<LineRenderer>();
         private List<(Vector3 pos, char phase)>[] _arcPoints = Array.Empty<List<(Vector3 pos, char phase)>>();
         private bool[] _wasLaunched = Array.Empty<bool>();
         private bool[] _arcActive = Array.Empty<bool>();
 
-        public void Init(Func<ulong, CharacterState> getState, PlayerRenderer[] renderers, ulong localPlayerId, ArenaDefinition arena)
+        public void Init(Func<ulong, CharacterState> getState, PlayerRenderer[] renderers, ArenaDefinition arena)
         {
             _getState = getState;
-            _localPlayerId = localPlayerId;
             _heightmap = arena.Heightmap;
             _arena = arena;
 
             _rings = new Ring[renderers?.Length ?? 0];
-            _tetherLines = new LineRenderer[_rings.Length];
             _arcPoints = new List<(Vector3, char)>[_rings.Length];
             _wasLaunched = new bool[_rings.Length];
             _arcActive = new bool[_rings.Length];
@@ -95,18 +74,12 @@ namespace SlopArena.Client.Combat
                 mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 _rings[i] = new Ring(renderer, ringGO.transform, mr);
                 ringGO.SetActive(false);
-
-                _tetherLines[i] = CreateLine(transform, $"HeightTether_{renderer?.EntityId}", TetherColor);
             }
         }
 
         private void Update()
         {
             if (_getState == null || _rings.Length == 0) return;
-
-            var local = _getState(_localPlayerId);
-            bool locked = local.LockOn;
-            ulong targetId = local.TargetEntityId;
 
             for (int i = 0; i < _rings.Length; i++)
             {
@@ -115,7 +88,6 @@ namespace SlopArena.Client.Combat
                 if (renderer == null)
                 {
                     ring.Transform.gameObject.SetActive(false);
-                    _tetherLines[i].enabled = false;
                     _arcActive[i] = false;
                     continue;
                 }
@@ -126,7 +98,6 @@ namespace SlopArena.Client.Combat
                 {
                     // Off the heightmap grid (knocked out of the arena) — no floor to pin to.
                     ring.Transform.gameObject.SetActive(false);
-                    _tetherLines[i].enabled = false;
                     _arcActive[i] = false;
                     continue;
                 }
@@ -134,29 +105,10 @@ namespace SlopArena.Client.Combat
                 ring.Transform.gameObject.SetActive(true);
                 ring.Transform.position = new Vector3(pos.x, floorY + RingHeightAboveFloor, pos.z);
                 var state = _getState(ring.EntityId);
-                ring.Mesh.material.color = locked && targetId == ring.EntityId ? Red : White;
-                UpdateTether(i, ring, pos, floorY, locked, targetId, state);
                 UpdateLaunchArc(i, ring, state);
             }
         }
 
-        // ── B: height tether ──
-
-        private void UpdateTether(int i, in Ring ring, Vector3 pos, float floorY, bool locked, ulong targetId, in CharacterState state)
-        {
-            bool isLockTarget = locked && targetId == ring.EntityId;
-            bool show = isLockTarget && !state.IsGrounded;
-            if (!show)
-            {
-                _tetherLines[i].enabled = false;
-                return;
-            }
-
-            _tetherLines[i].enabled = true;
-            _tetherLines[i].positionCount = 2;
-            _tetherLines[i].SetPosition(0, new Vector3(pos.x, floorY + RingHeightAboveFloor, pos.z));
-            _tetherLines[i].SetPosition(1, new Vector3(pos.x, pos.y, pos.z));
-        }
 
         // ── A: launch trajectory arc ──
 
@@ -229,25 +181,6 @@ namespace SlopArena.Client.Combat
             return arc;
         }
         // ── Helpers ──
-
-        private static LineRenderer CreateLine(Transform parent, string name, Color color)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            var line = go.AddComponent<LineRenderer>();
-            line.material = new Material(Shader.Find("Sprites/Default"));
-            line.startWidth = 0.05f;
-            line.endWidth = 0.05f;
-            line.useWorldSpace = true;
-            line.numCapVertices = 4;
-            line.alignment = LineAlignment.View;
-            var c = color;
-            c.a = Mathf.Min(c.a, 0.6f);
-            line.startColor = line.endColor = c;
-            line.receiveShadows = false;
-            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            return line;
-        }
 
         private static Color PhaseColor(char phase) => phase switch
         {

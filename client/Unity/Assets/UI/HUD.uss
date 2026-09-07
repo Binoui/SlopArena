@@ -386,3 +386,36 @@
     background-color: #4b231e;
     border-bottom-color: #ffc821;
 }
+
+/* ── Locked target readout ──────────────────────────────────────────────── */
+.target-lock {
+    position: absolute;
+    display: none;
+    width: 60px;
+    height: 44px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.target-lock.visible {
+    display: flex;
+}
+
+.target-lock-arrow {
+    color: #EF4444;
+    height: 16px;
+    font-size: 17px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.target-lock-damage {
+    color: #FFFCEE;
+    height: 28px;
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgba(13, 13, 20, 0.95);
+}

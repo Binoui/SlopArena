@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// THROWAWAY LOOK-DEV GENERATOR. Builds three playable arena prefabs and bakes their
+/// THROWAWAY LOOK-DEV GENERATOR. Builds five playable arena prefabs and bakes their
 /// authoritative collision data. Delete this tool after the layouts are accepted.
 /// </summary>
 public static class GeneratePrototypeArenas
@@ -52,11 +52,10 @@ public static class GeneratePrototypeArenas
         GenerateAfterHours();
         GenerateRecCenterRoof();
         GeneratePicnicPanic();
-        GenerateTrainingLab();
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[PrototypeArenas] Generated and baked five match arenas plus Training Lab.");
+        Debug.Log("[PrototypeArenas] Generated and baked five match arenas.");
     }
 
     private static void GenerateSlopCourt()
@@ -320,70 +319,6 @@ public static class GeneratePrototypeArenas
         SaveAndBake(key, "Picnic Panic", "#657f57", root, boxes, spawns, -12f);
     }
 
-    private static void GenerateTrainingLab()
-    {
-        const string key = "training";
-        var boxes = new[]
-        {
-            new Box("Measurement Floor", new Vector3(0f, -0.25f, 0f), new Vector3(30f, 0.5f, 24f)),
-            new Box("Backstop", new Vector3(0f, 2.5f, 12.25f), new Vector3(30f, 5f, 0.5f)),
-            new Box("Half Meter Block", new Vector3(10f, 0.25f, -6f), new Vector3(3f, 0.5f, 3f)),
-            new Box("One Meter Block", new Vector3(10f, 0.5f, 0f), new Vector3(3f, 1f, 3f)),
-            new Box("Two Meter Block", new Vector3(10f, 1f, 6f), new Vector3(3f, 2f, 3f)),
-        };
-        var spawns = new[]
-        {
-            new Spawn(new Vector3(0f, 0.85f, -2.5f), 0f),
-            new Spawn(new Vector3(0f, 0.85f, 2.5f), 180f),
-            new Spawn(new Vector3(-5f, 0.85f, 0f), 90f),
-            new Spawn(new Vector3(5f, 0.85f, 0f), 270f),
-        };
-
-        var floor = Mat(key, "Floor", new Color(0.30f, 0.36f, 0.40f), 0.18f);
-        var minor = Mat(key, "Minor Lines", new Color(0.42f, 0.47f, 0.48f), 0.10f);
-        var major = Mat(key, "Major Lines", new Color(0.74f, 0.71f, 0.62f), 0.10f);
-        var orange = Mat(key, "Orange", new Color(0.67f, 0.39f, 0.21f), 0.12f);
-        var navy = Mat(key, "Navy", new Color(0.11f, 0.17f, 0.21f), 0.22f);
-        var screen = Mat(key, "Screen", new Color(0.25f, 0.52f, 0.54f), 0.16f, new Color(0.01f, 0.06f, 0.06f));
-
-        var root = NewRoot("Training Lab");
-        root.AddComponent<ArenaAtmosphere>().Configure(
-            new Color(0.48f, 0.60f, 0.66f),
-            new Color(0.58f, 0.64f, 0.65f),
-            new Color(0.24f, 0.28f, 0.29f),
-            0.92f);
-        AddCollisionVisuals(root, boxes, floor, new Dictionary<string, Material>
-        {
-            ["Backstop"] = navy,
-            ["Half Meter Block"] = orange,
-            ["One Meter Block"] = orange,
-            ["Two Meter Block"] = orange,
-        });
-
-        for (int x = -15; x <= 15; x++)
-            Cube(root, $"Grid X {x}", new Vector3(x, 0.035f, 0f), new Vector3(x % 5 == 0 ? 0.08f : 0.025f, 0.04f, 24f), x % 5 == 0 ? major : minor);
-        for (int z = -12; z <= 12; z++)
-            Cube(root, $"Grid Z {z}", new Vector3(0f, 0.036f, z), new Vector3(30f, 0.04f, z % 5 == 0 ? 0.08f : 0.025f), z % 5 == 0 ? major : minor);
-
-        Cube(root, "Origin X", new Vector3(0f, 0.055f, 0f), new Vector3(6f, 0.05f, 0.16f), orange);
-        Cube(root, "Origin Z", new Vector3(0f, 0.056f, 0f), new Vector3(0.16f, 0.05f, 6f), orange);
-        foreach (int angle in new[] { 0, 15, 30, 45, 60, 75, 90 })
-        {
-            float radians = angle * Mathf.Deg2Rad;
-            var direction = new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians));
-            Cube(root, $"Launch Angle {angle}", direction * 4f + new Vector3(0f, 0.06f, 0f), new Vector3(0.06f, 0.045f, 8f), major, new Vector3(0f, angle, 0f));
-        }
-        for (int z = -10; z <= 10; z += 5)
-            Cube(root, $"Distance Marker {z}", new Vector3(-14.3f, 0.4f, z), new Vector3(0.6f, 0.8f, 0.25f), orange);
-
-        Cube(root, "Monitor Cart", new Vector3(-18f, 1.2f, 7f), new Vector3(4f, 2.4f, 2.5f), navy);
-        Cube(root, "Monitor Screen", new Vector3(-18f, 2.8f, 6.6f), new Vector3(3.2f, 1.8f, 0.2f), screen);
-        for (int i = -2; i <= 2; i++)
-            Cylinder(root, "Training Cone", new Vector3(-18f + i * 1.6f, 0.6f, -7f), new Vector3(0.45f, 0.6f, 0.45f), orange);
-        AddSpawnMarkers(root, spawns);
-
-        SaveAndBake(key, "Training Lab", "#59656b", root, boxes, spawns, -12f);
-    }
 
     private static GameObject NewRoot(string name)
     {

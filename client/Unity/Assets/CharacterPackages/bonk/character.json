@@ -163,7 +163,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 35,
+            "durationTicks": 80,
             "iasaTicks": 30,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -222,7 +222,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 42,
+            "durationTicks": 74,
             "iasaTicks": 37,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -281,7 +281,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 38,
+            "durationTicks": 60,
             "iasaTicks": 33,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -340,7 +340,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 58,
+            "durationTicks": 94,
             "iasaTicks": 52,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -569,7 +569,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 56,
+            "durationTicks": 100,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -603,7 +603,7 @@
                   "baseKnockback": 2,
                   "knockbackGrowth": 8,
                   "stunTicks": 8,
-                  "durationTicks": 4,
+                  "durationTicks": 60,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"

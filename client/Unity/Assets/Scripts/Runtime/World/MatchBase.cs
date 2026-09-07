@@ -59,7 +59,11 @@ namespace SlopArena.Client.World
             gameObject.AddComponent<MatchVisualStyle>().Apply();
         }
         private void FixedUpdate() => OnMatchFixedUpdate();
-        protected virtual void OnDestroy() => _timelinePresentations.Clear();
+        protected virtual void OnDestroy()
+        {
+            _aimHandler?.ResetPresentation();
+            _timelinePresentations.Clear();
+        }
 
         // ── Leave match (pause menu) ─────────────────────────────────────────
 
@@ -188,20 +192,21 @@ namespace SlopArena.Client.World
         {
             _aimHandler?.Init(_cameraMount, _cameraMount?.RenderCamera,
                 _playerRenderer.transform, def.CapsuleHeight);
+            _aimHandler?.BindTargetPresentation(_hudManager?.TargetingRoot);
         }
 
         /// <summary>
         /// Instantiate the global ground-shadow indicator (ADR-0018 / issue #127):
-        /// one white ring pinned to the arena floor under every renderer, turning red
-        /// under the local player's lock target. Pass every renderer to mark.
+        /// one neutral ring pinned to the arena floor under every renderer.
         /// </summary>
         protected void SetupLockIndicator(PlayerRenderer[] renderers, ArenaDefinition arena)
         {
             var go = new GameObject("LockTargetIndicator");
             go.transform.SetParent(transform, false);
             var indicator = go.AddComponent<TargetIndicator>();
-            indicator.Init(Bridge.GetState, renderers, PlayerEntityId, arena);
+            indicator.Init(Bridge.GetState, renderers, arena);
         }
+
 
         /// <summary>
         /// Pick the nearest enemy within 20m that is closest to screen center.

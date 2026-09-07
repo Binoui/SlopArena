@@ -82,12 +82,26 @@ Shader "SlopArena/GraphicCharacter"
                 half3 normalWS = normalize(input.normalWS);
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
                 half wrappedLight = saturate(dot(normalWS, mainLight.direction) * 0.5h + 0.5h);
-                half band = wrappedLight < 0.38h ? 0.48h : (wrappedLight < 0.72h ? 0.76h : 1.0h);
-                half3 shadowed = lerp(_ShadowColor.rgb * albedo.rgb, albedo.rgb, band);
+                // Broad, soft steps retain the graphic look without cutting across faces.
+                half band = 0.35h + 0.40h * smoothstep(0.30h, 0.58h, wrappedLight)
+                    + 0.25h * smoothstep(0.65h, 0.88h, wrappedLight);
+                half3 diffuseTint = lerp(_ShadowColor.rgb, half3(1, 1, 1), band);
                 half3 viewDir = SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
-                half rim = pow(saturate(1.0h - dot(normalWS, viewDir)), _RimPower) * _RimStrength;
-                half shadowAttenuation = lerp(0.72h, 1.0h, mainLight.shadowAttenuation);
-                half3 color = shadowed * mainLight.color * shadowAttenuation + _RimColor.rgb * rim;
+                half shadowAttenuation = lerp(0.45h, 1.0h, mainLight.shadowAttenuation);
+                half3 ambient = max(SampleSH(normalWS), half3(0, 0, 0));
+                half3 color = albedo.rgb * (ambient
+                    + diffuseTint * mainLight.color * shadowAttenuation);
+
+                // A restrained satin highlight gives volume without a wet/plastic finish.
+                half3 halfDir = SafeNormalize(mainLight.direction + viewDir);
+                half highlight = pow(saturate(dot(normalWS, halfDir)), 32.0h)
+                    * smoothstep(0.45h, 0.75h, wrappedLight);
+                color += mainLight.color * highlight * 0.16h * mainLight.shadowAttenuation;
+
+                // Keep player colour on the silhouette, not across the entire material.
+                half rim = pow(saturate(1.0h - dot(normalWS, viewDir)), _RimPower + 1.5h)
+                    * _RimStrength * 0.4h;
+                color += _RimColor.rgb * rim;
                 return half4(color, albedo.a);
             }
             ENDHLSL

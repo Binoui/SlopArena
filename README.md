@@ -6,7 +6,7 @@ SlopArena takes the platform-fighter fundamentals of movement, damage percent, r
 
 The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked roster characters: FightGuy, Manki, Kistu, and Bonk. Nilus remains a legacy compatibility implementation, not a fifth demo character. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
+> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked demo-roster packages: FightGuy, Manki, Kistu, and Bonk. Package admission does not prove kit completeness or player acceptance. Nilus remains a legacy compatibility implementation, not part of the four-character demo roster. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
 
 ## The game
 
@@ -23,14 +23,13 @@ Each kit has a canonical **16-entry grid**: grounded and aerial variants for nor
 
 | Fighter | Style | Content status |
 | --- | --- | --- |
-| **FightGuy** | Direct martial-arts fundamentals, projectile, launcher, and beam | Cooked package; rostered |
-| **Manki** | Agile rushdown and explosive space control | Cooked package; rostered |
-| **Kistu** | Sword pressure and counterplay | Cooked package; rostered |
-| **Bonk** | — | Cooked package; rostered |
-| **Nilus** | Void-based zoning and control | Legacy compatibility implementation |
+| [**FightGuy**](docs/characters/fightguy.md) | Close-range martial-arts brawler with Ki Shot, Rising Dragon, Cyclone Kick, and Fist of Fury | Admitted cooked package |
+| [**Manki**](docs/characters/manki.md) | Explosive all-rounder / jetpack-bazooka skirmisher with bombs and aerosol area denial | Admitted cooked package |
+| [**Kistu**](docs/characters/kistu.md) | Mid-range kitsune sword-spacing duelist focused on launches and air juggles | Admitted cooked package |
+| [**Bonk**](docs/characters/bonk.md) | Greatsword fighter with sword-reach normals, targeted jump-slam recovery, and Blade Storm | Admitted cooked package; avatar visual/pose review pending |
+| [**Nilus**](docs/characters/nilus.md) | Legacy compatibility implementation | Not part of the four-character demo roster |
 
-Nilus is compatibility-only and is not a fifth playable demo character.
-See the [FightGuy package reference](docs/characters/fightguy.md) and the [character roster](docs/README.md#character-roster) for details.
+Package admission identifies content accepted by the cooked roster manifest; it does not by itself establish kit completeness or player acceptance.
 
 ## Development
 

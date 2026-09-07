@@ -156,6 +156,10 @@ namespace SlopArena.Client.UI
         private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
         private VisualElement _actionBar;
+        public VisualElement TargetingRoot
+            => _uiDocument != null
+                ? _uiDocument.rootVisualElement.Q<VisualElement>("target-lock-indicator")
+                : null;
 
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
@@ -215,9 +219,9 @@ namespace SlopArena.Client.UI
 
                 if (!p.IsLocal)
                 {
-                    var panel = BuildOverheadPanel(p, i);
-                    _panels[p.EntityId] = panel;
-                    _overheadLayer?.Add(panel.Root);
+                    // TargetLockIndicator owns the only in-world opponent damage readout.
+                    // Keep the scoreboard/billboard percent; do not create a duplicate
+                    // floating VFX percent here.
                 }
                 else
                 {

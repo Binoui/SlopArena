@@ -188,7 +188,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 17,
+            "durationTicks": 30,
             "iasaTicks": 13,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -204,14 +204,14 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 4,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
                   "radius": 0.35,
                   "offsetX": 0,
-                  "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetY": 0.3,
+                  "offsetZ": 0.3,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -332,7 +332,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 25,
+            "durationTicks": 50,
             "iasaTicks": 22,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -348,13 +348,13 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 5,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
                   "radius": 0.4,
                   "offsetX": 0,
-                  "offsetY": 0,
+                  "offsetY": 0.2,
                   "offsetZ": 0.21,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
@@ -476,7 +476,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 29,
+            "durationTicks": 38,
             "iasaTicks": 25,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -492,13 +492,13 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 7,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
                   "radius": 0.4,
                   "offsetX": 0,
-                  "offsetY": 0,
+                  "offsetY": 0.2,
                   "offsetZ": 0.21,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
@@ -506,11 +506,11 @@
                   "startBoneId": "bone.right-foot",
                   "endBoneId": null,
                   "damage": 7,
-                  "angle": 55,
+                  "angle": 25,
                   "baseKnockback": 5,
-                  "knockbackGrowth": 24,
+                  "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 6,
+                  "durationTicks": 10,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"

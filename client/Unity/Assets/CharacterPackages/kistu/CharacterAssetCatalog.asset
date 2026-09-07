@@ -51,11 +51,11 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.kistu.hit-hard
   - _semanticId: anim.kistu.g1
-    _clip: {fileID: 7400000, guid: 4e19647e0b6f4a95a9c095972e17037c, type: 2}
+    _clip: {fileID: 7400000, guid: e76c4d19de06c9439ae8ddd44295afcb, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.kistu.g1
   - _semanticId: anim.kistu.g2
-    _clip: {fileID: 7400000, guid: c373f78fb169761e88123a7e4bb79e87, type: 2}
+    _clip: {fileID: 7400000, guid: 81bbfb12a168d14d2927ba5121dc0c34, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.kistu.g2
   - _semanticId: anim.kistu.g3
@@ -91,7 +91,7 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.kistu.e
   - _semanticId: anim.kistu.r
-    _clip: {fileID: 7400000, guid: 7387f33971650c23b98a4c63b6dbb26c, type: 2}
+    _clip: {fileID: 7400000, guid: af9973c936e7ae75a8fb52cf0b9405af, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.r
   - _semanticId: anim.kistu.f

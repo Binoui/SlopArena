@@ -1,8 +1,20 @@
 # Training Box Stage — Design Spec
 
 **Date:** 2026-08-01
-**Status:** Approved, pending implementation
+**Status:** Superseded by the grey lab rebuild on 2026-09-08; the tutorial below is historical.
 **Owner:** binoui (new to Unity — spec doubles as a build tutorial)
+
+## Current training lab — 2026-09-08
+
+- Neutral grey room: 40 × 40 m interior, 20 m walls, a clear centre, and three 4 × 4 m side platforms at 1, 2, and 3.5 m.
+- Flat texture markings replace raised bars and checkerboards: 1 m grid, stronger 5 m lines, muted red origin axes, distance labels, and platform-height labels.
+- Reduced stage ambient fill and material brightness keep the floor mid-grey rather than near-white.
+- Authoritative source: `client/Unity/Assets/Stages/training/training.unity`; bake with `sloparena.stage.bake --stage training`.
+- Presentation: `client/Unity/Assets/Resources/Stages/training.prefab`, with materials/textures under `Assets/Art/Stages/GeneratedPrototypes/training/GreyLab/`. Presentation has no Unity colliders.
+- The old prototype generator no longer regenerates Training. Edit the source scene and presentation prefab separately.
+- Direct offline Play defaults to `training`; explicit stage selection still takes precedence.
+- **Known Shared limitation, explicitly deferred by the user:** movement integrates X/Z and snaps to heightmap surfaces; it does not block vertical wall/platform sides. Baked triangles do not make the room a solid enclosure. A proper Shared collision fix is separate work, not a Unity workaround.
+- Verification: typed bake/inspection, arena shipping tests, live Training renders, and FightGuy landing/jump-route smoke checks. Wall containment is not claimed.
 
 ## Overview
 

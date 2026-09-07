@@ -14,13 +14,11 @@ public sealed class KistuUltFlurry : ServerAbility
 {
     private readonly CookedKistuBladeFlurryCapabilityParameters _parameters;
     private ushort _ticks;
-
     public KistuUltFlurry(CookedKistuBladeFlurryCapabilityParameters parameters)
         => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         _ticks = 0;
-
         s.State = ActionState.Attacking;
         s.AttackSlot = (byte)(Slot + 1);
         AnimIndex = 0;
@@ -39,9 +37,26 @@ public sealed class KistuUltFlurry : ServerAbility
 
         var spec = def.GetSlotAbility(Slot, airborne: false);
         ushort duration = spec?.Stages is { Length: > 0 } ? spec.Stages[0].DurationTicks : (ushort)64;
-        if (_ticks <= _parameters.MoveTicks)
+        // F timing is authored at 30 FPS: ascend on frames 7-14 (ticks 14-28),
+        // float at roughly two metres above launch height until frame 30 (tick 60),
+        // then descend through the spike.
+        if (_ticks >= 14 && _ticks <= 28)
+        {
             SetVelocityInFacing(ref s, _parameters.ForwardSpeed);
-        else { s.VX = 0f; s.VZ = 0f; }
+            s.VY = 60f * 2f / (28f - 14f);
+        }
+        else if (_ticks < 60)
+        {
+            s.VX = 0f;
+            s.VZ = 0f;
+            s.VY = 0f;
+        }
+        else
+        {
+            s.VX = 0f;
+            s.VZ = 0f;
+            s.VY = -12f;
+        }
 
         var events = spec?.Stages is { Length: > 0 } ? spec.Stages[0].HitboxEvents : null;
         if (events == null || events.Length == 0)

@@ -189,7 +189,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 24,
+            "durationTicks": 60,
             "iasaTicks": 21,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -205,7 +205,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 12,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -223,9 +223,10 @@
                   "baseKnockback": 4,
                   "knockbackGrowth": 20,
                   "stunTicks": 14,
-                  "durationTicks": 6,
+                  "durationTicks": 12,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -247,7 +248,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 34,
+            "durationTicks": 60,
             "iasaTicks": 30,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -263,7 +264,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 8,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -283,7 +284,8 @@
                   "stunTicks": 10,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -305,7 +307,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 32,
+            "durationTicks": 60,
             "iasaTicks": 28,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -321,7 +323,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 11,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -341,7 +343,8 @@
                   "stunTicks": 18,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -363,7 +366,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 44,
+            "durationTicks": 70,
             "iasaTicks": 39,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -379,7 +382,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 18,
+                "tick": 39,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -399,7 +402,8 @@
                   "stunTicks": 22,
                   "durationTicks": 14,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -457,7 +461,8 @@
                   "stunTicks": 14,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -515,7 +520,8 @@
                   "stunTicks": 16,
                   "durationTicks": 5,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -573,7 +579,8 @@
                   "stunTicks": 16,
                   "durationTicks": 6,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -631,7 +638,8 @@
                   "stunTicks": 20,
                   "durationTicks": 7,
                   "interruptible": true,
-                  "hitGroup": 0
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -740,19 +748,23 @@
     },
     {
       "id": "ground.E",
-      "name": "Dash Slash",
-      "description": "Dash Slash",
+      "name": "Rising Slash",
+      "description": "An upward recovery slash that carries Kistu into the air.",
       "iconId": "icon.e",
-      "behavior": "directionalDash",
-      "aimMode": "groundVector",
-      "aimMovement": "mobile",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
       "cooldownTicks": 90,
-      "isRecoveryMove": false,
+      "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
+      "chargePool": {
+        "maxCharges": 2,
+        "regenTicks": 240
+      },
       "timeline": {
         "stages": [
           {
-            "durationTicks": 197,
+            "durationTicks": 60,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -770,12 +782,39 @@
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",
-                "capabilityId": "slop.internal.kistu.dash-slash.v1",
+                "capabilityId": "slop.internal.kistu.rising-slash.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "dashDistance": 5,
-                  "dashDurationTicks": 16,
-                  "maxAimTicks": 180
+                  "riseSpeed": 8,
+                  "riseTicks": 30,
+                  "homingRange": 7,
+                  "homingSpeed": 10
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 19,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 20,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -785,23 +824,19 @@
     },
     {
       "id": "ground.R",
-      "name": "Rising Slash",
-      "description": "Rising Slash",
+      "name": "Dash Slash",
+      "description": "Aim a direction, then dash and slash.",
       "iconId": "icon.r",
-      "behavior": "meleeCombo",
-      "aimMode": "none",
-      "aimMovement": "fixed",
-      "cooldownTicks": 0,
+      "behavior": "directionalDash",
+      "aimMode": "groundVector",
+      "aimMovement": "mobile",
+      "cooldownTicks": 90,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
-      "chargePool": {
-        "maxCharges": 2,
-        "regenTicks": 240
-      },
       "timeline": {
         "stages": [
           {
-            "durationTicks": 24,
+            "durationTicks": 80,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -819,13 +854,38 @@
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",
-                "capabilityId": "slop.internal.kistu.rising-slash.v1",
+                "capabilityId": "slop.internal.kistu.dash-slash.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "riseSpeed": 8,
-                  "riseTicks": 8,
-                  "homingRange": 7,
-                  "homingSpeed": 10
+                  "dashDistance": 5,
+                  "dashDurationTicks": 16,
+                  "maxAimTicks": 60
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 22,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 10,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]
@@ -835,8 +895,8 @@
     },
     {
       "id": "ground.F",
-      "name": "Blade Flurry",
-      "description": "Blade Flurry",
+      "name": "Skyfall",
+      "description": "Launch the opponent upward, follow into the air, then spike them straight down.",
       "iconId": "icon.f",
       "behavior": "meleeCombo",
       "aimMode": "none",
@@ -847,7 +907,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 64,
+            "durationTicks": 128,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -868,8 +928,60 @@
                 "capabilityId": "slop.internal.kistu.blade-flurry.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "forwardSpeed": 7,
-                  "moveTicks": 40
+                  "forwardSpeed": 0,
+                  "moveTicks": 24
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 14,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 4,
+                  "angle": 90,
+                  "baseKnockback": 8,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 30,
+                  "durationTicks": 5,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 60,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 16,
+                  "angle": -90,
+                  "baseKnockback": 16,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 36,
+                  "durationTicks": 8,
+                  "interruptible": false,
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

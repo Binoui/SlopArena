@@ -1613,6 +1613,14 @@ public sealed class AbilityLabWindow : EditorWindow
         var stage = slot.Timeline.Stages[_lab.StageIndex];
         var moveGroup = new Foldout { text = $"Move · {slot.Name}", value = true };
         moveGroup.Add(new Label($"Duration {stage.DurationTicks} · IASA {stage.IasaTicks} · Landing lag {stage.LandingLagTicks}"));
+        var durationField = new IntegerField("Duration ticks") { value = stage.DurationTicks, isDelayed = true };
+        durationField.RegisterValueChangedCallback(evt =>
+        {
+            if (_updatingControls || _lab == null) return;
+            int duration = Mathf.Clamp(evt.newValue, 1, ushort.MaxValue);
+            CommitStage(current => current with { DurationTicks = (ushort)duration }, _lab.StageIndex);
+        });
+        moveGroup.Add(durationField);
         moveGroup.Add(new Label($"Auto-cancel before {stage.AutoCancelBeforeTicks} · after {stage.AutoCancelAfterTicks}"));
         var animationIds = (_preview?.AnimationCatalog?.Animations ?? Array.Empty<CharacterAnimationCatalog.AnimationEntry>())
             .Where(animation => animation != null && !string.IsNullOrEmpty(animation.SemanticId))
@@ -1637,6 +1645,12 @@ public sealed class AbilityLabWindow : EditorWindow
                     }, _lab.StageIndex);
             });
             moveGroup.Add(field);
+            var animationEntry = _preview?.AnimationCatalog?.Animations
+                ?.FirstOrDefault(entry => entry != null && entry.SemanticId == animationId);
+            int frameCount = animationEntry?.FrameCount ?? 0;
+            moveGroup.Add(new Label(frameCount > 0
+                ? $"Animation frames {frameCount} · {frameCount / (float)Mathf.Max(1, stage.DurationTicks):0.00} frames/tick"
+                : "Animation frames unavailable"));
         }
         var addHitbox = new Button(() =>
         {

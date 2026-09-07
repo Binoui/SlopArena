@@ -272,6 +272,13 @@ namespace SlopArena.Client.World
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
             PresentTimelineEvents();
 
+            var presentationState = _bridge.GetState(PlayerEntityId);
+            _opponentRenderers.TryGetValue(presentationState.TargetEntityId, out var presentationTarget);
+            ushort targetDamagePercent = presentationTarget != null
+                ? _bridge.GetState(presentationState.TargetEntityId).DamagePercent
+                : (ushort)0;
+            _aimHandler?.UpdateTargetPresentation(presentationState, presentationTarget, targetDamagePercent);
+
             UpdateLockCamera();
 
             PresentStockLosses();
@@ -296,6 +303,7 @@ namespace SlopArena.Client.World
                 else if (matchState == MatchState.Ended)
                 {
                     _hudManager?.ShowMatchCallout("MATCH COMPLETE", 1.4f);
+                    _aimHandler?.ResetPresentation();
                 }
             }
 
