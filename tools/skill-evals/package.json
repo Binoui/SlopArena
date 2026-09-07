@@ -1,0 +1,18 @@
+{
+  "name": "@sloparena/skill-evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import": "bun run src/import.ts",
+    "annotate": "bun run src/annotate.ts",
+    "list": "bun run src/list.ts",
+    "eval:dev": "evalite watch",
+    "eval:run": "evalite"
+  },
+  "devDependencies": {
+    "evalite": "1.0.0-beta.16",
+    "vitest": "^3.2.4",
+    "typescript": "^5.9.2",
+    "@types/node": "^24"
+  }
+}

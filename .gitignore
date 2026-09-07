@@ -274,3 +274,7 @@ __pycache__/
 
 # Separate website repository; not a game submodule
 /SlopArena-web/
+
+# Skill evals: raw local session observations (labelled fixtures in fixtures.jsonl are committed)
+/tools/skill-evals/node_modules/
+/tools/skill-evals/data/observations.jsonl
