@@ -896,6 +896,18 @@ namespace SlopArena.Shared
 					_states[secondId] = second;
 				}
 			}
+			// Pushbox correction can move a character into a wall. Recover only the
+			// bounded stage overlap; never snap to a different platform.
+			for (int k = 0; k < simIds.Length; k++)
+			{
+				ulong id = simIds[k];
+				if (!_states.TryGetValue(id, out var state)
+				    || !_defs.TryGetValue(id, out var def)
+				    || _rule.IsEliminated(state))
+					continue;
+				Simulation.RecoverStageOverlap(ref state, def, _arena);
+				_states[id] = state;
+			}
 		}
 		/// <summary>
 		/// Find the closest enemy entity ID for target lock.
@@ -1260,7 +1272,8 @@ namespace SlopArena.Shared
                     {
                         targetState.DIX = targetInput.MoveX;
                         targetState.DIY = targetInput.MoveY;
-                        Simulation.ApplySdi(ref targetState, targetState.DIX, targetState.DIY);
+                        Simulation.ApplySdi(ref targetState, targetState.DIX, targetState.DIY,
+                            _defs[hit.TargetEntityId], _arena);
                         Simulation.ApplyDirectionalInfluence(ref targetState);
                         targetState.DIX = targetState.DIY = 0f;
                     }

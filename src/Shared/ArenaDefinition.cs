@@ -193,6 +193,489 @@ namespace SlopArena.Shared
         public const float SideBlastMargin = 10f;
         /// <summary>Height above the heightmap's highest surface for the auto top blast line.</summary>
         public const float TopBlastMargin = 20f;
+        public readonly struct CollisionContact
+        {
+            public readonly float Time;
+            public readonly float NormalX, NormalY, NormalZ;
+            public readonly float Penetration;
+            public readonly int TriangleIndex;
+
+            public CollisionContact(float time, float normalX, float normalY, float normalZ,
+                float penetration, int triangleIndex)
+            {
+                Time = time;
+                NormalX = normalX;
+                NormalY = normalY;
+                NormalZ = normalZ;
+                Penetration = penetration;
+                TriangleIndex = triangleIndex;
+            }
+        }
+
+        private readonly struct ClosestPoints
+        {
+            public readonly float SegmentX, SegmentY, SegmentZ;
+            public readonly float TriangleX, TriangleY, TriangleZ;
+            public readonly float Distance;
+            public readonly float NormalX, NormalY, NormalZ;
+
+            public ClosestPoints(float segmentX, float segmentY, float segmentZ,
+                float triangleX, float triangleY, float triangleZ, float distance,
+                float normalX, float normalY, float normalZ)
+            {
+                SegmentX = segmentX;
+                SegmentY = segmentY;
+                SegmentZ = segmentZ;
+                TriangleX = triangleX;
+                TriangleY = triangleY;
+                TriangleZ = triangleZ;
+                Distance = distance;
+                NormalX = normalX;
+                NormalY = normalY;
+                NormalZ = normalZ;
+            }
+        }
+
+        /// <summary>Returns true when the arena has authoritative triangle collision.</summary>
+        public static bool HasTriangles(in ArenaDefinition arena)
+            => arena.CollisionTriangles is { Length: > 0 };
+
+        /// <summary>
+        /// Returns unique triangles overlapping an AABB. The grid is optional: directly
+        /// constructed synthetic arenas fall back to a deterministic linear scan.
+        /// </summary>
+        public static int GetCandidateTrianglesForAabb(
+            float minX, float minY, float minZ, float maxX, float maxY, float maxZ,
+            in ArenaDefinition arena, int[] outIndices)
+        {
+            var triangles = arena.CollisionTriangles;
+            if (triangles == null || triangles.Length == 0 || outIndices.Length == 0)
+                return 0;
+
+            var grid = arena.SpatialGrid;
+            if (grid.CellStarts == null || grid.CellTriangles == null || grid.CellSize <= 0f
+                || grid.CellsX <= 0 || grid.CellsY <= 0 || grid.CellsZ <= 0)
+            {
+                int scanCount = Math.Min(triangles.Length, outIndices.Length);
+                for (int i = 0; i < scanCount; i++)
+                    outIndices[i] = i;
+                return scanCount;
+            }
+
+            int ixMin = (int)MathF.Floor((minX - grid.OriginX) / grid.CellSize);
+            int ixMax = (int)MathF.Floor((maxX - grid.OriginX) / grid.CellSize);
+            int iyMin = (int)MathF.Floor((minY - grid.OriginY) / grid.CellSize);
+            int iyMax = (int)MathF.Floor((maxY - grid.OriginY) / grid.CellSize);
+            int izMin = (int)MathF.Floor((minZ - grid.OriginZ) / grid.CellSize);
+            int izMax = (int)MathF.Floor((maxZ - grid.OriginZ) / grid.CellSize);
+            if (ixMin < 0) ixMin = 0;
+            if (ixMax >= grid.CellsX) ixMax = grid.CellsX - 1;
+            if (iyMin < 0) iyMin = 0;
+            if (iyMax >= grid.CellsY) iyMax = grid.CellsY - 1;
+            if (izMin < 0) izMin = 0;
+            if (izMax >= grid.CellsZ) izMax = grid.CellsZ - 1;
+            if (ixMin > ixMax || iyMin > iyMax || izMin > izMax)
+                return 0;
+
+            int count = 0;
+            for (int iz = izMin; iz <= izMax; iz++)
+            for (int iy = iyMin; iy <= iyMax; iy++)
+            for (int ix = ixMin; ix <= ixMax; ix++)
+            {
+                int cell = iz * grid.CellsX * grid.CellsY + iy * grid.CellsX + ix;
+                if (cell < 0 || cell + 1 >= grid.CellStarts.Length) continue;
+                int start = grid.CellStarts[cell];
+                int end = grid.CellStarts[cell + 1];
+                for (int i = start; i < end && i < grid.CellTriangles.Length; i++)
+                {
+                    int triangleIndex = grid.CellTriangles[i];
+                    if (triangleIndex < 0 || triangleIndex >= triangles.Length) continue;
+                    bool duplicate = false;
+                    for (int j = 0; j < count; j++)
+                        if (outIndices[j] == triangleIndex) { duplicate = true; break; }
+                    if (!duplicate && count < outIndices.Length)
+                        outIndices[count++] = triangleIndex;
+                }
+            }
+            return count;
+        }
+
+        public static int GetCandidateTrianglesForSweep(
+            float startX, float startY, float startZ, float endX, float endY, float endZ,
+            float radius, float capsuleHeight, in ArenaDefinition arena, int[] outIndices)
+        {
+            float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
+            return GetCandidateTrianglesForAabb(
+                MathF.Min(startX, endX) - radius,
+                MathF.Min(startY, endY) - halfLine - radius,
+                MathF.Min(startZ, endZ) - radius,
+                MathF.Max(startX, endX) + radius,
+                MathF.Max(startY, endY) + halfLine + radius,
+                MathF.Max(startZ, endZ) + radius,
+                in arena, outIndices);
+        }
+
+        /// <summary>
+        /// Sweeps a vertical capsule along a displacement and returns the first solid
+        /// triangle contact. The fixed conservative-advancement and binary-refinement
+        /// loops are deterministic and do not depend on frame rate or Unity physics.
+        /// </summary>
+        public static bool SweepCapsule(
+            float startX, float startY, float startZ, float endX, float endY, float endZ,
+            float radius, float capsuleHeight, in ArenaDefinition arena,
+            int[] candidateIndices, int candidateCount, out CollisionContact contact)
+        {
+            contact = default;
+            var triangles = arena.CollisionTriangles;
+            if (triangles == null || candidateCount <= 0) return false;
+
+            float dx = endX - startX, dy = endY - startY, dz = endZ - startZ;
+            float speed = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+            float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
+            float bestTime = float.PositiveInfinity;
+            int bestTriangle = int.MaxValue;
+            ClosestPoints best = default;
+
+            for (int c = 0; c < candidateCount; c++)
+            {
+                int triangleIndex = candidateIndices[c];
+                if (triangleIndex < 0 || triangleIndex >= triangles.Length) continue;
+                var triangle = triangles[triangleIndex];
+                if (!TryCapsuleTriangleDistance(startX, startY, startZ, halfLine,
+                        in triangle, out var atStart))
+                    continue;
+
+                float approach = dx * atStart.NormalX + dy * atStart.NormalY + dz * atStart.NormalZ;
+                if (atStart.Distance <= radius + 0.0001f && (atStart.Distance < radius - 0.0001f || approach < -0.0001f))
+                {
+                    if (0f < bestTime || (bestTime == 0f && triangleIndex < bestTriangle))
+                    {
+                        bestTime = 0f;
+                        bestTriangle = triangleIndex;
+                        best = atStart;
+                    }
+                    continue;
+                }
+                if (speed <= 0.000001f) continue;
+
+                float time = 0f;
+                ClosestPoints previous = atStart;
+                for (int iteration = 0; iteration < 64 && time < 1f; iteration++)
+                {
+                    float advance = (previous.Distance - radius) / speed;
+                    if (advance < 0.0001f) advance = 0.0001f;
+                    float next = MathF.Min(1f, time + advance);
+                    float nx = startX + dx * next;
+                    float ny = startY + dy * next;
+                    float nz = startZ + dz * next;
+                    if (!TryCapsuleTriangleDistance(nx, ny, nz, halfLine,
+                            in triangle, out var atNext))
+                        break;
+
+                    float nextApproach = dx * atNext.NormalX + dy * atNext.NormalY + dz * atNext.NormalZ;
+                    if (atNext.Distance <= radius + 0.0001f && nextApproach < -0.0001f)
+                    {
+                        float lo = time, hi = next;
+                        for (int refine = 0; refine < 20; refine++)
+                        {
+                            float mid = (lo + hi) * 0.5f;
+                            float mx = startX + dx * mid;
+                            float my = startY + dy * mid;
+                            float mz = startZ + dz * mid;
+                            TryCapsuleTriangleDistance(mx, my, mz, halfLine,
+                                in triangle, out var atMid);
+                            if (atMid.Distance <= radius) hi = mid;
+                            else lo = mid;
+                        }
+                        float hitX = startX + dx * hi;
+                        float hitY = startY + dy * hi;
+                        float hitZ = startZ + dz * hi;
+                        TryCapsuleTriangleDistance(hitX, hitY, hitZ, halfLine,
+                            in triangle, out var atHit);
+                        if (hi < bestTime - 0.000001f
+                            || (MathF.Abs(hi - bestTime) <= 0.000001f && triangleIndex < bestTriangle))
+                        {
+                            bestTime = hi;
+                            bestTriangle = triangleIndex;
+                            best = atHit;
+                        }
+                        break;
+                    }
+                    if (next >= 1f) break;
+                    time = next;
+                    previous = atNext;
+                }
+            }
+
+            if (bestTriangle == int.MaxValue) return false;
+            contact = new CollisionContact(bestTime, best.NormalX, best.NormalY, best.NormalZ,
+                MathF.Max(0f, radius - best.Distance), bestTriangle);
+            return true;
+        }
+
+        /// <summary>Pushes a penetrating capsule out along the nearest contact only.</summary>
+        public static bool RecoverCapsule(
+            ref float px, ref float py, ref float pz, float radius, float capsuleHeight,
+            in ArenaDefinition arena, int[] candidateIndices, int maxIterations = 4,
+            float maxCorrection = 0.5f)
+        {
+            bool changed = false;
+            float corrected = 0f;
+            for (int iteration = 0; iteration < maxIterations && corrected < maxCorrection; iteration++)
+            {
+                float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
+                int count = GetCandidateTrianglesForAabb(
+                    px - radius, py - halfLine - radius, pz - radius,
+                    px + radius, py + halfLine + radius, pz + radius,
+                    in arena, candidateIndices);
+                float deepest = 0f;
+                int deepestTriangle = int.MaxValue;
+                float nx = 0f, ny = 0f, nz = 0f;
+                for (int c = 0; c < count; c++)
+                {
+                    int triangleIndex = candidateIndices[c];
+                    var triangle = arena.CollisionTriangles[triangleIndex];
+                    if (!TryCapsuleTriangleDistance(px, py, pz, halfLine,
+                            in triangle, out var closest)) continue;
+                    float penetration = radius - closest.Distance;
+                    if (penetration > deepest + 0.000001f
+                        || (MathF.Abs(penetration - deepest) <= 0.000001f
+                            && triangleIndex < deepestTriangle))
+                    {
+                        deepest = penetration;
+                        deepestTriangle = triangleIndex;
+                        nx = closest.NormalX; ny = closest.NormalY; nz = closest.NormalZ;
+                    }
+                }
+                if (deepest <= 0.0001f || deepestTriangle == int.MaxValue) break;
+                float amount = MathF.Min(deepest + 0.0005f, maxCorrection - corrected);
+                px += nx * amount;
+                py += ny * amount;
+                pz += nz * amount;
+                corrected += amount;
+                changed = true;
+            }
+            return changed;
+        }
+
+        public static bool TryFindSupport(
+            float px, float py, float pz, float radius, float capsuleHeight,
+            in ArenaDefinition arena, int[] candidateIndices,
+            out CollisionContact support)
+        {
+            support = default;
+            float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
+            int count = GetCandidateTrianglesForAabb(
+                px - radius, py - halfLine - radius - 0.002f, pz - radius,
+                px + radius, py + halfLine + radius + 0.002f, pz + radius,
+                in arena, candidateIndices);
+            bool found = false;
+            for (int c = 0; c < count; c++)
+            {
+                int triangleIndex = candidateIndices[c];
+                var triangle = arena.CollisionTriangles[triangleIndex];
+                if (!TryCapsuleTriangleDistance(px, py, pz, halfLine,
+                        in triangle, out var closest)
+                    || closest.Distance > radius + 0.002f
+                    || closest.NormalY <= 0.5f)
+                    continue;
+                var candidate = new CollisionContact(0f, closest.NormalX, closest.NormalY,
+                    closest.NormalZ, MathF.Max(0f, radius - closest.Distance), triangleIndex);
+                if (!found || triangleIndex < support.TriangleIndex)
+                {
+                    support = candidate;
+                    found = true;
+                }
+            }
+            return found;
+        }
+
+        private static bool TryCapsuleTriangleDistance(
+            float centerX, float centerY, float centerZ, float halfLine,
+            in CollisionTriangle triangle, out ClosestPoints result)
+        {
+            float p0x = centerX, p0y = centerY - halfLine, p0z = centerZ;
+            float p1x = centerX, p1y = centerY + halfLine, p1z = centerZ;
+            float bestSquared = float.PositiveInfinity;
+            float bestSx = 0f, bestSy = 0f, bestSz = 0f;
+            float bestTx = 0f, bestTy = 0f, bestTz = 0f;
+
+            void Consider(float sx, float sy, float sz, float tx, float ty, float tz)
+            {
+                float x = sx - tx, y = sy - ty, z = sz - tz;
+                float squared = x * x + y * y + z * z;
+                if (squared < bestSquared)
+                {
+                    bestSquared = squared;
+                    bestSx = sx; bestSy = sy; bestSz = sz;
+                    bestTx = tx; bestTy = ty; bestTz = tz;
+                }
+            }
+
+            ClosestPointOnTriangle(p0x, p0y, p0z, in triangle,
+                out float p0tx, out float p0ty, out float p0tz);
+            Consider(p0x, p0y, p0z, p0tx, p0ty, p0tz);
+            ClosestPointOnTriangle(p1x, p1y, p1z, in triangle,
+                out float p1tx, out float p1ty, out float p1tz);
+            Consider(p1x, p1y, p1z, p1tx, p1ty, p1tz);
+
+            SegmentSegmentClosest(p0x, p0y, p0z, p1x, p1y, p1z,
+                triangle.AX, triangle.AY, triangle.AZ, triangle.BX, triangle.BY, triangle.BZ,
+                out float sx, out float sy, out float sz, out float tx, out float ty, out float tz);
+            Consider(sx, sy, sz, tx, ty, tz);
+            SegmentSegmentClosest(p0x, p0y, p0z, p1x, p1y, p1z,
+                triangle.BX, triangle.BY, triangle.BZ, triangle.CX, triangle.CY, triangle.CZ,
+                out sx, out sy, out sz, out tx, out ty, out tz);
+            Consider(sx, sy, sz, tx, ty, tz);
+            SegmentSegmentClosest(p0x, p0y, p0z, p1x, p1y, p1z,
+                triangle.CX, triangle.CY, triangle.CZ, triangle.AX, triangle.AY, triangle.AZ,
+                out sx, out sy, out sz, out tx, out ty, out tz);
+            Consider(sx, sy, sz, tx, ty, tz);
+
+            float abx = triangle.BX - triangle.AX, aby = triangle.BY - triangle.AY, abz = triangle.BZ - triangle.AZ;
+            float acx = triangle.CX - triangle.AX, acy = triangle.CY - triangle.AY, acz = triangle.CZ - triangle.AZ;
+            float normalX = aby * acz - abz * acy;
+            float normalY = abz * acx - abx * acz;
+            float normalZ = abx * acy - aby * acx;
+            float normalLength = MathF.Sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+            if (normalLength <= 0.000001f)
+            {
+                result = default;
+                return false;
+            }
+            normalX /= normalLength; normalY /= normalLength; normalZ /= normalLength;
+            float denom = normalX * (p1x - p0x) + normalY * (p1y - p0y) + normalZ * (p1z - p0z);
+            if (MathF.Abs(denom) > 0.000001f)
+            {
+                float planeT = (normalX * (triangle.AX - p0x)
+                    + normalY * (triangle.AY - p0y)
+                    + normalZ * (triangle.AZ - p0z)) / denom;
+                if (planeT >= 0f && planeT <= 1f)
+                {
+                    float ix = p0x + (p1x - p0x) * planeT;
+                    float iy = p0y + (p1y - p0y) * planeT;
+                    float iz = p0z + (p1z - p0z) * planeT;
+                    if (PointInTriangle(ix, iy, iz, in triangle, normalX, normalY, normalZ))
+                        Consider(ix, iy, iz, ix, iy, iz);
+                }
+            }
+
+            float distance = MathF.Sqrt(bestSquared);
+            float vx = bestSx - bestTx, vy = bestSy - bestTy, vz = bestSz - bestTz;
+            if (distance > 0.000001f)
+            {
+                vx /= distance; vy /= distance; vz /= distance;
+            }
+            else
+            {
+                vx = normalX; vy = normalY; vz = normalZ;
+                float toward = (centerX - bestTx) * vx + (centerY - bestTy) * vy
+                    + (centerZ - bestTz) * vz;
+                if (toward < 0f) { vx = -vx; vy = -vy; vz = -vz; }
+            }
+            result = new ClosestPoints(bestSx, bestSy, bestSz, bestTx, bestTy, bestTz,
+                distance, vx, vy, vz);
+            return true;
+        }
+
+        private static void ClosestPointOnTriangle(float px, float py, float pz,
+            in CollisionTriangle t, out float x, out float y, out float z)
+        {
+            float abx = t.BX - t.AX, aby = t.BY - t.AY, abz = t.BZ - t.AZ;
+            float acx = t.CX - t.AX, acy = t.CY - t.AY, acz = t.CZ - t.AZ;
+            float apx = px - t.AX, apy = py - t.AY, apz = pz - t.AZ;
+            float d1 = abx * apx + aby * apy + abz * apz;
+            float d2 = acx * apx + acy * apy + acz * apz;
+            if (d1 <= 0f && d2 <= 0f) { x = t.AX; y = t.AY; z = t.AZ; return; }
+            float bpx = px - t.BX, bpy = py - t.BY, bpz = pz - t.BZ;
+            float d3 = abx * bpx + aby * bpy + abz * bpz;
+            float d4 = acx * bpx + acy * bpy + acz * bpz;
+            if (d3 >= 0f && d4 <= d3) { x = t.BX; y = t.BY; z = t.BZ; return; }
+            float vc = d1 * d4 - d3 * d2;
+            if (vc <= 0f && d1 >= 0f && d3 <= 0f)
+            {
+                float v = d1 / (d1 - d3);
+                x = t.AX + abx * v; y = t.AY + aby * v; z = t.AZ + abz * v; return;
+            }
+            float cpx = px - t.CX, cpy = py - t.CY, cpz = pz - t.CZ;
+            float d5 = abx * cpx + aby * cpy + abz * cpz;
+            float d6 = acx * cpx + acy * cpy + acz * cpz;
+            if (d6 >= 0f && d5 <= d6) { x = t.CX; y = t.CY; z = t.CZ; return; }
+            float vb = d5 * d2 - d1 * d6;
+            if (vb <= 0f && d2 >= 0f && d6 <= 0f)
+            {
+                float w = d2 / (d2 - d6);
+                x = t.AX + acx * w; y = t.AY + acy * w; z = t.AZ + acz * w; return;
+            }
+            float va = d3 * d6 - d5 * d4;
+            if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
+            {
+                float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+                x = t.BX + (t.CX - t.BX) * w;
+                y = t.BY + (t.CY - t.BY) * w;
+                z = t.BZ + (t.CZ - t.BZ) * w;
+                return;
+            }
+            float denominator = 1f / (va + vb + vc);
+            float vFace = vb * denominator, wFace = vc * denominator;
+            x = t.AX + abx * vFace + acx * wFace;
+            y = t.AY + aby * vFace + acy * wFace;
+            z = t.AZ + abz * vFace + acz * wFace;
+        }
+
+        private static void SegmentSegmentClosest(
+            float p1x, float p1y, float p1z, float q1x, float q1y, float q1z,
+            float p2x, float p2y, float p2z, float q2x, float q2y, float q2z,
+            out float c1x, out float c1y, out float c1z, out float c2x, out float c2y, out float c2z)
+        {
+            float d1x = q1x - p1x, d1y = q1y - p1y, d1z = q1z - p1z;
+            float d2x = q2x - p2x, d2y = q2y - p2y, d2z = q2z - p2z;
+            float rx = p1x - p2x, ry = p1y - p2y, rz = p1z - p2z;
+            float a = d1x * d1x + d1y * d1y + d1z * d1z;
+            float e = d2x * d2x + d2y * d2y + d2z * d2z;
+            float f = d2x * rx + d2y * ry + d2z * rz;
+            float s, t;
+            if (a <= 0.000001f && e <= 0.000001f) { s = t = 0f; }
+            else if (a <= 0.000001f)
+            {
+                s = 0f; t = Math.Clamp(f / e, 0f, 1f);
+            }
+            else
+            {
+                float c = d1x * rx + d1y * ry + d1z * rz;
+                if (e <= 0.000001f) { t = 0f; s = Math.Clamp(-c / a, 0f, 1f); }
+                else
+                {
+                    float b = d1x * d2x + d1y * d2y + d1z * d2z;
+                    float denominator = a * e - b * b;
+                    s = denominator != 0f ? Math.Clamp((b * f - c * e) / denominator, 0f, 1f) : 0f;
+                    t = (b * s + f) / e;
+                    if (t < 0f) { t = 0f; s = Math.Clamp(-c / a, 0f, 1f); }
+                    else if (t > 1f) { t = 1f; s = Math.Clamp((b - c) / a, 0f, 1f); }
+                }
+            }
+            c1x = p1x + d1x * s; c1y = p1y + d1y * s; c1z = p1z + d1z * s;
+            c2x = p2x + d2x * t; c2y = p2y + d2y * t; c2z = p2z + d2z * t;
+        }
+
+        private static bool PointInTriangle(float px, float py, float pz,
+            in CollisionTriangle t, float nx, float ny, float nz)
+        {
+            float abx = t.BX - t.AX, aby = t.BY - t.AY, abz = t.BZ - t.AZ;
+            float bcx = t.CX - t.BX, bcy = t.CY - t.BY, bcz = t.CZ - t.BZ;
+            float cax = t.AX - t.CX, cay = t.AY - t.CY, caz = t.AZ - t.CZ;
+            float apx = px - t.AX, apy = py - t.AY, apz = pz - t.AZ;
+            float bpx = px - t.BX, bpy = py - t.BY, bpz = pz - t.BZ;
+            float cpx = px - t.CX, cpy = py - t.CY, cpz = pz - t.CZ;
+            float c1x = aby * apz - abz * apy, c1y = abz * apx - abx * apz, c1z = abx * apy - aby * apx;
+            float c2x = bcy * bpz - bcz * bpy, c2y = bcz * bpx - bcx * bpz, c2z = bcx * bpy - bcy * bpx;
+            float c3x = cay * cpz - caz * cpy, c3y = caz * cpx - cax * cpz, c3z = cax * cpy - cay * cpx;
+            float d1 = c1x * nx + c1y * ny + c1z * nz;
+            float d2 = c2x * nx + c2y * ny + c2z * nz;
+            float d3 = c3x * nx + c3y * ny + c3z * nz;
+            return d1 >= -0.0001f && d2 >= -0.0001f && d3 >= -0.0001f;
+        }
+
 
         /// <summary>
         /// Resolved blast-zone planes for one arena. Inactive planes are ±infinity,

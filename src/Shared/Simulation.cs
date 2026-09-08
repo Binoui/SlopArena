@@ -26,6 +26,18 @@ namespace SlopArena.Shared
         /// <summary>Hook for debug logging. Set by the client to receive sim trace messages.</summary>
         public static System.Action<string>? OnDebugLog;
         public const float TickDt = 1f / 60f;
+        [ThreadStatic]
+        private static int[]? _triangleCandidates;
+
+        private static int[] TriangleCandidates(in ArenaDefinition arena)
+        {
+            int required = arena.CollisionTriangles?.Length ?? 0;
+            if (required <= 0) return Array.Empty<int>();
+            if (_triangleCandidates == null || _triangleCandidates.Length < required)
+                _triangleCandidates = new int[required];
+            return _triangleCandidates;
+        }
+
 
         /// <summary>
         /// ── Constants ──
@@ -230,7 +242,6 @@ namespace SlopArena.Shared
             s.AimYaw = aimDeg * (MathF.PI / 180f);
             // Store aim target distance (cm → m) for projectile abilities
             s.AimTargetDistance = input.AimDistance * 0.01f;
-            // Apply combat aim pitch from input (degrees * 100 → radians)
             s.AimPitch = input.AimPitch * 0.01f * (MathF.PI / 180f);
 
             // ── Hitstop (ADR-0012): per-pair freeze. While frozen, capture the defender's
@@ -242,7 +253,7 @@ namespace SlopArena.Shared
                 {
                     if (!s.SdiApplied)
                     {
-                        ApplySdi(ref s, input.MoveX, input.MoveY);
+                        ApplySdi(ref s, input.MoveX, input.MoveY, def, arena);
                         s.SdiApplied = true;
                     }
                     s.DIX = input.MoveX;
@@ -359,8 +370,8 @@ namespace SlopArena.Shared
                         if (s.VZ > jumpCap) s.VZ = jumpCap;
                         else if (s.VZ < -jumpCap) s.VZ = -jumpCap;
                     }
-                }
                 // During squat: preserve horizontal momentum, no acceleration
+            }
             }
             s.IsAiming = input.IsAiming;
 
@@ -370,7 +381,7 @@ namespace SlopArena.Shared
             // 2. Hitstun overrides everything (DI window)
             if (s.State == ActionState.Hitstun)
             {
-                ProcessHitstun(ref s, input);
+                ProcessHitstun(ref s, input, arena, def);
                 // Fall through — position update + ground collision must run during hitstun.
                 // Without this, the target stands perfectly still for the entire stun duration
                 // (V=KV set but PX/PZ/PY never updated), then does a single-frame hop on expiry.
@@ -564,40 +575,64 @@ namespace SlopArena.Shared
             if (s.State != ActionState.Hitstun && s.State != ActionState.LedgeHang)
                 ApplyGravity(ref s, stats, input);
             
-            // 9. Position integration
-            s.PX += s.VX * TickDt;
-
-            s.PZ += s.VZ * TickDt;
-            s.PY += s.VY * TickDt;
-
-            // 10. Ground collision via heightmap
+            // 9-10. Authoritative triangle collision, with the old heightmap path kept
+            // intact for legacy and synthetic unbaked arenas.
             float capsuleHalf = def.CapsuleHeight * 0.5f;
-            float surfaceY = arena.Heightmap.Data != null
-                ? arena.Heightmap.Sample(s.PX, s.PZ)
-                : arena.KillHeight + 1f;
+            float surfaceY = float.MinValue;
             float groundY = float.NaN;
-            if (surfaceY > float.MinValue)
+            if (ArenaCollision.HasTriangles(arena))
             {
-                groundY = surfaceY + capsuleHalf;
-                if (s.State == ActionState.Hitstun)
+                MoveThroughStage(ref s, def, arena,
+                    s.VX * TickDt, s.VY * TickDt, s.VZ * TickDt);
+                if (s.IsGrounded)
                 {
-                    // During hitstun: skip snap while rising (KVY > 0) so launch works.
-                    // Re-snap when falling (KVY <= 0) — clear KVY to prevent next-tick gravity drill.
-                    // Force-snap if below surface to prevent map fall-through.
-                    bool atSurface = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
-                    if (atSurface && s.KVY <= 0f)
+                    surfaceY = s.PY - capsuleHalf;
+                    groundY = s.PY;
+                }
+            }
+            else
+            {
+                // 9. Position integration
+                s.PX += s.VX * TickDt;
+                s.PZ += s.VZ * TickDt;
+                s.PY += s.VY * TickDt;
+
+                // 10. Ground collision via heightmap
+                surfaceY = arena.Heightmap.Data != null
+                    ? arena.Heightmap.Sample(s.PX, s.PZ)
+                    : arena.KillHeight + 1f;
+                if (surfaceY > float.MinValue)
+                {
+                    groundY = surfaceY + capsuleHalf;
+                    if (s.State == ActionState.Hitstun)
                     {
-                        s.IsGrounded = true;
-                        s.VY = 0f;
-                        s.PY = groundY;
-                        s.AirTimeTicks = 0;
-                        s.KVY = 0f;
+                        bool atSurface = s.PY <= groundY + PlatformLandTolerance && s.PY >= groundY - PlatformSnapTolerance;
+                        if (atSurface && s.KVY <= 0f)
+                        {
+                            s.IsGrounded = true;
+                            s.VY = 0f;
+                            s.PY = groundY;
+                            s.AirTimeTicks = 0;
+                            s.KVY = 0f;
+                        }
+                        else if (s.PY < groundY - PlatformSnapTolerance)
+                        {
+                            s.IsGrounded = true;
+                            s.VY = 0f;
+                            s.KVY = 0f;
+                            s.PY = groundY;
+                            s.AirTimeTicks = 0;
+                            }
+                        else
+                        {
+                            s.IsGrounded = false;
+                        }
                     }
-                    else if (s.PY < groundY - PlatformSnapTolerance)
+                    else if (s.PY <= groundY + PlatformLandTolerance
+                        && (s.PY >= groundY - PlatformSnapTolerance || s.PY < groundY))
                     {
                         s.IsGrounded = true;
                         s.VY = 0f;
-                        s.KVY = 0f;
                         s.PY = groundY;
                         s.AirTimeTicks = 0;
                     }
@@ -606,22 +641,10 @@ namespace SlopArena.Shared
                         s.IsGrounded = false;
                     }
                 }
-                else if (s.PY <= groundY + PlatformLandTolerance
-                    && (s.PY >= groundY - PlatformSnapTolerance || s.PY < groundY))
-                {
-                    s.IsGrounded = true;
-                    s.VY = 0f;
-                    s.PY = groundY;
-                    s.AirTimeTicks = 0;
-                }
                 else
                 {
                     s.IsGrounded = false;
                 }
-            }
-            else
-            {
-                s.IsGrounded = false;
             }
 
             // Walk-off: running off a platform must start falling immediately, not ride
@@ -728,19 +751,16 @@ namespace SlopArena.Shared
         /// HitstunTicks controls how long the victim can't act (animation lock).
         /// DI input is stored during hitstun and applied when it expires.
         /// </summary>
-        private static void ProcessHitstun(ref CharacterState s, InputState input)
+        private static void ProcessHitstun(ref CharacterState s, InputState input,
+            ArenaDefinition arena, CharacterDefinition def)
         {
             // ADR-0019: constant knockback velocity during hitstun. Position is NOT
-            // integrated here — the caller falls through to the generic position update
-            // (step 9) + ground collision (step 10), which run for Hitstun states. Early
-            // versions integrated here too, double-moving the victim by 2x KV*dt per tick.
+            // integrated here — the caller falls through to the generic position update.
             s.VX = s.KVX;
             s.VY = s.KVY;
             s.VZ = s.KVZ;
             if (s.VY > 0f) s.IsGrounded = false;
 
-            // Post-hitstop input updates DI only. SDI is exclusively committed
-            // during hitstop and applied at the freeze boundary.
             if (input.MoveX != 0f || input.MoveY != 0f)
             {
                 s.DIX = input.MoveX;
@@ -749,9 +769,13 @@ namespace SlopArena.Shared
 
             if (s.HitstunTicks == 0)
             {
-                // Hitstun expiry applies ASDI and transitions to actionable state.
-                s.PX += s.DIX * 0.4f;
-                s.PZ += s.DIY * 0.4f;
+                if (ArenaCollision.HasTriangles(arena))
+                    MoveThroughStage(ref s, def, arena, s.DIX * 0.4f, 0f, s.DIY * 0.4f);
+                else
+                {
+                    s.PX += s.DIX * 0.4f;
+                    s.PZ += s.DIY * 0.4f;
+                }
                 s.DIX = 0f;
                 s.DIY = 0f;
                 s.SdiApplied = false;
@@ -765,10 +789,118 @@ namespace SlopArena.Shared
                 s.State = ActionState.Idle;
             }
         }
-        public static void ApplySdi(ref CharacterState s, float dx, float dz)
+
+        /// <summary>
+        /// Moves one character through triangle geometry. The remaining displacement is
+        /// projected against each contact, so walls slide and corners settle without
+        /// tunnelling. Both ordinary and knockback velocities receive the same projection.
+        /// </summary>
+        internal static bool MoveThroughStage(ref CharacterState s, CharacterDefinition def,
+            in ArenaDefinition arena, float dx, float dy, float dz)
         {
-            s.PX += dx * 0.4f;
-            s.PZ += dz * 0.4f;
+            if (!ArenaCollision.HasTriangles(arena))
+            {
+                s.PX += dx; s.PY += dy; s.PZ += dz;
+                return false;
+            }
+
+            int[] candidates = TriangleCandidates(in arena);
+            ArenaCollision.RecoverCapsule(ref s.PX, ref s.PY, ref s.PZ,
+                def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
+            float remainingX = dx, remainingY = dy, remainingZ = dz;
+            bool supported = false;
+            for (int iteration = 0; iteration < 4; iteration++)
+            {
+                float length = MathF.Sqrt(remainingX * remainingX + remainingY * remainingY + remainingZ * remainingZ);
+                if (length <= 0.000001f) break;
+                int count = ArenaCollision.GetCandidateTrianglesForSweep(
+                    s.PX, s.PY, s.PZ,
+                    s.PX + remainingX, s.PY + remainingY, s.PZ + remainingZ,
+                    def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
+                if (!ArenaCollision.SweepCapsule(
+                    s.PX, s.PY, s.PZ,
+                    s.PX + remainingX, s.PY + remainingY, s.PZ + remainingZ,
+                    def.CapsuleRadius, def.CapsuleHeight, in arena,
+                    candidates, count, out var contact))
+                {
+                    s.PX += remainingX; s.PY += remainingY; s.PZ += remainingZ;
+                    remainingX = remainingY = remainingZ = 0f;
+                    break;
+                }
+
+                float contactTime = Math.Clamp(contact.Time, 0f, 1f);
+                s.PX += remainingX * contactTime;
+                s.PY += remainingY * contactTime;
+                s.PZ += remainingZ * contactTime;
+                float after = 1f - contactTime;
+                remainingX *= after;
+                remainingY *= after;
+                remainingZ *= after;
+
+                float inward = remainingX * contact.NormalX
+                    + remainingY * contact.NormalY + remainingZ * contact.NormalZ;
+                if (inward < 0f)
+                {
+                    remainingX -= contact.NormalX * inward;
+                    remainingY -= contact.NormalY * inward;
+                    remainingZ -= contact.NormalZ * inward;
+                }
+
+                ProjectVelocity(ref s.VX, ref s.VY, ref s.VZ, contact.NormalX, contact.NormalY, contact.NormalZ);
+                ProjectVelocity(ref s.KVX, ref s.KVY, ref s.KVZ, contact.NormalX, contact.NormalY, contact.NormalZ);
+                float approach = dx * contact.NormalX + dy * contact.NormalY + dz * contact.NormalZ;
+                if (contact.NormalY > 0.5f && (approach < -0.0001f || s.IsGrounded))
+                    supported = true;
+                if (remainingX * remainingX + remainingY * remainingY + remainingZ * remainingZ <= 0.000001f)
+                    break;
+            }
+
+            if (ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ, def.CapsuleRadius,
+                    def.CapsuleHeight, in arena, candidates, out _))
+                supported = true;
+            s.IsGrounded = supported;
+            if (supported)
+            {
+                if (s.VY < 0f) s.VY = 0f;
+                if (s.KVY < 0f) s.KVY = 0f;
+                s.AirTimeTicks = 0;
+            }
+            return supported;
+        }
+
+        internal static void RecoverStageOverlap(ref CharacterState s, CharacterDefinition def,
+            in ArenaDefinition arena)
+        {
+            if (!ArenaCollision.HasTriangles(arena)) return;
+            int[] candidates = TriangleCandidates(in arena);
+            ArenaCollision.RecoverCapsule(ref s.PX, ref s.PY, ref s.PZ,
+                def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
+            s.IsGrounded = ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ,
+                def.CapsuleRadius, def.CapsuleHeight, in arena, candidates, out _);
+        }
+
+        private static void ProjectVelocity(ref float vx, ref float vy, ref float vz,
+            float nx, float ny, float nz)
+        {
+            float into = vx * nx + vy * ny + vz * nz;
+            if (into < 0f)
+            {
+                vx -= nx * into;
+                vy -= ny * into;
+                vz -= nz * into;
+            }
+        }
+
+        public static void ApplySdi(ref CharacterState s, float dx, float dz,
+            CharacterDefinition def, in ArenaDefinition arena)
+        {
+            if (ArenaCollision.HasTriangles(arena))
+                MoveThroughStage(ref s, def, arena, dx * 0.4f, 0f, dz * 0.4f);
+            else
+            {
+                s.PX += dx * 0.4f;
+                s.PZ += dz * 0.4f;
+            }
         }
 
         public static void ApplyDirectionalInfluence(ref CharacterState s)
@@ -880,6 +1012,7 @@ namespace SlopArena.Shared
                 s.PX += inwardX * (LedgeSnapRange + def.CapsuleRadius);
                 s.PZ += inwardZ * (LedgeSnapRange + def.CapsuleRadius);
                 s.VX = s.VY = s.VZ = 0f;
+                RecoverStageOverlap(ref s, def, arena);
                 s.State = ActionState.Idle;
                 s.InvincibilityTicks = 0;
             }
@@ -923,33 +1056,38 @@ namespace SlopArena.Shared
             s.VY = s.KVY;
             s.VZ = s.KVZ;
 
-            // Position update
-            s.PX += s.VX * TickDt;
-            s.PZ += s.VZ * TickDt;
-            s.PY += s.VY * TickDt;
-
-            // Ground check via heightmap
             bool wasAirborne = !s.IsGrounded;
-            float capsuleHalfKb = def.CapsuleHeight * 0.5f;
-            float kbSurfaceY = arena.Heightmap.Data != null
-                ? arena.Heightmap.Sample(s.PX, s.PZ)
-                : float.MinValue;
-            if (kbSurfaceY > float.MinValue)
+            if (ArenaCollision.HasTriangles(arena))
             {
-                float groundY = kbSurfaceY + capsuleHalfKb;
-                s.IsGrounded = s.KVY <= 0f
-                    && s.PY <= groundY + PlatformLandTolerance
-                    && (wasAirborne || s.PY >= groundY - PlatformSnapTolerance);
+                MoveThroughStage(ref s, def, arena,
+                    s.VX * TickDt, s.VY * TickDt, s.VZ * TickDt);
             }
             else
             {
-                s.IsGrounded = false;
-            }
-
-            if (s.IsGrounded)
-            {
-                s.VY = 0f;
-                s.PY = kbSurfaceY + capsuleHalfKb;
+                // Position update and ground check via the legacy heightmap path.
+                s.PX += s.VX * TickDt;
+                s.PZ += s.VZ * TickDt;
+                s.PY += s.VY * TickDt;
+                float capsuleHalfKb = def.CapsuleHeight * 0.5f;
+                float kbSurfaceY = arena.Heightmap.Data != null
+                    ? arena.Heightmap.Sample(s.PX, s.PZ)
+                    : float.MinValue;
+                if (kbSurfaceY > float.MinValue)
+                {
+                    float groundY = kbSurfaceY + capsuleHalfKb;
+                    s.IsGrounded = s.KVY <= 0f
+                        && s.PY <= groundY + PlatformLandTolerance
+                        && (wasAirborne || s.PY >= groundY - PlatformSnapTolerance);
+                    if (s.IsGrounded)
+                    {
+                        s.VY = 0f;
+                        s.PY = groundY;
+                    }
+                }
+                else
+                {
+                    s.IsGrounded = false;
+                }
             }
 
             if (wasAirborne && s.IsGrounded)
@@ -1551,51 +1689,10 @@ namespace SlopArena.Shared
             in ArenaDefinition arena,
             int[] outIndices)
         {
-            var grid = arena.SpatialGrid;
-            if (grid.CellStarts == null || grid.CellStarts.Length == 0)
-                return 0;
-
-            int ixMin = (int)((px - radius - grid.OriginX) / grid.CellSize);
-            int ixMax = (int)((px + radius - grid.OriginX) / grid.CellSize);
-            int iyMin = (int)((py - radius - grid.OriginY) / grid.CellSize);
-            int iyMax = (int)((py + radius - grid.OriginY) / grid.CellSize);
-            int izMin = (int)((pz - radius - grid.OriginZ) / grid.CellSize);
-            int izMax = (int)((pz + radius - grid.OriginZ) / grid.CellSize);
-
-            if (ixMin < 0) ixMin = 0;
-            if (ixMax >= grid.CellsX) ixMax = grid.CellsX - 1;
-            if (iyMin < 0) iyMin = 0;
-            if (iyMax >= grid.CellsY) iyMax = grid.CellsY - 1;
-            if (izMin < 0) izMin = 0;
-            if (izMax >= grid.CellsZ) izMax = grid.CellsZ - 1;
-
-            if (ixMin > ixMax || iyMin > iyMax || izMin > izMax)
-                return 0;
-
-            int count = 0;
-            for (int iz = izMin; iz <= izMax; iz++)
-            {
-                for (int iy = iyMin; iy <= iyMax; iy++)
-                {
-                    for (int ix = ixMin; ix <= ixMax; ix++)
-                    {
-                        int cell = iz * grid.CellsX * grid.CellsY + iy * grid.CellsX + ix;
-                        int start = grid.CellStarts[cell];
-                        int end = grid.CellStarts[cell + 1];
-                        for (int i = start; i < end; i++)
-                        {
-                            int ti = grid.CellTriangles[i];
-                            bool dup = false;
-                            for (int j = 0; j < count; j++)
-                                if (outIndices[j] == ti) { dup = true; break; }
-                            if (!dup)
-                                outIndices[count++] = ti;
-                        }
-                    }
-                }
-            }
-
-            return count;
+            return ArenaCollision.GetCandidateTrianglesForAabb(
+                px - radius, py - radius, pz - radius,
+                px + radius, py + radius, pz + radius,
+                in arena, outIndices);
         }
 
         private static float MoveToward(float from, float to, float delta)
