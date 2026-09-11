@@ -644,7 +644,7 @@ namespace SlopArena.Client.Entities
                 // e.g. Manki A release ComboStage 1, only anim.manki.ga). GetAnimationName
                 // wraps; using the wrapped index keeps the baked-duration lookup consistent.
                 int stageIdx = comboStage % spec.AnimationNames.Length;
-                animName = spec.GetAnimationName(stageIdx);
+                animName = spec.AnimationNames[stageIdx];
                 if (_bakedData != null && spec.Stages != null && stageIdx < spec.Stages.Length)
                 {
                     int bakedIdx = _bakedData.FindAnimIndex(animName);
