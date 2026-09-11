@@ -123,7 +123,7 @@ namespace SlopArena.Shared
 		/// Activate a server ability for an entity.
 		/// Calls OnStart and registers the ability for per-tick updates.
 		/// </summary>
-		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def)
+		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def, short? activationAimYaw = null)
 		{
 			if (!_states.TryGetValue(entityId, out var state)) return;
 			ability.Resolver = _spellResolver;
@@ -149,6 +149,13 @@ namespace SlopArena.Shared
 			// Acting ends the post-hitstun flight regime.
 			state.InPostHitstunFlight = false;
 			ability.OnStart(ref state, def);
+            bool aimingAbility = cookedSlot != null
+                ? cookedSlot.AimMode != AuthoringAimMode.None
+                : spec != null && spec.AimMode != AimMode.None;
+            if (aimingAbility)
+                state.FacingYaw = activationAimYaw.HasValue
+                    ? activationAimYaw.Value * 0.01f * (MathF.PI / 180f)
+                    : state.AimYaw;
 			state.AnimIndex = ability.AnimIndex;
 			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 			{
@@ -687,7 +694,7 @@ namespace SlopArena.Shared
 				{
 					AbilityFactory.InitFromSpec(ability, spec!, (byte)(input.ActiveSlot - 1));
 				}
-				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def);
+				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def, input.AimYaw);
 
                 // Spend a charge from the cooked or legacy pool; capabilities refund valid hits.
                 if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))

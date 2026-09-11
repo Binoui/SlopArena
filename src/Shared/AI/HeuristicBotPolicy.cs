@@ -61,7 +61,6 @@ public sealed class HeuristicBotPolicy
         var input = new InputState();
         if (!actionable)
         {
-            memory.WasActionable = false;
             return input;
         }
 
@@ -87,7 +86,6 @@ public sealed class HeuristicBotPolicy
 
         if (!hasTarget)
         {
-            memory.WasActionable = true;
             return input;
         }
 
@@ -105,7 +103,6 @@ public sealed class HeuristicBotPolicy
         bool waiting = memory.DecisionTicksRemaining > 0 || memory.ReactionTicksRemaining > 0;
         if (waiting)
         {
-            memory.WasActionable = true;
             return input;
         }
 
@@ -113,7 +110,6 @@ public sealed class HeuristicBotPolicy
         memory.DecisionTicksRemaining = profile.DecisionIntervalTicks;
         if (!inRange)
         {
-            memory.WasActionable = true;
             return input;
         }
 
@@ -128,7 +124,6 @@ public sealed class HeuristicBotPolicy
         {
             input.Jump = true;
             input.JumpHeld = true;
-            memory.WasActionable = true;
             return input;
         }
 
@@ -144,7 +139,6 @@ public sealed class HeuristicBotPolicy
             input.Dash = true;
             input.MoveX = -dx / dist;
             input.MoveY = -dz / dist;
-            memory.WasActionable = true;
             return input;
         }
 
@@ -161,8 +155,6 @@ public sealed class HeuristicBotPolicy
         if (attack)
         {
             input.ActiveSlot = slot!.Value;
-            memory.LastPressedSlot = input.ActiveSlot;
-            memory.WasActionable = true;
             return input;
         }
 
@@ -177,7 +169,6 @@ public sealed class HeuristicBotPolicy
         {
             input.MoveX = -dx / dist;
             input.MoveY = -dz / dist;
-            memory.WasActionable = true;
             return input;
         }
 
@@ -185,7 +176,6 @@ public sealed class HeuristicBotPolicy
             memory.StrafeDirection = rng.Next(2) == 0 ? (sbyte)-1 : (sbyte)1;
         input.MoveX = -dz / dist * memory.StrafeDirection;
         input.MoveY = dx / dist * memory.StrafeDirection;
-        memory.WasActionable = true;
         return input;
     }
 

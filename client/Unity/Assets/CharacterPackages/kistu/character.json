@@ -753,7 +753,7 @@
       "iconId": "icon.e",
       "behavior": "meleeCombo",
       "aimMode": "none",
-      "aimMovement": "fixed",
+      "aimMovement": "mobile",
       "cooldownTicks": 90,
       "isRecoveryMove": true,
       "preserveMomentumOnStart": false,

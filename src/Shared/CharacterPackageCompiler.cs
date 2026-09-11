@@ -52,6 +52,7 @@ public static class CharacterPackageCompiler
         "slop.internal.manki.jetpack-boost.v1",
         "slop.internal.manki.bazooka.v1",
     };
+    internal static bool IsTrustedCapability(string id) => TrustedCapabilities.Contains(id);
 
     public static CharacterCompileResult Compile(string packageManifestJson, string characterJson, CharacterCookProfile profile = CharacterCookProfile.Workshop)
     {
@@ -108,7 +109,7 @@ public static class CharacterPackageCompiler
             ValidateId(requirement.CapabilityId, "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", d);
             if (!capabilityMap.TryAdd(requirement.CapabilityId, requirement.CapabilityVersion)) d.Error("id.duplicate", "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", "Duplicate capability requirement.");
             if (profile == CharacterCookProfile.Workshop && requirement.CapabilityId.StartsWith("slop.internal.", StringComparison.Ordinal)) d.Error("capability.untrusted", "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", "Trusted built-in capabilities are not allowed in Workshop profile.");
-            if (profile == CharacterCookProfile.TrustedBuiltIn && (!TrustedCapabilities.Contains(requirement.CapabilityId) || requirement.CapabilityVersion != "1")) d.Error("capability.unknown", "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", "Capability is not admitted by the trusted profile.");
+            if (profile == CharacterCookProfile.TrustedBuiltIn && (!IsTrustedCapability(requirement.CapabilityId) || requirement.CapabilityVersion != "1")) d.Error("capability.unknown", "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", "Capability is not admitted by the trusted profile.");
         }
         if (capabilityCount > CookedBudget.MaxCapabilityRequirements) d.Error("budget.exceeded", "character.capabilityRequirements", "Capability requirement budget exceeded.");
         ValidateFinite(c, d);

@@ -163,7 +163,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 80,
+            "durationTicks": 48,
             "iasaTicks": 30,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -179,7 +179,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 9,
+                "tick": 17,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -562,7 +562,8 @@
       "iconId": "icon.f",
       "behavior": "meleeCombo",
       "aimMode": "none",
-      "aimMovement": "fixed",
+      "aimMovement": "mobile",
+      "aimAnimationId": "anim.bonk.gf",
       "cooldownTicks": 900,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -583,6 +584,12 @@
               "anim.bonk.gf"
             ],
             "operations": [
+              {
+                "kind": "setAimState",
+                "tick": 0,
+                "unit": "ticks",
+                "aimState": "cameraForward3D"
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 8,

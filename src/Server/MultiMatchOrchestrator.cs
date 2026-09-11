@@ -18,7 +18,6 @@ namespace SlopArena.Server
         private readonly ServerConfig _config;
         private readonly MatchContentCatalogProvider _contentProvider;
 
-        public MatchContentCatalogProvider ContentProvider => _contentProvider;
 
         public MultiMatchOrchestrator(ServerConfig config)
         {
@@ -70,20 +69,6 @@ namespace SlopArena.Server
         public int CurrentMatchCount => _activeMatches.Count;
 
         /// <summary>
-        /// Maximum concurrent matches (from config).
-        /// </summary>
-        public int MaxConcurrentMatches => _config.MaxConcurrentMatches;
-
-        /// <summary>
-        /// Server name from config.
-        /// </summary>
-        public string ServerName => _config.ServerName;
-
-        /// <summary>
-        /// Region from config.
-        /// </summary>
-        public string Region => _config.Region;
-
         /// <summary>
         /// Graceful shutdown — stop all matches and wait for threads.
         /// </summary>

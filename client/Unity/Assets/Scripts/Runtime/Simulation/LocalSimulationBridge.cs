@@ -6,14 +6,11 @@ namespace SlopArena.Client.Simulation
     public class LocalSimulationBridge : ISimulationBridge
     {
         private readonly ServerSimulation _server;
-        private readonly ArenaDefinition _arena;
         private readonly List<TimelinePresentationEvent> _lastTickPresentationEvents = new();
 
         public LocalSimulationBridge(ArenaDefinition arena, IMatchRule? rule = null)
         {
             _arena = arena;
-            _server = new ServerSimulation(arena, rule);
-        }
 
         public void RegisterEntity(ulong id, CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
             => _server.RegisterEntity(id, def, initialState, baked);

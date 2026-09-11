@@ -16,8 +16,6 @@ public readonly record struct ContentHandle(ushort Value)
     public bool IsValid => Value != 0;
     public override string ToString() => Value.ToString();
 }
-public sealed record BuiltInRosterEntrySource(CharacterClass Selector, string PackageId);
-public sealed record BuiltInRosterManifestSource(ushort SchemaVersion, IReadOnlyList<BuiltInRosterEntrySource> Entries);
 public sealed record BuiltInRosterEntry(CharacterClass Selector, string PackageId, MatchContentPackageRequirement Requirement);
 
 public sealed class BuiltInRosterManifest
@@ -248,23 +246,6 @@ public sealed class LegacyCharacterCatalogAdapter
 
 public static class BuiltInRosterManifestCodec
 {
-    public static BuiltInRosterManifestSource ParseSource(string json)
-    {
-        var root = ParseObject(json, "roster");
-        ushort schema = RequiredUInt16(root, "schemaVersion");
-        var entries = ParseEntries(root, false);
-        return new BuiltInRosterManifestSource(schema, entries);
-    }
-
-    public static string SerializeSource(BuiltInRosterManifestSource source)
-    {
-        if (source == null) throw new ArgumentNullException(nameof(source));
-        using var stream = new MemoryStream();
-        using var w = new Utf8JsonWriter(stream);
-        w.WriteStartObject(); w.WriteNumber("schemaVersion", source.SchemaVersion); w.WritePropertyName("entries"); w.WriteStartArray();
-        foreach (var x in source.Entries) { w.WriteStartObject(); w.WriteString("selector", x.Selector.ToString()); w.WriteString("packageId", x.PackageId); w.WriteEndObject(); }
-        w.WriteEndArray(); w.WriteEndObject(); w.Flush(); return Encoding.UTF8.GetString(stream.ToArray());
-    }
 
     public static BuiltInRosterManifest ParseCooked(string json)
     {
@@ -294,16 +275,6 @@ public static class BuiltInRosterManifestCodec
 
     public static BuiltInRosterManifest Load(string path) => ParseCooked(File.ReadAllText(path));
 
-    private static List<BuiltInRosterEntrySource> ParseEntries(Dictionary<string, JsonElement> root, bool cooked)
-    {
-        var result = new List<BuiltInRosterEntrySource>();
-        foreach (var item in RequiredArray(root, "entries").EnumerateArray())
-        {
-            var e = StrictObject(item, "entries[]", "selector", "packageId");
-            result.Add(new BuiltInRosterEntrySource(ParseSelector(RequiredString(e, "selector")), RequiredString(e, "packageId")));
-        }
-        return result;
-    }
 
     private static CharacterClass ParseSelector(string value) => value switch
     {
