@@ -23,6 +23,17 @@ public sealed class CookedTimelineAbility : ServerAbility
         AnimationNames = animationNames ?? Array.Empty<string>();
     }
     internal bool IsHoldingAim => _unlimitedAimHold;
+    internal bool ContinuesThroughLanding
+    {
+        get
+        {
+            for (var i = 0; i < _capabilities.Count; i++)
+                if (_capabilities[i] is ILandingContinuationCapability)
+                    return true;
+            return false;
+        }
+    }
+
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {

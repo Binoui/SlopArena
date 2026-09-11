@@ -4,7 +4,7 @@ using SlopArena.Shared;
 namespace SlopArena.Shared.Abilities;
 
 /// <summary>Bonk E: hold a ground cursor, jump ballistically to the target, then slam on landing.</summary>
-public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability
+public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, ILandingContinuationCapability
 {
     private readonly CookedBonkTargetedJumpSlamCapabilityParameters _parameters;
     private enum Phase { Aim, Jump, Slam }

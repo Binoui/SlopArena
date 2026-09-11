@@ -79,6 +79,8 @@ namespace SlopArena.Shared
         public byte ComboStage;
         /// <summary>Animation index (into spec's AnimationNames[]) set by server ability. Synced to client.</summary>
         public byte AnimIndex;
+        /// <summary>Increments on every ability activation so clients can restart same-slot attack clips.</summary>
+        public byte AttackSequence;
         /// <summary>
         /// chain window remaining
         /// </summary>
@@ -188,12 +190,10 @@ namespace SlopArena.Shared
         /// ── Rush / ledge ──
         /// </summary>
         /// <summary>
-        /// Rush window remaining ticks (ADR-0020): counts down only while the fighter is
-        /// purely running in one direction on the ground (Simulation.TickTimers gates it
-        /// on the Run state). Any other action freezes it; landings and ability
-        /// activations refill it to full. A reversal within the window is an instant
-        /// Rush flip that restarts it; zero means Run proper (a reversal becomes a
-        /// Turnaround).
+        /// Rush window remaining ticks. Counts down only while the fighter is purely
+        /// running in one direction on the ground. Any other action freezes it; landings
+        /// refill it. A reversal is always an instant full-speed flip; zero only means
+        /// the Rush kick-off window has expired.
         /// </summary>
         public ushort RushTicks;
         /// <summary>Re-grab lockout after a voluntary ledge drop (S-drop) or a walk-off.

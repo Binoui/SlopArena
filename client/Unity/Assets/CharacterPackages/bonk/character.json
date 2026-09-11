@@ -179,7 +179,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 17,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -197,7 +197,7 @@
                   "baseKnockback": 4,
                   "knockbackGrowth": 20,
                   "stunTicks": 12,
-                  "durationTicks": 16,
+                  "durationTicks": 10,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -242,7 +242,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.33,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -301,21 +301,21 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.7,
+                  "radius": 0.5,
                   "offsetX": 0,
-                  "offsetY": 0,
+                  "offsetY": -0.2,
                   "offsetZ": 0,
                   "endOffsetX": 0,
-                  "endOffsetY": 0,
+                  "endOffsetY": -0.2,
                   "endOffsetZ": 0,
                   "startBoneId": "_weapon_hilt",
                   "endBoneId": "_weapon_tip",
-                  "damage": 6,
-                  "angle": 30,
-                  "baseKnockback": 4,
-                  "knockbackGrowth": 20,
-                  "stunTicks": 12,
-                  "durationTicks": 20,
+                  "damage": 10,
+                  "angle": 35,
+                  "baseKnockback": 7,
+                  "knockbackGrowth": 30,
+                  "stunTicks": 16,
+                  "durationTicks": 16,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -360,7 +360,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.38,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -571,7 +571,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 30,
+            "durationTicks": 120,
             "iasaTicks": 4,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -584,7 +584,67 @@
             "animationIds": [
               "anim.bonk.gr"
             ],
-            "operations": []
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 22,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 7,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 42,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 9,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 0,
+                "unit": "metersPerSecond",
+                "speed": 3,
+                "durationTicks": 3
+              }
+            ]
           }
         ]
       }
@@ -793,7 +853,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.28,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -807,7 +867,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
                   "stunTicks": 14,
-                  "durationTicks": 20,
+                  "durationTicks": 17,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -880,11 +940,11 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 12,
+                "tick": 15,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.32,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -898,7 +958,7 @@
                   "baseKnockback": 7,
                   "knockbackGrowth": 30,
                   "stunTicks": 20,
-                  "durationTicks": 15,
+                  "durationTicks": 13,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -923,7 +983,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 100,
+            "durationTicks": 64,
             "iasaTicks": 59,
             "landingLagTicks": 24,
             "autoCancelBeforeTicks": 16,
@@ -939,7 +999,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 35,
+                "tick": 27,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -995,7 +1055,15 @@
             "animationIds": [
               "anim.bonk.aa"
             ],
-            "operations": []
+            "operations": [
+              {
+                "kind": "forwardLunge",
+                "tick": 9,
+                "unit": "metersPerSecond",
+                "speed": 6,
+                "durationTicks": 3
+              }
+            ]
           }
         ]
       }

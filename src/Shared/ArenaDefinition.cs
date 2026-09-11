@@ -349,7 +349,7 @@ namespace SlopArena.Shared
 
                 float closingSpeed = -(dx * atStart.NormalX + dy * atStart.NormalY + dz * atStart.NormalZ);
                 if (atStart.Distance <= contactRadius
-                    && (atStart.Distance < radius - tolerance || closingSpeed > 0f))
+                    && (atStart.Distance < radius - tolerance || closingSpeed > tolerance))
                 {
                     if (0f < bestTime || (bestTime == 0f && triangleIndex < bestTriangle))
                     {
@@ -367,7 +367,7 @@ namespace SlopArena.Shared
                 for (int iteration = 0; iteration < 64 && time < 1f; iteration++)
                 {
                     closingSpeed = -(dx * previous.NormalX + dy * previous.NormalY + dz * previous.NormalZ);
-                    if (closingSpeed <= 0f) { finished = true; break; }
+                    if (closingSpeed <= tolerance) { finished = true; break; }
                     float gap = previous.Distance - contactRadius;
                     float next = MathF.Min(1f, time + MathF.Max(0f, gap / closingSpeed));
                     if (next <= time)
@@ -386,7 +386,8 @@ namespace SlopArena.Shared
                         finished = true;
                         break;
                     }
-                    if (atNext.Distance <= contactRadius)
+                    float nextClosingSpeed = -(dx * atNext.NormalX + dy * atNext.NormalY + dz * atNext.NormalZ);
+                    if (atNext.Distance <= contactRadius && nextClosingSpeed > tolerance)
                     {
                         float lo = time, hi = next;
                         for (int refine = 0; refine < 20; refine++)

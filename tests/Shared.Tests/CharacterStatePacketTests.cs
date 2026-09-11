@@ -22,6 +22,7 @@ public class CharacterStatePacketTests
             AttackSlot = 3,
             ComboStage = 2,
             AnimIndex = 5,
+            AttackSequence = 9,
             FacingYaw = 1.234f,
             MatchState = MatchState.Playing,
             HitstunLevel = 2,
@@ -72,6 +73,7 @@ public class CharacterStatePacketTests
         Assert.Equal(original.AttackSlot, restored.AttackSlot);
         Assert.Equal(original.ComboStage, restored.ComboStage);
         Assert.Equal(original.AnimIndex, restored.AnimIndex);
+        Assert.Equal(original.AttackSequence, restored.AttackSequence);
         Assert.Equal(original.FacingYaw, restored.FacingYaw);
         Assert.Equal(original.MatchState, restored.MatchState);
         Assert.Equal(original.HitstunLevel, restored.HitstunLevel);
@@ -104,8 +106,9 @@ public class CharacterStatePacketTests
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 109 bytes: the fixed state fields, eleven cooldown slots, and rollback resources.
-        Assert.Equal(109, CharacterStatePacket.Size);
+        // 110 bytes: the fixed state fields, eleven cooldown slots, rollback resources,
+        // and the attack animation restart marker.
+        Assert.Equal(110, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

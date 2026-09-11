@@ -30,6 +30,8 @@ namespace SlopArena.Shared
         public byte ComboStage;
         /// <summary>Animation index into the ability's AnimationNames[] (set by server ability class).</summary>
         public byte AnimIndex;
+        /// <summary>Changes on every ability activation, including same-slot IASA restarts.</summary>
+        public byte AttackSequence;
         /// <summary>Facing yaw in radians, from server authority.</summary>
         public float FacingYaw;
 
@@ -72,9 +74,8 @@ namespace SlopArena.Shared
         /// <summary>Ledge re-grab suppression (walk-off self-grab guard) — on-wire so the rollback
         /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
         public ushort LedgeRegrabLockTicks;
-
-        /// <summary>109 bytes: fixed state fields, eleven cooldown slots, and rollback resources.</summary>
-        public const int Size = 109;
+        /// <summary>110 bytes: fixed state fields, eleven cooldown slots, rollback resources, and attack sequence.</summary>
+        public const int Size = 110;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -89,12 +90,13 @@ namespace SlopArena.Shared
                 VelocityY = s.VY,
                 VelocityZ = s.VZ,
                 CurrentActionState = (byte)s.State,
-                IsGrounded = s.IsGrounded,
                 StateDurationFrames = s.StateTicks,
+                IsGrounded = s.IsGrounded,
                 AttackSlot = s.AttackSlot,
                 ComboStage = s.ComboStage,
                 FacingYaw = s.FacingYaw,
                 AnimIndex = s.AnimIndex,
+                AttackSequence = s.AttackSequence,
                 MatchState = s.MatchState,
                 HitstunLevel = s.HitstunLevel,
                 AimPitch = s.AimPitch,
@@ -148,6 +150,7 @@ namespace SlopArena.Shared
                 AttackSlot = AttackSlot,
                 ComboStage = ComboStage,
                 AnimIndex = AnimIndex,
+                AttackSequence = AttackSequence,
                 FacingYaw = FacingYaw,
                 MatchState = MatchState,
                 HitstunLevel = HitstunLevel,
@@ -239,6 +242,7 @@ namespace SlopArena.Shared
             buffer[105] = JumpHeldTicks;
             buffer[106] = LockOn ? (byte)1 : (byte)0;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), LedgeRegrabLockTicks);
+            buffer[109] = AttackSequence;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -295,6 +299,7 @@ namespace SlopArena.Shared
             packet.JumpHeldTicks = buffer[105];
             packet.LockOn = buffer[106] != 0;
             packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
+            packet.AttackSequence = buffer[109];
             return packet;
         }
 
@@ -304,7 +309,7 @@ namespace SlopArena.Shared
         /// non-wire field at its default), this preserves everything ApplyTo doesn't touch —
         /// used by LocalTrack (ADR-0011), which must patch its own full-fidelity self state
         /// with the server's authoritative wire fields without clobbering fields the wire
-        /// doesn't carry (e.g. AttackElapsedTicks, knockback velocity).
+        /// doesn't carry (e.g. attack elapsed ticks, knockback velocity).
         /// </summary>
         public void ApplyTo(ref CharacterState s)
         {
@@ -312,10 +317,10 @@ namespace SlopArena.Shared
             s.VX = VelocityX; s.VY = VelocityY; s.VZ = VelocityZ;
             s.State = (ActionState)CurrentActionState;
             s.IsGrounded = IsGrounded;
-            s.StateTicks = StateDurationFrames;
             s.AttackSlot = AttackSlot;
             s.ComboStage = ComboStage;
             s.AnimIndex = AnimIndex;
+            s.AttackSequence = AttackSequence;
             s.FacingYaw = FacingYaw;
             s.MatchState = MatchState;
             s.HitstunLevel = HitstunLevel;

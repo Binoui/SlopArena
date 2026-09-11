@@ -57,16 +57,14 @@ Holding the dedicated Down key (X by default — deliberately NOT the backward-m
 _Avoid_: dive, plummet, down air
 
 **Run**:
-The single ground locomotion tier (ADR-0020 §1 — replaces the old walk/sprint split; Melee's "dash" tier is NOT adopted). Reached instantly from the Rush; the soft-start accel survives only to recover from a Turnaround (parallel velocity). Releasing brakes to a stop fast (`GroundStopFriction`, 36 m/s² — no semi-truck drift). Changing axis while at run speed is an instant redirect — the perpendicular velocity is cleared, never carried between axes (no diagonal drag). No selectable walk speed on 8-way input.
+The single ground locomotion tier (ADR-0020 §1 — replaces the old walk/sprint split; Melee's "dash" tier is NOT adopted). Reached instantly from the Rush. Releasing brakes to a stop fast (`GroundStopFriction`, 36 m/s² — no semi-truck drift). Changing axis while at run speed is an instant redirect — the perpendicular velocity is cleared, never carried between axes (no diagonal drag), and reversing direction snaps immediately to `RunSpeed`. No selectable walk speed on 8-way input.
 _Avoid_: walk, sprint (the deleted two-tier model)
 
 **Rush**:
-The reversal-free burst that starts a Run from a standstill — a fixed window (`RushTicks`, ~10 ticks) during which velocity is at `RunSpeed` immediately. Reversing within the window is an instant full-speed flip that restarts it — Melee's "dash-dance", renamed because "Dash" is the SA mechanic. A perpendicular (90°) redirect also restarts the window, so an 8-way WASD dash-dance never drops out of Rush. Releasing inside the window stops dead (no drift — a tap is a fixed burst, not a slide). Holding one direction steady past the window enters Run proper, where reversal becomes a Turnaround.
-_Avoid_: dash, dash-dance, initial dash
+The reversal-free burst that starts a Run from a standstill — a fixed window (`RushTicks`, ~10 ticks) during which velocity is at `RunSpeed` immediately. Reversing within the window is an instant full-speed flip that restarts it — Melee's "dash-dance", renamed because "Dash" is the SA mechanic. A perpendicular (90°) redirect also restarts the window, so an 8-way WASD dash-dance never drops out of Rush. Releasing inside the window stops dead (no drift — a tap is a fixed burst, not a slide). Holding one direction steady past the window enters Run proper; reversals remain immediate.
 
 **Turnaround**:
-The turn-lag reversal from a full Run — friction-through-zero, the pivot skid. Decelerates hard (`TurnaroundFriction` 70 m/s², ~0.2 s / ~1.4 m) so it's a short, decisive pivot, not an ice slide. Slower than the instant Rush flip; the skid is the commitment. Applies only once the Rush window has expired.
-_Avoid_: pivot turn, skid, about-face
+~~Removed — grounded reversals are now immediate after the Rush window.~~
 
 **Dash** (SA Dash):
 The Shift-triggered burst — the shield substitute (SA has no shields), used for quick dodges and approaches (wavedash-like). A *mechanic*, not a locomotion tier (ADR-0020 §1). Short burst (2-10 m per character style); grounded dash **hard-stops** on expiry, aerial dash **preserves momentum** (approach tool). I-frames cover only the start (`DashInvincibilityTicks` = 4) — dodging through is doable but timing-tight. See **DashInvincibility**.

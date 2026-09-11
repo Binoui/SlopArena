@@ -133,6 +133,37 @@ public sealed class BonkKitTests
         Assert.True(oppositeHitbox);
         Assert.True(opposite.PX < 20f, "opposite yaw must travel in the opposite world-space direction");
     }
+
+    [Fact]
+    public void BonkE_AirborneStartContinuesThroughLandingIntoSlam()
+    {
+        var def = BonkDefinition();
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def) + 3f;
+        state.IsGrounded = false;
+        state.VY = -1f;
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 4, true) });
+        for (var i = 0; i < 8; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 0, true) });
+
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 0, false) });
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        Assert.False(sim.GetState(1).IsGrounded);
+
+        var slamSeen = false;
+        for (var i = 0; i < 120; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            slamSeen |= sim.Resolver.GetActiveHitboxes().Any(x => x.OwnerId == 1 && x.Damage == 13f);
+            if (slamSeen) break;
+        }
+
+        Assert.True(slamSeen, $"state={sim.GetState(1).State} slot={sim.GetState(1).AttackSlot} py={sim.GetState(1).PY} grounded={sim.GetState(1).IsGrounded} active={sim.GetActiveAbility(1)?.GetType().Name}");
+    }
+
     [Fact]
     public void BonkE_HoldsPastAimCap_AllowsMovementAndReleasesCachedTarget()
     {

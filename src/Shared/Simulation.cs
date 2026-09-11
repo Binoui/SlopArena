@@ -112,17 +112,9 @@ namespace SlopArena.Shared
         private const float VelocityDeadZone = 0.015f;
         /// <summary>
         /// Release brake on the ground (ADR-0020): how fast a Run decelerates to zero once
-        /// input is released. A passive coast, slower than the decisive Turnaround pivot.
-        /// A Rush release stops instantly (no drift at all).
+        /// input is released. A Rush release stops instantly (no drift at all).
         /// </summary>
         private const float GroundStopFriction = 36f;
-
-        /// <summary>
-        /// Run-reversal (Turnaround) deceleration (ADR-0020): the pivot skid. Much faster
-        /// than the coast `GroundFriction` so reversing reads as a short, decisive pivot —
-        /// ~0.2 s / ~1.4 m to stop from full run speed (Melee feel).
-        /// </summary>
-        private const float TurnaroundFriction = 70f;
 
         /// <summary>
         /// Tolerance for snapping to platform surfaces (units).
@@ -690,11 +682,8 @@ namespace SlopArena.Shared
             if (s.BurstRecoveryTicks > 0) s.BurstRecoveryTicks--;
             if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
 
-            // Rush window ticks (ADR-0020): counts ONLY while the fighter is purely
-            // moving in one direction on the ground (Run). Any other action — attack,
-            // jump, dash, hitstun, aim — freezes it; landings and ability activations
-            // refill it. The fighter stays in Rush through footsies and only falls
-            // into Run (slow Turnaround) after a long same-direction hold.
+            // Rush window ticks: counts only while purely moving in one direction on the
+            // ground. Other actions freeze it; the expired window no longer adds turn lag.
             if (s.RushTicks > 0 && s.IsGrounded && s.State == ActionState.Run)
                 s.RushTicks--;
             if (s.LedgeRegrabLockTicks > 0) s.LedgeRegrabLockTicks--;
@@ -837,15 +826,24 @@ namespace SlopArena.Shared
 
                 float inward = remainingX * contact.NormalX
                     + remainingY * contact.NormalY + remainingZ * contact.NormalZ;
+                float verticalDisplacementBeforeProjection = remainingY;
                 if (inward < 0f)
                 {
                     remainingX -= contact.NormalX * inward;
                     remainingY -= contact.NormalY * inward;
                     remainingZ -= contact.NormalZ * inward;
+                    if (verticalDisplacementBeforeProjection <= 0f && remainingY > verticalDisplacementBeforeProjection)
+                        remainingY = verticalDisplacementBeforeProjection;
                 }
 
+                float velocityYBeforeProjection = s.VY;
+                float knockbackVelocityYBeforeProjection = s.KVY;
                 ProjectVelocity(ref s.VX, ref s.VY, ref s.VZ, contact.NormalX, contact.NormalY, contact.NormalZ);
                 ProjectVelocity(ref s.KVX, ref s.KVY, ref s.KVZ, contact.NormalX, contact.NormalY, contact.NormalZ);
+                if (velocityYBeforeProjection <= 0f && s.VY > velocityYBeforeProjection)
+                    s.VY = velocityYBeforeProjection;
+                if (knockbackVelocityYBeforeProjection <= 0f && s.KVY > knockbackVelocityYBeforeProjection)
+                    s.KVY = knockbackVelocityYBeforeProjection;
                 float approach = dx * contact.NormalX + dy * contact.NormalY + dz * contact.NormalZ;
                 if (contact.NormalY > 0.5f && (approach < -0.0001f || s.IsGrounded))
                     supported = true;
@@ -1239,11 +1237,9 @@ namespace SlopArena.Shared
             }
 
             // Starting from a standstill opens the Rush window (ADR-0020): a fixed
-            // dash-dance window during which reversals are instant and velocity is set
-            // to cruise speed immediately (no soft-start ramp — Melee's initial dash).
-            // A perpendicular redirect (90° axis change) also keeps the fighter in the
-            // window; only holding a steady direction lets it expire into Run. Reversals
-            // are deliberately excluded — at Run they stay a Turnaround skid.
+            // dash-dance window during which velocity is set to cruise speed immediately.
+            // A perpendicular redirect also restarts the window; reversals remain instant
+            // after it expires.
             bool wasStopped = (s.LastDirX == 0f && s.LastDirZ == 0f);
             float dirChangeDot = (s.LastDirX * dirX) + (s.LastDirZ * dirZ);
             if (wasStopped || MathF.Abs(dirChangeDot) < 0.5f) s.RushTicks = stats.RushTicks;
@@ -1268,12 +1264,10 @@ namespace SlopArena.Shared
                 bool pivot = speed > VelocityDeadZone && (s.VX * dirX + s.VZ * dirZ) < 0f;   // velocity opposes input
                 if (pivot)
                 {
-                    // Turnaround (Run reversal at cruise): friction-through-zero — the
-                    // pivot skid. Decelerates hard (TurnaroundFriction) so the pivot is a
-                    // short, decisive turn, not an ice slide; still slower than the Rush flip.
-                    float friction = TurnaroundFriction * TickDt;
-                    s.VX = MoveToward(s.VX, 0f, friction);
-                    s.VZ = MoveToward(s.VZ, 0f, friction);
+                    // Ground reversals are immediate after Rush as well: no sluggish
+                    // Turnaround skid. Snap to cruise speed in the requested direction.
+                    s.VX = dirX * stats.RunSpeed;
+                    s.VZ = dirZ * stats.RunSpeed;
                     if (isLocomotion) s.State = ActionState.Run;
                 }
                 else if (speed > stats.RunSpeed)
@@ -1293,10 +1287,8 @@ namespace SlopArena.Shared
                 }
                 else
                 {
-                    // Run hold / Turnaround recovery. The soft-start accel recovers from a
-                    // Turnaround (velocity parallel to input). Any perpendicular component
-                    // is a redirect: snap to the input direction at current speed, dropping
-                    // the perpendicular (no diagonal drag) — ADR-0020.
+                    // Run hold. Any perpendicular component is a redirect: snap to the
+                    // input direction at current speed, dropping it (no diagonal drag).
                     float perp = (s.VX * dirZ) - (s.VZ * dirX);
                     if (MathF.Abs(perp) > VelocityDeadZone)
                     {

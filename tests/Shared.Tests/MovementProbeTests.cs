@@ -109,15 +109,13 @@ public class MovementProbeTests
     }
 
     [Fact]
-    public void Reversal_FromCruise_IsPivotSkidThenReaccel()
+    public void Reversal_FromCruise_IsImmediate()
     {
         var rev = Measured().Reversal;
-        // A 180° flip does NOT refresh the rush window (perpendicular redirects only), so
-        // reversal = skid through zero + soft-start re-accel. It must take longer than a
-        // single tick (no instant flip) and complete within a sane window.
-        Assert.True(rev.ReversalTicks > 5, $"reversal suspiciously instant ({rev.ReversalTicks} ticks)");
-        Assert.True(rev.ReversalTicks <= 60, $"reversal too slow ({rev.ReversalTicks} ticks)");
-        Assert.True(rev.Displacement > 1f, $"reversal displacement {rev.Displacement:F2}m");
+        // Ground reversal does not enter a Turnaround skid after Rush expires.
+        Assert.True(rev.ReversalTicks <= 2,
+            $"reversal should be immediate ({rev.ReversalTicks} ticks)");
+        Assert.True(rev.Displacement > 0f, $"reversal displacement {rev.Displacement:F2}m");
     }
 
     [Fact]

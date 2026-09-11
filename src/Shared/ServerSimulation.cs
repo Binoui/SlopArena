@@ -144,10 +144,9 @@ namespace SlopArena.Shared
                 state.VX = 0f;
                 state.VZ = 0f;
             }
-            // Ability refresh (ADR-0020): activating any ability refills the Rush window.
-            state.RushTicks = def.Movement.RushTicks;
-			// Acting ends the post-hitstun flight regime.
-			state.InPostHitstunFlight = false;
+            // Presentation-only restart marker: same-slot IASA keeps the attacking
+            // state, slot, and stage unchanged, so clients need an explicit edge.
+            unchecked { state.AttackSequence++; }
 			ability.OnStart(ref state, def);
             bool aimingAbility = cookedSlot != null
                 ? cookedSlot.AimMode != AuthoringAimMode.None
@@ -465,6 +464,10 @@ namespace SlopArena.Shared
 			// Only AIR-started moves terminate on landing (drift fix). A ground move launched
 			// and landed mid-move keeps its ground behavior — no termination.
 			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
+			// Some capabilities deliberately use landing as their action trigger. They must
+			// survive this frame so their next tick can transition into the landing action.
+			if (activeAbility is CookedTimelineAbility landingContinuation
+			    && landingContinuation.ContinuesThroughLanding) return;
 			// Aim holds own release timing and remain active across an air-to-ground transition.
 			if (state.State == ActionState.Aiming &&
 			    (activeAbility is IAimHoldCapability ||

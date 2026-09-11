@@ -671,8 +671,10 @@ namespace SlopArena.Client.Entities
                 return false;
 
             var animState = _animancer.Play(clip, 0.05f);
+            // Animancer intentionally preserves a reused state's time. Attack
+            // restarts, including same-slot IASA, must rewind the clip.
+            animState.Time = 0;
             animState.Speed = animSpeed;
-            _currentAnimState = animState;
             _currentExtrapolationMode = ExtrapolationMode.None;
             // Cooked catalogs own extrapolation metadata; legacy configs retain
             // their existing per-definition overrides.
@@ -1032,7 +1034,12 @@ namespace SlopArena.Client.Entities
             // ── Combat state changes (excluding hitstun — handled above) ──
             bool stateChanged = state.State != _lastAnimState
                 || (state.State == ActionState.Attacking && (
-                    state.AttackSlot != _lastAttackSlot || state.ComboStage != _lastComboStage));
+                    state.AttackSlot != _lastAttackSlot
+                    || state.ComboStage != _lastComboStage
+                    || state.AttackSequence != _lastState.AttackSequence
+                    // Keep the local full-fidelity fallback for states produced
+                    // before the sequence marker reaches the client.
+                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks));
 
             if (isCombat && stateChanged)
             {

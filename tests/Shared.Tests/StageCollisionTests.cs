@@ -21,6 +21,68 @@ public sealed class StageCollisionTests
         Assert.InRange(state.PX, 2f - Def.CapsuleRadius - 0.03f, 2f - Def.CapsuleRadius + 0.03f);
         Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.01f, Def.CapsuleHeight * 0.5f + 0.01f);
     }
+    [Fact]
+    public void WalkingAcrossTriangleSeam_DoesNotStopAtRestingContact()
+    {
+        var arena = Arena(
+            Floor(0f, -10f, 10f, -10f, 10f),
+            FloorOther(0f, -10f, 10f, -10f, 10f));
+        var state = Grounded(0f, 0f);
+        state.State = ActionState.Attacking;
+        state.AnimLockTicks = 10;
+        state.VX = 12f;
+
+        for (int i = 0; i < 3; i++)
+            Simulation.SimulateTick(ref state, Def, default, arena);
+
+
+        Assert.True(state.PX > 0.5f);
+        Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.02f,
+            Def.CapsuleHeight * 0.5f + 0.02f);
+    }
+
+
+    [Fact]
+    public void HorizontalContactWithPlatformEdge_DoesNotCreateUpwardMomentum()
+    {
+        var arena = Arena(
+            Floor(0f, -10f, 10f, -10f, 10f),
+            FloorOther(0f, -10f, 10f, -10f, 10f),
+            WallX(2f, 0f, 1f),
+            PlatformTop(2f, 6f, -2f, 2f));
+        var state = Grounded(1.4f, 0f);
+        state.PY = 1.5f;
+        state.IsGrounded = false;
+        state.State = ActionState.Attacking;
+        state.AnimLockTicks = 10;
+        state.VX = 20f;
+
+        Simulation.SimulateTick(ref state, Def, default, arena);
+
+        Assert.True(state.PY <= 1.501f);
+        Assert.True(state.VY <= 0.001f);
+    }
+
+    [Fact]
+    public void KnockbackIntoPlatformEdge_DoesNotCreateUpwardMomentum()
+    {
+        var arena = Arena(
+            Floor(0f, -10f, 10f, -10f, 10f),
+            FloorOther(0f, -10f, 10f, -10f, 10f),
+            WallX(2f, 0f, 1f),
+            PlatformTop(2f, 6f, -2f, 2f));
+        var state = Grounded(1.4f, 0f);
+        state.PY = 1.5f;
+        state.IsGrounded = false;
+        Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 30f, 0f, 0f, 30, 100f);
+
+        for (int i = 0; i < 4; i++)
+            Simulation.SimulateTick(ref state, Def, default, arena);
+
+        Assert.True(state.PY <= 1.501f);
+        Assert.True(state.VY <= 0.001f);
+    }
+
 
     [Fact]
     public void DiagonalWallContact_SlidesAndSettlesAtCorner()
@@ -207,6 +269,22 @@ public sealed class StageCollisionTests
             BX = minX, BY = y, BZ = maxZ,
             CX = maxX, CY = y, CZ = minZ,
         };
+    private static CollisionTriangle FloorOther(float y, float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = maxX, AY = y, AZ = maxZ,
+            BX = maxX, BY = y, BZ = minZ,
+            CX = minX, CY = y, CZ = maxZ,
+        };
+
+    private static CollisionTriangle PlatformTop(float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = minX, AY = 1f, AZ = minZ,
+            BX = minX, BY = 1f, BZ = maxZ,
+            CX = maxX, CY = 1f, CZ = minZ,
+        };
+
 
     private static CollisionTriangle WallX(float x, float minY, float maxY)
         => new()

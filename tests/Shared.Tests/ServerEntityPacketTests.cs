@@ -3,7 +3,7 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(109)
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(110)
 /// + hasInput(1) + InputState(20) when the server consumed input that tick.
 /// Input relay for client rollback prediction (issue #80, ADR-0010).
 /// </summary>
@@ -176,13 +176,13 @@ public class ServerEntityPacketTests
     public void SizeConstants_AssertWireLayout()
     {
         // Downlink max packet size is a wire contract: 8 entityId + 4 tick
-        // + 109 CharacterStatePacket + 1B flag + 20B input.
+        // + 110 CharacterStatePacket + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(121, ServerEntityPacket.BaseSize);
+        Assert.Equal(122, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(142, ServerEntityPacket.MaxSize);
-        Assert.Equal(122, ServerEntityPacket.NoInputSize);
+        Assert.Equal(143, ServerEntityPacket.MaxSize);
+        Assert.Equal(123, ServerEntityPacket.NoInputSize);
         // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
         // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
         Assert.Equal(20, InputState.Size);

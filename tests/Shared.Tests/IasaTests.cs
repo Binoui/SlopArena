@@ -99,6 +99,30 @@ public class IasaTests : KitScenarioTests
         });
     }
 
+    [Fact]
+    public void Iasa_SameSlotRestart_ResetsAttackClockAndSequence()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+
+        for (int tick = 0; tick <= Slot1Iasa; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = tick == 0 || tick == Slot1Iasa
+                    ? TestHelpers.Input(AbilitySlots.Slot1)
+                    : default,
+            });
+        }
+
+        var restarted = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, restarted.State);
+        Assert.Equal(AbilitySlots.Slot1, restarted.AttackSlot);
+        Assert.Equal((byte)0, restarted.ComboStage);
+        Assert.Equal((byte)2, restarted.AttackSequence);
+        Assert.InRange(restarted.AttackElapsedTicks, (ushort)1, Slot1Iasa);
+    }
+
     /// <summary>
     /// Press Slot2 two ticks BEFORE the IASA tick: the old lock applies, Slot1 keeps
     /// running (press is outside the 6-tick buffer window, so it is dropped entirely)

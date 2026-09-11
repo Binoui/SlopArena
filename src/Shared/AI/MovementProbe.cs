@@ -155,11 +155,8 @@ namespace SlopArena.Shared
             int stopTick = First(stop, s => s.Tick >= 30 && s.Speed < 0.01f, 30);
             var stopMetrics = new StopMetrics(stopTick - 30, stop[stopTick].PosX - stop[30].PosX, stop.ToArray());
 
-            // Reversal: cruise right 30 ticks, then full opposite input. A 180° flip does
-            // NOT refresh the rush window (that only fires on perpendicular redirects,
-            // |dirChangeDot| < 0.5) — so a reversal is the pivot skid through zero
-            // (TurnaroundFriction) followed by the soft-start re-accel
-            // (RunAccelerationA + B). This is the accel curve's only real context.
+            // Reversal: cruise right 30 ticks, then full opposite input. Ground reversals
+            // remain immediate even after the Rush window expires.
             var rev = RunSim(def, arena, groundY, t => t < 30 ? Input(right: true) : Input(left: true), 90);
             int revDone = First(rev, s => s.Tick > 30 && s.Speed >= m.RunSpeed * 0.99f, 89);
             var reversalMetrics = new ReversalMetrics(revDone - 30, Math.Abs(rev[revDone].PosX - rev[30].PosX),

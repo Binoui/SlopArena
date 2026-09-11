@@ -276,7 +276,7 @@ public class PhysicsTests
     }
 
     [Fact]
-    public void RunReversal_AfterRushWindowUsesFrictionNotInstantFlip()
+    public void RunReversal_AfterRushWindowFlipsInstantly()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState(50f, 50f);
@@ -289,35 +289,12 @@ public class PhysicsTests
         var before = sim.GetState(1);
         TestHelpers.AssertNear(Move.RunSpeed, before.VZ, 0.1f);
 
-        // Reverse at Run: a Turnaround (friction), NOT an instant flip — VZ stays
-        // positive and merely decays.
+        // Reversal remains responsive after Rush: instant full-speed flip.
         sim.Tick(new() { { 1, TestHelpers.Input(moveY: -1f) } });
         var after = sim.GetState(1);
-        Assert.True(after.VZ > 0f && after.VZ < before.VZ,
-            $"Run reversal must friction (stay +Z, decay), got VZ={after.VZ:F3}");
+        TestHelpers.AssertNear(-Move.RunSpeed, after.VZ, 0.1f);
     }
 
-    [Fact]
-    public void Turnaround_DeceleratesHardShortSkid()
-    {
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var state = TestHelpers.PlayerState(50f, 50f);
-        state.PY = GroundPx;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Run +Z past the Rush window into Run proper.
-        for (int i = 0; i < 20; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
-        TestHelpers.AssertNear(Move.RunSpeed, sim.GetState(1).VZ, 0.1f);
-
-        // Reverse: the Turnaround pivot decelerates hard (~TurnaroundFriction), stopping
-        // in ~10-12 ticks — a short skid, not the old ~90-tick coast (ice slide).
-        for (int i = 0; i < 12; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(moveY: -1f) } });
-        var s = sim.GetState(1);
-        Assert.True(MathF.Abs(s.VZ) < 1.0f,
-            $"Turnaround should nearly stop within 12 ticks, got VZ={s.VZ:F3}");
-    }
 
     [Fact]
     public void RushRelease_StopsInstantly()
@@ -384,9 +361,8 @@ public class PhysicsTests
         state.PY = GroundPx;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // W→A→S→D is a chain of 90° redirects. Each must restart the Rush window
-        // (previously it burned down and dropped the fighter into Run, where a
-        // reversal skids as a Turnaround instead of flipping instantly).
+        // W→A→S→D is a chain of 90° redirects. Each must restart the Rush window,
+        // and reversals remain crisp after the window expires.
         var dirs = new (float x, float z)[] { (0f, 1f), (-1f, 0f), (0f, -1f), (1f, 0f) };
         for (int i = 0; i < 12; i++)
         {
@@ -403,36 +379,6 @@ public class PhysicsTests
         Assert.Equal(0f, s.VZ);
     }
 
-    [Fact]
-    public void AbilityActivation_RefreshesRushWindow_AndFreezesThroughTheMove()
-    {
-        // ADR-0020: activating an ability refills the Rush dash-dance window, and the
-        // countdown only drains while purely running (Simulation.TickTimers gates it on
-        // the Run state). A poke mid-footsie keeps the instant-reversal privilege;
-        // Run's slow Turnaround appears only after holding one direction a long time.
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var def = TestHelpers.FightGuyDef;
-        var state = TestHelpers.PlayerState(50f, 50f) with { PY = TestHelpers.GroundPY(def) };
-        TestHelpers.RegisterPlayer(sim, def, state);
-
-        // Run +Z past the Rush window (RushTicks = 10) into Run proper.
-        for (int i = 0; i < 20; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f) } });
-        Assert.Equal((ushort)0, sim.GetState(1).RushTicks);
-
-        // Poke (Slot1 Low Kick) while running: the activation refills the window.
-        sim.Tick(new() { { 1, TestHelpers.Input(moveY: 1f, activeSlot: AbilitySlots.Slot1) } });
-        Assert.Equal(def.Movement.RushTicks, sim.GetState(1).RushTicks);
-
-        // The countdown is frozen for the whole move, so the fighter exits in Rush —
-        // the window is full on the tick control returns to Idle.
-        int guard = 0;
-        while (sim.GetState(1).State == ActionState.Attacking && guard++ < 120)
-            sim.Tick(new() { { 1, default } });
-        var after = sim.GetState(1);
-        Assert.NotEqual(ActionState.Attacking, after.State);
-        Assert.Equal(def.Movement.RushTicks, after.RushTicks);
-    }
 
     [Fact]
     public void RunDiagonalStraighten_ClearsReleasedAxis()
