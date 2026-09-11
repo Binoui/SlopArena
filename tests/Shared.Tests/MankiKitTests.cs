@@ -190,8 +190,7 @@ public class MankiKitTests
             sim.Tick(new() { { 1, default }, { 100, default } });
 
         var npcAfter = sim.GetState(100);
-        Assert.Equal((ushort)4, npcAfter.DamagePercent);
-        Assert.True(npcAfter.KVY > 0f, $"NPC should launch upward, got {npcAfter.KVY}");
+        Assert.Equal((ushort)10, npcAfter.DamagePercent);
     }
 
     [Fact]

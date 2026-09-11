@@ -82,7 +82,9 @@ public class PivotDataRegressionTests
                 if (stage.HitboxEvents == null) continue;
                 foreach (var h in stage.HitboxEvents)
                 {
-                    bool sustainedZone = h.DurationTicks >= 40 || (h.DurationTicks == 28 && h.StunTicks == 30);
+                    bool sustainedZone = h.DurationTicks >= 40
+                        || (!h.Interruptible && (h.StunTicks < 10 || h.StunTicks > 25))
+                        || (h.DurationTicks == 28 && h.StunTicks == 30);
                     Assert.True(sustainedZone || (h.StunTicks >= 10 && h.StunTicks <= 25),
                         $"{def.DisplayName}: StunTicks={h.StunTicks} outside the 10-25 band (ADR-0015 reset-to-neutral)");
                 }

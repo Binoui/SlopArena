@@ -44,6 +44,43 @@ public sealed class TimelineRuntimeTests
     }
 
     [Fact]
+    public void ForwardLungeCapturesFacingForItsFullDurationAndPreservesMomentum()
+    {
+        var slot = Slot(10,
+            new CookedForwardLungeOperation(2, AuthoringUnit.MetersPerSecond, 12f, 3));
+        var (sim, def) = Create(slot, TestHelpers.PlayerState() with { FacingYaw = MathF.PI / 2f });
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        sim.TickAbilities(inputs);
+        sim.TickAbilities(inputs);
+        var state = sim.GetState(1);
+        TestHelpers.AssertNear(12f, state.VX);
+        TestHelpers.AssertNear(0f, state.VZ);
+
+        state.FacingYaw = 0f;
+        sim.SetState(1, state);
+        sim.TickAbilities(inputs);
+        sim.TickAbilities(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(12f, state.VX);
+        TestHelpers.AssertNear(0f, state.VZ);
+
+        sim.TickAbilities(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(12f, state.VX);
+        TestHelpers.AssertNear(0f, state.VZ);
+
+        state.State = ActionState.Hitstun;
+        sim.SetState(1, state);
+        sim.TickAbilities(inputs);
+        Assert.Null(sim.GetActiveAbility(1));
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(12f, state.VX);
+        TestHelpers.AssertNear(0f, state.VZ);
+    }
+
+    [Fact]
     public void ProjectileUsesAimDirectionAndMaxFlightLifetime()
     {
         var slot = Slot(5, new CookedSpawnProjectileOperation(0, AuthoringUnit.Meters,

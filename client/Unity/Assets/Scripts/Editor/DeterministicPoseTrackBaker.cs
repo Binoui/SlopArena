@@ -57,7 +57,7 @@ internal static class DeterministicPoseTrackBaker
             }
             WeaponEntry weaponEntry = null;
             Transform weaponBone = null;
-            Vector3 tipLocal = new Vector3(0f, 0f, 1.5f);
+            Vector3 tipLocal = Vector3.zero;
             Vector3 hiltLocal = Vector3.zero;
             if (weaponConfig != null)
             {
@@ -67,30 +67,51 @@ internal static class DeterministicPoseTrackBaker
                     x => x.name == weaponEntry.BoneName);
                 if (weaponBone == null) throw new InvalidOperationException($"Weapon config bone is missing: {weaponEntry.BoneName}.");
                 if (weaponEntry.Prefab == null) throw new InvalidOperationException($"Weapon prefab is missing for bone {weaponEntry.BoneName}.");
-                var vertices = new List<Vector3>();
-                foreach (var meshFilter in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
+                Transform root = weaponEntry.Prefab.transform;
+                var weaponTransforms = weaponEntry.Prefab.GetComponentsInChildren<Transform>(true);
+                Transform hiltMarker = weaponTransforms.SingleOrDefault(x => x.name == "bladeHilt");
+                Transform tipMarker = weaponTransforms.SingleOrDefault(x => x.name == "bladeEnd");
+                if (hiltMarker != null || tipMarker != null)
                 {
-                    var mesh = meshFilter.sharedMesh;
-                    if (mesh == null || !mesh.isReadable) continue;
-                    Matrix4x4 toPrefab = weaponEntry.Prefab.transform.worldToLocalMatrix * meshFilter.transform.localToWorldMatrix;
-                    foreach (var vertex in mesh.vertices)
-                        vertices.Add(toPrefab.MultiplyPoint3x4(vertex));
+                    if (hiltMarker == null || tipMarker == null)
+                        throw new InvalidOperationException($"Weapon '{root.name}' requires both bladeHilt and bladeEnd markers.");
+                    hiltLocal = Vector3.Scale(root.localScale, root.InverseTransformPoint(hiltMarker.position));
+                    tipLocal = Vector3.Scale(root.localScale, root.InverseTransformPoint(tipMarker.position));
                 }
-                // Readability is optional for presentation prefabs. Keep deterministic
-                // fallback points when an imported mesh does not expose CPU vertices.
-                if (vertices.Count > 0)
+                else
                 {
-                    Vector3 min = vertices[0], max = vertices[0];
-                    foreach (var vertex in vertices) { min = Vector3.Min(min, vertex); max = Vector3.Max(max, vertex); }
-                    Vector3 extent = max - min;
-                    Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
-                        : extent.y >= extent.z ? Vector3.up : Vector3.forward;
-                    float tipProjection = float.MinValue, hiltProjection = float.MaxValue;
-                    foreach (var vertex in vertices)
+                    var vertices = new List<Vector3>();
+                    foreach (var meshFilter in weaponEntry.Prefab.GetComponentsInChildren<MeshFilter>())
                     {
-                        float projection = Vector3.Dot(vertex, axis);
-                        if (projection > tipProjection) { tipProjection = projection; tipLocal = vertex; }
-                        if (projection < hiltProjection) { hiltProjection = projection; hiltLocal = vertex; }
+                        var mesh = meshFilter.sharedMesh;
+                        if (mesh == null || !mesh.isReadable) continue;
+                        Matrix4x4 toPrefab = root.worldToLocalMatrix * meshFilter.transform.localToWorldMatrix;
+                        foreach (var vertex in mesh.vertices)
+                            vertices.Add(toPrefab.MultiplyPoint3x4(vertex));
+                    }
+                    if (vertices.Count > 0)
+                    {
+                        Vector3 min = vertices[0], max = vertices[0];
+                        foreach (var vertex in vertices) { min = Vector3.Min(min, vertex); max = Vector3.Max(max, vertex); }
+                        Vector3 extent = max - min;
+                        Vector3 axis = extent.x >= extent.y && extent.x >= extent.z ? Vector3.right
+                            : extent.y >= extent.z ? Vector3.up : Vector3.forward;
+                        float tipProjection = float.MinValue, hiltProjection = float.MaxValue;
+                        foreach (var vertex in vertices)
+                        {
+                            float projection = Vector3.Dot(vertex, axis);
+                            if (projection > tipProjection) { tipProjection = projection; tipLocal = vertex; }
+                            if (projection < hiltProjection) { hiltProjection = projection; hiltLocal = vertex; }
+                        }
+                        hiltLocal = Vector3.Scale(root.localScale, hiltLocal);
+                        tipLocal = Vector3.Scale(root.localScale, tipLocal);
+                    }
+                    else
+                    {
+                        // Readability is optional for presentation prefabs (e.g. non-blade props like bombs).
+                        // Keep deterministic fallback points when an imported mesh does not expose CPU vertices.
+                        tipLocal = new Vector3(0f, 0f, 1.5f);
+                        hiltLocal = Vector3.zero;
                     }
                 }
                 names[RequiredBones.Length] = "_weapon_tip";

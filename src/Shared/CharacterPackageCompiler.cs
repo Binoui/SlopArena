@@ -172,6 +172,9 @@ public static class CharacterPackageCompiler
             foreach (var operation in stage.Operations)
             {
                 if (operation.Tick >= stage.DurationTicks) d.Error("value.out-of-range", "character.operation.tick", "Operation tick must be within its stage.");
+                if (operation is ForwardLungeOperationSource lunge &&
+                    (int)lunge.Tick + lunge.DurationTicks > stage.DurationTicks)
+                    d.Error("value.out-of-range", "character.forwardLunge.durationTicks", "Forward lunge must end within its stage.");
                 if (operation is StartCapabilityOperationSource capability)
                 {
                     if (!capabilities.TryGetValue(capability.CapabilityId, out var version)) d.Error("capability.unknown", "character.operation.capabilityId", "Capability is not declared.");
@@ -187,12 +190,17 @@ public static class CharacterPackageCompiler
 
     private static void ValidateOperation(CharacterTimelineOperationSource operation, CharacterAuthoringDocument c, DiagnosticBag d)
     {
-        var expected = operation switch { SetVelocityOperationSource => AuthoringUnit.MetersPerSecond, SpawnHitboxOperationSource => AuthoringUnit.Meters, SpawnProjectileOperationSource => AuthoringUnit.Meters, _ => AuthoringUnit.Ticks };
+        var expected = operation switch { SetVelocityOperationSource or ForwardLungeOperationSource => AuthoringUnit.MetersPerSecond, SpawnHitboxOperationSource => AuthoringUnit.Meters, SpawnProjectileOperationSource => AuthoringUnit.Meters, _ => AuthoringUnit.Ticks };
         if (operation.Unit != expected) d.Error("unit.unknown", "character.operation.unit", "Unit does not match operation contract.");
         switch (operation)
         {
             case SetVelocityOperationSource velocity:
                 ValidateFiniteValues(new[] { velocity.X, velocity.Y, velocity.Z }, "character.operation", d);
+                break;
+            case ForwardLungeOperationSource lunge:
+                ValidateFiniteValues(new[] { lunge.Speed }, "character.forwardLunge.speed", d);
+                if (lunge.Speed <= 0f) d.Error("value.out-of-range", "character.forwardLunge.speed", "Speed must be greater than zero.");
+                if (lunge.DurationTicks == 0) d.Error("value.out-of-range", "character.forwardLunge.durationTicks", "Duration must be greater than zero.");
                 break;
             case SpawnHitboxOperationSource hitbox:
                 ValidateFiniteValues(new[] { hitbox.Hitbox.Radius, hitbox.Hitbox.OffsetX, hitbox.Hitbox.OffsetY, hitbox.Hitbox.OffsetZ, hitbox.Hitbox.EndOffsetX, hitbox.Hitbox.EndOffsetY, hitbox.Hitbox.EndOffsetZ, hitbox.Hitbox.Damage, hitbox.Hitbox.Angle, hitbox.Hitbox.BaseKnockback, hitbox.Hitbox.KnockbackGrowth }, "character.hitbox", d);
@@ -333,6 +341,7 @@ public static class CharacterPackageCompiler
         => op switch
         {
             SetVelocityOperationSource x => x with { },
+            ForwardLungeOperationSource x => x with { },
             SpawnHitboxOperationSource x => x with { Hitbox = x.Hitbox with { } },
             SpawnProjectileOperationSource x => x with { Projectile = x.Projectile with { } },
             SetAimStateOperationSource x => x with { },
@@ -376,6 +385,7 @@ public static class CharacterPackageCompiler
                 switch (op)
                 {
                     case SetVelocityOperationSource x: cookedOps.Add(new CookedSetVelocityOperation(x.Tick, x.Unit, x.VelocityMode, x.X, x.Y, x.Z)); break;
+                    case ForwardLungeOperationSource x: cookedOps.Add(new CookedForwardLungeOperation(x.Tick, x.Unit, x.Speed, x.DurationTicks)); break;
                     case SpawnHitboxOperationSource x: hitboxes++; cookedOps.Add(new CookedSpawnHitboxOperation(x.Tick, x.Unit, new CookedHitbox(x.Hitbox.Shape, x.Hitbox.Radius, x.Hitbox.OffsetX, x.Hitbox.OffsetY, x.Hitbox.OffsetZ, x.Hitbox.EndOffsetX, x.Hitbox.EndOffsetY, x.Hitbox.EndOffsetZ, x.Hitbox.StartBoneId, x.Hitbox.EndBoneId, x.Hitbox.Damage, x.Hitbox.Angle, x.Hitbox.BaseKnockback, x.Hitbox.KnockbackGrowth, x.Hitbox.StunTicks, x.Hitbox.DurationTicks, x.Hitbox.Interruptible, x.Hitbox.HitGroup, x.Hitbox.KnockbackDirection))); break;
                     case SpawnProjectileOperationSource x: projectiles++; cookedOps.Add(new CookedSpawnProjectileOperation(x.Tick, x.Unit, new CookedProjectile(x.Projectile.LaunchOffsetX, x.Projectile.LaunchOffsetY, x.Projectile.LaunchOffsetZ, x.Projectile.Speed, x.Projectile.Gravity, x.Projectile.Radius, x.Projectile.Damage, x.Projectile.Angle, x.Projectile.BaseKnockback, x.Projectile.KnockbackGrowth, x.Projectile.StunTicks, x.Projectile.MaxFlightTicks, x.Projectile.YawOffsetDegrees))); break;
                     case SetAimStateOperationSource x: cookedOps.Add(new CookedSetAimStateOperation(x.Tick, x.Unit, x.AimState)); break;
@@ -466,7 +476,48 @@ public static class CharacterPackageCompiler
         w.WriteEndObject();
     }
     private static void WriteStage(Utf8JsonWriter w, CookedStage x) { w.WriteStartObject(); w.WriteNumber("durationTicks", x.DurationTicks); w.WriteNumber("iasaTicks", x.IasaTicks); w.WriteNumber("landingLagTicks", x.LandingLagTicks); w.WriteNumber("autoCancelBeforeTicks", x.AutoCancelBeforeTicks); w.WriteNumber("autoCancelAfterTicks", x.AutoCancelAfterTicks); Number(w, "attackRange", x.AttackRange); Number(w, "warpRange", x.WarpRange); w.WriteBoolean("useTargetLock", x.UseTargetLock); w.WriteBoolean("rotateTowardTarget", x.RotateTowardTarget); Number(w, "trackingStrength", x.TrackingStrength); w.WritePropertyName("animationIds"); w.WriteStartArray(); foreach (var id in x.AnimationIds) w.WriteStringValue(id); w.WriteEndArray(); w.WritePropertyName("operations"); w.WriteStartArray(); foreach (var op in x.Operations) WriteOperation(w, op); w.WriteEndArray(); w.WriteEndObject(); }
-    private static void WriteOperation(Utf8JsonWriter w, CookedTimelineOperation x) { w.WriteStartObject(); w.WriteNumber("kind", (byte)x.Kind); w.WriteNumber("tick", x.Tick); w.WriteNumber("unit", (byte)x.Unit); switch (x) { case CookedSetVelocityOperation v: w.WriteNumber("velocityMode", (byte)v.VelocityMode); Number(w, "x", v.X); Number(w, "y", v.Y); Number(w, "z", v.Z); break; case CookedSpawnHitboxOperation h: WriteHitbox(w, h.Hitbox); break; case CookedSpawnProjectileOperation p: WriteProjectile(w, p.Projectile); break; case CookedSetAimStateOperation a: w.WriteNumber("aimState", (byte)a.AimState); break; case CookedStartCapabilityOperation c: w.WriteString("capabilityId", c.CapabilityId); w.WriteString("capabilityVersion", c.CapabilityVersion); w.WritePropertyName("parameters"); WriteParameters(w, c.Parameters); break; case CookedEmitPresentationOperation p: w.WriteNumber("operationIndex", p.OperationIndex); w.WriteString("presentationId", p.PresentationId); break; case CookedCompleteTimelineOperation: break; } w.WriteEndObject(); }
+    private static void WriteOperation(Utf8JsonWriter w, CookedTimelineOperation x)
+    {
+        w.WriteStartObject();
+        w.WriteNumber("kind", (byte)x.Kind);
+        w.WriteNumber("tick", x.Tick);
+        w.WriteNumber("unit", (byte)x.Unit);
+        switch (x)
+        {
+            case CookedSetVelocityOperation v:
+                w.WriteNumber("velocityMode", (byte)v.VelocityMode);
+                Number(w, "x", v.X);
+                Number(w, "y", v.Y);
+                Number(w, "z", v.Z);
+                break;
+            case CookedForwardLungeOperation lunge:
+                Number(w, "speed", lunge.Speed);
+                w.WriteNumber("durationTicks", lunge.DurationTicks);
+                break;
+            case CookedSpawnHitboxOperation h:
+                WriteHitbox(w, h.Hitbox);
+                break;
+            case CookedSpawnProjectileOperation p:
+                WriteProjectile(w, p.Projectile);
+                break;
+            case CookedSetAimStateOperation a:
+                w.WriteNumber("aimState", (byte)a.AimState);
+                break;
+            case CookedStartCapabilityOperation c:
+                w.WriteString("capabilityId", c.CapabilityId);
+                w.WriteString("capabilityVersion", c.CapabilityVersion);
+                w.WritePropertyName("parameters");
+                WriteParameters(w, c.Parameters);
+                break;
+            case CookedEmitPresentationOperation p:
+                w.WriteNumber("operationIndex", p.OperationIndex);
+                w.WriteString("presentationId", p.PresentationId);
+                break;
+            case CookedCompleteTimelineOperation:
+                break;
+        }
+        w.WriteEndObject();
+    }
     private static void WriteHitbox(Utf8JsonWriter w, CookedHitbox x) { w.WritePropertyName("hitbox"); w.WriteStartObject(); w.WriteNumber("shape", (byte)x.Shape); Number(w, "radius", x.Radius); Number(w, "offsetX", x.OffsetX); Number(w, "offsetY", x.OffsetY); Number(w, "offsetZ", x.OffsetZ); Number(w, "endOffsetX", x.EndOffsetX); Number(w, "endOffsetY", x.EndOffsetY); Number(w, "endOffsetZ", x.EndOffsetZ); if (x.StartBoneId != null) w.WriteString("startBoneId", x.StartBoneId); else w.WriteNull("startBoneId"); if (x.EndBoneId != null) w.WriteString("endBoneId", x.EndBoneId); else w.WriteNull("endBoneId"); Number(w, "damage", x.Damage); Number(w, "angle", x.Angle); Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("durationTicks", x.DurationTicks); w.WriteBoolean("interruptible", x.Interruptible); w.WriteNumber("hitGroup", x.HitGroup); w.WriteNumber("knockbackDirection", (byte)x.KnockbackDirection); w.WriteEndObject(); }
     private static void WriteProjectile(Utf8JsonWriter w, CookedProjectile x) { w.WritePropertyName("projectile"); w.WriteStartObject(); Number(w, "launchOffsetX", x.LaunchOffsetX); Number(w, "launchOffsetY", x.LaunchOffsetY); Number(w, "launchOffsetZ", x.LaunchOffsetZ); Number(w, "speed", x.Speed); Number(w, "gravity", x.Gravity); Number(w, "radius", x.Radius); Number(w, "damage", x.Damage); Number(w, "angle", x.Angle); Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); Number(w, "yawOffsetDegrees", x.YawOffsetDegrees); w.WriteEndObject(); }
     private static void WriteParameters(Utf8JsonWriter w, CookedCapabilityParameters p)

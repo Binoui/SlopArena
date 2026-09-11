@@ -140,6 +140,12 @@ public sealed record SetVelocityOperationSource(
     float X,
     float Y,
     float Z) : CharacterTimelineOperationSource(Tick, Unit);
+public sealed record ForwardLungeOperationSource(
+    ushort Tick,
+    AuthoringUnit Unit,
+    float Speed,
+    ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
+
 
 public sealed record SpawnHitboxOperationSource(
     ushort Tick,

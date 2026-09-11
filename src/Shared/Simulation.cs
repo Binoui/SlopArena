@@ -657,11 +657,7 @@ namespace SlopArena.Shared
             // same fall also makes VY < 0 within the ledge-grab range, so suppress the
             // self-grab (mirrors the S-drop escape: running off must fall, not grab the
             // ledge it just left — TryLedgeGrab honors LedgeRegrabLockTicks).
-            if (wasGrounded && !s.IsGrounded && s.VY <= 0f && !HasKnockback(s))
-            {
-                s.AirTimeTicks = stats.FloatWindowTicks;
-                s.LedgeRegrabLockTicks = LedgeRegrabLockDurationTicks;
-            }
+            ApplyWalkOffTransition(ref s, wasGrounded, stats.FloatWindowTicks);
 
             // Landing resets to a fresh Rush window (ADR-0020): the first reversal after
             // landing is an instant dash, not a Turnaround (Melee resets to a dash on land).
@@ -804,6 +800,8 @@ namespace SlopArena.Shared
                 return false;
             }
 
+            bool wasGrounded = s.IsGrounded;
+
             int[] candidates = TriangleCandidates(in arena);
             ArenaCollision.RecoverCapsule(ref s.PX, ref s.PY, ref s.PZ,
                 def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
@@ -865,6 +863,7 @@ namespace SlopArena.Shared
                 if (s.KVY < 0f) s.KVY = 0f;
                 s.AirTimeTicks = 0;
             }
+            ApplyWalkOffTransition(ref s, wasGrounded, def.Movement.FloatWindowTicks);
             return supported;
         }
 
@@ -872,11 +871,22 @@ namespace SlopArena.Shared
             in ArenaDefinition arena)
         {
             if (!ArenaCollision.HasTriangles(arena)) return;
+            bool wasGrounded = s.IsGrounded;
             int[] candidates = TriangleCandidates(in arena);
             ArenaCollision.RecoverCapsule(ref s.PX, ref s.PY, ref s.PZ,
                 def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
             s.IsGrounded = ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ,
                 def.CapsuleRadius, def.CapsuleHeight, in arena, candidates, out _);
+            ApplyWalkOffTransition(ref s, wasGrounded, def.Movement.FloatWindowTicks);
+        }
+        private static void ApplyWalkOffTransition(
+            ref CharacterState s, bool wasGrounded, ushort floatWindowTicks)
+        {
+            if (wasGrounded && !s.IsGrounded && s.VY <= 0f && !HasKnockback(s))
+            {
+                s.AirTimeTicks = floatWindowTicks;
+                s.LedgeRegrabLockTicks = LedgeRegrabLockDurationTicks;
+            }
         }
 
         private static void ProjectVelocity(ref float vx, ref float vy, ref float vz,

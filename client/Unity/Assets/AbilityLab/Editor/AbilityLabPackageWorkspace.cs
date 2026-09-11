@@ -431,6 +431,17 @@ public sealed class AbilityLabPackageWorkspace
             1f, 45f, 5f, 80f, 8, 1, false, 0);
         return AddOperation(slotIndex, stageIndex, new SpawnHitboxOperationSource(0, AuthoringUnit.Meters, hitbox));
     }
+    public bool AddForwardLunge(string canonicalSlotId, int stageIndex)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        return AddOperation(slotIndex, stageIndex,
+            new ForwardLungeOperationSource(0, AuthoringUnit.MetersPerSecond, 12f, 6));
+    }
+
 
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
     {

@@ -5,16 +5,12 @@
     "State": 4,
     "PY": 0.75,
     "AttackSlot": 7,
-    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
   "NpcSnap": {
-    "FacingYaw": -3.1415927,
     "PY": 0.75,
     "PZ": 1,
-    "DamagePercent": 7,
-    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

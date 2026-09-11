@@ -6,9 +6,7 @@
 **Decision:** [ADR-0029](../adr/0029-character-authoring-and-cooking.md)  
 **Scope:** FightGuy vertical slice; Manki, Kistu, and Nilus remain temporary legacy source inputs behind one catalog-builder adapter.
 
-Execution detail:
-- [Phase 3 completion plan](../../PHASE_3_COMPLETION_PLAN.md)
-- [Phase 4 authoritative-events plan](../../PHASE_4_AUTHORITATIVE_PLAN.md)
+The former Phase 3 and Phase 4 detail documents were retired with the obsolete root-level plans. This dated record preserves the parent context; current implementation work follows the [playable friends demo reset](2026-09-05-playable-demo-reset.md).
 
 
 ## Goal

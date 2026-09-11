@@ -330,7 +330,9 @@ namespace SlopArena.Shared
             if (triangles == null || candidateCount <= 0) return false;
 
             float dx = endX - startX, dy = endY - startY, dz = endZ - startZ;
-            float speed = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+            float displacementSq = dx * dx + dy * dy + dz * dz;
+            const float tolerance = 0.0001f;
+            float contactRadius = radius + tolerance;
             float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
             float bestTime = float.PositiveInfinity;
             int bestTriangle = int.MaxValue;
@@ -345,8 +347,9 @@ namespace SlopArena.Shared
                         in triangle, out var atStart))
                     continue;
 
-                float approach = dx * atStart.NormalX + dy * atStart.NormalY + dz * atStart.NormalZ;
-                if (atStart.Distance <= radius + 0.0001f && (atStart.Distance < radius - 0.0001f || approach < -0.0001f))
+                float closingSpeed = -(dx * atStart.NormalX + dy * atStart.NormalY + dz * atStart.NormalZ);
+                if (atStart.Distance <= contactRadius
+                    && (atStart.Distance < radius - tolerance || closingSpeed > 0f))
                 {
                     if (0f < bestTime || (bestTime == 0f && triangleIndex < bestTriangle))
                     {
@@ -356,55 +359,57 @@ namespace SlopArena.Shared
                     }
                     continue;
                 }
-                if (speed <= 0.000001f) continue;
+                if (displacementSq <= 1e-12f) continue;
 
                 float time = 0f;
                 ClosestPoints previous = atStart;
+                bool finished = false;
                 for (int iteration = 0; iteration < 64 && time < 1f; iteration++)
                 {
-                    float advance = (previous.Distance - radius) / speed;
-                    if (advance < 0.0001f) advance = 0.0001f;
-                    float next = MathF.Min(1f, time + advance);
+                    closingSpeed = -(dx * previous.NormalX + dy * previous.NormalY + dz * previous.NormalZ);
+                    if (closingSpeed <= 0f) { finished = true; break; }
+                    float gap = previous.Distance - contactRadius;
+                    float next = MathF.Min(1f, time + MathF.Max(0f, gap / closingSpeed));
+                    if (next <= time)
+                    {
+                        RecordConservativeContact(time, previous, triangleIndex,
+                            ref bestTime, ref bestTriangle, ref best);
+                        finished = true;
+                        break;
+                    }
                     float nx = startX + dx * next;
                     float ny = startY + dy * next;
                     float nz = startZ + dz * next;
                     if (!TryCapsuleTriangleDistance(nx, ny, nz, halfLine,
                             in triangle, out var atNext))
+                    {
+                        finished = true;
                         break;
-
-                    float nextApproach = dx * atNext.NormalX + dy * atNext.NormalY + dz * atNext.NormalZ;
-                    if (atNext.Distance <= radius + 0.0001f && nextApproach < -0.0001f)
+                    }
+                    if (atNext.Distance <= contactRadius)
                     {
                         float lo = time, hi = next;
                         for (int refine = 0; refine < 20; refine++)
                         {
                             float mid = (lo + hi) * 0.5f;
-                            float mx = startX + dx * mid;
-                            float my = startY + dy * mid;
-                            float mz = startZ + dz * mid;
-                            TryCapsuleTriangleDistance(mx, my, mz, halfLine,
-                                in triangle, out var atMid);
-                            if (atMid.Distance <= radius) hi = mid;
+                            TryCapsuleTriangleDistance(startX + dx * mid, startY + dy * mid,
+                                startZ + dz * mid, halfLine, in triangle, out var atMid);
+                            if (atMid.Distance <= contactRadius) hi = mid;
                             else lo = mid;
                         }
-                        float hitX = startX + dx * hi;
-                        float hitY = startY + dy * hi;
-                        float hitZ = startZ + dz * hi;
-                        TryCapsuleTriangleDistance(hitX, hitY, hitZ, halfLine,
-                            in triangle, out var atHit);
-                        if (hi < bestTime - 0.000001f
-                            || (MathF.Abs(hi - bestTime) <= 0.000001f && triangleIndex < bestTriangle))
-                        {
-                            bestTime = hi;
-                            bestTriangle = triangleIndex;
-                            best = atHit;
-                        }
+                        TryCapsuleTriangleDistance(startX + dx * hi, startY + dy * hi,
+                            startZ + dz * hi, halfLine, in triangle, out var atHit);
+                        RecordContact(hi, atHit, triangleIndex,
+                            ref bestTime, ref bestTriangle, ref best);
+                        finished = true;
                         break;
                     }
-                    if (next >= 1f) break;
                     time = next;
                     previous = atNext;
                 }
+                if (!finished && time < 1f)
+                    RecordConservativeContact(time, previous, triangleIndex,
+                        ref bestTime, ref bestTriangle, ref best);
             }
 
             if (bestTriangle == int.MaxValue) return false;
@@ -412,6 +417,20 @@ namespace SlopArena.Shared
                 MathF.Max(0f, radius - best.Distance), bestTriangle);
             return true;
         }
+
+        private static void RecordContact(float time, in ClosestPoints candidate, int triangleIndex,
+            ref float bestTime, ref int bestTriangle, ref ClosestPoints best)
+        {
+            if (time < bestTime - 0.000001f
+                || (MathF.Abs(time - bestTime) <= 0.000001f && triangleIndex < bestTriangle))
+            {
+                bestTime = time; bestTriangle = triangleIndex; best = candidate;
+            }
+        }
+
+        private static void RecordConservativeContact(float time, in ClosestPoints candidate, int triangleIndex,
+            ref float bestTime, ref int bestTriangle, ref ClosestPoints best)
+            => RecordContact(time, candidate, triangleIndex, ref bestTime, ref bestTriangle, ref best);
 
         /// <summary>Pushes a penetrating capsule out along the nearest contact only.</summary>
         public static bool RecoverCapsule(

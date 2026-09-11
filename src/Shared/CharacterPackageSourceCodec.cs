@@ -331,6 +331,7 @@ public static class CharacterPackageSourceCodec
         => op switch
         {
             SetVelocityOperationSource x => x with { },
+            ForwardLungeOperationSource x => x with { },
             SpawnHitboxOperationSource x => x with { Hitbox = x.Hitbox with { } },
             SpawnProjectileOperationSource x => x with { Projectile = x.Projectile with { } },
             SetAimStateOperationSource x => x with { },
@@ -381,7 +382,45 @@ public static class CharacterPackageSourceCodec
     private static void WritePresentation(Utf8JsonWriter w, CharacterPresentationSource x) { w.WritePropertyName("presentation"); w.WriteStartObject(); w.WriteString("idle",x.Idle); w.WriteString("run",x.Run); w.WriteString("dash",x.Dash); w.WriteString("jump",x.Jump); w.WriteString("fall",x.Fall); w.WriteString("hitSmall",x.HitSmall); w.WriteString("hitMedium",x.HitMedium); w.WriteString("hitHard",x.HitHard); Number(w,"landStartOffsetSeconds",x.LandStartOffsetSeconds); w.WriteString("modelResourcePath",x.ModelResourcePath); Number(w,"visualScale",x.VisualScale); Number(w,"hurtboxBoneScale",x.HurtboxBoneScale); Number(w,"modelYOffset",x.ModelYOffset); Number(w,"modelSoleOffset",x.ModelSoleOffset); w.WriteBoolean("autoModelYOffset",x.AutoModelYOffset); w.WriteEndObject(); }
     private static void WriteSlot(Utf8JsonWriter w, CharacterSlotSource x) { w.WriteStartObject(); w.WriteString("id",x.Id); w.WriteString("name",x.Name); w.WriteString("description",x.Description); w.WriteString("iconId",x.IconId); w.WriteString("behavior",BehaviorText(x.Behavior)); w.WriteString("aimMode",AimText(x.AimMode)); w.WriteString("aimMovement",AimMovementText(x.AimMovement)); if (x.AimAnimationId != null) w.WriteString("aimAnimationId", x.AimAnimationId); w.WriteNumber("cooldownTicks",x.CooldownTicks); w.WriteBoolean("isRecoveryMove",x.IsRecoveryMove); w.WriteBoolean("preserveMomentumOnStart",x.PreserveMomentumOnStart); if (x.ChargePool != null) { w.WritePropertyName("chargePool"); w.WriteStartObject(); w.WriteNumber("maxCharges",x.ChargePool.MaxCharges); w.WriteNumber("regenTicks",x.ChargePool.RegenTicks); w.WriteEndObject(); } w.WritePropertyName("timeline"); w.WriteStartObject(); w.WritePropertyName("stages"); w.WriteStartArray(); foreach(var stage in x.Timeline.Stages) WriteStage(w,stage); w.WriteEndArray(); w.WriteEndObject(); w.WriteEndObject(); }
     private static void WriteStage(Utf8JsonWriter w, CharacterStageSource x) { w.WriteStartObject(); w.WriteNumber("durationTicks",x.DurationTicks); w.WriteNumber("iasaTicks",x.IasaTicks); w.WriteNumber("landingLagTicks",x.LandingLagTicks); w.WriteNumber("autoCancelBeforeTicks",x.AutoCancelBeforeTicks); w.WriteNumber("autoCancelAfterTicks",x.AutoCancelAfterTicks); Number(w,"attackRange",x.AttackRange); Number(w,"warpRange",x.WarpRange); w.WriteBoolean("useTargetLock",x.UseTargetLock); w.WriteBoolean("rotateTowardTarget",x.RotateTowardTarget); Number(w,"trackingStrength",x.TrackingStrength); WriteStringArray(w,"animationIds",x.AnimationIds); w.WritePropertyName("operations"); w.WriteStartArray(); foreach(var op in x.Operations) WriteOperation(w,op); w.WriteEndArray(); w.WriteEndObject(); }
-    private static void WriteOperation(Utf8JsonWriter w, CharacterTimelineOperationSource x) { w.WriteStartObject(); w.WriteString("kind", OperationKind(x)); w.WriteNumber("tick",x.Tick); w.WriteString("unit",UnitText(x.Unit)); switch(x) { case SetVelocityOperationSource v: w.WriteString("velocityMode",VelocityText(v.VelocityMode)); Number(w,"x",v.X); Number(w,"y",v.Y); Number(w,"z",v.Z); break; case SpawnHitboxOperationSource h: WriteHitbox(w,h.Hitbox); break; case SpawnProjectileOperationSource p: WriteProjectile(w,p.Projectile); break; case SetAimStateOperationSource a: w.WriteString("aimState",AimText(a.AimState)); break; case StartCapabilityOperationSource c: w.WriteString("capabilityId",c.CapabilityId); w.WriteString("capabilityVersion",c.CapabilityVersion); w.WritePropertyName("parameters"); WriteParameters(w,c.Parameters); break; case EmitPresentationOperationSource e: w.WriteString("presentationId",e.PresentationId); break; } w.WriteEndObject(); }
+    private static void WriteOperation(Utf8JsonWriter w, CharacterTimelineOperationSource x)
+    {
+        w.WriteStartObject();
+        w.WriteString("kind", OperationKind(x));
+        w.WriteNumber("tick", x.Tick);
+        w.WriteString("unit", UnitText(x.Unit));
+        switch (x)
+        {
+            case SetVelocityOperationSource v:
+                w.WriteString("velocityMode", VelocityText(v.VelocityMode));
+                Number(w, "x", v.X);
+                Number(w, "y", v.Y);
+                Number(w, "z", v.Z);
+                break;
+            case ForwardLungeOperationSource lunge:
+                Number(w, "speed", lunge.Speed);
+                w.WriteNumber("durationTicks", lunge.DurationTicks);
+                break;
+            case SpawnHitboxOperationSource h:
+                WriteHitbox(w, h.Hitbox);
+                break;
+            case SpawnProjectileOperationSource p:
+                WriteProjectile(w, p.Projectile);
+                break;
+            case SetAimStateOperationSource a:
+                w.WriteString("aimState", AimText(a.AimState));
+                break;
+            case StartCapabilityOperationSource c:
+                w.WriteString("capabilityId", c.CapabilityId);
+                w.WriteString("capabilityVersion", c.CapabilityVersion);
+                w.WritePropertyName("parameters");
+                WriteParameters(w, c.Parameters);
+                break;
+            case EmitPresentationOperationSource e:
+                w.WriteString("presentationId", e.PresentationId);
+                break;
+        }
+        w.WriteEndObject();
+    }
     private static void WriteHitbox(Utf8JsonWriter w, HitboxSource x) { w.WritePropertyName("hitbox"); w.WriteStartObject(); w.WriteString("shape",ShapeText(x.Shape)); Number(w,"radius",x.Radius); Number(w,"offsetX",x.OffsetX); Number(w,"offsetY",x.OffsetY); Number(w,"offsetZ",x.OffsetZ); Number(w,"endOffsetX",x.EndOffsetX); Number(w,"endOffsetY",x.EndOffsetY); Number(w,"endOffsetZ",x.EndOffsetZ); if(x.StartBoneId == null) w.WriteNull("startBoneId"); else w.WriteString("startBoneId",x.StartBoneId); if(x.EndBoneId == null) w.WriteNull("endBoneId"); else w.WriteString("endBoneId",x.EndBoneId); Number(w,"damage",x.Damage); Number(w,"angle",x.Angle); Number(w,"baseKnockback",x.BaseKnockback); Number(w,"knockbackGrowth",x.KnockbackGrowth); w.WriteNumber("stunTicks",x.StunTicks); w.WriteNumber("durationTicks",x.DurationTicks); w.WriteBoolean("interruptible",x.Interruptible); w.WriteNumber("hitGroup",x.HitGroup); w.WriteString("knockbackDirection",KnockbackDirectionText(x.KnockbackDirection)); w.WriteEndObject(); }
     private static void WriteProjectile(Utf8JsonWriter w, ProjectileSource x) { w.WritePropertyName("projectile"); w.WriteStartObject(); Number(w,"launchOffsetX",x.LaunchOffsetX); Number(w,"launchOffsetY",x.LaunchOffsetY); Number(w,"launchOffsetZ",x.LaunchOffsetZ); Number(w,"speed",x.Speed); Number(w,"gravity",x.Gravity); Number(w,"radius",x.Radius); Number(w,"damage",x.Damage); Number(w,"angle",x.Angle); Number(w,"baseKnockback",x.BaseKnockback); Number(w,"knockbackGrowth",x.KnockbackGrowth); w.WriteNumber("stunTicks",x.StunTicks); w.WriteNumber("maxFlightTicks",x.MaxFlightTicks); Number(w,"yawOffsetDegrees",x.YawOffsetDegrees); w.WriteEndObject(); }
     private static void WriteParameters(Utf8JsonWriter w, TypedCapabilityParameters x)
@@ -426,7 +465,7 @@ public static class CharacterPackageSourceCodec
     private static string KnockbackDirectionText(AuthoringKnockbackDirection value)=>value switch { AuthoringKnockbackDirection.AwayFromOwner=>"awayFromOwner", AuthoringKnockbackDirection.TowardOwner=>"towardOwner", _=>throw new InvalidDataException("Unknown knockback direction.") };
     private static string VelocityText(AuthoringVelocityMode value)=>value switch { AuthoringVelocityMode.Absolute=>"absolute", AuthoringVelocityMode.Additive=>"additive", _=>throw new InvalidDataException("Unknown velocity mode.") };
     private static string UnitText(AuthoringUnit value)=>value switch { AuthoringUnit.Meters=>"meters", AuthoringUnit.MetersPerSecond=>"metersPerSecond", AuthoringUnit.MetersPerSecondSquared=>"metersPerSecondSquared", AuthoringUnit.Degrees=>"degrees", AuthoringUnit.Normalized=>"normalized", AuthoringUnit.Damage=>"damage", AuthoringUnit.Knockback=>"knockback", AuthoringUnit.Ticks=>"ticks", _=>throw new InvalidDataException("Unknown unit.") };
-    private static string OperationKind(CharacterTimelineOperationSource value)=>value switch { SetVelocityOperationSource=>"setVelocity", SpawnHitboxOperationSource=>"spawnHitbox", SpawnProjectileOperationSource=>"spawnProjectile", SetAimStateOperationSource=>"setAimState", StartCapabilityOperationSource=>"startCapability", EmitPresentationOperationSource=>"emitPresentation", CompleteTimelineOperationSource=>"completeTimeline", _=>throw new InvalidDataException("Unknown operation.") };
+    private static string OperationKind(CharacterTimelineOperationSource value)=>value switch { SetVelocityOperationSource=>"setVelocity", ForwardLungeOperationSource=>"forwardLunge", SpawnHitboxOperationSource=>"spawnHitbox", SpawnProjectileOperationSource=>"spawnProjectile", SetAimStateOperationSource=>"setAimState", StartCapabilityOperationSource=>"startCapability", EmitPresentationOperationSource=>"emitPresentation", CompleteTimelineOperationSource=>"completeTimeline", _=>throw new InvalidDataException("Unknown operation.") };
 
     private static PackageManifestSource ParseManifest(JsonElement root, DiagnosticBag d)
     {
@@ -613,7 +652,7 @@ public static class CharacterPackageSourceCodec
         foreach (var e in a.EnumerateArray())
         {
             var opPath = path + ".operations[" + i + "]";
-            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId");
+            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "speed", "durationTicks", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId");
             var kind = String(p, "kind", opPath + ".kind", d);
             var tick = UShort(p, "tick", opPath + ".tick", d);
             var unit = ParseUnit(p, "unit", opPath + ".unit", d);
@@ -622,6 +661,8 @@ public static class CharacterPackageSourceCodec
             {
                 case "setVelocity":
                     result.Add(new SetVelocityOperationSource(tick, unit, EnumValue(p, "velocityMode", opPath + ".velocityMode", d, ParseVelocityMode), Float(p, "x", opPath + ".x", d), Float(p, "y", opPath + ".y", d), Float(p, "z", opPath + ".z", d))); break;
+                case "forwardLunge":
+                    result.Add(new ForwardLungeOperationSource(tick, unit, Float(p, "speed", opPath + ".speed", d), UShort(p, "durationTicks", opPath + ".durationTicks", d))); break;
                 case "spawnHitbox": result.Add(new SpawnHitboxOperationSource(tick, unit, ParseHitbox(p, opPath, d))); break;
                 case "spawnProjectile": result.Add(new SpawnProjectileOperationSource(tick, unit, ParseProjectile(p, opPath, d))); break;
                 case "setAimState": result.Add(new SetAimStateOperationSource(tick, unit, EnumValue(p, "aimState", opPath + ".aimState", d, ParseAimMode))); break;
@@ -639,6 +680,7 @@ public static class CharacterPackageSourceCodec
         var allowed = kind switch
         {
             "setVelocity" => new[] { "kind", "tick", "unit", "velocityMode", "x", "y", "z" },
+            "forwardLunge" => new[] { "kind", "tick", "unit", "speed", "durationTicks" },
             "spawnHitbox" => new[] { "kind", "tick", "unit", "hitbox" },
             "spawnProjectile" => new[] { "kind", "tick", "unit", "projectile" },
             "setAimState" => new[] { "kind", "tick", "unit", "aimState" },

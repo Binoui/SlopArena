@@ -98,7 +98,7 @@ public static class UnityCharacterAssetCooker
     public const int BindingSchemaVersion = 1;
     public const int PoseVersion = 1;
     public const int SampleRate = 60;
-    public const string CookerVersion = "fightguy-phase5-1";
+    public const string CookerVersion = "weapon-markers-1";
 
     public static CharacterAssetCookResult Cook(string packageRoot, CharacterAssetCatalog catalog, CharacterCookOutput output, CharacterCookProfile profile)
     {

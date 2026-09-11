@@ -903,7 +903,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 18,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",

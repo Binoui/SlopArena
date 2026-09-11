@@ -63,7 +63,7 @@ public sealed class BonkKitTests
         Assert.False(stale.IsValid);
         Assert.Contains(stale.Diagnostics, x => x.Code == "package.identity.mismatch");
         var operation = Assert.IsType<CookedStartCapabilityOperation>(
-            Assert.Single(loaded.Package!.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations));
+            Assert.Single(loaded.Package!.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations.OfType<CookedStartCapabilityOperation>()));
         var parameters = Assert.IsType<CookedBonkTargetedJumpSlamCapabilityParameters>(operation.Parameters);
         Assert.Equal((ushort)0, parameters.MaxAimTicks);
         Assert.Equal((ushort)72, parameters.MaxFlightTicks);
@@ -77,6 +77,11 @@ public sealed class BonkKitTests
         Assert.Equal(32f, parameters.SlamKnockbackGrowth);
         Assert.Equal((ushort)20, parameters.SlamStunTicks);
         Assert.Equal((ushort)6, parameters.SlamDurationTicks);
+        var lunge = Assert.IsType<CookedForwardLungeOperation>(
+            Assert.Single(loaded.Package.Definition.Slots.Single(x => x.Id == "ground.A")
+                .Timeline.Stages.Single().Operations.OfType<CookedForwardLungeOperation>()));
+        Assert.Equal((16f, (ushort)16, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick));
+
     }
 
     [Fact]

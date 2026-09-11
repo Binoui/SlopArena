@@ -128,10 +128,50 @@ public static class CookedCharacterPackageLoader
         private static CookedSlotDefinition ParseSlot(JsonElement e){var q=OOptional(e,new[]{"aimMovement","aimAnimationId"},"ordinal","id","isAir","name","description","iconId","behavior","aimMode","aimMovement","aimAnimationId","cooldownTicks","isRecoveryMove","preserveMomentumOnStart","chargePool","timeline");var pool=q["chargePool"].ValueKind==JsonValueKind.Null?null:ParseChargePool(q["chargePool"]);var t=O(q["timeline"],"stages");return new CookedSlotDefinition(I(q,"ordinal"),S(q,"id"),Bo(q,"isAir"),S(q,"name"),S(q,"description"),S(q,"iconId"),(AuthoringAbilityBehavior)B(q,"behavior"),(AuthoringAimMode)B(q,"aimMode"),U(q,"cooldownTicks"),Bo(q,"isRecoveryMove"),Bo(q,"preserveMomentumOnStart"),new CookedTimeline(A(t,"stages").EnumerateArray().Select(ParseStage).ToList()),pool,(AuthoringAimMovementMode)BOrDefault(q,"aimMovement",0),q.TryGetValue("aimAnimationId",out var aa)&&aa.ValueKind==JsonValueKind.String?aa.GetString():null);}
         private static CookedChargePool ParseChargePool(JsonElement e){var q=O(e,"maxCharges","regenTicks");return new CookedChargePool(I(q,"maxCharges"),U(q,"regenTicks"));}
         private static CookedStage ParseStage(JsonElement e){var q=OOptional(e,new[]{"attackRange","warpRange","useTargetLock","rotateTowardTarget","trackingStrength"},"durationTicks","iasaTicks","landingLagTicks","autoCancelBeforeTicks","autoCancelAfterTicks","attackRange","warpRange","useTargetLock","rotateTowardTarget","trackingStrength","animationIds","operations");return new CookedStage(U(q,"durationTicks"),U(q,"iasaTicks"),U(q,"landingLagTicks"),U(q,"autoCancelBeforeTicks"),U(q,"autoCancelAfterTicks"),A(q["animationIds"]).EnumerateArray().Select(x=>x.GetString()!).ToList(),A(q["operations"]).EnumerateArray().Select(ParseOperation).ToList(),FOrDefault(q,"attackRange",0f),FOrDefault(q,"warpRange",0f),BoOrDefault(q,"useTargetLock",false),BoOrDefault(q,"rotateTowardTarget",false),FOrDefault(q,"trackingStrength",0f));}
-        private static CookedTimelineOperation ParseOperation(JsonElement e){var common=All(e);var k=(CookedOperationKind)B(common,"kind");var tick=U(common,"tick");var unit=(AuthoringUnit)B(common,"unit");return k switch{CookedOperationKind.SetVelocity=>Velocity(e,tick,unit),CookedOperationKind.SpawnHitbox=>new CookedSpawnHitboxOperation(tick,unit,ParseHitbox(O(e,"kind","tick","unit","hitbox")["hitbox"])),CookedOperationKind.SpawnProjectile=>new CookedSpawnProjectileOperation(tick,unit,ParseProjectile(O(e,"kind","tick","unit","projectile")["projectile"])),CookedOperationKind.SetAimState=>new CookedSetAimStateOperation(tick,unit,(AuthoringAimMode)B(O(e,"kind","tick","unit","aimState"),"aimState")),CookedOperationKind.StartCapability=>Capability(e,tick,unit),CookedOperationKind.EmitPresentation=>Emit(e,tick,unit),CookedOperationKind.CompleteTimeline=>new CookedCompleteTimelineOperation(tick,unit),_=>throw new InvalidDataException("Unknown cooked operation kind.")};}
-        private static CookedSetVelocityOperation Velocity(JsonElement e,ushort tick,AuthoringUnit unit){var q=O(e,"kind","tick","unit","velocityMode","x","y","z");return new CookedSetVelocityOperation(tick,unit,(AuthoringVelocityMode)B(q,"velocityMode"),F(q,"x"),F(q,"y"),F(q,"z"));}
-        private static CookedStartCapabilityOperation Capability(JsonElement e,ushort tick,AuthoringUnit unit){var q=O(e,"kind","tick","unit","capabilityId","capabilityVersion","parameters");var id=S(q,"capabilityId");return new CookedStartCapabilityOperation(tick,unit,id,S(q,"capabilityVersion"),ParseParameters(id,q["parameters"]));}
-        private static CookedEmitPresentationOperation Emit(JsonElement e,ushort tick,AuthoringUnit unit){var q=O(e,"kind","tick","unit","presentationId","operationIndex");return new CookedEmitPresentationOperation(tick,unit,S(q,"presentationId"),I(q,"operationIndex"));}
+        private static CookedTimelineOperation ParseOperation(JsonElement e)
+        {
+            var common = All(e);
+            var kind = (CookedOperationKind)B(common, "kind");
+            var tick = U(common, "tick");
+            var unit = (AuthoringUnit)B(common, "unit");
+            return kind switch
+            {
+                CookedOperationKind.SetVelocity => Velocity(e, tick, unit),
+                CookedOperationKind.ForwardLunge => ForwardLunge(e, tick, unit),
+                CookedOperationKind.SpawnHitbox => new CookedSpawnHitboxOperation(tick, unit, ParseHitbox(O(e, "kind", "tick", "unit", "hitbox")["hitbox"])),
+                CookedOperationKind.SpawnProjectile => new CookedSpawnProjectileOperation(tick, unit, ParseProjectile(O(e, "kind", "tick", "unit", "projectile")["projectile"])),
+                CookedOperationKind.SetAimState => new CookedSetAimStateOperation(tick, unit, (AuthoringAimMode)B(O(e, "kind", "tick", "unit", "aimState"), "aimState")),
+                CookedOperationKind.StartCapability => Capability(e, tick, unit),
+                CookedOperationKind.EmitPresentation => Emit(e, tick, unit),
+                CookedOperationKind.CompleteTimeline => new CookedCompleteTimelineOperation(tick, unit),
+                _ => throw new InvalidDataException("Unknown cooked operation kind."),
+            };
+        }
+
+        private static CookedSetVelocityOperation Velocity(JsonElement e, ushort tick, AuthoringUnit unit)
+        {
+            var q = O(e, "kind", "tick", "unit", "velocityMode", "x", "y", "z");
+            return new CookedSetVelocityOperation(tick, unit, (AuthoringVelocityMode)B(q, "velocityMode"), F(q, "x"), F(q, "y"), F(q, "z"));
+        }
+
+        private static CookedForwardLungeOperation ForwardLunge(JsonElement e, ushort tick, AuthoringUnit unit)
+        {
+            var q = O(e, "kind", "tick", "unit", "speed", "durationTicks");
+            return new CookedForwardLungeOperation(tick, unit, F(q, "speed"), U(q, "durationTicks"));
+        }
+
+        private static CookedStartCapabilityOperation Capability(JsonElement e, ushort tick, AuthoringUnit unit)
+        {
+            var q = O(e, "kind", "tick", "unit", "capabilityId", "capabilityVersion", "parameters");
+            var id = S(q, "capabilityId");
+            return new CookedStartCapabilityOperation(tick, unit, id, S(q, "capabilityVersion"), ParseParameters(id, q["parameters"]));
+        }
+
+        private static CookedEmitPresentationOperation Emit(JsonElement e, ushort tick, AuthoringUnit unit)
+        {
+            var q = O(e, "kind", "tick", "unit", "presentationId", "operationIndex");
+            return new CookedEmitPresentationOperation(tick, unit, S(q, "presentationId"), I(q, "operationIndex"));
+        }
         
         private static CookedHitbox ParseHitbox(JsonElement e){var q=OOptional(e,new[]{"knockbackDirection"},"shape","radius","offsetX","offsetY","offsetZ","endOffsetX","endOffsetY","endOffsetZ","startBoneId","endBoneId","damage","angle","baseKnockback","knockbackGrowth","stunTicks","durationTicks","interruptible","hitGroup","knockbackDirection");return new CookedHitbox((AuthoringHitboxShape)B(q,"shape"),F(q,"radius"),F(q,"offsetX"),F(q,"offsetY"),F(q,"offsetZ"),F(q,"endOffsetX"),F(q,"endOffsetY"),F(q,"endOffsetZ"),N(q,"startBoneId"),N(q,"endBoneId"),F(q,"damage"),F(q,"angle"),F(q,"baseKnockback"),F(q,"knockbackGrowth"),U(q,"stunTicks"),U(q,"durationTicks"),Bo(q,"interruptible"),B(q,"hitGroup"),(AuthoringKnockbackDirection)BOrDefault(q,"knockbackDirection",(byte)AuthoringKnockbackDirection.AwayFromOwner));}
         private static CookedProjectile ParseProjectile(JsonElement e){var q=O(e,"launchOffsetX","launchOffsetY","launchOffsetZ","speed","gravity","radius","damage","angle","baseKnockback","knockbackGrowth","stunTicks","maxFlightTicks","yawOffsetDegrees");return new CookedProjectile(F(q,"launchOffsetX"),F(q,"launchOffsetY"),F(q,"launchOffsetZ"),F(q,"speed"),F(q,"gravity"),F(q,"radius"),F(q,"damage"),F(q,"angle"),F(q,"baseKnockback"),F(q,"knockbackGrowth"),U(q,"stunTicks"),U(q,"maxFlightTicks"),F(q,"yawOffsetDegrees"));}

@@ -277,6 +277,7 @@ public enum CookedOperationKind : byte
     StartCapability = 4,
     EmitPresentation = 5,
     CompleteTimeline = 6,
+    ForwardLunge = 7,
 }
 
 public abstract class CookedTimelineOperation
@@ -309,6 +310,19 @@ public sealed class CookedSetVelocityOperation : CookedTimelineOperation
         Z = z;
     }
 }
+public sealed class CookedForwardLungeOperation : CookedTimelineOperation
+{
+    public float Speed { get; }
+    public ushort DurationTicks { get; }
+
+    public CookedForwardLungeOperation(ushort tick, AuthoringUnit unit, float speed, ushort durationTicks)
+        : base(tick, unit, CookedOperationKind.ForwardLunge)
+    {
+        Speed = speed;
+        DurationTicks = durationTicks;
+    }
+}
+
 
 public sealed class CookedSpawnHitboxOperation : CookedTimelineOperation
 {

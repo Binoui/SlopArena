@@ -50,9 +50,12 @@ public sealed record AbilityLabTimelineProjection
             {
                 var operation = sourceOperations[operationIndex] ?? throw new InvalidDataException($"Operation {stageIndex}:{operationIndex} is null.");
                 int operationStart = startTick + operation.Tick;
-                int operationEnd = operation is SpawnHitboxOperationSource hitbox
-                    ? operationStart + hitbox.Hitbox.DurationTicks
-                    : operationStart + 1;
+                int operationEnd = operation switch
+                {
+                    SpawnHitboxOperationSource hitbox => operationStart + hitbox.Hitbox.DurationTicks,
+                    ForwardLungeOperationSource lunge => operationStart + lunge.DurationTicks,
+                    _ => operationStart + 1,
+                };
                 operations.Add(new AbilityLabOperationProjection(
                     stageIndex,
                     operationIndex,
@@ -84,6 +87,7 @@ public sealed record AbilityLabTimelineProjection
     private static CookedOperationKind KindOf(CharacterTimelineOperationSource operation) => operation switch
     {
         SetVelocityOperationSource => CookedOperationKind.SetVelocity,
+        ForwardLungeOperationSource => CookedOperationKind.ForwardLunge,
         SpawnHitboxOperationSource => CookedOperationKind.SpawnHitbox,
         SpawnProjectileOperationSource => CookedOperationKind.SpawnProjectile,
         SetAimStateOperationSource => CookedOperationKind.SetAimState,
@@ -96,6 +100,7 @@ public sealed record AbilityLabTimelineProjection
     private static string SummaryOf(CharacterTimelineOperationSource operation) => operation switch
     {
         SetVelocityOperationSource => "Set velocity",
+        ForwardLungeOperationSource => "Forward lunge",
         SpawnHitboxOperationSource => "Hitbox",
         SpawnProjectileOperationSource => "Projectile",
         SetAimStateOperationSource => "Set aim",

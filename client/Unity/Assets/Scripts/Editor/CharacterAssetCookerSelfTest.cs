@@ -18,6 +18,64 @@ public static class CharacterAssetCookerSelfTest
         "anim.rising-dragon", "anim.cyclone-kick", "anim.dragon-beam",
     };
 
+    [MenuItem("Tools/SlopArena/Tests/Weapon Marker Poses")]
+    public static void RunWeaponMarkerSelfTest()
+    {
+        var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>("Assets/CharacterPackages/bonk/CharacterAssetCatalog.asset");
+        var entry = catalog.WeaponConfig.Entries.First(x => x != null);
+        var animations = catalog.Bindings.Where(x => x.Clip != null)
+            .Select(x => new DeterministicPoseTrackBaker.SampledAnimation
+            {
+                SemanticId = x.SemanticId,
+                PoseTrackId = x.PoseTrackId,
+                Clip = x.Clip,
+                FrameCount = Mathf.CeilToInt(x.Clip.length * 60),
+            }).ToArray();
+        var baked = BakedAnimationData.LoadFromBin(DeterministicPoseTrackBaker.Bake(catalog.Rig, animations, 60, catalog.WeaponConfig));
+        var rig = UnityEngine.Object.Instantiate(catalog.Rig);
+        var weapon = UnityEngine.Object.Instantiate(entry.Prefab);
+        rig.hideFlags = weapon.hideFlags = HideFlags.HideAndDontSave;
+        try
+        {
+            var hand = rig.GetComponentsInChildren<Transform>(true).First(x => x.name == entry.BoneName);
+            var hips = rig.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Hips);
+            var markers = weapon.GetComponentsInChildren<Transform>(true);
+            var hilt = markers.Single(x => x.name == "bladeHilt");
+            var tip = markers.Single(x => x.name == "bladeEnd");
+            int hiltIndex = Array.IndexOf(baked.BoneNames, "_weapon_hilt");
+            int tipIndex = Array.IndexOf(baked.BoneNames, "_weapon_tip");
+            int frames = 0;
+            foreach (var animation in animations)
+            {
+                for (int frame = 0; frame < animation.FrameCount; frame++)
+                {
+                    animation.Clip.SampleAnimation(rig, frame / 60f);
+                    // Place an actual prefab instance as WeaponAttach does, including its scale.
+                    weapon.transform.position = hand.TransformPoint(entry.PositionOffset);
+                    weapon.transform.rotation = hand.rotation * Quaternion.Euler(entry.RotationOffset);
+                    AssertMarkerPose(hiltIndex, hilt.position - hips.position, "_weapon_hilt");
+                    AssertMarkerPose(tipIndex, tip.position - hips.position, "_weapon_tip");
+                    frames++;
+
+                    void AssertMarkerPose(int boneIndex, Vector3 expected, string bone)
+                    {
+                        if (!baked.GetBonePosition(animation.PoseTrackId, frame, boneIndex, out float x, out float y, out float z))
+                            throw new InvalidOperationException($"Missing {bone} at {animation.SemanticId}:{frame}.");
+                        float error = Vector3.Distance(expected, new Vector3(x, y, z));
+                        if (error > 0.0001f)
+                            throw new InvalidOperationException($"{bone} differs from rendered marker by {error:F6}m at {animation.SemanticId}:{frame}.");
+                    }
+                }
+            }
+            Debug.Log($"[SlopArena] Weapon marker poses passed: {animations.Length} clips, {frames} frames, both endpoints within 0.1mm.");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(weapon);
+            UnityEngine.Object.DestroyImmediate(rig);
+        }
+    }
+
     public static void RunFightGuySelfTest()
     {
         var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>("Assets/CharacterPackages/fightguy/CharacterAssetCatalog.asset");

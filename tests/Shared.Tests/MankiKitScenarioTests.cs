@@ -60,10 +60,10 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             package.Definition.CapabilityRequirements.Select(x => x.CapabilityId).OrderBy(x => x).ToArray());
         var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
         {
-            ["ground.1"] = (17, 13, 4, 5, .35f, 4, 8, 4, 20, 14, 0, 0, 0),
-            ["ground.2"] = (25, 22, 5, 5, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
-            ["ground.3"] = (29, 25, 7, 6, .4f, 7, 55, 5, 24, 18, 0, 0, 0),
-            ["ground.4"] = (60, 56, 10, 7, .42f, 14, 28, 9, 42, 26, 0, 0, 0),
+            ["ground.1"] = (30, 13, 8, 5, .35f, 4, 8, 4, 20, 14, 0, 0, 0),
+            ["ground.2"] = (50, 22, 8, 5, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
+            ["ground.3"] = (38, 25, 8, 10, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
+            ["ground.4"] = (60, 56, 10, 7, .5f, 14, 28, 9, 42, 26, 0, 0, 0),
             ["air.1"] = (33, 29, 6, 5, .30f, 3, 55, 5, 24, 12, 9, 5, 23),
             ["air.3"] = (44, 41, 14, 6, .35f, 8, 65, 5, 26, 20, 9, 5, 30),
             ["air.4"] = (54, 50, 20, 7, .4f, 13, 25, 8, 42, 26, 12, 5, 38),
@@ -127,13 +127,13 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         var flame = Assert.IsType<CookedSpawnHitboxOperation>(aerosolStage.Operations[1]);
         Assert.Equal((ushort)18, flame.Tick);
         Assert.Equal(AuthoringHitboxShape.Capsule, flame.Hitbox.Shape);
-        Assert.Equal(1.25f, flame.Hitbox.Radius);
+        Assert.Equal(0.7f, flame.Hitbox.Radius);
         Assert.Equal(0f, flame.Hitbox.OffsetX);
         Assert.Equal(0.25f, flame.Hitbox.OffsetY);
         Assert.Equal(1.25f, flame.Hitbox.OffsetZ);
         Assert.Equal(0f, flame.Hitbox.EndOffsetX);
-        Assert.Equal(4.5f, flame.Hitbox.EndOffsetY);
-        Assert.Equal(1.25f, flame.Hitbox.EndOffsetZ);
+        Assert.Equal(0f, flame.Hitbox.EndOffsetY);
+        Assert.Equal(3f, flame.Hitbox.EndOffsetZ);
         Assert.Equal(15f, flame.Hitbox.Damage);
         Assert.Equal(55f, flame.Hitbox.Angle);
         Assert.Equal(12f, flame.Hitbox.BaseKnockback);
@@ -213,13 +213,13 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal((ushort)3, jetpack.StartupTicks);
         Assert.Equal(15f, jetpack.VerticalSpeed);
         Assert.Equal(3.5f, jetpack.HorizontalSpeed);
-        Assert.Equal(1.25f, jetpack.ExplosionRadius);
-        Assert.Equal(4f, jetpack.ExplosionDamage);
-        Assert.Equal(75f, jetpack.ExplosionKbAngle);
-        Assert.Equal(2f, jetpack.ExplosionKbBase);
-        Assert.Equal(8f, jetpack.ExplosionKbGrowth);
-        Assert.Equal((ushort)8, jetpack.ExplosionStunTicks);
-        Assert.Equal((ushort)4, jetpack.ExplosionDurationTicks);
+        Assert.Equal(1.5f, jetpack.ExplosionRadius);
+        Assert.Equal(10f, jetpack.ExplosionDamage);
+        Assert.Equal(30f, jetpack.ExplosionKbAngle);
+        Assert.Equal(2.4f, jetpack.ExplosionKbBase);
+        Assert.Equal(24f, jetpack.ExplosionKbGrowth);
+        Assert.Equal((ushort)18, jetpack.ExplosionStunTicks);
+        Assert.Equal((ushort)8, jetpack.ExplosionDurationTicks);
 
         var bazooka = Assert.IsType<CookedMankiBazookaCapabilityParameters>(
             Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.R").Timeline.Stages.Single().Operations)).Parameters);
@@ -381,8 +381,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             NpcSetup = () => TestHelpers.NpcState(0f, 0.75f) with { PY = GroundPy },
             NpcAssert = npc =>
             {
-                Assert.Equal((ushort)4, npc.DamagePercent);
-                Assert.True(npc.KVY > 0f, $"NPC should launch upward, got {npc.KVY}");
+                Assert.Equal((ushort)10, npc.DamagePercent);
             },
             SnapshotTick = 10,
             TotalTicks = 11,

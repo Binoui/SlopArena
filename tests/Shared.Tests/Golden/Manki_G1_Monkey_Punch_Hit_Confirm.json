@@ -11,12 +11,10 @@
   "NpcSnap": {
     "State": 2,
     "FacingYaw": -3.1415927,
-    "PY": 0.78974795,
-    "PZ": 1.2828207,
-    "VY": 0.59621763,
-    "VZ": 4.2423086,
+    "PY": 0.75,
+    "PZ": 1,
     "DamagePercent": 4,
-    "HitstunTicks": 7,
+    "HitstunTicks": 11,
     "JumpsLeft": 2
   },
   "PlayerFinal": {

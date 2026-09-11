@@ -441,7 +441,7 @@ public class ServerSimulationTests
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A) } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < 60; i++)
             sim.Tick(new() { { 1, default } });
 
         ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);
@@ -460,9 +460,7 @@ public class ServerSimulationTests
 
         // Fire Ki Shot (A slot, activeSlot 11, cooldown 120): press, hold, release.
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.A) } });
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < 60; i++)
             sim.Tick(new() { { 1, default } });
 
         Assert.Equal((ushort)0, sim.GetState(1).GetCooldown(AbilitySlots.A));

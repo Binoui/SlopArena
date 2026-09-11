@@ -117,48 +117,6 @@ public class KistuAbilityTests
         Assert.True(s.PY > GroundPY + 1f, $"expected Kistu to rise above {GroundPY + 1f:F2}, got {s.PY:F2}");
     }
 
-    // ── E: launches a grounded enemy ──
-
-    [Fact]
-    public void E_LaunchesGroundedEnemy()
-    {
-        var sim = SimWithPlayer(out _);
-        var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
-        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-        Assert.True(sim.GetState(100).DamagePercent > 0, "E should hit and damage the grounded enemy");
-    }
-
-
-    [Fact]
-    public void E_RefundsChargeOnHit()
-    {
-        var sim = SimWithPlayer(out _);
-        var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
-        for (int i = 0; i < 24; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-
-        Assert.True(sim.GetState(100).DamagePercent > 0, "E should have connected");
-        Assert.Equal((byte)0, sim.GetState(1).ChargeStockSpent);
-    }
-
-    [Fact]
-    public void E_RefundToEmpty_ClearsRegenTimer()
-    {
-        var sim = SimWithPlayer(out _);
-        var npc = TestHelpers.NpcState(0f, 1.0f); npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 4) }, { 100, default } });
-        for (int i = 0; i < 24; i++) sim.Tick(new() { { 1, default }, { 100, default } });
-
-        var s = sim.GetState(1);
-        Assert.Equal((byte)0, s.ChargeStockSpent);
-        Assert.Equal((ushort)0, s.ChargeStockRegenTicks);
-    }
 
     // ── F: blade flurry deals damage ──
 

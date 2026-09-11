@@ -61,6 +61,25 @@ public sealed class AbilityLabTimelineProjectionTests
     }
 
     [Fact]
+    public void ForwardLungeProjectsItsFullDurationAndRetainsItsParametersWhenRetimed()
+    {
+        var lunge = new ForwardLungeOperationSource(3, AuthoringUnit.MetersPerSecond, 16f, 4);
+        var source = WithSlot(Slot(new CharacterStageSource(
+            10, 0, 0, 0, 0, Array.Empty<string>(), new CharacterTimelineOperationSource[] { lunge })));
+
+        var projection = AbilityLabTimelineProjection.Build(source.Character.Slots[0]);
+        var operation = Assert.Single(projection.Stages[0].Operations);
+        Assert.Equal((CookedOperationKind.ForwardLunge, "Forward lunge", 3, 7),
+            (operation.Kind, operation.Summary, operation.StartTick, operation.EndTick));
+
+        var result = CharacterPackageSourceCodec.ReplaceOperationTick(source, 0, 0, 0, 5);
+        Assert.True(result.IsValid);
+        var retimed = Assert.IsType<ForwardLungeOperationSource>(
+            result.Source!.Character.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal((5, 16f, (ushort)4), (retimed.Tick, retimed.Speed, retimed.DurationTicks));
+    }
+
+    [Fact]
     public void EmptyAndNullTimelinesAreHandledExplicitly()
     {
         var projection = AbilityLabTimelineProjection.Build(Slot(new CharacterStageSource(

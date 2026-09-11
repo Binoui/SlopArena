@@ -1666,6 +1666,21 @@ public sealed class AbilityLabWindow : EditorWindow
         };
         addHitbox.tooltip = "Add a default hitbox to this move stage.";
         moveGroup.Add(addHitbox);
+        var addForwardLunge = new Button(() =>
+        {
+            if (_lab == null || !_workspace.AddForwardLunge(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            UpdateTimelineControls();
+            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _timelineTrack.SelectedOperation = _selectedOperation;
+            RefreshInspector();
+            SceneView.RepaintAll();
+        })
+        {
+            text = "Add forward lunge"
+        };
+        addForwardLunge.tooltip = "Move in the current facing direction at a fixed speed for a fixed duration.";
+        moveGroup.Add(addForwardLunge);
+
         var presentationIds = _workspace.Draft.PresentationIds ?? Array.Empty<string>();
         var addPresentation = new Button(() =>
         {
@@ -1702,6 +1717,22 @@ public sealed class AbilityLabWindow : EditorWindow
             AddHitboxAttachment(group, hitbox);
             _inspector.Add(group);
         }
+        else if (selected?.Source is ForwardLungeOperationSource lunge)
+        {
+            var group = new Foldout { text = "Forward lunge", value = true };
+            group.Add(new Label("Direction is captured from facing when the lunge begins."));
+            AddDelayedInteger(group, "Start tick", lunge.Tick, CommitForwardLungeStart);
+            AddDelayedInteger(group, "Duration ticks", lunge.DurationTicks,
+                value => CommitForwardLunge(current => current with
+                {
+                    DurationTicks = (ushort)Mathf.Clamp(value, 1,
+                        Mathf.Max(1, CurrentStage().DurationTicks - current.Tick))
+                }));
+            AddDelayedFloat(group, "Speed (m/s)", lunge.Speed,
+                value => CommitForwardLunge(current => current with { Speed = Mathf.Max(0.01f, value) }));
+            _inspector.Add(group);
+        }
+
         else if (selected?.Source is EmitPresentationOperationSource presentationOperation)
         {
             var group = new Foldout { text = "Presentation", value = true };
@@ -1801,6 +1832,40 @@ public sealed class AbilityLabWindow : EditorWindow
         if (_lab == null || !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot))
             throw new InvalidOperationException("No selected source slot.");
         return slot.Timeline.Stages[_lab.StageIndex];
+    }
+
+    private void CommitForwardLunge(Func<ForwardLungeOperationSource, ForwardLungeOperationSource> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            _selectedOperation?.Source is not ForwardLungeOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex, stageIndex, operationIndex, edit(original));
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void CommitForwardLungeStart(int startTick)
+    {
+        if (_selectedOperation?.Source is not ForwardLungeOperationSource lunge) return;
+        int maxStart = Mathf.Max(0, CurrentStage().DurationTicks - lunge.DurationTicks);
+        CommitForwardLunge(current => current with
+        {
+            Tick = (ushort)Mathf.Clamp(startTick, 0, maxStart)
+        });
     }
 
     private void CommitHitbox(Func<HitboxSource, HitboxSource> edit)

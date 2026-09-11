@@ -20,6 +20,15 @@ public static class AbilityLabPackageSelfTest
         {
             if (!workspace.NewPackage(packageId, "Self Test")) throw new InvalidOperationException(string.Join("\n", workspace.Diagnostics));
             if (workspace.Draft.Slots.Count != 16 || workspace.Draft.CapabilityRequirements.Count != 0) throw new InvalidOperationException("Minimal package contract failed.");
+            if (!workspace.AddForwardLunge("ground.A", 0) ||
+                workspace.Draft.Slots.Single(slot => slot.Id == "ground.A").Timeline.Stages[0].Operations
+                    .SingleOrDefault(operation => operation is ForwardLungeOperationSource)
+                    is not ForwardLungeOperationSource lunge ||
+                lunge.Unit != AuthoringUnit.MetersPerSecond ||
+                lunge.Speed != 12f ||
+                lunge.DurationTicks != 6)
+                throw new InvalidOperationException("Forward lunge source edit did not add the default typed operation.");
+
             string characterPath = Path.Combine(full, "character.json");
             string before = File.ReadAllText(characterPath);
             File.AppendAllText(characterPath, "\n");

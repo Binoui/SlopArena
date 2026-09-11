@@ -220,7 +220,7 @@ public class FightGuyAbilityTests
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
 
         float beforeKickZ = 0f;
-        for (int i = 0; i < 120; i++)
+        for (int i = 0; i < 140; i++)
         {
             sim.Tick(new()
             {

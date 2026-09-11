@@ -313,7 +313,7 @@ public class Kit117SlotSemanticsTests
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < 60; i++)
             sim.Tick(new() { { 1, default } });
 
         ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);

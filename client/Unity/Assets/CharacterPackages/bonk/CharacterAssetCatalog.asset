@@ -51,23 +51,23 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.hit-hard
   - _semanticId: anim.bonk.g1
-    _clip: {fileID: 7400000, guid: 0f18c70933529f77d8e61bf9fba09b67, type: 3}
+    _clip: {fileID: 7400000, guid: 4f502aaf0c0768b65bdd358b45029792, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.g1
   - _semanticId: anim.bonk.g2
-    _clip: {fileID: 7400000, guid: 6fed0ce783af60849b6d6d039ad801e5, type: 3}
+    _clip: {fileID: 7400000, guid: 5749cf25830adcca4bd3750b4afcf904, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.g2
   - _semanticId: anim.bonk.g3
-    _clip: {fileID: 7400000, guid: 0ee17c0c798a942d8abc01a71e40e004, type: 3}
+    _clip: {fileID: 7400000, guid: 7a29359b5554bb75980244af2fa1f615, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.g3
   - _semanticId: anim.bonk.g4
-    _clip: {fileID: 7400000, guid: 3a8d8da0178c15238b66bc1e200ad0c7, type: 2}
+    _clip: {fileID: 7400000, guid: 77adee449636536078c538b0fe0e02df, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.g4
   - _semanticId: anim.bonk.ga
-    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _clip: {fileID: 7400000, guid: 6e19a07b540610cedb493c62d38b4fe8, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.bonk.ga
   - _semanticId: anim.bonk.ge
@@ -99,7 +99,7 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.bonk.a4
   - _semanticId: anim.bonk.aa
-    _clip: {fileID: 7400000, guid: 7e3b7df525f7bdf018c81568e85307c0, type: 3}
+    _clip: {fileID: 7400000, guid: 6e19a07b540610cedb493c62d38b4fe8, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.bonk.aa
   - _semanticId: anim.bonk.ar

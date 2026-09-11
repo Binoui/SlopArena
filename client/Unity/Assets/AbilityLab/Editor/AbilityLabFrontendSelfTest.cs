@@ -70,6 +70,10 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException("Source edits did not remain an unsaved authoritative draft.");
             Refresh(window);
             RefreshInspector(window);
+            if (!root.Q<VisualElement>("inspector").Query<Button>().ToList()
+                    .Any(button => button.text == "Add forward lunge"))
+                throw new InvalidOperationException("Forward-lunge control is unavailable in the Move inspector.");
+
             if (root.Q<FloatField>("character-weight").value != priorWeight + 1f ||
                 root.Q<Button>("package-status-toggle").text != "Unsaved" ||
                 root.Q<Label>("package-status") != null ||

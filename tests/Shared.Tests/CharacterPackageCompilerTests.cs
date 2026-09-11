@@ -92,10 +92,10 @@ public sealed class CharacterPackageCompilerTests
         Assert.Equal(new[] { "_weapon_hilt", "_weapon_tip" }, package.Definition.AttachmentBoneIds.OrderBy(x => x).ToArray());
         var shuriken = package.Definition.Slots.Single(x => x.Id == "ground.A").Timeline.Stages.Single().Operations.OfType<CookedSpawnProjectileOperation>().ToArray();
         Assert.Equal(new[] { -15f, 0f, 15f }, shuriken.Select(x => x.Projectile.YawOffsetDegrees).OrderBy(x => x).ToArray());
-        Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.R").ChargePool!.RegenTicks));
+        Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.RegenTicks));
     }
     [Fact]
-    public void BonkAndKistu_EAimMovementPolicies_CookMobile()
+    public void BonkAndKistu_EAimMovementPolicies_CookExpectedModes()
     {
         var bonk = CharacterPackageCompiler.Compile(
             File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json")),
@@ -110,7 +110,40 @@ public sealed class CharacterPackageCompilerTests
             File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/character.json")),
             CharacterCookProfile.TrustedBuiltIn);
         Assert.NotNull(kistu.CookedPackage);
-        Assert.Equal(AuthoringAimMovementMode.Mobile, kistu.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
+        Assert.Equal(AuthoringAimMovementMode.Fixed, kistu.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
+    }
+
+    [Fact]
+    public void ForwardLungeRequiresPositiveSpeedAndStageBoundedDuration()
+    {
+        CharacterCompileResult zeroSpeed = CompileCharacter(character =>
+        {
+            var operations = (JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!;
+            operations.Add(new JsonObject
+            {
+                ["kind"] = "forwardLunge",
+                ["tick"] = 1,
+                ["unit"] = "metersPerSecond",
+                ["speed"] = 0,
+                ["durationTicks"] = 1,
+            });
+        });
+        AssertError(zeroSpeed, "value.out-of-range");
+
+        CharacterCompileResult pastStage = CompileCharacter(character =>
+        {
+            var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
+            var operations = (JsonArray)stage["operations"]!;
+            operations.Add(new JsonObject
+            {
+                ["kind"] = "forwardLunge",
+                ["tick"] = (int)stage["durationTicks"]! - 1,
+                ["unit"] = "metersPerSecond",
+                ["speed"] = 1,
+                ["durationTicks"] = 2,
+            });
+        });
+        AssertError(pastStage, "value.out-of-range");
     }
 
     [Fact]

@@ -263,6 +263,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
                 CookedOperationKind.EmitPresentation => "Presentation",
                 CookedOperationKind.StartCapability => "Capability",
                 CookedOperationKind.SetVelocity => "Velocity",
+                CookedOperationKind.ForwardLunge => "Forward lunge",
                 CookedOperationKind.SetAimState => "Aim",
                 CookedOperationKind.CompleteTimeline => "Complete",
                 _ => operation.Summary,

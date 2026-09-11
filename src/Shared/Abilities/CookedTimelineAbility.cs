@@ -12,6 +12,10 @@ public sealed class CookedTimelineAbility : ServerAbility
     private int _operationCursor;
     private bool _completed;
     private bool _unlimitedAimHold;
+    private float _forwardLungeSpeed;
+    private float _forwardLungeYaw;
+    private ushort _forwardLungeTicksRemaining;
+
 
     public CookedTimelineAbility(CookedSlotDefinition slot, string[] animationNames)
     {
@@ -27,6 +31,10 @@ public sealed class CookedTimelineAbility : ServerAbility
         _operationCursor = 0;
         _completed = false;
         _unlimitedAimHold = false;
+        _forwardLungeSpeed = 0f;
+        _forwardLungeYaw = 0f;
+        _forwardLungeTicksRemaining = 0;
+
         s.State = ActionState.Attacking;
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
@@ -42,6 +50,8 @@ public sealed class CookedTimelineAbility : ServerAbility
     {
         if (_completed)
             return;
+        ApplyForwardLunge(ref s);
+
 
         bool wasAiming = _unlimitedAimHold && s.State == ActionState.Aiming;
         if (!wasAiming)
@@ -121,6 +131,9 @@ public sealed class CookedTimelineAbility : ServerAbility
                         s.VZ += velocity.Z;
                     }
                     break;
+                case CookedForwardLungeOperation lunge:
+                    StartForwardLunge(ref s, lunge);
+                    break;
                 case CookedSpawnHitboxOperation hitbox:
                     SpawnCookedHitbox(ref s, hitbox.Hitbox);
                     break;
@@ -143,6 +156,24 @@ public sealed class CookedTimelineAbility : ServerAbility
             }
         }
     }
+    private void StartForwardLunge(ref CharacterState s, CookedForwardLungeOperation operation)
+    {
+        _forwardLungeSpeed = operation.Speed;
+        _forwardLungeYaw = s.FacingYaw;
+        _forwardLungeTicksRemaining = operation.DurationTicks;
+        ApplyForwardLunge(ref s);
+    }
+
+    private void ApplyForwardLunge(ref CharacterState s)
+    {
+        if (_forwardLungeTicksRemaining == 0)
+            return;
+
+        s.VX = MathF.Sin(_forwardLungeYaw) * _forwardLungeSpeed;
+        s.VZ = MathF.Cos(_forwardLungeYaw) * _forwardLungeSpeed;
+        _forwardLungeTicksRemaining--;
+    }
+
 
     private void SpawnCookedHitbox(ref CharacterState s, CookedHitbox cooked)
     {
