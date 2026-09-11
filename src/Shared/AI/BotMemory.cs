@@ -15,17 +15,12 @@ public sealed class BotMemory
     /// <summary>Ticks remaining before a newly detected threat can trigger a reaction.</summary>
     public int ReactionTicksRemaining;
 
-    /// <summary>Last slot pressed by this bot; runner-owned telemetry, not sim state.</summary>
-    public byte LastPressedSlot;
-
     /// <summary>True for the previous tick when this bot's hitbox connected.</summary>
     public bool LastAttackConnected;
 
     /// <summary>Whether the target was attacking/recovering on the previous pre-tick snapshot.</summary>
     public bool LastTargetWasAttacking;
 
-    /// <summary>Whether this bot was actionable on the previous policy call.</summary>
-    public bool WasActionable;
 
     /// <summary>Stable lateral direction for range-holding: -1 or +1 once selected.</summary>
     public sbyte StrafeDirection;
@@ -36,10 +31,8 @@ public sealed class BotMemory
         DifficultyLevel = 5;
         DecisionTicksRemaining = 0;
         ReactionTicksRemaining = 0;
-        LastPressedSlot = 0;
         LastAttackConnected = false;
         LastTargetWasAttacking = false;
-        WasActionable = false;
         StrafeDirection = 0;
     }
 }

@@ -632,20 +632,9 @@ internal static class Program
     {
         var file = File.OpenRead(path);
         var gzip = new GZipStream(file, CompressionMode.Decompress);
-        return new TarReader(new OwnedStream(gzip, file));
+        return new TarReader(gzip);
     }
 
-    private sealed class OwnedStream : Stream
-    {
-        private readonly Stream _inner;
-        private readonly Stream _owner;
-        public OwnedStream(Stream inner, Stream owner) { _inner = inner; _owner = owner; }
-        public override bool CanRead => _inner.CanRead; public override bool CanSeek => false; public override bool CanWrite => false;
-        public override long Length => throw new NotSupportedException(); public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-        public override void Flush() => _inner.Flush(); public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException(); public override void SetLength(long value) => throw new NotSupportedException(); public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        protected override void Dispose(bool disposing) { if (disposing) { _inner.Dispose(); _owner.Dispose(); } base.Dispose(disposing); }
-    }
 
     private static bool FilesEqual(string a, string b)
     {

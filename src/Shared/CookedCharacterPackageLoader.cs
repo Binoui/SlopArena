@@ -85,7 +85,7 @@ public static class CookedCharacterPackageLoader
             if(m.PackageId!=requirement!.PackageId||m.Version!=requirement.Version||m.CookedContentHash!=requirement.CookedContentHash||m.PackageHash!=requirement.PackageHash) d.Add(Error("package.identity.mismatch","manifest","Package identity does not match the requested requirement."));
             if(m.CookedSchemaVersion!=1||m.RuntimeApiMin!="1.0.0"||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
             if(m.Dependencies.Count!=0) d.Add(Error("package.dependencies.unsupported","manifest.dependencies","Unresolved package dependencies are not supported."));
-            foreach(var c in m.Capabilities) if(c.CapabilityVersion!="1"||!SupportedCapability(c.CapabilityId)) d.Add(Error("package.capability.unsupported",c.CapabilityId,"Cooked capability is not supported by this runtime."));
+            foreach(var c in m.Capabilities) if(c.CapabilityVersion!="1"||!CharacterPackageCompiler.IsTrustedCapability(c.CapabilityId)) d.Add(Error("package.capability.unsupported",c.CapabilityId,"Cooked capability is not supported by this runtime."));
             var package=RuntimeParser.Parse(copied[CharacterPackageAssembler.RuntimePath]);
             if(package.Metadata.PackageId!=m.PackageId||package.Metadata.Version!=m.Version||package.Metadata.CookedSchemaVersion!=m.CookedSchemaVersion) d.Add(Error("package.runtime.metadata-mismatch",CharacterPackageAssembler.RuntimePath,"Runtime package metadata does not match manifest."));
             var baked=BakedAnimationData.LoadFromBin(copied[CharacterPackageAssembler.PosePath]);
@@ -97,8 +97,6 @@ public static class CookedCharacterPackageLoader
 
     private static CookedCharacterPackageLoadResult Failure(List<CharacterDiagnostic> d)=>new(null,null,new MatchContentIdentity("","","","",""),d);
     private static CharacterDiagnostic Error(string c,string p,string m)=>new(CharacterDiagnosticSeverity.Error,c,p,m);
-    private static bool SupportedCapability(string id)=>id=="slop.internal.fightguy.cyclone-kick.v1"||id=="slop.internal.fightguy.dragon-beam.v1"||id=="slop.internal.fightguy.ki-shot.v1"||id=="slop.internal.fightguy.rising-dragon.v1"||id=="slop.internal.kistu.dash-slash.v1"||id=="slop.internal.kistu.rising-slash.v1"||id=="slop.internal.kistu.blade-flurry.v1"||id=="slop.internal.bonk.targeted-jump-slam.v1"||id=="slop.internal.manki.round-bomb.v1"||id=="slop.internal.manki.jetpack-boost.v1"||id=="slop.internal.manki.bazooka.v1";
-
     private sealed class ManifestInfo { public string PackageId=""; public string Version=""; public ushort CookedSchemaVersion; public string RuntimeApiMin=""; public string RuntimeApiMax=""; public string SourceHash=""; public string CookedContentHash=""; public string PackageHash=""; public readonly List<PackageDependencySource> Dependencies=new(); public readonly List<CookedCapabilityRequirement> Capabilities=new(); }
     private static ManifestInfo ParseManifest(byte[] bytes)
     {

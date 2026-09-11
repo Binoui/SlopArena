@@ -168,6 +168,12 @@ internal static class DeterministicPoseTrackBaker
         WriteSingle(stream, value.z);
     }
 
+    private static Transform FindMarker(Transform root, string name)
+    {
+        return root.GetComponentsInChildren<Transform>(true)
+            .FirstOrDefault(x => x.name == name);
+    }
+
     private static void WriteString(Stream stream, string value)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(value);

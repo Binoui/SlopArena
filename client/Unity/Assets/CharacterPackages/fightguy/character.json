@@ -1167,7 +1167,7 @@
                   "angle": 45,
                   "baseKnockback": 5,
                   "knockbackGrowth": 80,
-                  "stunTicks": 8,
+                  "stunTicks": 10,
                   "durationTicks": 11,
                   "interruptible": false,
                   "hitGroup": 0,

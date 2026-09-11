@@ -24,7 +24,7 @@ namespace SlopArena.MoveDataReport;
 ///
 /// Usage: dotnet run --project tools/MoveDataReport -- [character] [--pcts 0,30,60] [--out path]
 ///        [--json report.json] [--html report.html] [--combos] [--example]
-/// Character: fightguy (default) | manki | kistu | nilus.
+/// Character: fightguy (default) | manki | kistu | bonk | nilus.
 /// Default markdown output: docs/generated/{character}-move-data.md.
 /// Kill % / blast clearance: on a Crossroads-style 60x60 proxy (top +20, sides ±40, bottom -10).
 /// </summary>
@@ -127,9 +127,10 @@ internal static class Program
             "fightguy" => BuiltInContentResolver.Resolve(CharacterClass.FightGuy),
             "manki"    => BuiltInContentResolver.Resolve(CharacterClass.Manki),
             "kistu"    => BuiltInContentResolver.Resolve(CharacterClass.Kistu),
+            "bonk"     => BuiltInContentResolver.Resolve(CharacterClass.Bonk),
             "nilus"    => BuiltInContentResolver.Resolve(CharacterClass.Nilus),
             var c => throw new ArgumentException(
-                $"unknown character: {c} (expected one of: fightguy, manki, kistu, nilus)"),
+                $"unknown character: {c} (expected one of: fightguy, manki, kistu, bonk, nilus)"),
         };
     }
 
@@ -138,6 +139,9 @@ internal static class Program
 
     internal static int Main(string[] args)
     {
+        if (args.Contains("--coverage"))
+            return ContactCoverageReport.Run(args);
+
         string which = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "fightguy";
         int? trajSlot = ParseTraj(args);
         int[] pcts = ParsePcts(args) ?? (trajSlot.HasValue

@@ -224,6 +224,33 @@ public sealed class BonkKitTests
         Assert.True(heavySeen);
     }
 
+    [Fact]
+    public void BonkF_AllowsMovementWhileSlashing()
+    {
+        var def = BonkDefinition();
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+
+        float startZ = state.PZ;
+        var heavySeen = false;
+        for (var i = 0; i < 60; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = TestHelpers.Input(activeSlot: 6, moveY: 0.25f) });
+            var st = sim.GetState(1);
+            Assert.Equal(ActionState.Aiming, st.State);
+            heavySeen |= sim.Resolver.GetActiveHitboxes().Any(x => x.OwnerId == 1 && x.Damage == 12f);
+        }
+        Assert.True(sim.GetState(1).PZ > startZ, "F must allow normal movement while slashing");
+        Assert.True(heavySeen);
+
+        for (var i = 0; i < 60; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.Null(sim.GetActiveAbility(1));
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+    }
+
     private static CharacterCompileResult CompileBonk()
     {
         return CharacterPackageCompiler.Compile(

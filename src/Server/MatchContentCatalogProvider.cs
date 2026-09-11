@@ -12,8 +12,6 @@ public sealed class MatchContentCatalogProvider
     private readonly string _manifestPath;
     private readonly BuiltInRosterManifest _manifest;
 
-    public BuiltInRosterManifest Manifest => _manifest;
-
     public MatchContentCatalogProvider(string cookedRoot = "content-cooked", string manifestPath = "content-cooked/roster/manifest.json")
     {
         _cookedRoot = cookedRoot ?? throw new ArgumentNullException(nameof(cookedRoot));

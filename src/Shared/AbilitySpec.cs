@@ -100,24 +100,5 @@ namespace SlopArena.Shared
         /// <summary>Named float parameters for server-side abilities (e.g., "backflip_damage").</summary>
         public Dictionary<string, float> Params = new();
 
-        /// <summary>
-        /// Get the animation name for a given combo stage.
-        /// Falls back to "melee".
-        /// </summary>
-        public string GetAnimationName(int comboStage)
-        {
-            if (AnimationNames != null && AnimationNames.Length > 0)
-                return AnimationNames[comboStage % AnimationNames.Length];
-            return "melee";
-        }
-
-        /// <summary>
-        /// Override for custom hitbox spawning (projectiles, mines, etc.).
-        /// Return true if handled (skip default melee hitbox), false to fall through.
-        /// </summary>
-        public virtual bool SpawnHitbox(HitboxEvent evt, CharacterState state, CharacterDefinition def, SpellResolver resolver, ulong ownerId)
-        {
-            return false;
-        }
     }
 }

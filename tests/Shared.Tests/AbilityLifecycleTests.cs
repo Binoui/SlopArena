@@ -269,7 +269,54 @@ public class AbilityLifecycleTests
         }
     }
 
+        public static IEnumerable<object[]> GroundAndAirAimingAbilityCases()
+    {
+        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk, CharacterClass.Nilus })
+        {
+            var def = character == CharacterClass.Nilus
+                ? TestHelpers.ResolveDef(character)
+                : BuiltInContentResolver.Resolve(character).Definition;
+            for (byte wireSlot = 1; wireSlot <= AbilitySlots.Count; wireSlot++)
+            {
+                for (int air = 0; air < 2; air++)
+                {
+                    bool airborne = air != 0;
+                    var cooked = def.GetCookedSlotAbility(wireSlot, airborne);
+                    var spec = def.GetSlotAbility(wireSlot - 1, airborne);
+                    bool aiming = cooked != null
+                        ? cooked.AimMode != AuthoringAimMode.None
+                        : spec != null && spec.AimMode != AimMode.None;
+                    if (aiming)
+                        yield return new object[] { character, wireSlot, airborne };
+                }
+            }
+        }
+    }
+
     [Theory]
+    [MemberData(nameof(GroundAndAirAimingAbilityCases))]
+    public void EveryAuthoredAimingAbility_FacesActivationAim(
+        CharacterClass character, byte wireSlot, bool airborne)
+    {
+        var def = character == CharacterClass.Nilus
+            ? TestHelpers.ResolveDef(character)
+            : BuiltInContentResolver.Resolve(character).Definition;
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.GroundPY(def) + (airborne ? 2f : 0f);
+        state.IsGrounded = !airborne;
+        TestHelpers.RegisterPlayer(sim, def, state);
+
+        const short aimYaw = 9000; // +90° world yaw
+        sim.Tick(new()
+        {
+            { 1, new InputState { ActiveSlot = wireSlot, AimYaw = aimYaw, IsAiming = true } },
+        });
+
+        TestHelpers.AssertNear(MathF.PI / 2f, sim.GetState(1).FacingYaw);
+    }
+
+[Theory]
     [MemberData(nameof(GroundAbilityCases))]
     public void EveryAuthoredGroundAbility_ReleasesAttackState(CharacterClass character, byte wireSlot)
     {
