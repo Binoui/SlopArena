@@ -5,11 +5,11 @@ namespace SlopArena.Shared.Tests;
 using SlopArena.Shared.AI;
 
 /// <summary>
-/// Issue #148 — <see cref="HeuristicBotPolicy"/> decision correctness against crafted sim states:
-/// approaches when far (world-space movement), faces the opponent (AimYaw via ADR-0017 snap),
-/// attacks when in reach, never emits action input while locked, magnitudes ≤ 1, and is
-/// deterministic for a fixed seeded RNG stream.
+/// CPU policy decisions are driven by delayed, runner-owned opponent observations. The tests
+/// inspect only the public InputState seam while retaining the existing movement, attack, lock,
+/// and seeded-determinism coverage.
 /// </summary>
+
 public class BotPolicyTests
 {
     private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
@@ -30,14 +30,25 @@ public class BotPolicyTests
         return s;
     }
 
+    private static void Prime(BotMemory memory, CharacterState target)
+    {
+        int delay = BotDifficultyProfile.ForDifficulty(memory.Difficulty).ReactionDelayTicks;
+        for (int i = 0; i <= delay; i++)
+            memory.ObserveOpponent(target);
+    }
+
     private static InputState Decide(CharacterState self, CharacterState target, int seed = 42, BotMemory? memory = null)
-        => Policy.Decide(self, target, Def, new Random(seed), memory ?? new BotMemory());
+    {
+        memory ??= new BotMemory();
+        Prime(memory, target);
+        return Policy.Decide(self, target, Def, new Random(seed), memory);
+    }
 
     [Fact]
     public void FarOpponent_ApproachesWithWorldSpaceMovement_NoAttack()
     {
         var self = Self();
-        var target = Opponent(z: 10f); // 10 m directly ahead on +Z
+        var target = Opponent(z: 50f); // well beyond every resolved move envelope on +Z
 
         var input = Decide(self, target);
 
@@ -53,7 +64,7 @@ public class BotPolicyTests
     public void FarOpponentToTheSide_MovesAndFacesCorrectly()
     {
         var self = Self();
-        var target = Opponent(x: 5f, z: 0f); // 5 m on the +X axis
+        var target = Opponent(x: 50f, z: 0f); // well beyond every resolved move envelope on +X
 
         var input = Decide(self, target);
 
@@ -153,49 +164,90 @@ public class BotPolicyTests
     }
 
     [Fact]
-    public void ThreatResponse_HigherLevelCanDodgeWhileLowLevelWaits()
+    public void ThreatResponse_HarderDifficultyCanDodgeWhileEasyWaits()
     {
         var self = Self();
         var target = Opponent(z: 0.5f);
         target.State = ActionState.Attacking;
-        int highLevelDodges = 0;
+        int hardDodges = 0;
 
         for (int seed = 0; seed < 100; seed++)
         {
-            var lowMemory = new BotMemory { DifficultyLevel = 1 };
-            var highMemory = new BotMemory { DifficultyLevel = 9 };
-            var low = Policy.Decide(self, target, Def, new Random(seed), lowMemory);
-            var high = Policy.Decide(self, target, Def, new Random(seed), highMemory);
+            var easyMemory = new BotMemory { Difficulty = CpuDifficulty.Easy };
+            var hardMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(easyMemory, target);
+            Prime(hardMemory, target);
+            var easy = Policy.Decide(self, target, Def, new Random(seed), easyMemory);
+            var hard = Policy.Decide(self, target, Def, new Random(seed), hardMemory);
 
-            Assert.Equal(0, low.ActiveSlot);
-            Assert.False(low.Dash);
-            Assert.False(low.Jump);
-            if (high.Dash) highLevelDodges++;
+            Assert.False(easy.Jump);
+            if (hard.Dash) hardDodges++;
         }
 
-        Assert.True(highLevelDodges > 0, "level 9 never selected a threat dodge across 100 seeds");
+        Assert.True(hardDodges > 0, "Hard never selected a threat dodge across 100 seeds");
+    }
+
+    [Theory]
+    [InlineData(CpuDifficulty.Easy, 24)]
+    [InlineData(CpuDifficulty.Normal, 18)]
+    [InlineData(CpuDifficulty.Hard, 12)]
+    public void ReactionDelay_UsesOnlyInformationAtOrBeyondNamedBoundary(
+        CpuDifficulty difficulty, int expectedDelay)
+    {
+        var self = Self();
+        var oldTarget = Opponent(z: 10f);
+        var changedTarget = Opponent(z: 0.5f);
+        changedTarget.State = ActionState.Attacking;
+        var oldMemory = new BotMemory { Difficulty = difficulty };
+        var changedMemory = new BotMemory { Difficulty = difficulty };
+        var oldRng = new Random(184);
+        var changedRng = new Random(184);
+
+        for (int tick = 0; tick < expectedDelay; tick++)
+        {
+            var oldInput = Policy.Decide(self, oldTarget, Def, oldRng, oldMemory);
+            var changedInput = Policy.Decide(self, changedTarget, Def, changedRng, changedMemory);
+            Assert.Equal(oldInput.MoveX, changedInput.MoveX);
+            Assert.Equal(oldInput.MoveY, changedInput.MoveY);
+            Assert.Equal(oldInput.ActiveSlot, changedInput.ActiveSlot);
+            Assert.Equal(oldInput.Dash, changedInput.Dash);
+            Assert.Equal(oldInput.Jump, changedInput.Jump);
+            Assert.Equal(oldInput.AimYaw, changedInput.AimYaw);
+            Assert.Equal(oldInput.FaceToCamera, changedInput.FaceToCamera);
+        }
+
+        var oldAtBoundary = Policy.Decide(self, oldTarget, Def, oldRng, oldMemory);
+        var changedAtBoundary = Policy.Decide(self, changedTarget, Def, changedRng, changedMemory);
+        bool changed = oldAtBoundary.MoveX != changedAtBoundary.MoveX
+            || oldAtBoundary.MoveY != changedAtBoundary.MoveY
+            || oldAtBoundary.ActiveSlot != changedAtBoundary.ActiveSlot
+            || oldAtBoundary.Dash != changedAtBoundary.Dash
+            || oldAtBoundary.Jump != changedAtBoundary.Jump;
+        Assert.True(changed, "opponent change did not become observable at the delay boundary");
     }
 
     [Fact]
-    public void ConfirmedHitMemory_EnablesMoreHighLevelFollowUps()
+    public void ConfirmedHitMemory_EnablesMoreHardDifficultyFollowUps()
     {
         var self = Self();
         var target = Opponent(z: 0.5f);
-        int lowAttacks = 0;
-        int highAttacks = 0;
+        int easyAttacks = 0;
+        int hardAttacks = 0;
 
-        for (int seed = 0; seed < 200; seed++)
+        for (int seed = 0; seed < 100; seed++)
         {
-            var lowMemory = new BotMemory { DifficultyLevel = 1, LastAttackConnected = true };
-            var highMemory = new BotMemory { DifficultyLevel = 9, LastAttackConnected = true };
-            if (Policy.Decide(self, target, Def, new Random(seed), lowMemory).ActiveSlot > 0)
-                lowAttacks++;
-            if (Policy.Decide(self, target, Def, new Random(seed), highMemory).ActiveSlot > 0)
-                highAttacks++;
+            var easyMemory = new BotMemory { Difficulty = CpuDifficulty.Easy, LastAttackConnected = true };
+            var hardMemory = new BotMemory { Difficulty = CpuDifficulty.Hard, LastAttackConnected = true };
+            Prime(easyMemory, target);
+            Prime(hardMemory, target);
+            if (Policy.Decide(self, target, Def, new Random(seed), easyMemory).ActiveSlot > 0)
+                easyAttacks++;
+            if (Policy.Decide(self, target, Def, new Random(seed), hardMemory).ActiveSlot > 0)
+                hardAttacks++;
         }
 
-        Assert.True(highAttacks > lowAttacks,
-            $"expected more level-9 follow-ups, got low={lowAttacks} high={highAttacks}");
+        Assert.True(hardAttacks > easyAttacks,
+            $"expected more Hard follow-ups, got easy={easyAttacks} hard={hardAttacks}");
     }
 
     [Fact]
@@ -206,6 +258,7 @@ public class BotPolicyTests
         var memory = new BotMemory();
         var rng = new Random(42);
 
+        Prime(memory, target);
         var first = Policy.Decide(self, target, Def, rng, memory);
         Assert.True(first.ActiveSlot > 0);
 
@@ -215,4 +268,86 @@ public class BotPolicyTests
         Assert.Equal(0f, next.MoveX);
         Assert.Equal(0f, next.MoveY);
     }
+    [Fact]
+    public void CanonicalSecondaryGroundSlot_IsEligibleWhenOtherSlotsAreLocked()
+    {
+        var self = Self();
+        foreach (var slot in new[]
+        {
+            AbilitySlots.Slot1, AbilitySlots.Slot3, AbilitySlots.Slot4,
+            AbilitySlots.A, AbilitySlots.E, AbilitySlots.R, AbilitySlots.F,
+        })
+            self.SetCooldown(slot, 999);
+
+        var target = Opponent(z: 0.75f);
+        bool selected = false;
+        for (int seed = 0; seed < 32 && !selected; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            selected = Policy.Decide(self, target, Def, new Random(seed), memory).ActiveSlot
+                == AbilitySlots.Slot2;
+        }
+
+        Assert.True(selected, "canonical grounded slot 2 was never considered");
+    }
+
+    [Fact]
+    public void EmptyAerialSlot_IsUnavailable()
+    {
+        var def = BuiltInContentResolver.Resolve(CharacterClass.Bonk).Definition;
+        var self = TestHelpers.PlayerState();
+        self.PY = TestHelpers.GroundPY(def);
+        self.IsGrounded = false;
+        foreach (var slot in new[]
+        {
+            AbilitySlots.Slot1, AbilitySlots.Slot3, AbilitySlots.Slot4,
+            AbilitySlots.A, AbilitySlots.E, AbilitySlots.R, AbilitySlots.F,
+        })
+            self.SetCooldown(slot, 999);
+
+        var target = TestHelpers.PlayerState(z: 0.5f);
+        target.EntityId = 100;
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+
+        var input = Policy.Decide(self, target, def, new Random(1), memory);
+
+        Assert.Equal(0, input.ActiveSlot);
+    }
+
+    [Fact]
+    public void AimedMove_HoldsThenReleasesTheResolvedAimPlan()
+    {
+        var def = TestHelpers.ResolveDef(CharacterClass.Manki);
+        var self = TestHelpers.PlayerState();
+        self.PY = TestHelpers.GroundPY(def);
+        foreach (var slot in new[]
+        {
+            AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4,
+            AbilitySlots.E, AbilitySlots.R, AbilitySlots.F,
+        })
+            self.SetCooldown(slot, 999);
+
+        var target = TestHelpers.PlayerState(z: 0.75f);
+        target.EntityId = 100;
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+        var initial = Policy.Decide(self, target, def, new Random(0), memory);
+
+        Assert.Equal(AbilitySlots.A, initial.ActiveSlot);
+        Assert.True(initial.IsAiming);
+
+        self.State = ActionState.Aiming;
+        self.AttackSlot = AbilitySlots.A;
+        var held = Policy.Decide(self, def, new Random(0), memory);
+        Assert.True(held.IsAiming);
+
+        InputState released = default;
+        for (int i = 0; i < 12; i++)
+            released = Policy.Decide(self, def, new Random(0), memory);
+        Assert.False(released.IsAiming);
+        Assert.Equal(0, released.ActiveSlot);
+    }
+
 }

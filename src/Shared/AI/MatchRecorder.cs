@@ -113,9 +113,30 @@ public sealed class MatchRecorder
         }
     }
 
-    /// <summary>Active window (ticks) of a slot's first stage = max(trigger + duration) across its hitboxes.</summary>
+    /// <summary>Active window for the resolved slot's timeline, or legacy first-stage hitboxes.</summary>
     private static int ActiveWindowTicks(CharacterDefinition def, byte activeSlot, bool airborne)
     {
+        var cooked = def.GetCookedSlotAbility(activeSlot, airborne);
+        if (cooked != null)
+        {
+            int total = 0;
+            int effectEnd = 0;
+            foreach (var stage in cooked.Timeline.Stages)
+            {
+                foreach (var operation in stage.Operations)
+                {
+                    int end = operation.Tick;
+                    if (operation is CookedSpawnProjectileOperation projectile)
+                        end += projectile.Projectile.MaxFlightTicks;
+                    else if (operation is CookedStartCapabilityOperation capability)
+                        end += CapabilityWindowTicks(capability.Parameters);
+                    effectEnd = Math.Max(effectEnd, total + end);
+                }
+                total += stage.DurationTicks;
+            }
+            return Math.Max(total, effectEnd);
+        }
+
         var spec = def.GetSlotAbility(activeSlot - 1, airborne);
         if (spec == null || spec.Stages == null || spec.Stages.Length == 0) return 0;
         int max = 0;
@@ -124,4 +145,20 @@ public sealed class MatchRecorder
                 max = Math.Max(max, evt.TriggerTick + evt.DurationTicks);
         return max;
     }
+    private static int CapabilityWindowTicks(CookedCapabilityParameters parameters)
+        => parameters switch
+        {
+            CookedKiShotCapabilityParameters x => x.StartupTicks + x.DurationTicks + x.MaxFlightTicks,
+            CookedRisingDragonCapabilityParameters x => x.RiseDelay + x.RiseTicks,
+            CookedCycloneKickCapabilityParameters x => x.DurationTicks,
+            CookedDragonBeamCapabilityParameters x => x.DurationTicks + x.HitboxDurationTicks,
+            CookedKistuDashSlashCapabilityParameters x => x.MaxAimTicks + x.DashDurationTicks,
+            CookedKistuRisingSlashCapabilityParameters x => x.RiseTicks,
+            CookedKistuBladeFlurryCapabilityParameters x => x.MoveTicks,
+            CookedBonkTargetedJumpSlamCapabilityParameters x => x.MaxAimTicks + x.MaxFlightTicks + x.SlamDurationTicks,
+            CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick + x.MaxFlightTicks + x.ExplosionDurationTicks,
+            CookedMankiJetpackBoostCapabilityParameters x => x.StartupTicks + x.ExplosionDurationTicks,
+            CookedMankiBazookaCapabilityParameters x => x.FireTriggerTick + x.MaxFlightTicks + x.RecoveryDuration,
+            _ => 0,
+        };
 }

@@ -3,6 +3,7 @@ using System.IO;
 using System;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using SlopArena.Shared;
@@ -42,7 +43,8 @@ namespace SlopArena.Client.World
         [SerializeField] private CombatFeedback _combatFeedback;
         [SerializeField] private ProjectileVFXManager _projectileVFX;
         [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Idle;
-        [SerializeField, Range(1, 9)] private int _npcCpuLevel = 5;
+        [SerializeField, FormerlySerializedAs("_npcCpuLevel")]
+        private CpuDifficulty _npcDifficulty = CpuDifficulty.Normal;
 
         [Header("Hitboxes")]
         [SerializeField] private bool _showHitboxes;
@@ -51,10 +53,12 @@ namespace SlopArena.Client.World
         protected override ISimulationBridge Bridge => _bridge;
 
         private uint _tick;
-        // Heuristic-bot policy is stateless; per-NPC state (memory, rng, def) lives in NpcSlot.
+        // Heuristic-bot policy consumes delayed observations; per-NPC state (memory, rng, def)
+        // lives in NpcSlot.
         private readonly HeuristicBotPolicy _npcPolicy = new();
         private readonly List<NpcSlot> _npcs = new();
         private int _nextNpcId = 101; // first NPC keeps entity id 100 (capture harness + Solo)
+
         private MatchContentEntry _npcEntry;
         private int _selectedNpcIndex;
 #if UNITY_EDITOR
@@ -68,6 +72,7 @@ namespace SlopArena.Client.World
         private const ulong NpcEntityId = 100;
         private TargetIndicator _lockIndicator;
         private TrainingSettingsPanel _settingsPanel;
+
         private sealed class NpcSlot
         {
             public ulong Id;
@@ -77,6 +82,7 @@ namespace SlopArena.Client.World
             public System.Random Rng;
             public float SpawnX;
             public float SpawnZ;
+            public byte LastDeaths;
         }
         private ushort _soloCountdownTicks;
         private ushort _lastSoloPlayerDeaths;
@@ -98,6 +104,7 @@ namespace SlopArena.Client.World
         public int NpcCount => _npcs.Count;
         public int SelectedNpcIndex => _selectedNpcIndex;
         public NpcAiMode CurrentNpcMode => _npcAiMode;
+        public CpuDifficulty CurrentNpcDifficulty => BotDifficultyProfile.Normalize(_npcDifficulty);
         public ulong SelectedNpcId => _npcs.Count > 0 ? _npcs[_selectedNpcIndex].Id : 0ul;
         public ulong GetNpcIdAt(int index) => _npcs[index].Id;
 
@@ -112,6 +119,13 @@ namespace SlopArena.Client.World
 
         public void SetNpcMode(NpcAiMode mode) => _npcAiMode = mode;
 
+        public void SetNpcDifficulty(CpuDifficulty difficulty)
+        {
+            _npcDifficulty = BotDifficultyProfile.Normalize(difficulty);
+            foreach (var npc in _npcs)
+                npc.Memory.Difficulty = _npcDifficulty;
+            _settingsPanel?.RefreshDifficultyHighlight();
+        }
         public float GetSelectedNpcDamage()
             => _npcs.Count > 0 ? _bridge.GetState(SelectedNpcId).DamagePercent : 0f;
 
@@ -136,7 +150,7 @@ namespace SlopArena.Client.World
                 SpawnX = _npcs.Count * 2f,
                 SpawnZ = 0f,
             };
-            slot.Memory.DifficultyLevel = Mathf.Clamp(_npcCpuLevel, 1, 9);
+            slot.Memory.Difficulty = CurrentNpcDifficulty;
             if (!SpawnNpcSlot(slot))
                 return;
             _npcs.Add(slot);
@@ -183,6 +197,7 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
             bool solo = MatchConfig.Mode == GameMode.Solo;
+            _npcDifficulty = BotDifficultyProfile.Normalize(_npcDifficulty);
             _soloCountdownTicks = solo ? (ushort)300 : (ushort)0;
             _bridge = new LocalSimulationBridge(
                 arena,
@@ -237,8 +252,8 @@ namespace SlopArena.Client.World
                 SpawnZ = 0f,
                 Rng = new System.Random(),
             };
-            first.Memory.DifficultyLevel = Mathf.Clamp(
-                solo ? MatchConfig.SoloCpuLevel : _npcCpuLevel, 1, 9);
+            first.Memory.Difficulty = BotDifficultyProfile.Normalize(
+                solo ? MatchConfig.SoloCpuDifficulty : CurrentNpcDifficulty);
             if (!SpawnNpcSlot(first))
                 return;
             _npcs.Add(first);
@@ -368,20 +383,28 @@ namespace SlopArena.Client.World
             // Tick
             _bridge.Tick(tickInputs);
 
-            // Feed only authoritative resolver hits and the pre-tick target snapshot back to
-            // the runner-owned bot memory. AttackSlot is persistent and is never used here.
+            // Feed only authoritative resolver outcomes back to runner-owned bot memory.
+            // The next policy call records the current pre-tick target state together with
+            // this result, so both state and combat feedback share the same delay.
             foreach (var npc in _npcs)
             {
+                var npcState = _bridge.GetState(npc.Id);
+                if (npcState.Deaths > npc.LastDeaths)
+                {
+                    npc.LastDeaths = npcState.Deaths;
+                    npc.Memory.Reset();
+                    npc.Memory.Difficulty = CurrentNpcDifficulty;
+                    continue;
+                }
+
                 npc.Memory.LastAttackConnected = false;
                 foreach (var hit in _bridge.LastTickHits)
                 {
                     if (hit.OwnerEntityId == npc.Id)
-                    {
                         npc.Memory.LastAttackConnected = true;
-                        break;
-                    }
+                    if (hit.TargetEntityId == PlayerEntityId)
+                        npc.Memory.RecordOpponentHit();
                 }
-                npc.Memory.LastTargetWasAttacking = IsThreatening(playerState);
             }
 
             _projectileVFX?.OnTick();
@@ -562,12 +585,7 @@ namespace SlopArena.Client.World
         {
             if (slot.Def == null) return BuildIdleInput();
             slot.Rng ??= new System.Random();
-            return _npcAiMode switch
-            {
-                NpcAiMode.Idle => BuildIdleInput(),
-                NpcAiMode.Heuristic => BuildHeuristicInput(npcState, playerState, slot),
-                _ => BuildIdleInput(),
-            };
+            return _npcPolicy.Decide(npcState, playerState, slot.Def, slot.Rng, slot.Memory, _npcEntry.BakedAnimation);
         }
 
         private static InputState BuildIdleInput()

@@ -24,9 +24,10 @@ public static class SelfPlayMatch
     /// <param name="seed">Determinism seed — same seed reproduces the same match.</param>
     /// <param name="maxTicks">Tick cap; a match reaching it is <see cref="MatchRecord.TimedOut"/>.</param>
     /// <param name="stocks">Stocks per bot for the <see cref="StockMatchRule"/>.</param>
-    /// <param name="cpuLevel">Shared CPU level for both bots, clamped to 1..9.</param>
+    /// <param name="difficulty">Shared named CPU difficulty for both bots.</param>
     public static MatchRecord Run(CharacterDefinition def, ArenaDefinition arena, int seed,
-        BakedAnimationData? baked = null, int maxTicks = DefaultMaxTicks, int stocks = 3, int cpuLevel = 5)
+        BakedAnimationData? baked = null, int maxTicks = DefaultMaxTicks, int stocks = 3,
+        CpuDifficulty difficulty = CpuDifficulty.Normal)
     {
         var rule = new StockMatchRule((byte)stocks);
         var sim = new ServerSimulation(arena, rule);
@@ -38,52 +39,59 @@ public static class SelfPlayMatch
         var rng = new Random(seed);
         var memA = new BotMemory();
         var memB = new BotMemory();
-        int clampedCpuLevel = Math.Clamp(cpuLevel, 1, 9);
-        memA.DifficultyLevel = clampedCpuLevel;
-        memB.DifficultyLevel = clampedCpuLevel;
+        memA.Difficulty = BotDifficultyProfile.Normalize(difficulty);
+        memB.Difficulty = BotDifficultyProfile.Normalize(difficulty);
         var policy = new HeuristicBotPolicy();
         var recorder = new MatchRecorder();
         var inputs = new Dictionary<ulong, InputState>();
         int tick = 0;
+        byte deathsA = 0;
+        byte deathsB = 0;
 
         for (; tick < maxTicks; tick++)
         {
             var sA = sim.GetState(EntityA);
             var sB = sim.GetState(EntityB);
-            bool targetAWasAttacking = IsThreatening(sB);
-            bool targetBWasAttacking = IsThreatening(sA);
-            inputs[EntityA] = policy.Decide(sA, sB, def, rng, memA);
-            inputs[EntityB] = policy.Decide(sB, sA, def, rng, memB);
+            inputs[EntityA] = policy.Decide(sA, sB, def, rng, memA, baked);
+            inputs[EntityB] = policy.Decide(sB, sA, def, rng, memB, baked);
 
             recorder.RecordPresses(sim, tick, inputs, def); // swings from the pre-tick presses
             sim.Tick(inputs);
             recorder.RecordTick(sim, tick, inputs, def);     // hits + positions + close swings
 
+            var postA = sim.GetState(EntityA);
+            var postB = sim.GetState(EntityB);
+            bool respawnedA = postA.Deaths > deathsA;
+            bool respawnedB = postB.Deaths > deathsB;
+            if (respawnedA)
+            {
+                deathsA = postA.Deaths;
+                memA.Reset();
+                memA.Difficulty = BotDifficultyProfile.Normalize(difficulty);
+            }
+            if (respawnedB)
+            {
+                deathsB = postB.Deaths;
+                memB.Reset();
+                memB.Difficulty = BotDifficultyProfile.Normalize(difficulty);
+            }
+
             memA.LastAttackConnected = false;
             memB.LastAttackConnected = false;
             foreach (var hit in sim.LastTickHits)
             {
-                if (hit.OwnerEntityId == EntityA) memA.LastAttackConnected = true;
-                if (hit.OwnerEntityId == EntityB) memB.LastAttackConnected = true;
+                if (!respawnedA && hit.OwnerEntityId == EntityA) memA.LastAttackConnected = true;
+                if (!respawnedB && hit.OwnerEntityId == EntityB) memB.LastAttackConnected = true;
+                if (!respawnedA && hit.TargetEntityId == EntityB) memA.RecordOpponentHit();
+                if (!respawnedB && hit.TargetEntityId == EntityA) memB.RecordOpponentHit();
             }
-            memA.LastTargetWasAttacking = targetAWasAttacking;
-            memB.LastTargetWasAttacking = targetBWasAttacking;
 
             var outcome = rule.Evaluate(sim.GetAllStates());
             if (outcome.IsEnded)
                 return Finalize(recorder, sim, tick, seed, outcome, timedOut: false);
         }
-
         // Tick cap reached — draw.
         return Finalize(recorder, sim, tick, seed, default, timedOut: true);
-    }
-
-    private static bool IsThreatening(in CharacterState state)
-    {
-        return state.State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping
-            || state.AnimLockTicks > 0
-            || state.LandingLagTicks > 0
-            || state.BurstRecoveryTicks > 0;
     }
 
     private static void RegisterBot(ServerSimulation sim, CharacterDefinition def, ulong id, float x, float py, BakedAnimationData? baked)
