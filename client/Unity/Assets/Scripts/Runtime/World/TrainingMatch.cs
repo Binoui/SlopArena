@@ -384,8 +384,8 @@ namespace SlopArena.Client.World
             _bridge.Tick(tickInputs);
 
             // Feed only authoritative resolver outcomes back to runner-owned bot memory.
-            // The next policy call records the current pre-tick target state together with
-            // this result, so both state and combat feedback share the same delay.
+            // Combat events are delayed inside BotMemory; no one-tick hit flag is exposed
+            // to policy decisions.
             foreach (var npc in _npcs)
             {
                 var npcState = _bridge.GetState(npc.Id);
@@ -397,13 +397,13 @@ namespace SlopArena.Client.World
                     continue;
                 }
 
-                npc.Memory.LastAttackConnected = false;
                 foreach (var hit in _bridge.LastTickHits)
                 {
-                    if (hit.OwnerEntityId == npc.Id)
-                        npc.Memory.LastAttackConnected = true;
-                    if (hit.TargetEntityId == PlayerEntityId)
-                        npc.Memory.RecordOpponentHit();
+                    if (hit.OwnerEntityId != npc.Id || hit.TargetEntityId != PlayerEntityId)
+                        continue;
+                    var playerAfterHit = _bridge.GetState(PlayerEntityId);
+                    npc.Memory.RecordOpponentHit(hit.AttackSlot, !playerAfterHit.IsGrounded,
+                        playerAfterHit, playerAfterHit.HitstunTicks, hit.HitstopTicks);
                 }
             }
 

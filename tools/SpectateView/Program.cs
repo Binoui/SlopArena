@@ -56,10 +56,12 @@ internal static class Program
         float gpy = def.CapsuleHeight * 0.5f;
         RegisterBot(sim, def, SelfPlayMatch.EntityA, -12f, gpy, baked);
         RegisterBot(sim, def, SelfPlayMatch.EntityB, 12f, gpy, baked);
-
         var rng = new Random(seed);
+
         var memA = new BotMemory();
         var memB = new BotMemory();
+        byte lastDeathsA = 0;
+        byte lastDeathsB = 0;
         var policy = new HeuristicBotPolicy();
         var inputs = new Dictionary<ulong, InputState>();
         var recorder = new MatchRecorder();
@@ -79,6 +81,27 @@ internal static class Program
             recorder.RecordPresses(sim, tick, inputs, def); // swings from pre-tick presses
             sim.Tick(inputs);
             recorder.RecordTick(sim, tick, inputs, def);     // hits + positions
+            var postA = sim.GetState(SelfPlayMatch.EntityA);
+            var postB = sim.GetState(SelfPlayMatch.EntityB);
+            if (postA.Deaths > lastDeathsA)
+            {
+                lastDeathsA = postA.Deaths;
+                memA.Reset();
+            }
+            if (postB.Deaths > lastDeathsB)
+            {
+                lastDeathsB = postB.Deaths;
+                memB.Reset();
+            }
+            foreach (var hit in sim.LastTickHits)
+            {
+                if (hit.TargetEntityId == SelfPlayMatch.EntityB)
+                    memA.RecordOpponentHit(hit.AttackSlot, !postB.IsGrounded, postB,
+                        postB.HitstunTicks, hit.HitstopTicks);
+                if (hit.TargetEntityId == SelfPlayMatch.EntityA)
+                    memB.RecordOpponentHit(hit.AttackSlot, !postA.IsGrounded, postA,
+                        postA.HitstunTicks, hit.HitstopTicks);
+            }
 
             if (jsonPath != null)
                 frames.Add(new FrameSnap(tick, new[]

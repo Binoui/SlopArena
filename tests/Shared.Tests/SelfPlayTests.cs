@@ -31,9 +31,10 @@ public class SelfPlayTests
         };
     }
 
-    private static MatchRecord Run(int seed, int maxTicks = 2000, int cpuLevel = 5)
+    private static MatchRecord Run(int seed, int maxTicks = 2000,
+        CpuDifficulty difficulty = CpuDifficulty.Normal)
         => SelfPlayMatch.Run(Def, KillArena(), seed, TestHelpers.LoadBakedData(Def), maxTicks,
-            cpuLevel: cpuLevel);
+            difficulty: difficulty);
 
     [Fact]
     public void SameSeed_TerminatesWithIdenticalMatch()
@@ -111,10 +112,10 @@ public class SelfPlayTests
     }
 
     [Fact]
-    public void SameSeedAndLevel_IsIdentical_ChangingLevelChangesTrace()
+    public void SameSeedAndDifficulty_IsIdentical_ChangingDifficultyChangesTrace()
     {
-        var a = Run(42, maxTicks: 1200, cpuLevel: 5);
-        var b = Run(42, maxTicks: 1200, cpuLevel: 5);
+        var a = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Normal);
+        var b = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Normal);
 
         Assert.Equal(a.DurationTicks, b.DurationTicks);
         Assert.Equal(a.Swings.Count, b.Swings.Count);
@@ -129,18 +130,18 @@ public class SelfPlayTests
             Assert.Equal(a.Samples[i].PZ, b.Samples[i].PZ);
         }
 
-        var low = Run(42, maxTicks: 1200, cpuLevel: 1);
-        var high = Run(42, maxTicks: 1200, cpuLevel: 9);
-        bool different = low.Swings.Count != high.Swings.Count
-            || low.Hits.Count != high.Hits.Count
-            || low.Samples.Count != high.Samples.Count;
+        var easy = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Easy);
+        var hard = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Hard);
+        bool different = easy.Swings.Count != hard.Swings.Count
+            || easy.Hits.Count != hard.Hits.Count
+            || easy.Samples.Count != hard.Samples.Count;
         if (!different)
         {
-            for (int i = 0; i < low.Samples.Count; i++)
+            for (int i = 0; i < easy.Samples.Count; i++)
             {
-                if (low.Samples[i].PX != high.Samples[i].PX
-                    || low.Samples[i].PY != high.Samples[i].PY
-                    || low.Samples[i].PZ != high.Samples[i].PZ)
+                if (easy.Samples[i].PX != hard.Samples[i].PX
+                    || easy.Samples[i].PY != hard.Samples[i].PY
+                    || easy.Samples[i].PZ != hard.Samples[i].PZ)
                 {
                     different = true;
                     break;
@@ -148,6 +149,77 @@ public class SelfPlayTests
             }
         }
 
-        Assert.True(different, "changing CPU level did not change the self-play trace");
+        Assert.True(different, "changing CPU difficulty did not change the self-play trace");
     }
+    [Fact]
+    public void Recorder_UninterruptedHitstun_IsTrueCombo()
+    {
+        var sim = RecorderSimulation();
+        var recorder = new MatchRecorder();
+        var target = sim.GetState(100);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 8;
+        sim.SetState(100, target);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 0, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        target.HitstunTicks = 4;
+        sim.SetState(100, target);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 3, new Dictionary<ulong, InputState>(), Def);
+
+        var record = recorder.Finish(4, 1, new MatchOutcome(false, 0, false));
+        var combo = Assert.Single(record.Combos);
+        Assert.True(combo.IsTrueCombo);
+        Assert.False(combo.IsPressureString);
+    }
+
+    [Fact]
+    public void Recorder_ActionableGap_IsPressureString()
+    {
+        var sim = RecorderSimulation();
+        var recorder = new MatchRecorder();
+        var target = sim.GetState(100);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 1;
+        sim.SetState(100, target);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 0, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        target.State = ActionState.Idle;
+        target.HitstunTicks = 0;
+        sim.SetState(100, target);
+        recorder.RecordTick(sim, 1, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 2, new Dictionary<ulong, InputState>(), Def);
+
+        var record = recorder.Finish(3, 1, new MatchOutcome(false, 0, false));
+        var combo = Assert.Single(record.Combos);
+        Assert.False(combo.IsTrueCombo);
+        Assert.True(combo.IsPressureString);
+    }
+
+    private static ServerSimulation RecorderSimulation()
+    {
+        var sim = TestHelpers.MakeSim();
+        var attacker = TestHelpers.PlayerState();
+        attacker.PY = Def.CapsuleHeight * 0.5f;
+        var target = TestHelpers.NpcState(z: 1f);
+        target.PY = Def.CapsuleHeight * 0.5f;
+        TestHelpers.RegisterPlayer(sim, Def, attacker);
+        TestHelpers.RegisterNpc(sim, Def, target);
+        return sim;
+    }
+
+    private static SpellResolver.HitResult RecorderHit()
+        => new()
+        {
+            OwnerEntityId = SelfPlayMatch.EntityA,
+            TargetEntityId = SelfPlayMatch.EntityB,
+            AttackSlot = AbilitySlots.Slot1,
+            Damage = 1f,
+            StunTicks = 8,
+        };
 }

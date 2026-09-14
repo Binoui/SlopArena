@@ -247,10 +247,16 @@ public class BotPolicyTests
 
         for (int seed = 0; seed < 100; seed++)
         {
-            var easyMemory = new BotMemory { Difficulty = CpuDifficulty.Easy, LastAttackConnected = true };
-            var hardMemory = new BotMemory { Difficulty = CpuDifficulty.Hard, LastAttackConnected = true };
+            var easyMemory = new BotMemory { Difficulty = CpuDifficulty.Easy };
+            var hardMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
             Prime(easyMemory, target);
             Prime(hardMemory, target);
+            easyMemory.RecordOpponentHit(AbilitySlots.Slot1, target, 18, 0);
+            hardMemory.RecordOpponentHit(AbilitySlots.Slot1, target, 18, 0);
+            for (int i = 0; i < BotDifficultyProfile.ForDifficulty(easyMemory.Difficulty).ReactionDelayTicks; i++)
+                easyMemory.ObserveOpponent(target);
+            for (int i = 0; i < BotDifficultyProfile.ForDifficulty(hardMemory.Difficulty).ReactionDelayTicks; i++)
+                hardMemory.ObserveOpponent(target);
             if (Policy.Decide(self, target, Def, new Random(seed), easyMemory).ActiveSlot > 0)
                 easyAttacks++;
             if (Policy.Decide(self, target, Def, new Random(seed), hardMemory).ActiveSlot > 0)
@@ -259,6 +265,34 @@ public class BotPolicyTests
 
         Assert.True(hardAttacks > easyAttacks,
             $"expected more Hard follow-ups, got easy={easyAttacks} hard={hardAttacks}");
+    }
+
+    [Fact]
+    public void ConfirmedHit_SurvivesReactionDelayAndActionLock()
+    {
+        var self = Self();
+        self.State = ActionState.Attacking;
+        self.AttackSlot = AbilitySlots.Slot1;
+        self.AnimLockTicks = 6;
+        var target = Opponent(z: 0.5f);
+        target.State = ActionState.Attacking;
+        target.AttackSlot = AbilitySlots.Slot1;
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+        memory.RecordOpponentHit(AbilitySlots.Slot1, target, 0, 4);
+
+        int delay = BotDifficultyProfile.ForDifficulty(memory.Difficulty).ReactionDelayTicks;
+        var rng = new Random(42);
+        for (int i = 0; i < delay; i++)
+            Assert.Equal(0, Policy.Decide(self, target, Def, rng, memory).ActiveSlot);
+
+        self.State = ActionState.Idle;
+        self.AttackSlot = 0;
+        self.AnimLockTicks = 0;
+        var followUp = Policy.Decide(self, target, Def, rng, memory);
+
+        Assert.True(followUp.ActiveSlot > 0,
+            "confirmed hit was forgotten while the CPU was action-locked");
     }
 
     [Fact]

@@ -76,14 +76,14 @@ public static class SelfPlayMatch
                 memB.Difficulty = BotDifficultyProfile.Normalize(difficulty);
             }
 
-            memA.LastAttackConnected = false;
-            memB.LastAttackConnected = false;
             foreach (var hit in sim.LastTickHits)
             {
-                if (!respawnedA && hit.OwnerEntityId == EntityA) memA.LastAttackConnected = true;
-                if (!respawnedB && hit.OwnerEntityId == EntityB) memB.LastAttackConnected = true;
-                if (!respawnedA && hit.TargetEntityId == EntityB) memA.RecordOpponentHit();
-                if (!respawnedB && hit.TargetEntityId == EntityA) memB.RecordOpponentHit();
+                if (!respawnedA && hit.TargetEntityId == EntityB)
+                    memA.RecordOpponentHit(hit.AttackSlot, !postB.IsGrounded, postB,
+                        postB.HitstunTicks, hit.HitstopTicks);
+                if (!respawnedB && hit.TargetEntityId == EntityA)
+                    memB.RecordOpponentHit(hit.AttackSlot, !postA.IsGrounded, postA,
+                        postA.HitstunTicks, hit.HitstopTicks);
             }
 
             var outcome = rule.Evaluate(sim.GetAllStates());

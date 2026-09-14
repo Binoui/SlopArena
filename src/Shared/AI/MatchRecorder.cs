@@ -16,12 +16,13 @@ namespace SlopArena.Shared.AI;
 /// </summary>
 public sealed class MatchRecorder
 {
-    /// <summary>Max ticks between same-(attacker,target) hits to count as one combo.</summary>
+    /// <summary>Maximum age of a same-pair hit link before it is a new exchange.</summary>
     public const int ComboGapTicks = 90;
 
     private readonly MatchRecord _record = new();
     private readonly Dictionary<ulong, List<SwingRecord>> _openSwings = new();
-    private ComboLink? _currentCombo;
+    private readonly Dictionary<(ulong Attacker, ulong Target), ComboLink> _openCombos = new();
+    private readonly Dictionary<(ulong Attacker, ulong Target), bool> _actionableSinceHit = new();
 
     public MatchRecord Record => _record;
 
@@ -32,8 +33,10 @@ public sealed class MatchRecorder
         _record.Seed = seed;
         _record.WinnerEntityId = outcome.WinnerEntityId;
         _record.SharedVictory = outcome.IsSharedVictory;
-        if (_currentCombo is { Hits: >= 2 })
-            _record.Combos.Add(_currentCombo);
+        foreach (var combo in _openCombos.Values)
+            if (combo.Hits >= 2)
+                _record.Combos.Add(combo);
+        _openCombos.Clear();
         return _record;
     }
 
@@ -77,33 +80,71 @@ public sealed class MatchRecorder
         foreach (var (id, st) in states)
             _record.Samples.Add(new TickSample { Tick = tick, EntityId = id, PX = st.PX, PY = st.PY, PZ = st.PZ });
 
+        foreach (var pair in _openCombos.Keys.ToArray())
+            if (states.TryGetValue(pair.Target, out var target) && IsActionable(target))
+                _actionableSinceHit[pair] = true;
+
+        var hitPairs = new HashSet<(ulong Attacker, ulong Target)>();
         foreach (var hit in sim.LastTickHits)
         {
             _record.Hits.Add(new HitEvent
             {
-                Attacker = hit.OwnerEntityId, Target = hit.TargetEntityId, Damage = hit.Damage, Tick = tick,
+                Attacker = hit.OwnerEntityId,
+                Target = hit.TargetEntityId,
+                AttackSlot = hit.AttackSlot,
+                Damage = hit.Damage,
+                Tick = tick,
             });
             if (_openSwings.TryGetValue(hit.OwnerEntityId, out var swings))
                 foreach (var sw in swings) sw.Connected = true;
 
-            if (_currentCombo != null
-                && _currentCombo.Attacker == hit.OwnerEntityId
-                && _currentCombo.Target == hit.TargetEntityId
-                && tick - _currentCombo.EndTick <= ComboGapTicks)
+            var pair = (hit.OwnerEntityId, hit.TargetEntityId);
+            bool hadActionableWindow = _actionableSinceHit.TryGetValue(pair, out var actionable)
+                && actionable;
+            ComboLink? combo = _openCombos.TryGetValue(pair, out var existing) ? existing : null;
+            if (hadActionableWindow && combo is { Hits: 1 }
+                && tick - combo.EndTick <= ComboGapTicks)
             {
-                _currentCombo.Hits++;
-                _currentCombo.EndTick = tick;
+                combo.Hits = 2;
+                combo.EndTick = tick;
+                combo.IsTrueCombo = false;
+                combo.IsPressureString = true;
+            }
+            else if (combo == null || tick - combo.EndTick > ComboGapTicks || hadActionableWindow)
+            {
+                if (combo is { Hits: >= 2 })
+                    _record.Combos.Add(combo);
+                combo = new ComboLink
+                {
+                    Attacker = hit.OwnerEntityId,
+                    Target = hit.TargetEntityId,
+                    Hits = 1,
+                    StartTick = tick,
+                    EndTick = tick,
+                    IsTrueCombo = !hadActionableWindow,
+                    IsPressureString = hadActionableWindow,
+                };
+                _openCombos[pair] = combo;
             }
             else
             {
-                if (_currentCombo is { Hits: >= 2 })
-                    _record.Combos.Add(_currentCombo);
-                _currentCombo = new ComboLink
-                {
-                    Attacker = hit.OwnerEntityId, Target = hit.TargetEntityId, Hits = 1, StartTick = tick, EndTick = tick,
-                };
+                combo.Hits++;
+                combo.EndTick = tick;
             }
+
+            _actionableSinceHit[pair] = false;
+            hitPairs.Add(pair);
         }
+
+        foreach (var pair in _openCombos.Keys.ToArray())
+        {
+            if (hitPairs.Contains(pair)
+                || !states.TryGetValue(pair.Item2, out var target))
+                continue;
+            if (IsActionable(target))
+                _actionableSinceHit[pair] = true;
+        }
+
 
         foreach (var id in _openSwings.Keys.ToArray())
         {
@@ -112,6 +153,12 @@ public sealed class MatchRecorder
             if (list.Count == 0) _openSwings.Remove(id);
         }
     }
+    private static bool IsActionable(in CharacterState state)
+        => state.HitstunTicks == 0
+            && state.HitstopTicks == 0
+            && state.AnimLockTicks == 0
+            && state.LandingLagTicks == 0
+            && state.State is ActionState.Idle or ActionState.Run;
 
     /// <summary>Active window for the resolved slot's timeline, or legacy first-stage hitboxes.</summary>
     private static int ActiveWindowTicks(CharacterDefinition def, byte activeSlot, bool airborne)

@@ -22,7 +22,8 @@ namespace SlopArena.SelfPlayReport;
 /// and accumulates character-relative whiff spots. Emits lossless JSON (gitignored) + a
 /// self-contained HTML visual report + a markdown summary.
 ///
-/// Usage: dotnet run --project tools/SelfPlayReport -- [--matches N] [--seed S] [--char fightguy|kistu]
+/// Usage: dotnet run --project tools/SelfPlayReport -- [--matches N] [--seed S]
+///        [--char fightguy|kistu] [--difficulty Easy|Normal|Hard]
 ///        [--json report.json] [--html report.html] [--out report.md]
 /// </summary>
 internal static class Program
@@ -41,9 +42,10 @@ internal static class Program
     internal sealed record MoveEnvelope(string Label, string Ability, int Slot, bool Air, float Reach, EnvDisc[] Discs);
     internal sealed record MoveStats(string Label, string Ability, int Swings, int Hits, int Whiffs, int Damage);
     internal sealed record WhiffCell(int Gx, int Gy, int Count);
-    internal sealed record ReportData(string Character, string GeneratedAt, int Matches, int Seed,
+    internal sealed record ReportData(string Character, string Difficulty, string GeneratedAt, int Matches, int Seed,
         int AvgDurationTicks, int MaxDurationTicks,
         float HitRate, float WhiffRate, float AvgComboLen, int MaxComboLen,
+        int TrueComboCount, int PressureStringCount,
         float DamagePerMatch, float DamagePerStock,
         int WinsA, int WinsB, int Draws,
         MoveStats[] PerMove, MoveEnvelope[] Envelope, WhiffCell[] WhiffGrid,
@@ -57,6 +59,14 @@ internal static class Program
         int matches = ParseInt(args, "--matches", 20);
         int seed = ParseInt(args, "--seed", 20260817);
         string charName = ParseArg(args, "--char") ?? "fightguy";
+        string difficultyName = ParseArg(args, "--difficulty") ?? "normal";
+        CpuDifficulty difficulty = difficultyName.ToLowerInvariant() switch
+        {
+            "easy" => CpuDifficulty.Easy,
+            "normal" => CpuDifficulty.Normal,
+            "hard" => CpuDifficulty.Hard,
+            _ => throw new ArgumentException($"Unknown CPU difficulty '{difficultyName}'. Use Easy, Normal, or Hard."),
+        };
         string? jsonPath = ParseArg(args, "--json");
         string? htmlPath = ParseArg(args, "--html");
         string? outPath = ParseArg(args, "--out") ?? $"docs/generated/{charName}-selfplay.md";
@@ -83,11 +93,11 @@ internal static class Program
         var records = new List<MatchRecord>(matches);
         for (int m = 0; m < matches; m++)
         {
-            var rec = SelfPlayMatch.Run(def, arena, seed + m, baked);
+            var rec = SelfPlayMatch.Run(def, arena, seed + m, baked, difficulty: difficulty);
             records.Add(rec);
         }
 
-        var report = Aggregate(entry, records, seed);
+        var report = Aggregate(entry, records, seed, difficulty);
 
         Console.WriteLine(BuildMarkdown(report));
 
@@ -112,14 +122,15 @@ internal static class Program
 
     // ── Aggregation ─────────────────────────────────────────────────────────
 
-    internal static ReportData Aggregate(MatchContentEntry entry, List<MatchRecord> records, int seed)
+    internal static ReportData Aggregate(MatchContentEntry entry, List<MatchRecord> records, int seed,
+        CpuDifficulty difficulty = CpuDifficulty.Normal)
     {
         var def = entry.Definition;
         var perMove = new Dictionary<string, MoveStats>();
         string Key(bool air, byte slotByte) => $"{(air ? "a" : "g")}{SlotOf(slotByte)}";
-
         int totalSwings = 0, totalHits = 0, totalWhiffs = 0, totalDamage = 0;
         int totalComboLen = 0, comboCount = 0, maxComboLen = 0;
+        int trueComboCount = 0, pressureStringCount = 0;
         int winsA = 0, winsB = 0, draws = 0;
         long durationSum = 0; int maxDuration = 0;
         int damageSum = 0;
@@ -149,11 +160,13 @@ internal static class Program
                     Whiffs = ms.Whiffs + (sw.Connected ? 0 : 1),
                 };
             }
-            foreach (var h in r.Hits) { totalDamage += (int)Math.Round(h.Damage); }
             foreach (var c in r.Combos)
             {
-                totalComboLen += c.Hits; comboCount++;
+                totalComboLen += c.Hits;
+                comboCount++;
                 maxComboLen = Math.Max(maxComboLen, c.Hits);
+                if (c.IsTrueCombo) trueComboCount++;
+                if (c.IsPressureString) pressureStringCount++;
             }
         }
 
@@ -169,7 +182,6 @@ internal static class Program
         // available, else the hit's owner's last swing). Simplify: per-move damage from connected swings
         // is not stored on hits; approximate per-move damage via the swings' slot on the hit's attacker.
         // We use per-move Hit counts only for the table; Damage column is filled from connected swings.
-
         var envelope = SampleEnvelope(entry);
         var (whiffGrid, silhouette) = AccumulateWhiffs(records, envelope);
 
@@ -178,9 +190,11 @@ internal static class Program
         float maxHeight = envelope.Length > 0 ? envelope.Max(e => e.Discs.Length > 0 ? e.Discs.Max(d => d.RelY + d.Radius) : 0f) : 0f;
 
         return new ReportData(
-            def.DisplayName, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm'Z'", CultureInfo.InvariantCulture),
+            def.DisplayName, BotDifficultyProfile.DisplayName(difficulty),
+            DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm'Z'", CultureInfo.InvariantCulture),
             matchCount, seed, (int)(matchCount > 0 ? durationSum / matchCount : 0), maxDuration,
-            hitRate, whiffRate, avgCombo, maxComboLen, dmgPerMatch, dmgPerStock,
+            hitRate, whiffRate, avgCombo, maxComboLen, trueComboCount, pressureStringCount,
+            dmgPerMatch, dmgPerStock,
             winsA, winsB, draws, perMoveArray, envelope, whiffGrid,
             maxReach, maxHeight, silhouette,
             totalSwings, totalHits, totalWhiffs, totalDamage);
@@ -285,11 +299,11 @@ internal static class Program
     {
         var sb = new StringBuilder();
         sb.AppendLine($"# {r.Character} — self-play telemetry");
-        sb.AppendLine($"Generated {r.GeneratedAt} · {r.Matches} seeded bot-vs-bot matches on the real ServerSimulation (issue #148). ");
+        sb.AppendLine($"Generated {r.GeneratedAt} · {r.Matches} seeded {r.Difficulty} bot-vs-bot matches on the real ServerSimulation (issue #148). ");
         sb.AppendLine($"Seed {r.Seed} · avg {r.AvgDurationTicks / 60f:F1}s, max {r.MaxDurationTicks / 60f:F1}s · wins {r.WinsA}–{r.WinsB}, draws {r.Draws}.");
         sb.AppendLine();
         sb.AppendLine($"- **Hit rate** {r.HitRate * 100f:F1}% ({r.TotalHits}/{r.TotalSwings} swings) — **whiff rate** {r.WhiffRate * 100f:F1}% ({r.TotalWhiffs}/{r.TotalSwings}).");
-        sb.AppendLine($"- **Combos**: avg length {r.AvgComboLen:F2}, max {r.MaxComboLen} (gap ≤ 1.5 s between same-pair hits).");
+        sb.AppendLine($"- **Combos**: avg length {r.AvgComboLen:F2}, max {r.MaxComboLen}; true combos {r.TrueComboCount}, pressure strings {r.PressureStringCount}.");
         sb.AppendLine($"- **Damage**: {r.DamagePerMatch:F0} per match, {r.DamagePerStock:F0} per stock ({2 * 3} stocks/match).");
         sb.AppendLine();
         sb.AppendLine("| move | swings | hits | whiffs | hit% |");
@@ -317,7 +331,6 @@ internal static class Program
 
     internal static string BuildHtml(ReportData r)
     {
-        const int W = 760, H = 420, PAD = 34;
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
         sb.AppendLine($"<title>{Escape(r.Character)} self-play telemetry</title><style>");
@@ -325,9 +338,8 @@ internal static class Program
         sb.AppendLine("table.heat{border-collapse:collapse;font-size:13px;}table.heat td,table.heat th{border:1px solid #ccc;padding:3px 8px;text-align:center;}table.heat td.move,table.heat th.move{text-align:left;white-space:nowrap;}");
         sb.AppendLine(".envs{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 20px;}figure{margin:0;text-align:center;font-size:11px;color:#555;}svg.env{border:1px solid #eee;background:#fafbfc;display:block;}.legend{font-size:12px;color:#444;margin:6px 0 16px;max-width:900px;line-height:1.5;}");
         sb.AppendLine(".heat-svg{border:1px solid #eee;background:#fafbfc;max-width:100%;height:auto;}</style></head><body>");
-
         sb.AppendLine($"<h1>{Escape(r.Character)} — self-play telemetry</h1>");
-        sb.AppendLine($"<div class=\"meta\">Generated {Escape(r.GeneratedAt)} &middot; {r.Matches} seeded bot-vs-bot matches on the real ServerSimulation (issue #148). " +
+        sb.AppendLine($"<div class=\"meta\">Generated {Escape(r.GeneratedAt)} &middot; {r.Matches} seeded {Escape(r.Difficulty)} bot-vs-bot matches on the real ServerSimulation (issue #148). " +
             $"Seed {r.Seed} &middot; avg {r.AvgDurationTicks / 60f:F1}s, max {r.MaxDurationTicks / 60f:F1}s &middot; wins {r.WinsA}–{r.WinsB}, draws {r.Draws}. " +
             $"Same seed &rarr; bit-identical match.</div>");
 

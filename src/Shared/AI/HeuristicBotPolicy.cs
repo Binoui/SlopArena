@@ -52,10 +52,14 @@ public sealed class HeuristicBotPolicy
         public readonly bool RequiresAim;
         public readonly bool IsRecovery;
         public readonly ushort StartupTicks;
+        public readonly ushort TravelTicks;
+        public readonly float TravelSpeed;
+        public readonly float TravelOffset;
 
         public MoveCandidate(byte slot, float reach, float damage, bool functional,
             bool hasDamage, bool hasMovement, bool requiresAim, bool isRecovery,
-            ushort startupTicks)
+            ushort startupTicks, ushort travelTicks = 0, float travelSpeed = 0f,
+            float travelOffset = 0f)
         {
             Slot = slot;
             Reach = MathF.Max(0f, reach);
@@ -66,6 +70,9 @@ public sealed class HeuristicBotPolicy
             RequiresAim = requiresAim;
             IsRecovery = isRecovery;
             StartupTicks = startupTicks;
+            TravelTicks = travelTicks;
+            TravelSpeed = MathF.Max(0f, travelSpeed);
+            TravelOffset = MathF.Max(0f, travelOffset);
         }
     }
 
@@ -94,36 +101,12 @@ public sealed class HeuristicBotPolicy
     {
         EnsureProfile(def, baked);
 
-        // A selected move is an execution plan, not a fresh opponent reaction. Keep the
-        // captured target until the ordinary simulation accepts the press and any aim hold.
         if (memory.PlanPhase != BotPlanPhase.None)
         {
             if (!self.IsGrounded)
                 memory.PlanWasAirborne = true;
-            if (PlanInvalidated(self, memory))
-            {
-                memory.ClearPlan();
-                return default;
-            }
-
-            if (memory.PlanPhase == BotPlanPhase.AimHold
-                && self.State == ActionState.Aiming
-                && self.AttackSlot == memory.PlanSlot)
-            {
-                bool aiming = memory.PlanTicks < memory.PlanHoldTicks;
-                var planned = PlanInput(memory, aiming);
-                if (aiming)
-                    memory.PlanTicks++;
-                else
-                    memory.ClearPlan();
-                return planned;
-            }
-
-            // The press was accepted, or the action was interrupted before acceptance.
-            memory.ClearPlan();
-            return default;
+            return ContinuePlan(self, def, memory);
         }
-
         var profile = BotDifficultyProfile.ForDifficulty(memory.Difficulty);
         if (memory.DecisionTicksRemaining > 0)
             memory.DecisionTicksRemaining--;
@@ -141,6 +124,14 @@ public sealed class HeuristicBotPolicy
         var input = new InputState();
         if (!actionable || !memory.TryGetDelayedOpponent(out var target))
             return input;
+
+        if (memory.TryGetNewHit(out var hit))
+        {
+            QueueFollowUp(self, target, hit, def, profile, rng, memory);
+            memory.MarkHitEvaluated(hit);
+            if (memory.PlanPhase != BotPlanPhase.None)
+                return ContinuePlan(self, def, memory);
+        }
 
         float dx = target.PX - self.PX;
         float dz = target.PZ - self.PZ;
@@ -190,22 +181,11 @@ public sealed class HeuristicBotPolicy
             && self.DashDurationTicks == 0
             && self.BurstRecoveryTicks == 0;
 
-        if (targetThreatening && canDash && rng.NextDouble() < profile.DodgeChance)
-        {
-            input.Dash = true;
-            input.MoveX = -dx / dist;
-            input.MoveY = -dz / dist;
-            return input;
-        }
-
-        bool combo = candidate.HasValue
-            && memory.LastAttackConnected
-            && rng.NextDouble() < profile.ComboChance;
         bool punish = candidate.HasValue
             && targetThreatening
             && rng.NextDouble() < profile.PunishChance;
         bool attack = candidate.HasValue
-            && (punish || combo || rng.NextDouble() < profile.AttackChance);
+            && (punish || rng.NextDouble() < profile.AttackChance);
         if (attack)
         {
             var selected = candidate.GetValueOrDefault();
@@ -218,6 +198,14 @@ public sealed class HeuristicBotPolicy
                 self.Deaths, self.IsGrounded);
             if (selected.RequiresAim)
                 input.IsAiming = true;
+            return input;
+        }
+
+        if (targetThreatening && canDash && rng.NextDouble() < profile.DodgeChance)
+        {
+            input.Dash = true;
+            input.MoveX = -dx / dist;
+            input.MoveY = -dz / dist;
             return input;
         }
 
@@ -239,13 +227,171 @@ public sealed class HeuristicBotPolicy
         return input;
     }
 
+    private InputState ContinuePlan(in CharacterState self, CharacterDefinition def, BotMemory memory)
+    {
+        if (PlanInvalidated(self, memory))
+        {
+            memory.ClearPlan();
+            return default;
+        }
+
+        if (!memory.PlanPressIssued)
+        {
+            if (!CanPress(self, def, memory.PlanSlot))
+                return default;
+
+            memory.PlanPressIssued = true;
+            return PlanPressInput(memory);
+        }
+
+        if (memory.PlanPhase == BotPlanPhase.AimHold
+            && self.State == ActionState.Aiming
+            && self.AttackSlot == memory.PlanSlot)
+        {
+            bool aiming = memory.PlanTicks < memory.PlanHoldTicks;
+            var planned = PlanInput(memory, aiming);
+            if (aiming)
+                memory.PlanTicks++;
+            else
+                memory.ClearPlan();
+            return planned;
+        }
+
+        // A non-aim press was accepted, or an aim plan reached its release phase.
+        if ((self.State is ActionState.Attacking or ActionState.Aiming)
+            && self.AttackSlot == memory.PlanSlot)
+        {
+            memory.ClearPlan();
+            return default;
+        }
+
+        // The simulation rejected or interrupted the precommitment. Do not replay it
+        // from a fresh current-state read.
+        memory.ClearPlan();
+        return default;
+    }
+
+    private static bool CanPress(in CharacterState self, CharacterDefinition def, byte slot)
+        => self.HitstunTicks == 0
+            && self.HitstopTicks == 0
+            && self.BurstRecoveryTicks == 0
+            && self.LandingLagTicks == 0
+            && self.AnimLockTicks == 0
+            && (self.State == ActionState.Idle || self.State == ActionState.Run)
+            && self.GetCooldown(slot) == 0
+            && (def.GetCookedSlotAbility(slot, !self.IsGrounded) != null
+                || def.GetSlotAbility(slot - 1, !self.IsGrounded) != null);
+
+    private static InputState PlanPressInput(BotMemory memory)
+        => new()
+        {
+            ActiveSlot = memory.PlanSlot,
+            IsAiming = memory.PlanPhase == BotPlanPhase.AimHold,
+            AimYaw = memory.PlanAimYaw,
+            AimPitch = memory.PlanAimPitch,
+            AimDistance = memory.PlanAimDistance,
+        };
+
+    private void QueueFollowUp(in CharacterState self, in CpuObservation target,
+        in CpuHitObservation hit, CharacterDefinition def, BotDifficultyProfile profile,
+        Random rng, BotMemory memory)
+    {
+        float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
+        var trueCombo = ChooseTrueCombo(self, hit, memory.RemainingHitstun(hit), rangeScale, rng);
+        if (trueCombo.HasValue && rng.NextDouble() < profile.ComboChance)
+        {
+            var selected = trueCombo.GetValueOrDefault();
+            short yaw = AimYaw(hit.PX - self.PX, hit.PZ - self.PZ);
+            memory.QueueFollowUp(selected.Slot, BotPlanKind.TrueCombo, yaw,
+                AimPitch(hit.PY - self.PY, Distance(hit.PX - self.PX, hit.PZ - self.PZ)),
+                AimDistance(Distance(hit.PX - self.PX, hit.PZ - self.PZ)),
+                selected.RequiresAim ? AimHoldTicks : (ushort)0, self.Deaths, self.IsGrounded);
+            return;
+        }
+
+        float dx = target.PX - self.PX;
+        float dz = target.PZ - self.PZ;
+        float dist = Distance(dx, dz);
+        var pressure = ChooseSlot(self, target, dist, rangeScale, rng);
+        if (!pressure.HasValue || (!target.IsThreatening && memory.RemainingHitstun(hit) == 0))
+            return;
+        if (!target.IsThreatening && rng.NextDouble() >= profile.AttackChance)
+            return;
+
+        var pressureMove = pressure.GetValueOrDefault();
+        memory.QueueFollowUp(pressureMove.Slot, BotPlanKind.PressureString,
+            AimYaw(dx, dz), AimPitch(target.PY - self.PY, dist), AimDistance(dist),
+            pressureMove.RequiresAim ? AimHoldTicks : (ushort)0, self.Deaths, self.IsGrounded);
+    }
+
+    private MoveCandidate? ChooseTrueCombo(in CharacterState self, in CpuHitObservation hit,
+        int remainingHitstun, float rangeScale, Random rng)
+    {
+        if (remainingHitstun <= 0)
+            return null;
+
+        bool air = !self.IsGrounded;
+        Span<MoveCandidate> viable = stackalloc MoveCandidate[Slots.Length];
+        int count = 0;
+        for (int i = 0; i < Slots.Length; i++)
+        {
+            var candidate = air ? _airProfile[i] : _profile[i];
+            if (!candidate.Functional || !candidate.HasDamage
+                || self.GetCooldown(candidate.Slot) > 0
+                || IsChargePoolExhausted(self, candidate.Slot, air))
+                continue;
+
+            int timing = candidate.StartupTicks;
+            float predictedX = hit.PX + hit.VX * timing * Simulation.TickDt;
+            float predictedZ = hit.PZ + hit.VZ * timing * Simulation.TickDt;
+            float dist = Distance(predictedX - self.PX, predictedZ - self.PZ);
+            if (candidate.TravelSpeed > 0f)
+            {
+                float flightDistance = MathF.Max(0f, dist - candidate.TravelOffset);
+                int travel = (int)MathF.Ceiling(flightDistance / candidate.TravelSpeed
+                    * (1f / Simulation.TickDt));
+                timing += Math.Min(travel, candidate.TravelTicks);
+                predictedX = hit.PX + hit.VX * timing * Simulation.TickDt;
+                predictedZ = hit.PZ + hit.VZ * timing * Simulation.TickDt;
+                dist = Distance(predictedX - self.PX, predictedZ - self.PZ);
+            }
+            else
+            {
+                timing += candidate.TravelTicks;
+                predictedX = hit.PX + hit.VX * timing * Simulation.TickDt;
+                predictedZ = hit.PZ + hit.VZ * timing * Simulation.TickDt;
+                dist = Distance(predictedX - self.PX, predictedZ - self.PZ);
+            }
+            if (timing <= remainingHitstun
+                && dist <= (candidate.Reach + VictimRadiusMargin) * rangeScale)
+                viable[count++] = candidate;
+        }
+
+        if (count == 0)
+            return null;
+
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < count; i++)
+            bestScore = MathF.Max(bestScore, Score(viable[i], viable[i].Reach, false));
+        Span<MoveCandidate> best = stackalloc MoveCandidate[Slots.Length];
+        int bestCount = 0;
+        for (int i = 0; i < count; i++)
+            if (Score(viable[i], viable[i].Reach, false) >= bestScore - 2f)
+                best[bestCount++] = viable[i];
+        return best[rng.Next(bestCount)];
+    }
+
+    private static float Distance(float x, float z)
+        => MathF.Sqrt(x * x + z * z);
+
     private static bool PlanInvalidated(in CharacterState self, BotMemory memory)
         => self.Deaths != memory.PlanDeaths
             || self.HitstunTicks > 0
             || self.LandingLagTicks > 0
             || self.BurstRecoveryTicks > 0
             || (memory.PlanWasAirborne && self.IsGrounded)
-            || ((self.State is ActionState.Attacking or ActionState.Aiming)
+            || (memory.PlanPressIssued
+                && (self.State is ActionState.Attacking or ActionState.Aiming)
                 && self.AttackSlot != memory.PlanSlot);
 
     private static InputState PlanInput(BotMemory memory, bool aiming)
@@ -375,7 +521,9 @@ public sealed class HeuristicBotPolicy
         {
             bool functional = false, hasDamage = false, hasMovement = false;
             float hitReach = 0f, movementReach = 0f, damage = 0f;
+            float travelSpeed = 0f, travelOffset = 0f;
             int startup = int.MaxValue;
+            int travelTicks = 0;
             int stageOffset = 0;
             for (int stageIndex = 0; stageIndex < cooked.Timeline.Stages.Count; stageIndex++)
             {
@@ -383,26 +531,33 @@ public sealed class HeuristicBotPolicy
                 var animationNames = stage.AnimationIds.ToArray();
                 foreach (var operation in stage.Operations)
                 {
-                    startup = Math.Min(startup, stageOffset + operation.Tick);
+                    int operationTick = stageOffset + operation.Tick;
                     switch (operation)
                     {
                         case CookedSpawnHitboxOperation hitbox:
+                            startup = Math.Min(startup, operationTick);
                             functional = true;
                             var evt = ToHitboxEvent(hitbox.Hitbox);
+                            float poseReach = PoseForwardReach(def, evt, activeSlot, airborne,
+                                animationNames, (byte)stageIndex, baked);
                             hitReach = MathF.Max(hitReach,
-                                PoseForwardReach(def, evt, activeSlot, airborne,
-                                    animationNames, (byte)stageIndex, baked));
+                                poseReach > 0f ? poseReach : DirectForwardReach(evt));
                             hasDamage |= hitbox.Hitbox.Damage > 0f;
                             damage += MathF.Max(0f, hitbox.Hitbox.Damage);
                             break;
                         case CookedSpawnProjectileOperation projectile:
+                            startup = Math.Min(startup, operationTick);
+                            travelTicks = Math.Max(travelTicks, projectile.Projectile.MaxFlightTicks);
+                            travelSpeed = MathF.Max(travelSpeed, projectile.Projectile.Speed);
+                            travelOffset = MathF.Max(travelOffset,
+                                MathF.Max(0f, projectile.Projectile.LaunchOffsetZ)
+                                + projectile.Projectile.Radius);
                             functional = true;
                             hasDamage |= projectile.Projectile.Damage > 0f;
                             damage += MathF.Max(0f, projectile.Projectile.Damage);
                             hitReach = MathF.Max(hitReach,
-                                MathF.Max(0f, projectile.Projectile.LaunchOffsetZ)
-                                + projectile.Projectile.Speed * projectile.Projectile.MaxFlightTicks / 60f
-                                + projectile.Projectile.Radius);
+                                travelOffset + projectile.Projectile.Speed
+                                * projectile.Projectile.MaxFlightTicks / 60f);
                             break;
                         case CookedSetVelocityOperation velocity:
                             bool hasVelocity = velocity.X != 0f || velocity.Y != 0f || velocity.Z != 0f;
@@ -420,6 +575,10 @@ public sealed class HeuristicBotPolicy
                             break;
                         case CookedStartCapabilityOperation capability
                             when IsSupportedCapability(capability.Parameters):
+                            startup = Math.Min(startup,
+                                operationTick + CapabilityFirstActiveTicks(capability.Parameters));
+                            CapabilityTravelParameters(capability.Parameters,
+                                ref travelTicks, ref travelSpeed, ref travelOffset);
                             functional = true;
                             ApplyCapability(capability.Parameters, ref hitReach, ref movementReach,
                                 ref damage, ref hasDamage, ref hasMovement);
@@ -428,14 +587,15 @@ public sealed class HeuristicBotPolicy
                 }
                 stageOffset += stage.DurationTicks;
             }
-
             candidate = new MoveCandidate(activeSlot, hitReach + movementReach, damage,
                 functional, hasDamage, hasMovement,
                 cooked.AimMode != AuthoringAimMode.None
                     || cooked.Behavior is AuthoringAbilityBehavior.AimedProjectile
                     or AuthoringAbilityBehavior.DirectionalDash
                     or AuthoringAbilityBehavior.ChargeAttack,
-                cooked.IsRecoveryMove, startup == int.MaxValue ? (ushort)0 : (ushort)Math.Min(startup, ushort.MaxValue));
+                cooked.IsRecoveryMove,
+                startup == int.MaxValue ? (ushort)0 : (ushort)Math.Min(startup, ushort.MaxValue),
+                (ushort)Math.Min(travelTicks, ushort.MaxValue), travelSpeed, travelOffset);
             return functional;
         }
 
@@ -508,6 +668,7 @@ public sealed class HeuristicBotPolicy
             EndOffZ = hitbox.EndOffsetZ,
             BoneName = hitbox.StartBoneId,
             EndBoneName = hitbox.EndBoneId,
+
             TriggerTick = 0,
             DurationTicks = hitbox.DurationTicks,
             Damage = hitbox.Damage,
@@ -516,6 +677,8 @@ public sealed class HeuristicBotPolicy
             HitGroup = hitbox.HitGroup,
             KnockbackDirection = hitbox.KnockbackDirection,
         };
+    private static float DirectForwardReach(in HitboxEvent evt)
+        => MathF.Max(evt.OffZ, evt.EndOffZ) + evt.Radius;
     private static bool IsSupportedCapability(CookedCapabilityParameters parameters)
         => parameters is CookedKiShotCapabilityParameters
             or CookedRisingDragonCapabilityParameters
@@ -566,6 +729,50 @@ public sealed class HeuristicBotPolicy
             case CookedMankiBazookaCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ProjectileSpeed * x.MaxFlightTicks / 60f + x.HitboxRadius);
                 damage += x.Damage; hasDamage |= x.Damage > 0f; break;
+        }
+    }
+
+    private static ushort CapabilityFirstActiveTicks(CookedCapabilityParameters parameters)
+        => parameters switch
+        {
+            CookedKiShotCapabilityParameters x => x.StartupTicks,
+            CookedRisingDragonCapabilityParameters x => x.RiseDelay,
+            CookedCycloneKickCapabilityParameters x => x.WindupTicks,
+            CookedDragonBeamCapabilityParameters x => x.FireTick,
+            CookedKistuDashSlashCapabilityParameters x => x.MaxAimTicks,
+            CookedKistuRisingSlashCapabilityParameters _ => 0,
+            CookedBonkTargetedJumpSlamCapabilityParameters x => x.MaxAimTicks,
+            CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick,
+            CookedMankiJetpackBoostCapabilityParameters x => x.StartupTicks,
+            CookedMankiBazookaCapabilityParameters x => x.FireTriggerTick,
+            _ => 0,
+        };
+
+    private static void CapabilityTravelParameters(CookedCapabilityParameters parameters,
+        ref int travelTicks, ref float travelSpeed, ref float travelOffset)
+    {
+        switch (parameters)
+        {
+            case CookedKiShotCapabilityParameters x:
+                travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
+                travelSpeed = MathF.Max(travelSpeed, x.ProjectileSpeed);
+                travelOffset = MathF.Max(travelOffset, x.HitboxRadius);
+                break;
+            case CookedMankiRoundBombCapabilityParameters x:
+                travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
+                if (x.MaxFlightTicks > 0)
+                    travelSpeed = MathF.Max(travelSpeed,
+                        x.MaxRange * (1f / Simulation.TickDt) / x.MaxFlightTicks);
+                travelOffset = MathF.Max(travelOffset, x.HitboxRadius);
+                break;
+            case CookedMankiBazookaCapabilityParameters x:
+                travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
+                travelSpeed = MathF.Max(travelSpeed, x.ProjectileSpeed);
+                travelOffset = MathF.Max(travelOffset, x.HitboxRadius);
+                break;
+            case CookedBonkTargetedJumpSlamCapabilityParameters x:
+                travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
+                break;
         }
     }
 

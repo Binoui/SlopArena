@@ -29,6 +29,8 @@ namespace SlopArena.Shared
         {
             public ulong TargetEntityId;
             public ulong OwnerEntityId;
+            /// <summary>Resolved canonical attack slot that produced the hit.</summary>
+            public byte AttackSlot;
             public float Damage;
             public float DirX;
             /// <summary>Launch angle in degrees (-90 to 90).</summary>
@@ -299,6 +301,7 @@ namespace SlopArena.Shared
                             {
                                 TargetEntityId = entity.Id,
                                 OwnerEntityId = hb.OwnerId,
+                                AttackSlot = hb.AttackSlot,
                                 Damage = hb.Damage,
                                 DirX = dirXNorm,
                                 KnockbackAngle = launchAngle,

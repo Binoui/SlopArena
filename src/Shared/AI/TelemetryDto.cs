@@ -25,11 +25,11 @@ public sealed class HitEvent
 {
     public ulong Attacker;
     public ulong Target;
+    public byte AttackSlot;
     public float Damage;
     public int Tick;
 }
-
-/// <summary>A run of consecutive same-(attacker,target) hits counted as one combo.</summary>
+/// <summary>A run of same-pair hits classified by authoritative action availability.</summary>
 public sealed class ComboLink
 {
     public ulong Attacker;
@@ -37,6 +37,8 @@ public sealed class ComboLink
     public int Hits;
     public int StartTick;
     public int EndTick;
+    public bool IsTrueCombo;
+    public bool IsPressureString;
 }
 
 /// <summary>Per-tick entity position sample (provenance for the stats; the spatial maps use swings).</summary>
