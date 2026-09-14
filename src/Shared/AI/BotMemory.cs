@@ -53,6 +53,14 @@ public readonly struct CpuObservation
             || BurstRecoveryTicks > 0;
 }
 
+/// <summary>Execution phase for one selected CPU action.</summary>
+internal enum BotPlanPhase : byte
+{
+    None,
+    PendingPress,
+    AimHold,
+}
+
 /// <summary>
 /// Persistent per-entity bot state that spans ticks. Held by the runner/controller — never
 /// written into <see cref="CharacterState"/>, so the prediction wire is untouched.
@@ -78,14 +86,18 @@ public sealed class BotMemory
     public sbyte StrafeDirection;
 
     /// <summary>
-    /// One ordinary input plan for an aim-to-fire or directional ability. The policy owns this
-    /// transient state; it is never copied into CharacterState or replicated.
+    /// One ordinary input plan selected by the policy. It carries both the initial press and
+    /// any required aim/hold/release sequence without entering CharacterState.
     /// </summary>
-    internal byte AimPlanSlot;
-    internal ushort AimPlanTicks;
-    internal short AimPlanYaw;
-    internal short AimPlanPitch;
-    internal ushort AimPlanDistance;
+    internal BotPlanPhase PlanPhase;
+    internal byte PlanSlot;
+    internal ushort PlanTicks;
+    internal ushort PlanHoldTicks;
+    internal short PlanAimYaw;
+    internal short PlanAimPitch;
+    internal ushort PlanAimDistance;
+    internal byte PlanDeaths;
+    internal bool PlanWasAirborne;
 
     /// <summary>
     /// Record the opponent's current simulation state. The policy can only retrieve it after
@@ -128,22 +140,36 @@ public sealed class BotMemory
         DecisionTicksRemaining = 0;
         LastAttackConnected = false;
         StrafeDirection = 0;
-        AimPlanSlot = 0;
-        AimPlanTicks = 0;
-        AimPlanYaw = 0;
-        AimPlanPitch = 0;
-        AimPlanDistance = 0;
+        ClearPlan();
         _opponentHistoryCount = 0;
         _opponentHistoryWriteIndex = 0;
         _opponentHitPending = false;
     }
 
-    internal void ClearAimPlan()
+    internal void StartPlan(byte slot, bool requiresAim, short aimYaw, short aimPitch,
+        ushort aimDistance, ushort holdTicks, byte deaths, bool wasGrounded)
     {
-        AimPlanSlot = 0;
-        AimPlanTicks = 0;
-        AimPlanYaw = 0;
-        AimPlanPitch = 0;
-        AimPlanDistance = 0;
+        PlanPhase = requiresAim ? BotPlanPhase.AimHold : BotPlanPhase.PendingPress;
+        PlanSlot = slot;
+        PlanTicks = 0;
+        PlanHoldTicks = holdTicks;
+        PlanAimYaw = aimYaw;
+        PlanAimPitch = aimPitch;
+        PlanAimDistance = aimDistance;
+        PlanDeaths = deaths;
+        PlanWasAirborne = !wasGrounded;
+    }
+
+    internal void ClearPlan()
+    {
+        PlanPhase = BotPlanPhase.None;
+        PlanSlot = 0;
+        PlanTicks = 0;
+        PlanHoldTicks = 0;
+        PlanAimYaw = 0;
+        PlanAimPitch = 0;
+        PlanAimDistance = 0;
+        PlanDeaths = 0;
+        PlanWasAirborne = false;
     }
 }

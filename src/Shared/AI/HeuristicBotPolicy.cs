@@ -94,24 +94,34 @@ public sealed class HeuristicBotPolicy
     {
         EnsureProfile(def, baked);
 
-        // Aiming is an execution plan, not a fresh opponent reaction. Keep the same
-        // direction/target distance until the ordinary simulation accepts the release.
-        if (memory.AimPlanSlot > 0)
+        // A selected move is an execution plan, not a fresh opponent reaction. Keep the
+        // captured target until the ordinary simulation accepts the press and any aim hold.
+        if (memory.PlanPhase != BotPlanPhase.None)
         {
-            if (self.State == ActionState.Aiming && self.AttackSlot == memory.AimPlanSlot)
+            if (!self.IsGrounded)
+                memory.PlanWasAirborne = true;
+            if (PlanInvalidated(self, memory))
             {
-                var held = AimInput(memory, aiming: memory.AimPlanTicks < AimHoldTicks);
-                if (held.IsAiming)
-                {
-                    memory.AimPlanTicks++;
-                    return held;
-                }
-
-                memory.ClearAimPlan();
-                return held;
+                memory.ClearPlan();
+                return default;
             }
-            // Hitstun, landing, KO, or another accepted action invalidates the old plan.
-            memory.ClearAimPlan();
+
+            if (memory.PlanPhase == BotPlanPhase.AimHold
+                && self.State == ActionState.Aiming
+                && self.AttackSlot == memory.PlanSlot)
+            {
+                bool aiming = memory.PlanTicks < memory.PlanHoldTicks;
+                var planned = PlanInput(memory, aiming);
+                if (aiming)
+                    memory.PlanTicks++;
+                else
+                    memory.ClearPlan();
+                return planned;
+            }
+
+            // The press was accepted, or the action was interrupted before acceptance.
+            memory.ClearPlan();
+            return default;
         }
 
         var profile = BotDifficultyProfile.ForDifficulty(memory.Difficulty);
@@ -202,15 +212,12 @@ public sealed class HeuristicBotPolicy
             input.ActiveSlot = selected.Slot;
             input.AimPitch = AimPitch(dy, dist);
             input.AimDistance = AimDistance(dist);
+            memory.StartPlan(selected.Slot, selected.RequiresAim,
+                input.AimYaw, input.AimPitch, input.AimDistance,
+                selected.RequiresAim ? AimHoldTicks : (ushort)0,
+                self.Deaths, self.IsGrounded);
             if (selected.RequiresAim)
-            {
-                memory.AimPlanSlot = selected.Slot;
-                memory.AimPlanTicks = 0;
-                memory.AimPlanYaw = input.AimYaw;
-                memory.AimPlanPitch = input.AimPitch;
-                memory.AimPlanDistance = input.AimDistance;
                 input.IsAiming = true;
-            }
             return input;
         }
 
@@ -232,13 +239,22 @@ public sealed class HeuristicBotPolicy
         return input;
     }
 
-    private InputState AimInput(BotMemory memory, bool aiming)
+    private static bool PlanInvalidated(in CharacterState self, BotMemory memory)
+        => self.Deaths != memory.PlanDeaths
+            || self.HitstunTicks > 0
+            || self.LandingLagTicks > 0
+            || self.BurstRecoveryTicks > 0
+            || (memory.PlanWasAirborne && self.IsGrounded)
+            || ((self.State is ActionState.Attacking or ActionState.Aiming)
+                && self.AttackSlot != memory.PlanSlot);
+
+    private static InputState PlanInput(BotMemory memory, bool aiming)
         => new()
         {
             IsAiming = aiming,
-            AimYaw = memory.AimPlanYaw,
-            AimPitch = memory.AimPlanPitch,
-            AimDistance = memory.AimPlanDistance,
+            AimYaw = memory.PlanAimYaw,
+            AimPitch = memory.PlanAimPitch,
+            AimDistance = memory.PlanAimDistance,
         };
 
     private void EnsureProfile(CharacterDefinition def, BakedAnimationData? baked)

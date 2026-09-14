@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -42,6 +44,15 @@ public class BotPolicyTests
         memory ??= new BotMemory();
         Prime(memory, target);
         return Policy.Decide(self, target, Def, new Random(seed), memory);
+    }
+    private static void LockNonAimSlots(ref CharacterState state)
+    {
+        foreach (var slot in new[]
+        {
+            AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4,
+            AbilitySlots.E, AbilitySlots.R, AbilitySlots.F,
+        })
+            state.SetCooldown(slot, 999);
     }
 
     [Fact]
@@ -342,12 +353,160 @@ public class BotPolicyTests
         self.AttackSlot = AbilitySlots.A;
         var held = Policy.Decide(self, def, new Random(0), memory);
         Assert.True(held.IsAiming);
+        Assert.Equal(initial.AimYaw, held.AimYaw);
+        Assert.Equal(initial.AimPitch, held.AimPitch);
+        Assert.Equal(initial.AimDistance, held.AimDistance);
 
         InputState released = default;
         for (int i = 0; i < 12; i++)
             released = Policy.Decide(self, def, new Random(0), memory);
         Assert.False(released.IsAiming);
         Assert.Equal(0, released.ActiveSlot);
+    }
+
+    [Fact]
+    public void ActionPlan_InvalidatesOnInterruptionDeathAndReset()
+    {
+        var def = TestHelpers.MankiDef;
+        var target = Opponent(z: 0.75f);
+
+        var interruptedMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        var interruptedSelf = Self();
+        LockNonAimSlots(ref interruptedSelf);
+        Prime(interruptedMemory, target);
+        var initial = Policy.Decide(interruptedSelf, target, def, new Random(0), interruptedMemory);
+        Assert.Equal(AbilitySlots.A, initial.ActiveSlot);
+        Assert.True(initial.IsAiming);
+
+        interruptedSelf.State = ActionState.Hitstun;
+        interruptedSelf.HitstunTicks = 4;
+        var interrupted = Policy.Decide(interruptedSelf, def, new Random(0), interruptedMemory);
+        Assert.Equal(0, interrupted.ActiveSlot);
+        Assert.False(interrupted.IsAiming);
+
+        var landingMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        var landingSelf = Self();
+        LockNonAimSlots(ref landingSelf);
+        Prime(landingMemory, target);
+        Assert.True(Policy.Decide(landingSelf, target, def, new Random(0), landingMemory).IsAiming);
+        landingSelf.State = ActionState.Aiming;
+        landingSelf.AttackSlot = AbilitySlots.A;
+        landingSelf.IsGrounded = false;
+        Assert.True(Policy.Decide(landingSelf, def, new Random(0), landingMemory).IsAiming);
+        landingSelf.IsGrounded = true;
+        var afterLanding = Policy.Decide(landingSelf, def, new Random(0), landingMemory);
+        Assert.Equal(0, afterLanding.ActiveSlot);
+        Assert.False(afterLanding.IsAiming);
+
+        var deadMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        var deadSelf = Self();
+        LockNonAimSlots(ref deadSelf);
+        Prime(deadMemory, target);
+        Assert.True(Policy.Decide(deadSelf, target, def, new Random(0), deadMemory).IsAiming);
+        deadSelf.Deaths = 1;
+        var afterDeath = Policy.Decide(deadSelf, def, new Random(0), deadMemory);
+        Assert.Equal(0, afterDeath.ActiveSlot);
+        Assert.False(afterDeath.IsAiming);
+
+        var resetMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        var resetSelf = Self();
+        LockNonAimSlots(ref resetSelf);
+        Prime(resetMemory, target);
+        Assert.True(Policy.Decide(resetSelf, target, def, new Random(0), resetMemory).IsAiming);
+        resetMemory.Reset();
+        resetSelf.State = ActionState.Aiming;
+        resetSelf.AttackSlot = AbilitySlots.A;
+        var afterReset = Policy.Decide(resetSelf, def, new Random(0), resetMemory);
+        Assert.Equal(0, afterReset.ActiveSlot);
+        Assert.False(afterReset.IsAiming);
+    }
+
+    [Fact]
+    public void AimedPlan_ReachesResolverThroughPolicyAcrossSeeds()
+    {
+        var def = TestHelpers.MankiDef;
+        for (int seed = 0; seed < 8; seed++)
+        {
+            var sim = TestHelpers.MakeSim();
+            var self = Self();
+            self.PY = TestHelpers.GroundPY(def);
+            foreach (var slot in new[]
+            {
+                AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4,
+                AbilitySlots.E, AbilitySlots.R, AbilitySlots.F,
+            })
+                self.SetCooldown(slot, 999);
+
+            var target = Opponent(z: 2f);
+            target.PY = TestHelpers.GroundPY(def);
+            TestHelpers.RegisterPlayer(sim, def, self);
+            TestHelpers.RegisterNpc(sim, def, target);
+
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            var rng = new Random(seed);
+            bool aimed = false;
+            bool hit = false;
+            for (int tick = 0; tick < 180 && !hit; tick++)
+            {
+                var currentSelf = sim.GetState(1);
+                var currentTarget = sim.GetState(100);
+                var input = Policy.Decide(currentSelf, currentTarget, def, rng, memory);
+                aimed |= input.IsAiming;
+                sim.Tick(new Dictionary<ulong, InputState>
+                {
+                    [1] = input,
+                    [100] = default,
+                });
+                hit = sim.LastTickHits.Exists(x =>
+                    x.OwnerEntityId == 1 && x.TargetEntityId == 100 && x.Damage > 0f);
+            }
+
+            Assert.True(aimed, $"seed {seed} never entered the aim plan");
+            Assert.True(hit, $"seed {seed} never produced a resolver hit");
+        }
+    }
+
+    [Fact]
+    public void DirectionalPlan_ExecutesMovementThroughSimulationAcrossSeeds()
+    {
+        var def = TestHelpers.KistuDef;
+        for (int seed = 0; seed < 8; seed++)
+        {
+            var sim = TestHelpers.MakeSim();
+            var self = Self();
+            self.PY = TestHelpers.GroundPY(def);
+            foreach (var slot in new[]
+            {
+                AbilitySlots.Lmb, AbilitySlots.Rmb, AbilitySlots.Slot1, AbilitySlots.E,
+                AbilitySlots.F, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4,
+                AbilitySlots.Slot5, AbilitySlots.A,
+            })
+                self.SetCooldown(slot, 999);
+
+            var target = Opponent(z: 2f);
+            target.PY = TestHelpers.GroundPY(def);
+            TestHelpers.RegisterPlayer(sim, def, self);
+            TestHelpers.RegisterNpc(sim, def, target);
+
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            var rng = new Random(seed);
+            bool aimed = false;
+            bool moved = false;
+            for (int tick = 0; tick < 180 && !moved; tick++)
+            {
+                var input = Policy.Decide(sim.GetState(1), sim.GetState(100), def, rng, memory);
+                aimed |= input.IsAiming;
+                sim.Tick(new Dictionary<ulong, InputState>
+                {
+                    [1] = input,
+                    [100] = default,
+                });
+                moved = sim.GetState(1).PZ > 1f;
+            }
+
+            Assert.True(aimed, $"seed {seed} never entered the directional plan");
+            Assert.True(moved, $"seed {seed} never moved through the directional dash");
+        }
     }
 
 }
