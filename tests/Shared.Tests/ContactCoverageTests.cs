@@ -84,6 +84,188 @@ public sealed class ContactCoverageTests
         Assert.Equal(new[] { 2, 2 }, intervals.Select(x => x.SuccessfulPressTicks).ToArray());
     }
 
+    [Fact]
+    public void Normals_GroundedHitAndWhiffUseRealActivationEvidence()
+    {
+        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
+        var report = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { slot },
+            X = new[] { 0f, 4f },
+            Y = new[] { 0f },
+            Z = new[] { 0f, 6f },
+        });
+        var hit = report.Samples.Single(x => x.PositionIndex == 0);
+        var miss = report.Samples.Single(x => x.PositionIndex == 3);
+        Assert.Equal("hit", hit.Outcome);
+        Assert.True(hit.ActivationId > 0);
+        Assert.Equal(slot.Id, hit.CanonicalSlot);
+        Assert.NotNull(hit.FirstContact);
+        Assert.True(hit.FirstContact!.Damage > 0);
+        Assert.Equal(hit.FirstContact.Damage, hit.TargetDamageAfter - hit.TargetDamageBefore);
+        Assert.Equal("miss", miss.Outcome);
+        Assert.Equal("effects-complete", miss.CompletionReason);
+    }
+
+    [Fact]
+    public void Normals_MeasureRealJumpStylesAndMatchedReferences()
+    {
+        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
+        var report = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { slot },
+            X = new[] { 4f },
+            Y = new[] { 2f },
+            Z = new[] { 6f },
+        });
+        var neutral = report.JumpReferences.Single(x => x.JumpStyle == "neutral");
+        var drift = report.JumpReferences.Single(x => x.JumpStyle == "neutral-drift");
+        var running = report.JumpReferences.Single(x => x.JumpStyle == "running");
+        Assert.Equal(neutral.TakeoffTick, drift.TakeoffTick);
+        Assert.Equal(neutral.LandingTick, drift.LandingTick);
+        Assert.True(running.TakeoffAfter!.VelocityZ > 0);
+        Assert.True(neutral.TakeoffBefore!.IsGrounded);
+        Assert.False(neutral.TakeoffAfter!.IsGrounded);
+        foreach (var reference in report.JumpReferences)
+        {
+            var rows = report.Samples.Where(x => x.JumpStyle == reference.JumpStyle).ToArray();
+            Assert.Equal(3, rows.Length);
+            Assert.Equal(reference.TakeoffTick + 1, rows.Single(x => x.Checkpoint == "immediate").ScheduledPressTick);
+            Assert.Equal(reference.TakeoffTick + Math.Max(1, reference.FlightTicks / 3),
+                rows.Single(x => x.Checkpoint == "early").ScheduledPressTick);
+            Assert.Equal(reference.TakeoffTick + Math.Max(1, 2 * reference.FlightTicks / 3),
+                rows.Single(x => x.Checkpoint == "late").ScheduledPressTick);
+        }
+        Assert.True(report.Samples.Single(x => x.JumpStyle == "neutral-drift" && x.Checkpoint == "late").PrePressAttacker!.PositionZ > 0);
+        Assert.True(report.Samples.Single(x => x.JumpStyle == "running" && x.Checkpoint == "late").PrePressAttacker!.PositionZ > 0);
+        Assert.Equal(2f, report.Samples[0].ReferenceVictim!.PositionY, 5);
+    }
+
+    [Fact]
+    public void Normals_EmptyAirSlotRemainsUnavailableInCompleteMatrix()
+    {
+        var attacker = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground));
+        Assert.True(CanonicalSlotProjection.TryGet("air.2", out var air));
+        var report = ContactCoverageReport.BuildNormals(attacker, victim, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { ground, air },
+            X = new[] { 0f },
+            Y = new[] { 0f },
+            Z = new[] { 0.75f },
+            ExtraPositions = new[] { new ContactCoverageReport.CoveragePosition(0f, 0f, 0f), new ContactCoverageReport.CoveragePosition(0.5f, 1f, 2.75f) },
+        });
+        Assert.Equal(3, report.Positions.Count);
+        Assert.Equal(30, report.Samples.Count);
+        Assert.Equal(27, report.Samples.Count(x => x.SlotId == "air.2" && x.Outcome == "unavailable" && x.Reason == "empty-normal"));
+        Assert.All(report.Samples.Where(x => x.SlotId == "air.2"), x =>
+        {
+            Assert.False(x.AttackInputSent);
+            Assert.Null(x.ActivationId);
+        });
+    }
+
+    [Fact]
+    public void Normals_MaxTickBudgetDistinguishesTruncatedAndCompletedSlices()
+    {
+        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
+        var shortReport = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { slot }, X = new[] { 4f }, Y = new[] { 0f }, Z = new[] { 6f }, MaxTicks = 1,
+        });
+        var fullReport = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { slot }, X = new[] { 4f }, Y = new[] { 0f }, Z = new[] { 6f },
+        });
+        Assert.Equal("truncated", shortReport.Samples.Single().Outcome);
+        Assert.Equal("miss", fullReport.Samples.Single().Outcome);
+        Assert.Equal(1, shortReport.Totals.Truncated);
+        Assert.Null(shortReport.Summaries.Single().ConnectionFraction);
+        Assert.Equal(0f, fullReport.Summaries.Single().ConnectionFraction);
+    }
+
+    [Fact]
+    public void Normals_PostLandingPressIsRejectedWithoutGroundSubstitution()
+    {
+        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
+        var reference = ContactCoverageReport.MeasureNormalJump(entry, Arena, "neutral");
+        var sample = ContactCoverageReport.RunNormalSample(entry, entry, Arena, slot,
+            new ContactCoverageReport.CoveragePosition(0f, 0f, 0.75f), 0, "neutral", "late",
+            reference, reference.LandingTick + 1, 1);
+        Assert.Equal("unavailable", sample.Outcome);
+        Assert.Equal("wrong-locomotion-state", sample.Reason);
+        Assert.True(sample.FirstLandingTick.HasValue);
+        Assert.False(sample.AttackInputSent);
+        Assert.Null(sample.ActivationId);
+    }
+
+    [Fact]
+    public void Normals_RepeatedSerializationIsDeterministic()
+    {
+        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
+        ContactCoverageReport.NormalCoverageReportData Build() => ContactCoverageReport.BuildNormals(entry, entry,
+            new ContactCoverageReport.NormalCoverageOptions
+            {
+                Slots = new[] { slot }, X = new[] { 0f, 4f }, Y = new[] { 0f }, Z = new[] { 0f, 6f },
+            });
+        Assert.Equal(ContactCoverageReport.ToJson(Build()), ContactCoverageReport.ToJson(Build()));
+    }
+
+    [Fact]
+    public void Normals_MixedSlotsKeepIndependentLifecycleDenominators()
+    {
+        var attacker = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground1));
+        Assert.True(CanonicalSlotProjection.TryGet("ground.2", out var ground2));
+        Assert.True(CanonicalSlotProjection.TryGet("air.2", out var air2));
+        var report = ContactCoverageReport.BuildNormals(attacker, victim, new ContactCoverageReport.NormalCoverageOptions
+        {
+            Slots = new[] { ground1, ground2, air2 },
+            X = new[] { 0f, 4f },
+            Y = new[] { 0f },
+            Z = new[] { 0f, 6f },
+            MaxTicks = 60,
+        });
+        Assert.Equal("miss", report.Samples.Single(x => x.SlotId == "ground.1" && x.PositionIndex == 3).Outcome);
+        Assert.Equal("truncated", report.Samples.Single(x => x.SlotId == "ground.2" && x.PositionIndex == 3).Outcome);
+        Assert.All(report.Samples.Where(x => x.SlotId == "air.2"), x => Assert.Equal("unavailable", x.Outcome));
+        Assert.Equal(4, report.Summaries.Single(x => x.SlotId == "ground.1").CompletedAttempts);
+        Assert.Equal(4, report.Summaries.Single(x => x.SlotId == "ground.2").Truncated + report.Summaries.Single(x => x.SlotId == "ground.2").CompletedAttempts);
+        Assert.All(report.Summaries.Where(x => x.SlotId == "air.2"), x => Assert.Null(x.ConnectionFraction));
+    }
+
+    [Theory]
+    [InlineData("--slots", "ground.A")]
+    [InlineData("--x", "NaN")]
+    [InlineData("--y", "-1")]
+    [InlineData("--air-scale", "1")]
+    public void Normals_RejectInvalidCliArguments(string option, string value)
+    {
+        int exit = ContactCoverageReport.Run(new[] { "fightguy", "--coverage", "--experiment", "normals", option, value });
+        Assert.Equal(2, exit);
+    }
+
+    [Fact]
+    public void Normals_RejectOutOfArenaPositionBeforeWriting()
+    {
+        int exit = ContactCoverageReport.Run(new[]
+        {
+            "fightguy", "--coverage", "--experiment", "normals", "--slots", "ground.1",
+            "--x", "1000", "--y", "0", "--z", "0.75",
+            "--json", "artifacts/normal-coverage/should-not-write.json",
+            "--html", "artifacts/normal-coverage/should-not-write.html",
+        });
+        Assert.Equal(2, exit);
+    }
+
+
     private static (int Tick, float Damage) RunOracle(MatchContentEntry attacker, MatchContentEntry victim, float x, float z, SlotAddress slot)
     {
         var sim = new ServerSimulation(Arena);

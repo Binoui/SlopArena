@@ -5,7 +5,7 @@ using System.Text.Encodings.Web;
 
 namespace SlopArena.MoveDataReport;
 
-internal static class ContactCoverageHtml
+internal static partial class ContactCoverageHtml
 {
     internal static string ToHtml(ContactCoverageReport.CoverageReportData report)
     {

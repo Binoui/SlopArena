@@ -10,7 +10,7 @@ using SlopArena.Shared;
 
 namespace SlopArena.MoveDataReport;
 
-internal static class ContactCoverageReport
+internal static partial class ContactCoverageReport
 {
     internal const string BaselineProfile = "baseline";
     internal const string CandidateProfile = "candidate";
@@ -306,6 +306,8 @@ internal static class ContactCoverageReport
         try
         {
             var parsed = ParseArgs(args);
+            if (parsed.Experiment == "normals")
+                return RunNormals(parsed);
             string[] selectors = parsed.Character == "all" ? new[] { "fightguy", "manki", "kistu", "bonk" } : new[] { parsed.Character };
             var attackers = selectors.Select(Program.ResolveEntry).ToArray();
             var victim = Program.ResolveEntry(parsed.Victim);
@@ -345,6 +347,49 @@ internal static class ContactCoverageReport
             Console.Error.WriteLine($"coverage content error: {ex.Message}");
             return 1;
         }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"coverage output error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static int RunNormals(ParsedArgs parsed)
+    {
+        if (parsed.Character == "all")
+            throw new CoverageArgumentException("normal experiment requires exactly one attacker (all is not valid)");
+        var attacker = Program.ResolveEntry(parsed.Character);
+        var victim = Program.ResolveEntry(parsed.Victim);
+        var options = new NormalCoverageOptions
+        {
+            Slots = parsed.Slots,
+            X = parsed.X,
+            Y = parsed.Y,
+            Z = parsed.Z,
+            ExtraPositions = parsed.ExtraPositions,
+            MaxTicks = parsed.MaxTicks,
+        };
+        string basePath = Path.Combine("artifacts", "normal-coverage", $"{parsed.Character}-vs-{parsed.Victim}");
+        string json = parsed.JsonPath ?? basePath + ".json";
+        string html = parsed.HtmlPath ?? basePath + ".html";
+        ValidateOutputPath(json, "--json");
+        ValidateOutputPath(html, "--html");
+        if (string.Equals(Path.GetFullPath(json), Path.GetFullPath(html), StringComparison.Ordinal))
+            throw new CoverageArgumentException("--json and --html destinations must be distinct");
+        var report = BuildNormals(attacker, victim, options);
+        WriteFile(json, ToJson(report));
+        WriteFile(html, ContactCoverageHtml.ToHtml(report));
+        Console.Error.WriteLine($"coverage normals: attacker={parsed.Character}, victim={parsed.Victim}, slots={parsed.Slots.Count}, positions={report.Positions.Count}, samples={report.Samples.Count}");
+        Console.Error.WriteLine($"wrote {json}");
+        Console.Error.WriteLine($"wrote {html}");
+        return 0;
+    }
+
+    private static void ValidateOutputPath(string path, string option)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new CoverageArgumentException($"{option} destination must be nonempty");
+        _ = Path.GetFullPath(path);
     }
 
     internal static CoverageContext PrepareContext(MatchContentEntry attacker, MatchContentEntry victim, float airScale, ArenaDefinition arena)
@@ -640,9 +685,14 @@ internal static class ContactCoverageReport
 
     private static ParsedArgs ParseArgs(string[] args)
     {
-        string character = "all", victim = "fightguy";
+        string character = "all", victim = "fightguy", experiment = "dense";
         var slots = new List<SlotAddress>();
         float step = 0.5f, airScale = 0.8f;
+        IReadOnlyList<float> x = new[] { -1f, 0f, 1f };
+        IReadOnlyList<float> y = new[] { 0f, 1f, 2f };
+        IReadOnlyList<float> z = new[] { 0.75f, 1.5f, 2.25f };
+        IReadOnlyList<CoveragePosition> extras = Array.Empty<CoveragePosition>();
+        int maxTicks = Program.MaxTicks;
         string? json = null, html = null;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         bool positional = false;
@@ -658,7 +708,8 @@ internal static class ContactCoverageReport
             string key = arg.ToLowerInvariant();
             if (key is "--reach" or "--truecombos" or "--kbm" or "--pcts" or "--example" or "--out")
                 throw new CoverageArgumentException($"{arg} is not valid with --coverage");
-            if (key is not ("--victim" or "--slots" or "--step" or "--air-scale" or "--json" or "--html"))
+            if (key is not ("--victim" or "--slots" or "--step" or "--air-scale" or "--json" or "--html"
+                or "--experiment" or "--x" or "--y" or "--z" or "--extra"))
                 throw new CoverageArgumentException($"unknown option '{arg}'");
             if (!seen.Add(key)) throw new CoverageArgumentException($"duplicate option '{arg}'");
             if (++i >= args.Length || args[i].StartsWith("--", StringComparison.Ordinal)) throw new CoverageArgumentException($"missing value for {arg}");
@@ -667,6 +718,11 @@ internal static class ContactCoverageReport
             {
                 case "--victim": victim = value.ToLowerInvariant(); break;
                 case "--slots": slots = ParseSlots(value); break;
+                case "--experiment":
+                    experiment = value.ToLowerInvariant();
+                    if (experiment is not ("dense" or "normals"))
+                        throw new CoverageArgumentException($"unknown coverage experiment '{value}' (expected dense or normals)");
+                    break;
                 case "--step":
                     if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out step) || step is not (0.25f or 0.5f or 1f))
                         throw new CoverageArgumentException("--step must be 0.25, 0.5, or 1");
@@ -675,6 +731,10 @@ internal static class ContactCoverageReport
                     if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out airScale) || !float.IsFinite(airScale) || airScale <= 0f || airScale > 1f)
                         throw new CoverageArgumentException("--air-scale must be finite, greater than 0, and at most 1");
                     break;
+                case "--x": x = ParseNormalAxis(value, "X", false); break;
+                case "--y": y = ParseNormalAxis(value, "Y", true); break;
+                case "--z": z = ParseNormalAxis(value, "Z", false); break;
+                case "--extra": extras = ParseNormalExtras(value); break;
                 case "--json": json = value; break;
                 case "--html": html = value; break;
             }
@@ -682,7 +742,16 @@ internal static class ContactCoverageReport
         if (character is not ("all" or "fightguy" or "manki" or "kistu" or "bonk")) throw new CoverageArgumentException($"unknown character: {character} (expected all, fightguy, manki, kistu, bonk)");
         if (victim is not ("fightguy" or "manki" or "kistu" or "bonk")) throw new CoverageArgumentException($"unknown victim: {victim}");
         if (slots.Count == 0) slots.AddRange(CanonicalSlotProjection.All.Where(x => x.InputLabel is "1" or "2" or "3" or "4"));
-        return new ParsedArgs(character, victim, slots.OrderBy(x => x.Ordinal).ToArray(), step, airScale, json, html);
+        if (experiment == "normals")
+        {
+            if (character == "all") throw new CoverageArgumentException("normal experiment requires exactly one attacker (all is not valid)");
+            if (seen.Contains("--step") || seen.Contains("--air-scale"))
+                throw new CoverageArgumentException("--step and --air-scale are not valid with --experiment normals");
+        }
+        else if (seen.Contains("--x") || seen.Contains("--y") || seen.Contains("--z") || seen.Contains("--extra"))
+            throw new CoverageArgumentException("--x, --y, --z, and --extra are only valid with --experiment normals");
+        return new ParsedArgs(character, victim, experiment, slots.OrderBy(x => x.Ordinal).ToArray(), step, airScale,
+            x, y, z, extras, maxTicks, json, html);
     }
 
     private static List<SlotAddress> ParseSlots(string value)
@@ -856,6 +925,8 @@ internal static class ContactCoverageReport
         File.WriteAllText(path, content);
     }
 
-    private sealed record ParsedArgs(string Character, string Victim, IReadOnlyList<SlotAddress> Slots, float Step, float AirScale, string? JsonPath, string? HtmlPath);
+    private sealed record ParsedArgs(string Character, string Victim, string Experiment, IReadOnlyList<SlotAddress> Slots,
+        float Step, float AirScale, IReadOnlyList<float> X, IReadOnlyList<float> Y, IReadOnlyList<float> Z,
+        IReadOnlyList<CoveragePosition> ExtraPositions, int MaxTicks, string? JsonPath, string? HtmlPath);
     private sealed class CoverageArgumentException : Exception { internal CoverageArgumentException(string message) : base(message) { } }
 }
