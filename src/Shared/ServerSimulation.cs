@@ -281,6 +281,14 @@ namespace SlopArena.Shared
 					// For interrupted abilities (dash/interrupt): OnEnd was NOT called — but
 					// StartDash already cleared AttackSlot/AnimLockTicks, so
 					// the clean-up below (cooldown, buffered slot, AnimLockTicks) is still correct.
+					// Grounded attacks release after this movement pass. Re-open the
+					// existing Rush handoff so held ground input reaches RunSpeed on the
+					// first unlocked tick; landing already does the same in Simulation.
+					// Preserve airborne exits and residual momentum; recovery gates still apply.
+					if (!ability.AirborneAtStart && state.IsGrounded
+					    && state.State == ActionState.Idle && state.AttackSlot == 0)
+						state.RushTicks = _defs[id].Movement.RushTicks;
+
 					
 					// Apply cooldown (all 11 slots — issue #117; the old < 6 gate skipped
 					// slots 6-10 entirely, so Ki Shot on the Q slot would never cooldown)
@@ -615,6 +623,47 @@ namespace SlopArena.Shared
 			return false;
 		}
 
+        private static bool IsGroundedNormal(byte slot)
+            => slot == AbilitySlots.Slot1
+                || slot == AbilitySlots.Slot2
+                || slot == AbilitySlots.Slot3
+                || slot == AbilitySlots.Slot4;
+
+        /// <summary>
+        /// Cancel a ready grounded normal on directional movement, at the same pre-tick
+        /// boundary as an explicit ability interrupt. This path deliberately does not
+        /// participate in explicit-attack cancellation: a rejected attack input must not
+        /// silently turn into a movement cancel.
+        /// </summary>
+        private bool TryCancelGroundedNormalOnMovement(
+            ulong id, ref CharacterState state, CharacterDefinition def, in InputState input)
+        {
+            if (!state.IsGrounded || state.State != ActionState.Attacking
+                || !IsGroundedNormal(state.AttackSlot)
+                || ((input.MoveX * input.MoveX) + (input.MoveY * input.MoveY) <= 1e-4f))
+                return false;
+
+            if (state.HitstunTicks > 0 || state.HitstopTicks > 0
+                || state.BurstRecoveryTicks > 0 || state.LandingLagTicks > 0
+                || !Simulation.IsIasaUnlocked(state, def)
+                || !_activeAbilities.TryGetValue(id, out var ability))
+                return false;
+
+            ability.OnCancel(ref state);
+            _spellResolver.RemoveOwnedHitboxes(id, ability.ActivationId);
+            _activeAbilities.Remove(id);
+            if (ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
+                state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
+
+            state.State = ActionState.Idle;
+            state.AttackSlot = 0;
+            state.ComboStage = 0;
+            state.AttackElapsedTicks = 0;
+            state.AnimLockTicks = 0;
+            state.BufferedSlot = 0;
+            return true;
+        }
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -628,7 +677,12 @@ namespace SlopArena.Shared
 				var def = _defs[id];
 				if (CanTakeOrdinaryAbilityAction(state, def))
 					_lastTickOrdinaryActionOpportunities.Add(id);
-				if (input.ActiveSlot == 0) continue;
+				if (input.ActiveSlot == 0)
+				{
+					if (TryCancelGroundedNormalOnMovement(id, ref state, def, input))
+						_states[id] = state;
+					continue;
+				}
 
 				// IASA early-out (issue #124): an attack stage that has passed its IasaTicks
 				// releases the anim lock for ability inputs — the press interrupts the recovery.

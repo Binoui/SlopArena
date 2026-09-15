@@ -381,6 +381,40 @@ public class LandingLagTests : KitScenarioTests
         Assert.True(states[50].PX > states[44].PX); // lag expired (t45): the stick walks
     }
 
+    [Fact]
+    public void MoveInputAfterLandingLagUnlock_StartsAtRunSpeed()
+    {
+        var state = FallingStart(4.7f);
+        // Preserve an existing ground direction so this is specifically a recovery exit,
+        // not the ordinary standstill Rush kick-off.
+        state.LastDirX = 1f;
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, LagDef, state, TestHelpers.LoadBakedData(LagDef));
+
+        var states = new List<CharacterState>();
+        for (int tick = 0; tick <= 45; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = tick == 0
+                    ? new InputState { ActiveSlot = AbilitySlots.Slot1, MoveX = 1f }
+                    : new InputState { MoveX = 1f },
+            });
+            states.Add(sim.GetState(1));
+        }
+
+        // The held stick cannot bypass landing lag: it remains planted until the lock
+        // expires (landing is t27, lock is live through t44).
+        Assert.True(states[44].LandingLagTicks > 0);
+        Assert.Equal(states[27].PX, states[44].PX);
+        Assert.Equal(0f, states[44].VX);
+
+        // The first unlocked tick starts at cruise speed, rather than ramping from zero.
+        Assert.Equal((ushort)0, states[45].LandingLagTicks);
+        TestHelpers.AssertNear(LagDef.Movement.RunSpeed, states[45].VX, 0.1f);
+        Assert.Equal(ActionState.Run, states[45].State);
+    }
+
     /// <summary>
     /// Being hit ends the commitment: ApplyKnockback (the hitstun choke point) clears the
     /// lock so a stale LandingLagTicks cannot re-lock the victim after hitstun resolves.

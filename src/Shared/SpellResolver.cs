@@ -109,6 +109,25 @@ namespace SlopArena.Shared
             }
             return false;
         }
+        /// <summary>
+        /// Remove every active hitbox owned by one ability activation without firing
+        /// projectile explosions. Used when the owning ability is cancelled before its
+        /// effects are allowed to linger.
+        /// </summary>
+        internal void RemoveOwnedHitboxes(ulong ownerId, ulong activationId)
+        {
+            for (int i = _hitboxes.Count - 1; i >= 0; i--)
+            {
+                var hb = _hitboxes[i];
+                if (!hb.Active || hb.OwnerId != ownerId || hb.ActivationId != activationId)
+                    continue;
+
+                hb.Active = false;
+                OnHitboxRemoved?.Invoke(hb, hb.X, hb.Y, hb.Z);
+                _hitboxes.RemoveAt(i);
+            }
+        }
+
 
         /// <summary>
         /// Clear all hitboxes (e.g., on match reset).

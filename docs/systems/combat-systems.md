@@ -42,6 +42,8 @@ Visual hit reactions, VFX, audio, and camera effects are presentation only. Dama
 A Duration Lock prevents action during an authored move commitment. The engine owns interruption:
 
 - IASA lets an authored stage accept a new ability from its configured tick onward;
+- grounded normals also accept directional movement at that same pre-tick IASA boundary; movement cancels the current activation and its remaining hitboxes rather than steering an active attack;
+- explicit ability input takes priority over movement cancellation; hitstop, Hitstun, Burst recovery, and landing lag still block cancellation, and jumping retains its existing full-lock gate;
 - Hitstun, death, Burst, and simulation-owned overrides cancel active content through the cancellation path;
 - landing lag applies to an aerial move unless the landing tick is in its auto-cancel window;
 - a cancellation never depends on an authored cleanup operation that may not execute.
