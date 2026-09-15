@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T00:00:00Z",
+  "title": "Design System: SlopArena",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#17131B",
+        "tonalRamp": ["#F0EEE8", "#625C6B", "#17131B", "#0D0D14"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#F0EEE8",
+        "tonalRamp": ["#FFFFFF", "#F0EEE8", "#D8D3C9", "#A8A39B"]
+      },
+      "acid": {
+        "role": "primary",
+        "displayName": "Acid",
+        "canonical": "#FFC821",
+        "tonalRamp": ["#FFF0A8", "#FFD95C", "#FFC821", "#B88600"]
+      },
+      "combat-orange": {
+        "role": "secondary",
+        "displayName": "Combat Orange",
+        "canonical": "#E05C2A",
+        "tonalRamp": ["#FFB09A", "#FF7650", "#E05C2A", "#8E2E18"]
+      },
+      "online-green": {
+        "role": "tertiary",
+        "displayName": "Online Green",
+        "canonical": "#4CDD88",
+        "tonalRamp": ["#B9F6D1", "#79EBA7", "#4CDD88", "#238A4D"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Compressed Display",
+        "purpose": "One dominant declaration: title, result, fighter name, or major state change."
+      },
+      "label": {
+        "displayName": "Utility Label",
+        "purpose": "Uppercase broadcast metadata, status, roster roles, and technical annotations."
+      }
+    },
+    "shadows": [
+      {
+        "name": "title-offset",
+        "value": "10px 55px 0 #E05C2A",
+        "purpose": "Hard printed offset behind the main display title."
+      },
+      {
+        "name": "structural-edge",
+        "value": "0 8px 0 #0D0D14",
+        "purpose": "Bottom edge that gives primary controls a stamped, pressable silhouette."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "0.12s",
+        "purpose": "Short decisive hover, focus, and press translation."
+      },
+      {
+        "name": "hud-feedback",
+        "value": "0.12s–0.18s",
+        "purpose": "Brief scale, translate, opacity, and color feedback for combat readouts."
+      }
+    ],
+    "breakpoints": [],
+    "narrative": {
+      "northStar": "The Questionable Fight Flyer",
+      "overview": "A handmade fight poster became a live game broadcast. Cool fighting imagery leads; dry jokes and rough print gestures support it without obscuring the player's next action.",
+      "keyCharacteristics": [
+        "Underground fight-poster energy with disciplined hierarchy.",
+        "Square geometry, heavy borders, and offset physical layering.",
+        "Compressed uppercase display type paired with compact utility labels.",
+        "Characters treated as graphic cutouts.",
+        "Dry self-aware copy that never obscures status."
+      ],
+      "rules": [
+        {
+          "name": "The One Accent Rule",
+          "body": "Acid and Combat Orange may both exist on a screen, but one accent owns each region.",
+          "section": "colors"
+        },
+        {
+          "name": "The Hard Edge Rule",
+          "body": "Use borders, offsets, and layers before blur, glow, or ambient shadow.",
+          "section": "elevation"
+        },
+        {
+          "name": "The Declaration Rule",
+          "body": "Give each composition one loud phrase. Supporting labels are smaller, quieter, and useful.",
+          "section": "typography"
+        }
+      ],
+      "dos": [
+        "Do establish the grid before adding crooked poster gestures.",
+        "Do make focus, selected, disabled, and confirmation states more obvious than texture.",
+        "Do keep gameplay HUD texture restrained and information stable."
+      ],
+      "donts": [
+        "Don't use rounded cards, glassmorphism, soft ambient shadows, or glossy gradients by default.",
+        "Don't rotate dense information or required actions.",
+        "Don't use color as the only status indicator."
+      ]
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acid, square, bordered, and physically pressable.",
+      "html": "<button class=\"ds-btn-primary\">JOIN A FIGHT</button>",
+      "css": ".ds-btn-primary { background:#FFC821; color:#17131B; border:3px solid #0D0D14; border-bottom-width:8px; padding:0 18px; height:60px; font-weight:700; letter-spacing:2px; text-transform:uppercase; } .ds-btn-primary:hover,.ds-btn-primary:focus { background:#FFD95C; border-color:#FFC821; transform:translateY(-2px); } .ds-btn-primary:active { transform:translateY(3px); }"
+    },
+    {
+      "name": "Hot Button",
+      "kind": "button",
+      "refersTo": "button-hot",
+      "description": "Combat-orange action for host, join, or other high-energy paths.",
+      "html": "<button class=\"ds-btn-hot\">HOST A MATCH</button>",
+      "css": ".ds-btn-hot { background:#E05C2A; color:#F0EEE8; border:3px solid #0D0D14; border-bottom-width:8px; padding:0 18px; height:60px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }"
+    },
+    {
+      "name": "Broadcast Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Compact ink strip for live status, roster metadata, and technical labels.",
+      "html": "<span class=\"ds-status-pill\">LIVE ROSTER // 4 CHARACTERS</span>",
+      "css": ".ds-status-pill { display:inline-block; background:#17131B; color:#F0EEE8; padding:8px 12px; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; border-left:8px solid #FFC821; }"
+    }
+  ]
+}
