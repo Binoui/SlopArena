@@ -11,21 +11,26 @@ using SlopArena.Client.Network;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Character select screen (issue #34). Two modes:
+    /// Character select screen (issue #34) with Training, Solo, and PvP flows.
     /// <list type="bullet">
-    /// <item><b>Training</b> — single-player: pick a character, click SELECT,
+    /// <item><b>Training</b> — single-player: pick a character, click ENTER TRAINING,
     /// launch the training scene directly.</item>
+    /// <item><b>Solo</b> — single-player: assign a player and CPU character,
+    /// choose a difficulty, then select a stage.</item>
     /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
     /// lock in, and the host starts the match when everyone is locked in (min 2).
-    /// Uses the shared <see cref="ClientSession.ActiveLobby"/> connection.</item>
     /// </list>
     /// </summary>
     public class CharSelectController : MonoBehaviour
     {
         [SerializeField] private UIDocument _uiDocument;
 
-        private CharacterClass _selected = CharacterClass.Manki;
+        private CharacterClass _selected = CharacterClass.None;
+        private bool _selectingCpu;
         private readonly List<Button> _gridButtons = new();
+        private Button _btnEditPlayer;
+        private Button _btnEditCpu;
+        private Label _selectionTarget;
 
         // PvP state
         private LobbyClient _lobby;
@@ -36,78 +41,56 @@ namespace SlopArena.Client.UI
         private bool _lockedIn;
         private LobbySnapshot _snapshot;
 
-        private static readonly CharacterClass[] Classes = GetPlayableClasses();
-
-        private static CharacterClass[] GetPlayableClasses()
-        {
-            try
-            {
-                string[] roots =
-                {
-                    "content-cooked",
-                    System.IO.Path.Combine(Application.dataPath, "../../../content-cooked"),
-                    System.IO.Path.Combine(Application.streamingAssetsPath, "content-cooked"),
-                };
-                foreach (string root in roots)
-                {
-                    string path = System.IO.Path.Combine(root, "roster", "manifest.json");
-                    if (System.IO.File.Exists(path))
-                        return BuiltInRosterManifestCodec.Load(path).Entries.Select(x => x.Selector).ToArray();
-                }
-                throw new System.IO.FileNotFoundException("Cooked roster manifest is missing.");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[CharSelect] Built-in roster unavailable: {ex.Message}");
-                return System.Array.Empty<CharacterClass>();
-            }
-        }
-
-        private static readonly System.Collections.Generic.Dictionary<CharacterClass, string> RolePhrases = new()
-        {
-            { CharacterClass.FightGuy, "DISCIPLINE / BLUE-WHITE KI" },
-            { CharacterClass.Manki, "MISCHIEF / EXPLOSIVES" },
-            { CharacterClass.Kistu, "BLADE / PRECISION" },
-            { CharacterClass.Bonk, "BLADE / HEAVY IMPACT" },
-            { CharacterClass.Nilus, "NATURE / CONTROL" },
-        };
-
         private void OnEnable()
         {
             _gridButtons.Clear();
+            _selectingCpu = false;
             var root = _uiDocument.rootVisualElement;
             var grid = root.Q<VisualElement>("char-grid");
-            grid.Clear();
+            grid?.Clear();
 
-            // Build large portrait cards from the playable character roster.
-            foreach (var cls in Classes)
+            CharacterClass[] classes = MenuRoster.Classes;
+            _selected = classes.Contains(MatchConfig.PlayerClass)
+                ? MatchConfig.PlayerClass
+                : classes.Length > 0 ? classes[0] : CharacterClass.None;
+            if (MatchConfig.Mode == GameMode.Solo &&
+                classes.Length > 0 &&
+                !classes.Contains(MatchConfig.SoloBotClass))
+                MatchConfig.SoloBotClass = classes[0];
+
+            // Build portrait cards in the admitted manifest's authored order.
+            if (grid != null)
             {
-                var capturedCls = cls;
-                var btn = new Button(() => SelectCharacter(capturedCls, root))
+                foreach (var cls in classes)
                 {
-                    name = $"char-{cls}"
-                };
-                btn.AddToClassList("char-card");
+                    var capturedCls = cls;
+                    var btn = new Button(() => SelectCharacter(capturedCls, root))
+                    {
+                        name = $"char-{cls}"
+                    };
+                    btn.AddToClassList("char-card");
 
-                var portrait = new VisualElement { name = "char-portrait" };
-                portrait.AddToClassList("char-portrait");
-                var texture = Resources.Load<Texture2D>($"UI/Portraits/{cls}");
-                if (texture != null)
-                    portrait.style.backgroundImage = new StyleBackground(texture);
+                    var portrait = new VisualElement { name = "char-portrait" };
+                    portrait.AddToClassList("char-portrait");
+                    var texture = Resources.Load<Texture2D>($"UI/Portraits/{cls}");
+                    if (texture != null)
+                        portrait.style.backgroundImage = new StyleBackground(texture);
 
-                var name = new Label(cls.ToString().ToUpper()) { name = "char-card-name" };
-                name.AddToClassList("char-card-name");
-                var markers = new VisualElement { name = "char-markers" };
-                markers.AddToClassList("char-markers");
+                    var name = new Label(cls.ToString().ToUpperInvariant()) { name = "char-card-name" };
+                    name.AddToClassList("char-card-name");
+                    var markers = new VisualElement { name = "char-markers" };
+                    markers.AddToClassList("char-markers");
 
-                btn.Add(portrait);
-                btn.Add(name);
-                btn.Add(markers);
-                grid.Add(btn);
-                _gridButtons.Add(btn);
+                    btn.Add(portrait);
+                    btn.Add(name);
+                    btn.Add(markers);
+                    grid.Add(btn);
+                    _gridButtons.Add(btn);
+                }
             }
 
-            SelectCharacter(_selected, root);
+            if (_selected != CharacterClass.None)
+                SelectCharacter(_selected, root);
 
             if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(root);
@@ -121,80 +104,209 @@ namespace SlopArena.Client.UI
         }
         private void InitTraining(VisualElement root)
         {
-            root.Q<Label>("roster-meta").text = $"{Classes.Length} FIGHTERS // TRAINING";
+            SetModeChrome(root, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 1  /  FIGHTER");
+            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
+                ? "NO ADMITTED FIGHTERS"
+                : $"{MenuRoster.Classes.Length} FIGHTERS // TRAINING";
             root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
             root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
-            root.Q<Button>("btn-select").style.display = DisplayStyle.Flex;
+
+            var selectButton = root.Q<Button>("btn-select");
+            if (selectButton != null)
+            {
+                selectButton.style.display = DisplayStyle.Flex;
+                selectButton.text = "ENTER TRAINING";
+                selectButton.SetEnabled(MenuRoster.Classes.Length > 0);
+                selectButton.clicked += () =>
+                {
+                    MatchConfig.PlayerClass = _selected;
+                    MatchConfig.ArenaName = "training";
+                    SceneManager.LoadScene("Arena_Offline");
+                };
+            }
 
             _rosterPanel = root.Q<VisualElement>("roster-panel");
             RenderTrainingRoster();
 
-            root.Q<Button>("btn-select").clicked += () =>
-            {
-                MatchConfig.PlayerClass = _selected;
-                MatchConfig.ArenaName = "training";
-                SceneManager.LoadScene("Arena_Offline");
-            };
+            var btnBack = root.Q<Button>("btn-back");
+            Action back = () => SceneManager.LoadScene("MainMenu");
+            if (btnBack != null)
+                btnBack.clicked += back;
+            ConfigureNavigation(root, MenuRoster.Classes.Length > 0 ? selectButton : null, btnBack, back);
 
-            root.Q<Button>("btn-back").clicked += () =>
-            {
-                string prev = MatchConfig.Mode == GameMode.Training ? "MainMenu" : "Lobby";
-                SceneManager.LoadScene(prev);
-            };
+            if (MenuRoster.Classes.Length == 0)
+                ShowRosterUnavailable(root, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
         }
+
         private void InitSolo(VisualElement root)
         {
-            root.Q<Label>("roster-meta").text = $"{Classes.Length} FIGHTERS // SOLO";
+            SetModeChrome(root, "SOLO // CHOOSE YOUR FIGHTERS", "STEP 1 OF 2  /  FIGHTERS");
+            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
+                ? "NO ADMITTED FIGHTERS"
+                : $"{MenuRoster.Classes.Length} FIGHTERS // SOLO";
             root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
             root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
+
             var selectButton = root.Q<Button>("btn-select");
-            selectButton.style.display = DisplayStyle.Flex;
-            selectButton.text = "START SOLO";
+            if (selectButton != null)
+            {
+                selectButton.style.display = DisplayStyle.Flex;
+                selectButton.text = "SELECT STAGE";
+                selectButton.SetEnabled(MenuRoster.Classes.Length > 0);
+            }
 
             _rosterPanel = root.Q<VisualElement>("roster-panel");
             RenderSoloRoster();
 
             var config = root.Q<VisualElement>("solo-config");
-            config.style.display = DisplayStyle.Flex;
+            if (config != null)
+                config.style.display = DisplayStyle.Flex;
 
-            var botLabel = root.Q<Label>("solo-bot-label");
-            root.Q<Button>("btn-assign-cpu").clicked += () =>
-            {
-                MatchConfig.SoloBotClass = _selected;
-                RenderSoloRoster();
-                botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
-            };
+            _btnEditPlayer = root.Q<Button>("btn-edit-player");
+            _btnEditCpu = root.Q<Button>("btn-edit-cpu");
+            _selectionTarget = root.Q<Label>("selection-target");
+            if (_btnEditPlayer != null)
+                _btnEditPlayer.clicked += () => SetSelectionTarget(root, selectingCpu: false);
+            if (_btnEditCpu != null)
+                _btnEditCpu.clicked += () => SetSelectionTarget(root, selectingCpu: true);
+            SetSelectionTarget(root, selectingCpu: false);
 
             var difficultyLabel = root.Q<Label>("solo-difficulty-label");
             MatchConfig.SoloCpuDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
-            difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}";
+            if (difficultyLabel != null)
+                difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}";
             foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
                 var capturedDifficulty = difficulty;
                 var button = root.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
+                if (button == null) continue;
                 button.clicked += () =>
                 {
                     MatchConfig.SoloCpuDifficulty = capturedDifficulty;
-                    difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(capturedDifficulty)}";
+                    if (difficultyLabel != null)
+                        difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(capturedDifficulty)}";
+                    UpdateDifficultyButtons(root);
                     RenderSoloRoster();
                 };
-                button.EnableInClassList("active", difficulty == MatchConfig.SoloCpuDifficulty);
+            }
+            UpdateDifficultyButtons(root);
+
+            if (selectButton != null)
+            {
+                selectButton.clicked += () =>
+                {
+                    if (_selected == CharacterClass.None) return;
+                    SceneManager.LoadScene("StageSelect");
+                };
             }
 
-            selectButton.clicked += () =>
+            var btnBack = root.Q<Button>("btn-back");
+            Action back = () => SceneManager.LoadScene("MainMenu");
+            if (btnBack != null)
+                btnBack.clicked += back;
+            ConfigureNavigation(root, MenuRoster.Classes.Length > 0
+                ? _btnEditPlayer ?? _gridButtons.FirstOrDefault()
+                : null, btnBack, back);
+
+            if (MenuRoster.Classes.Length == 0)
+                ShowRosterUnavailable(root, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
+        }
+
+        private static void SetModeChrome(VisualElement root, string title, string progress)
+        {
+            var titleLabel = root.Q<Label>("title");
+            if (titleLabel != null)
+                titleLabel.text = title;
+            var progressLabel = root.Q<Label>("flow-progress");
+            if (progressLabel != null)
+                progressLabel.text = progress;
+        }
+
+        private static void ConfigureNavigation(
+            VisualElement root,
+            Button initial,
+            Button backButton,
+            Action back)
+        {
+            if (backButton != null && initial != null)
+                MenuNavigation.Configure(root, initial, back);
+            else if (backButton != null)
+                MenuNavigation.Configure(root, backButton, back);
+        }
+
+        private static void ShowRosterUnavailable(VisualElement root, string heading, string detail)
+        {
+            var nameLabel = root.Q<Label>("char-name");
+            if (nameLabel != null)
+                nameLabel.text = heading;
+            var roleLabel = root.Q<Label>("char-role");
+            if (roleLabel != null)
+                roleLabel.text = detail;
+            var statusLabel = root.Q<Label>("lbl-pvp-status");
+            if (statusLabel != null)
+                statusLabel.text = detail;
+        }
+
+        private static void UpdateDifficultyButtons(VisualElement root)
+        {
+            CpuDifficulty current = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
+            foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
-                MatchConfig.PlayerClass = _selected;
-                SceneManager.LoadScene("StageSelect");
-            };
-            root.Q<Button>("btn-back").clicked += () => SceneManager.LoadScene("MainMenu");
+                var button = root.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
+                button?.EnableInClassList("active", difficulty == current);
+            }
+        }
+
+        private void SetSelectionTarget(VisualElement root, bool selectingCpu)
+        {
+            if (MatchConfig.Mode != GameMode.Solo)
+                return;
+
+            _selectingCpu = selectingCpu;
+            _selected = selectingCpu ? MatchConfig.SoloBotClass : MatchConfig.PlayerClass;
+            if (_selectionTarget != null)
+            {
+                string target = selectingCpu ? "CPU" : "PLAYER";
+                string fighter = _selected == CharacterClass.None
+                    ? "NONE"
+                    : _selected.ToString().ToUpperInvariant();
+                _selectionTarget.text = $"EDITING {target}  /  {fighter}";
+            }
+            _btnEditPlayer?.EnableInClassList("active", !selectingCpu);
+            _btnEditCpu?.EnableInClassList("active", selectingCpu);
+            var botLabel = root.Q<Label>("solo-bot-label");
+            if (botLabel != null)
+                botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
+            if (_selected != CharacterClass.None)
+                UpdateSelectionVisuals(_selected, root);
+            RenderSoloRoster();
+        }
+
+        private void UpdateSelectionVisuals(CharacterClass cls, VisualElement root)
+        {
+            foreach (var btn in _gridButtons)
+            {
+                btn.RemoveFromClassList("char-card--selected");
+                if (btn.name == $"char-{cls}")
+                    btn.AddToClassList("char-card--selected");
+            }
+
+            var nameLabel = root.Q<Label>("char-name");
+            if (nameLabel != null)
+                nameLabel.text = cls.ToString().ToUpperInvariant();
+            var roleLabel = root.Q<Label>("char-role");
+            if (roleLabel != null)
+                roleLabel.text = MenuRoster.Description(cls);
         }
 
         private void RenderSoloRoster()
         {
             if (_rosterPanel == null) return;
             _rosterPanel.Clear();
+            if (MenuRoster.Classes.Length == 0)
+                return;
             _rosterPanel.Add(BuildPlayerCard(
-                "P1", "YOU", _selected, "SELECTED", local: true, host: true));
+                "P1", "YOU", MatchConfig.PlayerClass, "SELECTED", local: true, host: true));
             _rosterPanel.Add(BuildPlayerCard(
                 "P2", "CPU", MatchConfig.SoloBotClass,
                 $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}", local: false, host: false));
@@ -202,47 +314,55 @@ namespace SlopArena.Client.UI
 
         private void InitPvP(VisualElement root)
         {
-            // Hide single-player SELECT button; show the PvP panel.
+            SetModeChrome(root, "ONLINE // CHOOSE YOUR FIGHTER", "STEP 1 OF 2  /  FIGHTER");
             root.Q<Button>("btn-select").style.display = DisplayStyle.None;
             root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
 
             _snapshot = ClientSession.LobbyRoster;
-            root.Q<Label>("roster-meta").text =
-                $"{Classes.Length} FIGHTERS // {_snapshot?.Players.Count ?? 0} PLAYERS";
+            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
+                ? "NO ADMITTED FIGHTERS"
+                : $"{MenuRoster.Classes.Length} FIGHTERS // {_snapshot?.Players.Count ?? 0} PLAYERS";
             _rosterPanel   = root.Q<VisualElement>("roster-panel");
             _btnLockIn     = root.Q<Button>("btn-lockin");
             _btnStartMatch = root.Q<Button>("btn-start-match");
             _lblPvPStatus  = root.Q<Label>("lbl-pvp-status");
+            _lockedIn = false;
 
-            _btnLockIn.text = "LOCK IN";
-            // Host-only: show SELECT STAGE button (enabled when all locked in, min 2).
-            // Clicking it moves everyone to the stage select screen; the host
-            // picks the arena there and the match starts from StageSelect.
             bool isHost = IsLocalHost();
-            // Roster-based host flag for downstream screens (StageSelect):
-            // MatchConfig.IsHost is false for everyone on a dedicated server.
             ClientSession.IsLobbyHost = isHost;
-            if (isHost)
+            if (_btnLockIn != null)
             {
-                _btnStartMatch.text = "SELECT STAGE";
-                _btnStartMatch.style.display = DisplayStyle.Flex;
-                _btnStartMatch.SetEnabled(false);
-                _btnStartMatch.clicked += OnStartMatchClicked;
-            }
-            else
-            {
-                _btnStartMatch.style.display = DisplayStyle.None;
+                _btnLockIn.text = "LOCK IN";
+                _btnLockIn.SetEnabled(MenuRoster.Classes.Length > 0);
+                _btnLockIn.clicked += OnLockInClicked;
             }
 
-            _btnLockIn.clicked += OnLockInClicked;
+            // Host-only: move everyone to stage select once all players lock in.
+            if (_btnStartMatch != null)
+            {
+                if (isHost)
+                {
+                    _btnStartMatch.text = "SELECT STAGE";
+                    _btnStartMatch.style.display = DisplayStyle.Flex;
+                    _btnStartMatch.SetEnabled(false);
+                    _btnStartMatch.clicked += OnStartMatchClicked;
+                }
+                else
+                {
+                    _btnStartMatch.style.display = DisplayStyle.None;
+                }
+            }
 
-            root.Q<Button>("btn-back").clicked += OnPvPBackClicked;
+            var btnBack = root.Q<Button>("btn-back");
+            if (btnBack != null)
+                btnBack.clicked += OnPvPBackClicked;
+            ConfigureNavigation(root, _gridButtons.FirstOrDefault() ?? _btnLockIn, btnBack, OnPvPBackClicked);
 
-            // Reuse the persistent lobby connection
             _lobby = ClientSession.ActiveLobby;
             if (_lobby == null)
             {
-                _lblPvPStatus.text = "No lobby connection. Returning to server browser.";
+                if (_lblPvPStatus != null)
+                    _lblPvPStatus.text = "No lobby connection. Returning to server browser.";
                 SceneManager.LoadScene("ServerBrowser");
                 return;
             }
@@ -253,10 +373,12 @@ namespace SlopArena.Client.UI
             _lobby.MatchStarted     += OnMatchStarted;
             _lobby.Error            += OnPvPError;
 
-            _lblPvPStatus.text = "Select your character...";
+            if (_lblPvPStatus != null)
+                _lblPvPStatus.text = MenuRoster.Classes.Length == 0
+                    ? "Fighter content is unavailable. Return to the menu."
+                    : "Choose your fighter, then lock in.";
             RenderRoster();
             UpdateStartMatchButton();
-
             RenderCardMarkers();
             Debug.Log($"[CharSelect] InitPvP: isHost={isHost}, snapshot={_snapshot?.Players.Count ?? 0} players, " +
                 $"steamId={ClientSession.SteamId}");
@@ -372,8 +494,6 @@ namespace SlopArena.Client.UI
             _rosterPanel.Clear();
             _rosterPanel.Add(BuildPlayerCard(
                 "P1", "YOU", _selected, "SELECTED", local: true, host: true));
-            _rosterPanel.Add(BuildPlayerCard(
-                "P2", "TRAINING BOT", CharacterClass.FightGuy, "BOT", local: false, host: false));
         }
 
         private void RenderRoster()
@@ -415,7 +535,9 @@ namespace SlopArena.Client.UI
             var number = new Label(playerNumber);
             number.AddToClassList("player-card__number");
             identity.Add(number);
-            var role = new Label(host ? "HOST" : "PLAYER");
+            var role = new Label(MatchConfig.Mode == GameMode.PvP
+                ? (host ? "HOST" : "PLAYER")
+                : (local ? "PLAYER" : "CPU"));
             role.AddToClassList("player-card__host");
             identity.Add(role);
             card.Add(identity);
@@ -488,6 +610,9 @@ namespace SlopArena.Client.UI
         // ── Shared ──
         private void AddTrainingMarker()
         {
+            foreach (var button in _gridButtons)
+                button.Q<VisualElement>("char-markers")?.Clear();
+
             var card = _uiDocument.rootVisualElement.Q<Button>($"char-{_selected}");
             var markers = card?.Q<VisualElement>("char-markers");
             if (markers == null) return;
@@ -502,24 +627,27 @@ namespace SlopArena.Client.UI
 
         private void SelectCharacter(CharacterClass cls, VisualElement root)
         {
+            if (cls == CharacterClass.None)
+                return;
+
             _selected = cls;
+            if (MatchConfig.Mode == GameMode.Solo && _selectingCpu)
+                MatchConfig.SoloBotClass = cls;
+            else
+                MatchConfig.PlayerClass = cls;
 
-            foreach (var btn in _gridButtons)
-            {
-                btn.RemoveFromClassList("char-card--selected");
-                if (btn.name == $"char-{cls}")
-                    btn.AddToClassList("char-card--selected");
-            }
-
-            root.Q<Label>("char-name").text = cls.ToString().ToUpper();
-            root.Q<Label>("char-role").text =
-                RolePhrases.TryGetValue(cls, out var role) ? role : "FIGHTER / UNKNOWN";
+            UpdateSelectionVisuals(cls, root);
             if (MatchConfig.Mode == GameMode.Training && _rosterPanel != null)
+            {
                 RenderTrainingRoster();
-            else if (MatchConfig.Mode == GameMode.Solo && _rosterPanel != null)
-                RenderSoloRoster();
-
+                AddTrainingMarker();
             }
+            else if (MatchConfig.Mode == GameMode.Solo && _rosterPanel != null)
+            {
+                RenderSoloRoster();
+                SetSelectionTarget(root, _selectingCpu);
+            }
+        }
 
         private void RenderCardMarkers()
         {

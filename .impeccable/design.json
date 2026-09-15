@@ -37,8 +37,8 @@
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Compressed Display",
-        "purpose": "One dominant declaration: title, result, fighter name, or major state change."
+        "displayName": "Playful Display",
+        "purpose": "Bundled Baloo 2 makes one dominant pre-match declaration; compact Unity UI type carries utility text."
       },
       "label": {
         "displayName": "Utility Label",
@@ -48,12 +48,12 @@
     "shadows": [
       {
         "name": "title-offset",
-        "value": "10px 55px 0 #E05C2A",
+        "value": "7px 7px 0 #E05C2A",
         "purpose": "Hard printed offset behind the main display title."
       },
       {
         "name": "structural-edge",
-        "value": "0 8px 0 #0D0D14",
+        "value": "0 6px 0 #0D0D14",
         "purpose": "Bottom edge that gives primary controls a stamped, pressable silhouette."
       }
     ],
@@ -76,7 +76,7 @@
       "keyCharacteristics": [
         "Underground fight-poster energy with disciplined hierarchy.",
         "Square geometry, heavy borders, and offset physical layering.",
-        "Compressed uppercase display type paired with compact utility labels.",
+        "Rounded, heavy display type paired with compact utility labels.",
         "Characters treated as graphic cutouts.",
         "Dry self-aware copy that never obscures status."
       ],
@@ -116,7 +116,7 @@
       "refersTo": "button-primary",
       "description": "Acid, square, bordered, and physically pressable.",
       "html": "<button class=\"ds-btn-primary\">JOIN A FIGHT</button>",
-      "css": ".ds-btn-primary { background:#FFC821; color:#17131B; border:3px solid #0D0D14; border-bottom-width:8px; padding:0 18px; height:60px; font-weight:700; letter-spacing:2px; text-transform:uppercase; } .ds-btn-primary:hover,.ds-btn-primary:focus { background:#FFD95C; border-color:#FFC821; transform:translateY(-2px); } .ds-btn-primary:active { transform:translateY(3px); }"
+      "css": ".ds-btn-primary { background:#FFC821; color:#17131B; border:2px solid #0D0D14; border-bottom-width:6px; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-primary:hover,.ds-btn-primary:focus-visible { background:#FFD95C; border-color:#F0EEE8; transform:translateY(-2px); } .ds-btn-primary:active { transform:translateY(3px); }"
     },
     {
       "name": "Hot Button",
@@ -124,7 +124,7 @@
       "refersTo": "button-hot",
       "description": "Combat-orange action for host, join, or other high-energy paths.",
       "html": "<button class=\"ds-btn-hot\">HOST A MATCH</button>",
-      "css": ".ds-btn-hot { background:#E05C2A; color:#F0EEE8; border:3px solid #0D0D14; border-bottom-width:8px; padding:0 18px; height:60px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }"
+      "css": ".ds-btn-hot { background:#E05C2A; color:#17131B; border:2px solid #0D0D14; border-bottom-width:6px; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-hot:hover,.ds-btn-hot:focus-visible { background:#FF7650; border-color:#FFC821; transform:translateY(-2px); } .ds-btn-hot:active { transform:translateY(3px); }"
     },
     {
       "name": "Broadcast Status Pill",

@@ -1,5 +1,7 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -10,130 +12,190 @@ using SlopArena.Client;
 
 namespace SlopArena.Client.UI
 {
-    /// <summary>
-    /// Lobby room screen driven by the SignalR <see cref="LobbyClient"/>
-    /// (ADR-0008, issue #33). Reached from the Server Browser after joining a
-    /// game server: shows the live player list pushed by the master server's
-    /// <c>LobbyHub</c>, lets the host start the match, and lets anyone leave.
-    /// </summary>
+    /// <summary>Live lobby room driven by the existing master-server lobby connection.</summary>
     public class LobbyRoomUI : MonoBehaviour
     {
         private const int MaxSlots = 4;
+        private const float LobbyTimeoutSeconds = 12f;
 
         [SerializeField] private UIDocument _uiDocument;
 
-        private LobbyClient _lobby;
-        private VisualElement _playerList;
-        private Button _btnStart;
-        private Button _btnLeave;
-        private Label _lblStatus;
-        private Label _lblServer;
-
-        private LobbySnapshot _snapshot;
+        private LobbyClient? _lobby;
+        private VisualElement? _playerList;
+        private Button? _btnStart;
+        private Button? _btnLeave;
+        private Button? _btnRetry;
+        private Button? _backButton;
+        private Label? _lblStatus;
+        private Label? _lblServer;
+        private LobbySnapshot? _snapshot;
+        private CancellationTokenSource? _lifecycleCts;
+        private Coroutine? _lobbyWatchdog;
+        private Coroutine? _startWatchdog;
+        private bool _alive;
+        private bool _awaitingLobby;
+        private bool _startPending;
+        private bool _leaving;
+        private int _attempt;
 
         private void OnEnable()
         {
+            _alive = true;
+            _leaving = false;
+            _lifecycleCts = new CancellationTokenSource();
+            int generation = ++_attempt;
             var root = _uiDocument.rootVisualElement;
             _playerList = root.Q<VisualElement>("player-list");
-            _btnStart    = root.Q<Button>("btn-start");
-            _btnLeave    = root.Q<Button>("btn-leave");
-            _lblStatus   = root.Q<Label>("lbl-status");
-            _lblServer   = root.Q<Label>("lbl-server");
+            _btnStart = root.Q<Button>("btn-start");
+            _btnLeave = root.Q<Button>("btn-leave");
+            _btnRetry = root.Q<Button>("btn-retry");
+            _backButton = root.Q<Button>("btn-back");
+            _lblStatus = root.Q<Label>("lbl-status");
+            _lblServer = root.Q<Label>("lbl-server");
 
-            _lblServer.text = string.IsNullOrEmpty(ClientSession.SelectedServerName)
-                ? ClientSession.SelectedServerId.ToString()
-                : ClientSession.SelectedServerName;
-
-            var btnBack = root.Q<Button>("btn-back");
-            btnBack.clicked += Leave;
-
-            _btnLeave.clicked += Leave;
-            _btnStart.clicked += OnStartClicked;
-            _btnStart.style.display = DisplayStyle.None; // shown once we learn we're host
-
-        RenderPlayers();
-
-        if (string.IsNullOrEmpty(ClientSession.AuthToken))
-        {
-            _lblStatus.text = "Not authenticated. Returning to server browser.";
-            SceneManager.LoadScene("ServerBrowser");
-            return;
-        }
-
-        // Create or reuse the lobby connection so it survives the scene
-        // transition to CharSelect (issue #34).
-        _lobby = ClientSession.ActiveLobby ??= new LobbyClient(
-            ClientSession.MasterServerUrl, ClientSession.AuthToken);
-
-        _lobby.Connected    += OnConnected;
-        _lobby.PlayerJoined += OnPlayerJoined;
-        _lobby.PlayerLeft   += OnPlayerLeft;
-        _lobby.LobbyUpdated += OnLobbyUpdated;
-        _lobby.MatchStarting += OnMatchStarting;
-        _lobby.Error        += OnError;
-        _lobby.Disconnected += OnDisconnected;
-
-        if (_lobby.IsConnected)
-        {
-            // Already connected (e.g. returning from CharSelect) — just re-join.
-            _lblStatus.text = "Connected.";
-            _ = _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
-        }
-        else
-        {
-            _lblStatus.text = "Connecting to lobby...";
-            ConnectAndJoin();
-        }
-
-        }
-        private async void ConnectAndJoin()
-        {
-            bool ok = await _lobby.ConnectAsync();
-            if (!ok)
+            if (_lblServer != null)
+                _lblServer.text = string.IsNullOrEmpty(ClientSession.SelectedServerName)
+                    ? ClientSession.SelectedServerId.ToString()
+                    : ClientSession.SelectedServerName;
+            if (_backButton != null) _backButton.clicked += Leave;
+            if (_btnLeave != null) _btnLeave.clicked += Leave;
+            if (_btnRetry != null)
             {
-                _lblStatus.text = "Could not reach the master server.";
+                _btnRetry.clicked += RetryConnection;
+                _btnRetry.style.display = DisplayStyle.None;
+            }
+            if (_btnStart != null)
+            {
+                _btnStart.clicked += OnStartClicked;
+                _btnStart.style.display = DisplayStyle.None;
+            }
+            // Leave is always visible; never focus a hidden recovery action first.
+            MenuNavigation.Configure(root, _btnLeave ?? _btnStart ?? _btnRetry, Leave);
+
+            RenderPlayers();
+            if (string.IsNullOrEmpty(ClientSession.AuthToken))
+            {
+                SetStatus("Your room session expired. Return to the browser to reconnect.", true);
+                SetRetryVisible(false);
                 return;
             }
-            await _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+
+            _lobby = ClientSession.ActiveLobby ??= new LobbyClient(
+                ClientSession.MasterServerUrl, ClientSession.AuthToken);
+            SubscribeLobby(_lobby);
+            _awaitingLobby = true;
+            SetStatus(_lobby.IsConnected ? "Rejoining the room…" : "Connecting to the room…", false);
+            SetRetryVisible(false);
+            StartLobbyWatchdog(generation);
+            ConnectAndJoin(generation, _lifecycleCts.Token);
         }
 
-        private void Update()
+        private void SubscribeLobby(LobbyClient lobby)
         {
-            // Marshals hub events from background threads onto the Unity main thread.
-            _lobby?.Pump();
+            lobby.Connected += OnConnected;
+            lobby.PlayerJoined += OnPlayerJoined;
+            lobby.PlayerLeft += OnPlayerLeft;
+            lobby.LobbyUpdated += OnLobbyUpdated;
+            lobby.MatchStarting += OnMatchStarting;
+            lobby.Error += OnError;
+            lobby.Disconnected += OnDisconnected;
         }
 
-        // ── Hub event handlers (fired on main thread via Pump) ──
+        private async void ConnectAndJoin(int generation, CancellationToken ct)
+        {
+            if (_lobby == null)
+                return;
+            try
+            {
+                bool connected = _lobby.IsConnected || await _lobby.ConnectAsync();
+                if (!IsCurrent(generation, ct)) return;
+                if (!connected)
+                {
+                    FailLobby("Couldn’t connect to the room directory. Retry, or return to the server browser.");
+                    return;
+                }
+
+                await _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+                if (!IsCurrent(generation, ct)) return;
+                SetStatus("Connected. Waiting for the room roster…", false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[LobbyRoom] Connection failed: {ex.Message}");
+                if (IsCurrent(generation, ct))
+                    FailLobby("Couldn’t join this room. Retry, or return to the server browser.");
+            }
+        }
+
+        private void StartLobbyWatchdog(int generation)
+        {
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            _lobbyWatchdog = StartCoroutine(LobbyWatchdog(generation));
+        }
+
+        private System.Collections.IEnumerator LobbyWatchdog(int generation)
+        {
+            yield return new WaitForSeconds(LobbyTimeoutSeconds);
+            if (_alive && generation == _attempt && _awaitingLobby)
+                FailLobby("The room did not answer in time. Retry the connection or return to the browser.");
+        }
+
+        private void RetryConnection()
+        {
+            if (!_alive || _leaving)
+                return;
+            _attempt++;
+            if (_lobby != null)
+            {
+                UnsubscribeLobby(_lobby);
+                _ = _lobby.DisconnectAsync();
+            }
+            _lobby = new LobbyClient(ClientSession.MasterServerUrl, ClientSession.AuthToken!);
+            ClientSession.ActiveLobby = _lobby;
+            SubscribeLobby(_lobby);
+            _awaitingLobby = true;
+            _startPending = false;
+            SetRetryVisible(false);
+            SetStatus("Retrying the room connection…", false);
+            StartLobbyWatchdog(_attempt);
+            ConnectAndJoin(_attempt, _lifecycleCts!.Token);
+        }
+
+        private void Update() => _lobby?.Pump();
 
         private void OnConnected()
         {
-            _lblStatus.text = "Connected.";
+            if (!_alive || !_awaitingLobby) return;
+            SetStatus("Connected. Waiting for the room roster…", false);
         }
 
-        // PlayerJoined/PlayerLeft are surfaced separately; LobbyUpdated is the
-        // authoritative snapshot, so these just log — they let a later ticket
-        // animate join/leave without waiting for the full snapshot.
         private void OnPlayerJoined(LobbyPlayerInfo player)
         {
-            Debug.Log($"[LobbyRoom] {player.Name} (SteamId {player.SteamId}) joined.");
+            if (_alive)
+                Debug.Log($"[LobbyRoom] {player.Name} (SteamId {player.SteamId}) joined.");
         }
 
         private void OnPlayerLeft(long steamId)
         {
-            Debug.Log($"[LobbyRoom] SteamId {steamId} left.");
+            if (_alive)
+                Debug.Log($"[LobbyRoom] SteamId {steamId} left.");
         }
+
         private void OnLobbyUpdated(LobbySnapshot snapshot)
         {
+            if (!_alive) return;
+            _awaitingLobby = false;
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
             _snapshot = snapshot;
+            SetRetryVisible(false);
             RenderPlayers();
         }
 
         private void OnMatchStarting(MatchStartingConfig config)
         {
-            Debug.Log($"[LobbyRoom] Match starting on server {config.ServerId} with {config.Players.Count} players.");
-            // Stash the roster so CharSelectController has the player list
-            // immediately on scene load, before the first LobbyUpdated push
-            // arrives (issue #34).
+            if (!_alive || _leaving) return;
+            _awaitingLobby = false;
             ClientSession.LobbyRoster = new LobbySnapshot(config.ServerId, config.Players);
             MatchConfig.Mode = GameMode.PvP;
             SceneManager.LoadScene("CharSelect");
@@ -141,118 +203,194 @@ namespace SlopArena.Client.UI
 
         private void OnError(string message)
         {
-            _lblStatus.text = message;
+            if (!_alive) return;
+            if (_startPending)
+            {
+                _startPending = false;
+                if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+                RenderPlayers();
+            }
+            FailLobby(string.IsNullOrWhiteSpace(message)
+                ? "The room rejected that request. Retry, or return to the browser."
+                : message);
         }
 
-        private void OnDisconnected(System.Exception ex)
+        private void OnDisconnected(Exception? ex)
         {
-            _lblStatus.text = ex == null ? "Disconnected." : $"Disconnected: {ex.Message}";
+            if (!_alive) return;
+            if (_startPending)
+            {
+                _startPending = false;
+                if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+                RenderPlayers();
+            }
+            _awaitingLobby = true;
+            SetRetryVisible(true);
+            SetStatus(ex == null
+                ? "The room connection closed. Retry, or return to the browser."
+                : "The room connection dropped. Retry, or return to the browser.", true);
         }
-
-        // ── UI ──
 
         private void OnStartClicked()
         {
-            _btnStart.SetEnabled(false);
-            _lblStatus.text = "Starting match...";
-            _ = _lobby.HostStartAsync();
+            if (!_alive || _lobby == null || _startPending || !_lobby.IsConnected)
+                return;
+            _startPending = true;
+            _btnStart?.SetEnabled(false);
+            SetStatus("Starting the match…", false);
+            if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+            _startWatchdog = StartCoroutine(StartWatchdog());
+            _ = StartMatchRequest();
+        }
+
+        private async Task StartMatchRequest()
+        {
+            try { await _lobby!.HostStartAsync(); }
+            catch (Exception ex)
+            {
+                if (_alive) OnError($"Couldn’t start the match: {ex.Message}");
+            }
+        }
+
+        private System.Collections.IEnumerator StartWatchdog()
+        {
+            yield return new WaitForSeconds(LobbyTimeoutSeconds);
+            if (_alive && _startPending)
+            {
+                _startPending = false;
+                RenderPlayers();
+                SetStatus("The match did not start in time. Check the room, then try again.", true);
+            }
         }
 
         private void RenderPlayers()
         {
+            if (_playerList == null) return;
             _playerList.Clear();
-
-            var players = _snapshot?.Players ?? System.Array.Empty<LobbyPlayerInfo>();
+            var players = _snapshot?.Players ?? Array.Empty<LobbyPlayerInfo>();
             bool isLocalHost = false;
             for (int i = 0; i < players.Count; i++)
-            {
-                if (players[i].SteamId == ClientSession.SteamId && players[i].IsHost)
-                    isLocalHost = true;
-            }
+                isLocalHost |= players[i].SteamId == ClientSession.SteamId && players[i].IsHost;
 
             for (int i = 0; i < MaxSlots; i++)
                 _playerList.Add(CreateSlot(i, players));
 
-            // Start button: host-only, enabled with 2+ players.
+            if (_btnStart != null)
+            {
+                _btnStart.style.display = isLocalHost ? DisplayStyle.Flex : DisplayStyle.None;
+                _btnStart.SetEnabled(isLocalHost && players.Count >= 2 && !_startPending);
+            }
             if (isLocalHost)
-            {
-                _btnStart.style.display = DisplayStyle.Flex;
-                _btnStart.SetEnabled(players.Count >= 2);
-            }
-            else
-            {
-                _btnStart.style.display = DisplayStyle.None;
-            }
-
-            if (!isLocalHost && players.Count > 0)
-                _lblStatus.text = "Waiting for host to start...";
+                SetStatus(players.Count >= 2 ? "Your room is ready. Start when everyone is here." : "Waiting for another player to join…", false);
+            else if (players.Count > 0)
+                SetStatus("Connected. Waiting for the host to start…", false);
         }
 
         private VisualElement CreateSlot(int index, IReadOnlyList<LobbyPlayerInfo> players)
         {
-            var slot = new VisualElement();
+            var slot = new VisualElement { name = "player-slot" };
             slot.AddToClassList("player-slot");
-
             var slotIndex = new Label($"P{index + 1}") { name = "slot-index" };
             slotIndex.AddToClassList("slot-index");
-
-        var name = new Label { name = "slot-name" };
-        name.AddToClassList("slot-name");
-
-        if (index < players.Count)
-        {
-            var p = players[index];
-            name.text = p.Name;
-
-            if (p.IsHost)
+            var name = new Label("Open slot") { name = "slot-name" };
+            name.AddToClassList("slot-name");
+            if (index < players.Count)
             {
-                var badge = new Label("HOST") { name = "host-badge" };
-                badge.AddToClassList("host-badge");
-                slot.Add(badge);
+                var player = players[index];
+                name.text = player.Name;
+                if (player.IsHost)
+                {
+                    var badge = new Label("HOST") { name = "host-badge" };
+                    badge.AddToClassList("host-badge");
+                    slot.Add(badge);
+                }
             }
-        }
-
-        slot.Add(slotIndex);
-        slot.Add(name);
+            slot.Add(slotIndex);
+            slot.Add(name);
             return slot;
         }
 
-        private async void Leave()
+        private void FailLobby(string message)
         {
-            // The host owns the embedded server subprocess (ADR-0005): backing
-            // out of the lobby must stop it, or the orphaned server keeps
-            // running and stays registered (issue #48). Non-hosts never touch
-            // it — MatchConfig.IsHost is the authoritative flag, not the roster.
+            if (!_alive) return;
+            _attempt++;
+            _awaitingLobby = false;
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            SetStatus(message, true);
+            SetRetryVisible(true);
+        }
+
+        private void SetStatus(string message, bool error)
+        {
+            if (_lblStatus == null) return;
+            _lblStatus.text = message;
+            if (error) _lblStatus.AddToClassList("error");
+            else _lblStatus.RemoveFromClassList("error");
+        }
+
+        private void SetRetryVisible(bool visible)
+        {
+            if (_btnRetry == null) return;
+            _btnRetry.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            _btnRetry.SetEnabled(visible && !_leaving);
+        }
+
+        private bool IsCurrent(int generation, CancellationToken ct) =>
+            _alive && !_leaving && generation == _attempt && !ct.IsCancellationRequested;
+
+        private void Leave()
+        {
+            if (!_alive || _leaving) return;
+            _leaving = true;
+            _alive = false;
+            _attempt++;
+            _lifecycleCts?.Cancel();
             if (MatchConfig.IsHost)
                 ServerHost.Instance?.Stop();
-
             if (_lobby != null)
-            {
-                try { await _lobby.LeaveLobbyAsync(); } catch { /* best effort */ }
-                await _lobby.DisconnectAsync();
-            }
+                _ = LeaveRoomAsync(_lobby);
             ClientSession.ActiveLobby = null;
             SceneManager.LoadScene("ServerBrowser");
         }
 
+        private static async Task LeaveRoomAsync(LobbyClient lobby)
+        {
+            try
+            {
+                await Task.WhenAny(lobby.LeaveLobbyAsync(), Task.Delay(2000));
+                await lobby.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[LobbyRoom] Room teardown failed: {ex.Message}");
+            }
+        }
+
         private void OnDisable()
         {
-            _btnStart.clicked -= OnStartClicked;
-            _btnLeave.clicked -= Leave;
-            if (_lobby != null)
-            {
-                // Unsubscribe our handlers but keep the connection alive —
-                // the lobby connection persists across the LobbyRoom → CharSelect
-                // transition via ClientSession.ActiveLobby (issue #34). The
-                // connection is only torn down on Leave (back to ServerBrowser).
-                _lobby.Connected    -= OnConnected;
-                _lobby.PlayerJoined -= OnPlayerJoined;
-                _lobby.PlayerLeft   -= OnPlayerLeft;
-                _lobby.LobbyUpdated -= OnLobbyUpdated;
-                _lobby.MatchStarting -= OnMatchStarting;
-                _lobby.Error        -= OnError;
-                _lobby.Disconnected -= OnDisconnected;
-            }
+            _alive = false;
+            _attempt++;
+            _lifecycleCts?.Cancel();
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+            if (_backButton != null) _backButton.clicked -= Leave;
+            if (_btnLeave != null) _btnLeave.clicked -= Leave;
+            if (_btnRetry != null) _btnRetry.clicked -= RetryConnection;
+            if (_btnStart != null) _btnStart.clicked -= OnStartClicked;
+            if (_lobby != null) UnsubscribeLobby(_lobby);
+            _lifecycleCts?.Dispose();
+            _lifecycleCts = null;
+        }
+
+        private void UnsubscribeLobby(LobbyClient lobby)
+        {
+            lobby.Connected -= OnConnected;
+            lobby.PlayerJoined -= OnPlayerJoined;
+            lobby.PlayerLeft -= OnPlayerLeft;
+            lobby.LobbyUpdated -= OnLobbyUpdated;
+            lobby.MatchStarting -= OnMatchStarting;
+            lobby.Error -= OnError;
+            lobby.Disconnected -= OnDisconnected;
         }
     }
 }

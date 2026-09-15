@@ -12,6 +12,31 @@ It does not prescribe one layout. New work should preserve the identity while ad
 
 The separate [Art and Asset Conventions](../contributing/conventions.md) remain authoritative for 3D character rendering, source assets, animation naming, licensing, and package hygiene. The two guides meet at readability, palette, silhouette, and presentation tone.
 
+## Native pre-match flow
+
+The Unity implementation lives in `Assets/UI/SlopArena.uss` and the Main Menu, Server Browser,
+Lobby Room, Character Select, and Stage Select UXML screens. The menu uses the bundled
+Baloo 2 display face through `Assets/Fonts/Baloo2.asset`; utility text retains Unity's UI
+face. Ink, paper, acid, and orange carry the fight-flyer identity without tactical grit
+or invented social activity.
+
+- **Main Menu:** Play Online, Solo vs CPU, and Training are distinct actions. The roster
+  comes from the admitted cooked catalog, not a decorative or hard-coded online count.
+- **Online:** browsing, hosting, and Join by Address converge on the registered room
+  session before fighter and stage selection. Address entry accepts IPv4 plus an
+  optional port; it still requires the room directory. It is not an offline bypass.
+- **Solo:** player and CPU selection are independent, with explicit edit targets and
+  Easy/Normal/Hard controls. Returning from Stage Select preserves both fighters and difficulty.
+- **Training:** Enter Training launches the fixed training arena directly. It does not
+  reuse a misleading stage-selection confirmation label.
+- **Stages:** cards show rendered previews of the actual project prefabs. Kistu and Bonk
+  portraits likewise come from existing character prefabs; image metadata records provenance.
+- **Recovery:** focus is visible; Cancel closes address entry before leaving the browser.
+  Directory, host, and room failures present a retry or a route back rather than an
+  indefinite connecting label. Empty player slots are not presented as connected players.
+
+Results and in-match HUD presentation are outside this pre-match refresh.
+
 ## One-sentence definition
 
 > Underground fight-poster energy filtered through a playful, self-aware prototype: uneven and handmade, but structured enough to stay readable and cool.

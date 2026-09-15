@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
@@ -8,7 +9,7 @@ using SlopArena.Client.Network;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Stage select for Training and PvP. The stage registry remains file-driven;
+    /// Stage select for Training, Solo, and PvP. The stage registry remains file-driven;
     /// this screen owns only presentation and the existing start-match flow.
     /// </summary>
     public class StageSelectController : MonoBehaviour
@@ -24,26 +25,47 @@ namespace SlopArena.Client.UI
 
         private void OnEnable()
         {
+            _selectedArena = "";
             var root = _uiDocument.rootVisualElement;
             var grid = root.Q<VisualElement>("stage-grid");
+            grid?.Clear();
             _btnConfirm = root.Q<Button>("btn-confirm");
             _lblSelectedStage = root.Q<Label>("lbl-selected-stage");
             _lblWaiting = root.Q<Label>("lbl-waiting");
             _playerCards = root.Q<VisualElement>("player-cards-area");
-            var btnBack = root.Q<Button>("btn-back");
 
-            bool isHost = MatchConfig.Mode != GameMode.PvP || ClientSession.IsLobbyHost;
-            _btnConfirm.style.display = DisplayStyle.None;
-            _lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
-            root.Q<Label>("lbl-host").text = isHost
-                ? "HOST PICKS THE BATTLEGROUND"
-                : "WAITING FOR HOST";
+            bool isOnline = MatchConfig.Mode == GameMode.PvP;
+            bool isHost = !isOnline || ClientSession.IsLobbyHost;
+            SetModeChrome(root, isOnline ? "ONLINE // SELECT STAGE" :
+                MatchConfig.Mode == GameMode.Solo ? "SOLO // SELECT STAGE" : "TRAINING // SELECT STAGE",
+                "STEP 2 OF 2  /  STAGE");
+            root.Q<Label>("subtitle").text = isHost
+                ? "CHOOSE YOUR BATTLEGROUND"
+                : "THE HOST WILL CHOOSE THE BATTLEGROUND";
+            root.Q<Label>("lbl-host").text = isOnline
+                ? (isHost ? "HOST CHOOSES THE STAGE" : "WAITING FOR HOST")
+                : MatchConfig.Mode == GameMode.Solo ? "YOU CHOOSE THE STAGE" : "CHOOSE A TRAINING STAGE";
+
+            if (_btnConfirm != null)
+            {
+                _btnConfirm.style.display = DisplayStyle.None;
+                _btnConfirm.text = MatchConfig.Mode == GameMode.Solo ? "START SOLO" :
+                    MatchConfig.Mode == GameMode.Training ? "START TRAINING" : "START MATCH";
+            }
+            if (_lblWaiting != null)
+            {
+                _lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
+                if (!isHost)
+                    _lblWaiting.text = "WAITING FOR HOST TO PICK A STAGE";
+            }
             RenderPlayerCards();
 
             string? arenaDir = BakedContentPaths.ArenaDirectory();
             if (arenaDir != null)
                 ArenaRegistry.LoadFromDirectory(arenaDir);
 
+            Button firstStageButton = null;
+            int stageCount = 0;
             foreach (var arena in ArenaRegistry.All)
             {
                 if (arena.Name == "training") continue;
@@ -63,28 +85,104 @@ namespace SlopArena.Client.UI
 
                 var swatch = new VisualElement();
                 swatch.AddToClassList("stage-swatch");
-                if (!string.IsNullOrEmpty(arena.PreviewColor) &&
+                var preview = Resources.Load<Texture2D>($"UI/Stages/{arena.Name}");
+                if (preview != null)
+                    swatch.style.backgroundImage = new StyleBackground(preview);
+                else if (!string.IsNullOrEmpty(arena.PreviewColor) &&
                     ColorUtility.TryParseHtmlString(arena.PreviewColor, out var swatchColor))
                     swatch.style.backgroundColor = swatchColor;
 
-                var label = new Label(arena.DisplayName ?? arena.Name.ToUpper());
+                var label = new Label(DisplayName(arena));
                 label.AddToClassList("stage-name");
                 card.Add(swatch);
                 card.Add(label);
                 card.SetEnabled(isHost);
-                grid.Add(card);
+                grid?.Add(card);
+                firstStageButton ??= card;
+                stageCount++;
             }
 
-            _lobby = MatchConfig.Mode == GameMode.PvP ? ClientSession.ActiveLobby : null;
+            if (stageCount == 0)
+            {
+                _selectedArena = "";
+                if (_lblSelectedStage != null)
+                    _lblSelectedStage.text = "NO STAGES AVAILABLE";
+                if (_lblWaiting != null)
+                {
+                    _lblWaiting.text = isHost
+                        ? "No admitted stages are available. Return to the menu."
+                        : "Waiting for host. No stage list is available.";
+                    _lblWaiting.style.display = DisplayStyle.Flex;
+                }
+                _btnConfirm?.SetEnabled(false);
+            }
+            else if (isHost && !string.IsNullOrEmpty(MatchConfig.ArenaName) &&
+                MatchConfig.ArenaName != "training" &&
+                grid?.Q<VisualElement>($"stage-{MatchConfig.ArenaName}") != null)
+            {
+                SelectStage(MatchConfig.ArenaName, root);
+            }
+
+            var btnBack = root.Q<Button>("btn-back");
+            Action back = BackToCharSelect;
+            if (btnBack != null)
+                btnBack.clicked += back;
+            Button initial = isHost && firstStageButton != null ? firstStageButton : btnBack;
+            if (initial != null)
+                MenuNavigation.Configure(root, initial, back);
+
+            _lobby = isOnline ? ClientSession.ActiveLobby : null;
             if (_lobby != null)
             {
                 _lobby.MatchStarted += OnMatchStarted;
                 _lobby.Error += OnError;
             }
 
-            _btnConfirm.clicked += OnConfirmClicked;
-            btnBack.clicked += () => SceneManager.LoadScene("CharSelect");
+            if (_btnConfirm != null)
+                _btnConfirm.clicked += OnConfirmClicked;
         }
+
+        private void Update() => _lobby?.Pump();
+
+        private void OnDisable()
+        {
+            if (_lobby != null)
+            {
+                _lobby.MatchStarted -= OnMatchStarted;
+                _lobby.Error -= OnError;
+                _lobby = null;
+            }
+            if (_btnConfirm != null) _btnConfirm.clicked -= OnConfirmClicked;
+        }
+
+        private static void SetModeChrome(VisualElement root, string title, string progress)
+        {
+            var titleLabel = root.Q<Label>("title");
+            if (titleLabel != null)
+                titleLabel.text = title;
+            var progressLabel = root.Q<Label>("flow-progress");
+            if (progressLabel != null)
+                progressLabel.text = progress;
+        }
+
+        private static string DisplayName(ArenaDefinition arena)
+        {
+            if (!string.IsNullOrWhiteSpace(arena.DisplayName))
+                return arena.DisplayName;
+            if (string.IsNullOrWhiteSpace(arena.Name))
+                return "UNKNOWN STAGE";
+
+            string[] words = arena.Name.Split('_');
+            for (int i = 0; i < words.Length; i++)
+            {
+                if (words[i].Length == 0) continue;
+                words[i] = char.ToUpperInvariant(words[i][0]) + words[i].Substring(1);
+            }
+            return string.Join(" ", words);
+        }
+
+        private static void BackToCharSelect()
+            => SceneManager.LoadScene("CharSelect");
 
         private void RenderPlayerCards()
         {
@@ -137,7 +235,9 @@ namespace SlopArena.Client.UI
             var number = new Label(playerNumber);
             number.AddToClassList("player-card__number");
             identity.Add(number);
-            var role = new Label(host ? "HOST" : "PLAYER");
+            var role = new Label(MatchConfig.Mode == GameMode.PvP
+                ? (host ? "HOST" : "PLAYER")
+                : (local ? "PLAYER" : "CPU"));
             role.AddToClassList("player-card__host");
             identity.Add(role);
             card.Add(identity);
@@ -171,19 +271,34 @@ namespace SlopArena.Client.UI
 
         private void OnConfirmClicked()
         {
-            if (string.IsNullOrEmpty(_selectedArena)) return;
-            MatchConfig.ArenaName = _selectedArena;
+            if (string.IsNullOrEmpty(_selectedArena))
+            {
+                if (_lblWaiting != null)
+                {
+                    _lblWaiting.text = "Choose a stage before starting.";
+                    _lblWaiting.style.display = DisplayStyle.Flex;
+                }
+                return;
+            }
 
+            MatchConfig.ArenaName = _selectedArena;
             if (MatchConfig.Mode is GameMode.Training or GameMode.Solo)
             {
                 SceneManager.LoadScene("Arena_Offline");
                 return;
             }
 
-            _btnConfirm.SetEnabled(false);
+            _btnConfirm?.SetEnabled(false);
+            if (_lblWaiting != null)
+            {
+                _lblWaiting.text = "STARTING MATCH…";
+                _lblWaiting.style.display = DisplayStyle.Flex;
+            }
             if (_lobby == null)
             {
                 Debug.LogError("[StageSelect] PvP mode but no lobby connection. Returning to server browser.");
+                if (_lblWaiting != null)
+                    _lblWaiting.text = "No lobby connection. Returning to server browser.";
                 SceneManager.LoadScene("ServerBrowser");
                 return;
             }
@@ -203,34 +318,43 @@ namespace SlopArena.Client.UI
 
         private void OnError(string message)
         {
-            _btnConfirm.SetEnabled(true);
+            _btnConfirm?.SetEnabled(true);
+            if (_lblWaiting != null)
+            {
+                _lblWaiting.text = $"COULD NOT START MATCH: {message}";
+                _lblWaiting.style.display = DisplayStyle.Flex;
+            }
             Debug.LogWarning($"[StageSelect] PvP error: {message}");
         }
-
-        private void Update() => _lobby?.Pump();
-
-        private void OnDisable()
-        {
-            if (_lobby != null)
-            {
-                _lobby.MatchStarted -= OnMatchStarted;
-                _lobby.Error -= OnError;
-            }
-        }
-
         private void SelectStage(string name, VisualElement root)
         {
+            if (MatchConfig.Mode == GameMode.PvP && !ClientSession.IsLobbyHost)
+                return;
+
             _selectedArena = name;
-            foreach (var card in root.Q<VisualElement>("stage-grid").Children())
+            MatchConfig.ArenaName = name;
+            var grid = root.Q<VisualElement>("stage-grid");
+            if (grid != null)
             {
-                card.RemoveFromClassList("stage-card--selected");
-                if (card.name == $"stage-{name}")
-                    card.AddToClassList("stage-card--selected");
+                foreach (var card in grid.Children())
+                {
+                    card.RemoveFromClassList("stage-card--selected");
+                    if (card.name == $"stage-{name}")
+                        card.AddToClassList("stage-card--selected");
+                }
             }
 
-            _lblSelectedStage.text = $"STAGE: {name.Replace('_', ' ').ToUpperInvariant()}";
-            _lblWaiting.style.display = DisplayStyle.None;
-            _btnConfirm.style.display = DisplayStyle.Flex;
+            ArenaDefinition? arena = ArenaRegistry.Get(name);
+            string label = arena.HasValue ? DisplayName(arena.Value) : name.Replace('_', ' ');
+            if (_lblSelectedStage != null)
+                _lblSelectedStage.text = $"STAGE SELECTED: {label.ToUpperInvariant()}";
+            if (_lblWaiting != null)
+                _lblWaiting.style.display = DisplayStyle.None;
+            if (_btnConfirm != null)
+            {
+                _btnConfirm.style.display = DisplayStyle.Flex;
+                _btnConfirm.SetEnabled(true);
+            }
         }
     }
 }

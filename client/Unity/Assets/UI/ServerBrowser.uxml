@@ -1,41 +1,59 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
     <ui:VisualElement name="root" class="screen server-browser-screen">
-        <ui:VisualElement class="server-browser-backdrop">
-            <ui:VisualElement class="backdrop-grid" />
-            <ui:VisualElement class="backdrop-burst backdrop-burst--orange" />
-            <ui:VisualElement class="backdrop-burst backdrop-burst--yellow" />
-            <ui:Label text="FIND A CREW. START A MESS." class="backdrop-note backdrop-note--right" />
-        </ui:VisualElement>
-        <ui:Button name="btn-back" text="← BACK" class="btn-back server-browser-back" />
-        <ui:Label text="ONLINE // SERVER BROWSER" class="server-browser-eyebrow" />
-        <ui:Label name="title" text="SERVER BROWSER" class="server-browser-title" />
-        <ui:Label text="FIND A MATCH WORTH JOINING" class="server-browser-subtitle" />
-        <ui:VisualElement name="browser-panel" class="browser-panel" style="align-self: auto; align-items: stretch; justify-content: flex-start; position: absolute; bottom: 609px; right: 836px; width: 737px; top: 283px; left: 395px;">
-            <ui:VisualElement class="browser-panel__header">
-                <ui:Label text="ACTIVE ARENAS" class="browser-panel__eyebrow" />
-                <ui:Label text="PUBLIC ROOMS" class="browser-panel__capacity" />
-            </ui:VisualElement>
-            <ui:VisualElement name="server-list" class="server-list" />
-            <ui:Label name="lbl-status" text="Loading..." class="browser-status" />
-            <ui:VisualElement class="browser-panel__footer">
-                <ui:Label text="REFRESH THE LIST TO SCAN AGAIN" class="browser-hint" />
-                <ui:Button name="btn-refresh" text="REFRESH" class="btn-primary browser-refresh" />
+        <ui:VisualElement name="backdrop" class="server-browser-backdrop" />
+        <ui:VisualElement name="flow-header" class="flow-header">
+            <ui:Button name="btn-back" text="BACK" class="btn-back" />
+            <ui:VisualElement class="flow-header-copy">
+                <ui:Label text="ONLINE PLAY" class="flow-eyebrow" />
+                <ui:Label name="title" text="SERVER BROWSER" class="flow-title" />
+                <ui:Label text="Find a room, or make one for the crew." class="flow-subtitle" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="global-chat" class="global-chat browser-chat" style="-unity-slice-scale: 1px; rotate: 0;">
-            <ui:VisualElement name="VisualElement" class="global-chat__header">
-                <ui:Label text="GLOBAL CHAT" class="global-chat__title" />
-                <ui:Label text="1,204 ONLINE" class="global-chat__online" />
+        <ui:VisualElement name="browser-layout" class="browser-layout">
+            <ui:VisualElement name="browser-panel" class="browser-panel">
+                <ui:VisualElement class="browser-panel__header">
+                    <ui:Label text="ROOMS TO JOIN" class="panel-title" />
+                    <ui:Label text="PUBLIC LIST" class="panel-note" />
+                </ui:VisualElement>
+                <ui:Label name="lbl-status" text="Loading the room list…" class="browser-status" />
+                <ui:ScrollView name="server-list" class="server-list" mode="Vertical" horizontal-scroller-visibility="Hidden" />
+                <ui:VisualElement class="browser-panel__footer">
+                    <ui:Label text="Nothing here? Refresh, host, or use an address." class="browser-hint" />
+                    <ui:Button name="btn-refresh" text="REFRESH" class="btn-secondary browser-refresh" />
+                </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement name="chat-feed" class="global-chat__feed">
-                <ui:Label text="BonkLord: gg wp anyone up for 2v2?" class="global-chat__message" />
-                <ui:Label text="slopqueen: ranked when??" class="global-chat__message global-chat__message--accent" />
-                <ui:Label text="dude420: host is up, join fast" class="global-chat__message global-chat__message--hot" />
+            <ui:VisualElement name="browser-tools" class="browser-tools">
+                <ui:VisualElement name="host-panel" class="browser-tool browser-host-panel">
+                    <ui:Label text="MAKE A ROOM" class="panel-title" />
+                    <ui:Label text="Start the room here, then invite your friends with the address." class="tool-copy" />
+                    <ui:Label text="PUBLIC ADDRESS (OPTIONAL)" class="field-label" />
+                    <ui:TextField name="host-ip-field" placeholdertext="auto-detect" class="browser-input" />
+                    <ui:Label text="Leave blank to advertise the server's detected address." class="field-help" />
+                    <ui:Label name="lbl-host-status" class="host-status" />
+                    <ui:VisualElement class="host-actions">
+                        <ui:Button name="btn-host-cancel" text="CANCEL HOST" class="btn-secondary host-cancel" style="display: none;" />
+                        <ui:Button name="btn-host" text="HOST MATCH" class="btn-hot" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="direct-connect-panel" class="browser-tool browser-direct-panel">
+                    <ui:Label text="JOIN BY ADDRESS" class="panel-title" />
+                    <ui:Label text="Have a registered server address from a friend? Enter it directly." class="tool-copy" />
+                    <ui:Button name="btn-direct-connect" text="JOIN BY ADDRESS" class="btn-secondary" />
+                </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement class="global-chat__input-row">
-                <ui:TextField name="chat-input" placeholdertext="type here…" class="global-chat__input" />
-                <ui:Button name="chat-send" text="➜" class="global-chat__send" />
+        </ui:VisualElement>
+        <ui:VisualElement name="direct-connect-modal" class="direct-connect-modal" style="display: none;">
+            <ui:VisualElement class="direct-connect-card">
+                <ui:Label text="JOIN BY ADDRESS" class="direct-connect-title" />
+                <ui:Label text="Find a registered server by its IPv4 address." class="direct-connect-copy" />
+                <ui:Label text="SERVER ADDRESS" class="field-label" />
+                <ui:TextField name="ip-field" value="127.0.0.1" placeholdertext="192.168.1.20:9876" class="direct-connect-input" />
+                <ui:Label name="direct-connect-status" class="direct-connect-status" />
+                <ui:VisualElement class="direct-connect-actions">
+                    <ui:Button name="btn-modal-close" text="CANCEL" class="btn-secondary" />
+                    <ui:Button name="btn-join" text="JOIN FIGHT" class="btn-hot" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

@@ -13,11 +13,10 @@ colors:
   highlight: "#FFFFFF"
 typography:
   display:
-    fontFamily: "Unity UI default sans-serif"
-    fontSize: "92px"
+    fontFamily: "Baloo 2"
+    fontSize: "148px"
     fontWeight: 700
-    lineHeight: 0.82
-    letterSpacing: "-5px"
+    letterSpacing: "-4px"
   label:
     fontFamily: "Unity UI default sans-serif"
     fontSize: "12px"
@@ -36,13 +35,13 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
     padding: "18px"
-    height: "60px"
+    height: "56px"
   button-hot:
     backgroundColor: "{colors.combat-orange}"
-    textColor: "{colors.paper}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.none}"
     padding: "18px"
-    height: "60px"
+    height: "56px"
   status-pill:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
@@ -63,7 +62,7 @@ The governing voice is **cool first, joke second**. A screen must work as a figh
 **Key Characteristics:**
 - Underground fight-poster energy with disciplined hierarchy.
 - Square geometry, heavy borders, and offset physical layering.
-- Compressed uppercase display type paired with compact utility labels.
+- Rounded, heavy display type paired with compact utility labels.
 - Characters treated as graphic cutouts, not decorative wallpaper.
 - Dry, self-aware copy that never obscures an action or status.
 
@@ -93,14 +92,14 @@ The palette is warm paper and near-black ink interrupted by rare hazard acid and
 
 ## Typography
 
-**Display Font:** Unity UI default sans-serif, heavy/bold treatment.
+**Display Font:** Bundled Baloo 2, through the native TextCore `Assets/Fonts/Baloo2.asset`; bold treatment for pre-match titles.
 **Body Font:** Unity UI default sans-serif, compact utility treatment.
 **Label/Mono Font:** No bundled mono face is currently established; utility labels use the same UI family with uppercase, tracking, and weight to create a technical voice.
 
-**Character:** Compressed, declarative, and printed rather than luxurious. Display type makes one statement at a time; utility type behaves like broadcast metadata, status, or a pasted annotation.
+**Character:** Broad, playful, and printed rather than tactical. Display type makes one statement at a time; utility type carries short actions, status, and annotations.
 
 ### Hierarchy
-- **Display** (bold, `92px`, `0.82` line-height, `-5px` tracking): Main title declarations and the dominant screen statement.
+- **Display** (bold Baloo 2, `148px`, `-4px` tracking): Main title declaration, with a `7px` print offset. Flow titles use a smaller screen-specific size.
 - **Headline** (bold, screen-specific): Results, fighter names, and major state changes. Keep it materially larger than metadata.
 - **Title** (bold, screen-specific): Section and flow titles such as Character Select or Lobby Room.
 - **Body** (regular/bold, screen-specific): Short explanatory copy, status messages, and join instructions. Keep it brief and readable.
@@ -142,10 +141,11 @@ Rotation is authored and restrained: typically under three degrees for grouped c
 
 ### Buttons
 - **Character:** Tactile and declarative; a button should feel stamped into the poster.
-- **Shape:** Square corners, `3px` dark border, and an `8px` bottom edge on full menu actions.
-- **Primary:** Acid background, Ink text, uppercase bold label, `60px` height, and `18px` horizontal padding.
-- **Hot:** Combat Orange background with Paper text for host, join, or high-energy actions.
-- **Hover / Focus:** Lighten the field, shift the border to Acid, and translate upward by about `2px`. Focus must be visibly stronger than decoration.
+- **Shape:** Square corners, `2px` dark border, and a `6px` bottom edge on pre-match controls.
+- **Primary:** Acid background, Ink text, uppercase bold label, `56px` minimum height, and `18px` horizontal padding.
+- **Main-menu actions:** `80px` minimum height, with distinct Online, Solo vs CPU, and Training labels. Ink text on acid, paper, and orange.
+- **Hot:** Combat Orange background with Ink text for host/join actions: `5.01:1` contrast. Paper text on this orange is only `3.16:1` and must not be used for small action labels.
+- **Hover / Focus:** Lighten the field and translate upward by about `2px`. Paper focus borders remain distinct from acid selection borders on stage cards.
 - **Active:** Translate downward by about `3px` so press has a physical response.
 - **Secondary:** Paper field with Ink text; retain the same border and geometry so hierarchy comes from color, not a different control language.
 
