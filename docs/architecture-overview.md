@@ -89,6 +89,13 @@ and `MankiData` references in legacy docs must be read only in that compatibilit
 
 Unity owns imported assets, package asset catalogs, Ability Lab, input polling, animation playback, cameras, UI, VFX, audio, and network transport. `PlayerRenderer` resolves generated semantic animation bindings and plays them through Animancer. Unity does not decide hit results, damage, timing, or match admission.
 
+`MatchBase` mirrors the loaded arena's baked triangles into a two-sided Unity mesh on
+the Ignore Raycast layer for camera queries only. `CameraObstruction` sphere-casts
+from the orbit's player target or the aim pivot, pulls in immediately, and smooths
+the return to the requested distance. It changes camera position, not aim rotation.
+Fighters, triggers, and ordinary aim raycasts do not participate in this proxy;
+Shared remains the gameplay collision authority.
+
 ## Common change paths
 
 ### Package gameplay

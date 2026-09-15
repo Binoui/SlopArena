@@ -44,6 +44,7 @@ namespace SlopArena.Client.World
         protected UnityEngine.Camera _mainCamera;
         private readonly TimelinePresentationDispatcher _timelinePresentations = new();
         protected MatchPauseMenu _pauseMenu;
+        private Mesh _cameraCollisionMesh;
 
         /// <summary>True while the in-match pause menu is open (issue #77).</summary>
         protected bool IsPaused => _pauseMenu != null && _pauseMenu.IsPaused;
@@ -63,6 +64,8 @@ namespace SlopArena.Client.World
         {
             _aimHandler?.ResetPresentation();
             _timelinePresentations.Clear();
+            if (_cameraCollisionMesh != null)
+                Destroy(_cameraCollisionMesh);
         }
 
         // ── Leave match (pause menu) ─────────────────────────────────────────
@@ -147,17 +150,48 @@ namespace SlopArena.Client.World
 
         /// <summary>
         /// Instantiate the stage's visual prefab (Resources/Stages/&lt;arena.Name&gt;.prefab)
-        /// under a "Stage" root. Collision comes from the baked .arena; the visual is cosmetic.
+        /// under a "Stage" root. Gameplay collision comes from the baked .arena.
+        /// A Unity mesh mirrors those triangles only for camera obstruction queries.
         /// </summary>
         protected void SpawnStageVisual(ArenaDefinition arena)
         {
+            var stageRoot = new GameObject("Stage");
+            var triangles = arena.CollisionTriangles;
+            if (triangles != null && triangles.Length > 0)
+            {
+                var vertices = new Vector3[triangles.Length * 3];
+                var indices = new int[triangles.Length * 6];
+                for (int i = 0; i < triangles.Length; i++)
+                {
+                    var triangle = triangles[i];
+                    int v = i * 3;
+                    vertices[v] = new Vector3(triangle.AX, triangle.AY, triangle.AZ);
+                    vertices[v + 1] = new Vector3(triangle.BX, triangle.BY, triangle.BZ);
+                    vertices[v + 2] = new Vector3(triangle.CX, triangle.CY, triangle.CZ);
+                    // Shared triangles are two-sided; camera queries must be too.
+                    int t = i * 6;
+                    indices[t] = indices[t + 3] = v;
+                    indices[t + 1] = indices[t + 5] = v + 1;
+                    indices[t + 2] = indices[t + 4] = v + 2;
+                }
+                _cameraCollisionMesh = new Mesh
+                {
+                    name = $"{arena.Name} Camera Collision",
+                    indexFormat = UnityEngine.Rendering.IndexFormat.UInt32,
+                    vertices = vertices,
+                    triangles = indices
+                };
+                // Excluded from default aim raycasts; cameras explicitly query this layer.
+                var collision = new GameObject("Camera Collision") { layer = LayerMask.NameToLayer("Ignore Raycast") };
+                collision.transform.SetParent(stageRoot.transform, false);
+                collision.AddComponent<MeshCollider>().sharedMesh = _cameraCollisionMesh;
+            }
             var prefab = Resources.Load<GameObject>($"Stages/{arena.Name}");
             if (prefab == null)
             {
                 Debug.LogWarning($"[{GetType().Name}] No stage visual '{arena.Name}' (missing Resources/Stages/{arena.Name}.prefab) — running collision-only.");
                 return;
             }
-            var stageRoot = new GameObject("Stage");
             var visual = Instantiate(prefab, stageRoot.transform);
             visual.transform.localPosition = Vector3.zero;
             visual.transform.localRotation = Quaternion.identity;

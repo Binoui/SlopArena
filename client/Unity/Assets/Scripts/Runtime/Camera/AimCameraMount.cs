@@ -6,9 +6,8 @@ namespace SlopArena.Client.Camera
     /// <summary>
     /// Owns the dedicated aim camera for CameraForward3D abilities (Bazooka).
     ///
-    /// Attach to the AimCamera GameObject alongside CinemachineCamera only.
-    /// Do NOT add CinemachineFollow — position is driven manually via ForceCameraPosition
-    /// so the camera sits at orbital distance with a shoulder offset, without Cinemachine fighting it.
+    /// Do NOT add CinemachineFollow — the pivot drives the desired camera transform.
+    /// CameraObstruction shortens that offset when a stage wall blocks the view.
     ///
     /// Pivot follows the player and rotates with mouse input.
     /// Camera = pivot.position + pivot.rotation * (shoulderX, shoulderY, -followDistance)
@@ -52,7 +51,17 @@ namespace SlopArena.Client.Camera
             // Start at -1 so the orbital camera (priority 0) always wins by default.
             // Activate raises to 20; Deactivate drops back to -1.
             if (_aimCinemachineCamera != null)
+            {
                 _aimCinemachineCamera.Priority = -1;
+                // Resolve toward the pivot without rotating the camera away from the aim ray.
+                _aimCinemachineCamera.Target = new CameraTarget
+                {
+                    TrackingTarget = _pivot,
+                    CustomLookAtTarget = true
+                };
+                if (!_aimCinemachineCamera.TryGetComponent<CameraObstruction>(out _))
+                    _aimCinemachineCamera.gameObject.AddComponent<CameraObstruction>();
+            }
         }
 
         /// <summary>
@@ -68,12 +77,12 @@ namespace SlopArena.Client.Camera
             _yawDeg         = facingYawRad * Mathf.Rad2Deg;
             _pitchDeg       = -_defaultPitchDeg; // negative: Unity Euler positive-X = tilt down
 
-            // Seed pivot so ForceCameraPosition starts from the right spot — prevents the blend
-            // from jumping if Cinemachine sampled the previous position before priority raised.
+            // Seed the desired pose before the camera becomes live.
             _pivot.position = player.position + Vector3.up * _pivotHeightOffset;
             _pivot.rotation = Quaternion.Euler(_pitchDeg, _yawDeg, 0f);
 
             ApplyCameraTransform();
+            _aimCinemachineCamera.PreviousStateIsValid = false;
 
             _aimCinemachineCamera.Priority = 20;
             _active = true;
@@ -91,8 +100,8 @@ namespace SlopArena.Client.Camera
         }
 
         /// <summary>
-        /// Reposition the pivot to track the player each FixedUpdate tick, then push
-        /// the computed camera position+rotation to Cinemachine via ForceCameraPosition.
+        /// Reposition the pivot to track the player each FixedUpdate tick, then update
+        /// the desired camera transform without resetting obstruction smoothing.
         /// Call before ApplyMouseDelta.
         /// </summary>
         public void Tick(Transform player)
@@ -119,9 +128,7 @@ namespace SlopArena.Client.Camera
         }
 
         /// <summary>
-        /// Compute world-space camera position (pivot + shoulder offset at follow distance)
-        /// and push it to the CinemachineCamera via ForceCameraPosition.
-        /// This bypasses CinemachineFollow so Cinemachine cannot fight the placement.
+        /// Set the desired world-space pose before Cinemachine constrains the camera position.
         /// </summary>
         private void ApplyCameraTransform()
         {
@@ -132,7 +139,7 @@ namespace SlopArena.Client.Camera
             Vector3 worldPos    = _pivot.position + _pivot.rotation * localOffset;
             Quaternion worldRot = _pivot.rotation;
 
-            _aimCinemachineCamera.ForceCameraPosition(worldPos, worldRot);
+            _aimCinemachineCamera.transform.SetPositionAndRotation(worldPos, worldRot);
         }
 
         /// <summary>Aim yaw in radians — fed into AimContext.AimYawRad.</summary>

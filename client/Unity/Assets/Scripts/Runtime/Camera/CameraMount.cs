@@ -29,6 +29,8 @@ namespace SlopArena.Client.Camera
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
             _inputAxisController = GetComponent<CinemachineInputAxisController>();
+            if (!TryGetComponent<CameraObstruction>(out _))
+                gameObject.AddComponent<CameraObstruction>();
             // Clamp pitch so camera stays above the stage floor level
             if (_orbital != null)
                 _orbital.VerticalAxis.Range = new Vector2(0f, 45f);
