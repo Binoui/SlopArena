@@ -78,6 +78,54 @@ The earlier `jumpForce` reduction from 13 to 12 remains: the authoritative
 flat-arena probe measures a 1.90 m full jump with 38 airborne ticks. Double-jump
 launch speed remains 9.6 m/s. Short hop, gravity, weight, and ability data are unchanged.
 
+### Grounded animation correction — 2026-09-15
+
+The package catalog binds corrected `.anim` assets for idle, Run, grounded normals,
+and specials. Idle, Run, and grounded 1 now share the animation pack's recommended
+T-pose Avatar, as grounded 2 already did; animated first-frame Avatars are not
+interchangeable reference poses.
+
+- Idle's normalized body-height reference is `0.924141`. Preserve authored body Y
+  against that common reference instead of recentering each clip's initial crouch.
+  E retains its existing, separately centered body curves.
+- Grounded 3 is rebuilt from `M_katana_Blade@Attack_4Combo_3_Inplace.FBX`.
+  Grounded 4's missing body translation is restored from `M_katana_Blade@Skill_H.FBX`,
+  mapped onto its existing edited timeline without changing its other curves.
+- A, R, and F regain body translation from the matching `Skill_E`, `Skill_A`, and
+  `Skill_G` sources. Authored airborne poses remain airborne.
+- Target-rig Humanoid foot IK and sole-clearance corrections are baked into these
+  animation assets. Runtime foot IK and root-motion movement remain disabled:
+  playback and subsequent pose cooking consume the same corrected source clips.
+- Run retains its original `0.533333 s` cycle and corrected foot poses. The initial
+  `0.2101266 s` stride-matching attempt looked too frantic in human playtesting and
+  was reverted. Gameplay remains `15 m/s`; some sliding is accepted in preference
+  to accelerated leg motion. The native playback window covers the full cycle.
+- `presentation.modelYOffset` is now `+0.194`, superseding the idle-only `+0.286`
+  compensation. Automatic offset stays disabled; collision dimensions and gameplay
+  values are unchanged.
+
+Verified through the transient Editor development catalog: all eight grounded slots,
+Run → idle, and jump → landing → idle. The corrected bindings and poses are now
+included in the cooked Kistu package and its refreshed roster requirement.
+
+### Grounded IASA tuning — 2026-09-15
+
+Grounded normal cancellation now follows the same IASA boundary used by attacks when
+grounded movement input is held. The package source values are:
+
+| Slot | Previous IASA | Tuned IASA | Intent |
+|------|--------------:|-----------:|--------|
+| `ground.1` | 21 | 24 | Delay cancellation past the final hitbox |
+| `ground.2` | 30 | 22 | Shorten recovery |
+| `ground.3` | 28 | 25 | Shorten recovery |
+| `ground.4` | 39 | 53 | Delay cancellation past the final hitbox |
+
+The timing pass changes only these IASA values; move durations, hitboxes, aerial data,
+and other gameplay fields remain unchanged. The transient Editor development catalog
+remains the local iteration path. These values are now included in the cooked package
+and admitted roster alongside the grounded animation correction.
+
+
 ## Design Pillars
 
 ### Predictable knockback, emergent combos

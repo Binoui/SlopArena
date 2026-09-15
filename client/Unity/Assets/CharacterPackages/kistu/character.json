@@ -40,9 +40,9 @@
     "modelResourcePath": "Characters/Kistu",
     "visualScale": 1,
     "hurtboxBoneScale": 0.85,
-    "modelYOffset": 0,
+    "modelYOffset": 0.194,
     "modelSoleOffset": 0,
-    "autoModelYOffset": true
+    "autoModelYOffset": false
   },
   "capsuleRadius": 0.35,
   "capsuleHeight": 1.7,
@@ -190,7 +190,7 @@
         "stages": [
           {
             "durationTicks": 60,
-            "iasaTicks": 21,
+            "iasaTicks": 24,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -249,7 +249,7 @@
         "stages": [
           {
             "durationTicks": 60,
-            "iasaTicks": 30,
+            "iasaTicks": 22,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -308,7 +308,7 @@
         "stages": [
           {
             "durationTicks": 60,
-            "iasaTicks": 28,
+            "iasaTicks": 25,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -367,7 +367,7 @@
         "stages": [
           {
             "durationTicks": 70,
-            "iasaTicks": 39,
+            "iasaTicks": 53,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,

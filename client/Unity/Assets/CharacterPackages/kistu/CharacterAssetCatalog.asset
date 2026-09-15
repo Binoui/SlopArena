@@ -19,11 +19,11 @@ MonoBehaviour:
   _sampleRate: 60
   _bindings:
   - _semanticId: anim.kistu.idle
-    _clip: {fileID: 7400000, guid: 8ccf52ec0972f0f8f8bacdcbea538cbf, type: 3}
+    _clip: {fileID: 7400000, guid: 73ee52b2f67546558a8a35dbe5daf51f, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.idle
   - _semanticId: anim.kistu.run
-    _clip: {fileID: 7400000, guid: f460b4e334f59bc9ab8b8bcc12743b75, type: 3}
+    _clip: {fileID: 7400000, guid: 000766a9758de9e9289548ff7853945d, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.run
   - _semanticId: anim.kistu.dash
@@ -51,11 +51,11 @@ MonoBehaviour:
     _extrapolation: 0
     _poseTrackId: anim.kistu.hit-hard
   - _semanticId: anim.kistu.g1
-    _clip: {fileID: 7400000, guid: e76c4d19de06c9439ae8ddd44295afcb, type: 3}
+    _clip: {fileID: 7400000, guid: 09f1224361da525a18810294325a0d31, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.g1
   - _semanticId: anim.kistu.g2
-    _clip: {fileID: 7400000, guid: 81bbfb12a168d14d2927ba5121dc0c34, type: 3}
+    _clip: {fileID: 7400000, guid: da8521f1a5193dad5a6d315fa11cf975, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.kistu.g2
   - _semanticId: anim.kistu.g3
