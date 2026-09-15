@@ -41,6 +41,7 @@ public class LedgeWalkOffTests
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
     [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
     [InlineData(CharacterClass.Nilus)]
     public void RunOffPlatform_FallsImmediately_NoHover_NoSelfGrab(CharacterClass cls)
     {
@@ -114,6 +115,7 @@ public class LedgeWalkOffTests
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
     [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
     [InlineData(CharacterClass.Nilus)]
     public void RunOffPlatform_FastFallWorksImmediately(CharacterClass cls)
     {

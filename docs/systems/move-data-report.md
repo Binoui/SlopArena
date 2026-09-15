@@ -11,6 +11,101 @@ runs, so the numbers are what the game produces — not a reimplementation.
 Primary use: attack duration, active frames, frame advantage, and knockback shape/range at a glance. The
 combo matrix/probes are experimental diagnostics, deliberately separated from the core report.
 
+## Aerial experiments
+
+Two opt-in headless tools measure the existing cooked gameplay without changing default
+bot behavior, momentum, hitboxes, or package data:
+
+```bash
+dotnet run --project tools/AerialApproachReport -- --out artifacts/aerial-approach --assert
+dotnet run --project tools/AerialProfileReport -- --out artifacts/aerial-profiles --selfcheck
+```
+
+`AerialApproachReport` sweeps real jump attack timings for all four admitted characters'
+air.1–4 against stationary and fixed-path targets. It compares zero drift with running
+approaches, straight/oblique directions, four target distances, and small/large admitted
+targets. Positions are matched at takeoff. JSON contains actual relative states, active
+frames, contact identities, accepted/rejected casts and contiguous successful press
+windows; CSV files provide cast, window and Bonk ground.3 coverage tables.
+The grid includes deliberately bad timings: its aggregate hit rate is not a player
+accuracy estimate. Zero-drift versus running changes the approach trajectory, not an
+attack-only momentum setting. Bonk contact identities describe actual cooked operations,
+not inferred visual animation parts.
+
+`AerialProfileReport` runs current/current, jump-in/grounded and jump-in/jump-in mirrors
+for each admitted character, seeds 42–46 and swapped sides, Normal difficulty, three
+stocks and a 10,800-tick cap. `--seeds 42` restricts the seed set. The wrappers preserve
+the base policy's attack selection and recovery safeguards; they change voluntary jump
+inputs, not aim quality. These are experimental policies, not trained aerial players.
+Outputs include raw match JSON, provenance, and aggregate CSV with entity-minute exposure,
+offensive/recovery/ambiguous aerial classifications and connected activation counts.
+Recovery classification follows move metadata, not inferred player intent. Temporal
+jump-in totals use the union of overlapping 90-tick windows per entity; they are
+associations, not causal attribution. Self-hit damage is labeled separately.
+
+### Recorded findings and decision — 2026-09-15
+
+These are historical measurements of the cooked packages below, not balance targets.
+The commands above reproduce the experiment design against the currently installed
+roster; changed content or simulation code can produce different results.
+
+- **Demonstrated and fixed:** FightGuy's bot budgeted Cyclone Kick travel using 40 ticks
+  instead of its 70-tick timeline, and could chain an aerial attack preserving outward
+  momentum. Bot travel checks were corrected without changing the move. In the same
+  15 non-mirror matchups, deaths fell 43→22 and losses 13→3, with timeouts rising 2→12.
+  Hit attribution, pre-respawn death context and cumulative damage accounting were also
+  corrected; see `docs/plans/policy-ai-self-play-telemetry.md`.
+- **Controlled sweep:** 74,752 trials, 38,400 accepted aerial casts. Zero-drift casts
+  connected 1,006/19,200 (5.24%); running casts 606/19,200 (3.16%). Four target distances
+  (0.75, 1.25, 1.75, 2.25 m), straight/oblique approaches, stationary/fixed-path targets,
+  small/large admitted targets and jump timing offsets were swept. Actual positions
+  matched at takeoff. This measures whole-trajectory sensitivity, not attack-time
+  momentum in isolation; intentionally bad timings make these unsuitable as player
+  accuracy estimates. Successful windows were not uniformly narrower at running speed.
+
+| Character | Zero-drift connections / accepted casts | Running connections / accepted casts |
+|---|---:|---:|
+| FightGuy | 370 / 4,736 (7.81%) | 152 / 4,736 (3.21%) |
+| Manki | 232 / 4,608 (5.03%) | 188 / 4,608 (4.08%) |
+| Kistu | 120 / 4,736 (2.53%) | 13 / 4,736 (0.27%) |
+| Bonk | 284 / 5,120 (5.55%) | 253 / 5,120 (4.94%) |
+
+- **Profile experiment:** 120 matches using the parameters above. Offensive aerial
+  activation connection rates in current mirrors versus jump-in mirrors were FightGuy
+  17.2%→25.0%, Manki 17.0%→17.8%, Kistu 11.7%→15.8%, and Bonk 6.6%→6.3%.
+  This does not show universal failure when both bots jump; attack selection and
+  engagement situations remain confounds. Recovery-tagged and ambiguous moves are
+  excluded, but authored tags do not establish actual intent.
+- **Bonk coverage:** ground.3 resolved to wire slot 8 and contained one authored hitbox
+  spawn at tick 17. The stationary grid connected in 23/60 cells. There was no separately
+  authored later contact to compare with the first visual animation part. The player's
+  reported small-target frontal miss remains a visual/coverage investigation, not a
+  demonstrated momentum defect. The separately reported broken slam landing hitbox
+  must not be treated as evidence of general aerial difficulty.
+- **Verification:** both complete experiment assertion/self-check runs and tool builds
+  passed. Current-profile output matched `SelfPlayMatch` for all four characters at seed
+  42. These were headless measurements; Unity visual contact and human gamefeel were not
+  verified.
+
+**Decision:** park further broad bot/AI experiments. Prefer a recurring human-reported
+interaction, ideally with footage and intended action, then use the simulation to
+explain the failure and test one bounded change. No global momentum change, homing
+commitment, or movement ADR follows from these results.
+
+All measured packages were version `0.0.0-dev`, with cooked definitions and baked poses
+loaded. Exact package hashes retained here keep the summary independent of temporary
+raw-artifact paths:
+
+| Package | Package hash |
+|---|---|
+| fightguy | `ed91019bc96fe42db06f75d55c5f531fa6c1df0805b38920036272d96e762722` |
+| manki | `234b9cb6c244f8debee3dcf5e40b87d2afb3f58148f55122d37f104a10a6374a` |
+| kistu | `fa55982d486e030d74a495895b3b72699680abad4e783454712ae1f8bb179b38` |
+| bonk | `c31ec969f28e2a99e41669e10c981ae2c652bbeea7e47de7d4ecf66546922da1` |
+
+The working tree was uncommitted; these content hashes do not pin the simulation/tool
+revision. Full raw traces are regenerable and are not required documentation artifacts.
+
 ## Usage
 
 ```bash

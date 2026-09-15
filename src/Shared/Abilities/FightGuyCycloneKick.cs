@@ -46,7 +46,7 @@ namespace SlopArena.Shared.Abilities
 
         private void SpawnDynamicHitbox(ref CharacterState s, float radius, float x, float y, float z, bool freezesOwner)
         {
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX + x,
                 Y = s.PY + y,
@@ -60,6 +60,7 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = _parameters.StunTicks,
                 DurationTicks = 2,
                 OwnerId = s.EntityId,
+                AttackSlot = (byte)(Slot + 1),
                 FreezesOwner = freezesOwner,
                 HitsMultipleOpponents = true,
                 HitEntities = _hitEntities,

@@ -14,6 +14,7 @@
   .moves{flex:1;min-width:320px;background:#171c22;border:1px solid #2a323c;border-radius:4px;padding:8px 12px;line-height:1.7}
   .a{color:#4dd8ff}.b{color:#ff6b6b}.dim{color:#5c6a78}
   #tick{color:#9fb2c2}
+  .telemetry{margin-top:8px;background:#171c22;border:1px solid #2a323c;border-radius:4px;padding:8px 12px;color:#9fb2c2}
 </style>
 </head>
 <body>
@@ -36,6 +37,7 @@
   <div class="moves" id="mA"><b class="a">A moves</b> <span class="dim">—</span></div>
   <div class="moves" id="mB"><b class="b">B moves</b> <span class="dim">—</span></div>
 </div>
+<div class="telemetry" id="telemetry"></div>
 <script>
 'use strict';
 let D = null, tick = 0, playing = false, speed = 8, last = 0;
@@ -81,6 +83,7 @@ function render() {
   drawTop(f);
   drawSide(f);
   drawMoves(f.t);
+  drawTelemetry(f.t);
 }
 
 // ── Top-down (XZ) ──────────────────────────────────────────────────────────
@@ -154,7 +157,10 @@ function drawMoves(t) {
   [0, 1].forEach(i => {
     const cnt = {}, hit = {};
     for (const sw of D.swings)
-      if (sw.e === i && sw.t <= t) { cnt[sw.m] = (cnt[sw.m] || 0) + 1; if (sw.hit) hit[sw.m] = (hit[sw.m] || 0) + 1; }
+      if (sw.e === i && sw.accepted !== false && sw.t <= t) {
+        cnt[sw.m] = (cnt[sw.m] || 0) + 1;
+        if (sw.hit) hit[sw.m] = (hit[sw.m] || 0) + 1;
+      }
     let dmg = 0;
     for (const h of D.hits) if (h.e === i && h.t <= t) dmg += h.dmg;
     const items = Object.entries(cnt).sort((x, y) => y[1] - x[1]).slice(0, 8)
@@ -162,6 +168,18 @@ function drawMoves(t) {
     $('m' + (i ? 'B' : 'A')).innerHTML =
       `<b class="${i ? 'b' : 'a'}">${i ? 'B' : 'A'} moves</b> ${items} <span class="dim">— dealt ${dmg.toFixed(0)}%</span>`;
   });
+}
+
+function drawTelemetry(t) {
+  const attempts = (D.attempts || []).filter(a => a.t <= t).length;
+  const accepted = (D.acceptedActions || []).filter(a => a.t <= t).length;
+  const hits = D.hits.filter(h => h.t <= t).length;
+  const combos = (D.combos || []).filter(c => c.end <= t);
+  const trueCombos = combos.filter(c => c.trueCombo).length;
+  const pressureStrings = combos.filter(c => c.pressureString).length;
+  $('telemetry').innerHTML =
+    `<b>Telemetry</b> attempted inputs ${attempts} · accepted actions ${accepted} · ` +
+    `confirmed hits ${hits} · True Combos ${trueCombos} · Pressure Strings ${pressureStrings}`;
 }
 
 document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); togglePlay(); } });

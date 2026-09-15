@@ -301,7 +301,8 @@ internal static class Program
     private static readonly string[] StatKeys =
     {
         "hitRate", "whiffRate", "avgComboLen", "maxComboLen",
-        "damagePerMatch", "damagePerStock", "winsA", "winsB", "draws",
+        "damagePerMatch", "damagePerStock", "totalDeaths", "creditedDeaths", "uncreditedDeaths",
+        "winsA", "winsB", "draws",
         "avgDurationTicks", "maxDurationTicks",
         "totalSwings", "totalHits", "totalWhiffs", "totalDamage",
     };
@@ -313,12 +314,15 @@ internal static class Program
         {
             var n = tel[k];
             if (n == null) continue;
-            double? b = n.OldValue is JsonValue bv && bv.TryGetValue<double>(out var x) ? x : null;
-            double? c = n.NewValue is JsonValue cv && cv.TryGetValue<double>(out var y) ? y : null;
+            double? b = NumberOrNull(n.OldValue);
+            double? c = NumberOrNull(n.NewValue);
             list.Add(new StatRow(k, b, c, b != null && c != null ? c - b : null));
         }
         return list;
     }
+
+    private static double? NumberOrNull(JsonNode? value)
+        => value is JsonValue json && json.TryGetValue<double>(out var number) ? number : null;
 
     private static List<UsageRow> CollectUsage(TuningDiffNode? perMove)
     {
@@ -542,7 +546,7 @@ internal static class Program
         // C — telemetry side-by-side
         sb.AppendLine("<h2>Self-play telemetry diff</h2>");
         sb.AppendLine("<div class=\"legend\">Same seed on both sides &rarr; the delta is the tuning effect, not match variance. " +
-            "Green = candidate higher, red = lower. Hit rate / whiff rate are percentages; combos in hits; damage per match and per stock.</div>");
+            "Green = candidate higher, red = lower. Hit rate / whiff rate are percentages; combos in hits; damage per match and per stock lost.</div>");
         sb.AppendLine("<table class=\"heat\"><thead><tr><th class=\"move\">stat</th><th>base</th><th>candidate</th><th>&Delta;</th></tr></thead><tbody>");
         foreach (var s in stats)
             sb.AppendLine($"<tr><td class=\"move\">{Escape(StatLabel(s.Key))}</td><td>{StatVal(s.Key, s.Base)}</td><td>{StatVal(s.Key, s.Cand)}</td>{StatDeltaCell(s.Key, s.Base, s.Cand)}</tr>");
@@ -640,7 +644,10 @@ internal static class Program
         "avgComboLen" => "avg combo length",
         "maxComboLen" => "max combo length",
         "damagePerMatch" => "damage / match",
-        "damagePerStock" => "damage / stock",
+        "damagePerStock" => "damage per stock lost",
+        "totalDeaths" => "total deaths",
+        "creditedDeaths" => "credited deaths",
+        "uncreditedDeaths" => "uncredited deaths",
         "winsA" => "wins (bot A)",
         "winsB" => "wins (bot B)",
         "draws" => "draws",

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using SlopArena.Shared;
+using SlopArena.Shared.AI;
 using SlopArena.Client.Network;
 
 namespace SlopArena.Client.UI
@@ -164,15 +165,20 @@ namespace SlopArena.Client.UI
                 botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
             };
 
-            var levelLabel = root.Q<Label>("solo-level-label");
-            for (int level = 1; level <= 9; level++)
+            var difficultyLabel = root.Q<Label>("solo-difficulty-label");
+            MatchConfig.SoloCpuDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
+            difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}";
+            foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
-                int capturedLevel = level;
-                root.Q<Button>($"btn-cpu-level-{level}").clicked += () =>
+                var capturedDifficulty = difficulty;
+                var button = root.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
+                button.clicked += () =>
                 {
-                    MatchConfig.SoloCpuLevel = capturedLevel;
-                    levelLabel.text = $"CPU LEVEL: {capturedLevel}";
+                    MatchConfig.SoloCpuDifficulty = capturedDifficulty;
+                    difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(capturedDifficulty)}";
+                    RenderSoloRoster();
                 };
+                button.EnableInClassList("active", difficulty == MatchConfig.SoloCpuDifficulty);
             }
 
             selectButton.clicked += () =>
@@ -191,7 +197,7 @@ namespace SlopArena.Client.UI
                 "P1", "YOU", _selected, "SELECTED", local: true, host: true));
             _rosterPanel.Add(BuildPlayerCard(
                 "P2", "CPU", MatchConfig.SoloBotClass,
-                $"CPU {MatchConfig.SoloCpuLevel}", local: false, host: false));
+                $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}", local: false, host: false));
         }
 
         private void InitPvP(VisualElement root)

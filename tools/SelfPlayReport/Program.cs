@@ -40,17 +40,19 @@ internal static class Program
     // ── Report model ───────────────────────────────────────────────────────
     internal sealed record EnvDisc(float RelZ, float RelY, float Radius);
     internal sealed record MoveEnvelope(string Label, string Ability, int Slot, bool Air, float Reach, EnvDisc[] Discs);
-    internal sealed record MoveStats(string Label, string Ability, int Swings, int Hits, int Whiffs, int Damage);
+    internal sealed record MoveStats(string Label, string Ability, int Swings, int Hits, int Whiffs, float Damage);
     internal sealed record WhiffCell(int Gx, int Gy, int Count);
     internal sealed record ReportData(string Character, string Difficulty, string GeneratedAt, int Matches, int Seed,
         int AvgDurationTicks, int MaxDurationTicks,
         float HitRate, float WhiffRate, float AvgComboLen, int MaxComboLen,
         int TrueComboCount, int PressureStringCount,
-        float DamagePerMatch, float DamagePerStock,
+        float DamagePerMatch, float? DamagePerStock,
+        int TotalDeaths, int CreditedDeaths, int UncreditedDeaths,
         int WinsA, int WinsB, int Draws,
         MoveStats[] PerMove, MoveEnvelope[] Envelope, WhiffCell[] WhiffGrid,
         float EnvelopeMaxReach, float EnvelopeMaxHeight, float[] Silhouette,
-        int TotalSwings, int TotalHits, int TotalWhiffs, int TotalDamage);
+        int TotalSwings, int TotalHits, int TotalWhiffs, float TotalDamage,
+        int TotalActionAttempts, int TotalAcceptedActions, int TotalConfirmedHits);
 
     internal static readonly byte[] SlotBytes = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
 
@@ -77,15 +79,23 @@ internal static class Program
             "kistu" => CharacterClass.Kistu,
             "manki" => CharacterClass.Manki,
             "nilus" => CharacterClass.Nilus,
-            _ => CharacterClass.FightGuy,
+            "bonk" => CharacterClass.Bonk,
+            _ => CharacterClass.None,
         };
-        var entry = BuiltInContentResolver.Resolve(cls);
-        var def = entry.Definition;
-        if (def.Class == CharacterClass.None)
+        if (cls == CharacterClass.None)
         {
             Console.Error.WriteLine($"Unknown character '{charName}'.");
             return 1;
         }
+        var entry = BuiltInContentResolver.Resolve(cls);
+        var def = entry.Definition;
+        if (def.Class == CharacterClass.None)
+        {
+            Console.Error.WriteLine($"Unable to resolve character '{charName}'.");
+            return 1;
+        }
+        Console.WriteLine($"Resolved character: {def.DisplayName} ({def.Class})");
+        Console.WriteLine($"Difficulty: {BotDifficultyProfile.DisplayName(difficulty)}  Seed: {seed}");
 
         var arena = BuildKillArena();
         var baked = LoadBakedData(entry);
@@ -128,12 +138,14 @@ internal static class Program
         var def = entry.Definition;
         var perMove = new Dictionary<string, MoveStats>();
         string Key(bool air, byte slotByte) => $"{(air ? "a" : "g")}{SlotOf(slotByte)}";
-        int totalSwings = 0, totalHits = 0, totalWhiffs = 0, totalDamage = 0;
+        int totalSwings = 0, totalHits = 0, totalWhiffs = 0;
+        float totalDamage = 0f;
+        int totalActionAttempts = 0, totalAcceptedActions = 0, totalConfirmedHits = 0;
+        int totalDeaths = 0, creditedDeaths = 0, uncreditedDeaths = 0;
         int totalComboLen = 0, comboCount = 0, maxComboLen = 0;
         int trueComboCount = 0, pressureStringCount = 0;
         int winsA = 0, winsB = 0, draws = 0;
         long durationSum = 0; int maxDuration = 0;
-        int damageSum = 0;
 
         foreach (var r in records)
         {
@@ -143,11 +155,18 @@ internal static class Program
             else if (r.WinnerEntityId == SelfPlayMatch.EntityA) winsA++;
             else if (r.WinnerEntityId == SelfPlayMatch.EntityB) winsB++;
             else draws++;
-
-            damageSum += r.Entity1Damage + r.Entity2Damage;
+            totalActionAttempts += r.ActionAttempts.Count;
+            totalAcceptedActions += r.AcceptedActions.Count;
+            totalConfirmedHits += r.Hits.Count;
+            totalDeaths += r.Deaths.Count;
+            creditedDeaths += r.Deaths.Count(d => d.KillerEntityId != 0);
+            uncreditedDeaths += r.Deaths.Count(d => d.KillerEntityId == 0);
+            foreach (var hit in r.Hits)
+                totalDamage += hit.Damage;
 
             foreach (var sw in r.Swings)
             {
+                if (!sw.Accepted) continue;
                 string k = Key(sw.Air, sw.ActiveSlot);
                 totalSwings++;
                 if (sw.Connected) totalHits++; else totalWhiffs++;
@@ -160,6 +179,13 @@ internal static class Program
                     Whiffs = ms.Whiffs + (sw.Connected ? 0 : 1),
                 };
             }
+            foreach (var hit in r.Hits)
+            {
+                float damage = hit.Damage;
+                string k = Key(hit.Air, hit.AttackSlot);
+                if (perMove.TryGetValue(k, out var ms))
+                    perMove[k] = ms with { Damage = ms.Damage + damage };
+            }
             foreach (var c in r.Combos)
             {
                 totalComboLen += c.Hits;
@@ -170,21 +196,17 @@ internal static class Program
             }
         }
 
-        int stocksPerMatch = 2 * 3; // 2 bots × 3 stocks
         int matchCount = records.Count;
         float hitRate = totalSwings > 0 ? totalHits / (float)totalSwings : 0f;
         float whiffRate = totalSwings > 0 ? totalWhiffs / (float)totalSwings : 0f;
         float avgCombo = comboCount > 0 ? totalComboLen / (float)comboCount : 0f;
-        float dmgPerMatch = matchCount > 0 ? damageSum / (float)matchCount : 0f;
-        float dmgPerStock = matchCount > 0 ? damageSum / (float)(matchCount * stocksPerMatch) : 0f;
+        float dmgPerMatch = matchCount > 0 ? totalDamage / matchCount : 0f;
+        float? dmgPerStock = totalDeaths > 0 ? totalDamage / totalDeaths : null;
 
-        // Per-move damage: attribute hit damage by ActiveSlot at hit time (use the open swing's slot when
-        // available, else the hit's owner's last swing). Simplify: per-move damage from connected swings
-        // is not stored on hits; approximate per-move damage via the swings' slot on the hit's attacker.
-        // We use per-move Hit counts only for the table; Damage column is filled from connected swings.
+        // Damage is the sum of authoritative resolved HitEvent values. It persists across
+        // respawns; final CharacterState damage is only the current stock's percent.
         var envelope = SampleEnvelope(entry);
         var (whiffGrid, silhouette) = AccumulateWhiffs(records, envelope);
-
         var perMoveArray = perMove.Values.OrderBy(m => m.Label, StringComparer.Ordinal).ToArray();
         float maxReach = envelope.Length > 0 ? envelope.Max(e => e.Reach) : 0f;
         float maxHeight = envelope.Length > 0 ? envelope.Max(e => e.Discs.Length > 0 ? e.Discs.Max(d => d.RelY + d.Radius) : 0f) : 0f;
@@ -195,18 +217,28 @@ internal static class Program
             matchCount, seed, (int)(matchCount > 0 ? durationSum / matchCount : 0), maxDuration,
             hitRate, whiffRate, avgCombo, maxComboLen, trueComboCount, pressureStringCount,
             dmgPerMatch, dmgPerStock,
+            totalDeaths, creditedDeaths, uncreditedDeaths,
             winsA, winsB, draws, perMoveArray, envelope, whiffGrid,
             maxReach, maxHeight, silhouette,
-            totalSwings, totalHits, totalWhiffs, totalDamage);
+            totalSwings, totalHits, totalWhiffs, totalDamage,
+            totalActionAttempts, totalAcceptedActions, totalConfirmedHits);
     }
 
     internal static string AbilityName(CharacterDefinition def, byte activeSlot, bool air)
-        => def.GetSlotAbility(activeSlot - 1, air)?.Name ?? "-";
+        => def.GetCookedSlotAbility(activeSlot, air)?.Name
+            ?? def.GetSlotAbility(activeSlot - 1, air)?.Name ?? "-";
 
-    internal static int SlotOf(byte activeSlot) => activeSlot switch
+    internal static string SlotOf(byte activeSlot) => activeSlot switch
     {
-        AbilitySlots.Slot1 => 1, AbilitySlots.Slot2 => 2, AbilitySlots.Slot3 => 3, AbilitySlots.Slot4 => 4,
-        _ => 0,
+        AbilitySlots.Slot1 => "1",
+        AbilitySlots.Slot2 => "2",
+        AbilitySlots.Slot3 => "3",
+        AbilitySlots.Slot4 => "4",
+        AbilitySlots.A => "A",
+        AbilitySlots.E => "E",
+        AbilitySlots.R => "R",
+        AbilitySlots.F => "F",
+        _ => "?",
     };
 
     // ── Reach envelope (deterministic threat zone, sampled from real hitboxes) ──
@@ -268,7 +300,7 @@ internal static class Program
         foreach (var r in records)
             foreach (var sw in r.Swings)
             {
-                if (sw.Connected) continue;
+                if (!sw.Accepted || sw.Connected) continue;
                 int gx = (int)((sw.RelForward - GridFwdMin) * 4);
                 int gy = (int)((sw.RelHeight - GridHtMin) * 4);
                 if (gx < 0 || gx >= GridFwdCells || gy < 0 || gy >= GridHtCells) continue;
@@ -301,10 +333,11 @@ internal static class Program
         sb.AppendLine($"# {r.Character} — self-play telemetry");
         sb.AppendLine($"Generated {r.GeneratedAt} · {r.Matches} seeded {r.Difficulty} bot-vs-bot matches on the real ServerSimulation (issue #148). ");
         sb.AppendLine($"Seed {r.Seed} · avg {r.AvgDurationTicks / 60f:F1}s, max {r.MaxDurationTicks / 60f:F1}s · wins {r.WinsA}–{r.WinsB}, draws {r.Draws}.");
-        sb.AppendLine();
+        sb.AppendLine($"- **Actions**: attempted inputs {r.TotalActionAttempts}, accepted actions {r.TotalAcceptedActions}, confirmed hits {r.TotalConfirmedHits}.");
         sb.AppendLine($"- **Hit rate** {r.HitRate * 100f:F1}% ({r.TotalHits}/{r.TotalSwings} swings) — **whiff rate** {r.WhiffRate * 100f:F1}% ({r.TotalWhiffs}/{r.TotalSwings}).");
-        sb.AppendLine($"- **Combos**: avg length {r.AvgComboLen:F2}, max {r.MaxComboLen}; true combos {r.TrueComboCount}, pressure strings {r.PressureStringCount}.");
-        sb.AppendLine($"- **Damage**: {r.DamagePerMatch:F0} per match, {r.DamagePerStock:F0} per stock ({2 * 3} stocks/match).");
+        sb.AppendLine($"- **Combos**: avg length {r.AvgComboLen:F2}, max {r.MaxComboLen}; true combos {r.TrueComboCount}, pressure strings {r.PressureStringCount} (classified by defender action availability).");
+        sb.AppendLine($"- **Damage**: {DamageMetric(r.TotalDamage)} cumulative, {DamageMetric(r.DamagePerMatch)} per match, {DamageMetric(r.DamagePerStock)} damage per stock lost.");
+        sb.AppendLine($"- **Deaths**: {r.TotalDeaths} total ({r.CreditedDeaths} credited, {r.UncreditedDeaths} uncredited).");
         sb.AppendLine();
         sb.AppendLine("| move | swings | hits | whiffs | hit% |");
         sb.AppendLine("|---|---|---|---|---|");
@@ -341,15 +374,18 @@ internal static class Program
         sb.AppendLine($"<h1>{Escape(r.Character)} — self-play telemetry</h1>");
         sb.AppendLine($"<div class=\"meta\">Generated {Escape(r.GeneratedAt)} &middot; {r.Matches} seeded {Escape(r.Difficulty)} bot-vs-bot matches on the real ServerSimulation (issue #148). " +
             $"Seed {r.Seed} &middot; avg {r.AvgDurationTicks / 60f:F1}s, max {r.MaxDurationTicks / 60f:F1}s &middot; wins {r.WinsA}–{r.WinsB}, draws {r.Draws}. " +
-            $"Same seed &rarr; bit-identical match.</div>");
+            "Same seed &rarr; bit-identical match.</div>");
 
         // 1 — stats
         sb.AppendLine("<h2>Match stats</h2>");
         sb.AppendLine("<div class=\"legend\">The empirical skill-vs-game read: what actually connects under the current tuning. " +
-            "Hit rate = connected swings / all swings; whiff rate = the rest. Combo = consecutive same-pair hits within 1.5 s.</div>");
+            "Attempted inputs are recorded before simulation; accepted actions come from authoritative activation; " +
+            "confirmed hits come from resolver outcomes. True combos have no ordinary defender action opportunity; " +
+            "pressure strings contain an actionable gap.</div>");
         sb.AppendLine("<table class=\"heat\"><tbody>");
-        sb.AppendLine($"<tr><td class=\"move\">hit rate</td><td><b>{r.HitRate * 100f:F1}%</b></td><td class=\"move\">whiff rate</td><td><b>{r.WhiffRate * 100f:F1}%</b></td></tr>");
-        sb.AppendLine($"<tr><td class=\"move\">combos</td><td>avg {r.AvgComboLen:F2}, max {r.MaxComboLen}</td><td class=\"move\">damage</td><td>{r.DamagePerMatch:F0}/match, {r.DamagePerStock:F0}/stock</td></tr>");
+        sb.AppendLine($"<tr><td class=\"move\">actions</td><td>{r.TotalActionAttempts} attempted / {r.TotalAcceptedActions} accepted / {r.TotalConfirmedHits} confirmed hits</td><td class=\"move\">hit rate</td><td><b>{r.HitRate * 100f:F1}%</b></td></tr>");
+        sb.AppendLine($"<tr><td class=\"move\">whiff rate</td><td><b>{r.WhiffRate * 100f:F1}%</b></td><td class=\"move\">combos</td><td>avg {r.AvgComboLen:F2}, max {r.MaxComboLen}; true {r.TrueComboCount}, pressure {r.PressureStringCount}</td></tr>");
+        sb.AppendLine($"<tr><td class=\"move\">damage</td><td>{DamageMetric(r.TotalDamage)} cumulative, {DamageMetric(r.DamagePerMatch)}/match, {DamageMetric(r.DamagePerStock)} damage per stock lost</td><td class=\"move\">deaths</td><td>{r.TotalDeaths} total ({r.CreditedDeaths} credited, {r.UncreditedDeaths} uncredited)</td></tr>");
         sb.AppendLine("</tbody></table>");
         sb.AppendLine("<table class=\"heat\"><thead><tr><th class=\"move\">move</th><th>swings</th><th>hits</th><th>whiffs</th><th>hit%</th></tr></thead><tbody>");
         foreach (var m in r.PerMove)
@@ -512,6 +548,8 @@ internal static class Program
         var s = ParseArg(args, key);
         return s != null && int.TryParse(s, out int v) ? v : fallback;
     }
+    internal static string DamageMetric(float? value)
+        => value?.ToString("0.##", CultureInfo.InvariantCulture) ?? "n/a";
 
     internal static string Escape(string s) => WebUtility.HtmlEncode(s);
 

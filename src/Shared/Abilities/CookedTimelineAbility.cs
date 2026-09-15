@@ -230,7 +230,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         float offsetZ = -projectile.LaunchOffsetX * sinYaw + projectile.LaunchOffsetZ * cosYaw;
         float damage = projectile.Damage;
         float radius = projectile.Radius;
-        Resolver.Spawn(new Hitbox
+        SpawnResolverHitbox(new Hitbox
         {
             X = s.PX + offsetX,
             Y = s.PY + projectile.LaunchOffsetY,
@@ -247,6 +247,7 @@ public sealed class CookedTimelineAbility : ServerAbility
             StunTicks = projectile.StunTicks,
             DurationTicks = projectile.MaxFlightTicks,
             OwnerId = s.EntityId,
+            AttackSlot = (byte)(Slot + 1),
             Gravity = projectile.Gravity,
         });
     }
@@ -263,6 +264,8 @@ public sealed class CookedTimelineAbility : ServerAbility
         capability.Arena = Arena;
         capability.Slot = Slot;
         capability.Cooldown = Cooldown;
+        capability.ActivationId = ActivationId;
+        capability.AirborneAtStart = AirborneAtStart;
         capability.AnimationNames = AnimationNames;
         // Aim-hold capabilities own their hold/release lifecycle: freeze the stage
         // clock while they hold ActionState.Aiming so an authored stage timeout can

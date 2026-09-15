@@ -1,28 +1,36 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace SlopArena.Shared.AI;
 
 /// <summary>
-/// Accumulates telemetry during a self-play match: per-tick positions, hit events, combo
-/// links, and swing records (slot presses with their active window, connect/whiff, and — on
-/// whiff — the opponent's position relative to the attacker in the facing frame).
+/// Accumulates telemetry during a self-play match: attempted inputs, accepted actions,
+/// confirmed hits, combo links, per-tick positions, and swing records.
 ///
 /// Swings are detected from the bot's PRE-TICK press (<c>RecordPresses</c>, called before the
 /// sim consumes the input). <c>CharacterState.AttackSlot</c> is NOT a reliable start signal —
-/// it persists as the "last used slot" and never returns to 0, so 0→nonzero transitions fire
-/// once per entity. A swing is a whiff iff no hit from that attacker lands within its window.
+/// it persists as the "last used slot" and never returns to 0. Every nonzero press records an
+/// attempt and provisional swing; only accepted swings count as whiffs or connected attacks.
+/// Combo classification uses only the defender's authoritative ordinary-action availability;
+/// it does not use an elapsed-time window.
 /// </summary>
 public sealed class MatchRecorder
 {
-    /// <summary>Maximum age of a same-pair hit link before it is a new exchange.</summary>
-    public const int ComboGapTicks = 90;
+    private sealed class PendingAction
+    {
+        public ActionAttempt Attempt = null!;
+        public SwingRecord Swing = null!;
+        public ulong ActivationId;
+    }
 
     private readonly MatchRecord _record = new();
-    private readonly Dictionary<ulong, List<SwingRecord>> _openSwings = new();
+    private readonly Dictionary<ulong, PendingAction> _pendingActions = new();
     private readonly Dictionary<(ulong Attacker, ulong Target), ComboLink> _openCombos = new();
     private readonly Dictionary<(ulong Attacker, ulong Target), bool> _actionableSinceHit = new();
+    private readonly Dictionary<ulong, SwingRecord> _acceptedSwings = new();
+    private readonly List<ulong> _pendingActionIds = new();
+    private readonly List<(ulong Attacker, ulong Target)> _openComboPairs = new();
+    private readonly HashSet<(ulong Attacker, ulong Target)> _hitPairs = new();
 
     public MatchRecord Record => _record;
 
@@ -33,14 +41,17 @@ public sealed class MatchRecorder
         _record.Seed = seed;
         _record.WinnerEntityId = outcome.WinnerEntityId;
         _record.SharedVictory = outcome.IsSharedVictory;
-        foreach (var combo in _openCombos.Values)
-            if (combo.Hits >= 2)
-                _record.Combos.Add(combo);
-        _openCombos.Clear();
+        CloseCombos();
         return _record;
     }
 
-    /// <summary>Open swings from the tick's presses. Call BEFORE sim.Tick (inputs not yet consumed).</summary>
+    /// <summary>
+    /// Explicitly end the current exchange without inventing a time-based combo boundary.
+    /// Match loops use this for interruptions that are not represented by a stock change.
+    /// </summary>
+    public void RecordInterruption() => CloseCombos();
+
+    /// <summary>Open attempted swings from the tick's presses. Call BEFORE sim.Tick.</summary>
     public void RecordPresses(ServerSimulation sim, int tick, IReadOnlyDictionary<ulong, InputState> inputs, CharacterDefinition def)
     {
         var states = sim.GetAllStates();
@@ -50,6 +61,12 @@ public sealed class MatchRecorder
             if (!states.TryGetValue(id, out var st)) continue;
 
             bool air = !st.IsGrounded;
+            var attempt = new ActionAttempt
+            {
+                EntityId = id, Tick = tick, ActiveSlot = input.ActiveSlot, Air = air,
+            };
+            _record.ActionAttempts.Add(attempt);
+
             int window = ActiveWindowTicks(def, input.ActiveSlot, air);
             ulong targetId = st.TargetEntityId;
             float side = 0f, fwd = 0f, dy = 0f;
@@ -66,99 +83,164 @@ public sealed class MatchRecorder
                 StartTick = tick, WindowTicks = window,
                 RelSide = side, RelForward = fwd, RelHeight = dy,
             };
-            if (!_openSwings.TryGetValue(id, out var list)) { list = new(); _openSwings[id] = list; }
-            list.Add(swing);
+            _pendingActions[id] = new PendingAction
+            {
+                Attempt = attempt, Swing = swing, ActivationId = sim.GetLastActivationId(id),
+            };
             _record.Swings.Add(swing);
         }
     }
+    /// <summary>Capture the exact per-entity inputs chosen for this simulation tick.</summary>
+    public void RecordInputs(int tick, IReadOnlyDictionary<ulong, InputState> inputs)
+    {
+        foreach (var (id, input) in inputs)
+            _record.Inputs.Add(new InputSample { Tick = tick, EntityId = id, Input = input });
+    }
 
-    /// <summary>Accumulate hits, positions, and close expired swings. Call AFTER sim.Tick.</summary>
+
+    /// <summary>Accumulate hits, positions, and authoritative deaths. Call AFTER sim.Tick.</summary>
     public void RecordTick(ServerSimulation sim, int tick, IReadOnlyDictionary<ulong, InputState> inputs, CharacterDefinition def)
     {
         var states = sim.GetAllStates();
+        _hitPairs.Clear();
 
+        bool stockBoundary = sim.LastTickDeaths.Count > 0;
+        if (stockBoundary)
+            _record.Deaths.AddRange(sim.LastTickDeaths);
         foreach (var (id, st) in states)
             _record.Samples.Add(new TickSample { Tick = tick, EntityId = id, PX = st.PX, PY = st.PY, PZ = st.PZ });
+        if (stockBoundary)
+            CloseCombos();
+        _pendingActionIds.Clear();
+        foreach (var id in _pendingActions.Keys)
+            _pendingActionIds.Add(id);
+        foreach (var id in _pendingActionIds)
+        {
+            var pending = _pendingActions[id];
+            if (!states.TryGetValue(id, out var state))
+            {
+                _pendingActions.Remove(id);
+                continue;
+            }
+            if (sim.GetLastActivationId(id) != pending.ActivationId)
+            {
+                pending.Swing.Accepted = true;
+                pending.Swing.ActivationId = sim.GetLastActivationId(id);
+                _acceptedSwings[pending.Swing.ActivationId] = pending.Swing;
+                _record.AcceptedActions.Add(new AcceptedAction
+                {
+                    EntityId = pending.Attempt.EntityId,
+                    Tick = pending.Attempt.Tick,
+                    ActiveSlot = pending.Attempt.ActiveSlot,
+                    Air = pending.Attempt.Air,
+                });
+                _pendingActions.Remove(id);
+            }
+            else if (state.State != ActionState.Warping)
+            {
+                _pendingActions.Remove(id);
+            }
+        }
 
-        foreach (var pair in _openCombos.Keys.ToArray())
-            if (states.TryGetValue(pair.Target, out var target) && IsActionable(target))
-                _actionableSinceHit[pair] = true;
+        if (!stockBoundary)
+        {
+            _openComboPairs.Clear();
+            foreach (var pair in _openCombos.Keys)
+                _openComboPairs.Add(pair);
+            foreach (var id in sim.LastTickOrdinaryActionOpportunities)
+                foreach (var pair in _openComboPairs)
+                    if (pair.Target == id)
+                        _actionableSinceHit[pair] = true;
+        }
 
-        var hitPairs = new HashSet<(ulong Attacker, ulong Target)>();
+        
         foreach (var hit in sim.LastTickHits)
         {
+            _openComboPairs.Clear();
+            foreach (var pair in _openCombos.Keys)
+                _openComboPairs.Add(pair);
+            foreach (var pair in _openComboPairs)
+            {
+                bool continuation = pair.Attacker == hit.OwnerEntityId
+                    && pair.Target == hit.TargetEntityId;
+                bool hitsParticipant = pair.Attacker == hit.TargetEntityId
+                    || pair.Target == hit.TargetEntityId;
+                if (hitsParticipant && !continuation)
+                    CloseCombo(pair);
+            }
+
+            bool hitAir = hit.Airborne;
             _record.Hits.Add(new HitEvent
             {
                 Attacker = hit.OwnerEntityId,
                 Target = hit.TargetEntityId,
                 AttackSlot = hit.AttackSlot,
+                ActivationId = hit.ActivationId,
+                Air = hitAir,
                 Damage = hit.Damage,
                 Tick = tick,
             });
-            if (_openSwings.TryGetValue(hit.OwnerEntityId, out var swings))
-                foreach (var sw in swings) sw.Connected = true;
-
-            var pair = (hit.OwnerEntityId, hit.TargetEntityId);
-            bool hadActionableWindow = _actionableSinceHit.TryGetValue(pair, out var actionable)
+            if (_acceptedSwings.TryGetValue(hit.ActivationId, out var swing))
+                swing.Connected = true;
+            var pairForHit = (hit.OwnerEntityId, hit.TargetEntityId);
+            bool hadActionableWindow = _actionableSinceHit.TryGetValue(pairForHit, out var actionable)
                 && actionable;
-            ComboLink? combo = _openCombos.TryGetValue(pair, out var existing) ? existing : null;
-            if (hadActionableWindow && combo is { Hits: 1 }
-                && tick - combo.EndTick <= ComboGapTicks)
+            if (!_openCombos.TryGetValue(pairForHit, out var combo))
             {
-                combo.Hits = 2;
-                combo.EndTick = tick;
-                combo.IsTrueCombo = false;
-                combo.IsPressureString = true;
-            }
-            else if (combo == null || tick - combo.EndTick > ComboGapTicks || hadActionableWindow)
-            {
-                if (combo is { Hits: >= 2 })
-                    _record.Combos.Add(combo);
                 combo = new ComboLink
                 {
                     Attacker = hit.OwnerEntityId,
                     Target = hit.TargetEntityId,
-                    Hits = 1,
+                    Hits = 0,
                     StartTick = tick,
                     EndTick = tick,
-                    IsTrueCombo = !hadActionableWindow,
-                    IsPressureString = hadActionableWindow,
+                    IsTrueCombo = true,
                 };
-                _openCombos[pair] = combo;
+                _openCombos[pairForHit] = combo;
             }
-            else
+
+            if (hadActionableWindow)
             {
-                combo.Hits++;
-                combo.EndTick = tick;
+                combo.IsTrueCombo = false;
+                combo.IsPressureString = true;
             }
-
-            _actionableSinceHit[pair] = false;
-            hitPairs.Add(pair);
+            combo.Hits++;
+            combo.EndTick = tick;
+            _actionableSinceHit[pairForHit] = false;
+            _hitPairs.Add(pairForHit);
         }
 
-        foreach (var pair in _openCombos.Keys.ToArray())
-        {
-            if (hitPairs.Contains(pair)
-                || !states.TryGetValue(pair.Item2, out var target))
-                continue;
-            if (IsActionable(target))
-                _actionableSinceHit[pair] = true;
-        }
-
-
-        foreach (var id in _openSwings.Keys.ToArray())
-        {
-            var list = _openSwings[id];
-            list.RemoveAll(sw => tick > sw.StartTick + sw.WindowTicks);
-            if (list.Count == 0) _openSwings.Remove(id);
-        }
+        _openComboPairs.Clear();
+        foreach (var pair in _openCombos.Keys)
+            _openComboPairs.Add(pair);
+        foreach (var id in sim.LastTickOrdinaryActionOpportunities)
+            foreach (var pair in _openComboPairs)
+                if (!_hitPairs.Contains(pair) && pair.Target == id)
+                    _actionableSinceHit[pair] = true;
+        if (stockBoundary)
+            CloseCombos();
     }
-    private static bool IsActionable(in CharacterState state)
-        => state.HitstunTicks == 0
-            && state.HitstopTicks == 0
-            && state.AnimLockTicks == 0
-            && state.LandingLagTicks == 0
-            && state.State is ActionState.Idle or ActionState.Run;
+
+    private void CloseCombos()
+    {
+        _openComboPairs.Clear();
+        foreach (var pair in _openCombos.Keys)
+            _openComboPairs.Add(pair);
+        foreach (var pair in _openComboPairs)
+            CloseCombo(pair);
+        _actionableSinceHit.Clear();
+    }
+
+    private void CloseCombo((ulong Attacker, ulong Target) pair)
+    {
+        if (_openCombos.TryGetValue(pair, out var combo))
+        {
+            if (combo.Hits >= 2)
+                _record.Combos.Add(combo);
+            _openCombos.Remove(pair);
+        }
+        _actionableSinceHit.Remove(pair);
+    }
 
     /// <summary>Active window for the resolved slot's timeline, or legacy first-stage hitboxes.</summary>
     private static int ActiveWindowTicks(CharacterDefinition def, byte activeSlot, bool airborne)

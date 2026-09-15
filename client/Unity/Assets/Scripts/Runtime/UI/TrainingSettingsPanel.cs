@@ -1,16 +1,16 @@
 using System;
 using UnityEngine;
 using UnityEngine.UIElements;
+using SlopArena.Shared.AI;
 using SlopArena.Client.World;
-
 namespace SlopArena.Client.UI
 {
     /// <summary>
     /// Training settings section shown inside the pause menu (issue #187). Training mode
     /// only: TrainingMatch attaches it to MatchPauseMenu's left side, so it appears
     /// alongside the pause buttons while the simulation is frozen. Controls: no ability
-    /// cooldowns (player slot cooldowns only), NPC damage %, NPC AI mode, and NPC
-    /// add/delete. The layout lives in Resources/UI/TrainingSettingsPanel.uxml.
+    /// cooldowns (player slot cooldowns only), CPU difficulty, NPC AI mode, NPC damage %,
+    /// and NPC add/delete. The layout lives in Resources/UI/TrainingSettingsPanel.uxml.
     /// </summary>
     public class TrainingSettingsPanel : MonoBehaviour
     {
@@ -19,11 +19,12 @@ namespace SlopArena.Client.UI
         private VisualElement _panel;
         private VisualElement _rosterRow;
         private readonly System.Collections.Generic.List<Button> _modeButtons = new();
+        private readonly System.Collections.Generic.List<Button> _difficultyButtons = new();
 
         // UXML-bound live-refresh labels.
         private Label _npcDamageLabel;
         private Label _npcModeLabel;
-
+        private Label _npcDifficultyLabel;
         public void Init(TrainingMatch match, MatchPauseMenu pauseMenu)
         {
             _match = match;
@@ -48,6 +49,7 @@ namespace SlopArena.Client.UI
                 cdToggle.RegisterValueChangedCallback(evt => _match.SetNoCooldowns(evt.newValue));
 
             _npcModeLabel = panel.Q<Label>("npc-mode-label");
+            _npcDifficultyLabel = panel.Q<Label>("npc-difficulty-label");
             _npcDamageLabel = panel.Q<Label>("npc-damage-label");
             _rosterRow = panel.Q<VisualElement>("roster-row");
 
@@ -64,6 +66,19 @@ namespace SlopArena.Client.UI
                 _modeButtons.Add(btn);
             }
 
+            foreach (var difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
+            {
+                var d = difficulty;
+                var btn = panel.Q<Button>($"difficulty-{d.ToString().ToLowerInvariant()}");
+                if (btn == null) continue;
+                btn.clicked += () =>
+                {
+                    _match.SetNpcDifficulty(d);
+                    RefreshDifficultyHighlight();
+                };
+                _difficultyButtons.Add(btn);
+            }
+
             var dmgMinus = panel.Q<Button>("dmg-minus");
             if (dmgMinus != null)
                 dmgMinus.clicked += () => _match.SetSelectedNpcDamage(_match.GetSelectedNpcDamage() - 10f);
@@ -76,7 +91,9 @@ namespace SlopArena.Client.UI
 
             RefreshRoster();
             RefreshModeHighlight();
+            RefreshDifficultyHighlight();
         }
+
 
         private void Update()
         {
@@ -118,6 +135,17 @@ namespace SlopArena.Client.UI
             foreach (var btn in _modeButtons)
             {
                 bool active = btn.text == _match.CurrentNpcMode.ToString().ToUpperInvariant();
+                btn.EnableInClassList("active", active);
+            }
+        }
+
+        public void RefreshDifficultyHighlight()
+        {
+            if (_npcDifficultyLabel != null)
+                _npcDifficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(_match.CurrentNpcDifficulty)}";
+            foreach (var btn in _difficultyButtons)
+            {
+                bool active = btn.text == BotDifficultyProfile.DisplayName(_match.CurrentNpcDifficulty);
                 btn.EnableInClassList("active", active);
             }
         }

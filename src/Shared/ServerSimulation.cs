@@ -11,17 +11,39 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, CharacterState> _states = new();
 		private readonly Dictionary<ulong, CharacterDefinition> _defs = new();
 		private readonly Dictionary<ulong, byte> _kos = new();
-		private readonly Dictionary<ulong, (ulong attackerId, uint tick)> _lastHitCredits = new();
+		private readonly Dictionary<ulong, (ulong attackerId, uint tick, byte slot)> _lastHitCredits = new();
+		private readonly Dictionary<ulong, (ulong attackerId, uint tick, byte slot)> _lastHitContexts = new();
+		private readonly Dictionary<ulong, ulong> _lastActivationIds = new();
+		private ulong _nextActivationId;
 		private uint _tick;
 		public void SetTick(uint tick) => _tick = tick;
 		private readonly List<TimelinePresentationEvent> _presentationEvents = new();
 		private const uint KillCreditWindowTicks = 180;
+
+		/// <summary>Authoritative death context captured before cancellation and respawn.</summary>
+		public struct DeathEvent
+		{
+			public uint Tick;
+			public ulong EntityId;
+			public CharacterState State;
+			public ulong KillerEntityId;
+			public ulong LastHitEntityId;
+			public uint LastHitTick;
+			public byte LastHitSlot;
+			public string Boundary;
+		}
+
+		/// <summary>Blast deaths captured during the most recent simulation tick.</summary>
+		public List<DeathEvent> LastTickDeaths { get; } = new();
 
 		private readonly Dictionary<ulong, BakedAnimationData> _bakedData = new();
 		private readonly Dictionary<ulong, int> _animFrames = new();
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
+		private readonly HashSet<ulong> _lastTickOrdinaryActionOpportunities = new();
+		public IReadOnlyCollection<ulong> LastTickOrdinaryActionOpportunities
+			=> _lastTickOrdinaryActionOpportunities;
 		private readonly SpellResolver _spellResolver = new();
 		/// <summary>Authoritative KOs credited during the current match.</summary>
 		public byte GetKOs(ulong entityId) => _kos.TryGetValue(entityId, out var kos) ? kos : (byte)0;
@@ -72,6 +94,8 @@ namespace SlopArena.Shared
 			_states[id] = initialState;
 			_kos[id] = 0;
 			_lastHitCredits.Remove(id);
+			_lastHitContexts.Remove(id);
+			_lastActivationIds.Remove(id);
 
 			if (baked != null) _bakedData[id] = baked;
 			_animFrames[id] = 0;
@@ -98,7 +122,9 @@ namespace SlopArena.Shared
 			_activeAbilities.Remove(id);
 			_respawnPositions.Remove(id);
 			_kos.Remove(id);
+			_lastActivationIds.Remove(id);
 			_lastHitCredits.Remove(id);
+			_lastHitContexts.Remove(id);
 
 		}
 
@@ -106,6 +132,9 @@ namespace SlopArena.Shared
 		public CharacterDefinition GetDefinition(ulong id) => _defs.TryGetValue(id, out var d) ? d : null;
 		public void SetState(ulong id, CharacterState state) => _states[id] = state;
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
+		/// <summary>Latest activation identity for an entity, including lingering projectiles.</summary>
+		public ulong GetLastActivationId(ulong entityId)
+			=> _lastActivationIds.TryGetValue(entityId, out var id) ? id : 0;
 		public List<SpellResolver.EntityData> GetLastEntityData() => _lastEntityList;
 		public SpellResolver Resolver => _spellResolver;
 		public IReadOnlyList<TimelinePresentationEvent> GetPresentationEvents(bool clear = false)
@@ -126,6 +155,13 @@ namespace SlopArena.Shared
 		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def, short? activationAimYaw = null)
 		{
 			if (!_states.TryGetValue(entityId, out var state)) return;
+			unchecked
+			{
+				_nextActivationId++;
+				if (_nextActivationId == 0) _nextActivationId = 1;
+			}
+			ability.ActivationId = _nextActivationId;
+			_lastActivationIds[entityId] = ability.ActivationId;
 			ability.Resolver = _spellResolver;
 			ability.SimulationStates = _states;
 			ability.BakedData = _bakedData.TryGetValue(entityId, out var b) ? b : null;
@@ -549,6 +585,36 @@ namespace SlopArena.Shared
         }
 
 
+		private bool CanTakeOrdinaryAbilityAction(in CharacterState state, CharacterDefinition def)
+		{
+			if (state.HitstunTicks > 0 || state.HitstopTicks > 0
+				|| state.BurstRecoveryTicks > 0 || state.LandingLagTicks > 0)
+				return false;
+			bool iasaUnlocked = Simulation.IsIasaUnlocked(state, def);
+			if (state.State != ActionState.Idle && state.State != ActionState.Run && !iasaUnlocked)
+				return false;
+			if (state.AnimLockTicks > 0 && !iasaUnlocked)
+				return false;
+
+			bool airborne = !state.IsGrounded;
+			for (byte slot = 1; slot <= AbilitySlots.Count; slot++)
+			{
+				var cooked = def.GetCookedSlotAbility(slot, airborne);
+				var spec = def.GetSlotAbility(slot - 1, airborne);
+				if (cooked == null && spec == null)
+					continue;
+				if (state.GetCooldown(slot) != 0)
+					continue;
+				int maxCharges = cooked?.ChargePool?.MaxCharges
+					?? (spec?.Params != null && spec.Params.TryGetValue("max_charges", out var charges)
+						? (int)charges : 0);
+				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
+					continue;
+				return true;
+			}
+			return false;
+		}
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -559,9 +625,11 @@ namespace SlopArena.Shared
 			{
 				if (!_states.TryGetValue(id, out var state)) continue;
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
+				var def = _defs[id];
+				if (CanTakeOrdinaryAbilityAction(state, def))
+					_lastTickOrdinaryActionOpportunities.Add(id);
 				if (input.ActiveSlot == 0) continue;
 
-				var def = _defs[id];
 				// IASA early-out (issue #124): an attack stage that has passed its IasaTicks
 				// releases the anim lock for ability inputs — the press interrupts the recovery.
 				// IasaTicks = 0 (default) keeps the full ADR-0014 lock. Only the AnimLockTicks
@@ -732,7 +800,9 @@ namespace SlopArena.Shared
 				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				bool wasGrounded = state.IsGrounded;
-                Simulation.SimulateTick(ref state, def, input, _arena);
+                Simulation.SimulateTick(ref state, def, input, _arena, out bool ordinaryActionOpportunity);
+				if (ordinaryActionOpportunity)
+					_lastTickOrdinaryActionOpportunities.Add(id);
                 TryLedgeGrab(id, ref state, def);
 				// Landing lag (issue #125 / ADR-0021 §3): land mid-aerial → lock, unless the
 				// landing frame falls in an auto-cancel window. Only air-started moves resolve
@@ -777,6 +847,12 @@ namespace SlopArena.Shared
 					float hx = burstState.PX + sin * BurstConfig.HitboxForwardOffset;
 					float hy = burstState.PY + BurstConfig.HitboxHeightOffset;
 					float hz = burstState.PZ + cos * BurstConfig.HitboxForwardOffset;
+					unchecked
+					{
+						_nextActivationId++;
+						if (_nextActivationId == 0) _nextActivationId = 1;
+					}
+					ulong burstActivationId = _nextActivationId;
 					_spellResolver.Spawn(new Hitbox
 					{
 						X = hx, Y = hy, Z = hz,
@@ -789,6 +865,8 @@ namespace SlopArena.Shared
 						StunTicks = BurstConfig.HitboxStunTicks,
 						DurationTicks = BurstConfig.HitboxDurationTicks,
 						OwnerId = id,
+						ActivationId = burstActivationId,
+						ActivationAirborne = !burstState.IsGrounded,
 						FreezesOwner = false,   // user is already in recovery; freezing them inside it would muddy the punish window
 					});
 				}
@@ -1155,12 +1233,19 @@ namespace SlopArena.Shared
 					if (defenderAbility.TryCounter(ref targetState, ref attackerState,
 					    _defs[hit.OwnerEntityId], hit.Damage))
 					{
-						_lastHitCredits[hit.OwnerEntityId] = (hit.TargetEntityId, _tick);
+						_lastHitCredits[hit.OwnerEntityId] =
+							(hit.TargetEntityId, _tick, targetState.AttackSlot);
+						_lastHitContexts[hit.OwnerEntityId] =
+							(hit.TargetEntityId, _tick, targetState.AttackSlot);
 						_states[hit.TargetEntityId] = targetState;
 						_states[hit.OwnerEntityId] = attackerState;
 						continue;
 					}
 				}
+				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+					_lastHitCredits[hit.TargetEntityId] = (hit.OwnerEntityId, _tick, hit.AttackSlot);
+				if (hit.OwnerEntityId != 0)
+					_lastHitContexts[hit.TargetEntityId] = (hit.OwnerEntityId, _tick, hit.AttackSlot);
 				// Knockback direction: from attacker to target (not hitbox to target).
 				// The hitbox offset can place it past the target, inverting the direction.
 				// Smash convention: always push away from the attacker.
@@ -1192,8 +1277,7 @@ namespace SlopArena.Shared
 				// Placed after the invincibility/counter continues, so ignored hits never mark.
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
 					targetState.LastAttackerEntityId = hit.OwnerEntityId;
-				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
-					_lastHitCredits[hit.TargetEntityId] = (hit.OwnerEntityId, _tick);
+
 
 
 				float finalDamage = hit.Damage;
@@ -1355,7 +1439,7 @@ namespace SlopArena.Shared
             // values into the config itself before Resolver.Spawn: NilusVoidRift does
             // exactly that (its explosion IS the payload rift), while MankiBazooka and
             // NilusEventHorizon use their authored configs.
-			foreach (var (ex, ey, ez, explosion, ownerId) in _spellResolver.DrainPendingExplosions())
+			foreach (var (ex, ey, ez, explosion, ownerId, attackSlot, activationId, airborne) in _spellResolver.DrainPendingExplosions())
 			{
 				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();
 				_spellResolver.Spawn(new Hitbox
@@ -1370,6 +1454,9 @@ namespace SlopArena.Shared
 					StunTicks = explosion.StunTicks,
 					DurationTicks = explosion.DurationTicks,
 					OwnerId = ownerId,
+					AttackSlot = attackSlot,
+					ActivationId = activationId,
+					ActivationAirborne = airborne,
 					CanHitOwner = explosion.CanHitOwner,
 					RehitIntervalTicks = explosion.RehitIntervalTicks,
 				});
@@ -1450,20 +1537,47 @@ namespace SlopArena.Shared
 			{
 				var d = _defs[id];
 				var oldState = _states[id];
-				if (_activeAbilities.TryGetValue(id, out var deadAbility))
+				string boundary = oldState.PY < _blastLines.KillHeight ? "bottom"
+					: oldState.PY > _blastLines.KillTop ? "top"
+					: oldState.PX < _blastLines.KillMinX ? "minX"
+					: oldState.PX > _blastLines.KillMaxX ? "maxX"
+					: oldState.PZ < _blastLines.KillMinZ ? "minZ"
+					: "maxZ";
+				ulong lastHitEntityId = 0;
+				uint lastHitTick = 0;
+				byte lastHitSlot = 0;
+				ulong killerEntityId = 0;
+				if (_lastHitContexts.TryGetValue(id, out var lastHit))
 				{
-					deadAbility.OnCancel(ref oldState);
-					_activeAbilities.Remove(id);
+					lastHitEntityId = lastHit.attackerId;
+					lastHitTick = lastHit.tick;
+					lastHitSlot = lastHit.slot;
 				}
 				if (_lastHitCredits.TryGetValue(id, out var credit)
 				    && _tick - credit.tick <= KillCreditWindowTicks
 				    && credit.attackerId != id
 				    && _kos.ContainsKey(credit.attackerId))
+					killerEntityId = credit.attackerId;
+				LastTickDeaths.Add(new DeathEvent
 				{
-					if (_kos[credit.attackerId] < byte.MaxValue)
-						_kos[credit.attackerId]++;
+					Tick = _tick,
+					EntityId = id,
+					State = oldState,
+					KillerEntityId = killerEntityId,
+					LastHitEntityId = lastHitEntityId,
+					LastHitTick = lastHitTick,
+					LastHitSlot = lastHitSlot,
+					Boundary = boundary,
+				});
+				if (_activeAbilities.TryGetValue(id, out var deadAbility))
+				{
+					deadAbility.OnCancel(ref oldState);
+					_activeAbilities.Remove(id);
 				}
+				if (killerEntityId != 0 && _kos[killerEntityId] < byte.MaxValue)
+					_kos[killerEntityId]++;
 				_lastHitCredits.Remove(id);
+				_lastHitContexts.Remove(id);
 				byte newDeaths = oldState.Deaths < byte.MaxValue ? (byte)(oldState.Deaths + 1) : oldState.Deaths;
 
 
@@ -1514,6 +1628,8 @@ namespace SlopArena.Shared
 
 		public void Tick(Dictionary<ulong, InputState> inputs)
 		{
+			LastTickDeaths.Clear();
+			_lastTickOrdinaryActionOpportunities.Clear();
 			_tick++;
 			PreTickAbilities(inputs);
 

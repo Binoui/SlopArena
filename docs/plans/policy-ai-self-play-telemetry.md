@@ -100,6 +100,14 @@ no `Dash` while `BurstRecoveryTicks > 0`; no duplicate one-shot flags across tic
 (one-shot semantics are the sim's job — the bot emits a fresh `InputState` per tick, same
 contract as a client).
 
+Committed attacks must keep their horizontal travel on supported arena ground, with a
+capsule-radius margin at the bounds. The bot checks the path, not just the endpoint.
+Cyclone Kick uses the remaining cooked timeline for its drive duration (70 ticks in
+the current package, not the capability's 40-tick parameter). Airborne attacks also
+check inherited horizontal velocity through their commitment, including aim time.
+Queued attacks and confirmed-hit follow-ups repeat this check before pressing a slot.
+These are bot choices; the move's simulation and authored balance values do not change.
+
 ## Self-play runner (`SelfPlayMatch`)
 
 - Register two entities (player id 1 / NPC id 100, mirrored spawns), `StockMatchRule`
@@ -112,19 +120,30 @@ contract as a client).
 
 ## Telemetry (`MatchRecorder`)
 
-- **Swing record** — one per slot press: attacker, slot, window `[trigger,
-  trigger+duration]` of the pressed move, whether any `HitResult` from that attacker landed
-  in the window (connect) or not (whiff), and — on whiff — the target's position relative
-  to the attacker at the window start, normalized into the attacker's facing frame
-  (`Δ` rotated by `−FacingYaw`): `relX` (side), `relY` (height), `relZ` (forward).
-- **Hit events** — attacker, target, damage, tick, attacker state at hit (grounded/air).
+- **Swing record** — one per authoritative accepted activation, separate from attempted
+  slot inputs. A simulation-scoped activation ID follows the ability, child capabilities,
+  hitboxes, projectiles, and explosions. A swing connects only when its own activation
+  produces a hit, including delayed hits after another attack or a stock loss. The
+  recorded move window is metadata, not an attribution cutoff. Target-relative
+  `relX`/`relY`/`relZ` are measured in the attacker's facing frame at activation.
+- **Hit events** — attacker, target, resolved damage, tick, activation ID, and the
+  grounded/aerial variant at activation, not the attacker's state when the hit lands.
+- **Death events** — authoritative pre-cancellation/pre-respawn state, blast boundary,
+  credited killer, and latest hit source/slot/tick. A historical hit does not imply KO
+  credit: stale, self-inflicted, and unattributed deaths remain distinguishable.
+  Death and last-hit ticks use the simulation clock (first `Tick` is 1 unless
+  `SetTick` overrides it); recorder input/hit/sample ticks use the caller's loop index
+  (zero-based in `SelfPlayMatch` and `SpectateView`).
 - **Combo links** — consecutive hits by the same attacker on the same target with the
   target in hitstun throughout the gap (derived from hit events + stun windows).
 - **Per-tick samples** — positions only (for the stats provenance; the spatial maps use the
   swing records, not raw positions — that is the whole correction).
 
-Derived stats: hit rate, whiff rate, damage per stock, avg/max combo length, per-move
-usage + per-move hit/whiff split, match duration, deaths.
+Derived stats: hit rate, whiff rate, cumulative resolved hit damage, damage per match,
+damage per stock lost, avg/max combo length, per-move usage + hit/whiff split, executed
+tick count, and total/credited/uncredited deaths. Damage sums retain fractional hits
+across respawns rather than reading final percent. Damage per stock lost divides by
+actual deaths; it is `null` in JSON and `n/a` in text when there are no deaths.
 
 ## Reach envelope (deterministic threat zone)
 

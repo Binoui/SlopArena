@@ -97,4 +97,242 @@ public class ArenaShippingTests
         Assert.True(lines.KillMaxZ > arena.MaxZ,
             $"{fileName}: max Z line {lines.KillMaxZ} not beyond mesh {arena.MaxZ}");
     }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void IndustrialRooftop_HeldRunStopsAtPenthouseWall(CharacterClass cls)
+    {
+        const float wallX = 2.5f;
+        const float surfaceY = -1.2f;
+        var arena = LoadIndustrialRooftop();
+        RequireHorizontalSurface(arena, "penthouse wall route floor", 0f, surfaceY, 20.5f);
+        RequireVerticalWall(arena, "penthouse west face", wallX, surfaceY, 20.5f);
+        var def = TestHelpers.ResolveDef(cls);
+        var state = TestHelpers.PlayerState(0f, 20.5f);
+        state.PY = TestHelpers.GroundPY(def, surfaceY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState> { [1] = TestHelpers.Input(moveX: 1f) };
+        bool contacted = false;
+        float contactX = 0f;
+
+        for (int tick = 0; tick < 120; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.PX <= wallX - def.CapsuleRadius + 0.03f,
+                Trace(cls, "penthouse wall", tick, inputs[1], current, "wall penetration"));
+            Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def, surfaceY)) <= 0.03f,
+                Trace(cls, "penthouse wall", tick, inputs[1], current, "wall climb"));
+            Assert.True(current.IsGrounded,
+                Trace(cls, "penthouse wall", tick, inputs[1], current, "groundedness"));
+            if (!contacted && current.PX >= wallX - def.CapsuleRadius - 0.03f)
+            {
+                contacted = true;
+                contactX = current.PX;
+            }
+        }
+
+        Assert.True(contacted,
+            $"{cls}: penthouse wall route never reached contact; final={Trace(cls, "penthouse wall", 119, inputs[1], sim.GetState(1), "contact")}");
+        inputs[1] = TestHelpers.Input(moveX: -1f);
+        for (int tick = 120; tick < 150; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.PX <= wallX - def.CapsuleRadius + 0.03f,
+                Trace(cls, "penthouse wall reverse", tick, inputs[1], current, "penetration"));
+            Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def, surfaceY)) <= 0.03f,
+                Trace(cls, "penthouse wall reverse", tick, inputs[1], current, "climb"));
+            Assert.True(current.IsGrounded,
+                Trace(cls, "penthouse wall reverse", tick, inputs[1], current, "groundedness"));
+        }
+
+        var away = sim.GetState(1);
+        Assert.True(contactX - away.PX >= 0.5f,
+            $"{cls}: penthouse wall reverse failed; contactX={contactX:F3}, final={Trace(cls, "penthouse wall reverse", 149, inputs[1], away, "movement away")}");
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void IndustrialRooftop_RunOffRoofFallsImmediately(CharacterClass cls)
+    {
+        const float roofY = 0f;
+        const float roofEdgeX = 17f;
+        var arena = LoadIndustrialRooftop();
+        RequireHorizontalSurface(arena, "main roof walk-off", 12f, roofY, -5f);
+        var def = TestHelpers.ResolveDef(cls);
+        var state = TestHelpers.PlayerState(12f, -5f);
+        state.PY = TestHelpers.GroundPY(def, roofY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var input = TestHelpers.Input(moveX: 1f);
+        var inputs = new Dictionary<ulong, InputState> { [1] = input };
+        int leaveTick = -1;
+        int fallTick = -1;
+
+        for (int tick = 0; tick < 120; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.NotEqual(ActionState.LedgeHang, current.State);
+            if (leaveTick < 0 && !current.IsGrounded)
+                leaveTick = tick;
+            if (leaveTick >= 0)
+            {
+                Assert.True(current.VY <= 0.001f,
+                    Trace(cls, "main roof walk-off", tick, input, current, "upward launch"));
+                if (current.VY < 0f && fallTick < 0)
+                {
+                    fallTick = tick;
+                    Assert.True(tick - leaveTick <= 2,
+                        Trace(cls, "main roof walk-off", tick, input, current, "fall delay"));
+                    Assert.True(current.PY - def.CapsuleHeight * 0.5f < roofY - 0.001f,
+                        Trace(cls, "main roof walk-off", tick, input, current, "height drop"));
+                }
+                if (current.PY - def.CapsuleHeight * 0.5f <= roofY - 1f)
+                {
+                    Assert.True(fallTick >= 0,
+                        Trace(cls, "main roof walk-off", tick, input, current, "fall start"));
+                    return;
+                }
+            }
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(leaveTick >= 0,
+            $"{cls}: main roof route never left x={roofEdgeX}; final={Trace(cls, "main roof walk-off", 119, input, final, "leave")}");
+        Assert.True(fallTick >= 0,
+            $"{cls}: main roof route did not fall within two ticks; final={Trace(cls, "main roof walk-off", 119, input, final, "fall")}");
+        Assert.True(final.PY - def.CapsuleHeight * 0.5f <= roofY - 1f,
+            $"{cls}: main roof route did not descend 1m before timeout; final={Trace(cls, "main roof walk-off", 119, input, final, "depth")}");
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void IndustrialRooftop_JumpBetweenServiceDecksLands(CharacterClass cls)
+    {
+        const float upperY = 4.43f;
+        const float lowerY = 2.01f;
+        var arena = LoadIndustrialRooftop();
+        RequireHorizontalSurface(arena, "upper service deck", -2.5f, upperY, 2.5f);
+        RequireHorizontalSurface(arena, "lower service deck", -7f, lowerY, 2.5f);
+        var def = TestHelpers.ResolveDef(cls);
+        var state = TestHelpers.PlayerState(-2.5f, 2.5f);
+        state.PY = TestHelpers.GroundPY(def, upperY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        bool tookOff = false;
+        bool crossedGap = false;
+        bool landed = false;
+        int landingTick = -1;
+        float landedX = 0f;
+
+        for (int tick = 0; tick < 180; tick++)
+        {
+            var before = sim.GetState(1);
+            bool jumpPress = tick == 0;
+            float moveX = !tookOff || before.PX > (landed ? landedX - 0.75f : -7f) ? -1f : 0f;
+            inputs[1] = TestHelpers.Input(moveX: moveX, jump: jumpPress, jumpHeld: true);
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            if (!tookOff && !current.IsGrounded && current.VY > 0f)
+                tookOff = true;
+            if (tookOff && !crossedGap && before.PX > -4.57f && current.PX <= -4.57f)
+                crossedGap = true;
+            if (tookOff && current.IsGrounded && !landed)
+            {
+                Assert.True(current.PX <= -4.57f + 0.03f,
+                    Trace(cls, "service deck jump", tick, inputs[1], current, "landed before lower deck"));
+                landed = true;
+                landingTick = tick;
+                landedX = current.PX;
+                Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def, lowerY)) <= 0.03f,
+                    Trace(cls, "service deck jump", tick, inputs[1], current, "lower deck landing height"));
+            }
+            if (landed && tick - landingTick >= 20)
+                break;
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(tookOff,
+            $"{cls}: service deck route had no takeoff; final={Trace(cls, "service deck jump", 179, inputs[1], final, "takeoff")}");
+        Assert.True(crossedGap,
+            $"{cls}: service deck route did not cross the 0.57m gap airborne; final={Trace(cls, "service deck jump", 179, inputs[1], final, "gap")}");
+        Assert.True(landed,
+            $"{cls}: service deck route did not land on the lower deck; final={Trace(cls, "service deck jump", 179, inputs[1], final, "landing")}");
+        Assert.True(final.IsGrounded && MathF.Abs(final.PY - TestHelpers.GroundPY(def, lowerY)) <= 0.03f,
+            Trace(cls, "service deck jump", landingTick + 20, inputs[1], final, "post-landing support"));
+        Assert.True(landedX - final.PX >= 0.5f,
+            $"{cls}: lower-deck movement after landing was insufficient; landedX={landedX:F3}, final={Trace(cls, "service deck jump", landingTick + 20, inputs[1], final, "post-landing travel")}");
+    }
+
+    private static ArenaDefinition LoadIndustrialRooftop()
+    {
+        string path = Path.Combine(RepoRoot(), "data", "arenas", "industrial_rooftop.arena");
+        var arenaOpt = ArenaBinaryFormat.LoadFromFile(path);
+        Assert.True(arenaOpt.HasValue, "industrial_rooftop: failed to parse shipped arena");
+        ArenaDefinition arena = arenaOpt.Value;
+        Assert.Equal("industrial_rooftop", arena.Name);
+        Assert.NotEmpty(arena.CollisionTriangles);
+        arena.SpatialGrid = ArenaCollision.BuildSpatialGrid(in arena);
+        return arena;
+    }
+
+    private static void RequireHorizontalSurface(ArenaDefinition arena, string route, float x, float y, float z)
+    {
+        foreach (var triangle in arena.CollisionTriangles)
+        {
+            if (MathF.Abs(triangle.AY - y) > 0.01f
+                || MathF.Abs(triangle.BY - y) > 0.01f
+                || MathF.Abs(triangle.CY - y) > 0.01f)
+                continue;
+            float minX = MathF.Min(triangle.AX, MathF.Min(triangle.BX, triangle.CX));
+            float maxX = MathF.Max(triangle.AX, MathF.Max(triangle.BX, triangle.CX));
+            float minZ = MathF.Min(triangle.AZ, MathF.Min(triangle.BZ, triangle.CZ));
+            float maxZ = MathF.Max(triangle.AZ, MathF.Max(triangle.BZ, triangle.CZ));
+            if (x >= minX - 0.01f && x <= maxX + 0.01f
+                && z >= minZ - 0.01f && z <= maxZ + 0.01f)
+                return;
+        }
+        Assert.Fail($"industrial_rooftop route prerequisite missing horizontal surface '{route}' at ({x:F2},{y:F2},{z:F2})");
+    }
+
+    private static void RequireVerticalWall(ArenaDefinition arena, string route, float x, float y, float z)
+    {
+        foreach (var triangle in arena.CollisionTriangles)
+        {
+            if (MathF.Abs(triangle.AX - x) > 0.01f
+                || MathF.Abs(triangle.BX - x) > 0.01f
+                || MathF.Abs(triangle.CX - x) > 0.01f)
+                continue;
+            float minY = MathF.Min(triangle.AY, MathF.Min(triangle.BY, triangle.CY));
+            float maxY = MathF.Max(triangle.AY, MathF.Max(triangle.BY, triangle.CY));
+            float minZ = MathF.Min(triangle.AZ, MathF.Min(triangle.BZ, triangle.CZ));
+            float maxZ = MathF.Max(triangle.AZ, MathF.Max(triangle.BZ, triangle.CZ));
+            if (y >= minY - 0.01f && y <= maxY + 0.01f
+                && z >= minZ - 0.01f && z <= maxZ + 0.01f)
+                return;
+        }
+        Assert.Fail($"industrial_rooftop route prerequisite missing wall '{route}' at ({x:F2},{y:F2},{z:F2})");
+    }
+
+    private static string Trace(CharacterClass cls, string route, int tick, InputState input,
+        CharacterState state, string contract)
+        => $"{cls} route={route} tick={tick} contract={contract} input=({input.MoveX:F2},{input.MoveY:F2}) " +
+           $"pos=({state.PX:F3},{state.PY:F3},{state.PZ:F3}) " +
+           $"vel=({state.VX:F3},{state.VY:F3},{state.VZ:F3}) grounded={state.IsGrounded} state={state.State}";
 }

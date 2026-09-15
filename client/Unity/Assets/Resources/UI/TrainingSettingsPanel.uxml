@@ -3,6 +3,12 @@
     <ui:VisualElement name="ts-panel" class="ts-panel">
         <ui:Label name="ts-title" class="ts-title" text="TRAINING SETTINGS" />
         <ui:Toggle name="no-cd-toggle" class="ts-toggle" label="No ability cooldowns (player)" />
+        <ui:Label name="npc-difficulty-label" class="ts-label" text="CPU DIFFICULTY: NORMAL" />
+        <ui:VisualElement name="difficulty-buttons" class="ts-btn-row">
+            <ui:Button name="difficulty-easy" class="ts-btn ts-mode-btn" text="EASY" />
+            <ui:Button name="difficulty-normal" class="ts-btn ts-mode-btn" text="NORMAL" />
+            <ui:Button name="difficulty-hard" class="ts-btn ts-mode-btn" text="HARD" />
+        </ui:VisualElement>
         <ui:Label name="npc-mode-label" class="ts-label" text="NPC MODE: HEURISTIC" />
         <ui:VisualElement name="mode-buttons" class="ts-btn-row">
             <ui:Button name="mode-heuristic" class="ts-btn ts-mode-btn" text="HEURISTIC" />

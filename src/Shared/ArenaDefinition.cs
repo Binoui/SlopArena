@@ -239,6 +239,25 @@ namespace SlopArena.Shared
         /// <summary>Returns true when the arena has authoritative triangle collision.</summary>
         public static bool HasTriangles(in ArenaDefinition arena)
             => arena.CollisionTriangles is { Length: > 0 };
+        internal static bool IsUpwardFacingTriangle(int triangleIndex, in ArenaDefinition arena)
+        {
+            if (arena.CollisionTriangles == null
+                || triangleIndex < 0 || triangleIndex >= arena.CollisionTriangles.Length)
+                return false;
+            var triangle = arena.CollisionTriangles[triangleIndex];
+            float abx = triangle.BX - triangle.AX;
+            float aby = triangle.BY - triangle.AY;
+            float abz = triangle.BZ - triangle.AZ;
+            float acx = triangle.CX - triangle.AX;
+            float acy = triangle.CY - triangle.AY;
+            float acz = triangle.CZ - triangle.AZ;
+            float normalY = abz * acx - abx * acz;
+            float normalX = aby * acz - abz * acy;
+            float normalZ = abx * acy - aby * acx;
+            float length = MathF.Sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+            return length > 0.000001f && normalY / length > 0.5f;
+        }
+
 
         /// <summary>
         /// Returns unique triangles overlapping an AABB. The grid is optional: directly
@@ -496,6 +515,7 @@ namespace SlopArena.Shared
                 var triangle = arena.CollisionTriangles[triangleIndex];
                 if (!TryCapsuleTriangleDistance(px, py, pz, halfLine,
                         in triangle, out var closest)
+                    || !IsUpwardFacingTriangle(triangleIndex, in arena)
                     || closest.Distance > radius + 0.002f
                     || closest.NormalY <= 0.5f)
                     continue;

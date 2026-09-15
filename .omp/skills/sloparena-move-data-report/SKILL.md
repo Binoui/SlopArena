@@ -26,6 +26,33 @@ triggers:
 normal hitboxes at several victim damage percents, and writes a markdown report. No xUnit, no assertion, no
 golden file — pure telemetry for a human to read. Reference: `docs/systems/move-data-report.md`.
 
+## Aerial/gamefeel measurement safeguards
+
+Use the opt-in `AerialApproachReport` and `AerialProfileReport` commands and schema notes
+in `docs/systems/move-data-report.md`; keep experiment results there, not in this skill.
+
+- Start with the player's intended action and recurring frustration, ideally footage.
+  The player supplies experience, not a required diagnosis. Simulation explains what
+  happened; headless success cannot establish satisfying controls or visually fair contact.
+- Normalize policy comparisons by entity-minutes: ticks / 3,600 at 60 Hz. A mirror
+  aggregate contains two players; a jump-in side against grounded contains one.
+- Count connected attack activations, not individual multi-hit contacts. Separate
+  offensive, recovery-tagged and ambiguous moves; metadata is not proof of intent.
+- Match positions at actual takeoff and measure actual velocities. Shared normalizes
+  nonzero movement input, so reducing stick magnitude does not establish lower speed.
+  Distinguish not-yet-airborne, rejected casts, landing, and accepted aerial casts.
+- Sweep useful distances as well as press timings; report disjoint contiguous success
+  windows separately. A sweep containing intentionally bad opportunities is a coverage
+  measurement, not player accuracy. Compare matched conditions before pooling results.
+- Zero-drift versus running changes the whole approach. It does not isolate retained
+  momentum during an attack or justify braking, homing, or global tuning by itself.
+- Separate actual authored contact identities from visual animation parts. Known broken
+  moves and target-size coverage issues must not become evidence of global movement flaws.
+- Union overlapping temporal windows per entity before aggregating damage/deaths; label
+  temporal association and self-hits explicitly. Preserve content hashes and limitations.
+- Stop broad collection when it no longer distinguishes actionable hypotheses. Prefer
+  one human-reported interaction, one bounded experiment, then human feel validation.
+
 ## Usage
 
 ```bash

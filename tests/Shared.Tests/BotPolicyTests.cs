@@ -17,6 +17,76 @@ public class BotPolicyTests
     private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
     private static readonly HeuristicBotPolicy Policy = new();
 
+    private static ArenaDefinition RecoveryArena()
+    {
+        const int size = 33;
+        var data = new float[size * size];
+        Array.Fill(data, float.MinValue);
+        for (int z = 10; z <= 22; z++)
+        for (int x = 10; x <= 22; x++)
+            data[z * size + x] = 0f;
+        return new ArenaDefinition
+        {
+            Name = "recovery-test",
+            KillHeight = -20f,
+            MinX = -6f,
+            MaxX = 6f,
+            MinZ = -6f,
+            MaxZ = 6f,
+            Heightmap = new ArenaHeightmap
+            {
+                Data = data,
+                Width = size,
+                Height = size,
+                CellSize = 1f,
+                OriginX = -16f,
+                OriginZ = -16f,
+            },
+            SpawnPoints = new[] { new SpawnPoint { X = 0f, Y = 0f, Z = 0f } },
+        };
+    }
+
+    private static ArenaDefinition BlockedRecoveryArena()
+    {
+        var arena = RecoveryArena();
+        arena.MinX = -5f;
+        arena.MaxX = 5f;
+        arena.MinZ = -5f;
+        arena.MaxZ = 5f;
+        for (int z = 0; z < arena.Heightmap.Height; z++)
+        for (int x = 0; x < arena.Heightmap.Width; x++)
+            if (x < 10 || x > 16 || z < 10 || z > 22)
+                arena.Heightmap.Data[z * arena.Heightmap.Width + x] = float.MinValue;
+
+        arena.CollisionTriangles = new[]
+        {
+            new CollisionTriangle
+            {
+                AX = -6f, AY = 0f, AZ = -6f,
+                BX = -6f, BY = 0f, BZ = 6f,
+                CX = 0f, CY = 0f, CZ = -6f,
+            },
+            new CollisionTriangle
+            {
+                AX = 0f, AY = 0f, AZ = 6f,
+                BX = 0f, BY = 0f, BZ = -6f,
+                CX = -6f, CY = 0f, CZ = 6f,
+            },
+            new CollisionTriangle
+            {
+                AX = -6f, AY = 2f, AZ = -6f,
+                BX = -6f, BY = 2f, BZ = 6f,
+                CX = 6f, CY = 2f, CZ = -6f,
+            },
+            new CollisionTriangle
+            {
+                AX = 6f, AY = 2f, AZ = 6f,
+                BX = 6f, BY = 2f, BZ = -6f,
+                CX = -6f, CY = 2f, CZ = 6f,
+            },
+        };
+        return arena;
+    }
     private static CharacterState Self(float x = 0f, float z = 0f)
     {
         var s = TestHelpers.PlayerState(x, z);
@@ -541,6 +611,287 @@ public class BotPolicyTests
             Assert.True(aimed, $"seed {seed} never entered the directional plan");
             Assert.True(moved, $"seed {seed} never moved through the directional dash");
         }
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void StageRecovery_ReturnsToAStageSurface(CharacterClass character)
+    {
+        var arena = RecoveryArena();
+        var def = TestHelpers.ResolveDef(character);
+        for (int seed = 0; seed < 4; seed++)
+        {
+            var state = TestHelpers.PlayerState(x: 8f);
+            state.PY = 4f;
+            state.VY = -3f;
+            state.IsGrounded = false;
+            state.AirTimeTicks = def.Movement.FloatWindowTicks;
+            state.JumpsLeft = def.Movement.MaxJumps;
+            var sim = TestHelpers.MakeSim(arena);
+            sim.RegisterEntity(1, def, state);
+            var target = TestHelpers.NpcState(x: 20f);
+            target.PY = TestHelpers.GroundPY(def);
+            sim.RegisterEntity(100, def, target);
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            var rng = new Random(seed);
+            bool returned = false;
+
+            for (int tick = 0; tick < 180; tick++)
+            {
+                var input = Policy.Decide(sim.GetState(1), sim.GetState(100), def,
+                    rng, memory, arena);
+                sim.Tick(new Dictionary<ulong, InputState>
+                {
+                    [1] = input,
+                    [100] = default,
+                });
+                var current = sim.GetState(1);
+                if (current.IsGrounded && current.PX >= arena.MinX
+                    && current.PX <= arena.MaxX && current.PZ >= arena.MinZ
+                    && current.PZ <= arena.MaxZ)
+                {
+                    returned = true;
+                    break;
+                }
+                Assert.True(current.PY > arena.KillHeight,
+                    $"{character} seed {seed} crossed blast height at tick {tick}");
+            }
+
+            Assert.True(returned, $"{character} seed {seed} did not return to stage");
+        }
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void RecoveryMove_IsReservedWhenOffstage(CharacterClass character)
+    {
+        var arena = RecoveryArena();
+        var def = TestHelpers.ResolveDef(character);
+        var self = TestHelpers.PlayerState(x: 10f);
+        self.PY = 4f;
+        self.VY = -5f;
+        self.IsGrounded = false;
+        self.JumpsLeft = 0;
+        self.DashCooldownTicks = 999;
+        var target = TestHelpers.NpcState(x: 20f);
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        int delay = BotDifficultyProfile.ForDifficulty(memory.Difficulty).ReactionDelayTicks;
+        for (int i = 0; i <= delay; i++)
+            memory.ObserveOpponent(target);
+
+        var input = Policy.Decide(self, target, def, new Random(0), memory, arena);
+
+        Assert.Equal(AbilitySlots.E, input.ActiveSlot);
+    }
+
+    [Fact]
+    public void RecoveryRejectsHeightmapSurfaceBehindBlockingTriangle()
+    {
+        var arena = BlockedRecoveryArena();
+        var def = TestHelpers.FightGuyDef;
+        var self = TestHelpers.PlayerState(x: 5.5f);
+        self.PY = 4f;
+        self.VY = -5f;
+        self.IsGrounded = false;
+        self.JumpsLeft = 0;
+        self.DashCooldownTicks = 999;
+        var target = TestHelpers.NpcState(x: 20f);
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+
+        var input = Policy.Decide(self, target, def, new Random(0), memory, arena);
+
+        Assert.Equal(0, input.ActiveSlot);
+        Assert.True(input.MoveX < -0.5f, "blocked recovery target did not fall back toward stage");
+    }
+
+    [Fact]
+    public void LedgeHang_UsesLegalStageSideExit()
+    {
+        var arena = RecoveryArena();
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState(x: 7.2f);
+        state.PY = TestHelpers.GroundPY(def);
+        state.VY = -1f;
+        state.IsGrounded = false;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(x: 20f));
+        for (int tick = 0; tick < 30 && sim.GetState(1).State != ActionState.LedgeHang; tick++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default, [100] = default });
+
+        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        var input = Policy.Decide(sim.GetState(1), sim.GetState(100), def,
+            new Random(0), memory, arena);
+        Assert.True(input.MoveX < -0.5f, "ledge exit did not move toward stage");
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = input, [100] = default });
+        Assert.NotEqual(ActionState.LedgeHang, sim.GetState(1).State);
+        Assert.True(sim.GetState(1).IsGrounded);
+    }
+
+    [Fact]
+    public void StageSideEdgeguard_DoesNotPursueOffstageTarget()
+    {
+        var arena = RecoveryArena();
+        var def = TestHelpers.FightGuyDef;
+        var self = TestHelpers.PlayerState(x: 5f);
+        self.PY = TestHelpers.GroundPY(def);
+        var target = TestHelpers.NpcState(x: 10f);
+        target.PY = 2f;
+        target.IsGrounded = false;
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        int delay = BotDifficultyProfile.ForDifficulty(memory.Difficulty).ReactionDelayTicks;
+        for (int i = 0; i <= delay; i++)
+            memory.ObserveOpponent(target);
+
+        for (int seed = 0; seed < 8; seed++)
+        {
+            var input = Policy.Decide(self, target, def, new Random(seed), memory, arena);
+            Assert.False(input.Jump);
+            Assert.True(input.MoveX <= 0f,
+                $"seed {seed} pursued offstage target with MoveX={input.MoveX}");
+        }
+    }
+    private static ArenaDefinition LungeArena()
+        => new()
+        {
+            MinX = -30f, MaxX = 30f, MinZ = -30f, MaxZ = 30f,
+            KillHeight = -10f,
+            SpawnPoints = new[] { new SpawnPoint() },
+            Heightmap = new ArenaHeightmap
+            {
+                Data = new float[60 * 60], Width = 60, Height = 60,
+                CellSize = 1f, OriginX = -30f, OriginZ = -30f,
+            },
+        };
+
+    private static CharacterState OnlyCyclone(float z, float yaw)
+    {
+        var self = Self(z: z);
+        self.FacingYaw = yaw;
+        foreach (var slot in new[]
+        {
+            AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4,
+            AbilitySlots.A, AbilitySlots.E, AbilitySlots.F,
+        })
+            self.SetCooldown(slot, 999);
+        return self;
+    }
+
+    [Fact]
+    public void CommittedLunge_RejectsOffstageTravel_ButKeepsInwardAttackAvailable()
+    {
+        var arena = LungeArena();
+        var policy = new HeuristicBotPolicy();
+        int inwardAttacks = 0;
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            var target = Opponent(z: 28f);
+            Prime(memory, target);
+            var outward = policy.Decide(OnlyCyclone(25f, 0f), target,
+                Def, new Random(seed), memory, arena);
+            Assert.NotEqual(AbilitySlots.R, outward.ActiveSlot);
+
+            memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            target = Opponent(z: 22f);
+            Prime(memory, target);
+            var inward = policy.Decide(OnlyCyclone(25f, MathF.PI), target,
+                Def, new Random(seed), memory, arena);
+            if (inward.ActiveSlot == AbilitySlots.R) inwardAttacks++;
+        }
+        Assert.True(inwardAttacks > 0, "Safe inward Cyclone must remain usable.");
+    }
+
+    [Fact]
+    public void CommittedLunge_AccountsForFullTimeline_NotShorterCapabilityParameter()
+    {
+        var arena = LungeArena();
+        var target = Opponent(z: 18f);
+        var policy = new HeuristicBotPolicy();
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            // The capability's 40-tick estimate fits; the actual 70-tick lunge does not.
+            var input = policy.Decide(OnlyCyclone(15f, 0f), target,
+                Def, new Random(seed), memory, arena);
+            Assert.NotEqual(AbilitySlots.R, input.ActiveSlot);
+        }
+    }
+
+    [Fact]
+    public void ConfirmedHitFollowUp_RejectsOffstageTravel()
+    {
+        var arena = LungeArena();
+        var target = Opponent(z: 28f);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 60;
+        var policy = new HeuristicBotPolicy();
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            memory.RecordOpponentHit(AbilitySlots.A, target, 60, 0);
+            Prime(memory, target);
+            var input = policy.Decide(OnlyCyclone(25f, 0f), target,
+                Def, new Random(seed), memory, arena);
+            Assert.NotEqual(AbilitySlots.R, input.ActiveSlot);
+        }
+    }
+
+    [Fact]
+    public void CommittedLunge_RejectsGapEvenWhenEndpointHasSupport()
+    {
+        var arena = LungeArena();
+        for (int z = 34; z < 37; z++)
+        for (int x = 0; x < 60; x++)
+            arena.Heightmap.Data[z * 60 + x] = float.MinValue;
+        var target = Opponent(z: 3f);
+        var policy = new HeuristicBotPolicy();
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            var input = policy.Decide(OnlyCyclone(0f, 0f), target,
+                Def, new Random(seed), memory, arena);
+            Assert.NotEqual(AbilitySlots.R, input.ActiveSlot);
+        }
+    }
+
+    [Fact]
+    public void AerialAttack_RejectsOutwardMomentumDuringLock_ButAllowsInwardMomentum()
+    {
+        var arena = LungeArena();
+        var self = OnlyCyclone(25f, 0f);
+        self.SetCooldown(AbilitySlots.R, 999);
+        self.SetCooldown(AbilitySlots.A, 0);
+        self.IsGrounded = false;
+        self.PY = 3f;
+        var target = Opponent(z: 28f);
+        var policy = new HeuristicBotPolicy();
+        int safeShots = 0;
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            self.VZ = 17f;
+            var outward = policy.Decide(self, target, Def, new Random(seed), memory, arena);
+            Assert.NotEqual(AbilitySlots.A, outward.ActiveSlot);
+
+            memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            self.VZ = -17f;
+            var inward = policy.Decide(self, target, Def, new Random(seed), memory, arena);
+            if (inward.ActiveSlot == AbilitySlots.A) safeShots++;
+        }
+        Assert.True(safeShots > 0, "Safe inherited momentum must not disable aerial attacks.");
     }
 
 }

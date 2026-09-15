@@ -142,7 +142,7 @@ namespace SlopArena.Shared.Abilities
             ushort explosionStunTicks = _parameters?.ExplosionStunTicks ?? (ushort)GetParam(def, "explosion_stun_ticks", 20f);
             ushort explosionDurationTicks = _parameters?.ExplosionDurationTicks ?? (ushort)GetParam(def, "explosion_duration_ticks", 6f);
 
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX,
                 Y = s.PY + 1.0f,

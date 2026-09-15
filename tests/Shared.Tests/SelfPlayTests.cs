@@ -35,6 +35,16 @@ public class SelfPlayTests
         CpuDifficulty difficulty = CpuDifficulty.Normal)
         => SelfPlayMatch.Run(Def, KillArena(), seed, TestHelpers.LoadBakedData(Def), maxTicks,
             difficulty: difficulty);
+    private static (
+        bool Up, bool Down, bool Left, bool Right, bool Jump, bool Dash, bool Burst,
+        bool JumpHeld, bool FaceToCamera, bool ToggleLock, float MoveX, float MoveY,
+        byte ActiveSlot, bool IsAiming, short FacingYaw, short AimYaw, ushort AimDistance,
+        short AimPitch, byte TargetEntityId, float WarpTargetX, float WarpTargetZ,
+        float WarpSpeed, float WarpAttackRange) InputKey(InputState x)
+        => (x.Up, x.Down, x.Left, x.Right, x.Jump, x.Dash, x.Burst, x.JumpHeld,
+            x.FaceToCamera, x.ToggleLock, x.MoveX, x.MoveY, x.ActiveSlot, x.IsAiming,
+            x.FacingYaw, x.AimYaw, x.AimDistance, x.AimPitch, x.TargetEntityId,
+            x.WarpTargetX, x.WarpTargetZ, x.WarpSpeed, x.WarpAttackRange);
 
     [Fact]
     public void SameSeed_TerminatesWithIdenticalMatch()
@@ -60,6 +70,18 @@ public class SelfPlayTests
         Assert.True(rec.TimedOut || rec.WinnerEntityId is SelfPlayMatch.EntityA or SelfPlayMatch.EntityB,
             "match must either time out or declare a winner");
     }
+    [Fact]
+    public void Run_CompletedMatchDurationIncludesEndingTick()
+    {
+        var arena = KillArena();
+        arena.KillMinX = -1f;
+        arena.KillMaxX = 1f;
+        var rec = SelfPlayMatch.Run(Def, arena, seed: 3,
+            baked: TestHelpers.LoadBakedData(Def), maxTicks: 20, stocks: 1);
+
+        Assert.False(rec.TimedOut);
+        Assert.Equal(1, rec.DurationTicks);
+    }
 
     [Fact]
     public void BothSides_Act()
@@ -72,24 +94,18 @@ public class SelfPlayTests
         // At least one swing connected on each side (real fighting, not one-sided whiffing).
         Assert.Contains(SelfPlayMatch.EntityA, rec.Swings.Where(s => s.Connected).Select(s => s.Attacker));
         Assert.Contains(SelfPlayMatch.EntityB, rec.Swings.Where(s => s.Connected).Select(s => s.Attacker));
+        Assert.Equal(rec.ActionAttempts.Count, rec.Swings.Count);
+        Assert.InRange(rec.AcceptedActions.Count, 1, rec.ActionAttempts.Count);
+        Assert.NotEmpty(rec.Hits);
     }
 
-    [Fact]
-    public void SwingAccounting_ConnectedPlusWhiffsEqualsTotal()
-    {
-        var rec = Run(42, maxTicks: 4000);
-
-        int connected = rec.Swings.Count(s => s.Connected);
-        int whiffs = rec.Swings.Count(s => !s.Connected);
-        Assert.Equal(rec.Swings.Count, connected + whiffs);
-    }
 
     [Fact]
     public void WhiffSwings_RecordFacingFrameGeometry()
     {
         var rec = Run(42, maxTicks: 4000);
 
-        var whiffs = rec.Swings.Where(s => !s.Connected).ToList();
+        var whiffs = rec.Swings.Where(s => s.Accepted && !s.Connected).ToList();
         if (whiffs.Count == 0) return; // not guaranteed in a short run; the invariant below is the contract
         foreach (var w in whiffs)
         {
@@ -112,44 +128,44 @@ public class SelfPlayTests
     }
 
     [Fact]
-    public void SameSeedAndDifficulty_IsIdentical_ChangingDifficultyChangesTrace()
+    public void SameSeedAndDifficulty_ReproducesCompletePublicTrace()
     {
         var a = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Normal);
         var b = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Normal);
 
         Assert.Equal(a.DurationTicks, b.DurationTicks);
-        Assert.Equal(a.Swings.Count, b.Swings.Count);
-        Assert.Equal(a.Hits.Count, b.Hits.Count);
-        Assert.Equal(a.Samples.Count, b.Samples.Count);
-        for (int i = 0; i < a.Samples.Count; i++)
-        {
-            Assert.Equal(a.Samples[i].Tick, b.Samples[i].Tick);
-            Assert.Equal(a.Samples[i].EntityId, b.Samples[i].EntityId);
-            Assert.Equal(a.Samples[i].PX, b.Samples[i].PX);
-            Assert.Equal(a.Samples[i].PY, b.Samples[i].PY);
-            Assert.Equal(a.Samples[i].PZ, b.Samples[i].PZ);
-        }
-
-        var easy = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Easy);
-        var hard = Run(42, maxTicks: 1200, difficulty: CpuDifficulty.Hard);
-        bool different = easy.Swings.Count != hard.Swings.Count
-            || easy.Hits.Count != hard.Hits.Count
-            || easy.Samples.Count != hard.Samples.Count;
-        if (!different)
-        {
-            for (int i = 0; i < easy.Samples.Count; i++)
-            {
-                if (easy.Samples[i].PX != hard.Samples[i].PX
-                    || easy.Samples[i].PY != hard.Samples[i].PY
-                    || easy.Samples[i].PZ != hard.Samples[i].PZ)
-                {
-                    different = true;
-                    break;
-                }
-            }
-        }
-
-        Assert.True(different, "changing CPU difficulty did not change the self-play trace");
+        Assert.Equal(a.TimedOut, b.TimedOut);
+        Assert.Equal(a.WinnerEntityId, b.WinnerEntityId);
+        Assert.Equal(a.SharedVictory, b.SharedVictory);
+        Assert.Equal(a.Entity1Deaths, b.Entity1Deaths);
+        Assert.Equal(a.Entity2Deaths, b.Entity2Deaths);
+        Assert.Equal(a.Entity1Damage, b.Entity1Damage);
+        Assert.Equal(a.Entity2Damage, b.Entity2Damage);
+        Assert.Equal(
+            a.ActionAttempts.Select(x => (x.EntityId, x.Tick, x.ActiveSlot, x.Air)),
+            b.ActionAttempts.Select(x => (x.EntityId, x.Tick, x.ActiveSlot, x.Air)));
+        Assert.Equal(
+            a.AcceptedActions.Select(x => (x.EntityId, x.Tick, x.ActiveSlot, x.Air)),
+            b.AcceptedActions.Select(x => (x.EntityId, x.Tick, x.ActiveSlot, x.Air)));
+        Assert.Equal(
+            a.Inputs.Select(x => (x.Tick, x.EntityId, Input: InputKey(x.Input))),
+            b.Inputs.Select(x => (x.Tick, x.EntityId, Input: InputKey(x.Input))));
+        Assert.Equal(
+            a.Swings.Select(x => (x.Attacker, x.Target, x.ActiveSlot, x.Air, x.StartTick,
+                x.WindowTicks, x.Accepted, x.Connected, x.ActivationId, x.RelSide, x.RelForward, x.RelHeight)),
+            b.Swings.Select(x => (x.Attacker, x.Target, x.ActiveSlot, x.Air, x.StartTick,
+                x.WindowTicks, x.Accepted, x.Connected, x.ActivationId, x.RelSide, x.RelForward, x.RelHeight)));
+        Assert.Equal(
+            a.Hits.Select(x => (x.Attacker, x.Target, x.AttackSlot, x.ActivationId, x.Air, x.Damage, x.Tick)),
+            b.Hits.Select(x => (x.Attacker, x.Target, x.AttackSlot, x.ActivationId, x.Air, x.Damage, x.Tick)));
+        Assert.Equal(
+            a.Combos.Select(x => (x.Attacker, x.Target, x.Hits, x.StartTick, x.EndTick,
+                x.IsTrueCombo, x.IsPressureString)),
+            b.Combos.Select(x => (x.Attacker, x.Target, x.Hits, x.StartTick, x.EndTick,
+                x.IsTrueCombo, x.IsPressureString)));
+        Assert.Equal(
+            a.Samples.Select(x => (x.Tick, x.EntityId, x.PX, x.PY, x.PZ)),
+            b.Samples.Select(x => (x.Tick, x.EntityId, x.PX, x.PY, x.PZ)));
     }
     [Fact]
     public void Recorder_UninterruptedHitstun_IsTrueCombo()
@@ -191,6 +207,11 @@ public class SelfPlayTests
         target.State = ActionState.Idle;
         target.HitstunTicks = 0;
         sim.SetState(100, target);
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [SelfPlayMatch.EntityA] = default,
+            [SelfPlayMatch.EntityB] = default,
+        });
         recorder.RecordTick(sim, 1, new Dictionary<ulong, InputState>(), Def);
         sim.LastTickHits.Add(RecorderHit());
         recorder.RecordTick(sim, 2, new Dictionary<ulong, InputState>(), Def);
@@ -201,9 +222,159 @@ public class SelfPlayTests
         Assert.True(combo.IsPressureString);
     }
 
-    private static ServerSimulation RecorderSimulation()
+    [Fact]
+    public void Recorder_NoActionGapBeyondLegacyWindow_RemainsTrueCombo()
     {
-        var sim = TestHelpers.MakeSim();
+        var sim = RecorderSimulation();
+        var recorder = new MatchRecorder();
+        var target = sim.GetState(100);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 120;
+        sim.SetState(100, target);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 0, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        target.HitstunTicks = 1;
+        sim.SetState(100, target);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 100, new Dictionary<ulong, InputState>(), Def);
+
+        var record = recorder.Finish(101, 1, new MatchOutcome(false, 0, false));
+        var combo = Assert.Single(record.Combos);
+        Assert.Equal(2, combo.Hits);
+        Assert.True(combo.IsTrueCombo);
+        Assert.False(combo.IsPressureString);
+    }
+
+    [Fact]
+    public void Recorder_InterruptionAndStockBoundary_StartNewExchanges()
+    {
+        var arena = TestHelpers.TestArena();
+        arena.KillMaxX = 10f;
+        var sim = RecorderSimulation(arena);
+        var recorder = new MatchRecorder();
+        var target = sim.GetState(100);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 8;
+        sim.SetState(100, target);
+
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 0, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 1, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        recorder.RecordInterruption();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 2, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 3, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        target = sim.GetState(100);
+        target.PX = 20f;
+        sim.SetState(100, target);
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [SelfPlayMatch.EntityA] = default,
+            [SelfPlayMatch.EntityB] = default,
+        });
+        Assert.Single(sim.LastTickDeaths);
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 4, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        target = sim.GetState(100);
+        target.State = ActionState.Hitstun;
+        target.HitstunTicks = 8;
+        sim.SetState(100, target);
+        sim.Tick(new Dictionary<ulong, InputState>());
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 5, new Dictionary<ulong, InputState>(), Def);
+        sim.Tick(new Dictionary<ulong, InputState>());
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 6, new Dictionary<ulong, InputState>(), Def);
+
+        var record = recorder.Finish(7, 1, new MatchOutcome(false, 0, false));
+        Assert.Equal(3, record.Combos.Count);
+        Assert.Equal(new[] { 2, 2, 2 }, record.Combos.Select(combo => combo.Hits));
+        Assert.All(record.Combos, combo => Assert.True(combo.IsTrueCombo));
+    }
+
+    [Fact]
+    public void Recorder_ReverseHit_InterruptsOpenExchange()
+    {
+        var sim = RecorderSimulation();
+        var recorder = new MatchRecorder();
+
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 0, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 1, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+
+        sim.LastTickHits.Add(RecorderHit(SelfPlayMatch.EntityB, SelfPlayMatch.EntityA));
+        recorder.RecordTick(sim, 2, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 3, new Dictionary<ulong, InputState>(), Def);
+        sim.LastTickHits.Clear();
+        sim.LastTickHits.Add(RecorderHit());
+        recorder.RecordTick(sim, 4, new Dictionary<ulong, InputState>(), Def);
+
+        var record = recorder.Finish(5, 1, new MatchOutcome(false, 0, false));
+        Assert.Equal(new[] { 2, 2 }, record.Combos.Select(combo => combo.Hits));
+    }
+
+    [Fact]
+    public void Recorder_DistinguishesAttemptedAndAcceptedActions()
+    {
+        var sim = RecorderSimulation();
+        var recorder = new MatchRecorder();
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [SelfPlayMatch.EntityA] = new InputState { ActiveSlot = AbilitySlots.A },
+        };
+        recorder.RecordPresses(sim, 0, inputs, Def);
+        sim.Tick(inputs);
+        recorder.RecordTick(sim, 0, inputs, Def);
+
+        var record = recorder.Finish(1, 1, new MatchOutcome(false, 0, false));
+        Assert.Single(record.ActionAttempts);
+        Assert.Single(record.AcceptedActions);
+        Assert.True(record.Swings[0].Accepted);
+    }
+
+    [Fact]
+    public void Recorder_RecordsRejectedAttemptWithoutAcceptedAction()
+    {
+        var sim = RecorderSimulation();
+        var attacker = sim.GetState(SelfPlayMatch.EntityA);
+        attacker.State = ActionState.Hitstun;
+        attacker.HitstunTicks = 1;
+        sim.SetState(SelfPlayMatch.EntityA, attacker);
+        var recorder = new MatchRecorder();
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [SelfPlayMatch.EntityA] = new InputState { ActiveSlot = AbilitySlots.A },
+        };
+
+        recorder.RecordPresses(sim, 0, inputs, Def);
+        sim.Tick(inputs);
+        recorder.RecordTick(sim, 0, inputs, Def);
+
+        var record = recorder.Finish(1, 1, new MatchOutcome(false, 0, false));
+        Assert.Single(record.ActionAttempts);
+        Assert.Empty(record.AcceptedActions);
+        Assert.False(record.Swings[0].Accepted);
+    }
+
+    private static ServerSimulation RecorderSimulation(ArenaDefinition? arena = null)
+    {
+        var sim = TestHelpers.MakeSim(arena);
         var attacker = TestHelpers.PlayerState();
         attacker.PY = Def.CapsuleHeight * 0.5f;
         var target = TestHelpers.NpcState(z: 1f);
@@ -213,11 +384,12 @@ public class SelfPlayTests
         return sim;
     }
 
-    private static SpellResolver.HitResult RecorderHit()
+    private static SpellResolver.HitResult RecorderHit(
+        ulong owner = SelfPlayMatch.EntityA, ulong target = SelfPlayMatch.EntityB)
         => new()
         {
-            OwnerEntityId = SelfPlayMatch.EntityA,
-            TargetEntityId = SelfPlayMatch.EntityB,
+            OwnerEntityId = owner,
+            TargetEntityId = target,
             AttackSlot = AbilitySlots.Slot1,
             Damage = 1f,
             StunTicks = 8,

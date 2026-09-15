@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SlopArena.Shared.AI;
 
 namespace SlopArena.Client.UI
 {
@@ -32,7 +33,7 @@ namespace SlopArena.Client.UI
 
         public static SlopArena.Shared.CharacterClass SoloBotClass
             = SlopArena.Shared.CharacterClass.FightGuy;
-        public static int SoloCpuLevel = 5;
+        public static CpuDifficulty SoloCpuDifficulty = CpuDifficulty.Normal;
 
         // Per-match entity IDs assigned by the master server at match start
         // (issue #35). The local player drives LocalEntityId; the opponents
@@ -53,7 +54,7 @@ namespace SlopArena.Client.UI
             PlayerPackageId = "fightguy";
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloBotClass = SlopArena.Shared.CharacterClass.FightGuy;
-            SoloCpuLevel = 5;
+            SoloCpuDifficulty = CpuDifficulty.Normal;
             ArenaName = "training";
             IsHost = true;
             ServerIP = "127.0.0.1";

@@ -6,42 +6,48 @@ namespace SlopArena.Shared.Tests;
 public sealed class BotDifficultyProfileTests
 {
     [Fact]
-    public void ForLevel_ClampsToSupportedRange()
+    public void NamedDifficultiesHaveExactReactionDelays()
     {
-        Assert.Equal(BotDifficultyProfile.ForLevel(1).DecisionIntervalTicks,
-            BotDifficultyProfile.ForLevel(0).DecisionIntervalTicks);
-        Assert.Equal(BotDifficultyProfile.ForLevel(9).DecisionIntervalTicks,
-            BotDifficultyProfile.ForLevel(10).DecisionIntervalTicks);
+        Assert.Equal(24, BotDifficultyProfile.ForDifficulty(CpuDifficulty.Easy).ReactionDelayTicks);
+        Assert.Equal(18, BotDifficultyProfile.ForDifficulty(CpuDifficulty.Normal).ReactionDelayTicks);
+        Assert.Equal(12, BotDifficultyProfile.ForDifficulty(CpuDifficulty.Hard).ReactionDelayTicks);
     }
 
     [Fact]
-    public void Profiles_BecomeFasterMoreAccurateAndMoreAggressive()
+    public void NamedDifficultiesUseOnlyCanonicalSerializedValues()
     {
-        var low = BotDifficultyProfile.ForLevel(1);
-        var mid = BotDifficultyProfile.ForLevel(5);
-        var high = BotDifficultyProfile.ForLevel(9);
+        Assert.Equal(0, (int)CpuDifficulty.Easy);
+        Assert.Equal(1, (int)CpuDifficulty.Normal);
+        Assert.Equal(2, (int)CpuDifficulty.Hard);
+        Assert.Equal(CpuDifficulty.Normal, BotDifficultyProfile.Normalize((CpuDifficulty)(-1)));
+        Assert.Equal(CpuDifficulty.Normal, BotDifficultyProfile.Normalize((CpuDifficulty)3));
+    }
+    [Fact]
+    public void ProfilesBecomeFasterMoreAccurateAndMoreAggressive()
+    {
+        var easy = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Easy);
+        var normal = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Normal);
+        var hard = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Hard);
 
-        Assert.True(low.DecisionIntervalTicks > mid.DecisionIntervalTicks);
-        Assert.True(mid.DecisionIntervalTicks > high.DecisionIntervalTicks);
-        Assert.True(low.ReactionDelayTicks > mid.ReactionDelayTicks);
-        Assert.True(mid.ReactionDelayTicks > high.ReactionDelayTicks);
-        Assert.True(low.RangeError > mid.RangeError);
-        Assert.True(mid.RangeError > high.RangeError);
-        Assert.True(low.AttackChance < mid.AttackChance);
-        Assert.True(mid.AttackChance < high.AttackChance);
-        Assert.True(low.PunishChance < mid.PunishChance);
-        Assert.True(mid.PunishChance < high.PunishChance);
-        Assert.True(low.ComboChance < mid.ComboChance);
-        Assert.True(mid.ComboChance < high.ComboChance);
+        Assert.True(easy.DecisionIntervalTicks > normal.DecisionIntervalTicks);
+        Assert.True(normal.DecisionIntervalTicks > hard.DecisionIntervalTicks);
+        Assert.True(easy.RangeError > normal.RangeError);
+        Assert.True(normal.RangeError > hard.RangeError);
+        Assert.True(easy.AttackChance < normal.AttackChance);
+        Assert.True(normal.AttackChance < hard.AttackChance);
+        Assert.True(easy.PunishChance < normal.PunishChance);
+        Assert.True(normal.PunishChance < hard.PunishChance);
+        Assert.True(easy.ComboChance < normal.ComboChance);
+        Assert.True(normal.ComboChance < hard.ComboChance);
     }
 
     [Fact]
-    public void LevelNine_RetainsNonZeroRangeError()
+    public void HardRetainsNonZeroRangeError()
     {
-        var high = BotDifficultyProfile.ForLevel(9);
+        var hard = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Hard);
 
-        Assert.InRange(high.RangeError, float.Epsilon, 1f);
-        Assert.True(high.PunishChance > 0f);
-        Assert.True(high.ComboChance > 0f);
+        Assert.InRange(hard.RangeError, float.Epsilon, 1f);
+        Assert.True(hard.PunishChance > 0f);
+        Assert.True(hard.ComboChance > 0f);
     }
 }

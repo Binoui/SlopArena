@@ -46,6 +46,9 @@ public sealed class HeuristicBotPolicy
         public readonly byte Slot;
         public readonly float Reach;
         public readonly float Damage;
+        public readonly float RecoveryHorizontal;
+        public readonly float RecoveryVertical;
+        public readonly bool RecoveryRequiresDelayedOpponent;
         public readonly bool Functional;
         public readonly bool HasDamage;
         public readonly bool HasMovement;
@@ -55,15 +58,22 @@ public sealed class HeuristicBotPolicy
         public readonly ushort TravelTicks;
         public readonly float TravelSpeed;
         public readonly float TravelOffset;
+        public readonly float ForwardTravel;
+        public readonly int CommitmentTicks;
 
         public MoveCandidate(byte slot, float reach, float damage, bool functional,
             bool hasDamage, bool hasMovement, bool requiresAim, bool isRecovery,
             ushort startupTicks, ushort travelTicks = 0, float travelSpeed = 0f,
-            float travelOffset = 0f)
+            float travelOffset = 0f, float recoveryHorizontal = 0f,
+            float recoveryVertical = 0f, bool recoveryRequiresDelayedOpponent = false,
+            float forwardTravel = 0f, int commitmentTicks = 0)
         {
             Slot = slot;
             Reach = MathF.Max(0f, reach);
             Damage = MathF.Max(0f, damage);
+            RecoveryHorizontal = MathF.Max(0f, recoveryHorizontal);
+            RecoveryVertical = MathF.Max(0f, recoveryVertical);
+            RecoveryRequiresDelayedOpponent = recoveryRequiresDelayedOpponent;
             Functional = functional;
             HasDamage = hasDamage;
             HasMovement = hasMovement;
@@ -73,8 +83,317 @@ public sealed class HeuristicBotPolicy
             TravelTicks = travelTicks;
             TravelSpeed = MathF.Max(0f, travelSpeed);
             TravelOffset = MathF.Max(0f, travelOffset);
+            ForwardTravel = MathF.Max(0f, forwardTravel);
+            CommitmentTicks = commitmentTicks + (requiresAim ? AimHoldTicks : 0);
         }
     }
+    private readonly struct RecoveryTarget
+    {
+        public readonly float X, Y, Z;
+
+        public RecoveryTarget(float x, float y, float z)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+    }
+
+    private const int MaxRecoveryTargets = 48;
+    private const float NearEdgeDistance = 2f;
+    private readonly RecoveryTarget[] _recoveryTargets = new RecoveryTarget[MaxRecoveryTargets];
+    private float[]? _recoveryHeightmap;
+    private CollisionTriangle[]? _recoveryTriangles;
+    private int[] _recoveryTriangleCandidates = Array.Empty<int>();
+    private int _recoveryTargetCount;
+    private float _recoveryMinSurface;
+    private float _recoveryCapsuleHeight;
+
+    private static bool HasArenaBounds(in ArenaDefinition arena)
+        => arena.MaxX > arena.MinX && arena.MaxZ > arena.MinZ;
+
+    private bool HasSupportAt(float x, float y, float z, in ArenaDefinition arena)
+    {
+        if (arena.Heightmap.Data != null && arena.Heightmap.Data.Length > 0)
+            return arena.Heightmap.Sample(x, z) > float.MinValue;
+        return ArenaCollision.HasTriangles(arena)
+            && _recoveryTriangleCandidates.Length > 0
+            && ArenaCollision.TryFindSupport(x, y, z, 0.35f, _recoveryCapsuleHeight,
+                in arena, _recoveryTriangleCandidates, out _);
+    }
+
+    private bool IsOffstage(in CharacterState state, in ArenaDefinition arena,
+        float minSurface = float.MinValue)
+    {
+        _ = minSurface;
+        if (!HasArenaBounds(arena))
+            return false;
+        bool outside = state.PX < arena.MinX - 0.35f || state.PX > arena.MaxX + 0.35f
+            || state.PZ < arena.MinZ - 0.35f || state.PZ > arena.MaxZ + 0.35f;
+        if (outside)
+            return true;
+        if (HasSupportAt(state.PX, state.PY, state.PZ, in arena))
+            return false;
+        return !Simulation.FindLedge(state, arena, _recoveryCapsuleHeight * 0.5f,
+            out _, out _, out _, out _, out _);
+    }
+
+    private bool IsOffstage(in CpuObservation state, in ArenaDefinition arena,
+        float minSurface = float.MinValue)
+    {
+        var current = new CharacterState
+        {
+            PX = state.PX, PY = state.PY, PZ = state.PZ, IsGrounded = state.IsGrounded,
+        };
+        return IsOffstage(current, in arena, minSurface);
+    }
+
+    private bool IsNearEdge(in CharacterState state, in ArenaDefinition arena)
+    {
+        if (!HasArenaBounds(arena))
+            return false;
+        if (!HasSupportAt(state.PX, state.PY, state.PZ, in arena))
+            return true;
+        return !HasSupportAt(state.PX + NearEdgeDistance, state.PY, state.PZ, in arena)
+            || !HasSupportAt(state.PX - NearEdgeDistance, state.PY, state.PZ, in arena)
+            || !HasSupportAt(state.PX, state.PY, state.PZ + NearEdgeDistance, in arena)
+            || !HasSupportAt(state.PX, state.PY, state.PZ - NearEdgeDistance, in arena);
+    }
+
+    private void EnsureRecoveryTargets(in ArenaDefinition arena, in CharacterDefinition def)
+    {
+        if (ReferenceEquals(_recoveryHeightmap, arena.Heightmap.Data)
+            && ReferenceEquals(_recoveryTriangles, arena.CollisionTriangles)
+            && _recoveryCapsuleHeight == def.CapsuleHeight)
+            return;
+        _recoveryHeightmap = arena.Heightmap.Data;
+
+        _recoveryTriangles = arena.CollisionTriangles;
+        _recoveryTriangleCandidates = new int[arena.CollisionTriangles?.Length ?? 0];
+        _recoveryCapsuleHeight = def.CapsuleHeight;
+        _recoveryTargetCount = 0;
+        _recoveryMinSurface = float.MinValue;
+        if (!HasArenaBounds(arena) || arena.Heightmap.Data == null
+            || arena.Heightmap.Width < 3 || arena.Heightmap.Height < 3)
+            return;
+        _recoveryMinSurface = float.MaxValue;
+
+        int cells = arena.Heightmap.Width * arena.Heightmap.Height;
+        int stride = Math.Max(1, (int)MathF.Ceiling(MathF.Sqrt(cells / (float)MaxRecoveryTargets)));
+        for (int z = 1; z < arena.Heightmap.Height - 1; z += stride)
+        {
+            for (int x = 1; x < arena.Heightmap.Width - 1; x += stride)
+            {
+                float px = arena.Heightmap.OriginX + x * arena.Heightmap.CellSize;
+                float pz = arena.Heightmap.OriginZ + z * arena.Heightmap.CellSize;
+                if (px < arena.MinX + def.CapsuleRadius
+                    || px > arena.MaxX - def.CapsuleRadius
+                    || pz < arena.MinZ + def.CapsuleRadius
+                    || pz > arena.MaxZ - def.CapsuleRadius)
+                    continue;
+
+                float surface = arena.Heightmap.Sample(px, pz);
+                if (surface <= float.MinValue)
+                    continue;
+                _recoveryMinSurface = MathF.Min(_recoveryMinSurface, surface);
+                if (_recoveryTargetCount < _recoveryTargets.Length)
+                    _recoveryTargets[_recoveryTargetCount++] =
+                        new RecoveryTarget(px, surface + def.CapsuleHeight * 0.5f, pz);
+            }
+        }
+        if (_recoveryMinSurface == float.MaxValue)
+            _recoveryMinSurface = float.MinValue;
+    }
+
+    private bool HasTraversableRecoveryPath(in CharacterState self,
+        in RecoveryTarget candidate, in CharacterDefinition def, in ArenaDefinition arena)
+    {
+        if (!ArenaCollision.HasTriangles(arena))
+            return true;
+
+        if (_recoveryTriangleCandidates.Length < arena.CollisionTriangles!.Length)
+            _recoveryTriangleCandidates = new int[arena.CollisionTriangles.Length];
+
+        if (!ArenaCollision.TryFindSupport(candidate.X, candidate.Y, candidate.Z,
+                def.CapsuleRadius, def.CapsuleHeight, in arena,
+                _recoveryTriangleCandidates, out var support))
+            return false;
+
+        int count = ArenaCollision.GetCandidateTrianglesForSweep(
+            self.PX, self.PY, self.PZ, candidate.X, candidate.Y, candidate.Z,
+            def.CapsuleRadius, def.CapsuleHeight, in arena, _recoveryTriangleCandidates);
+        if (count == 0)
+            return true;
+        if (!ArenaCollision.SweepCapsule(
+                self.PX, self.PY, self.PZ, candidate.X, candidate.Y, candidate.Z,
+                def.CapsuleRadius, def.CapsuleHeight, in arena,
+                _recoveryTriangleCandidates, count, out var contact))
+            return true;
+
+        // The destination support is the only allowed contact on the direct recovery path.
+        // Earlier contact means the sampled heightmap target is blocked by stage geometry.
+        return contact.TriangleIndex == support.TriangleIndex || contact.Time >= 0.98f;
+    }
+
+
+    private static float RecoveryHorizontalReach(in MoveCandidate candidate,
+        in CharacterState self, in RecoveryTarget target, BotMemory memory)
+    {
+        if (candidate.RecoveryHorizontal <= 0f)
+            return 0f;
+        if (!candidate.RecoveryRequiresDelayedOpponent)
+            return candidate.RecoveryHorizontal;
+        if (!memory.TryGetDelayedOpponent(out var enemy))
+            return 0f;
+        float targetX = target.X - self.PX;
+        float targetZ = target.Z - self.PZ;
+        float targetDistance = MathF.Sqrt(targetX * targetX + targetZ * targetZ);
+        float enemyX = enemy.PX - self.PX;
+        float enemyZ = enemy.PZ - self.PZ;
+        float enemyDistance = MathF.Sqrt(enemyX * enemyX + enemyZ * enemyZ);
+        if (targetDistance <= 0.001f || enemyDistance <= 0.001f)
+            return 0f;
+        float alignment = (targetX * enemyX + targetZ * enemyZ)
+            / (targetDistance * enemyDistance);
+        return alignment >= 0.5f
+            ? MathF.Min(candidate.RecoveryHorizontal, enemyDistance)
+            : 0f;
+    }
+
+    private bool TryGetRecoveryTarget(in CharacterState self, in CharacterDefinition def,
+        in ArenaDefinition arena, BotMemory memory, out RecoveryTarget target, out float distance)
+    {
+        EnsureRecoveryTargets(in arena, in def);
+        target = default;
+        distance = float.PositiveInfinity;
+        float regularReach = def.Movement.AirSpeedMax
+            * MathF.Min(90f, MathF.Max(30f, (self.PY - arena.KillHeight)
+                / MathF.Max(1f, def.Movement.Gravity) * 60f)) / 60f;
+        regularReach += self.JumpsLeft * def.Movement.AirSpeedMax
+            * def.Movement.AirJumpHMultiplier * 0.75f;
+        if (self.DashCooldownTicks == 0)
+            regularReach += def.Movement.DashSpeed * def.Movement.DashDurationTicks / 60f;
+
+        float bestScore = float.PositiveInfinity;
+        for (int i = 0; i < _recoveryTargetCount; i++)
+        {
+            var candidate = _recoveryTargets[i];
+            float dx = candidate.X - self.PX;
+            float dz = candidate.Z - self.PZ;
+            float d = MathF.Sqrt(dx * dx + dz * dz);
+            float dy = candidate.Y - self.PY;
+            var recovery = ChooseRecoveryMove(self, d);
+            float specialReach = recovery.HasValue
+                ? RecoveryHorizontalReach(recovery.GetValueOrDefault(), self, candidate, memory)
+                : 0f;
+            float verticalReach = recovery?.RecoveryVertical ?? 0f;
+            if (dy > def.Movement.JumpForce * def.Movement.JumpForce
+                    / MathF.Max(1f, 2f * def.Movement.Gravity) + verticalReach
+                && self.JumpsLeft == 0)
+                continue;
+            if (d > regularReach + specialReach + VictimRadiusMargin)
+                continue;
+            if (!HasTraversableRecoveryPath(in self, in candidate, in def, in arena))
+                continue;
+
+            float score = d + MathF.Max(0f, dy) * 0.35f;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                target = candidate;
+                distance = d;
+            }
+        }
+        return distance < float.PositiveInfinity;
+    }
+
+    private MoveCandidate? ChooseRecoveryMove(in CharacterState self, float distance)
+    {
+        bool air = !self.IsGrounded;
+        MoveCandidate? selected = null;
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < Slots.Length; i++)
+        {
+            var candidate = air ? _airProfile[i] : _profile[i];
+            if (!candidate.Functional || !candidate.IsRecovery
+                || self.GetCooldown(candidate.Slot) > 0
+                || IsChargePoolExhausted(self, candidate.Slot, air))
+                continue;
+            float score = candidate.Reach - MathF.Abs(candidate.Reach - distance) * 0.25f
+                + (candidate.HasMovement ? 2f : 0f);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                selected = candidate;
+            }
+        }
+        return selected;
+    }
+    private bool TryBuildRecoveryInput(in CharacterState self, CharacterDefinition def,
+        in ArenaDefinition arena, BotMemory memory, out InputState input)
+    {
+        input = default;
+        if (self.State == ActionState.LedgeHang)
+        {
+            memory.ClearPlan();
+            if (Simulation.FindLedge(self, arena, def.CapsuleHeight * 0.5f,
+                out _, out float inwardX, out float inwardZ, out _, out _))
+            {
+                input.MoveX = inwardX;
+                input.MoveY = inwardZ;
+            }
+            return true;
+        }
+        if (!IsOffstage(self, arena, _recoveryMinSurface))
+            return false;
+        if (!TryGetRecoveryTarget(self, in def, in arena, memory,
+                out var target, out float distance))
+        {
+            float centerX = (arena.MinX + arena.MaxX) * 0.5f;
+            float centerZ = (arena.MinZ + arena.MaxZ) * 0.5f;
+            float centerDistance = MathF.Max(0.001f,
+                MathF.Sqrt((centerX - self.PX) * (centerX - self.PX)
+                    + (centerZ - self.PZ) * (centerZ - self.PZ)));
+            input.MoveX = (centerX - self.PX) / centerDistance;
+            input.MoveY = (centerZ - self.PZ) / centerDistance;
+            return true;
+        }
+
+        float dx = target.X - self.PX;
+        float dz = target.Z - self.PZ;
+        float directionDistance = MathF.Max(0.001f, MathF.Sqrt(dx * dx + dz * dz));
+        input.MoveX = dx / directionDistance;
+        input.MoveY = dz / directionDistance;
+        input.AimYaw = AimYaw(dx, dz);
+        input.AimPitch = AimPitch(target.Y - self.PY, distance);
+        input.AimDistance = AimDistance(distance);
+        var recovery = ChooseRecoveryMove(self, distance);
+        bool urgent = self.VY <= 0f && (self.JumpsLeft == 0
+            || distance > 2f);
+        if (recovery.HasValue && urgent)
+        {
+            var selected = recovery.GetValueOrDefault();
+            memory.StartPlan(selected.Slot, selected.RequiresAim,
+                input.AimYaw, input.AimPitch, input.AimDistance,
+                selected.RequiresAim ? AimHoldTicks : (ushort)0,
+                self.Deaths, self.IsGrounded, pressIssued: true, kind: BotPlanKind.Recovery);
+            input.ActiveSlot = selected.Slot;
+            input.IsAiming = selected.RequiresAim;
+            return true;
+        }
+        if (self.JumpsLeft > 0 && self.VY <= 0f)
+        {
+            input.Jump = true;
+            input.JumpHeld = true;
+        }
+        else if (self.DashCooldownTicks == 0 && self.DashDurationTicks == 0
+            && distance > 1.2f)
+        {
+            input.Dash = true;
+        }
+        return true;
+    }
+
 
     private CharacterDefinition? _profileDefinition;
     private BakedAnimationData? _profileBaked;
@@ -83,7 +402,20 @@ public sealed class HeuristicBotPolicy
 
     public InputState Decide(in CharacterState self, in CharacterState target,
         CharacterDefinition def, Random rng, BotMemory memory)
-        => Decide(self, target, def, rng, memory, baked: null);
+        => Decide(self, target, def, rng, memory, default, baked: null);
+
+    public InputState Decide(in CharacterState self, in CharacterState target,
+        CharacterDefinition def, Random rng, BotMemory memory, in ArenaDefinition arena,
+        BakedAnimationData? baked = null)
+        => DecideObserved(self, target, def, rng, memory, in arena, baked);
+
+    private InputState DecideObserved(in CharacterState self, in CharacterState target,
+        CharacterDefinition def, Random rng, BotMemory memory, in ArenaDefinition arena,
+        BakedAnimationData? baked)
+    {
+        memory.ObserveOpponent(target);
+        return Decide(self, def, rng, memory, in arena, baked);
+    }
 
     /// <summary>
     /// Convenience entry point for local adapters. The target is sampled before the decision,
@@ -91,26 +423,21 @@ public sealed class HeuristicBotPolicy
     /// </summary>
     public InputState Decide(in CharacterState self, in CharacterState target,
         CharacterDefinition def, Random rng, BotMemory memory, BakedAnimationData? baked)
-    {
-        memory.ObserveOpponent(target);
-        return Decide(self, def, rng, memory, baked);
-    }
+        => DecideObserved(self, target, def, rng, memory, default, baked);
 
     public InputState Decide(in CharacterState self, CharacterDefinition def,
         Random rng, BotMemory memory, BakedAnimationData? baked = null)
+        => Decide(self, def, rng, memory, default, baked);
+
+    public InputState Decide(in CharacterState self, CharacterDefinition def,
+        Random rng, BotMemory memory, in ArenaDefinition arena, BakedAnimationData? baked = null)
     {
         EnsureProfile(def, baked);
+        EnsureRecoveryTargets(in arena, in def);
 
-        if (memory.PlanPhase != BotPlanPhase.None)
-        {
-            if (!self.IsGrounded)
-                memory.PlanWasAirborne = true;
-            return ContinuePlan(self, def, memory);
-        }
-        var profile = BotDifficultyProfile.ForDifficulty(memory.Difficulty);
-        if (memory.DecisionTicksRemaining > 0)
-            memory.DecisionTicksRemaining--;
-
+        if (self.State == ActionState.LedgeHang)
+            return TryBuildRecoveryInput(self, def, in arena, memory, out var ledgeInput)
+                ? ledgeInput : default;
         bool movementAllowed = self.HitstunTicks == 0
             && self.HitstopTicks == 0
             && self.BurstRecoveryTicks == 0
@@ -120,17 +447,41 @@ public sealed class HeuristicBotPolicy
             && (self.State == ActionState.Idle
                 || self.State == ActionState.Run
                 || Simulation.IsIasaUnlocked(self, def));
+        if (memory.PlanPhase != BotPlanPhase.None
+            && memory.PlanKind != BotPlanKind.Recovery)
+        {
+            if (actionable
+                && TryBuildRecoveryInput(self, def, in arena, memory, out var recoveryInput))
+                return recoveryInput;
+            if (!self.IsGrounded)
+                memory.PlanWasAirborne = true;
+            return ContinuePlan(self, def, memory, in arena);
+        }
+        if (memory.PlanPhase != BotPlanPhase.None)
+        {
+            if (!self.IsGrounded)
+                memory.PlanWasAirborne = true;
+            return ContinuePlan(self, def, memory, in arena);
+        }
+
+        var profile = BotDifficultyProfile.ForDifficulty(memory.Difficulty);
+        if (memory.DecisionTicksRemaining > 0)
+            memory.DecisionTicksRemaining--;
 
         var input = new InputState();
-        if (!actionable || !memory.TryGetDelayedOpponent(out var target))
+        if (!actionable)
+            return input;
+        if (TryBuildRecoveryInput(self, def, in arena, memory, out input))
+            return input;
+        if (!memory.TryGetDelayedOpponent(out var target))
             return input;
 
         if (memory.TryGetNewHit(out var hit))
         {
-            QueueFollowUp(self, target, hit, def, profile, rng, memory);
+            QueueFollowUp(self, target, hit, def, profile, rng, memory, in arena);
             memory.MarkHitEvaluated(hit);
             if (memory.PlanPhase != BotPlanPhase.None)
-                return ContinuePlan(self, def, memory);
+                return ContinuePlan(self, def, memory, in arena);
         }
 
         float dx = target.PX - self.PX;
@@ -143,14 +494,16 @@ public sealed class HeuristicBotPolicy
 
         input.AimYaw = AimYaw(dx, dz);
         input.FaceToCamera = true;
+        bool targetOffstage = IsOffstage(target, in arena, _recoveryMinSurface);
 
         // Range error is an intentional tier-specific spacing error around real reach.
         // The old constant 2x scale made every move appear twice as long as its resolved
         // hitbox/movement envelope.
         float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
-        float maxReach = MaxConnectReach(self, rangeScale);
+        bool allowRecoveryMove = !IsNearEdge(self, in arena);
+        float maxReach = MaxConnectReach(self, rangeScale, allowRecoveryMove, in arena);
         bool inRange = dist <= maxReach;
-        if (!inRange)
+        if (!inRange && !targetOffstage)
         {
             input.MoveX = dx / dist;
             input.MoveY = dz / dist;
@@ -167,7 +520,7 @@ public sealed class HeuristicBotPolicy
         input.MoveY = 0f;
 
         bool targetIsHigherOrAirborne = !target.IsGrounded || dy > JumpGap;
-        if (self.IsGrounded && targetIsHigherOrAirborne
+        if (self.IsGrounded && targetIsHigherOrAirborne && !targetOffstage
             && rng.NextDouble() < profile.JumpChance)
         {
             input.Jump = true;
@@ -176,7 +529,8 @@ public sealed class HeuristicBotPolicy
         }
 
         bool targetThreatening = target.IsThreatening;
-        var candidate = ChooseSlot(self, target, dist, rangeScale, rng);
+        var candidate = ChooseSlot(self, target, dist, rangeScale, rng,
+            allowRecoveryMove: !IsNearEdge(self, in arena), in arena);
         bool canDash = self.DashCooldownTicks == 0
             && self.DashDurationTicks == 0
             && self.BurstRecoveryTicks == 0;
@@ -198,6 +552,15 @@ public sealed class HeuristicBotPolicy
                 self.Deaths, self.IsGrounded);
             if (selected.RequiresAim)
                 input.IsAiming = true;
+            return input;
+        }
+
+        if (targetOffstage && self.IsGrounded)
+        {
+            // Edgeguard from a safe stage-side position; never chase an unreachable
+            // offstage target with a jump or forward movement.
+            input.MoveX = -dx / dist;
+            input.MoveY = -dz / dist;
             return input;
         }
 
@@ -227,7 +590,10 @@ public sealed class HeuristicBotPolicy
         return input;
     }
 
-    private InputState ContinuePlan(in CharacterState self, CharacterDefinition def, BotMemory memory)
+
+
+    private InputState ContinuePlan(in CharacterState self, CharacterDefinition def,
+        BotMemory memory, in ArenaDefinition arena)
     {
         if (PlanInvalidated(self, memory))
         {
@@ -239,6 +605,15 @@ public sealed class HeuristicBotPolicy
         {
             if (!CanPress(self, def, memory.PlanSlot))
                 return default;
+
+            var candidates = self.IsGrounded ? _profile : _airProfile;
+            for (int i = 0; i < candidates.Length; i++)
+                if (candidates[i].Slot == memory.PlanSlot
+                    && !HasSafeAttackTravel(self, candidates[i], in arena))
+                {
+                    memory.ClearPlan();
+                    return default;
+                }
 
             memory.PlanPressIssued = true;
             return PlanPressInput(memory);
@@ -276,8 +651,10 @@ public sealed class HeuristicBotPolicy
             && self.HitstopTicks == 0
             && self.BurstRecoveryTicks == 0
             && self.LandingLagTicks == 0
-            && self.AnimLockTicks == 0
-            && (self.State == ActionState.Idle || self.State == ActionState.Run)
+            && (self.AnimLockTicks == 0 || Simulation.IsIasaUnlocked(self, def))
+            && (self.State == ActionState.Idle
+                || self.State == ActionState.Run
+                || Simulation.IsIasaUnlocked(self, def))
             && self.GetCooldown(slot) == 0
             && (def.GetCookedSlotAbility(slot, !self.IsGrounded) != null
                 || def.GetSlotAbility(slot - 1, !self.IsGrounded) != null);
@@ -294,10 +671,12 @@ public sealed class HeuristicBotPolicy
 
     private void QueueFollowUp(in CharacterState self, in CpuObservation target,
         in CpuHitObservation hit, CharacterDefinition def, BotDifficultyProfile profile,
-        Random rng, BotMemory memory)
+        Random rng, BotMemory memory, in ArenaDefinition arena)
     {
         float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
-        var trueCombo = ChooseTrueCombo(self, hit, memory.RemainingHitstun(hit), rangeScale, rng);
+        bool allowRecoveryMove = !IsNearEdge(self, in arena);
+        var trueCombo = ChooseTrueCombo(self, hit, memory.RemainingHitstun(hit),
+            rangeScale, rng, allowRecoveryMove, in arena);
         if (trueCombo.HasValue && rng.NextDouble() < profile.ComboChance)
         {
             var selected = trueCombo.GetValueOrDefault();
@@ -312,7 +691,7 @@ public sealed class HeuristicBotPolicy
         float dx = target.PX - self.PX;
         float dz = target.PZ - self.PZ;
         float dist = Distance(dx, dz);
-        var pressure = ChooseSlot(self, target, dist, rangeScale, rng);
+        var pressure = ChooseSlot(self, target, dist, rangeScale, rng, allowRecoveryMove, in arena);
         if (!pressure.HasValue || (!target.IsThreatening && memory.RemainingHitstun(hit) == 0))
             return;
         if (!target.IsThreatening && rng.NextDouble() >= profile.AttackChance)
@@ -325,7 +704,8 @@ public sealed class HeuristicBotPolicy
     }
 
     private MoveCandidate? ChooseTrueCombo(in CharacterState self, in CpuHitObservation hit,
-        int remainingHitstun, float rangeScale, Random rng)
+        int remainingHitstun, float rangeScale, Random rng, bool allowRecoveryMove,
+        in ArenaDefinition arena)
     {
         if (remainingHitstun <= 0)
             return null;
@@ -336,9 +716,8 @@ public sealed class HeuristicBotPolicy
         for (int i = 0; i < Slots.Length; i++)
         {
             var candidate = air ? _airProfile[i] : _profile[i];
-            if (!candidate.Functional || !candidate.HasDamage
-                || self.GetCooldown(candidate.Slot) > 0
-                || IsChargePoolExhausted(self, candidate.Slot, air))
+            if (!IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena)
+                || !candidate.HasDamage)
                 continue;
 
             int timing = candidate.StartupTicks;
@@ -381,6 +760,8 @@ public sealed class HeuristicBotPolicy
         return best[rng.Next(bestCount)];
     }
 
+
+
     private static float Distance(float x, float z)
         => MathF.Sqrt(x * x + z * z);
 
@@ -418,15 +799,64 @@ public sealed class HeuristicBotPolicy
             EvaluateMove(def, Slots[i], airborne: true, baked, out _airProfile[i]);
         }
     }
+    private bool HasSafeAttackTravel(in CharacterState self, in MoveCandidate candidate,
+        in ArenaDefinition arena)
+    {
+        if (!HasArenaBounds(arena))
+            return true;
 
-    private float MaxConnectReach(in CharacterState self, float rangeScale)
+        // Lunges capture facing before this tick's facing input. Other aerial moves
+        // inherit velocity, including a previous lunge's momentum during their lock.
+        float dx, dz;
+        if (candidate.ForwardTravel > 0f)
+        {
+            dx = MathF.Sin(self.FacingYaw) * candidate.ForwardTravel;
+            dz = MathF.Cos(self.FacingYaw) * candidate.ForwardTravel;
+        }
+        else if (!self.IsGrounded)
+        {
+            dx = self.VX * candidate.CommitmentTicks * Simulation.TickDt;
+            dz = self.VZ * candidate.CommitmentTicks * Simulation.TickDt;
+        }
+        else
+            return true;
+
+        float travel = Distance(dx, dz);
+        if (travel <= 0f)
+            return true;
+        float radius = _profileDefinition!.CapsuleRadius;
+        int steps = Math.Max(1, (int)MathF.Ceiling(travel / 0.5f));
+        for (int step = 1; step <= steps; step++)
+        {
+            float fraction = step / (float)steps;
+            float x = self.PX + dx * fraction;
+            float z = self.PZ + dz * fraction;
+            if (x < arena.MinX + radius || x > arena.MaxX - radius
+                || z < arena.MinZ + radius || z > arena.MaxZ - radius
+                || !HasSupportAt(x, self.PY, z, in arena))
+                return false;
+        }
+        return true;
+    }
+
+
+    private bool IsCandidateAvailable(in CharacterState self, in MoveCandidate candidate,
+        bool air, bool allowRecoveryMove, in ArenaDefinition arena)
+        => candidate.Functional
+            && (allowRecoveryMove || !candidate.IsRecovery)
+            && self.GetCooldown(candidate.Slot) == 0
+            && !IsChargePoolExhausted(self, candidate.Slot, air)
+            && HasSafeAttackTravel(self, candidate, in arena);
+
+    private float MaxConnectReach(in CharacterState self, float rangeScale,
+        bool allowRecoveryMove, in ArenaDefinition arena)
     {
         bool air = !self.IsGrounded;
         float max = 0f;
         for (int i = 0; i < Slots.Length; i++)
         {
             var candidate = air ? _airProfile[i] : _profile[i];
-            if (candidate.Functional)
+            if (IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena))
                 max = MathF.Max(max, (candidate.Reach + VictimRadiusMargin) * rangeScale);
         }
         return max;
@@ -434,7 +864,7 @@ public sealed class HeuristicBotPolicy
 
 
     private MoveCandidate? ChooseSlot(in CharacterState self, in CpuObservation target,
-        float dist, float rangeScale, Random rng)
+        float dist, float rangeScale, Random rng, bool allowRecoveryMove, in ArenaDefinition arena)
     {
         bool air = !self.IsGrounded;
         Span<MoveCandidate> viable = stackalloc MoveCandidate[Slots.Length];
@@ -444,9 +874,7 @@ public sealed class HeuristicBotPolicy
         for (int i = 0; i < Slots.Length; i++)
         {
             var candidate = air ? _airProfile[i] : _profile[i];
-            if (!candidate.Functional
-                || self.GetCooldown(candidate.Slot) > 0
-                || IsChargePoolExhausted(self, candidate.Slot, air))
+            if (!IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena))
                 continue;
 
             bool inReach = candidate.Reach > 0f
@@ -461,9 +889,7 @@ public sealed class HeuristicBotPolicy
         for (int i = 0; i < Slots.Length; i++)
         {
             var candidate = air ? _airProfile[i] : _profile[i];
-            if (!candidate.Functional
-                || self.GetCooldown(candidate.Slot) > 0
-                || IsChargePoolExhausted(self, candidate.Slot, air))
+            if (!IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena))
                 continue;
 
             bool inReach = candidate.Reach > 0f
@@ -496,6 +922,7 @@ public sealed class HeuristicBotPolicy
         return best[rng.Next(bestCount)];
     }
 
+
     private static float Score(in MoveCandidate candidate, float dist, bool threatening)
         => (candidate.HasDamage ? 100f : 10f)
             + (threatening && candidate.HasDamage ? 5f : 0f)
@@ -521,14 +948,19 @@ public sealed class HeuristicBotPolicy
         {
             bool functional = false, hasDamage = false, hasMovement = false;
             float hitReach = 0f, movementReach = 0f, damage = 0f;
+            float forwardTravel = 0f;
+            int timelineTicks = cooked.Timeline.Stages.Sum(x => (int)x.DurationTicks);
+            float recoveryHorizontal = 0f, recoveryVertical = 0f;
+            bool recoveryRequiresDelayedOpponent = false;
             float travelSpeed = 0f, travelOffset = 0f;
             int startup = int.MaxValue;
             int travelTicks = 0;
             int stageOffset = 0;
+            var animationNames = cooked.Timeline.Stages
+                .SelectMany(x => x.AnimationIds).ToArray();
             for (int stageIndex = 0; stageIndex < cooked.Timeline.Stages.Count; stageIndex++)
             {
                 var stage = cooked.Timeline.Stages[stageIndex];
-                var animationNames = stage.AnimationIds.ToArray();
                 foreach (var operation in stage.Operations)
                 {
                     int operationTick = stageOffset + operation.Tick;
@@ -537,7 +969,7 @@ public sealed class HeuristicBotPolicy
                         case CookedSpawnHitboxOperation hitbox:
                             startup = Math.Min(startup, operationTick);
                             functional = true;
-                            var evt = ToHitboxEvent(hitbox.Hitbox);
+                            var evt = ToHitboxEvent(hitbox.Hitbox, operationTick);
                             float poseReach = PoseForwardReach(def, evt, activeSlot, airborne,
                                 animationNames, (byte)stageIndex, baked);
                             hitReach = MathF.Max(hitReach,
@@ -572,6 +1004,8 @@ public sealed class HeuristicBotPolicy
                             hasMovement = true;
                             movementReach = MathF.Max(movementReach,
                                 lunge.Speed * lunge.DurationTicks / 60f);
+                            forwardTravel = MathF.Max(forwardTravel,
+                                lunge.Speed * (timelineTicks - operationTick) / 60f);
                             break;
                         case CookedStartCapabilityOperation capability
                             when IsSupportedCapability(capability.Parameters):
@@ -581,7 +1015,17 @@ public sealed class HeuristicBotPolicy
                                 ref travelTicks, ref travelSpeed, ref travelOffset);
                             functional = true;
                             ApplyCapability(capability.Parameters, ref hitReach, ref movementReach,
-                                ref damage, ref hasDamage, ref hasMovement);
+                                ref damage, ref hasDamage, ref hasMovement,
+                                ref recoveryHorizontal, ref recoveryVertical,
+                                ref recoveryRequiresDelayedOpponent);
+                            if (capability.Parameters is CookedCycloneKickCapabilityParameters cyclone)
+                            {
+                                // Cyclone writes forward velocity until the owning timeline ends.
+                                float committed = cyclone.ForwardSpeed * (timelineTicks - operationTick) / 60f;
+                                forwardTravel = MathF.Max(forwardTravel, committed);
+                                hitReach = MathF.Max(hitReach, committed
+                                    + MathF.Max(cyclone.BodyRadius, cyclone.SideOffset + cyclone.SideRadius));
+                            }
                             break;
                     }
                 }
@@ -595,7 +1039,9 @@ public sealed class HeuristicBotPolicy
                     or AuthoringAbilityBehavior.ChargeAttack,
                 cooked.IsRecoveryMove,
                 startup == int.MaxValue ? (ushort)0 : (ushort)Math.Min(startup, ushort.MaxValue),
-                (ushort)Math.Min(travelTicks, ushort.MaxValue), travelSpeed, travelOffset);
+                (ushort)Math.Min(travelTicks, ushort.MaxValue), travelSpeed, travelOffset,
+                recoveryHorizontal, recoveryVertical, recoveryRequiresDelayedOpponent,
+                forwardTravel, timelineTicks);
             return functional;
         }
 
@@ -630,7 +1076,8 @@ public sealed class HeuristicBotPolicy
             legacyDamage, legacyFunctional, legacyDamage > 0f, legacyMovement != 0f,
             spec.AimMode != AimMode.None || spec.Behavior is AbilityBehavior.AimedProjectile
                 or AbilityBehavior.DirectionalDash or AbilityBehavior.ChargeAttack,
-            spec.IsRecoveryMove, FirstHitTick(legacyStage));
+            spec.IsRecoveryMove, FirstHitTick(legacyStage),
+            commitmentTicks: legacyStage.DurationTicks);
         return legacyFunctional;
     }
 
@@ -655,7 +1102,7 @@ public sealed class HeuristicBotPolicy
         return MathF.Max(0f, reach);
     }
 
-    private static HitboxEvent ToHitboxEvent(CookedHitbox hitbox)
+    private static HitboxEvent ToHitboxEvent(CookedHitbox hitbox, int triggerTick)
         => new()
         {
             Shape = hitbox.Shape == AuthoringHitboxShape.Capsule ? HitboxShape.Capsule : HitboxShape.Sphere,
@@ -668,8 +1115,7 @@ public sealed class HeuristicBotPolicy
             EndOffZ = hitbox.EndOffsetZ,
             BoneName = hitbox.StartBoneId,
             EndBoneName = hitbox.EndBoneId,
-
-            TriggerTick = 0,
+            TriggerTick = (ushort)Math.Clamp(triggerTick, 0, ushort.MaxValue),
             DurationTicks = hitbox.DurationTicks,
             Damage = hitbox.Damage,
             StunTicks = hitbox.StunTicks,
@@ -694,7 +1140,9 @@ public sealed class HeuristicBotPolicy
 
     private static void ApplyCapability(CookedCapabilityParameters parameters,
         ref float hitReach, ref float movementReach, ref float damage,
-        ref bool hasDamage, ref bool hasMovement)
+        ref bool hasDamage, ref bool hasMovement,
+        ref float recoveryHorizontal, ref float recoveryVertical,
+        ref bool recoveryRequiresDelayedOpponent)
     {
         switch (parameters)
         {
@@ -713,7 +1161,13 @@ public sealed class HeuristicBotPolicy
             case CookedKistuDashSlashCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.DashDistance); hasMovement = true; hasDamage = true; break;
             case CookedKistuRisingSlashCapabilityParameters x:
-                hitReach = MathF.Max(hitReach, x.HomingRange); hasMovement = true; hasDamage = true; break;
+                hitReach = MathF.Max(hitReach, x.HomingRange);
+                recoveryHorizontal = MathF.Max(recoveryHorizontal,
+                    x.HomingSpeed * x.RiseTicks / 60f);
+                recoveryVertical = MathF.Max(recoveryVertical,
+                    x.RiseSpeed * x.RiseTicks / 60f);
+                recoveryRequiresDelayedOpponent = true;
+                hasMovement = true; hasDamage = true; break;
             case CookedKistuBladeFlurryCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ForwardSpeed * x.MoveTicks / 60f);
                 hasMovement = true; hasDamage = true; break;
@@ -725,6 +1179,7 @@ public sealed class HeuristicBotPolicy
                 damage += x.Damage + x.ExplosionDamage; hasDamage |= x.Damage > 0f || x.ExplosionDamage > 0f; break;
             case CookedMankiJetpackBoostCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.HorizontalSpeed + x.ExplosionRadius);
+                recoveryHorizontal = MathF.Max(recoveryHorizontal, x.HorizontalSpeed);
                 damage += x.ExplosionDamage; hasDamage |= x.ExplosionDamage > 0f; hasMovement = true; break;
             case CookedMankiBazookaCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ProjectileSpeed * x.MaxFlightTicks / 60f + x.HitboxRadius);

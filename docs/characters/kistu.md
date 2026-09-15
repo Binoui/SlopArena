@@ -67,6 +67,17 @@ Fox-spirit theme gives a distinct roster silhouette (monkey / human / fox) and n
 - Mobility: agile, for **repositioning and spacing**, not stealth/escape. Not a full run-in rushdown — a pressure-at-range fighter.
 - **Designed weakness:** weak once an opponent gets *inside* the blade (classic Marth flaw) and an **honestly exploitable recovery** (see below).
 
+### Movement tuning — 2026-09-15
+
+Kistu keeps the roster's fastest Run (15 m/s), but pays for ground spacing with
+the lowest air-speed cap (8.5 → 7 m/s) and less frequent dashes. Air acceleration
+is reduced from 18 + 3.6 to 16 + 3.2 m/s²; dash speed drops from 24 to 22 m/s,
+with its 16-tick duration retained and cooldown increased from 44 to 52 ticks.
+
+The earlier `jumpForce` reduction from 13 to 12 remains: the authoritative
+flat-arena probe measures a 1.90 m full jump with 38 airborne ticks. Double-jump
+launch speed remains 9.6 m/s. Short hop, gravity, weight, and ability data are unchanged.
+
 ## Design Pillars
 
 ### Predictable knockback, emergent combos

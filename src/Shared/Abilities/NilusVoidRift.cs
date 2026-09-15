@@ -70,7 +70,7 @@ public sealed class NilusVoidRift : AimHoldAbility
         float riftDamage = GetParam(def, "rift_damage", 3f);
         float riftRadius = GetParam(def, "rift_radius", 3f);
 
-        Resolver.Spawn(new Hitbox
+        SpawnResolverHitbox(new Hitbox
         {
             X = s.PX,
             Y = s.PY + launchOffsetY,
@@ -93,6 +93,7 @@ public sealed class NilusVoidRift : AimHoldAbility
             StunTicks = 0,
             DurationTicks = (ushort)GetParam(def, "max_flight_ticks", 90f),
             OwnerId = s.EntityId,
+            AttackSlot = (byte)(Slot + 1),
             Gravity = g,
             Explosion = new ProjectileExplosion
             {

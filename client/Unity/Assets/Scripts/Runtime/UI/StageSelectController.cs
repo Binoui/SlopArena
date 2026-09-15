@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using SlopArena.Shared;
-using SlopArena.Client;
+using SlopArena.Shared.AI;
 using SlopArena.Client.Network;
 
 namespace SlopArena.Client.UI
@@ -98,7 +98,7 @@ namespace SlopArena.Client.UI
                 _playerCards.Add(BuildPlayerCard(
                     "P2", MatchConfig.Mode == GameMode.Solo ? "CPU" : "TRAINING BOT",
                     MatchConfig.Mode == GameMode.Solo ? MatchConfig.SoloBotClass : CharacterClass.FightGuy,
-                    MatchConfig.Mode == GameMode.Solo ? $"CPU {MatchConfig.SoloCpuLevel}" : "BOT",
+                    MatchConfig.Mode == GameMode.Solo ? $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}" : "BOT",
                     false, false));
                 return;
             }

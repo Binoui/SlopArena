@@ -1,6 +1,7 @@
 using System;
-using Xunit;
+using System.Collections.Generic;
 
+using Xunit;
 namespace SlopArena.Shared.Tests;
 
 public sealed class StageCollisionTests
@@ -16,7 +17,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 120f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.InRange(state.PX, 2f - Def.CapsuleRadius - 0.03f, 2f - Def.CapsuleRadius + 0.03f);
         Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.01f, Def.CapsuleHeight * 0.5f + 0.01f);
@@ -33,7 +34,7 @@ public sealed class StageCollisionTests
         state.VX = 12f;
 
         for (int i = 0; i < 3; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
 
         Assert.True(state.PX > 0.5f);
@@ -57,7 +58,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 20f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.True(state.PY <= 1.501f);
         Assert.True(state.VY <= 0.001f);
@@ -77,7 +78,7 @@ public sealed class StageCollisionTests
         Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 30f, 0f, 0f, 30, 100f);
 
         for (int i = 0; i < 4; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.True(state.PY <= 1.501f);
         Assert.True(state.VY <= 0.001f);
@@ -96,7 +97,7 @@ public sealed class StageCollisionTests
         state.VX = 120f;
         state.VZ = 60f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.True(state.PX <= 2f - Def.CapsuleRadius + 0.03f);
         Assert.True(state.PZ <= 2f - Def.CapsuleRadius + 0.03f);
@@ -116,7 +117,7 @@ public sealed class StageCollisionTests
         state.VY = -180f;
 
         for (int i = 0; i < 20; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.True(state.IsGrounded);
         Assert.InRange(state.PY, 2f + Def.CapsuleHeight * 0.5f - 0.02f,
@@ -132,7 +133,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 30f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.True(state.IsGrounded);
         Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.02f, Def.CapsuleHeight * 0.5f + 0.02f);
@@ -151,7 +152,7 @@ public sealed class StageCollisionTests
         state.AirTimeTicks = 30;
         state.VY = 120f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.False(state.IsGrounded);
         Assert.Equal(0f, state.VY);
@@ -167,13 +168,13 @@ public sealed class StageCollisionTests
         dash.State = ActionState.Dashing;
         dash.DashDurationTicks = 1;
         dash.VX = 240f;
-        Simulation.SimulateTick(ref dash, Def, default, arena);
+        Simulation.SimulateTick(ref dash, Def, default, arena, out _);
 
         var knockback = Grounded(0f, 0f);
         knockback.State = ActionState.Idle;
         knockback.IsGrounded = false;
         knockback.KVX = 240f;
-        Simulation.SimulateTick(ref knockback, Def, default, arena);
+        Simulation.SimulateTick(ref knockback, Def, default, arena, out _);
 
         Assert.True(dash.PX < 2f);
         Assert.True(knockback.PX < 2f);
@@ -189,7 +190,7 @@ public sealed class StageCollisionTests
         state.VX = 30f;
 
 
-        Simulation.SimulateTick(ref state, Def, default, arena);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _);
 
         Assert.False(state.IsGrounded);
         Assert.True(state.PX > 2f);
@@ -229,8 +230,8 @@ public sealed class StageCollisionTests
 
         for (int i = 0; i < 30; i++)
         {
-            Simulation.SimulateTick(ref first, Def, default, arena);
-            Simulation.SimulateTick(ref second, Def, default, arena);
+            Simulation.SimulateTick(ref first, Def, default, arena, out _);
+            Simulation.SimulateTick(ref second, Def, default, arena, out _);
         }
 
         Assert.Equal(first.PX, second.PX);
@@ -242,12 +243,337 @@ public sealed class StageCollisionTests
         Assert.Equal(first.IsGrounded, second.IsGrounded);
     }
 
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void HeldRunIntoWall_StopsAndCanMoveAway(CharacterClass cls)
+    {
+        const float wallX = 2f;
+        var def = TestHelpers.ResolveDef(cls);
+        var arena = FiniteArena(
+            new[] { Floor(0f, -20f, 20f, -20f, 20f), FloorOther(0f, -20f, 20f, -20f, 20f),
+                WallX(wallX, 0f, 10f, -20f, 20f), WallXOther(wallX, 0f, 10f, -20f, 20f) },
+            (0f, -20f, 20f, -20f, 20f));
+        var state = TestHelpers.PlayerState(0f, 0f);
+        state.PY = TestHelpers.GroundPY(def);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = TestHelpers.Input(moveX: 1f),
+        };
+
+        bool contacted = false;
+        float contactX = 0f;
+        for (int tick = 0; tick < 120; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.PX <= wallX - def.CapsuleRadius + 0.03f,
+                Trace(cls, tick, inputs[1], current, "wall penetration"));
+            Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def)) <= 0.03f,
+                Trace(cls, tick, inputs[1], current, "wall climb"));
+            Assert.True(current.IsGrounded,
+                Trace(cls, tick, inputs[1], current, "lost groundedness"));
+            if (!contacted && current.PX >= wallX - def.CapsuleRadius - 0.03f)
+            {
+                contacted = true;
+                contactX = current.PX;
+            }
+        }
+
+        Assert.True(contacted, $"{cls}: held run never reached wall contact; final state={Trace(cls, 119, inputs[1], sim.GetState(1), "contact")}");
+        inputs[1] = TestHelpers.Input(moveX: -1f);
+        for (int tick = 120; tick < 150; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.PX <= wallX - def.CapsuleRadius + 0.03f,
+                Trace(cls, tick, inputs[1], current, "reverse penetration"));
+            Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def)) <= 0.03f,
+                Trace(cls, tick, inputs[1], current, "reverse climb"));
+            Assert.True(current.IsGrounded,
+                Trace(cls, tick, inputs[1], current, "reverse lost groundedness"));
+        }
+
+        var away = sim.GetState(1);
+        Assert.True(contactX - away.PX >= 0.5f,
+            $"{cls}: reverse did not move at least 0.5m away; contactX={contactX:F3}, final={Trace(cls, 149, inputs[1], away, "reverse")}");
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void HeldDiagonalRunAlongWall_PreservesTangentialMovement(CharacterClass cls)
+    {
+        const float wallX = 2f;
+        var def = TestHelpers.ResolveDef(cls);
+        var arena = FiniteArena(
+            new[] { TraversalFloor(0f, -20f, 20f, -20f, 20f), TraversalFloorOther(0f, -20f, 20f, -20f, 20f),
+                WallX(wallX, 0f, 10f, -20f, 20f), WallXOther(wallX, 0f, 10f, -20f, 20f) },
+            (0f, -20f, 20f, -20f, 20f));
+        var state = TestHelpers.PlayerState(0f, -4f);
+        state.PY = TestHelpers.GroundPY(def);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var input = TestHelpers.Input(moveX: 1f, moveY: 1f);
+        var inputs = new Dictionary<ulong, InputState> { [1] = input };
+        var expectedDirection = ExpectedInputDirection(input);
+        float expectedZ = expectedDirection.z;
+        bool contacted = false;
+        int contactTick = -1;
+        float contactZ = 0f;
+
+        for (int tick = 0; tick < 90; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.PX <= wallX - def.CapsuleRadius + 0.03f,
+                Trace(cls, tick, input, current, "diagonal wall penetration"));
+            Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def)) <= 0.03f,
+                Trace(cls, tick, input, current, "diagonal wall climb"));
+            Assert.True(current.IsGrounded,
+                Trace(cls, tick, input, current, "diagonal lost groundedness"));
+            if (!contacted && current.PX >= wallX - def.CapsuleRadius - 0.03f)
+            {
+                contacted = true;
+                contactTick = tick;
+                contactZ = current.PZ;
+            }
+            if (contacted)
+            {
+                float tangentTravel = expectedZ * (current.PZ - contactZ);
+                if (tangentTravel >= 1f) break;
+            }
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(contacted, $"{cls}: diagonal run never reached wall contact; contactTick={contactTick}; final={Trace(cls, 89, input, final, "contact")}");
+        Assert.True(expectedZ * (final.PZ - contactZ) >= 1f,
+            $"{cls}: diagonal run lost tangential travel; contactTick={contactTick}, contactZ={contactZ:F3}, final={Trace(cls, 89, input, final, "tangent")}");
+    }
+
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Manki)]
+    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Bonk)]
+    public void RunOffTrianglePlatform_FallsWithoutHoverOrSelfGrab(CharacterClass cls)
+    {
+        const float platformY = 6f;
+        var def = TestHelpers.ResolveDef(cls);
+        var arena = FiniteArena(
+            new[] { Floor(platformY, -8f, 2f, -8f, 8f), FloorOther(platformY, -8f, 2f, -8f, 8f) },
+            (platformY, -8f, 2f, -8f, 8f));
+        var state = TestHelpers.PlayerState(0f, 0f);
+        state.PY = TestHelpers.GroundPY(def, platformY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var input = TestHelpers.Input(moveX: 1f);
+        var inputs = new Dictionary<ulong, InputState> { [1] = input };
+        int leaveTick = -1;
+        int fallTick = -1;
+
+        for (int tick = 0; tick < 120; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.NotEqual(ActionState.LedgeHang, current.State);
+            if (leaveTick < 0 && !current.IsGrounded)
+                leaveTick = tick;
+            if (leaveTick >= 0)
+            {
+                Assert.True(current.VY <= 0.001f,
+                    Trace(cls, tick, input, current, "walk-off launched upward"));
+                if (current.VY < 0f && fallTick < 0)
+                {
+                    fallTick = tick;
+                    Assert.True(tick - leaveTick <= 2,
+                        Trace(cls, tick, input, current, "walk-off fall delayed"));
+                    Assert.True(current.PY - def.CapsuleHeight * 0.5f < platformY - 0.001f,
+                        Trace(cls, tick, input, current, "walk-off height did not drop"));
+                }
+                if (current.PY - def.CapsuleHeight * 0.5f <= platformY - 1f)
+                {
+                    Assert.True(fallTick >= 0, Trace(cls, tick, input, current, "walk-off never entered fall"));
+                    return;
+                }
+            }
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(leaveTick >= 0, $"{cls}: never left finite triangle platform; final={Trace(cls, 119, input, final, "leave")}");
+        Assert.True(fallTick >= 0, $"{cls}: no negative velocity within two ticks; final={Trace(cls, 119, input, final, "fall")}");
+        Assert.True(final.PY - def.CapsuleHeight * 0.5f <= platformY - 1f,
+            $"{cls}: did not fall 1m below platform; final={Trace(cls, 119, input, final, "depth")}");
+    }
+
+    [Theory]
+    [InlineData(CharacterClass.FightGuy, 0f)]
+    [InlineData(CharacterClass.FightGuy, 0.5f)]
+    [InlineData(CharacterClass.Manki, 0f)]
+    [InlineData(CharacterClass.Manki, 0.5f)]
+    [InlineData(CharacterClass.Kistu, 0f)]
+    [InlineData(CharacterClass.Kistu, 0.5f)]
+    [InlineData(CharacterClass.Bonk, 0f)]
+    [InlineData(CharacterClass.Bonk, 0.5f)]
+    public void HeldJumpBetweenTrianglePlatforms_LandsAndKeepsMoving(CharacterClass cls, float destinationY)
+    {
+        const float sourceY = 0f;
+        var def = TestHelpers.ResolveDef(cls);
+        var triangles = new List<CollisionTriangle>
+        {
+            Floor(sourceY, -10f, 0f, -8f, 8f),
+            FloorOther(sourceY, -10f, 0f, -8f, 8f),
+            Floor(destinationY, 1f, 30f, -8f, 8f),
+            FloorOther(destinationY, 1f, 30f, -8f, 8f),
+        };
+        if (destinationY > sourceY)
+        {
+            triangles.Add(WallX(1f, sourceY, destinationY, -8f, 8f));
+            triangles.Add(WallXOther(1f, sourceY, destinationY, -8f, 8f));
+            triangles.Add(WallX(30f, sourceY, destinationY, -8f, 8f));
+            triangles.Add(WallXOther(30f, sourceY, destinationY, -8f, 8f));
+            triangles.Add(WallZ(-8f, sourceY, destinationY, 1f, 30f));
+            triangles.Add(WallZOther(-8f, sourceY, destinationY, 1f, 30f));
+            triangles.Add(WallZ(8f, sourceY, destinationY, 1f, 30f));
+            triangles.Add(WallZOther(8f, sourceY, destinationY, 1f, 30f));
+        }
+        var arena = FiniteArena(
+            triangles.ToArray(),
+            (sourceY, -10f, 0f, -8f, 8f),
+            (destinationY, 1f, 30f, -8f, 8f));
+        var state = TestHelpers.PlayerState(-1f, 0f);
+        state.PY = TestHelpers.GroundPY(def, sourceY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        bool tookOff = false;
+        bool crossedGap = false;
+        bool landed = false;
+        int landingTick = -1;
+        float landedX = 0f;
+
+        for (int tick = 0; tick < 180; tick++)
+        {
+            var before = sim.GetState(1);
+            bool jumpPress = tick == 0;
+            float moveX = !tookOff || before.PX < 4f ? 1f : 0f;
+            inputs[1] = TestHelpers.Input(moveX: moveX, jump: jumpPress, jumpHeld: true);
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            if (!tookOff && !current.IsGrounded && current.VY > 0f)
+                tookOff = true;
+            if (tookOff && !current.IsGrounded && current.PX > 1f)
+                crossedGap = true;
+            if (tookOff && !crossedGap && before.PX < 1f && current.PX >= 1f)
+                crossedGap = true;
+            if (tookOff && current.IsGrounded && !landed)
+            {
+                Assert.True(current.PX >= 1f - 0.03f,
+                    Trace(cls, tick, inputs[1], current, "landed before destination"));
+                landed = true;
+                landingTick = tick;
+                landedX = current.PX;
+                Assert.True(MathF.Abs(current.PY - TestHelpers.GroundPY(def, destinationY)) <= 0.03f,
+                    Trace(cls, tick, inputs[1], current, "destination landing height"));
+            }
+            if (tookOff && !landed && current.PX >= 1f - 0.03f)
+            {
+                Assert.True(current.PY - def.CapsuleHeight * 0.5f >= destinationY - 0.25f,
+                    Trace(cls, tick, inputs[1], current, "unexpected below-surface teleport"));
+            }
+            if (landed && tick - landingTick >= 20)
+                break;
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(tookOff, $"{cls} destinationY={destinationY:F1}: no takeoff; final={Trace(cls, 179, inputs[1], final, "takeoff")}");
+        Assert.True(crossedGap, $"{cls} destinationY={destinationY:F1}: gap was not crossed airborne; final={Trace(cls, 179, inputs[1], final, "gap")}");
+        Assert.True(landed, $"{cls} destinationY={destinationY:F1}: no destination landing; final={Trace(cls, 179, inputs[1], final, "landing")}");
+        Assert.True(final.IsGrounded && MathF.Abs(final.PY - TestHelpers.GroundPY(def, destinationY)) <= 0.03f,
+            Trace(cls, landingTick + 20, inputs[1], final, "post-landing support"));
+        Assert.True(final.PX - landedX >= 0.5f,
+            $"{cls} destinationY={destinationY:F1}: post-landing movement was insufficient; landedX={landedX:F3}, final={Trace(cls, landingTick + 20, inputs[1], final, "post-landing travel")}");
+    }
+
+    private static string Trace(CharacterClass cls, int tick, InputState input, CharacterState state, string contract)
+        => $"{cls} tick={tick} contract={contract} input=({input.MoveX:F2},{input.MoveY:F2}) " +
+           $"pos=({state.PX:F3},{state.PY:F3},{state.PZ:F3}) " +
+           $"vel=({state.VX:F3},{state.VY:F3},{state.VZ:F3}) grounded={state.IsGrounded} state={state.State}";
+
+    private static (float x, float z) ExpectedInputDirection(InputState input)
+    {
+        float x = input.MoveX;
+        float z = input.MoveY;
+        float length = MathF.Sqrt(x * x + z * z);
+        return length > 0.001f ? (x / length, z / length) : (0f, 0f);
+    }
+
+
     private static CharacterState Grounded(float x, float z)
     {
         var state = TestHelpers.PlayerState(x, z);
         state.PY = Def.CapsuleHeight * 0.5f;
         state.IsGrounded = true;
         return state;
+    }
+
+    private static ArenaDefinition FiniteArena(
+        CollisionTriangle[] triangles,
+        params (float y, float minX, float maxX, float minZ, float maxZ)[] surfaces)
+    {
+        const int width = 240;
+        const int height = 160;
+        const float cellSize = 0.25f;
+        const float originX = -20f;
+        const float originZ = -20f;
+        var data = new float[width * height];
+        for (int z = 0; z < height; z++)
+        for (int x = 0; x < width; x++)
+        {
+            float worldX = originX + x * cellSize;
+            float worldZ = originZ + z * cellSize;
+            float top = float.MinValue;
+            foreach (var surface in surfaces)
+            {
+                if (worldX >= surface.minX && worldX <= surface.maxX
+                    && worldZ >= surface.minZ && worldZ <= surface.maxZ)
+                    top = MathF.Max(top, surface.y);
+            }
+            data[z * width + x] = top;
+        }
+        var arena = new ArenaDefinition
+        {
+            Name = "finite-triangle-test",
+            DisplayName = "Finite Triangle Test",
+            KillHeight = -20f,
+            MinX = -20f,
+            MaxX = 40f,
+            MinZ = -20f,
+            MaxZ = 20f,
+            Heightmap = new ArenaHeightmap
+            {
+                Width = width,
+                Height = height,
+                CellSize = cellSize,
+                OriginX = originX,
+                OriginZ = originZ,
+                Data = data,
+            },
+            CollisionTriangles = triangles,
+        };
+        arena.SpatialGrid = ArenaCollision.BuildSpatialGrid(in arena);
+        return arena;
     }
 
     private static ArenaDefinition Arena(params CollisionTriangle[] triangles)
@@ -276,6 +602,22 @@ public sealed class StageCollisionTests
             BX = maxX, BY = y, BZ = minZ,
             CX = minX, CY = y, CZ = maxZ,
         };
+    private static CollisionTriangle TraversalFloor(float y, float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = minX, AY = y, AZ = minZ,
+            BX = minX, BY = y, BZ = maxZ,
+            CX = maxX, CY = y, CZ = maxZ,
+        };
+
+    private static CollisionTriangle TraversalFloorOther(float y, float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = maxX, AY = y, AZ = minZ,
+            BX = minX, BY = y, BZ = minZ,
+            CX = maxX, CY = y, CZ = maxZ,
+        };
+
 
     private static CollisionTriangle PlatformTop(float minX, float maxX, float minZ, float maxZ)
         => new()
@@ -287,18 +629,40 @@ public sealed class StageCollisionTests
 
 
     private static CollisionTriangle WallX(float x, float minY, float maxY)
+        => WallX(x, minY, maxY, -10f, 10f);
+
+    private static CollisionTriangle WallX(float x, float minY, float maxY, float minZ, float maxZ)
         => new()
         {
-            AX = x, AY = minY, AZ = -10f,
-            BX = x, BY = maxY, BZ = -10f,
-            CX = x, CY = minY, CZ = 10f,
+            AX = x, AY = minY, AZ = minZ,
+            BX = x, BY = maxY, BZ = minZ,
+            CX = x, CY = minY, CZ = maxZ,
+        };
+
+    private static CollisionTriangle WallXOther(float x, float minY, float maxY, float minZ, float maxZ)
+        => new()
+        {
+            AX = x, AY = minY, AZ = maxZ,
+            BX = x, BY = minY, BZ = minZ,
+            CX = x, CY = maxY, CZ = maxZ,
         };
 
     private static CollisionTriangle WallZ(float z, float minY, float maxY)
+        => WallZ(z, minY, maxY, -10f, 10f);
+
+    private static CollisionTriangle WallZ(float z, float minY, float maxY, float minX, float maxX)
         => new()
         {
-            AX = -10f, AY = minY, AZ = z,
-            BX = -10f, BY = maxY, BZ = z,
-            CX = 10f, CY = minY, CZ = z,
+            AX = minX, AY = minY, AZ = z,
+            BX = minX, BY = maxY, BZ = z,
+            CX = maxX, CY = minY, CZ = z,
+        };
+
+    private static CollisionTriangle WallZOther(float z, float minY, float maxY, float minX, float maxX)
+        => new()
+        {
+            AX = maxX, AY = minY, AZ = z,
+            BX = minX, BY = minY, BZ = z,
+            CX = maxX, CY = maxY, CZ = z,
         };
 }

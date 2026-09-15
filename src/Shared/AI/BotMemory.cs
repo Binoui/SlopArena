@@ -99,6 +99,7 @@ internal enum BotPlanKind : byte
     Ordinary,
     TrueCombo,
     PressureString,
+    Recovery,
 }
 
 /// <summary>

@@ -393,7 +393,10 @@ namespace SlopArena.Client.World
                 {
                     npc.LastDeaths = npcState.Deaths;
                     npc.Memory.Reset();
-                    npc.Memory.Difficulty = CurrentNpcDifficulty;
+                    npc.Memory.Difficulty = BotDifficultyProfile.Normalize(
+                        MatchConfig.Mode == GameMode.Solo
+                            ? MatchConfig.SoloCpuDifficulty
+                            : CurrentNpcDifficulty);
                     continue;
                 }
 
@@ -585,7 +588,8 @@ namespace SlopArena.Client.World
         {
             if (slot.Def == null) return BuildIdleInput();
             slot.Rng ??= new System.Random();
-            return _npcPolicy.Decide(npcState, playerState, slot.Def, slot.Rng, slot.Memory, _npcEntry.BakedAnimation);
+            return _npcPolicy.Decide(npcState, playerState, slot.Def, slot.Rng, slot.Memory,
+                _arenaDef, _npcEntry.BakedAnimation);
         }
 
         private static InputState BuildIdleInput()

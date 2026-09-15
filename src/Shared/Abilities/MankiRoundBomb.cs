@@ -75,7 +75,7 @@ namespace SlopArena.Shared.Abilities
             ushort maxFlightTicks = _parameters?.MaxFlightTicks ?? (ushort)GetParam(def, "max_flight_ticks", 90f);
             ushort explosionStunTicks = _parameters?.ExplosionStunTicks ?? (ushort)GetParam(def, "explosion_stun_ticks", 20f);
             ushort explosionDurationTicks = _parameters?.ExplosionDurationTicks ?? (ushort)GetParam(def, "explosion_duration_ticks", 6f);
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX, Y = s.PY + launchOffsetY, Z = s.PZ,
                 VX = hSpeed * aimSin, VY = vSpeed, VZ = hSpeed * aimCos,

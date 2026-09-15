@@ -67,6 +67,20 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 - R is fast fire-and-forget poke with rocket jump utility; aim at feet for vertical launch, aim at distant enemies for explosive poking
 - F is a committed area-denial finisher with a tall forward hitbox
 
+### Movement tuning — 2026-09-15
+
+Ordinary movement supports the mobile-skirmisher role without relying on specials
+to compensate for weaknesses in every category:
+
+- Run speed: 12 → 13.5 m/s; air-speed cap: 6.5 → 8 m/s, the roster's highest.
+- Air acceleration: 14 + 2.8 → 16 + 3.2 m/s².
+- Full-jump launch speed: 10 → 11.5 m/s; short-hop launch: 6 → 7.2 m/s.
+- JumpSquat: 6 → 4 ticks; the existing short-hop decision window still applies.
+- Dash duration: 15 → 18 ticks at the unchanged 20 m/s; cooldown: 60 → 48 ticks.
+
+Full-jump height measures 1.79 m, up from 1.35 m, through the authoritative
+flat-arena probe. Gravity, fall speeds, weight, and ability data are unchanged.
+
 ## Palette
 
 | Element | Color |

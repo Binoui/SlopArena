@@ -206,8 +206,10 @@ namespace SlopArena.Shared
             ref CharacterState s,
             CharacterDefinition def,
             InputState input,
-            ArenaDefinition arena)
+            ArenaDefinition arena,
+            out bool ordinaryActionOpportunity)
         {
+            ordinaryActionOpportunity = false;
             var stats = def.Movement;
             bool wasGrounded = s.IsGrounded;   // airborne→grounded detection for the Rush reset
 
@@ -369,6 +371,35 @@ namespace SlopArena.Shared
 
             // 1. Tick timers
             TickTimers(ref s);
+            if (s.State != ActionState.Hitstun && !HasKnockback(s))
+            {
+                bool movementAllowed = s.HitstunTicks == 0
+                    && s.HitstopTicks == 0
+                    && s.BurstRecoveryTicks == 0
+                    && s.LandingLagTicks == 0;
+                bool mobileAim = s.State == ActionState.Aiming
+                    && s.AttackSlot > 0
+                    && def.GetAimMovementMode(s.AttackSlot, !s.IsGrounded) == AimMovementMode.Mobile;
+                bool ordinaryMovement = movementAllowed
+                    && (s.State == ActionState.Idle || s.State == ActionState.Run || mobileAim);
+                bool jump = movementAllowed
+                    && s.JumpsLeft > 0
+                    && s.AnimLockTicks == 0
+                    && s.State != ActionState.JumpSquat
+                    && s.State != ActionState.Aiming
+                    && s.State != ActionState.LedgeHang;
+                bool dash = movementAllowed
+                    && (s.AnimLockTicks == 0 || IsIasaUnlocked(s, def))
+                    && s.DashDurationTicks == 0
+                    && s.DashCooldownTicks == 0
+                    && s.State != ActionState.JumpSquat
+                    && s.State != ActionState.Aiming
+                    && s.State != ActionState.LedgeHang;
+                bool ledgeExit = s.State == ActionState.LedgeHang
+                    && FindLedge(s, arena, def.CapsuleHeight * 0.5f,
+                        out _, out _, out _, out _, out _);
+                ordinaryActionOpportunity = ordinaryMovement || jump || dash || ledgeExit;
+            }
 
             // 2. Hitstun overrides everything (DI window)
             if (s.State == ActionState.Hitstun)
@@ -814,6 +845,17 @@ namespace SlopArena.Shared
                     remainingX = remainingY = remainingZ = 0f;
                     break;
                 }
+                if (contact.NormalY > 0.5f
+                    && !ArenaCollision.IsUpwardFacingTriangle(contact.TriangleIndex, in arena)
+                    && remainingY <= 0f)
+                {
+                    s.PX += remainingX;
+                    s.PY += remainingY;
+                    s.PZ += remainingZ;
+                    remainingX = remainingY = remainingZ = 0f;
+                    break;
+                }
+
 
                 float contactTime = Math.Clamp(contact.Time, 0f, 1f);
                 s.PX += remainingX * contactTime;
@@ -845,7 +887,9 @@ namespace SlopArena.Shared
                 if (knockbackVelocityYBeforeProjection <= 0f && s.KVY > knockbackVelocityYBeforeProjection)
                     s.KVY = knockbackVelocityYBeforeProjection;
                 float approach = dx * contact.NormalX + dy * contact.NormalY + dz * contact.NormalZ;
-                if (contact.NormalY > 0.5f && (approach < -0.0001f || s.IsGrounded))
+                if (contact.NormalY > 0.5f
+                    && ArenaCollision.IsUpwardFacingTriangle(contact.TriangleIndex, in arena)
+                    && (approach < -0.0001f || s.IsGrounded))
                     supported = true;
                 if (remainingX * remainingX + remainingY * remainingY + remainingZ * remainingZ <= 0.000001f)
                     break;
@@ -1287,10 +1331,17 @@ namespace SlopArena.Shared
                 }
                 else
                 {
-                    // Run hold. Any perpendicular component is a redirect: snap to the
-                    // input direction at current speed, dropping it (no diagonal drag).
+                    // Run hold. Redirects snap to the input direction, except when a
+                    // held direction has already been reduced to a single tangent by
+                    // stage collision. Re-adding the blocked component at full speed
+                    // every tick would make wall slides lose tangent speed geometrically.
                     float perp = (s.VX * dirZ) - (s.VZ * dirX);
-                    if (MathF.Abs(perp) > VelocityDeadZone)
+                    bool sameInput = MathF.Abs(s.LastDirX - dirX) <= 0.001f
+                        && MathF.Abs(s.LastDirZ - dirZ) <= 0.001f;
+                    bool tangentSlide = sameInput
+                        && ((MathF.Abs(s.VX) <= VelocityDeadZone && MathF.Abs(s.VZ) > VelocityDeadZone)
+                            || (MathF.Abs(s.VZ) <= VelocityDeadZone && MathF.Abs(s.VX) > VelocityDeadZone));
+                    if (MathF.Abs(perp) > VelocityDeadZone && !tangentSlide)
                     {
                         s.VX = dirX * speed;
                         s.VZ = dirZ * speed;

@@ -73,6 +73,8 @@ namespace SlopArena.Shared.Abilities
         /// </summary>
         public bool AirborneAtStart { get; set; }
 
+        /// <summary>Unique server-local identity for this ability activation.</summary>
+        public ulong ActivationId { get; set; }
         // ── Animation (set during Tick, synced to client via CharacterState.AnimIndex) ──
 
         /// <summary>
@@ -166,6 +168,8 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = evt.StunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,
+                ActivationId = ActivationId,
+                ActivationAirborne = AirborneAtStart,
                 FreezesOwner = true,
                 HitsMultipleOpponents = true,
                 HitEntities = sharedHitEntities,
@@ -176,6 +180,7 @@ namespace SlopArena.Shared.Abilities
                 AnimationNames = AnimationNames,
                 AnimIndex = AnimIndex,
                 Slot = Slot,
+                AttackSlot = (byte)(Slot + 1),
                 Airborne = !s.IsGrounded,
             });
         }
@@ -187,6 +192,13 @@ namespace SlopArena.Shared.Abilities
             s.VX = vx;
             s.VY = vy;
             s.VZ = vz;
+        }
+        /// <summary>Spawn a raw hitbox while preserving this activation's provenance.</summary>
+        protected void SpawnResolverHitbox(Hitbox hitbox)
+        {
+            hitbox.ActivationId = ActivationId;
+            hitbox.ActivationAirborne = AirborneAtStart;
+            Resolver.Spawn(hitbox);
         }
 
         /// <summary>

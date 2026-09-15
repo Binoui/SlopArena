@@ -15,7 +15,7 @@ namespace SlopArena.SpectateView;
 /// SelfPlayMatch — deterministic bots, seeded RNG) and renders a top-down XZ view
 /// in the terminal with ANSI colors. No Unity, no network.
 ///
-/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|kistu|manki|nilus]
+/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|kistu|manki|bonk|nilus]
 ///        [--seed N] [--speed N] [--stocks N] [--max-ticks N]
 ///   --speed N   ticks per rendered frame (1 = realtime 60fps, 4 = 4x at 15fps). 0 = headless
 ///               (no render, just the final result — useful for determinism checks).
@@ -30,6 +30,14 @@ internal static class Program
         int speed = ParseInt(args, "--speed", 1);
         int maxTicks = ParseInt(args, "--max-ticks", SelfPlayMatch.DefaultMaxTicks);
         int stocks = ParseInt(args, "--stocks", 3);
+        string difficultyName = ParseArg(args, "--difficulty") ?? "normal";
+        CpuDifficulty difficulty = difficultyName.ToLowerInvariant() switch
+        {
+            "easy" => CpuDifficulty.Easy,
+            "normal" => CpuDifficulty.Normal,
+            "hard" => CpuDifficulty.Hard,
+            _ => throw new ArgumentException($"Unknown CPU difficulty '{difficultyName}'. Use Easy, Normal, or Hard."),
+        };
         string? jsonPath = ParseArg(args, "--json");
 
         CharacterClass cls = charName.ToLowerInvariant() switch
@@ -38,15 +46,23 @@ internal static class Program
             "kistu" => CharacterClass.Kistu,
             "manki" => CharacterClass.Manki,
             "nilus" => CharacterClass.Nilus,
-            _ => CharacterClass.FightGuy,
+            "bonk" => CharacterClass.Bonk,
+            _ => CharacterClass.None,
         };
-        var entry = BuiltInContentResolver.Resolve(cls);
-        var def = entry.Definition;
-        if (def.Class == CharacterClass.None)
+        if (cls == CharacterClass.None)
         {
             Console.Error.WriteLine($"Unknown character '{charName}'.");
             return 1;
         }
+        var entry = BuiltInContentResolver.Resolve(cls);
+        var def = entry.Definition;
+        if (def.Class == CharacterClass.None)
+        {
+            Console.Error.WriteLine($"Unable to resolve character '{charName}'.");
+            return 1;
+        }
+        Console.WriteLine($"Resolved character: {def.DisplayName} ({def.Class})");
+        Console.WriteLine($"Difficulty: {BotDifficultyProfile.DisplayName(difficulty)}  Seed: {seed}");
 
         var arena = BuildKillArena();
         var baked = LoadBakedData(entry);
@@ -60,6 +76,8 @@ internal static class Program
 
         var memA = new BotMemory();
         var memB = new BotMemory();
+        memA.Difficulty = BotDifficultyProfile.Normalize(difficulty);
+        memB.Difficulty = BotDifficultyProfile.Normalize(difficulty);
         byte lastDeathsA = 0;
         byte lastDeathsB = 0;
         var policy = new HeuristicBotPolicy();
@@ -74,31 +92,38 @@ internal static class Program
         for (; tick < maxTicks; tick++)
         {
             inputs[SelfPlayMatch.EntityA] = policy.Decide(
-                sim.GetState(SelfPlayMatch.EntityA), sim.GetState(SelfPlayMatch.EntityB), def, rng, memA);
+                sim.GetState(SelfPlayMatch.EntityA), sim.GetState(SelfPlayMatch.EntityB),
+                def, rng, memA, arena, baked);
             inputs[SelfPlayMatch.EntityB] = policy.Decide(
-                sim.GetState(SelfPlayMatch.EntityB), sim.GetState(SelfPlayMatch.EntityA), def, rng, memB);
+                sim.GetState(SelfPlayMatch.EntityB), sim.GetState(SelfPlayMatch.EntityA),
+                def, rng, memB, arena, baked);
+            recorder.RecordInputs(tick, inputs);
 
             recorder.RecordPresses(sim, tick, inputs, def); // swings from pre-tick presses
             sim.Tick(inputs);
             recorder.RecordTick(sim, tick, inputs, def);     // hits + positions
             var postA = sim.GetState(SelfPlayMatch.EntityA);
             var postB = sim.GetState(SelfPlayMatch.EntityB);
-            if (postA.Deaths > lastDeathsA)
+            bool respawnedA = postA.Deaths > lastDeathsA;
+            bool respawnedB = postB.Deaths > lastDeathsB;
+            if (respawnedA)
             {
                 lastDeathsA = postA.Deaths;
                 memA.Reset();
+                memA.Difficulty = BotDifficultyProfile.Normalize(difficulty);
             }
-            if (postB.Deaths > lastDeathsB)
+            if (respawnedB)
             {
                 lastDeathsB = postB.Deaths;
                 memB.Reset();
+                memB.Difficulty = BotDifficultyProfile.Normalize(difficulty);
             }
             foreach (var hit in sim.LastTickHits)
             {
-                if (hit.TargetEntityId == SelfPlayMatch.EntityB)
+                if (!respawnedA && hit.TargetEntityId == SelfPlayMatch.EntityB)
                     memA.RecordOpponentHit(hit.AttackSlot, !postB.IsGrounded, postB,
                         postB.HitstunTicks, hit.HitstopTicks);
-                if (hit.TargetEntityId == SelfPlayMatch.EntityA)
+                if (!respawnedB && hit.TargetEntityId == SelfPlayMatch.EntityA)
                     memB.RecordOpponentHit(hit.AttackSlot, !postA.IsGrounded, postA,
                         postA.HitstunTicks, hit.HitstopTicks);
             }
@@ -116,37 +141,47 @@ internal static class Program
             if (rule.Evaluate(sim.GetAllStates()).IsEnded) break;
         }
 
+        int executedTicks = tick < maxTicks ? tick + 1 : maxTicks;
         var sA = sim.GetState(SelfPlayMatch.EntityA);
         var sB = sim.GetState(SelfPlayMatch.EntityB);
         var outcome = rule.Evaluate(sim.GetAllStates());
         string winner = outcome.IsSharedVictory ? "draw (shared)" :
             outcome.WinnerEntityId == SelfPlayMatch.EntityA ? "A" :
             outcome.WinnerEntityId == SelfPlayMatch.EntityB ? "B" : "draw (no winner)";
+        var record = recorder.Finish(executedTicks, seed, outcome);
+        record.TimedOut = executedTicks >= maxTicks && !outcome.IsEnded;
 
         if (!headless) Console.Write("\x1b[0m");
         Console.WriteLine();
-        Console.WriteLine($"Match over after {tick + 1} ticks ({(tick + 1) / 60.0:0.0}s) — winner: {winner}");
+        Console.WriteLine($"Match over after {executedTicks} ticks ({executedTicks / 60.0:0.0}s) — winner: {winner}");
+        Console.WriteLine($"CPU difficulty: {BotDifficultyProfile.DisplayName(difficulty)}");
         Console.WriteLine($"A: {sA.Deaths} deaths, {sA.DamagePercent}%  |  B: {sB.Deaths} deaths, {sB.DamagePercent}%");
-
-        recorder.Finish(tick, seed, outcome);
-        var swings = recorder.Record.Swings;
-        var hits = recorder.Record.Hits;
+        int creditedDeaths = record.Deaths.Count(d => d.KillerEntityId != 0);
+        int uncreditedDeaths = record.Deaths.Count - creditedDeaths;
+        Console.WriteLine($"Deaths: {record.Deaths.Count} total ({creditedDeaths} credited, {uncreditedDeaths} uncredited).");
+        var swings = record.Swings;
+        var hits = record.Hits;
         foreach (ulong id in new[] { SelfPlayMatch.EntityA, SelfPlayMatch.EntityB })
         {
-            var perMove = swings.Where(s => s.Attacker == id)
+            var perMove = swings.Where(s => s.Attacker == id && s.Accepted)
                 .GroupBy(s => (s.ActiveSlot, s.Air))
                 .Select(g => (Label: MoveLabel(def, g.Key.Item1, g.Key.Item2),
                               Swings: g.Count(), Hits: g.Count(s => s.Connected)))
                 .OrderByDescending(m => m.Swings);
-            string dmg = hits.Where(h => h.Attacker == id).Sum(h => h.Damage).ToString("0");
+            string dmg = hits.Where(h => h.Attacker == id).Sum(h => h.Damage)
+                .ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             Console.WriteLine($"{(id == SelfPlayMatch.EntityA ? "A" : "B")} used: "
                 + string.Join("  |  ", perMove.Select(m => $"{m.Label} {m.Swings}× ({m.Hits} hit)"))
                 + $"   — dealt {dmg}% total");
         }
+        Console.WriteLine($"Telemetry: attempted inputs {record.ActionAttempts.Count}, "
+            + $"accepted actions {record.AcceptedActions.Count}, confirmed hits {record.Hits.Count}, "
+            + $"true combos {record.Combos.Count(c => c.IsTrueCombo)}, "
+            + $"pressure strings {record.Combos.Count(c => c.IsPressureString)}.");
 
         if (jsonPath != null)
         {
-            WriteJson(jsonPath, def, arena, seed, stocks, recorder, frames);
+            WriteJson(jsonPath, def, arena, seed, stocks, difficulty, recorder, frames);
             Console.WriteLine($"Wrote match dump: {jsonPath}");
         }
         return 0;
@@ -236,14 +271,23 @@ internal static class Program
         return dz > 0 ? '/' : '\\';             // SW / NW
     }
 
-    /// <summary>"g1 Fist Jab" — g/a + slot number + ability name (SelfPlayReport convention).</summary>
+    /// <summary>"g1 Fist Jab" — g/a + canonical slot label + resolved ability name.</summary>
     private static string MoveLabel(CharacterDefinition def, byte slot, bool air)
-        => $"{(air ? "a" : "g")}{SlotOf(slot)} {def.GetSlotAbility(slot - 1, air)?.Name ?? "-"}";
+        => $"{(air ? "a" : "g")}{SlotLabel(slot)} "
+            + (def.GetCookedSlotAbility(slot, air)?.Name
+                ?? def.GetSlotAbility(slot - 1, air)?.Name ?? "-");
 
-    private static int SlotOf(byte activeSlot) => activeSlot switch
+    private static string SlotLabel(byte activeSlot) => activeSlot switch
     {
-        AbilitySlots.Slot1 => 1, AbilitySlots.Slot2 => 2, AbilitySlots.Slot3 => 3, AbilitySlots.Slot4 => 4,
-        AbilitySlots.Slot5 => 5, _ => 0,
+        AbilitySlots.Slot1 => "1",
+        AbilitySlots.Slot2 => "2",
+        AbilitySlots.Slot3 => "3",
+        AbilitySlots.Slot4 => "4",
+        AbilitySlots.A => "A",
+        AbilitySlots.E => "E",
+        AbilitySlots.R => "R",
+        AbilitySlots.F => "F",
+        _ => "?",
     };
 
     /// <summary>Top-4 moves by usage for one entity, e.g. "g1 Fist Jab ×8  a2 Uppercut ×3".</summary>
@@ -251,7 +295,7 @@ internal static class Program
     {
         var counts = new Dictionary<(byte, bool), int>();
         foreach (var sw in swings)
-            if (sw.Attacker == id)
+            if (sw.Attacker == id && sw.Accepted)
                 counts[(sw.ActiveSlot, sw.Air)] = counts.GetValueOrDefault((sw.ActiveSlot, sw.Air)) + 1;
         return counts.Count == 0 ? "-"
             : string.Join("  ", counts.OrderByDescending(kv => kv.Value).Take(4)
@@ -338,15 +382,18 @@ internal static class Program
     private sealed record EntSnap(float x, float y, float z, float fy, string st, ushort dmg, byte deaths, bool g, byte slot);
     private sealed record FrameSnap(int t, EntSnap[] e);
     private sealed record MoveDef(byte slot, bool air, string name, string label);
-    private sealed record SwingOut(int t, int e, int m, bool hit);
+    private sealed record SwingOut(int t, int e, int m, bool accepted, bool hit);
     private sealed record HitOut(int t, int e, float dmg);
+    private sealed record ComboOut(int attacker, int target, int hits, int start, int end,
+        bool trueCombo, bool pressureString);
+    private sealed record ActionOut(int t, int e, int slot, bool air);
 
     private static EntSnap Snap(CharacterState s) => new(s.PX, s.PY, s.PZ, s.FacingYaw,
         s.State.ToString(), s.DamagePercent, s.Deaths, s.IsGrounded, s.AttackSlot);
 
     /// <summary>Lossless-enough dump for playback: per-tick snapshots + move usage + hits.</summary>
     private static void WriteJson(string path, CharacterDefinition def, ArenaDefinition arena,
-        int seed, int stocks, MatchRecorder recorder, List<FrameSnap> frames)
+        int seed, int stocks, CpuDifficulty difficulty, MatchRecorder recorder, List<FrameSnap> frames)
     {
         var moveIdx = new Dictionary<(byte, bool), int>();
         var moves = new List<MoveDef>();
@@ -358,20 +405,47 @@ internal static class Program
                 i = moves.Count;
                 moveIdx[(sw.ActiveSlot, sw.Air)] = i;
                 moves.Add(new MoveDef(sw.ActiveSlot, sw.Air,
-                    def.GetSlotAbility(sw.ActiveSlot - 1, sw.Air)?.Name ?? "-",
+                    def.GetCookedSlotAbility(sw.ActiveSlot, sw.Air)?.Name
+                        ?? def.GetSlotAbility(sw.ActiveSlot - 1, sw.Air)?.Name ?? "-",
                     MoveLabel(def, sw.ActiveSlot, sw.Air)));
             }
-            swingsOut.Add(new SwingOut(sw.StartTick, sw.Attacker == SelfPlayMatch.EntityA ? 0 : 1, i, sw.Connected));
+            swingsOut.Add(new SwingOut(sw.StartTick, sw.Attacker == SelfPlayMatch.EntityA ? 0 : 1,
+                i, sw.Accepted, sw.Connected));
         }
+        var attemptsOut = recorder.Record.ActionAttempts
+            .Select(a => new ActionOut(a.Tick, a.EntityId == SelfPlayMatch.EntityA ? 0 : 1,
+                a.ActiveSlot, a.Air))
+            .ToArray();
+        var acceptedActionsOut = recorder.Record.AcceptedActions
+            .Select(a => new ActionOut(a.Tick, a.EntityId == SelfPlayMatch.EntityA ? 0 : 1,
+                a.ActiveSlot, a.Air))
+            .ToArray();
         var hitsOut = recorder.Record.Hits
             .Select(h => new HitOut(h.Tick, h.Attacker == SelfPlayMatch.EntityA ? 0 : 1, h.Damage))
+            .ToArray();
+        var combosOut = recorder.Record.Combos
+            .Select(c => new ComboOut(
+                c.Attacker == SelfPlayMatch.EntityA ? 0 : 1,
+                c.Target == SelfPlayMatch.EntityA ? 0 : 1,
+                c.Hits, c.StartTick, c.EndTick, c.IsTrueCombo, c.IsPressureString))
             .ToArray();
         var lines = ArenaCollision.ResolveBlastLines(arena);
         float floorY = arena.Heightmap.Data is { Length: > 0 } ? arena.Heightmap.Data.Max() : 0f;
 
+        var record = recorder.Record;
         var json = new
         {
-            charA = def.DisplayName, charB = def.DisplayName, seed, stocks,
+            charA = def.DisplayName, charB = def.DisplayName,
+            difficulty = BotDifficultyProfile.DisplayName(difficulty), seed, stocks,
+            durationTicks = record.DurationTicks, timedOut = record.TimedOut,
+            winnerEntityId = record.WinnerEntityId, sharedVictory = record.SharedVictory,
+            damageA = record.Hits.Where(h => h.Attacker == SelfPlayMatch.EntityA).Sum(h => h.Damage),
+            damageB = record.Hits.Where(h => h.Attacker == SelfPlayMatch.EntityB).Sum(h => h.Damage),
+            totalDamage = record.Hits.Sum(h => h.Damage),
+            totalDeaths = record.Deaths.Count,
+            creditedDeaths = record.Deaths.Count(d => d.KillerEntityId != 0),
+            uncreditedDeaths = record.Deaths.Count(d => d.KillerEntityId == 0),
+            deaths = record.Deaths,
             arena = new
             {
                 arena.MinX, arena.MaxX, arena.MinZ, arena.MaxZ,
@@ -380,8 +454,12 @@ internal static class Program
                 KillMinZ = lines.KillMinZ, KillMaxZ = lines.KillMaxZ,
                 FloorY = floorY,
             },
-            moves, frames, swings = swingsOut, hits = hitsOut,
+            moves, frames, attempts = attemptsOut, acceptedActions = acceptedActionsOut,
+            swings = swingsOut, hits = hitsOut, combos = combosOut,
         };
-        File.WriteAllText(path, JsonSerializer.Serialize(json));
+        File.WriteAllText(path, JsonSerializer.Serialize(json, new JsonSerializerOptions
+        {
+            IncludeFields = true,
+        }));
     }
 }

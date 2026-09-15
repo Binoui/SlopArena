@@ -1,6 +1,17 @@
 namespace SlopArena.Shared.AI;
 
 /// <summary>
+/// Named CPU challenge tiers shared by Solo, Training, and deterministic self-play.
+/// The enum values are the serialized tier indices; no numeric difficulty scale is retained.
+/// </summary>
+public enum CpuDifficulty
+{
+    Easy,
+    Normal,
+    Hard,
+}
+
+/// <summary>
 /// Fixed, deterministic tuning for the simple heuristic CPU. Probabilities are in the 0..1
 /// range; callers supply the only <see cref="System.Random"/> used to sample them.
 /// </summary>
@@ -39,23 +50,32 @@ public readonly struct BotDifficultyProfile
     }
 
     /// <summary>
-    /// Return the fixed profile for a Smash-style CPU level. Values outside 1..9 clamp to the
-    /// nearest supported level so bad inspector or replay data cannot change match semantics.
+    /// Normalize a serialized tier. Unknown values use the middle tier rather than changing
+    /// match semantics through an unsupported numeric value.
     /// </summary>
-    public static BotDifficultyProfile ForLevel(int level)
-    {
-        level = Math.Clamp(level, 1, 9);
-        return level switch
+    public static CpuDifficulty Normalize(CpuDifficulty difficulty)
+        => difficulty switch
         {
-            1 => new(30, 24, 0.20f, 0.35f, 0.05f, 0.10f, 0.45f, 0.00f, 0.00f),
-            2 => new(26, 20, 0.28f, 0.32f, 0.10f, 0.15f, 0.38f, 0.05f, 0.03f),
-            3 => new(22, 16, 0.36f, 0.29f, 0.16f, 0.20f, 0.32f, 0.12f, 0.08f),
-            4 => new(18, 12, 0.46f, 0.25f, 0.22f, 0.25f, 0.26f, 0.20f, 0.14f),
-            5 => new(14, 8, 0.56f, 0.21f, 0.30f, 0.30f, 0.20f, 0.32f, 0.22f),
-            6 => new(11, 6, 0.64f, 0.18f, 0.38f, 0.35f, 0.15f, 0.45f, 0.32f),
-            7 => new(8, 4, 0.72f, 0.15f, 0.46f, 0.40f, 0.11f, 0.58f, 0.44f),
-            8 => new(6, 2, 0.80f, 0.12f, 0.54f, 0.45f, 0.08f, 0.72f, 0.58f),
-            _ => new(4, 0, 0.88f, 0.10f, 0.62f, 0.50f, 0.05f, 0.85f, 0.72f),
+            CpuDifficulty.Easy => CpuDifficulty.Easy,
+            CpuDifficulty.Hard => CpuDifficulty.Hard,
+            _ => CpuDifficulty.Normal,
+        };
+
+    /// <summary>Return the player-facing name for a CPU tier.</summary>
+    public static string DisplayName(CpuDifficulty difficulty)
+        => Normalize(difficulty).ToString().ToUpperInvariant();
+
+    /// <summary>
+    /// Return the fixed profile for a named CPU difficulty.
+    /// Reaction delays are 24, 18, and 12 simulation ticks for Easy, Normal, and Hard.
+    /// </summary>
+    public static BotDifficultyProfile ForDifficulty(CpuDifficulty difficulty)
+    {
+        return Normalize(difficulty) switch
+        {
+            CpuDifficulty.Easy => new(30, 24, 0.20f, 0.35f, 0.05f, 0.10f, 0.45f, 0.00f, 0.00f),
+            CpuDifficulty.Normal => new(14, 18, 0.56f, 0.21f, 0.30f, 0.30f, 0.20f, 0.32f, 0.22f),
+            _ => new(4, 12, 0.88f, 0.10f, 0.62f, 0.50f, 0.05f, 0.85f, 0.72f),
         };
     }
 }

@@ -48,7 +48,7 @@ namespace SlopArena.Shared.Abilities
             float damage = _parameters.Damage;
             float radius = _parameters.BeamRadius;
 
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX,
                 Y = startY,
@@ -65,6 +65,7 @@ namespace SlopArena.Shared.Abilities
                 StunTicks = _parameters.StunTicks,
                 DurationTicks = _parameters.HitboxDurationTicks,
                 OwnerId = s.EntityId,
+                AttackSlot = (byte)(Slot + 1),
                 FreezesOwner = false,
                 HitsMultipleOpponents = true,
                 HitEntities = _hitEntities,

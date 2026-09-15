@@ -122,7 +122,7 @@ public sealed class KistuDashSlash : ServerAbility
 
         var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
 
-        Resolver.Spawn(new Hitbox
+        SpawnResolverHitbox(new Hitbox
         {
             X = sx,
             Y = s.PY + evt.OffY,
@@ -145,6 +145,7 @@ public sealed class KistuDashSlash : ServerAbility
             StunTicks = evt.StunTicks,
             DurationTicks = durationTicks > 0 ? durationTicks : (ushort)1,
             OwnerId = s.EntityId,
+            AttackSlot = (byte)(Slot + 1),
             FreezesOwner = true,
             HitsMultipleOpponents = true,
         });

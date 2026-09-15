@@ -106,7 +106,7 @@ public sealed class NilusRiftwalk : ServerAbility
 
             var (kbAngle, kbBase, kbGrowth) = new KnockbackData { Profile = KnockbackProfile.Light }.Resolve();
 
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX, Y = s.PY + 0.5f, Z = s.PZ,
                 EndX = s.PX, EndY = s.PY + 0.5f, EndZ = s.PZ,
@@ -119,6 +119,7 @@ public sealed class NilusRiftwalk : ServerAbility
                 StunTicks = (ushort)GetParam(def, "burst_stun_ticks", 12f),
                 DurationTicks = 4,
                 OwnerId = s.EntityId,
+                AttackSlot = (byte)(Slot + 1),
             });
         }
 

@@ -131,7 +131,7 @@ public sealed class NilusEventHorizon : ServerAbility
                 KnockbackGrowth = GetParam(def, "detonation_kb_growth", 9f),
             }.Resolve();
 
-            Resolver.Spawn(new Hitbox
+            SpawnResolverHitbox(new Hitbox
             {
                 X = s.PX, Y = s.PY + 0.5f, Z = s.PZ,
                 EndX = s.PX, EndY = s.PY + 0.5f, EndZ = s.PZ,
@@ -151,6 +151,7 @@ public sealed class NilusEventHorizon : ServerAbility
                 // radius, no double-hit.
                 RehitIntervalTicks = 5,
                 OwnerId = s.EntityId,
+                AttackSlot = (byte)(Slot + 1),
             });
 
             EndAbility(ref s);
@@ -201,7 +202,7 @@ public sealed class NilusEventHorizon : ServerAbility
         float pulseDamage = GetParam(def, "drag_damage", 3f);
         float pulseRadius = dragRadius;
 
-        Resolver.Spawn(new Hitbox
+        SpawnResolverHitbox(new Hitbox
         {
             X = s.PX, Y = s.PY + 0.5f, Z = s.PZ,
             EndX = s.PX, EndY = s.PY + 0.5f, EndZ = s.PZ,
@@ -218,6 +219,7 @@ public sealed class NilusEventHorizon : ServerAbility
             // DurationTicks = 1 the zone pulses exactly once, at age 0, then expires.
             RehitIntervalTicks = 1,
             OwnerId = s.EntityId,
+            AttackSlot = (byte)(Slot + 1),
         });
     }
 }

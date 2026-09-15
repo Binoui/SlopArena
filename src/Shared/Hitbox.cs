@@ -51,6 +51,11 @@ namespace SlopArena.Shared
         public ushort StunTicks;
         public ulong OwnerId;
 
+        /// <summary>Unique server-local ability activation that spawned this hitbox.</summary>
+        public ulong ActivationId;
+        /// <summary>Ground/air identity of the activation, independent of bone pose sampling.</summary>
+        public bool ActivationAirborne;
+
         /// <summary>Originating attack slot for presentation routing (0 = unspecified).</summary>
         public byte AttackSlot;
 
@@ -70,7 +75,7 @@ namespace SlopArena.Shared
         /// <summary>If true, this hitbox can hit the entity that spawned it.</summary>
         public bool CanHitOwner;
 
-        /// <summary>If true, this hit freezes the owner too (melee contact). Projectiles, zones, and explosions leave false — the receiver freezes alone (ADR-0012).</summary>
+        /// <summary>If true, this hit freezes the owner too (melee contact, ADR-0012). Projectiles, zones, and explosions leave false — the receiver freezes alone (ADR-0012).</summary>
         public bool FreezesOwner;
 
         /// <summary>

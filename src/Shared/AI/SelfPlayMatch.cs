@@ -52,8 +52,9 @@ public static class SelfPlayMatch
         {
             var sA = sim.GetState(EntityA);
             var sB = sim.GetState(EntityB);
-            inputs[EntityA] = policy.Decide(sA, sB, def, rng, memA, baked);
-            inputs[EntityB] = policy.Decide(sB, sA, def, rng, memB, baked);
+            inputs[EntityA] = policy.Decide(sA, sB, def, rng, memA, arena, baked);
+            inputs[EntityB] = policy.Decide(sB, sA, def, rng, memB, arena, baked);
+            recorder.RecordInputs(tick, inputs);
 
             recorder.RecordPresses(sim, tick, inputs, def); // swings from the pre-tick presses
             sim.Tick(inputs);
@@ -88,7 +89,7 @@ public static class SelfPlayMatch
 
             var outcome = rule.Evaluate(sim.GetAllStates());
             if (outcome.IsEnded)
-                return Finalize(recorder, sim, tick, seed, outcome, timedOut: false);
+                return Finalize(recorder, sim, tick + 1, seed, outcome, timedOut: false);
         }
         // Tick cap reached — draw.
         return Finalize(recorder, sim, tick, seed, default, timedOut: true);

@@ -7,6 +7,14 @@ It exercises the authoritative Shared compiler, trusted built-in capability
 admission, cooked package loading, Character Select discovery, and match
 content admission. Avatar visual/pose review remains a release prerequisite.
 
+## Movement tuning — 2026-09-15
+
+Bonk trades some ground speed for vertical reach: Run is reduced from 14 to
+13 m/s, while `jumpForce` rises from 12 to 13 m/s. Full-jump height measures
+2.24 m instead of 1.90 m through the authoritative flat-arena probe. The unchanged
+0.8 air-jump multiplier also raises double-jump launch speed from 9.6 to 10.4 m/s.
+Short hop, air control, dash, gravity, weight, and ability data are unchanged.
+
 ## Package ownership
 
 The package is `client/Unity/Assets/CharacterPackages/bonk/`:
