@@ -43,11 +43,10 @@ Desktop.ini
 # Local harness configuration
 /.mcp.json
 
-# Blender backups and local preview videos
+# Local Blender studies and export bundles (archive before pruning).
+# Existing tracked Blender sources remain versioned.
 *.blend1
-/art/blender/exports/*.mp4
-/art/blender/exports/*.mov
-/art/blender/exports/*.webm
+/art/blender/exports/
 
 # ==========================================
 # Large binary data (use Git LFS or generate at runtime)
@@ -225,6 +224,8 @@ client/Unity/Assets/Prefabs/Bridge_*.prefab.meta
 # scripts/move-data.sh --json instead of committing (docs/systems/move-data-report.md).
 # The .html/.md renderings of the same data stay committed.
 docs/generated/*-move-data.json
+/artifacts/normal-coverage/
+/artifacts/aerial-approach/
 
 # SpectateView match dumps (lossless per-tick JSON, regenerable in ~1s):
 #   dotnet run --project tools/SpectateView -- --json match.json --speed 0
@@ -278,3 +279,11 @@ __pycache__/
 # Skill evals: raw local session observations (labelled fixtures in fixtures.jsonl are committed)
 /tools/skill-evals/node_modules/
 /tools/skill-evals/data/observations.jsonl
+
+# Local UI review evidence; design contracts remain versioned.
+/.impeccable/review/
+/.impeccable/critique/
+
+# Runtime UI artwork shipped with the pre-match screens.
+!client/Unity/Assets/Resources/UI/Portraits/*.png
+!client/Unity/Assets/Resources/UI/Stages/*.png
