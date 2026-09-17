@@ -280,6 +280,44 @@ public class ArenaShippingTests
             $"{cls}: lower-deck movement after landing was insufficient; landedX={landedX:F3}, final={Trace(cls, "service deck jump", landingTick + 20, inputs[1], final, "post-landing travel")}");
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void SlopPit_FightGuyFullJump_LandsOnDiagonalPlatform(int direction)
+    {
+        var arena = ArenaBinaryFormat.LoadFromFile(
+            Path.Combine(RepoRoot(), "data", "arenas", "slop_pit.arena"))
+            ?? throw new InvalidOperationException("Slop Pit arena could not be loaded.");
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState(direction * 5.5f, direction * 8f);
+        state.PY = TestHelpers.GroundPY(def);
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState>();
+        bool airborne = false;
+
+        // Approach the inner edge rather than jumping into the underside from
+        // a spawn. A single held jump catches the rounded capsule on the lip,
+        // then continued movement settles the feet onto the platform top.
+        for (int tick = 0; tick < 80; tick++)
+        {
+            var current = sim.GetState(1);
+            inputs[1] = TestHelpers.Input(
+                moveX: direction * current.PX < 9f ? direction : 0f,
+                jump: tick == 0, jumpHeld: tick < 10);
+            sim.Tick(inputs);
+            airborne |= !sim.GetState(1).IsGrounded;
+        }
+
+        var landed = sim.GetState(1);
+        Assert.True(airborne, "The route must jump, not walk onto high ground.");
+        Assert.True(landed.IsGrounded, "The jump must end supported on the platform.");
+        Assert.InRange(landed.PY, TestHelpers.GroundPY(def, 2f) - 0.03f,
+            TestHelpers.GroundPY(def, 2f) + 0.03f);
+        Assert.InRange(direction * landed.PX, 7f, 13f);
+        Assert.InRange(direction * landed.PZ, 5.5f, 10.5f);
+    }
+
     private static ArenaDefinition LoadIndustrialRooftop()
     {
         string path = Path.Combine(RepoRoot(), "data", "arenas", "industrial_rooftop.arena");
