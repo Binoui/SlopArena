@@ -1,0 +1,64 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:Style src="Chat.uss" />
+    <ui:VisualElement name="chat-root" class="chat-root">
+        <ui:VisualElement name="chat-public-feed" class="chat-public-feed" />
+
+        <ui:VisualElement name="chat-collapsed" class="chat-collapsed">
+            <ui:Button name="chat-open" text="CHAT" class="chat-open" />
+            <ui:Label name="chat-status-collapsed" class="chat-status" />
+            <ui:Label name="chat-unread" class="chat-unread" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="chat-panel" class="chat-panel">
+            <ui:VisualElement class="chat-header">
+                <ui:VisualElement class="chat-header-copy">
+                    <ui:Label name="chat-title-header" text="CHAT" class="chat-title" />
+                </ui:VisualElement>
+                <ui:VisualElement class="chat-header-actions">
+                    <ui:Label name="chat-status-header" class="chat-status chat-status--header" />
+                    <ui:Button name="chat-close" text="CLOSE" class="chat-close" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="chat-setup" class="chat-setup">
+                <ui:Label text="CHOOSE A DISPLAY NAME" class="chat-section-label" />
+                <ui:Label text="Your guest identity stays with this launch. Local play remains available while chat connects." class="chat-help" />
+                <ui:TextField name="display-name" label="DISPLAY NAME" placeholdertext="1–24 characters" class="chat-name-field" />
+                <ui:Button name="name-submit" text="SET DISPLAY NAME" class="chat-action chat-action--primary" />
+                <ui:Label name="setup-feedback" class="chat-feedback" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="chat-main" class="chat-main">
+                <ui:VisualElement class="chat-tabs">
+                    <ui:Button name="chat-tab-global" text="GLOBAL" class="chat-tab" />
+                    <ui:Button name="chat-tab-server" text="SERVER" class="chat-tab" />
+                    <ui:Button name="chat-tab-direct" text="DIRECT" class="chat-tab" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="chat-body">
+                    <ui:ScrollView name="conversation-list" class="conversation-list" horizontal-scroller-visibility="Hidden" />
+                    <ui:VisualElement class="chat-detail">
+                        <ui:Button name="directory-refresh" text="REFRESH PLAYERS" class="chat-action chat-action--small" />
+                        <ui:Label name="online-feedback" class="chat-feedback" />
+                        <ui:ScrollView name="online-list" class="online-list" horizontal-scroller-visibility="Hidden" />
+                        <ui:ScrollView name="chat-history" class="chat-history" vertical-scroller-visibility="Auto" horizontal-scroller-visibility="Hidden" />
+                        <ui:Button name="chat-newest" text="RETURN TO NEWEST" class="chat-newest" />
+                        <ui:VisualElement class="chat-compose">
+                            <ui:TextField name="chat-draft" placeholdertext="Message literally…" class="chat-draft" />
+                            <ui:Button name="chat-send" text="SEND" class="chat-action chat-action--primary" />
+                        </ui:VisualElement>
+                        <ui:Label name="history-feedback" class="chat-feedback" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="chat-rename" class="chat-rename">
+                    <ui:Label text="RENAME OUTSIDE A GAMESERVER" class="chat-section-label" />
+                    <ui:VisualElement class="chat-rename-row">
+                        <ui:TextField name="rename-name" placeholdertext="New display name" class="chat-name-field" />
+                        <ui:Button name="rename-submit" text="RENAME" class="chat-action chat-action--small" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

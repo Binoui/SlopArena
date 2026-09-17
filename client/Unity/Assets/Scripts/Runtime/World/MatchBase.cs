@@ -72,8 +72,8 @@ namespace SlopArena.Client.World
 
         /// <summary>
         /// Pause-menu "LEAVE MATCH": return to the stage select screen. PvPMatch
-        /// overrides this to tear down its SignalR lobby connection first; the UDP
-        /// NetworkClient cleans itself up on scene unload.
+        /// overrides this to leave its GameServer membership; the persistent chat
+        /// connection survives. The UDP client cleans itself up on scene unload.
         /// </summary>
         protected virtual void LeaveMatch()
         {

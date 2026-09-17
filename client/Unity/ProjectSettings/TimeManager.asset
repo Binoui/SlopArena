@@ -5,7 +5,7 @@ TimeManager:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   Fixed Timestep:
-    m_Count: 2822399
+    m_Count: 2352000
     m_Rate:
       m_Denominator: 1
       m_Numerator: 141120000

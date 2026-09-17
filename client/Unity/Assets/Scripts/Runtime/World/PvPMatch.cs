@@ -44,24 +44,9 @@ namespace SlopArena.Client.World
 
         protected override void LeaveMatch()
         {
-            // Drop the SignalR lobby so the master server frees this player's
-            // slot; the UDP NetworkClient shuts itself down on scene unload
-            // (OnDestroy). Best-effort: the connection may already be dead.
-            var lobby = SlopArena.Client.ClientSession.ActiveLobby;
-            if (lobby != null)
-            {
-                SlopArena.Client.ClientSession.ActiveLobby = null;
-                try
-                {
-                    _ = lobby.LeaveLobbyAsync(); // best-effort, fire-and-forget
-                }
-                catch (Exception ex)
-                {
-                    // Dead/half-open connections can throw synchronously — never
-                    // block the scene redirect on a best-effort disconnect.
-                    Debug.LogWarning($"[PvPMatch] LeaveLobbyAsync failed (ignored): {ex.Message}");
-                }
-            }
+            // Explicitly abandoning PvP returns to offline stage selection.
+            // Release Server Chat membership without dropping Global/Direct.
+            _ = ClientSession.ActiveLobby?.LeaveLobbyAsync();
             base.LeaveMatch();
         }
 
@@ -342,7 +327,7 @@ namespace SlopArena.Client.World
         protected override void OnGUI()
         {
             base.OnGUI();
-            if (!UnityEngine.Input.GetKey(KeyCode.F3)) return;
+            if (ChatInputGate.SuppressShortcuts || !UnityEngine.Input.GetKey(KeyCode.F3)) return;
 
             var style = new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = Color.white } };
             GUI.Label(new Rect(10, 10, 400, 20), $"Corrections: {_bridge.CorrectionCount}", style);

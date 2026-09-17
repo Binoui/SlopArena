@@ -1356,112 +1356,6 @@
     font-size: 17px;
 }
 
-.global-chat {
-    position: absolute;
-    left: 24px;
-    bottom: 24px;
-    width: 330px;
-    height: 190px;
-    padding: 10px;
-    flex-direction: column;
-    background-color: rgba(13, 13, 20, 0.94);
-    border-width: 2px;
-    border-color: rgba(240, 238, 232, 0.28);
-    border-bottom-width: 5px;
-    border-bottom-color: rgb(224, 92, 42);
-}
-
-.global-chat__header {
-    height: 24px;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 6px;
-    background-color: rgb(25, 19, 27);
-    border-left-width: 4px;
-    border-left-color: rgb(255, 200, 33);
-}
-
-.global-chat__title,
-.global-chat__online {
-    font-size: 10px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-}
-
-.global-chat__title {
-    color: rgb(240, 238, 232);
-}
-
-.global-chat__online {
-    color: rgb(76, 221, 136);
-}
-
-.global-chat__feed {
-    flex-grow: 1;
-    min-height: 0;
-    margin: 8px 0;
-    padding: 6px;
-    flex-direction: column;
-    overflow: hidden;
-    background-color: rgba(240, 238, 232, 0.06);
-}
-
-.global-chat__message {
-    margin-bottom: 4px;
-    color: rgba(240, 238, 232, 0.82);
-    font-size: 11px;
-    white-space: normal;
-}
-
-.global-chat__message--accent {
-    color: rgb(255, 200, 33);
-}
-
-.global-chat__message--hot {
-    color: rgb(224, 92, 42);
-}
-
-.global-chat__input-row {
-    height: 30px;
-    flex-direction: row;
-    align-items: center;
-}
-
-.global-chat__input {
-    flex-grow: 1;
-    height: 30px;
-    padding-left: 8px;
-    padding-right: 8px;
-    border-width: 1px;
-    border-color: rgba(240, 238, 232, 0.28);
-    background-color: rgb(240, 238, 232);
-    color: rgb(25, 19, 27);
-    font-size: 10px;
-}
-
-.global-chat__input:focus {
-    border-color: rgb(255, 200, 33);
-    background-color: rgb(255, 249, 230);
-}
-
-.global-chat__send {
-    width: 38px;
-    height: 30px;
-    margin-left: 6px;
-    padding: 0;
-    border-width: 1px;
-    border-color: rgb(13, 13, 20);
-    background-color: rgb(255, 200, 33);
-    color: rgb(25, 19, 27);
-    font-size: 14px;
-    -unity-text-align: middle-center;
-}
-
-.global-chat__send:hover,
-.global-chat__send:focus {
-    background-color: rgb(255, 217, 92);
-}
 
 .results-screen {
     flex-grow: 1;
@@ -1826,17 +1720,6 @@
     z-index: 3;
 }
 
-.results-chat {
-    position: relative;
-    left: auto;
-    bottom: auto;
-    width: 46%;
-    height: auto;
-    margin-right: 18px;
-    flex-shrink: 0;
-    transform-origin: center;
-    rotate: -1deg;
-}
 
 .results-actions {
     flex-grow: 1;

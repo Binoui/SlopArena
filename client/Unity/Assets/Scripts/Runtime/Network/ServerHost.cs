@@ -134,7 +134,9 @@ namespace SlopArena.Client.Network
                 Region = "EU",
                 Port = _assignedPort,
                 MaxConcurrentMatches = 1,
-                MasterServerUrl = _masterServerUrl,
+                MasterServerUrl = string.IsNullOrWhiteSpace(SlopArena.Client.ClientSession.MasterServerUrl)
+                    ? _masterServerUrl
+                    : SlopArena.Client.ClientSession.MasterServerUrl,
                 IsOfficial = false,
                 ArenaDataDir = arenaDir,
                 // Host-entered public IP/domain (ADR-0009 host-and-play tier);

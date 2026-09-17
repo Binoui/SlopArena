@@ -102,14 +102,13 @@ namespace SlopArena.Client.UI
             if (initial != null)
                 MenuNavigation.Configure(root, initial, LeaveBrowser);
 
-            _masterClient = new MasterServerClient(_masterServerUrl);
-            ClientSession.MasterServerUrl = _masterServerUrl;
+            ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
+            _masterClient = ChatSession.Instance?.MasterClient;
             RefreshServers();
         }
-
         private async void RefreshServers()
         {
-            if (!_alive || _refreshing || _joining || _masterClient == null)
+            if (!_alive || _refreshing || _joining)
                 return;
 
             _refreshing = true;
@@ -122,18 +121,22 @@ namespace SlopArena.Client.UI
 
             try
             {
-                if (!_masterClient.IsAuthenticated)
+                var chat = ChatSession.Instance;
+                SetBrowserStatus("Connecting to the room directory…", loading: true);
+                if (chat == null || !await chat.EnsureConnectedAsync() || !IsCurrent(operation, ct))
                 {
-                    SetBrowserStatus("Connecting to the room directory…", loading: true);
-                    if (!await _masterClient.AuthenticateGuestAsync(ct))
-                    {
-                        if (IsCurrent(operation, ct))
-                            ShowBrowserFailure("Couldn’t reach the room directory. Check your connection, then retry.");
-                        return;
-                    }
-                    if (!IsCurrent(operation, ct)) return;
+                    if (IsCurrent(operation, ct))
+                        ShowBrowserFailure(chat?.NeedsDisplayName == true
+                            ? "Choose a display name in CHAT before browsing rooms."
+                            : "Couldn’t reach the room directory. Check your connection, then retry.");
+                    return;
                 }
-
+                _masterClient = chat.MasterClient;
+                if (_masterClient == null)
+                {
+                    ShowBrowserFailure("Couldn’t reach the room directory. Check your connection, then retry.");
+                    return;
+                }
                 SetBrowserStatus("Scanning for public rooms…", loading: true);
                 var servers = await _masterClient.GetServersAsync(ct);
                 if (!IsCurrent(operation, ct))
@@ -209,12 +212,10 @@ namespace SlopArena.Client.UI
             SetBrowserStatus($"Joining {server.Name}…", loading: true);
             SetBrowserActionsEnabled(false);
 
-            MatchConfig.Mode = GameMode.PvP;
-            MatchConfig.IsHost = false;
-            MatchConfig.ServerIP = server.IpAddress;
-            MatchConfig.ServerPort = server.Port;
-            ClientSession.AuthToken = _masterClient?.Token;
-            ClientSession.SteamId = _masterClient?.SteamId ?? 0;
+            var chat = ChatSession.Instance;
+            ClientSession.AuthToken = chat?.AuthToken;
+            ClientSession.SteamId = chat?.SteamId ?? 0;
+            ClientSession.Username = chat?.Self?.DisplayName;
             ClientSession.SelectedServerId = server.Id;
             ClientSession.SelectedServerName = server.Name;
             Debug.Log($"[ServerBrowser] Joining server: {server.Name} ({server.IpAddress}:{server.Port})");
@@ -299,10 +300,19 @@ namespace SlopArena.Client.UI
             SetAddressStatus("Finding the registered server…", false);
             try
             {
-                if (!_masterClient.IsAuthenticated && !await _masterClient.AuthenticateGuestAsync(ct))
+                var chat = ChatSession.Instance;
+                if (chat == null || !await chat.EnsureConnectedAsync())
                 {
                     if (_alive && !ct.IsCancellationRequested)
-                        SetAddressStatus("Couldn’t reach the room directory. Check your connection, then retry.", true);
+                        SetAddressStatus(chat?.NeedsDisplayName == true
+                            ? "Choose a display name in CHAT before browsing rooms."
+                            : "Couldn’t reach the room directory. Check your connection, then retry.", true);
+                    return;
+                }
+                _masterClient = chat.MasterClient;
+                if (_masterClient == null)
+                {
+                    SetAddressStatus("Couldn’t reach the room directory. Check your connection, then retry.", true);
                     return;
                 }
                 var address = IPAddress.Parse(ip);
@@ -369,21 +379,21 @@ namespace SlopArena.Client.UI
             long steamId = 0;
             try
             {
-                using (var masterClient = new MasterServerClient(_masterServerUrl))
+                var chat = ChatSession.Instance;
+                ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
+                SetHostStatus("Signing in as a guest…", ct);
+                bool authenticated = chat != null && await chat.EnsureConnectedAsync();
+                if (!IsCurrentHost(ct))
+                    return;
+                if (!authenticated || chat?.AuthToken == null)
                 {
-                    ClientSession.MasterServerUrl = _masterServerUrl;
-                    SetHostStatus("Signing in as a guest…", ct);
-                    bool authenticated = await masterClient.AuthenticateGuestAsync(ct);
-                    if (!IsCurrentHost(ct))
-                        return;
-                    if (!authenticated)
-                    {
-                        FinishHostFailure("Couldn’t sign in to the room directory. Retry when you’re online.", ct);
-                        return;
-                    }
-                    authToken = masterClient.Token;
-                    steamId = masterClient.SteamId ?? 0;
+                    FinishHostFailure(chat?.NeedsDisplayName == true
+                        ? "Choose a display name in CHAT before hosting a room."
+                        : "Couldn’t sign in to the room directory. Retry when you’re online.", ct);
+                    return;
                 }
+                authToken = chat.AuthToken;
+                steamId = chat.SteamId ?? 0;
 
                 if (!IsCurrentHost(ct))
                     return;
@@ -577,11 +587,9 @@ namespace SlopArena.Client.UI
             _refreshCts?.Cancel();
             if (_hostStarting)
             {
-                _hostCts?.Cancel();
                 StopOwnedHost();
                 _hostStarting = false;
             }
-            _masterClient?.Dispose();
             _masterClient = null;
             _lifecycleCts?.Dispose();
             _refreshCts?.Dispose();

@@ -142,7 +142,6 @@ namespace SlopArena.Client.UI
                 _btnConfirm.clicked += OnConfirmClicked;
         }
 
-        private void Update() => _lobby?.Pump();
 
         private void OnDisable()
         {

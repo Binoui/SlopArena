@@ -138,6 +138,9 @@ namespace SlopArena.Client.Combat
             CharacterDefinition charDef,
             InputController inputController)
         {
+            if (ChatInputGate.SuppressGameplay)
+                return AimContext.None;
+
             // ── 1. Resolve active aim spec ──
             AbilitySpec? spec = null;
             _aimingSlot = 0;

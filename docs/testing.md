@@ -133,6 +133,123 @@ exact cooked package set, clients receive the same content requirements, attacks
 from server state, and respawn/stock flow remains intact. Use [Netcode Architecture](systems/netcode-architecture.md)
 for packet and reconciliation details; do not duplicate volatile wire layouts here.
 
+#### Server verification layers
+
+Treat these as separate gates, not interchangeable evidence:
+
+| Layer | Proves | Does not prove |
+| --- | --- | --- |
+| Shared tests | Deterministic simulation, codecs, content admission | Socket delivery or Unity presentation |
+| GameServer tests | Covered server orchestration contracts | A complete live match |
+| Master tests (separate repository) | HTTP/SignalR auth, lobby/chat rules, launch requests | PostgreSQL behavior, real GameServer launch, Unity input |
+| Local full stack | Actual HTTP/SignalR and UDP lifecycle with real processes | Internet latency/loss, deployment, two-human playability |
+| Remote packaged clients | Deployed connectivity and observed human gameplay | Untested failure modes or sustained capacity |
+
+In the Master repository, run:
+
+```bash
+dotnet test MasterServer.Tests/MasterServer.Tests.csproj --nologo \
+  --logger trx --results-directory /tmp/sloparena-master-results
+```
+
+The maintained Master README documents startup, environment variables, and hub
+contracts. Its integration tests use real ASP.NET handlers and SignalR clients over
+TestServer long polling, isolated EF InMemory databases, and a substituted external
+match launcher. Passing them does not prove PostgreSQL transactions or TCP/WebSocket
+delivery. Use an isolated PostgreSQL database for the full-stack persistence gate;
+do not suppress transaction warnings in production to make an InMemory fixture pass.
+
+#### Local full-stack setup
+
+1. Start a **local Master** using its README, an isolated development database, and
+   development-only signing credentials. Record the actual listening URL. Never
+   reuse production credentials or point this test at production by accident.
+2. Build the GameServer, then make a temporary copy of `src/Server/server.json`.
+   Set `masterServerUrl` to that listener, `publicIp` to `127.0.0.1` for a same-machine
+   run, and an unused base `port`. Set `arenaDataDir` to an absolute directory of the
+   intended baked arenas. TCP control uses the base port; UDP match ports span the
+   base through `port + maxConcurrentMatches - 1`. For remote clients, use reachable
+   addresses and verify those ports instead of advertising loopback.
+3. Launch the real executable with that explicit configuration:
+
+   ```bash
+   dotnet src/Server/bin/Debug/net8.0/SlopArena.Server.dll /absolute/path/to/test-server.json
+   ```
+
+   Confirm successful registration and subsequent heartbeats in the logs, not merely
+   “Orchestrator running.” A failed initial registration leaves the process running
+   without Master integration; fix the cause and restart. Check the selected arena and
+   admitted package hashes rather than accepting fallback content as evidence.
+4. Configure both clients' Master endpoint **before launch authentication**. Use two
+   packaged clients for the remote acceptance pass. One Unity client plus a real
+   protocol peer is useful for diagnosis, but is not two-client UI or human-feel proof.
+   Use the [Unity CLI workflow](contributing/unity-cli.md) for Editor operations.
+5. Confirm distinct player IDs/tags, matching admitted content, and Unity Fixed Timestep
+   of 1/60 second. Record the registration/server ID, match ID, and assigned UDP port.
+
+There is currently no maintained one-command full-stack chat smoke harness. The
+2026-09-17 pass used a temporary local Master/UDP-peer fixture that was removed after
+verification; do not refer to it as an available repository command.
+
+#### Match, membership, and chat acceptance
+
+Run the normal lifecycle first, then repeat it with controlled failures:
+
+| Scenario | Required observation |
+| --- | --- |
+| Join → character/stage selection → match | Both clients receive the same admission content and reach authoritative gameplay; lobby slots are released without losing Server chat |
+| Combat → stocks/respawn → completion | Damage and outcomes agree with server state; result reporting succeeds at the Master and Results opens on both clients |
+| Results → rematch | A new match starts; launch identities, conversations, and drafts survive |
+| Full waiting roster | An additional admitted chat member can use Server chat without taking a waiting slot |
+| Explicit Leave / server switch | Old Server chat becomes read-only and stops delivering; Global and Direct remain usable |
+| Hub disconnect/reconnect during a match | Same identity/tag; previously admitted Server membership resumes without adding a waiting player or duplicating history/sends |
+| Offline/rate-rejected send | Draft retained, readable feedback, no automatic replay; uncertain delivery is not presented as confirmed failure |
+| Direct, rename, mute | Direct stays private; recipient identity is ID-based; rename does not retarget a conversation; local mute filters the sender |
+| Compose during combat | Movement/attacks/camera shortcuts suppressed, simulation and damage continue, Escape preserves draft, held controls require release |
+| Invalid or mismatched content | Admission fails explicitly; neither client proceeds with stale/substituted content |
+
+Then exercise the boundaries independently:
+
+- Interrupt **SignalR and UDP separately**. A restored chat connection is not proof of
+  recovered gameplay. Record both transports' state and the exact recovery behavior.
+- Disconnect the host during selection and disconnect a player during a match. Check
+  roster/host changes, match cleanup, and whether the remaining client can continue.
+- Restart Master and GameServer separately. Record lost in-memory state and surfaced
+  errors; do not assume either operation transparently resumes a match.
+- Run simultaneous matches and repeated join/leave/rematch cycles. Check isolation,
+  port/slot reuse, result association, and absence of cross-match state or Server chat leaks.
+- On an isolated test network, introduce latency, jitter, loss, and a brief outage.
+  Record the actual impairment settings and remove them afterward. No network-fault
+  tool is assumed installed; do not alter the development machine's shared route blindly.
+- Exercise real credential renewal and expiry without silently creating another guest.
+  Keep tokens and signing secrets out of saved evidence.
+
+#### Evidence and next-pass priorities
+
+Capture server/client logs with timestamps, player/server/match IDs, package hashes,
+transport state, authoritative and local ticks, observed action/phase, result-report
+HTTP status, and Unity console errors. Keep TRX files and screenshots outside Unity
+`Assets`. Distinguish process startup, successful admission, actual packet receipt,
+and successful UI transition. Do not force a client into Results to claim lifecycle
+success. Restore test preferences, Editor scene/view settings, processes, and temporary
+configuration when finished.
+
+The 2026-09-17 chat pass completed a real local match → Results → rematch and explicit
+Leave using Unity plus a protocol peer. It also repaired accidental Training ownership
+in the PvP scene and corrected Unity's 50 Hz fixed loop to 60 Hz. This was not a broad
+server reliability sign-off: local prediction still lagged authoritative state
+(one sample: local Countdown at tick 5507 versus server GO at tick 5597), and the full
+Shared suite still had gameplay/content failures. The next pass should prioritize:
+
+1. Reproduce and diagnose prediction/phase divergence with both clients' tick evidence.
+2. Establish the full Shared failure baseline; do not label unclassified failures pre-existing.
+3. Verify PostgreSQL result persistence and the complete lifecycle with two packaged clients.
+4. Exercise reconnects, restarts, impaired networks, and concurrent match isolation.
+
+The gitignored root `TESTING-UNITY.md` records the session-specific checks. Temporary
+evidence under `/tmp/sloparena-chat-evidence/` is local and disposable, not durable CI
+coverage or a prerequisite for running this procedure.
+
 ### Verification evidence
 
 Record:

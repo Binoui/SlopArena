@@ -1,4 +1,5 @@
 using System;
+using SlopArena.Client.Input;
 using UnityEngine.UIElements;
 
 namespace SlopArena.Client.UI
@@ -16,6 +17,8 @@ namespace SlopArena.Client.UI
             {
                 // Stop here so a modal or nested screen cannot also invoke its parent back action.
                 evt.StopImmediatePropagation();
+                if (ChatInputGate.SuppressShortcuts)
+                    return;
                 backAction?.Invoke();
             });
 

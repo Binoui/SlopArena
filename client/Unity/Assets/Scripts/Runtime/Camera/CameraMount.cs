@@ -1,7 +1,7 @@
 using UnityEngine;
 using Unity.Cinemachine;
 using UnityEngine.InputSystem;
-
+using SlopArena.Client.Input;
 namespace SlopArena.Client.Camera
 {
     public enum CameraMode
@@ -23,6 +23,14 @@ namespace SlopArena.Client.Camera
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
         private float _frozenPitch = 15f;
+        private bool _chatInputSuppressed;
+        private float _chatSuppressedYaw;
+        private float _chatSuppressedPitch;
+        private float _chatSuppressedRadial;
+        private float _lastStableYaw;
+        private float _lastStablePitch;
+        private float _lastStableRadial;
+        private bool _hasStableAngles;
 
         private void Awake()
         {
@@ -49,10 +57,39 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
 
+            if (ChatInputGate.SuppressGameplay)
+            {
+                // Keep the existing mode/cursor ownership, but stop Cinemachine and
+                // manual scroll input from moving the camera while chat has focus.
+                if (!_chatInputSuppressed)
+                {
+                    _chatSuppressedYaw = _hasStableAngles ? _lastStableYaw : GetCameraYawDeg();
+                    _chatSuppressedPitch = _hasStableAngles ? _lastStablePitch : GetCameraPitchDeg();
+                    _chatSuppressedRadial = _hasStableAngles ? _lastStableRadial : _orbital.RadialAxis.Value;
+                    _chatInputSuppressed = true;
+                }
+
+                SetCameraYawDeg(_chatSuppressedYaw);
+                SetCameraPitchDeg(_chatSuppressedPitch);
+                _orbital.RadialAxis.Value = _chatSuppressedRadial;
+                if (_inputAxisController != null)
+                    _inputAxisController.enabled = false;
+                return;
+            }
+
+            if (_chatInputSuppressed)
+            {
+                _chatInputSuppressed = false;
+                if (_inputAxisController != null &&
+                    (_mode == CameraMode.Normal || _mode == CameraMode.FreeCursor))
+                    _inputAxisController.enabled = true;
+            }
+
             // Normal — mouse controls yaw+pitch freely, scroll still works for zoom
             if (_mode == CameraMode.Normal)
             {
-                float dy = Mouse.current.scroll.ReadValue().y;
+                var mouse = Mouse.current;
+                float dy = mouse != null ? mouse.scroll.ReadValue().y : 0f;
                 if (Mathf.Abs(dy) > 0.001f)
                     _orbital.RadialAxis.Value -= dy * 0.05f;
                 // Pitch and yaw handled by Cinemachine's built-in orbital input
@@ -70,6 +107,26 @@ namespace SlopArena.Client.Camera
                 SetCameraPitchDeg(_frozenPitch);
             }
             // CameraMode.Aiming: do nothing — AimCameraMount owns all mouse input
+        }
+
+        private void LateUpdate()
+        {
+            if (_orbital == null) return;
+
+            if (_chatInputSuppressed)
+            {
+                // Cinemachine may process its axes after Update; restore the last stable
+                // pose again so the opening frame cannot move the camera.
+                SetCameraYawDeg(_chatSuppressedYaw);
+                SetCameraPitchDeg(_chatSuppressedPitch);
+                _orbital.RadialAxis.Value = _chatSuppressedRadial;
+                return;
+            }
+
+            _lastStableYaw = GetCameraYawDeg();
+            _lastStablePitch = GetCameraPitchDeg();
+            _lastStableRadial = _orbital.RadialAxis.Value;
+            _hasStableAngles = true;
         }
         public void SetMode(CameraMode mode)
         {

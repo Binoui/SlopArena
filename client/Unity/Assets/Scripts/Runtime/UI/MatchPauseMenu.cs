@@ -44,6 +44,9 @@ namespace SlopArena.Client.UI
 
         private void Update()
         {
+            if (ChatInputGate.SuppressShortcuts)
+                return;
+
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
                 SetPaused(!_paused);
         }

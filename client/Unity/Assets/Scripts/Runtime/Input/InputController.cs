@@ -54,12 +54,18 @@ namespace SlopArena.Client.Input
         /// Slot 0 = LMB, 1 = RMB, 2 = key "1", 3 = E, 4 = R, 5 = F, 6-9 = keys "2"-"5", 10 = A.
         /// Follows the remapped bindings (ADR-0016).
         /// </summary>
-        public bool IsSlotKeyHeld(byte slotIdx) => slotIdx switch
+        public bool IsSlotKeyHeld(byte slotIdx)
         {
-            0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
-            1 => Mouse.current != null && Mouse.current.rightButton.isPressed,
-            _ => Keyboard.current != null && Keyboard.current[Bind(SlotAction(slotIdx))].isPressed,
-        };
+            if (!_aiControlled && ChatInputGate.SuppressGameplay)
+                return false;
+
+            return slotIdx switch
+            {
+                0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
+                1 => Mouse.current != null && Mouse.current.rightButton.isPressed,
+                _ => Keyboard.current != null && Keyboard.current[Bind(SlotAction(slotIdx))].isPressed,
+            };
+        }
 
         /// <summary>Slot index (0-based) → the bindable action that triggers it (slots 2-10).</summary>
         private static BindableAction SlotAction(byte slotIdx) => slotIdx switch
@@ -127,15 +133,21 @@ namespace SlopArena.Client.Input
                 return;
             }
 
+            if (ChatInputGate.SuppressGameplay)
+            {
+                ClearPendingFrameState();
+                return;
+            }
+
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             if (kb[Bind(BindableAction.Jump)].wasPressedThisFrame) _pendingJump = true;
             if (kb[Bind(BindableAction.Dash)].wasPressedThisFrame) _pendingDash = true;
             if (kb[Bind(BindableAction.Burst)].wasPressedThisFrame) _pendingBurst = true;
             // Utility inputs — LMB snaps facing to the camera azimuth (ADR-0017, #126),
-            // RMB toggles the persistent target lock (ADR-0018, #127). Neither is an
-            // ability slot anymore (8-slot re-tier): the old LMB/RMB ability slots are
-            // unreachable from the client. Keyboard slot presses follow (one per frame).
+            // RMB toggles the persistent target lock (ADR-0018, #127). Neither is
+            // an ability slot anymore (8-slot re-tier): the old LMB/RMB ability slots
+            // are unreachable from the client. Keyboard slot presses follow (one per frame).
             if (mouse.leftButton.wasPressedThisFrame)
                 _pendingFaceToCamera = true;
             else if (mouse.rightButton.wasPressedThisFrame)
@@ -177,6 +189,12 @@ namespace SlopArena.Client.Input
 
         public byte ConsumePendingSlotPress()
         {
+            if (!_aiControlled && ChatInputGate.SuppressGameplay)
+            {
+                _pendingSlotPress = 0;
+                return 0;
+            }
+
             byte slot = _pendingSlotPress;
             if (slot > 0) {
                 Debug.Log($"[Input] ConsumePendingSlotPress: {slot}");
@@ -197,6 +215,9 @@ namespace SlopArena.Client.Input
         {
             if (_aiControlled)
                 return new Vector2(_aiInput.MoveX, _aiInput.MoveY);
+
+            if (ChatInputGate.SuppressGameplay)
+                return Vector2.zero;
 
             var kb = Keyboard.current;
             float x = 0f;
@@ -265,6 +286,13 @@ namespace SlopArena.Client.Input
                 input.AimPitch = 0;  // NPCs aim horizontally
 
                 return (input, moveDir, snappedDir);
+            }
+
+            if (ChatInputGate.SuppressGameplay)
+            {
+                ClearPendingFrameState();
+                input.TargetEntityId = targetEntityId;
+                return (input, Vector3.zero, Vector2.zero);
             }
 
             // ── Player path: camera-relative 8-direction input ──

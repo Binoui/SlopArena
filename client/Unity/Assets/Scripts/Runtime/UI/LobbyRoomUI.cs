@@ -73,18 +73,21 @@ namespace SlopArena.Client.UI
             MenuNavigation.Configure(root, _btnLeave ?? _btnStart ?? _btnRetry, Leave);
 
             RenderPlayers();
-            if (string.IsNullOrEmpty(ClientSession.AuthToken))
+            var chat = ChatSession.Instance;
+            if (chat == null)
             {
-                SetStatus("Your room session expired. Return to the browser to reconnect.", true);
+                SetStatus("Chat session unavailable. Return to the server browser.", true);
                 SetRetryVisible(false);
                 return;
             }
 
-            _lobby = ClientSession.ActiveLobby ??= new LobbyClient(
-                ClientSession.MasterServerUrl, ClientSession.AuthToken);
-            SubscribeLobby(_lobby);
+            _lobby = chat.ActiveLobby;
+            if (_lobby != null)
+                SubscribeLobby(_lobby);
             _awaitingLobby = true;
-            SetStatus(_lobby.IsConnected ? "Rejoining the room…" : "Connecting to the room…", false);
+            SetStatus(chat.NeedsDisplayName
+                ? "Choose a display name in CHAT before joining a room."
+                : (_lobby?.IsConnected == true ? "Rejoining the room…" : "Connecting to the room…"), false);
             SetRetryVisible(false);
             StartLobbyWatchdog(generation);
             ConnectAndJoin(generation, _lifecycleCts.Token);
@@ -103,6 +106,21 @@ namespace SlopArena.Client.UI
 
         private async void ConnectAndJoin(int generation, CancellationToken ct)
         {
+            if (_lobby == null)
+            {
+                var chat = ChatSession.Instance;
+                if (chat == null || !await chat.EnsureConnectedAsync())
+                {
+                    if (IsCurrent(generation, ct))
+                        FailLobby(chat?.NeedsDisplayName == true
+                            ? "Choose a display name in CHAT before joining a room."
+                            : "Couldn’t connect to the room directory. Retry, or return to the server browser.");
+                    return;
+                }
+                _lobby = chat.ActiveLobby;
+                if (_lobby != null)
+                    SubscribeLobby(_lobby);
+            }
             if (_lobby == null)
                 return;
             try
@@ -146,14 +164,7 @@ namespace SlopArena.Client.UI
             if (!_alive || _leaving)
                 return;
             _attempt++;
-            if (_lobby != null)
-            {
-                UnsubscribeLobby(_lobby);
-                _ = _lobby.DisconnectAsync();
-            }
-            _lobby = new LobbyClient(ClientSession.MasterServerUrl, ClientSession.AuthToken!);
-            ClientSession.ActiveLobby = _lobby;
-            SubscribeLobby(_lobby);
+            _lobby = ChatSession.Instance?.ActiveLobby;
             _awaitingLobby = true;
             _startPending = false;
             SetRetryVisible(false);
@@ -162,14 +173,12 @@ namespace SlopArena.Client.UI
             ConnectAndJoin(_attempt, _lifecycleCts!.Token);
         }
 
-        private void Update() => _lobby?.Pump();
 
         private void OnConnected()
         {
             if (!_alive || !_awaitingLobby) return;
             SetStatus("Connected. Waiting for the room roster…", false);
         }
-
         private void OnPlayerJoined(LobbyPlayerInfo player)
         {
             if (_alive)
@@ -292,7 +301,7 @@ namespace SlopArena.Client.UI
             slot.AddToClassList("player-slot");
             var slotIndex = new Label($"P{index + 1}") { name = "slot-index" };
             slotIndex.AddToClassList("slot-index");
-            var name = new Label("Open slot") { name = "slot-name" };
+            var name = new Label("Open slot") { name = "slot-name", enableRichText = false };
             name.AddToClassList("slot-name");
             if (index < players.Count)
             {
@@ -349,7 +358,6 @@ namespace SlopArena.Client.UI
                 ServerHost.Instance?.Stop();
             if (_lobby != null)
                 _ = LeaveRoomAsync(_lobby);
-            ClientSession.ActiveLobby = null;
             SceneManager.LoadScene("ServerBrowser");
         }
 
@@ -358,7 +366,6 @@ namespace SlopArena.Client.UI
             try
             {
                 await Task.WhenAny(lobby.LeaveLobbyAsync(), Task.Delay(2000));
-                await lobby.DisconnectAsync();
             }
             catch (Exception ex)
             {

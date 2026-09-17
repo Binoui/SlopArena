@@ -542,7 +542,7 @@ namespace SlopArena.Client.UI
             identity.Add(role);
             card.Add(identity);
 
-            var name = new Label(playerName);
+            var name = new Label(playerName) { enableRichText = false };
             name.AddToClassList("player-card__name");
             card.Add(name);
 
@@ -674,11 +674,6 @@ namespace SlopArena.Client.UI
             }
         }
 
-        private void Update()
-        {
-            // Marshal hub events onto the main thread (PvP mode only).
-            _lobby?.Pump();
-        }
 
         private void OnDisable()
         {

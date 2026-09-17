@@ -62,6 +62,40 @@ track-selected simulation state and semantic events.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+### Launch session and chat
+
+[`ChatSession`](../../client/Unity/Assets/Scripts/Runtime/Network/ChatSession.cs) owns
+guest authentication, credential renewal, and a single reusable
+[`LobbyClient`](../../client/Unity/Assets/Scripts/Runtime/Network/LobbyClient.cs) for
+the application launch. Only the chosen display name is saved locally. A new launch
+gets a new guest identity; reconnect and token renewal preserve the current identity
+and session tag. Configure a development Master endpoint before authentication.
+Scenes consume this session rather than authenticating or creating hub connections.
+
+- **Global:** shared across menus, Training, PvP, and Results.
+- **Direct:** addressed by player ID, not display name. Incoming messages mark an unread
+  conversation without opening it or entering the public gameplay feed.
+- **Server:** follows admitted GameServer membership, not the 2–4-player waiting roster
+  or an individual match. A full waiting roster can still admit Server chat.
+  Match launch, Results, and rematch retain membership. Explicit Leave revokes it.
+  `ResumeServer` restores a previously admitted member after reconnect without taking
+  a waiting-roster slot; it cannot grant access to an unjoined server.
+  Leave while disconnected makes Server chat read-only immediately and delivers the
+  revocation before membership restoration on reconnect.
+
+The client retains at most 32 conversations with 50 messages each. Drafts and local
+mutes are launch-scoped. Offline or rejected sends retain the draft and never queue an
+automatic resend; uncertain transport outcomes are reported as uncertain. Names and
+messages are literal text, limited to 24 and 500 Unicode scalars respectively.
+
+[`ChatOverlay`](../../client/Unity/Assets/Scripts/Runtime/UI/ChatOverlay.cs) attaches to
+the scene's existing `UIDocument`. During gameplay its compact feed shows at most
+three recent Global/current-Server lines, expires them after eight seconds, and never
+shows Direct messages. Enter opens or submits the composer; Escape closes it while
+preserving the draft. `ChatInputGate` suppresses human movement, attacks, camera, and
+conflicting UI shortcuts while composing. Held controls must be released before they
+can resume gameplay. Chat does not pause simulation or grant invulnerability.
+
 ---
 
 ## 3. Data Flow
@@ -81,6 +115,10 @@ Its fixed update:
    `RollbackSimulator`, which chooses `PredictedTrack` or `RawTrack` by action state.
 5. `PvPMatch` applies bridge-selected state and presentation events to `PlayerRenderer`
    and other presentation systems.
+
+Unity's project Fixed Timestep is **1/60 second**, matching the authoritative tick
+cadence. This sets the rate of the client fixed-update loop; it does not replace
+reconciliation or change its existing history-window policy.
 
 See [`PvPMatch.cs`](../../client/Unity/Assets/Scripts/Runtime/World/PvPMatch.cs),
 [`RollbackSimulationBridge.cs`](../../client/Unity/Assets/Scripts/Runtime/Simulation/RollbackSimulationBridge.cs),

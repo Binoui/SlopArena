@@ -26,9 +26,6 @@ namespace SlopArena.Client.UI
         private Label _metadata = null!;
         private Label _headline = null!;
         private Button _returnButton = null!;
-        private TextField _chatInput = null!;
-        private Button _chatSend = null!;
-        private VisualElement _chatFeed = null!;
 
         private void OnEnable()
         {
@@ -41,16 +38,11 @@ namespace SlopArena.Client.UI
 
             _headline = _root.Q<Label>("results-headline");
             _returnButton = _root.Q<Button>("btn-return-lobby");
-            _chatFeed = _root.Q<VisualElement>("chat-feed");
-            _chatInput = _root.Q<TextField>("chat-input");
-            _chatSend = _root.Q<Button>("chat-send");
 
             _returnButton.text = MatchConfig.Mode == GameMode.Solo
                 ? "BACK TO MENU"
                 : "RETURN TO LOBBY";
             _returnButton.clicked += ReturnFromResults;
-            _chatSend.clicked += SendChatMessage;
-            _chatInput.RegisterCallback<KeyDownEvent>(OnChatKeyDown);
             RenderResults();
         }
 
@@ -58,16 +50,8 @@ namespace SlopArena.Client.UI
         {
             if (_returnButton != null)
                 _returnButton.clicked -= ReturnFromResults;
-            if (_chatSend != null)
-                _chatSend.clicked -= SendChatMessage;
-            if (_chatInput != null)
-                _chatInput.UnregisterCallback<KeyDownEvent>(OnChatKeyDown);
         }
 
-        private void Update()
-        {
-            ClientSession.ActiveLobby?.Pump();
-        }
 
         private static void ReturnFromResults()
         {
@@ -137,7 +121,7 @@ namespace SlopArena.Client.UI
 
             var copy = new VisualElement();
             copy.AddToClassList("results-winner-copy");
-            var playerName = new Label(metadata.PlayerName);
+            var playerName = new Label(metadata.PlayerName) { enableRichText = false };
             playerName.AddToClassList("results-winner-player");
             copy.Add(playerName);
             var fighterName = new Label(metadata.FighterName);
@@ -166,7 +150,7 @@ namespace SlopArena.Client.UI
 
             var identity = new VisualElement();
             identity.AddToClassList("results-row-identity");
-            var playerName = new Label(metadata.PlayerName);
+            var playerName = new Label(metadata.PlayerName) { enableRichText = false };
             playerName.AddToClassList("results-row-player");
             identity.Add(playerName);
             var fighterName = new Label(metadata.FighterName);
@@ -250,28 +234,6 @@ namespace SlopArena.Client.UI
             return fallback;
         }
 
-        private void SendChatMessage()
-        {
-            string text = _chatInput.value.Trim();
-            if (text.Length == 0) return;
-
-            string sender = string.IsNullOrEmpty(ClientSession.Username)
-                ? "YOU"
-                : ClientSession.Username.ToUpperInvariant();
-            var message = new Label($"{sender}: {text}");
-            message.AddToClassList("global-chat__message");
-            message.AddToClassList("global-chat__message--accent");
-            _chatFeed.Add(message);
-            _chatInput.value = string.Empty;
-        }
-
-        private void OnChatKeyDown(KeyDownEvent evt)
-        {
-            if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
-                return;
-            SendChatMessage();
-            evt.StopPropagation();
-        }
 
         private static string FormatDuration(uint ticks)
         {

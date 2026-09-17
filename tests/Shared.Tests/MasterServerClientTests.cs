@@ -118,6 +118,86 @@ namespace SlopArena.Tests
             Assert.False(await client.AuthenticateGuestAsync());
         }
 
+        [Fact]
+        public async Task NamingRetry_KeepsGuestIdentityAndUsesChosenProfile()
+        {
+            int guestsCreated = 0;
+            int nameAttempts = 0;
+            using var client = MakeClient(request =>
+            {
+                if (request.RequestUri!.AbsolutePath == "/auth/guest")
+                {
+                    guestsCreated++;
+                    return JsonOk($"{{\"token\":\"guest-token\",\"steamId\":{42 + guestsCreated - 1}}}");
+                }
+                if (++nameAttempts == 1)
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                return JsonOk("{\"playerId\":\"42\",\"displayName\":\"Chosen name\",\"sessionTag\":\"16\"}");
+            });
+
+            Assert.False(await client.AuthenticateGuestAsync("Chosen name"));
+            Assert.True(await client.AuthenticateGuestAsync("Chosen name"));
+            var profile = await client.SetDisplayNameAsync("Chosen name");
+
+            Assert.Equal(1, guestsCreated);
+            Assert.Equal(42L, client.SteamId);
+            Assert.NotNull(profile);
+            Assert.Equal(42L, profile!.SteamId);
+            Assert.Equal("Chosen name", profile.Username);
+            Assert.Equal("16", profile.SessionTag);
+        }
+
+        [Fact]
+        public async Task Refresh_RejectsIdentitySubstitutionAndKeepsExistingCredential()
+        {
+            using var client = MakeClient(request =>
+            {
+                if (request.RequestUri!.AbsolutePath == "/auth/guest")
+                    return GuestAuthResponse();
+                if (request.RequestUri.AbsolutePath == "/auth/refresh")
+                    return JsonOk("{\"token\":\"other-player-token\",\"steamId\":99,\"expiresAt\":\"2099-01-01T00:00:00Z\"}");
+                return request.Headers.Authorization?.Parameter == SampleToken
+                    ? JsonOk(UserInfoJson)
+                    : new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            });
+
+            Assert.True(await client.AuthenticateGuestAsync());
+            Assert.False(await client.RefreshAsync());
+            var self = await client.GetMeAsync();
+
+            Assert.NotNull(self);
+            Assert.Equal(SampleSteamId, self!.SteamId);
+            Assert.Equal(SampleSteamId, client.SteamId);
+        }
+
+        [Fact]
+        public async Task Refresh_RotatesCredentialWithoutGuestSignIn()
+        {
+            int guestRequests = 0;
+            using var client = MakeClient(request =>
+            {
+                if (request.RequestUri!.AbsolutePath == "/auth/guest")
+                {
+                    guestRequests++;
+                    return GuestAuthResponse();
+                }
+                if (request.RequestUri.AbsolutePath == "/auth/refresh")
+                    return JsonOk("{\"token\":\"renewed-token\",\"steamId\":42,\"expiresAt\":\"2099-01-01T00:00:00Z\"}");
+                return request.Headers.Authorization?.Parameter == "renewed-token"
+                    ? JsonOk(UserInfoJson)
+                    : new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            });
+
+            Assert.True(await client.AuthenticateGuestAsync());
+            Assert.True(await client.RefreshAsync());
+            var self = await client.GetMeAsync();
+
+            Assert.NotNull(self);
+            Assert.Equal(SampleSteamId, self!.SteamId);
+            Assert.Equal(1, guestRequests);
+            Assert.Equal(DateTimeOffset.Parse("2099-01-01T00:00:00Z"), client.TokenExpiresAt);
+        }
+
         // ── GetMeAsync ──
 
         [Fact]

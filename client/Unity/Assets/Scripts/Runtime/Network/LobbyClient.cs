@@ -5,67 +5,71 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using SlopArena.Shared;
 
 namespace SlopArena.Client.Network
 {
     /// <summary>
-    /// Client-side connection to the master server's SignalR <c>LobbyHub</c>
-    /// (ADR-0004, issue #33). Connects with the guest JWT as bearer auth,
-    /// joins a lobby for a game server, and surfaces the hub's real-time pushes
-    /// as plain C# events marshalled onto the Unity main thread via <see cref="Pump"/>.
-    ///
-    /// Server → client pushes: <c>PlayerJoined</c>, <c>PlayerLeft</c>,
-    /// <c>LobbyUpdated</c>, <c>MatchStarting</c>, <c>StageSelect</c>, <c>MatchStarted</c>.
-    /// Client → server: <see cref="JoinLobbyAsync"/>, <see cref="LeaveLobbyAsync"/>,
-    /// <see cref="HostStartAsync"/>, <see cref="StartStageSelectAsync"/>, <see cref="StartMatchAsync"/>.
+    /// One authenticated SignalR connection to the master server. It carries
+    /// lobby control and all chat channels; callers keep this instance alive
+    /// across scene changes and only the persistent ChatSession pumps it.
     /// </summary>
     public sealed class LobbyClient
     {
+        private const int MaxPendingActions = 1024;
         private HubConnection? _conn;
         private readonly string _masterServerUrl;
-        private readonly string _authToken;
-        // Server the caller last asked to join; re-joined after an automatic
-        // reconnect because SignalR group membership is per-connection-id and
-        // does not survive a transport drop.
+        private readonly Func<string?> _authTokenProvider;
         private Guid _joinedServerId;
-        // Actions queued from background SignalR threads; drained on the main
-        // thread by the owner MonoBehaviour's Update → Pump().
         private readonly ConcurrentQueue<Action> _pending = new();
+        private int _pendingCount;
+        private int _overflowed;
 
         /// <summary>True while the hub connection is open.</summary>
         public bool IsConnected => _conn != null && _conn.State == HubConnectionState.Connected;
 
-        // ── Real-time lobby events (raised on the main thread, after Pump) ──
+        private bool _resumeServerOnly;
+        private bool _leavePending;
+        /// <summary>Server target retained for reconnect revalidation.</summary>
+        public Guid JoinedServerId => _joinedServerId;
 
-        /// <summary>A player joined the lobby.</summary>
+        /// <summary>True if background pushes exceeded the bounded main-thread queue.</summary>
+        public bool HasPendingOverflow => Volatile.Read(ref _overflowed) != 0;
+        public void ClearPendingOverflow() => Interlocked.Exchange(ref _overflowed, 0);
+
+        // ── Real-time lobby events (raised on the main thread, after Pump) ──
         public event Action<LobbyPlayerInfo>? PlayerJoined;
-        /// <summary>A player left the lobby (arg = their SteamId).</summary>
         public event Action<long>? PlayerLeft;
-        /// <summary>Full lobby snapshot pushed on any membership change.</summary>
         public event Action<LobbySnapshot>? LobbyUpdated;
-        /// <summary>The host started the match; clients should go to char-select.</summary>
         public event Action<MatchStartingConfig>? MatchStarting;
-        /// <summary>All locked in; the host moved everyone to stage select.</summary>
         public event Action<MatchStartingConfig>? StageSelect;
-        /// <summary>A player locked in / changed their character (issue #34).</summary>
         public event Action<LobbyPlayerInfo>? CharacterSelected;
-        /// <summary>The host started the actual match; clients should connect to the game server (issue #34).</summary>
         public event Action<MatchStartedConfig>? MatchStarted;
-        /// <summary>The hub connection opened (or reopened after a retry).</summary>
         public event Action? Connected;
-        /// <summary>The hub connection closed. Arg is null on a clean close.</summary>
         public event Action<Exception?>? Disconnected;
-        /// <summary>A non-fatal error (e.g. a hub method rejected the call).</summary>
         public event Action<string>? Error;
+
+        // ── Chat pushes (raised on the main thread, after Pump) ──
+        public event Action<ChatMessage>? ChatMessageReceived;
+        public event Action<ChatPresence>? ChatPresenceChanged;
+        public event Action<ServerChatState>? ChatServerChanged;
+        public event Action<ChatSnapshot>? ChatStateReceived;
+        public event Action<ChatPlayer[]>? OnlinePlayersReceived;
 
         /// <param name="masterServerUrl">Master server base URL (e.g. http://localhost:5000).</param>
         /// <param name="authToken">Guest JWT to send as bearer auth on the connection.</param>
         public LobbyClient(string masterServerUrl, string authToken)
+            : this(masterServerUrl, () => authToken)
+        {
+        }
+
+        /// <summary>Construct with a live token provider so renewal updates the hub credential.</summary>
+        public LobbyClient(string masterServerUrl, Func<string?> authTokenProvider)
         {
             _masterServerUrl = masterServerUrl.TrimEnd('/');
-            _authToken = authToken;
+            _authTokenProvider = authTokenProvider ?? throw new ArgumentNullException(nameof(authTokenProvider));
         }
 
         /// <summary>
@@ -74,184 +78,342 @@ namespace SlopArena.Client.Network
         /// </summary>
         public async Task<bool> ConnectAsync()
         {
-            if (_conn != null)
-                return IsConnected;
-
-            _conn = new HubConnectionBuilder()
-                .WithUrl($"{_masterServerUrl}/lobby", options =>
+            if (IsConnected) return true;
+            if (_conn?.State is HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+                return false;
+            if (string.IsNullOrEmpty(_authTokenProvider()))
+            {
+                Enqueue(() => Error?.Invoke("Not authenticated; cannot connect to the room directory."));
+                return false;
+            }
+            if (_conn == null)
+            {
+                _conn = new HubConnectionBuilder()
+                    .WithUrl($"{_masterServerUrl}/lobby", options =>
+                    {
+                        options.AccessTokenProvider = () => Task.FromResult(_authTokenProvider());
+                        // Unity Mono/Proton requires the existing long-poll transport.
+                        options.Transports = HttpTransportType.LongPolling;
+                    })
+                    .WithAutomaticReconnect()
+                    .Build();
+                RegisterHandlers();
+                _conn.Closed += ex =>
                 {
-                    options.AccessTokenProvider = () => Task.FromResult<string?>(_authToken);
-                    // LongPolling only: Unity Mono's ClientWebSocket is unreliable in
-                    // standalone players (hub connect fails silently under Proton/Wine
-                    // while plain HttpClient calls work). LongPolling is plain HTTP and
-                    // works on every platform. Revisit if a native WebSocket impl lands.
-                    options.Transports = HttpTransportType.LongPolling;
-                })
-                .WithAutomaticReconnect()
-                .Build();
-
-            RegisterHandlers();
-
-            _conn.Closed += ex =>
-            {
-                _pending.Enqueue(() => Disconnected?.Invoke(ex));
-                return Task.CompletedTask;
-            };
-            _conn.Reconnecting += ex =>
-            {
-                _pending.Enqueue(() => Disconnected?.Invoke(ex));
-                return Task.CompletedTask;
-            };
-            _conn.Reconnected += _connectionId =>
-            {
-                // Re-add ourselves to the lobby group after a reconnect; the
-                // new connection id is not in the old group. Fire-and-forget —
-                // errors surface via the Error event in InvokeSafe.
-                var serverId = _joinedServerId;
-                if (serverId != Guid.Empty)
-                    _ = _conn.InvokeAsync("JoinLobby", serverId);
-                _pending.Enqueue(() => Connected?.Invoke());
-                return Task.CompletedTask;
-            };
-
+                    Enqueue(() => Disconnected?.Invoke(ex));
+                    return Task.CompletedTask;
+                };
+                _conn.Reconnecting += ex =>
+                {
+                    Enqueue(() => Disconnected?.Invoke(ex));
+                    return Task.CompletedTask;
+                };
+                _conn.Reconnected += async _ =>
+                {
+                    await RestoreMembershipAsync();
+                    Enqueue(() => Connected?.Invoke());
+                };
+            }
             try
             {
                 await _conn.StartAsync();
-                _pending.Enqueue(() => Connected?.Invoke());
+                await RestoreMembershipAsync();
+                Enqueue(() => Connected?.Invoke());
                 return true;
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[LobbyClient] SignalR connect failed: {ex}");
-                _pending.Enqueue(() => Error?.Invoke($"Failed to connect: {ex.Message}"));
+                UnityEngine.Debug.LogWarning($"[LobbyClient] SignalR connect failed: {ex.Message}");
+                Enqueue(() => Error?.Invoke($"Failed to connect: {ex.Message}"));
                 return false;
+            }
+        }
+
+        private async Task RestoreMembershipAsync()
+        {
+            if (_leavePending)
+            {
+                await LeaveLobbyAsync();
+                return;
+            }
+            if (_joinedServerId == Guid.Empty) return;
+            try
+            {
+                await _conn!.InvokeCoreAsync(
+                    _resumeServerOnly ? "ResumeServer" : "JoinLobby",
+                    new object?[] { _joinedServerId });
+            }
+            catch (Exception ex)
+            {
+                Enqueue(() => Error?.Invoke($"Server membership could not be revalidated: {ex.Message}"));
             }
         }
 
         private void RegisterHandlers()
         {
-            // PlayerJoined: { steamId, name, characterSelection, isHost }
             _conn!.On<JsonElement>("PlayerJoined", element =>
             {
                 var player = LobbyPayloadCodec.TryParsePlayer(element);
-                if (player is null) return;
-                _pending.Enqueue(() => PlayerJoined?.Invoke(player));
+                if (player is not null) Enqueue(() => PlayerJoined?.Invoke(player));
             });
-
-            // PlayerLeft: a bare long (the leaving player's SteamId)
-            _conn.On<long>("PlayerLeft", steamId =>
-            {
-                _pending.Enqueue(() => PlayerLeft?.Invoke(steamId));
-            });
-
-            // LobbyUpdated / MatchStarting: { serverId, players[] }
+            _conn.On<long>("PlayerLeft", steamId => Enqueue(() => PlayerLeft?.Invoke(steamId)));
             _conn.On<JsonElement>("LobbyUpdated", element =>
             {
                 var snap = LobbyPayloadCodec.TryParseSnapshot(element);
-                if (snap is null) return;
-                _pending.Enqueue(() => LobbyUpdated?.Invoke(snap));
+                if (snap is not null) Enqueue(() => LobbyUpdated?.Invoke(snap));
             });
             _conn.On<JsonElement>("MatchStarting", element =>
             {
                 var cfg = LobbyPayloadCodec.TryParseMatchStarting(element);
-                if (cfg is null) return;
-                _pending.Enqueue(() => MatchStarting?.Invoke(cfg));
+                if (cfg is not null) Enqueue(() => MatchStarting?.Invoke(cfg));
             });
-            // StageSelect carries the same { serverId, players[] } shape as MatchStarting.
             _conn.On<JsonElement>("StageSelect", element =>
             {
                 var cfg = LobbyPayloadCodec.TryParseMatchStarting(element);
-                if (cfg is null) return;
-                _pending.Enqueue(() => StageSelect?.Invoke(cfg));
+                if (cfg is not null) Enqueue(() => StageSelect?.Invoke(cfg));
             });
             _conn.On<JsonElement>("CharacterSelected", element =>
             {
                 var player = LobbyPayloadCodec.TryParsePlayer(element);
-                if (player is null) return;
-                _pending.Enqueue(() => CharacterSelected?.Invoke(player));
+                if (player is not null) Enqueue(() => CharacterSelected?.Invoke(player));
             });
             _conn.On<JsonElement>("MatchStarted", element =>
             {
                 var cfg = LobbyPayloadCodec.TryParseMatchStarted(element);
-                if (cfg is null) return;
-                _pending.Enqueue(() => MatchStarted?.Invoke(cfg));
+                if (cfg is not null)
+                {
+                    _resumeServerOnly = true;
+                    Enqueue(() => MatchStarted?.Invoke(cfg));
+                }
+            });
+            _conn.On<JsonElement>("ChatMessage", element =>
+            {
+                var message = Deserialize<ChatMessage>(element);
+                if (message is not null) Enqueue(() =>
+                {
+                    if (string.Equals(message.Channel, "server", StringComparison.OrdinalIgnoreCase)
+                        && (_leavePending || message.ServerId != _joinedServerId))
+                        return;
+                    ChatMessageReceived?.Invoke(message);
+                });
+            });
+            _conn.On<JsonElement>("ChatPresenceChanged", element =>
+            {
+                var presence = Deserialize<ChatPresence>(element);
+                if (presence is not null) Enqueue(() => ChatPresenceChanged?.Invoke(presence));
+            });
+            _conn.On<JsonElement>("ChatServerChanged", element =>
+            {
+                var state = Deserialize<ServerChatState>(element);
+                if (state is not null) Enqueue(() =>
+                {
+                    if (!_leavePending && state.ServerId == (_joinedServerId == Guid.Empty ? (Guid?)null : _joinedServerId))
+                        ChatServerChanged?.Invoke(state);
+                });
             });
         }
 
         /// <summary>Join the lobby for the given game server.</summary>
-        public Task JoinLobbyAsync(Guid serverId)
-        {
-            _joinedServerId = serverId;
-            return InvokeSafe("JoinLobby", serverId);
-        }
-
-        /// <summary>Leave the current lobby.</summary>
-        public Task LeaveLobbyAsync()
-        {
-            _joinedServerId = Guid.Empty;
-            return InvokeSafe("LeaveLobby");
-        }
-
-        /// <summary>Host-only: start the match for this lobby.</summary>
-        public Task HostStartAsync() =>
-            InvokeSafe("HostStart");
-
-        /// <summary>Lock in a character selection (issue #34). Can be called again to change pick.</summary>
-        public Task SelectCharacterAsync(string characterClass) =>
-            InvokeSafe("SelectCharacter", characterClass);
-
-        /// <summary>
-        /// Host-only: move everyone from char select to stage select. Requires
-        /// all players locked in; the host picks the arena there, then calls
-        /// <see cref="StartMatchAsync"/>.
-        /// </summary>
-        public Task StartStageSelectAsync() =>
-            InvokeSafe("StartStageSelect");
-
-        /// <summary>Host-only: start the actual match on the given arena (issue #34). Requires all locked in.</summary>
-        public Task StartMatchAsync(string arenaName) =>
-            InvokeSafe("StartMatch", arenaName);
-
-        private async Task InvokeSafe(string method, params object[] args)
+        public async Task JoinLobbyAsync(Guid serverId)
         {
             if (_conn is null || !IsConnected)
             {
-                _pending.Enqueue(() => Error?.Invoke($"Not connected; cannot {method}."));
+                Enqueue(() => Error?.Invoke("Not connected; cannot JoinLobby."));
+                return;
+            }
+            if (_leavePending)
+            {
+                await LeaveLobbyAsync();
+                if (_leavePending) return;
+            }
+            var previousServerId = _joinedServerId;
+            bool previousResumeOnly = _resumeServerOnly;
+            // An interrupted reply is not a rejected admission. Revalidate it
+            // as chat-only on reconnect rather than allocating a waiting slot.
+            _joinedServerId = serverId;
+            _resumeServerOnly = true;
+            try
+            {
+                await _conn.InvokeCoreAsync("JoinLobby", new object?[] { serverId });
+                _resumeServerOnly = false;
+            }
+            catch (Exception ex)
+            {
+                if (ex is HubException && !ex.Message.Contains("lobby_full"))
+                {
+                    _joinedServerId = previousServerId;
+                    _resumeServerOnly = previousResumeOnly;
+                }
+                UnityEngine.Debug.LogWarning($"[LobbyClient] JoinLobby rejected: {ex.Message}");
+                Enqueue(() => Error?.Invoke($"JoinLobby rejected: {ex.Message}"));
+            }
+        }
+        /// <summary>
+        /// Revalidate an already admitted GameServer after reconnect without
+        /// re-entering its waiting roster.
+        /// </summary>
+        public async Task ResumeServerAsync(Guid serverId)
+        {
+            if (_leavePending) return;
+            if (_conn is null || !IsConnected)
+            {
+                Enqueue(() => Error?.Invoke("Not connected; cannot ResumeServer."));
                 return;
             }
             try
             {
-                // Use the object[]-taking overload: InvokeAsync(string, object? arg1, …)
-                // would bind args as a SINGLE argument (the array), serializing
-                // arguments:[[…]] which fails server-side binding. InvokeCoreAsync
-                // passes the array straight through (observed on the wire, fixed 2026-08-04).
+                await _conn.InvokeCoreAsync("ResumeServer", new object?[] { serverId });
+                _joinedServerId = serverId;
+                _resumeServerOnly = true;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[LobbyClient] ResumeServer rejected: {ex.Message}");
+                Enqueue(() => Error?.Invoke($"ResumeServer rejected: {ex.Message}"));
+            }
+        }
+
+        /// <summary>Leave the current lobby and revoke Server Chat membership.</summary>
+        public async Task LeaveLobbyAsync()
+        {
+            _leavePending = true;
+            _joinedServerId = Guid.Empty;
+            _resumeServerOnly = false;
+            Enqueue(() => ChatServerChanged?.Invoke(new ServerChatState()));
+            if (_conn is null || !IsConnected)
+            {
+                Enqueue(() => Error?.Invoke("Server leave will complete after reconnect."));
+                return;
+            }
+            try
+            {
+                await _conn.InvokeCoreAsync("LeaveLobby", Array.Empty<object?>());
+                _leavePending = false;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[LobbyClient] LeaveLobby not confirmed: {ex.Message}");
+                Enqueue(() => Error?.Invoke($"LeaveLobby rejected: {ex.Message}"));
+            }
+        }
+
+        public Task HostStartAsync() => InvokeSafe("HostStart");
+        public Task SelectCharacterAsync(string characterClass) => InvokeSafe("SelectCharacter", characterClass);
+        public Task StartStageSelectAsync() => InvokeSafe("StartStageSelect");
+        public Task StartMatchAsync(string arenaName) => InvokeSafe("StartMatch", arenaName);
+
+        public async Task<ChatSnapshot?> GetChatStateAsync()
+        {
+            var snapshot = await InvokeChatAsync<ChatSnapshot>("GetChatState");
+            if (_leavePending && snapshot != null)
+                snapshot.Server = new ServerChatState();
+            return snapshot;
+        }
+        public Task<ChatPlayer[]?> GetOnlinePlayersAsync() => InvokeChatAsync<ChatPlayer[]>("GetOnlinePlayers");
+        public Task<ChatMessage?> SendGlobalAsync(string text) => SendChatAsync("SendGlobal", text);
+        public Task<ChatMessage?> SendServerAsync(Guid serverId, string text) =>
+            _leavePending || serverId != _joinedServerId
+                ? Task.FromException<ChatMessage?>(new InvalidOperationException("not_joined"))
+                : SendChatAsync("SendServer", serverId, text);
+        public Task<ChatMessage?> SendDirectAsync(string playerId, string text) =>
+            SendChatAsync("SendDirect", playerId, text);
+
+        private Task<ChatMessage?> SendChatAsync(string method, params object?[] args)
+        {
+            if (_conn is null || !IsConnected)
+                return Task.FromException<ChatMessage?>(new InvalidOperationException("not_connected"));
+            return _conn.InvokeCoreAsync<ChatMessage?>(method, args);
+        }
+
+        private async Task InvokeSafe(string method, params object?[] args)
+        {
+            if (_conn is null || !IsConnected)
+            {
+                Enqueue(() => Error?.Invoke($"Not connected; cannot {method}."));
+                return;
+            }
+            try
+            {
                 await _conn.InvokeCoreAsync(method, args);
             }
             catch (Exception ex)
             {
-                // HubException surfaces here (e.g. non-host HostStart rejected).
                 UnityEngine.Debug.LogError($"[LobbyClient] {method} rejected: {ex}");
-                _pending.Enqueue(() => Error?.Invoke($"{method} rejected: {ex.Message}"));
+                Enqueue(() => Error?.Invoke($"{method} rejected: {ex.Message}"));
             }
         }
 
-        /// <summary>
-        /// Drain queued hub events onto the calling (main) thread. The owning
-        /// MonoBehaviour MUST call this from Update so the UI events fire there.
-        /// </summary>
-        public void Pump()
+        private async Task<T?> InvokeChatAsync<T>(string method, params object?[] args)
         {
-            while (_pending.TryDequeue(out var action))
-                action();
+            if (_conn is null || !IsConnected)
+            {
+                Enqueue(() => Error?.Invoke($"not_connected: cannot {method}."));
+                return default;
+            }
+            try
+            {
+                return await _conn.InvokeCoreAsync<T>(method, args);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[LobbyClient] {method} rejected: {ex.Message}");
+                Enqueue(() => Error?.Invoke($"{method} rejected: {ex.Message}"));
+                return default;
+            }
         }
 
-        /// <summary>Stop the connection if open. Safe to call from OnDisable.</summary>
+        private static T? Deserialize<T>(JsonElement element)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<T>(element.GetRawText(), JsonOptions);
+            }
+            catch
+            {
+                return default;
+            }
+        }
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+        };
+
+        private void Enqueue(Action action)
+        {
+            while (true)
+            {
+                int count = Volatile.Read(ref _pendingCount);
+                if (count >= MaxPendingActions)
+                {
+                    Interlocked.Exchange(ref _overflowed, 1);
+                    return;
+                }
+                if (Interlocked.CompareExchange(ref _pendingCount, count + 1, count) == count)
+                    break;
+            }
+            _pending.Enqueue(action);
+        }
+
+        /// <summary>Drain queued hub events onto the calling (main) thread.</summary>
+        public void Pump(int maxActions = MaxPendingActions)
+        {
+            if (maxActions < 1) return;
+            int pumped = 0;
+            while (pumped++ < maxActions && _pending.TryDequeue(out var action))
+            {
+                try { action(); }
+                finally { Interlocked.Decrement(ref _pendingCount); }
+            }
+        }
+
+        /// <summary>Stop the connection if open. Safe to call during application shutdown.</summary>
         public async Task DisconnectAsync()
         {
             if (_conn != null)
             {
-                try { await _conn.StopAsync(); }
-                catch { /* best-effort shutdown */ }
+                try { await _conn.DisposeAsync(); }
+                catch { }
                 _conn = null;
             }
         }
