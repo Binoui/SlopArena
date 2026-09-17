@@ -19,6 +19,7 @@ Read these in order:
 | [Netcode Architecture](systems/netcode-architecture.md) | GameServer, prediction, reconciliation, and transport |
 | [Release Pipeline](systems/release-pipeline.md) | Build, packaging, and release flow |
 | [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands and live Editor verification |
+| [SlopArena Chat design](design/sloparena-chat.md) | Approved Global/Server/Direct chat contract; Master implemented and headless-verified, Unity integration pending |
 
 ## Gameplay systems
 

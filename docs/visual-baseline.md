@@ -47,7 +47,7 @@ The table must be populated before merge. Paths are repository-relative or attac
 
 | ID | Bright: `Slop Court` | Dark: `After Hours` | Build/commit | Notes |
 |---|---|---|---|---|
-| VB-01 | [`vb-01-neutral-spacing.png`](evidence/visual-baseline/slop_court/vb-01-neutral-spacing.png) | _pending_ | `73d1fe9` | Captured in Unity gameplay camera; PNG only; fighters were grounded at capture. |
+| VB-01 | _pending_ | _pending_ | `73d1fe9` (recorded capture) | The earlier PNG is unavailable in the repository; recover it or repeat the capture. |
 | VB-02 | _pending_ | _pending_ | _pending_ | |
 | VB-03 | _pending_ | _pending_ | _pending_ | |
 | VB-04 | _pending_ | _pending_ | _pending_ | |
@@ -81,6 +81,7 @@ Known deviations or blockers: [none or exact deviation]
 #### VB-01 — Slop Court bright
 
 - Evidence: `docs/evidence/visual-baseline/slop_court/vb-01-neutral-spacing.png`
+- Availability: this PNG was not committed and is absent from the checkout. Recover it or repeat the capture before using this row as baseline evidence.
 - Captured in the Unity gameplay surface at commit `73d1fe9`.
 - Arena: Slop Court, bright representative arena.
 - Fighters: FightGuy P1 blue and FightGuy P2 red.
