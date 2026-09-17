@@ -128,6 +128,42 @@ _Avoid_: i-frames, dodge window, invuln
 The restoration of FloatWindow gravity by setting AirTime to 0 mid-air. Triggered by: the RecoveryMove, taking damage, or landing (ADR-0015: aerial attacks no longer reset it — that was the hover crutch). Without a reset, the character progresses into full gravity (the old FallRamp is removed by ADR-0020).
 _Avoid_: air reset, float restore, hover refresh
 
+**CPU Opponent**:
+A computer-controlled fighter intended to challenge a human player. It uses its kit, pursues combos, and recovers, with mistakes appropriate to its difficulty.
+_Avoid_: AI player
+
+**CPU Reaction Delay**:
+The nonzero time between an opponent action becoming observable and a CPU Opponent responding to that observation. It delays new opponent information, not execution of actions already selected from earlier observations.
+_Avoid_: input lag, decision interval
+
+**CPU Observation**:
+Information about an opponent's combat state that a CPU Opponent can use after its CPU Reaction Delay. It can include exact remaining Hitstun and attack-recovery times, but never the opponent's input commands.
+_Avoid_: input reading
+
+**True Combo**:
+A sequence of hits against one defender with no opportunity for an ordinary action between hits. Burst remains an explicit escape.
+_Avoid_: pressure string, hit streak
+
+**Pressure String**:
+A sequence of attacks that maintains pressure while leaving the defender opportunities to act between attacks. It is not a True Combo.
+_Avoid_: true combo, guaranteed follow-up
+
+**Stage Recovery**:
+The return from offstage to a stage surface or LedgeHang. It can combine movement, jumps, Dash, and a RecoveryMove.
+_Avoid_: attack recovery, RecoveryMove (when referring to the whole return)
+
+**Stage-side Edgeguarding**:
+Attacks against an offstage opponent from the stage or a ledge, without pursuing that opponent beyond the stage edge.
+_Avoid_: offstage pursuit
+
+**CPU Difficulty**:
+One of three named CPU skill tiers: Easy, Normal, and Hard. All tiers retain the full functional character move repertoire; reaction speed, move selection, spacing, and follow-up reliability distinguish them.
+_Avoid_: CPU level, 1–9 scale
+
+**Character Kit**:
+A character's grounded and aerial normals and specials, identified by the canonical Slot grid. Universal mechanics such as Dash, Burst, and Combo Influence are not part of the Character Kit.
+_Avoid_: control scheme
+
 ## PvP / Multiplayer
 
 **ServerBrowser**:
@@ -139,8 +175,44 @@ A pre-match waiting state managed by the master server via SignalR. Players who 
 _Avoid_: waiting room, pre-game, staging
 
 **GuestAuth**:
-Anonymous authentication via `POST /auth/guest` on the master server. Returns a JWT + temporary SteamId (Guid). No Steam SDK, no credentials. Placeholder for future Steam authentication — the JWT issuance and all downstream code stays unchanged when Steam auth lands.
+Access to SlopArena under a temporary player identity without Steam authentication. A guest identity is not a Steam identity.
 _Avoid_: dev login, anonymous auth, temp account
+
+**SlopArena Chat**:
+In-game text communication between SlopArena players, separate from Steam's chat system.
+_Avoid_: Steam chat (when referring to this feature)
+
+**Global Chat**:
+The SlopArena-wide chat channel, not restricted to one GameServer, LobbyRoom, or Match.
+_Avoid_: server chat
+
+**Server Chat**:
+The SlopArena Chat channel shared by players on the same GameServer, including players in different matches and players waiting to play.
+_Avoid_: lobby chat, match chat
+
+**Direct Message**:
+A SlopArena Chat message visible only to its sender and recipient, both connected to chat. Direct Messages are not queued for offline delivery.
+_Avoid_: inbox, offline message
+
+**Guest Session**:
+A player's visit to SlopArena during one game launch, with one temporary identity across chat reconnects. A later launch starts a new Guest Session.
+_Avoid_: persistent account
+
+**Display Name**:
+A player's chosen name shown in SlopArena Chat. Display Names need not be unique and are not player identities.
+_Avoid_: player ID
+
+**Session Tag**:
+A short identifier that distinguishes a player alongside their Display Name for one Guest Session.
+_Avoid_: Steam ID
+
+**Channel Backlog**:
+Recent Global Chat or Server Chat messages available to players who join after those messages were sent. Direct Messages are not part of a Channel Backlog.
+_Avoid_: offline inbox
+
+**Personal Mute**:
+A player's choice to hide a sender's messages and alerts across SlopArena Chat for the current game launch. It applies to the sender's identity, not their Display Name.
+_Avoid_: ban, account block
 
 **StockMode**:
 The win condition for PvP matches. Each player starts with N stocks (default 3). Getting KO'd (void death or blast zone) costs one stock. A player with 0 stocks is eliminated. Last player with stocks remaining wins. Scales naturally from 2 to 4+ players.
