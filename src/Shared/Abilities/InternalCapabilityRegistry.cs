@@ -49,6 +49,9 @@ public static class InternalCapabilityRegistry
             case "slop.internal.manki.bazooka.v1" when parameters is CookedMankiBazookaCapabilityParameters bazooka:
                 capability = new MankiBazooka(bazooka);
                 return true;
+            case "slop.internal.manki.aerosol-inferno.v1" when parameters is CookedMankiAerosolInfernoCapabilityParameters aerosol:
+                capability = new MankiAerosolInferno(aerosol);
+                return true;
             default:
                 return false;
         }

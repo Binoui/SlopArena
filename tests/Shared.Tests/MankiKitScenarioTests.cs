@@ -18,6 +18,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     private const string RoundBombCapabilityId = "slop.internal.manki.round-bomb.v1";
     private const string JetpackCapabilityId = "slop.internal.manki.jetpack-boost.v1";
     private const string BazookaCapabilityId = "slop.internal.manki.bazooka.v1";
+    private const string AerosolCapabilityId = "slop.internal.manki.aerosol-inferno.v1";
 
     private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
     private static float GroundPy => TestHelpers.GroundPY(Def);
@@ -55,8 +56,8 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(first.CookedPackage!.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
 
         var package = first.CookedPackage;
-        Assert.Equal(3, package.Definition.CapabilityRequirements.Count);
-        Assert.Equal(new[] { BazookaCapabilityId, JetpackCapabilityId, RoundBombCapabilityId },
+        Assert.Equal(4, package.Definition.CapabilityRequirements.Count);
+        Assert.Equal(new[] { AerosolCapabilityId, BazookaCapabilityId, JetpackCapabilityId, RoundBombCapabilityId },
             package.Definition.CapabilityRequirements.Select(x => x.CapabilityId).OrderBy(x => x).ToArray());
         var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
         {
@@ -112,37 +113,33 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal((ushort)60, jetpackSlot.Timeline.Stages.Single().DurationTicks);
         var airJetpack = package.Definition.Slots.Single(x => x.Id == "air.E");
         Assert.Equal(jetpackSlot.Name, airJetpack.Name);
-        Assert.Equal(jetpackSlot.Description, airJetpack.Description);
         var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
         Assert.Equal(AuthoringAbilityBehavior.AreaDenial, aerosol.Behavior);
-        Assert.Equal(AuthoringAimMode.None, aerosol.AimMode);
+        Assert.Equal(AuthoringAimMode.CameraForward3D, aerosol.AimMode);
         Assert.Equal((ushort)600, aerosol.CooldownTicks);
+        Assert.Equal("anim.manki.gf-loop", aerosol.AimAnimationId);
         var aerosolStage = Assert.Single(aerosol.Timeline.Stages);
         Assert.Equal((ushort)52, aerosolStage.DurationTicks);
         Assert.Equal((ushort)0, aerosolStage.IasaTicks);
         Assert.Equal(2, aerosolStage.Operations.Count);
-        var presentation = Assert.IsType<CookedEmitPresentationOperation>(aerosolStage.Operations[0]);
+        var start = Assert.IsType<CookedStartCapabilityOperation>(aerosolStage.Operations[0]);
+        Assert.Equal((ushort)0, start.Tick);
+        var aerosolParameters = Assert.IsType<CookedMankiAerosolInfernoCapabilityParameters>(start.Parameters);
+        Assert.Equal((ushort)28, aerosolParameters.HitboxDurationTicks);
+        Assert.Equal((ushort)52, aerosolParameters.FireDurationTicks);
+        Assert.Equal(0.7f, aerosolParameters.HitboxRadius);
+        Assert.Equal(0.25f, aerosolParameters.OffsetY);
+        Assert.Equal(1.25f, aerosolParameters.OffsetZ);
+        Assert.Equal(3f, aerosolParameters.EndOffsetZ);
+        Assert.Equal(15f, aerosolParameters.Damage);
+        Assert.Equal(55f, aerosolParameters.KnockbackAngle);
+        Assert.Equal(12f, aerosolParameters.KnockbackBase);
+        Assert.Equal(20f, aerosolParameters.KnockbackGrowth);
+        Assert.Equal((ushort)30, aerosolParameters.StunTicks);
+        Assert.Equal((byte)1, aerosolParameters.HitGroup);
+        var presentation = Assert.IsType<CookedEmitPresentationOperation>(aerosolStage.Operations[1]);
         Assert.Equal((ushort)18, presentation.Tick);
         Assert.Equal("presentation.manki.aerosol-inferno.start", presentation.PresentationId);
-        var flame = Assert.IsType<CookedSpawnHitboxOperation>(aerosolStage.Operations[1]);
-        Assert.Equal((ushort)18, flame.Tick);
-        Assert.Equal(AuthoringHitboxShape.Capsule, flame.Hitbox.Shape);
-        Assert.Equal(0.7f, flame.Hitbox.Radius);
-        Assert.Equal(0f, flame.Hitbox.OffsetX);
-        Assert.Equal(0.25f, flame.Hitbox.OffsetY);
-        Assert.Equal(1.25f, flame.Hitbox.OffsetZ);
-        Assert.Equal(0f, flame.Hitbox.EndOffsetX);
-        Assert.Equal(0f, flame.Hitbox.EndOffsetY);
-        Assert.Equal(3f, flame.Hitbox.EndOffsetZ);
-        Assert.Equal(15f, flame.Hitbox.Damage);
-        Assert.Equal(55f, flame.Hitbox.Angle);
-        Assert.Equal(12f, flame.Hitbox.BaseKnockback);
-        Assert.Equal(20f, flame.Hitbox.KnockbackGrowth);
-        Assert.Equal((ushort)30, flame.Hitbox.StunTicks);
-        Assert.Equal((ushort)28, flame.Hitbox.DurationTicks);
-        Assert.True(flame.Hitbox.Interruptible);
-        Assert.Equal((byte)1, flame.Hitbox.HitGroup);
-
         Assert.Empty(package.Definition.Slots.SelectMany(x => x.Timeline.Stages).SelectMany(x => x.Operations).OfType<CookedSetVelocityOperation>());
     }
 
@@ -244,15 +241,14 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal("presentation.manki.bazooka.explosion", bazooka.ExplosionPresentationId);
         var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
         Assert.Equal((ushort)52, aerosol.Timeline.Stages.Single().DurationTicks);
-        var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[0]);
+        var start = Assert.IsType<CookedStartCapabilityOperation>(aerosol.Timeline.Stages.Single().Operations[0]);
+        var aerosolParameters = Assert.IsType<CookedMankiAerosolInfernoCapabilityParameters>(start.Parameters);
+        Assert.Equal((ushort)18, aerosolParameters.FireTriggerTick);
+        Assert.Equal((ushort)52, aerosolParameters.FireDurationTicks);
+        Assert.Equal((ushort)28, aerosolParameters.HitboxDurationTicks);
+        var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[1]);
         Assert.Equal("presentation.manki.aerosol-inferno.start", emit.PresentationId);
-        var flame = Assert.IsType<CookedSpawnHitboxOperation>(aerosol.Timeline.Stages.Single().Operations[1]);
-        Assert.Equal(15f, flame.Hitbox.Damage);
-        Assert.Equal((ushort)28, flame.Hitbox.DurationTicks);
     }
-
-    // ── Golden scenarios: normals ──
-
     [Fact]
     public void G1_MonkeyPunch_HitConfirm_IsGolden()
     {

@@ -175,8 +175,13 @@
     {
       "capabilityId": "slop.internal.manki.bazooka.v1",
       "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.manki.aerosol-inferno.v1",
+      "capabilityVersion": "1"
     }
   ],
+
   "slots": [
     {
       "id": "ground.1",
@@ -880,8 +885,9 @@
       "description": "Shake and point an aerosol can, then project a forward fire column",
       "iconId": "icon.f",
       "behavior": "areaDenial",
-      "aimMode": "none",
+      "aimMode": "cameraForward3D",
       "aimMovement": "fixed",
+      "aimAnimationId": "anim.manki.gf-loop",
       "cooldownTicks": 600,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -899,9 +905,32 @@
             "rotateTowardTarget": false,
             "trackingStrength": 0,
             "animationIds": [
-              "anim.manki.gf"
+              "anim.manki.gf-loop",
+              "anim.manki.gf-atk"
             ],
             "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.manki.aerosol-inferno.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "fireTriggerTick": 18,
+                  "fireDurationTicks": 52,
+                  "hitboxDurationTicks": 28,
+                  "hitboxRadius": 0.7,
+                  "offsetY": 0.25,
+                  "offsetZ": 1.25,
+                  "endOffsetZ": 3,
+                  "damage": 15,
+                  "knockbackAngle": 55,
+                  "knockbackBase": 12,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 30,
+                  "hitGroup": 1
+                }
+              },
               {
                 "kind": "emitPresentation",
                 "tick": 18,
@@ -920,32 +949,6 @@
                   "localScaleY": 1,
                   "localScaleZ": 1,
                   "durationTicks": 28
-                }
-              },
-              {
-                "kind": "spawnHitbox",
-                "tick": 18,
-                "unit": "meters",
-                "hitbox": {
-                  "shape": "capsule",
-                  "radius": 0.7,
-                  "offsetX": 0,
-                  "offsetY": 0.25,
-                  "offsetZ": 1.25,
-                  "endOffsetX": 0,
-                  "endOffsetY": 0,
-                  "endOffsetZ": 3,
-                  "startBoneId": "bone.right-hand",
-                  "endBoneId": null,
-                  "damage": 15,
-                  "angle": 55,
-                  "baseKnockback": 12,
-                  "knockbackGrowth": 20,
-                  "stunTicks": 30,
-                  "durationTicks": 28,
-                  "interruptible": true,
-                  "hitGroup": 1,
-                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

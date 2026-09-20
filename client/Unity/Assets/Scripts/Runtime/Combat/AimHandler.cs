@@ -309,11 +309,13 @@ namespace SlopArena.Client.Combat
                 {
                     Vector2 delta = Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
                     _aimCameraMount.Tick(_characterTransform);
-                    _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity);
+                    bool horizontalOnly = charDef.Class == CharacterClass.Manki
+                        && (byte)(_aimingSlot + 1) == AbilitySlots.F;
+                    _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity, !horizontalOnly);
 
-                    _lastAimYawRad   = _aimCameraMount.GetAimYawRad();
-                    _lastAimPitchRad = _aimCameraMount.GetAimPitchRad();
-                    _lastAimingSlot  = _aimingSlot;
+                    _lastAimYawRad = _aimCameraMount.GetAimYawRad();
+                    _lastAimPitchRad = horizontalOnly ? 0f : _aimCameraMount.GetAimPitchRad();
+                    _lastAimingSlot = _aimingSlot;
 
                     ctx = new AimContext
                     {

@@ -517,6 +517,21 @@ public sealed record CookedMankiBazookaCapabilityParameters(
     ushort RecoveryDuration,
     string ExplosionPresentationId = "") : CookedCapabilityParameters;
 
+public sealed record CookedMankiAerosolInfernoCapabilityParameters(
+    ushort FireTriggerTick,
+    ushort FireDurationTicks,
+    ushort HitboxDurationTicks,
+    float HitboxRadius,
+    float OffsetY,
+    float OffsetZ,
+    float EndOffsetZ,
+    float Damage,
+    float KnockbackAngle,
+    float KnockbackBase,
+    float KnockbackGrowth,
+    ushort StunTicks,
+    byte HitGroup) : CookedCapabilityParameters;
+
 public sealed record CookedBudget(
     int SlotCount,
     int StageCount,

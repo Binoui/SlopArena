@@ -102,14 +102,14 @@ flat-arena probe. Gravity, fall speeds, weight, and ability data are unchanged.
 | **Q** | Round Bomb | Lob round bomb in arc → explodes on impact | Poke / zone, aimable air + ground |
 | **E** | Jetpack Boost | Compression → ignition launch | 3 vulnerable startup ticks; 15 m/s vertical, normalized 3.5 m/s horizontal cap; 1.25m ignition sphere, 4 damage, 75° / 2+8 KB, 8 stun, 4 ticks; no ascent steering; air drift returns at apex |
 | **R** | Bazooka | Short cast → fire rocket in camera direction | FPS-style fire-and-forget. Projectile arcs, explodes on impact. Rocket jump (4 self-dmg) |
-| **F** | Aerosol Inferno | Aerosol can vents a tall orange flame column | Forward area denial; 15 damage, 55° launch, 30 ticks stun |
+| **F** | Aerosol Inferno | Hold aerosol can → release into a tall orange flame column | Hold-to-aim while stationary; camera yaw tracks facing; release attack fires after 18 ticks; 15 damage, 55° launch, 30 ticks stun |
 
 ## Design Notes
 - **Air LMB**: Air Kick — 2-hit combo via `AirLmbCombo` (generic `StageChainAbility` subclass, shared by all characters). First kick (16 ticks, 4 dmg, lunge) chains to second kick (18 ticks, 6 dmg, higher KB). Buffer input during stage 1 to chain.
 - **Air RMB**: Knuckle Spike — hold-to-charge via `AirChargeAttack` (shared charge lifecycle, `ChargeHoldTicks=45`). Pressing mid-ascent stops the climb and the charge hovers in place (deliberately unlike air LMB, which keeps momentum). Tap (release before threshold) = the original spike (16 tick startup, 30 total, capsule straight down OffY=-0.5 to -1.5, 10 damage); charged = bigger knuckle (radius 1.0, 14 damage, 40t stun). Spike knockback (downward). Punish tool for reads.
 - **E**: Jetpack Boost. On activation, Manki compresses for 3 vulnerable ticks while preserving vertical fall velocity and clearing horizontal velocity. On ignition, the authoritative simulation samples the current movement stick, normalizes it when above 0.001 magnitude, and launches at `VY=15` with horizontal speed `3.5` along that direction. A single owner-centered sphere (radius 1.25, damage 4, 75° angle, base 2, growth 8, stun 8, duration 4) resolves the ignition hit. The ascent is unsteerable; gravity is active immediately, and normal air drift/actions return when `VY <= 0`. Cooldown: 210 ticks. The move is a recovery move and aliases `air.E` to `ground.E`.
 - **R**: Bazooka (FPS-style). Short cast (20 ticks), fire a rocket projectile in camera direction (AimYaw/AimPitch). Projectile has gravity (15 m/s²), speed 40 m/s, max flight 45 ticks. Explodes on entity hit or ground contact with 3m AoE. CanHitOwner=true on explosion — aim at feet for rocket jump (4 self-damage, upward knockback). No rise, no hover, no hold-to-aim. 240 tick cooldown (4s).
-- **F**: Aerosol Inferno. A tall forward aerosol flame column starts after the commitment window. It is an area-denial finisher, not a self-buff.
+- **F**: Aerosol Inferno. Hold enters the loop animation and freezes horizontal movement. Manki follows camera yaw only; vertical aim is ignored. Release switches to the attack animation, then emits the right-hand aerosol VFX and forward flame hitbox at the authored 18-tick trigger. Cooldown: 600 ticks.
 
 ## Animation Inventory
 
@@ -126,7 +126,8 @@ flat-arena probe. Gravity, fall speeds, weight, and ability data are unchanged.
 | `anim.manki.ga` | Round bomb | Ground `A` |
 | `anim.manki.ge` | Jetpack Boost | Ground `E` and Air `E` alias |
 | `anim.manki.gr` | Bazooka | Ground `R` |
-| `anim.manki.gf` | Aerosol Inferno | Ground `F` and Air `F` alias |
+| `anim.manki.gf-loop` | Aerosol Inferno hold loop | Ground `F` while held |
+| `anim.manki.gf-atk` | Aerosol Inferno release attack | Ground `F` after release |
 
 ## Files
 - `client/Unity/Assets/CharacterPackages/manki/package.json` — package identity and license

@@ -194,12 +194,20 @@ _Avoid_: lobby chat, match chat
 A SlopArena Chat message visible only to its sender and recipient, both connected to chat. Direct Messages are not queued for offline delivery.
 _Avoid_: inbox, offline message
 
+**Social Dock**:
+The menu's reserved area for SlopArena Chat, separate from the current match-preparation page. On compact layouts, a persistent social strip provides access to a chat view that temporarily replaces the page.
+_Avoid_: chat overlay (for the menu dock)
+
+**Unread Message**:
+An incoming, unmuted SlopArena Chat message not yet acknowledged by viewing its conversation at the newest messages while the game has focus and the conversation is unobscured. A brief combat preview alone does not acknowledge the message.
+_Avoid_: notification (when referring to unread conversation state)
+
 **Guest Session**:
 A player's visit to SlopArena during one game launch, with one temporary identity across chat reconnects. A later launch starts a new Guest Session.
 _Avoid_: persistent account
 
 **Display Name**:
-A player's chosen name shown in SlopArena Chat. Display Names need not be unique and are not player identities.
+A player's chosen name shown in SlopArena Chat, entered on first launch and remembered for later launches. Display Names need not be unique; remembering a name does not preserve a player identity across Guest Sessions.
 _Avoid_: player ID
 
 **Session Tag**:

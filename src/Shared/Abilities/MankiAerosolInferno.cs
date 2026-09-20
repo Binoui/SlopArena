@@ -1,0 +1,96 @@
+
+namespace SlopArena.Shared.Abilities;
+
+/// <summary>Hold F to aim the aerosol stream, then release to fire.</summary>
+public sealed class MankiAerosolInferno : ServerAbility, IAimHoldCapability
+{
+    private readonly CookedMankiAerosolInfernoCapabilityParameters _parameters;
+    private bool _fired;
+    private bool _released;
+
+    public MankiAerosolInferno(CookedMankiAerosolInfernoCapabilityParameters parameters)
+    {
+        _parameters = parameters;
+    }
+
+    public override void OnStart(ref CharacterState s, CharacterDefinition def)
+    {
+        _fired = false;
+        _released = false;
+        s.State = ActionState.Aiming;
+        s.IsAiming = true;
+        s.ComboStage = 0;
+        s.AttackElapsedTicks = 0;
+        s.VX = 0f;
+        s.VY = 0f;
+        s.VZ = 0f;
+        AnimIndex = 0;
+    }
+
+    public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
+    {
+        if (!_released)
+        {
+            s.VX = 0f;
+            s.VY = 0f;
+            s.VZ = 0f;
+            s.FacingYaw = s.AimYaw;
+            if (input.IsAiming) return;
+
+            _released = true;
+            s.State = ActionState.Attacking;
+            s.IsAiming = false;
+            s.ComboStage = 1;
+            s.AttackElapsedTicks = 0;
+            s.AnimLockTicks = _parameters.FireDurationTicks;
+            AnimIndex = 1;
+            return;
+        }
+
+        if (!_fired && s.AttackElapsedTicks >= _parameters.FireTriggerTick)
+        {
+            _fired = true;
+            SpawnFlame(ref s);
+        }
+
+        if (s.AttackElapsedTicks >= _parameters.FireDurationTicks)
+            EndAbility(ref s);
+    }
+
+    public override void OnEnd(ref CharacterState s)
+    {
+        s.IsAiming = false;
+    }
+
+    public override void OnCancel(ref CharacterState s)
+    {
+        s.IsAiming = false;
+    }
+
+    private void SpawnFlame(ref CharacterState s)
+    {
+        SpawnHitbox(ref s, new HitboxEvent
+        {
+            TriggerTick = _parameters.FireTriggerTick,
+            DurationTicks = _parameters.HitboxDurationTicks,
+            Shape = HitboxShape.Capsule,
+            Radius = _parameters.HitboxRadius,
+            OffY = _parameters.OffsetY,
+            OffZ = _parameters.OffsetZ,
+            EndOffZ = _parameters.EndOffsetZ,
+            BoneName = "mixamorig:RightHand",
+            Damage = _parameters.Damage,
+            Knockback = new KnockbackData
+            {
+                Profile = KnockbackProfile.Custom,
+                Angle = (sbyte)_parameters.KnockbackAngle,
+                BaseKnockback = _parameters.KnockbackBase,
+                KnockbackGrowth = _parameters.KnockbackGrowth,
+            },
+            StunTicks = _parameters.StunTicks,
+            Interruptible = true,
+            HitGroup = _parameters.HitGroup,
+            KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner,
+        });
+    }
+}

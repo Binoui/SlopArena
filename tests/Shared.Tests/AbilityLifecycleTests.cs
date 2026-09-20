@@ -136,23 +136,41 @@ public class AbilityLifecycleTests
     // ══════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void MankiF_AerosolInferno_CommitsFor52TicksThenReturnsToIdle()
+    public void MankiF_AerosolInferno_HoldsUntilReleaseThenReturnsToIdle()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.F) } });
-        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
-        Assert.Equal((byte)AbilitySlots.F, sim.GetState(1).AttackSlot);
+        var held = new InputState { ActiveSlot = AbilitySlots.F, IsAiming = true, AimYaw = 9000 };
+        sim.Tick(new() { { 1, held } });
+        var started = sim.GetState(1);
+        Assert.Equal(ActionState.Aiming, started.State);
+        Assert.Equal((byte)AbilitySlots.F, started.AttackSlot);
+        var heldX = started.PX;
+        var heldY = started.PY;
+        var heldZ = started.PZ;
 
-        TestHelpers.TickDefault(sim, 50);
-        var committed = sim.GetState(1);
-        Assert.Equal(ActionState.Attacking, committed.State);
-        Assert.Equal((byte)AbilitySlots.F, committed.AttackSlot);
+        for (var tick = 0; tick < 20; tick++)
+        {
+            sim.Tick(new() { { 1, held } });
+        }
 
-        TestHelpers.TickDefault(sim, 1);
+        var aiming = sim.GetState(1);
+        Assert.Equal(ActionState.Aiming, aiming.State);
+        Assert.Equal(heldX, aiming.PX);
+        Assert.Equal(heldY, aiming.PY);
+        Assert.Equal(heldZ, aiming.PZ);
+        Assert.Equal(MathF.PI / 2f, aiming.FacingYaw, 1e-4f);
+
+        sim.Tick(new() { { 1, new InputState { AimYaw = 9000 } } });
+        var released = sim.GetState(1);
+        Assert.Equal(ActionState.Attacking, released.State);
+        Assert.Equal((byte)AbilitySlots.F, released.AttackSlot);
+        Assert.Equal((byte)1, released.ComboStage);
+
+        TestHelpers.TickDefault(sim, 60);
         var completed = sim.GetState(1);
         Assert.Equal(ActionState.Idle, completed.State);
         Assert.Equal((byte)0, completed.AttackSlot);

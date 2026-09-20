@@ -51,6 +51,8 @@ public static class CharacterPackageCompiler
         "slop.internal.manki.round-bomb.v1",
         "slop.internal.manki.jetpack-boost.v1",
         "slop.internal.manki.bazooka.v1",
+        "slop.internal.manki.aerosol-inferno.v1",
+
     };
     internal static bool IsTrustedCapability(string id) => TrustedCapabilities.Contains(id);
 
@@ -419,6 +421,7 @@ public static class CharacterPackageCompiler
             MankiRoundBombCapabilityParameters x => x with { },
             MankiJetpackBoostCapabilityParameters x => x with { },
             MankiBazookaCapabilityParameters x => x with { },
+            MankiAerosolInfernoCapabilityParameters x => x with { },
             _ => throw new InvalidDataException("Unknown capability parameters.")
         };
 
@@ -467,6 +470,7 @@ public static class CharacterPackageCompiler
         MankiRoundBombCapabilityParameters x => new CookedMankiRoundBombCapabilityParameters(x.ThrowTriggerTick, x.MaxRange, x.LaunchAngle, x.Gravity, x.HitboxRadius, x.Damage, x.StunTicks, x.MaxFlightTicks, x.KbAngle, x.ExplosionDamage, x.ExplosionRadius, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionStunTicks, x.ExplosionDurationTicks, x.ExplosionKbAngle, x.ExplosionPresentationId),
         MankiJetpackBoostCapabilityParameters x => new CookedMankiJetpackBoostCapabilityParameters(x.StartupTicks, x.VerticalSpeed, x.HorizontalSpeed, x.ExplosionRadius, x.ExplosionDamage, x.ExplosionKbAngle, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionStunTicks, x.ExplosionDurationTicks, x.ExplosionPresentationId),
         MankiBazookaCapabilityParameters x => new CookedMankiBazookaCapabilityParameters(x.FireTriggerTick, x.ProjectileSpeed, x.HitboxRadius, x.Damage, x.Gravity, x.MaxFlightTicks, x.StunTicks, x.ExplosionRadius, x.KbAngle, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionStunTicks, x.ExplosionDurationTicks, x.ExplosionKbAngle, x.CastDuration, x.RecoveryDuration, x.ExplosionPresentationId),
+        MankiAerosolInfernoCapabilityParameters x => new CookedMankiAerosolInfernoCapabilityParameters(x.FireTriggerTick, x.FireDurationTicks, x.HitboxDurationTicks, x.HitboxRadius, x.OffsetY, x.OffsetZ, x.EndOffsetZ, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.StunTicks, x.HitGroup),
         _ => throw new InvalidDataException("Unknown capability parameters.")
     };
 
@@ -610,6 +614,7 @@ public static class CharacterPackageCompiler
             case CookedMankiRoundBombCapabilityParameters x: w.WriteNumber("throwTriggerTick", x.ThrowTriggerTick); Number(w, "maxRange", x.MaxRange); Number(w, "launchAngle", x.LaunchAngle); Number(w, "gravity", x.Gravity); Number(w, "hitboxRadius", x.HitboxRadius); Number(w, "damage", x.Damage); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); Number(w, "kbAngle", x.KbAngle); Number(w, "explosionDamage", x.ExplosionDamage); Number(w, "explosionRadius", x.ExplosionRadius); Number(w, "explosionKbBase", x.ExplosionKbBase); Number(w, "explosionKbGrowth", x.ExplosionKbGrowth); w.WriteNumber("explosionStunTicks", x.ExplosionStunTicks); w.WriteNumber("explosionDurationTicks", x.ExplosionDurationTicks); Number(w, "explosionKbAngle", x.ExplosionKbAngle); OptionalString(w, "explosionPresentationId", x.ExplosionPresentationId); break;
             case CookedMankiJetpackBoostCapabilityParameters x: w.WriteNumber("startupTicks", x.StartupTicks); Number(w, "verticalSpeed", x.VerticalSpeed); Number(w, "horizontalSpeed", x.HorizontalSpeed); Number(w, "explosionRadius", x.ExplosionRadius); Number(w, "explosionDamage", x.ExplosionDamage); Number(w, "explosionKbAngle", x.ExplosionKbAngle); Number(w, "explosionKbBase", x.ExplosionKbBase); Number(w, "explosionKbGrowth", x.ExplosionKbGrowth); w.WriteNumber("explosionStunTicks", x.ExplosionStunTicks); w.WriteNumber("explosionDurationTicks", x.ExplosionDurationTicks); OptionalString(w, "explosionPresentationId", x.ExplosionPresentationId); break;
             case CookedMankiBazookaCapabilityParameters x: w.WriteNumber("fireTriggerTick", x.FireTriggerTick); Number(w, "projectileSpeed", x.ProjectileSpeed); Number(w, "hitboxRadius", x.HitboxRadius); Number(w, "damage", x.Damage); Number(w, "gravity", x.Gravity); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); w.WriteNumber("stunTicks", x.StunTicks); Number(w, "explosionRadius", x.ExplosionRadius); Number(w, "kbAngle", x.KbAngle); Number(w, "explosionKbBase", x.ExplosionKbBase); Number(w, "explosionKbGrowth", x.ExplosionKbGrowth); w.WriteNumber("explosionStunTicks", x.ExplosionStunTicks); w.WriteNumber("explosionDurationTicks", x.ExplosionDurationTicks); Number(w, "explosionKbAngle", x.ExplosionKbAngle); w.WriteNumber("castDuration", x.CastDuration); w.WriteNumber("recoveryDuration", x.RecoveryDuration); OptionalString(w, "explosionPresentationId", x.ExplosionPresentationId); break;
+            case CookedMankiAerosolInfernoCapabilityParameters x: w.WriteNumber("fireTriggerTick", x.FireTriggerTick); w.WriteNumber("fireDurationTicks", x.FireDurationTicks); w.WriteNumber("hitboxDurationTicks", x.HitboxDurationTicks); Number(w, "hitboxRadius", x.HitboxRadius); Number(w, "offsetY", x.OffsetY); Number(w, "offsetZ", x.OffsetZ); Number(w, "endOffsetZ", x.EndOffsetZ); Number(w, "damage", x.Damage); Number(w, "knockbackAngle", x.KnockbackAngle); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("hitGroup", x.HitGroup); break;
             default: throw new InvalidDataException("Unknown capability parameters.");
         }
         w.WriteEndObject();

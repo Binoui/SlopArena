@@ -364,6 +364,21 @@ public sealed record MankiBazookaCapabilityParameters(
     ushort RecoveryDuration,
     string ExplosionPresentationId = "") : TypedCapabilityParameters;
 
+public sealed record MankiAerosolInfernoCapabilityParameters(
+    ushort FireTriggerTick,
+    ushort FireDurationTicks,
+    ushort HitboxDurationTicks,
+    float HitboxRadius,
+    float OffsetY,
+    float OffsetZ,
+    float EndOffsetZ,
+    float Damage,
+    float KnockbackAngle,
+    float KnockbackBase,
+    float KnockbackGrowth,
+    ushort StunTicks,
+    byte HitGroup) : TypedCapabilityParameters;
+
 public enum AuthoringAbilityBehavior : byte
 {
     MeleeCombo = 0,

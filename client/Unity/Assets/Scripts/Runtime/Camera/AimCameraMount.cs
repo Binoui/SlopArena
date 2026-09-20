@@ -115,13 +115,16 @@ namespace SlopArena.Client.Camera
         /// Accumulate mouse input into aim yaw and pitch.
         /// Call after Tick(), before reading GetAimYawRad/GetAimPitchRad.
         /// </summary>
-        public void ApplyMouseDelta(Vector2 delta, float sensitivity)
+        public void ApplyMouseDelta(Vector2 delta, float sensitivity, bool allowPitch = true)
         {
             if (!_active || _pivot == null) return;
 
-            _yawDeg   += delta.x * sensitivity;
-            _pitchDeg -= delta.y * sensitivity; // invert Y: mouse down = aim down
-            _pitchDeg  = Mathf.Clamp(_pitchDeg, _pitchMin, _pitchMax);
+            _yawDeg += delta.x * sensitivity;
+            if (allowPitch)
+            {
+                _pitchDeg -= delta.y * sensitivity; // invert Y: mouse down = aim down
+                _pitchDeg = Mathf.Clamp(_pitchDeg, _pitchMin, _pitchMax);
+            }
 
             _pivot.rotation = Quaternion.Euler(_pitchDeg, _yawDeg, 0f);
             ApplyCameraTransform();
