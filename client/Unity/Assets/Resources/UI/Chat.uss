@@ -21,6 +21,25 @@
     color: var(--chat-paper);
 }
 
+/* Explicit Page/Social region-switch affordance (issue #215). Sits at the
+   bottom-left of the attached surface, opposite the chat strip. Text is set
+   by ChatOverlay: the region the switch reaches. */
+.chat-region-hint {
+    display: none;
+    position: absolute;
+    left: 16px;
+    bottom: 12px;
+    padding: 4px 9px;
+    background-color: rgba(13, 13, 20, 0.88);
+    border-left-width: 3px;
+    border-left-color: var(--chat-acid);
+    color: var(--chat-muted);
+    font-size: 10px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+}
+
 .chat-collapsed {
     min-height: 42px;
     flex-direction: row;
@@ -120,6 +139,12 @@
     border-color: var(--chat-paper);
     border-bottom-width: 6px;
     border-bottom-color: var(--chat-orange);
+}
+
+/* Docked and compact-replacement chat is opaque: the reserved band or the
+   replaced page must not show through the conversation (issue #214). */
+.chat-panel--solid {
+    background-color: rgb(13, 13, 20);
 }
 
 .chat-header {

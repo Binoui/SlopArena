@@ -1,5 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <ui:Style src="Chat.uss" />
+    <ui:Label name="chat-region-hint" class="chat-region-hint" picking-mode="Ignore" />
     <ui:VisualElement name="chat-root" class="chat-root">
         <ui:VisualElement name="chat-public-feed" class="chat-public-feed" />
 

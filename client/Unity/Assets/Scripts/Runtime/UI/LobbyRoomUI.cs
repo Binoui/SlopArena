@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
-using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Client.Network;
 using SlopArena.Client;
@@ -42,6 +41,10 @@ namespace SlopArena.Client.UI
         {
             _alive = true;
             _leaving = false;
+            // Page re-entry is a fresh room (ADR-0032): a roster or start
+            // attempt left by a previous visit must not outlive its page.
+            _snapshot = null;
+            _startPending = false;
             _lifecycleCts = new CancellationTokenSource();
             int generation = ++_attempt;
             var root = _uiDocument.rootVisualElement;
@@ -86,7 +89,7 @@ namespace SlopArena.Client.UI
                 SubscribeLobby(_lobby);
             _awaitingLobby = true;
             SetStatus(chat.NeedsDisplayName
-                ? "Choose a display name in CHAT before joining a room."
+                ? "Choose a display name on the HOME screen before joining a room."
                 : (_lobby?.IsConnected == true ? "Rejoining the room…" : "Connecting to the room…"), false);
             SetRetryVisible(false);
             StartLobbyWatchdog(generation);
@@ -100,6 +103,8 @@ namespace SlopArena.Client.UI
             lobby.PlayerLeft += OnPlayerLeft;
             lobby.LobbyUpdated += OnLobbyUpdated;
             lobby.MatchStarting += OnMatchStarting;
+            lobby.StageSelect += OnServerStageSelect;
+            lobby.MatchStarted += OnServerMatchStarted;
             lobby.Error += OnError;
             lobby.Disconnected += OnDisconnected;
         }
@@ -113,7 +118,7 @@ namespace SlopArena.Client.UI
                 {
                     if (IsCurrent(generation, ct))
                         FailLobby(chat?.NeedsDisplayName == true
-                            ? "Choose a display name in CHAT before joining a room."
+                            ? "Choose a display name on the HOME screen before joining a room."
                             : "Couldn’t connect to the room directory. Retry, or return to the server browser.");
                     return;
                 }
@@ -207,7 +212,44 @@ namespace SlopArena.Client.UI
             _awaitingLobby = false;
             ClientSession.LobbyRoster = new LobbySnapshot(config.ServerId, config.Players);
             MatchConfig.Mode = GameMode.PvP;
-            SceneManager.LoadScene("CharSelect");
+            // Host authority comes from the authoritative roster at every
+            // server-driven transition (issue #213), not from a local hosting
+            // flag; CharSelectController recomputes the same way.
+            ClientSession.IsLobbyHost = IsRosterHost(config.Players);
+            FrontendController.Show(FrontendPage.FighterSelect);
+        }
+
+        private void OnServerStageSelect(MatchStartingConfig config)
+        {
+            // A player who locked in and backed out to this room is still in
+            // the match-start flow: the host's stage-select push advances this
+            // page too (issue #213). LobbyRoomUI shows no dialogs, but page
+            // deactivation still drops any departed-page state.
+            if (!_alive || _leaving) return;
+            _awaitingLobby = false;
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            ClientSession.LobbyRoster = new LobbySnapshot(config.ServerId, config.Players);
+            MatchConfig.Mode = GameMode.PvP;
+            ClientSession.IsLobbyHost = IsRosterHost(config.Players);
+            FrontendController.Show(FrontendPage.StageSelect);
+        }
+
+        private void OnServerMatchStarted(MatchStartedConfig config)
+        {
+            if (!_alive || _leaving) return;
+            _awaitingLobby = false;
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            ClientSession.ApplyMatchStarted(config);
+        }
+
+        private static bool IsRosterHost(IReadOnlyList<LobbyPlayerInfo> players)
+        {
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (players[i].SteamId == ClientSession.SteamId && players[i].IsHost)
+                    return true;
+            }
+            return false;
         }
 
         private void OnError(string message)
@@ -358,7 +400,7 @@ namespace SlopArena.Client.UI
                 ServerHost.Instance?.Stop();
             if (_lobby != null)
                 _ = LeaveRoomAsync(_lobby);
-            SceneManager.LoadScene("ServerBrowser");
+            FrontendController.Show(FrontendPage.ServerBrowser);
         }
 
         private static async Task LeaveRoomAsync(LobbyClient lobby)
@@ -396,6 +438,8 @@ namespace SlopArena.Client.UI
             lobby.PlayerLeft -= OnPlayerLeft;
             lobby.LobbyUpdated -= OnLobbyUpdated;
             lobby.MatchStarting -= OnMatchStarting;
+            lobby.StageSelect -= OnServerStageSelect;
+            lobby.MatchStarted -= OnServerMatchStarted;
             lobby.Error -= OnError;
             lobby.Disconnected -= OnDisconnected;
         }

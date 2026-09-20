@@ -9,8 +9,9 @@ using SlopArena.Client.Network;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Stage select for Training, Solo, and PvP. The stage registry remains file-driven;
+    /// Stage select for Solo and PvP. The stage registry remains file-driven;
     /// this screen owns only presentation and the existing start-match flow.
+    /// Training does not route through stage select (issue #211).
     /// </summary>
     public class StageSelectController : MonoBehaviour
     {
@@ -36,21 +37,19 @@ namespace SlopArena.Client.UI
 
             bool isOnline = MatchConfig.Mode == GameMode.PvP;
             bool isHost = !isOnline || ClientSession.IsLobbyHost;
-            SetModeChrome(root, isOnline ? "ONLINE // SELECT STAGE" :
-                MatchConfig.Mode == GameMode.Solo ? "SOLO // SELECT STAGE" : "TRAINING // SELECT STAGE",
+            SetModeChrome(root, isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
                 "STEP 2 OF 2  /  STAGE");
             root.Q<Label>("subtitle").text = isHost
                 ? "CHOOSE YOUR BATTLEGROUND"
                 : "THE HOST WILL CHOOSE THE BATTLEGROUND";
             root.Q<Label>("lbl-host").text = isOnline
                 ? (isHost ? "HOST CHOOSES THE STAGE" : "WAITING FOR HOST")
-                : MatchConfig.Mode == GameMode.Solo ? "YOU CHOOSE THE STAGE" : "CHOOSE A TRAINING STAGE";
+                : "YOU CHOOSE THE STAGE";
 
             if (_btnConfirm != null)
             {
                 _btnConfirm.style.display = DisplayStyle.None;
-                _btnConfirm.text = MatchConfig.Mode == GameMode.Solo ? "START SOLO" :
-                    MatchConfig.Mode == GameMode.Training ? "START TRAINING" : "START MATCH";
+                _btnConfirm.text = isOnline ? "START MATCH" : "START SOLO";
             }
             if (_lblWaiting != null)
             {
@@ -116,7 +115,10 @@ namespace SlopArena.Client.UI
                 }
                 _btnConfirm?.SetEnabled(false);
             }
-            else if (isHost && !string.IsNullOrEmpty(MatchConfig.ArenaName) &&
+            // Solo keeps its in-flow stage choice through backward navigation;
+            // online stage selection derives from server state, never from a
+            // restored preference left by a previous flow (issue #213).
+            else if (MatchConfig.Mode == GameMode.Solo && !string.IsNullOrEmpty(MatchConfig.ArenaName) &&
                 MatchConfig.ArenaName != "training" &&
                 grid?.Q<VisualElement>($"stage-{MatchConfig.ArenaName}") != null)
             {
@@ -124,7 +126,7 @@ namespace SlopArena.Client.UI
             }
 
             var btnBack = root.Q<Button>("btn-back");
-            Action back = BackToCharSelect;
+            Action back = BackToFighterSelect;
             if (btnBack != null)
                 btnBack.clicked += back;
             Button initial = isHost && firstStageButton != null ? firstStageButton : btnBack;
@@ -180,22 +182,21 @@ namespace SlopArena.Client.UI
             return string.Join(" ", words);
         }
 
-        private static void BackToCharSelect()
-            => SceneManager.LoadScene("CharSelect");
+        private static void BackToFighterSelect()
+            => FrontendController.Show(FrontendPage.FighterSelect);
 
         private void RenderPlayerCards()
         {
             if (_playerCards == null) return;
             _playerCards.Clear();
 
-            if (MatchConfig.Mode is GameMode.Training or GameMode.Solo)
+            if (MatchConfig.Mode == GameMode.Solo)
             {
                 _playerCards.Add(BuildPlayerCard(
                     "P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
                 _playerCards.Add(BuildPlayerCard(
-                    "P2", MatchConfig.Mode == GameMode.Solo ? "CPU" : "TRAINING BOT",
-                    MatchConfig.Mode == GameMode.Solo ? MatchConfig.SoloBotClass : CharacterClass.FightGuy,
-                    MatchConfig.Mode == GameMode.Solo ? $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}" : "BOT",
+                    "P2", "CPU", MatchConfig.SoloBotClass,
+                    $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}",
                     false, false));
                 return;
             }
@@ -281,7 +282,7 @@ namespace SlopArena.Client.UI
             }
 
             MatchConfig.ArenaName = _selectedArena;
-            if (MatchConfig.Mode is GameMode.Training or GameMode.Solo)
+            if (MatchConfig.Mode == GameMode.Solo)
             {
                 SceneManager.LoadScene("Arena_Offline");
                 return;
@@ -298,7 +299,7 @@ namespace SlopArena.Client.UI
                 Debug.LogError("[StageSelect] PvP mode but no lobby connection. Returning to server browser.");
                 if (_lblWaiting != null)
                     _lblWaiting.text = "No lobby connection. Returning to server browser.";
-                SceneManager.LoadScene("ServerBrowser");
+                FrontendController.Show(FrontendPage.ServerBrowser);
                 return;
             }
             _ = _lobby.StartMatchAsync(_selectedArena);

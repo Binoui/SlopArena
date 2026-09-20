@@ -56,7 +56,8 @@ namespace SlopArena.Client.World
         {
             UISFX.PlayMatchMusic();
             _pauseMenu = gameObject.AddComponent<MatchPauseMenu>();
-            _pauseMenu.Init(_cameraMount, _inputController, LeaveMatch);
+            _pauseMenu.Init(_cameraMount, _inputController, LeaveMatch,
+                _hudManager != null ? _hudManager.Document : null);
             OnMatchStart();
             gameObject.AddComponent<MatchVisualStyle>().Apply();
         }
@@ -72,17 +73,15 @@ namespace SlopArena.Client.World
         // ── Leave match (pause menu) ─────────────────────────────────────────
 
         /// <summary>
-        /// Pause-menu "LEAVE MATCH": return to the stage select screen. PvPMatch
-        /// overrides this to leave its GameServer membership; the persistent chat
-        /// connection survives. The UDP client cleans itself up on scene unload.
+        /// Pause-menu "LEAVE MATCH": mode-specific early exit (issue #210).
+        /// Solo and Training return to the frontend Fighter Select page with
+        /// their local choices retained; PvPMatch overrides this to leave its
+        /// GameServer membership. The persistent chat connection survives.
+        /// The UDP client cleans itself up on scene unload.
         /// </summary>
         protected virtual void LeaveMatch()
         {
-            // StageSelect needs a usable mode without a lobby — reset to the
-            // offline picker so leaving an online match doesn't strand the player
-            // on a dead PvP waiting screen.
-            MatchConfig.Mode = GameMode.Training;
-            UnityEngine.SceneManagement.SceneManager.LoadScene("StageSelect");
+            FrontendController.Show(FrontendPage.FighterSelect);
         }
 
         // ── Shared setup helpers ────────────────────────────────────────────

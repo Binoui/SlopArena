@@ -44,10 +44,16 @@ namespace SlopArena.Client.World
 
         protected override void LeaveMatch()
         {
-            // Explicitly abandoning PvP returns to offline stage selection.
-            // Release Server Chat membership without dropping Global/Direct.
+            // The host owns the embedded GameServer process (ADR-0005): abandoning
+            // PvP early must stop it, or it stays registered with the Master with
+            // no owner able to stop it (issue #48; same contract as backing out of
+            // fighter select). Non-hosts never touch it.
+            if (MatchConfig.IsHost)
+                ServerHost.Instance?.Stop();
+            // Leaving the GameServer revokes Server Chat membership; Global/Direct
+            // keep running on the persistent connection (issue #210).
             _ = ClientSession.ActiveLobby?.LeaveLobbyAsync();
-            base.LeaveMatch();
+            FrontendController.Show(FrontendPage.ServerBrowser);
         }
 
         protected override void OnMatchStart()
@@ -409,7 +415,7 @@ namespace SlopArena.Client.World
                 yield break;
             }
 
-            SceneManager.LoadScene("Results");
+            FrontendController.Show(FrontendPage.Results);
         }
     }
 }

@@ -531,7 +531,7 @@ namespace SlopArena.Client.World
         private System.Collections.IEnumerator LoadSoloResults()
         {
             yield return new WaitForSecondsRealtime(2f);
-            SceneManager.LoadScene("Results");
+            FrontendController.Show(FrontendPage.Results);
         }
 
         /// <summary>

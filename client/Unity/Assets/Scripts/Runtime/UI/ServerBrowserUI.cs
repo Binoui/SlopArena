@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
-using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Client;
 using SlopArena.Client.Network;
@@ -18,6 +17,16 @@ namespace SlopArena.Client.UI
     {
         private const int DefaultServerPort = 9876;
         private const int HostRegistrationTimeoutMs = 15000;
+
+        /// <summary>
+        /// One-shot status shown on the next browser activation (issue #213):
+        /// Results sets it when a completed PvP match cannot return to its
+        /// LobbyRoom, so the browser explains why the room is gone.
+        /// </summary>
+        public static string? PendingReturnNotice;
+
+        /// <summary>Notice captured for this activation; shown until the scan settles.</summary>
+        private string? _pendingReturnNotice;
 
         [SerializeField] private UIDocument _uiDocument;
         [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
@@ -38,6 +47,7 @@ namespace SlopArena.Client.UI
         private Focusable _focusBeforeModal;
         private Button _modalClose;
         private Button _modalJoin;
+        private bool _modalPresented;
 
         private CancellationTokenSource _lifecycleCts;
         private CancellationTokenSource _refreshCts;
@@ -82,6 +92,15 @@ namespace SlopArena.Client.UI
             if (_modalClose != null) _modalClose.clicked += CloseDirectConnect;
             if (_modalJoin != null) _modalJoin.clicked += JoinDirectConnect;
 
+            // Page re-entry is a fresh browser (ADR-0032): rows left by a
+            // previous visit's scan must not survive their operation.
+            _serverList?.Clear();
+            if (_directConnectStatus != null)
+            {
+                _directConnectStatus.text = string.Empty;
+                _directConnectStatus.RemoveFromClassList("error");
+            }
+
             if (_btnHostCancel != null)
                 _btnHostCancel.style.display = DisplayStyle.None;
             if (_lblHostStatus != null)
@@ -104,6 +123,16 @@ namespace SlopArena.Client.UI
 
             ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
             _masterClient = ChatSession.Instance?.MasterClient;
+            // The return explanation is captured for this activation and shown
+            // until the scan settles; SetBrowserStatus suppresses loading
+            // replacements while it is pending (issue #213).
+            _pendingReturnNotice = PendingReturnNotice;
+            PendingReturnNotice = null;
+            if (_pendingReturnNotice != null)
+            {
+                Debug.Log($"[ServerBrowser] {_pendingReturnNotice}");
+                SetBrowserStatus(_pendingReturnNotice, loading: false);
+            }
             RefreshServers();
         }
         private async void RefreshServers()
@@ -127,7 +156,7 @@ namespace SlopArena.Client.UI
                 {
                     if (IsCurrent(operation, ct))
                         ShowBrowserFailure(chat?.NeedsDisplayName == true
-                            ? "Choose a display name in CHAT before browsing rooms."
+                            ? "Choose a display name on the HOME screen before browsing rooms."
                             : "Couldn’t reach the room directory. Check your connection, then retry.");
                     return;
                 }
@@ -150,10 +179,12 @@ namespace SlopArena.Client.UI
                 _serverList?.Clear();
                 if (servers.Count == 0)
                 {
+                    _pendingReturnNotice = null;
                     SetBrowserStatus("No public rooms right now. Host a match or retry the scan.", loading: false);
                     return;
                 }
 
+                _pendingReturnNotice = null;
                 if (_lblStatus != null)
                 {
                     _lblStatus.style.display = DisplayStyle.None;
@@ -219,7 +250,7 @@ namespace SlopArena.Client.UI
             ClientSession.SelectedServerId = server.Id;
             ClientSession.SelectedServerName = server.Name;
             Debug.Log($"[ServerBrowser] Joining server: {server.Name} ({server.IpAddress}:{server.Port})");
-            SceneManager.LoadScene("LobbyRoom");
+            FrontendController.Show(FrontendPage.LobbyRoom);
         }
 
         private void OpenDirectConnect()
@@ -231,6 +262,8 @@ namespace SlopArena.Client.UI
             root.Q<VisualElement>("flow-header")?.SetEnabled(false);
             root.Q<VisualElement>("browser-layout")?.SetEnabled(false);
             _directConnectModal.style.display = DisplayStyle.Flex;
+            _modalPresented = true;
+            UiModalState.Push();
             if (_directConnectStatus != null)
             {
                 _directConnectStatus.text = string.Empty;
@@ -269,6 +302,11 @@ namespace SlopArena.Client.UI
                 _modalJoin?.SetEnabled(true);
             }
             _directConnectModal.style.display = DisplayStyle.None;
+            if (_modalPresented)
+            {
+                _modalPresented = false;
+                UiModalState.Pop();
+            }
             var root = _uiDocument.rootVisualElement;
             root.Q<VisualElement>("flow-header")?.SetEnabled(true);
             root.Q<VisualElement>("browser-layout")?.SetEnabled(true);
@@ -305,7 +343,7 @@ namespace SlopArena.Client.UI
                 {
                     if (_alive && !ct.IsCancellationRequested)
                         SetAddressStatus(chat?.NeedsDisplayName == true
-                            ? "Choose a display name in CHAT before browsing rooms."
+                            ? "Choose a display name on the HOME screen before browsing rooms."
                             : "Couldn’t reach the room directory. Check your connection, then retry.", true);
                     return;
                 }
@@ -388,7 +426,7 @@ namespace SlopArena.Client.UI
                 if (!authenticated || chat?.AuthToken == null)
                 {
                     FinishHostFailure(chat?.NeedsDisplayName == true
-                        ? "Choose a display name in CHAT before hosting a room."
+                        ? "Choose a display name on the HOME screen before hosting a room."
                         : "Couldn’t sign in to the room directory. Retry when you’re online.", ct);
                     return;
                 }
@@ -444,7 +482,10 @@ namespace SlopArena.Client.UI
                     ClientSession.SteamId = steamId;
                     ClientSession.SelectedServerId = serverId;
                     ClientSession.SelectedServerName = GenerateServerName();
-                    SceneManager.LoadScene("LobbyRoom");
+                    // Host ownership transfer: the persistent ServerHost is now
+                    // owned by the Lobby Room page (ADR-0005, ADR-0032). Page
+                    // deactivation must not stop the handed-off process.
+                    FrontendController.Show(FrontendPage.LobbyRoom);
                 }
                 finally
                 {
@@ -511,7 +552,7 @@ namespace SlopArena.Client.UI
                 StopOwnedHost();
                 _hostStarting = false;
             }
-            SceneManager.LoadScene("MainMenu");
+            FrontendController.Show(FrontendPage.Home);
         }
 
         private void SetHostBusy(bool busy, string status)
@@ -547,6 +588,10 @@ namespace SlopArena.Client.UI
         {
             if (_lblStatus == null)
                 return;
+            // A pending return explanation stays visible until the scan
+            // settles (issue #213).
+            if (loading && _pendingReturnNotice != null)
+                return;
             _lblStatus.style.display = DisplayStyle.Flex;
             _lblStatus.text = text;
             if (loading) _lblStatus.RemoveFromClassList("error");
@@ -556,6 +601,11 @@ namespace SlopArena.Client.UI
         {
             if (_lblStatus == null)
                 return;
+            if (_pendingReturnNotice != null)
+            {
+                text = $"{_pendingReturnNotice}\n{text}";
+                _pendingReturnNotice = null;
+            }
             _lblStatus.style.display = DisplayStyle.Flex;
             _lblStatus.text = text;
             _lblStatus.AddToClassList("error");
@@ -580,6 +630,11 @@ namespace SlopArena.Client.UI
             if (_btnHostCancel != null) _btnHostCancel.clicked -= CancelHost;
             if (_modalClose != null) _modalClose.clicked -= CloseDirectConnect;
             if (_modalJoin != null) _modalJoin.clicked -= JoinDirectConnect;
+            if (_modalPresented)
+            {
+                _modalPresented = false;
+                UiModalState.Pop();
+            }
             _addressCts?.Cancel();
             _addressCts?.Dispose();
             _addressCts = null;
@@ -591,9 +646,16 @@ namespace SlopArena.Client.UI
                 _hostStarting = false;
             }
             _masterClient = null;
+            // Page re-entry re-runs OnEnable against this same component, so
+            // disposed sources must not survive the deactivation cycle
+            // (issue #212): a stale disposed CTS would throw on the next
+            // Cancel and break Back-during-pending.
             _lifecycleCts?.Dispose();
             _refreshCts?.Dispose();
             _hostCts?.Dispose();
+            _lifecycleCts = null;
+            _refreshCts = null;
+            _hostCts = null;
         }
 
         private static bool TryParseServerAddress(string raw, out string host, out int port, out string error)

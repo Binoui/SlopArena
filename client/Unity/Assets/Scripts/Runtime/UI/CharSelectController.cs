@@ -129,7 +129,7 @@ namespace SlopArena.Client.UI
             RenderTrainingRoster();
 
             var btnBack = root.Q<Button>("btn-back");
-            Action back = () => SceneManager.LoadScene("MainMenu");
+            Action back = () => FrontendController.Show(FrontendPage.Home);
             if (btnBack != null)
                 btnBack.clicked += back;
             ConfigureNavigation(root, MenuRoster.Classes.Length > 0 ? selectButton : null, btnBack, back);
@@ -196,12 +196,12 @@ namespace SlopArena.Client.UI
                 selectButton.clicked += () =>
                 {
                     if (_selected == CharacterClass.None) return;
-                    SceneManager.LoadScene("StageSelect");
+                    FrontendController.Show(FrontendPage.StageSelect);
                 };
             }
 
             var btnBack = root.Q<Button>("btn-back");
-            Action back = () => SceneManager.LoadScene("MainMenu");
+            Action back = () => FrontendController.Show(FrontendPage.Home);
             if (btnBack != null)
                 btnBack.clicked += back;
             ConfigureNavigation(root, MenuRoster.Classes.Length > 0
@@ -363,7 +363,7 @@ namespace SlopArena.Client.UI
             {
                 if (_lblPvPStatus != null)
                     _lblPvPStatus.text = "No lobby connection. Returning to server browser.";
-                SceneManager.LoadScene("ServerBrowser");
+                FrontendController.Show(FrontendPage.ServerBrowser);
                 return;
             }
 
@@ -415,7 +415,7 @@ namespace SlopArena.Client.UI
         {
             // Everyone moves to the stage select screen; the host picks the
             // arena there, then the match starts from StageSelect.
-            SceneManager.LoadScene("StageSelect");
+            FrontendController.Show(FrontendPage.StageSelect);
         }
 
         private void OnLobbyUpdated(LobbySnapshot snapshot)
@@ -485,7 +485,7 @@ namespace SlopArena.Client.UI
                 ServerHost.Instance?.Stop();
 
             // Return to lobby room (connection still alive)
-            SceneManager.LoadScene("LobbyRoom");
+            FrontendController.Show(FrontendPage.LobbyRoom);
         }
 
         private void RenderTrainingRoster()

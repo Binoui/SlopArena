@@ -28,15 +28,17 @@ namespace SlopArena.Client.UI
         /// <summary>True while the pause menu is open (gameplay frozen).</summary>
         public bool IsPaused => _paused;
 
-        public void Init(CameraMount? cameraMount, InputController? inputController, Action? onLeaveMatch = null)
+        public void Init(CameraMount? cameraMount, InputController? inputController, Action? onLeaveMatch = null, UIDocument? hostDocument = null)
         {
             _cameraMount = cameraMount;
             _inputController = inputController;
             _onLeaveMatch = onLeaveMatch;
-            var doc = FindFirstObjectByType<UIDocument>();
+            // Explicit host (issue #210): the match's HUD document is passed in
+            // rather than discovered as "whichever UIDocument is first".
+            var doc = hostDocument != null ? hostDocument : FindFirstObjectByType<UIDocument>();
             if (doc == null)
             {
-                Debug.LogWarning("[PauseMenu] No UIDocument in scene — pause menu unavailable.");
+                Debug.LogWarning("[PauseMenu] No UIDocument host for the pause menu — pause menu unavailable.");
                 return;
             }
             BuildPanel(doc.rootVisualElement);
@@ -76,6 +78,11 @@ namespace SlopArena.Client.UI
 
             if (_panel != null)
                 _panel.style.display = paused ? DisplayStyle.Flex : DisplayStyle.None;
+
+            // The pause menu obscures chat, so the docked/expanded conversation
+            // behind it must not be treated as read (issue #214).
+            if (paused) UiModalState.Push();
+            else UiModalState.Pop();
         }
 
         /// <summary>
@@ -173,6 +180,8 @@ namespace SlopArena.Client.UI
         {
             // Never leave the sim frozen if the match scene unloads mid-pause.
             Time.timeScale = 1f;
+            if (_paused)
+                UiModalState.Pop(); // match scene unload while paused (issue #214)
         }
     }
 }

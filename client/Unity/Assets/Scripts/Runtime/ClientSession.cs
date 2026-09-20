@@ -174,7 +174,7 @@ namespace SlopArena.Client
                 if (config.Content == null || !TryBuildAndValidateMatchCatalog(config.Content, out var catalog, out failure))
                 {
                     UnityEngine.Debug.LogError($"[PvP] Match content admission failed: {failure ?? "authoritative content map is missing."}");
-                    UnityEngine.SceneManagement.SceneManager.LoadScene("ServerBrowser");
+                    UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
                     return;
                 }
                 MatchContentCatalog = catalog;
@@ -196,7 +196,7 @@ namespace SlopArena.Client
             if (local == null)
             {
                 UnityEngine.Debug.LogError("[PvP] Match started but local player missing from roster.");
-                UnityEngine.SceneManagement.SceneManager.LoadScene("ServerBrowser");
+                UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
                 return;
             }
 

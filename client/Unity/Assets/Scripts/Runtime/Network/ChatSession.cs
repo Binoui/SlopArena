@@ -46,6 +46,8 @@ namespace SlopArena.Client.Network
         private ChatConversation? _activeConversation;
         private bool _authAttempted;
         private bool _nameApplied;
+        private bool _savedNameRejected;
+        private int _nameGeneration;
         private bool _directoryAvailable;
         private bool _chatStateReady;
         private bool _destroyed;
@@ -56,9 +58,19 @@ namespace SlopArena.Client.Network
         public static ChatSession? Instance => _instance;
         public event Action? Changed;
 
+        /// <summary>
+        /// Raised with the conversation key when the bounded history buffer
+        /// (issue #214) trims its oldest message to stay at
+        /// <see cref="MaxMessagesPerConversation"/>. Presentation uses this to
+        /// return an evicted reading anchor to newest with an explanation.
+        /// </summary>
+        public event Action<string>? ConversationHistoryTrimmed;
+
         public ChatPlayer? Self { get; private set; }
-        public bool IsConnected => _chatStateReady && _lobby?.IsConnected == true;
+        public bool IsConnected => _nameApplied && _chatStateReady && _lobby?.IsConnected == true;
         public bool NeedsDisplayName => string.IsNullOrEmpty(_savedDisplayName);
+        public string SavedDisplayName => _savedDisplayName;
+        public bool SavedNameRejected => _savedNameRejected;
         public bool DirectoryAvailable => _directoryAvailable;
         public string Status => _status;
         public Guid? JoinedServerId => _joinedServerId;
@@ -126,7 +138,7 @@ namespace SlopArena.Client.Network
                 }
             }
 
-            if (!NeedsDisplayName && !IsConnected && _connectTask == null &&
+            if (!NeedsDisplayName && !_savedNameRejected && !IsConnected && _connectTask == null &&
                 Time.unscaledTime >= _nextRetryAt && _authAttempted)
             {
                 _nextRetryAt = Time.unscaledTime + _retryDelay;
@@ -168,22 +180,24 @@ namespace SlopArena.Client.Network
                 SetStatus("Choose a display name to connect.");
                 return false;
             }
-            if (IsConnected)
+            if (IsConnected && _nameApplied)
                 return true;
+            Task<bool>? task;
             lock (_taskSync)
             {
                 if (_connectTask == null)
                     _connectTask = ConnectCoreAsync();
+                task = _connectTask;
             }
             try
             {
-                return await _connectTask;
+                return await task;
             }
             finally
             {
                 lock (_taskSync)
                 {
-                    if (_connectTask?.IsCompleted == true)
+                    if (ReferenceEquals(_connectTask, task) && task.IsCompleted)
                         _connectTask = null;
                 }
             }
@@ -209,14 +223,58 @@ namespace SlopArena.Client.Network
             }
             ApplySelf(ToChatPlayer(profile));
             _savedDisplayName = normalized;
+            // A rename accepted while an initial connect apply is still in
+            // flight makes the apply loop re-apply this latest name. Keep
+            // _nameApplied false so the trailing EnsureConnectedAsync runs
+            // that versioned apply instead of trusting the connected
+            // fast-path.
+            _nameGeneration++;
             PlayerPrefs.SetString(DisplayNamePlayerPrefsKey, normalized);
             PlayerPrefs.Save();
-            _nameApplied = true;
+            _nameApplied = false;
             SetStatus(IsConnected ? "Connected" : "Connecting…");
             return await EnsureConnectedAsync();
         }
 
         public Task<bool> RenameAsync(string name) => SetDisplayNameAsync(name);
+
+        /// <summary>
+        /// Validate and persist the display name locally without waiting for
+        /// Master acceptance (issue #209). Solo and Training remain available
+        /// offline; the saved name is applied remotely on the next connection,
+        /// and a remote rejection is surfaced without claiming connection
+        /// success.
+        /// </summary>
+        public async Task<bool> AcceptDisplayNameLocallyAsync(string name)
+        {
+            if (!ChatTextValidation.TryValidateDisplayName(name, out var normalized, out var validationError))
+            {
+                SetStatus(validationError);
+                return false;
+            }
+            bool changed = !string.Equals(_savedDisplayName, normalized, StringComparison.Ordinal);
+            _savedDisplayName = normalized;
+            _savedNameRejected = false;
+            if (changed)
+            {
+                _nameGeneration++;
+                _nameApplied = false;
+            }
+            PlayerPrefs.SetString(DisplayNamePlayerPrefsKey, normalized);
+            PlayerPrefs.Save();
+            SetStatus(changed ? "Display name saved locally. Connecting…" : "Display name saved locally.");
+            NotifyChanged();
+            try
+            {
+                await EnsureConnectedAsync();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Connection problem after saving your display name. Local play remains available.");
+            }
+            return true;
+        }
 
         public async Task RefreshDirectoryAsync()
         {
@@ -243,7 +301,10 @@ namespace SlopArena.Client.Network
             if (conversation == null)
                 return false;
             _activeConversation = conversation;
-            MarkActiveRead();
+            // Read state is presentation-owned (issue #214): selecting alone
+            // does not acknowledge; the overlay marks read only when the
+            // selected conversation is visible, focused, unobscured and at
+            // newest.
             RefreshConversationStates();
             NotifyChanged();
             return true;
@@ -260,7 +321,10 @@ namespace SlopArena.Client.Network
                 return false;
             conversation.Title = FormatPlayerTitle(player);
             _activeConversation = conversation;
-            MarkActiveRead();
+            // Read state is presentation-owned (issue #214): selecting alone
+            // does not acknowledge; the overlay marks read only when the
+            // selected conversation is visible, focused, unobscured and at
+            // newest.
             RefreshConversationStates();
             NotifyChanged();
             return true;
@@ -406,14 +470,36 @@ namespace SlopArena.Client.Network
                 return false;
             if (!_nameApplied)
             {
-                var profile = await _masterClient!.SetDisplayNameAsync(_savedDisplayName);
-                if (profile == null)
+                // Re-apply while a local save races this connect, so the latest
+                // locally accepted name is the one the Master sees.
+                while (true)
                 {
-                    SetStatus("Could not apply your saved display name. Retry without changing identity.");
-                    return false;
+                    int generation = _nameGeneration;
+                    var profile = await _masterClient!.SetDisplayNameAsync(_savedDisplayName);
+                    if (profile == null)
+                    {
+                        _nameApplied = false;
+                        int? statusCode = _masterClient.LastStatusCode;
+                        // A 4xx against an outdated generation says nothing about
+                        // the latest local name; keep retrying that instead.
+                        if (_nameGeneration == generation && statusCode is 400 or 409 or 422)
+                        {
+                            _savedNameRejected = true;
+                            SetStatus("Master rejected your saved display name. Correct it in CHAT; local play remains available.");
+                        }
+                        else
+                        {
+                            SetStatus("Could not apply your saved display name yet. Local play remains available; connection keeps retrying.");
+                        }
+                        return false;
+                    }
+                    ApplySelf(ToChatPlayer(profile));
+                    if (_nameGeneration == generation)
+                    {
+                        _nameApplied = true;
+                        break;
+                    }
                 }
-                ApplySelf(ToChatPlayer(profile));
-                _nameApplied = true;
             }
 
             if (_lobby == null)
@@ -450,12 +536,20 @@ namespace SlopArena.Client.Network
                 return true;
             _authAttempted = true;
             SetStatus("Signing in as a guest…");
-            _authTask ??= _masterClient.AuthenticateGuestAsync();
+            Task<bool>? task;
+            lock (_taskSync)
+            {
+                _authTask ??= _masterClient.AuthenticateGuestAsync();
+                task = _authTask;
+            }
             bool authenticated;
-            try { authenticated = await _authTask; }
+            try { authenticated = await task; }
             finally
             {
-                if (_authTask?.IsCompleted == true) _authTask = null;
+                lock (_taskSync)
+                {
+                    if (ReferenceEquals(_authTask, task) && task.IsCompleted) _authTask = null;
+                }
             }
             if (!authenticated)
             {
@@ -656,8 +750,14 @@ namespace SlopArena.Client.Network
             if (conversation.MutableMessages.Any(existing => existing.MessageId == message.MessageId))
                 return;
             conversation.MutableMessages.Add(message);
+            bool trimmed = false;
             while (conversation.MutableMessages.Count > MaxMessagesPerConversation)
+            {
                 conversation.MutableMessages.RemoveAt(0);
+                trimmed = true;
+            }
+            if (trimmed)
+                ConversationHistoryTrimmed?.Invoke(conversation.Key);
             bool incoming = message.Sender?.PlayerId != _selfPlayerId;
             if (incoming && IsMessageVisible(message))
                 conversation.Unread++;
@@ -713,6 +813,7 @@ namespace SlopArena.Client.Network
             ClientSession.SteamId = long.TryParse(player.PlayerId, out var id) ? id : ClientSession.SteamId;
             ClientSession.Username = player.DisplayName;
             _nameApplied = true;
+            _savedNameRejected = false;
             RefreshConversationStates();
         }
 

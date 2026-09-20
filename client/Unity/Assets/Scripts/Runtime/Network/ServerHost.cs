@@ -226,7 +226,7 @@ namespace SlopArena.Client.Network
             try
             {
                 if (!_process.HasExited)
-                    _process.Kill();
+                    KillProcessTree(_process);
                 _process.WaitForExit(2000);
             }
             catch (Exception ex)
@@ -236,6 +236,75 @@ namespace SlopArena.Client.Network
 
             DetachProcess();
             CleanupConfig();
+        }
+
+        /// <summary>
+        /// Kill the spawned server and all of its children. The Editor
+        /// fallback spawns <c>dotnet run</c>, which launches the game server
+        /// binary as a child process; a bare <see cref="Process.Kill"/> only
+        /// reaches the wrapper and leaves the server orphaned and registered
+        /// with the Master (issue #212 leave/cancellation contract).
+        /// </summary>
+        private static void KillProcessTree(Process process)
+        {
+            if (Application.platform == RuntimePlatform.WindowsEditor ||
+                Application.platform == RuntimePlatform.WindowsPlayer)
+            {
+                using var killer = Process.Start(new ProcessStartInfo(
+                    "taskkill", $"/PID {process.Id} /T /F")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                });
+                killer?.WaitForExit(2000);
+                return;
+            }
+
+            // Unix: children reparent once the wrapper dies, so collect them
+            // before killing it, then kill whatever is still running.
+            var children = ListChildProcessIds(process.Id);
+            process.Kill();
+            foreach (var pid in children)
+            {
+                try
+                {
+                    using var child = Process.GetProcessById(pid);
+                    if (!child.HasExited)
+                        child.Kill();
+                }
+                catch
+                {
+                    // Child already exited or pid reused; nothing to kill.
+                }
+            }
+        }
+
+        private static System.Collections.Generic.List<int> ListChildProcessIds(int parentPid)
+        {
+            var children = new System.Collections.Generic.List<int>();
+            try
+            {
+                using var pgrep = Process.Start(new ProcessStartInfo(
+                    "pgrep", $"-P {parentPid}")
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+                if (pgrep == null) return children;
+                string line;
+                while ((line = pgrep.StandardOutput.ReadLine()) != null)
+                {
+                    if (int.TryParse(line.Trim(), out var pid))
+                        children.Add(pid);
+                }
+                pgrep.WaitForExit(2000);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[ServerHost] Child process listing failed: {ex.Message}");
+            }
+            return children;
         }
 
         /// <summary>Drain background-thread subprocess events onto the main thread.</summary>

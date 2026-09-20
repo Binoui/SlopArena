@@ -30,6 +30,10 @@ namespace SlopArena.Client.UI
     {
         [SerializeField] private UIDocument _uiDocument;
         [SerializeField] private MatchTextVFX _textVfx;
+
+        /// <summary>The HUD's UI document — the explicit host for match-surface
+        /// overlays (pause menu) so nothing searches for a first document.</summary>
+        public UIDocument? Document => _uiDocument;
         /// <summary>Identity required by both the tracked readout and broadcast card.</summary>
         public readonly struct HudPlayer
         {

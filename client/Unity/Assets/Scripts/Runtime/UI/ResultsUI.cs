@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
-using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Client;
 
@@ -40,10 +39,13 @@ namespace SlopArena.Client.UI
             _headline = _root.Q<Label>("results-headline");
             _returnButton = _root.Q<Button>("btn-return-lobby");
 
-            _returnButton.text = MatchConfig.Mode == GameMode.Solo
-                ? "BACK TO MENU"
-                : "RETURN TO LOBBY";
+            // Local modes end at Home; only PvP has a lobby to return to.
+            bool isLocal = MatchConfig.Mode != GameMode.PvP;
+            _returnButton.text = isLocal ? "BACK TO MENU" : "RETURN TO LOBBY";
             _returnButton.clicked += ReturnFromResults;
+            // Page activation contract (issue #210): focus the page action and
+            // give Escape the page's flow-specific back (return) action.
+            MenuNavigation.Configure(_root, _returnButton, ReturnFromResults);
             RenderResults();
         }
 
@@ -56,8 +58,32 @@ namespace SlopArena.Client.UI
 
         private static void ReturnFromResults()
         {
-            SceneManager.LoadScene(
-                MatchConfig.Mode == GameMode.Solo ? "MainMenu" : "LobbyRoom");
+            // Completed local results (Solo, Training) end at Home with
+            // preparation reset (issues #210, #211); PvP keeps its lobby
+            // return route.
+            if (MatchConfig.Mode != GameMode.PvP)
+            {
+                FrontendController.Show(FrontendPage.Home);
+                return;
+            }
+
+            // Completed PvP returns to the existing LobbyRoom only while the
+            // GameServer membership is still valid (issue #213); otherwise the
+            // Server Browser explains why the room is gone instead of showing
+            // an unusable room.
+            var lobby = ClientSession.ActiveLobby;
+            bool membershipValid = lobby != null && lobby.IsConnected &&
+                ClientSession.SelectedServerId != Guid.Empty &&
+                lobby.JoinedServerId == ClientSession.SelectedServerId;
+            if (membershipValid)
+            {
+                FrontendController.Show(FrontendPage.LobbyRoom);
+                return;
+            }
+
+            ServerBrowserUI.PendingReturnNotice =
+                "Your room connection closed during the match. Pick another room or host a new one.";
+            FrontendController.Show(FrontendPage.ServerBrowser);
         }
 
         private void RenderResults()

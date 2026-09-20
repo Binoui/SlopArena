@@ -3,6 +3,7 @@
     <ui:VisualElement name="root" class="screen menu-screen">
         <ui:VisualElement name="backdrop" class="menu-backdrop" />
         <ui:VisualElement name="menu-content" class="menu-content">
+            <ui:ScrollView name="menu-scroll" class="menu-scroll" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="Auto">
             <ui:VisualElement name="menu-intro" class="menu-intro">
                 <ui:VisualElement name="title-wrap" class="menu-title-wrap">
                     <ui:VisualElement class="menu-title-face">
@@ -13,6 +14,7 @@
                 <ui:VisualElement class="menu-title-rule" />
                 <ui:Label text="AWKWARD FIGHTERS. QUESTIONABLE IDEAS." class="menu-tagline" />
                 <ui:Label text="Pick a way in. The hard part is choosing who gets blamed for the rematch." class="menu-copy" />
+                <ui:VisualElement name="identity-panel" class="menu-identity" />
                 <ui:VisualElement name="menu-actions" class="menu-actions">
                     <ui:VisualElement class="menu-action-item">
                         <ui:Button name="btn-multiplayer" text="PLAY ONLINE" class="menu-action menu-action--primary" />
@@ -33,6 +35,7 @@
                 <ui:Label text="A different bad idea for every playstyle." class="menu-roster-intro" />
                 <ui:VisualElement name="roster-panel" class="menu-roster" />
             </ui:VisualElement>
+            </ui:ScrollView>
         </ui:VisualElement>
         <ui:VisualElement class="menu-footer">
             <ui:Label text="SLOPARENA // DESKTOP DEMO" class="menu-version" />

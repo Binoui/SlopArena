@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using SlopArena.Client.Input;
 using SlopArena.Client.Network;
@@ -22,9 +23,20 @@ namespace SlopArena.Client.UI
         private const int MaxMessageScalars = 500;
         private const double CompactLifetimeSeconds = 8d;
 
+        /// <summary>
+        /// Reserved right-hand band for the Social Dock at roomy sizes, as a
+        /// percentage of the shell panel (issue #214). Page layout shrinks to
+        /// the remainder, so page controls never sit under the conversation.
+        /// </summary>
+        private const float DockWidthPercent = 21f;
+        /// <summary>Windows narrower than this use the compact strip instead of the dock.</summary>
+        private const float DockMinWindowWidth = 1600f;
+        public const string DockOpenPlayerPrefsKey = "SlopArena.Chat.DockOpen";
+
         private static ChatOverlay? _instance;
 
         private VisualElement? _root;
+        private VisualElement? _frame;
         private VisualElement? _collapsed;
         private VisualElement? _panel;
         private VisualElement? _setup;
@@ -69,6 +81,43 @@ namespace SlopArena.Client.UI
         private CursorLockMode _previousCursorLock;
         private bool _previousCursorVisible;
 
+        // Social Dock state (issue #214). The open/collapsed preference
+        // persists across launches; compact presentation never rewrites it.
+        private bool _dockOpen;
+        // Per-conversation scroll anchors, launch-scoped presentation state:
+        // key -> pinned-to-newest and last scroll offset survive page changes,
+        // gameplay and frontend recreation via this persistent overlay.
+        private readonly Dictionary<string, bool> _pinnedNewest = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Vector2> _scrollOffsets = new(StringComparer.Ordinal);
+        // Conversations whose reading anchor was evicted by the bounded
+        // buffer (issue #214): the next render returns them to newest with
+        // the explanation already written to the conversation Feedback.
+        private readonly HashSet<string> _evictionReset = new(StringComparer.Ordinal);
+        private VisualElement? _hostPageRoot;
+        private Label? _regionHint;
+        private float _lastWindowWidth = -1f;
+        // Zero-size focusable element parked on the gameplay HUD root when
+        // the panel collapses (issue #216): focus never rests on the chat
+        // surface while the panel hides, so UI Toolkit's focus fixup — which
+        // re-focuses the visible strip at the panel's next dirty pass and
+        // would re-arm the gate as if the player had navigated there — never
+        // has a lost focus to repair.
+        private VisualElement? _focusParker;
+
+        /// <summary>
+        /// Explicit focus regions in the frontend shell (issue #215). Page is
+        /// the active page's controls; Social is the chat surface (the panel
+        /// when open, otherwise the persistent strip). Directional navigation
+        /// stays inside the active region because the inactive region's
+        /// controls are not focusable.
+        /// </summary>
+        private enum UiRegion { Page, Social }
+
+        private UiRegion _region = UiRegion.Page;
+        // Last valid focused control per region; index = (int)UiRegion.
+        // Launch-scoped: validated with panel != null before use.
+        private readonly VisualElement?[] _regionFocus = new VisualElement?[2];
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
@@ -100,6 +149,7 @@ namespace SlopArena.Client.UI
 
             _instance = this;
             DontDestroyOnLoad(gameObject);
+            _dockOpen = PlayerPrefs.GetInt(DockOpenPlayerPrefsKey, 1) == 1;
         }
 
         private void OnEnable()
@@ -108,11 +158,13 @@ namespace SlopArena.Client.UI
             AttachToScene(SceneManager.GetActiveScene());
             TryBindSession();
             SceneManager.sceneLoaded += OnSceneLoaded;
+            FrontendController.PageChanged += OnFrontendPageChanged;
         }
 
         private void OnDisable()
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            FrontendController.PageChanged -= OnFrontendPageChanged;
             if (_expanded)
                 ChatInputGate.End();
         }
@@ -120,7 +172,10 @@ namespace SlopArena.Client.UI
         private void OnDestroy()
         {
             if (_session != null)
+            {
                 _session.Changed -= OnSessionChanged;
+                _session.ConversationHistoryTrimmed -= OnConversationHistoryTrimmed;
+            }
             if (_instance == this)
                 _instance = null;
             _root?.RemoveFromHierarchy();
@@ -130,20 +185,121 @@ namespace SlopArena.Client.UI
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             _ownsCursor = false;
-            SetExpanded(false, false);
+            // Scene boundaries are hard transitions (issue #215): the page
+            // region owns the next frontend activation. Social focus memory
+            // is launch-scoped and revalidated on restore.
+            _region = UiRegion.Page;
+            // Frontend recreation must not reset the conversation view
+            // (issue #214): scene loads keep the dock/expanded state and
+            // re-attach to the explicit host. Entering gameplay is the one
+            // deliberate collapse — match entry ends interactive chat while
+            // ChatSession keeps drafts and selection.
+            if (!FrontendController.IsFrontendActive && ChatInputGate.IsGameplayScene)
+                SetExpanded(false, false);
             AttachToScene(scene);
         }
 
         private void AttachToScene(Scene scene)
         {
             if (_root == null) return;
-            foreach (var document in FindObjectsByType<UIDocument>(FindObjectsSortMode.None))
+            // Explicit presentation hosts (issue #214): the frontend shell's
+            // active page document in menus, the match HUD document in
+            // gameplay. No first-document discovery; anything else detaches.
+            UIDocument? host = FrontendController.IsFrontendActive
+                ? FrontendController.ActivePageDocument
+                : FindFirstObjectByType<HUDManager>()?.Document;
+            if (host == null || !host.isActiveAndEnabled ||
+                host.gameObject.scene != scene || host.rootVisualElement == null)
             {
-                if (document.gameObject.scene != scene) continue;
-                document.rootVisualElement.Add(_root);
-                _root.BringToFront();
+                _hostPageRoot = null;
+                if (_root.panel != null)
+                    _root.RemoveFromHierarchy();
                 return;
             }
+            if (_root.parent != host.rootVisualElement)
+            {
+                _root.RemoveFromHierarchy();
+                host.rootVisualElement.Add(_root);
+            }
+            RegisterRegionClickFollow(host.rootVisualElement);
+            _hostPageRoot = FindHostPageRoot(host);
+            _root.BringToFront();
+            ApplyPresentation();
+        }
+
+        private VisualElement? FindHostPageRoot(UIDocument host)
+        {
+            if (_root == null || _root.parent != host.rootVisualElement)
+                return null;
+            // The page's UXML root is the host document's first child; the
+            // chat root itself is a later sibling added by this overlay.
+            foreach (var child in host.rootVisualElement.Children())
+            {
+                if (child != _root)
+                    return child;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Input follows the last-touched side (issue #215): a click into the
+        /// page makes the page the active region and a click into the chat
+        /// surface makes Social active, so mouse users get region-local
+        /// navigation without the explicit switch. Registered on the host
+        /// document root, which UI Toolkit re-clones on every page enable, so
+        /// the registration never accumulates across page re-entries. The
+        /// same root consumes the keyboard Tab switch before UI Toolkit's
+        /// focus cycling can move focus inside the old region.
+        /// </summary>
+        private void RegisterRegionClickFollow(VisualElement hostRoot)
+        {
+            if (hostRoot.userData is bool)
+                return;
+            hostRoot.userData = true;
+            hostRoot.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene
+                    || UiModalState.Presented)
+                    return;
+                if (evt.target is not VisualElement target)
+                    return;
+                if (_root.Contains(target))
+                {
+                    SetActiveRegion(UiRegion.Social, focusTarget: false);
+                    return;
+                }
+                bool inPage = _hostPageRoot != null && _hostPageRoot.Contains(target);
+                bool changed = _region != UiRegion.Page;
+                SetActiveRegion(UiRegion.Page, focusTarget: false);
+                if (changed && inPage)
+                {
+                    // The clicked page control only grabs focus while it was
+                    // focusable, which happened after its pointer-down; focus
+                    // it explicitly so directional input continues there.
+                    FocusClickedPageControl(target);
+                }
+            });
+        }
+
+        private void FocusClickedPageControl(VisualElement target)
+        {
+            for (var element = target; element != null; element = element.parent)
+            {
+                if (element is Focusable && TryFocus(element))
+                    return;
+            }
+        }
+
+
+        private void OnFrontendPageChanged(FrontendPage page)
+        {
+            // Page activation replaces scene-load teardown: re-host the chat on
+            // the newly active page without collapsing it or touching state.
+            AttachToScene(SceneManager.GetActiveScene());
+            // Roomy menus show the dock open according to the remembered
+            // preference; compact layouts keep the strip (issue #214).
+            if (FrontendController.IsFrontendActive && !_expanded && _dockOpen && IsRoomyWindow())
+                SetExpanded(true, false);
         }
 
         private void LateUpdate()
@@ -156,19 +312,75 @@ namespace SlopArena.Client.UI
         private void Update()
         {
             TryBindSession();
+            // Evaluate the gate every frame so an armed release requirement
+            // clears as soon as every held control is released (issue #215):
+            // nothing evaluates it in menus, and a stale arm would turn the
+            // next fresh back press into a dead one.
+            _ = ChatInputGate.SuppressShortcuts;
             var keyboard = Keyboard.current;
             bool enterHeld = keyboard != null && (keyboard.enterKey.isPressed || keyboard.numpadEnterKey.isPressed);
             if (!enterHeld) _enterConsumed = false;
-            if (_expanded && keyboard?.escapeKey.wasPressedThisFrame == true)
+            if (keyboard?.escapeKey.wasPressedThisFrame == true && OwnsBackPress())
             {
-                SetExpanded(false, false);
+                HandleEscape();
                 return;
+            }
+            // Face-button submit/cancel for controller navigation (issue #215):
+            // the dpad move path is native, these are not.
+            GamepadUIBridge.Pump(_root?.panel);
+            PollRegionSwitch();
+            float windowWidth = Screen.width;
+            if (!Mathf.Approximately(windowWidth, _lastWindowWidth))
+            {
+                bool wasRoomy = _lastWindowWidth >= DockMinWindowWidth;
+                _lastWindowWidth = windowWidth;
+                // Presentation transitions are a menu concern (issue #216):
+                // a gameplay window resize never opens or closes the chat
+                // panel by itself; gameplay keeps the legacy overlay at any
+                // width.
+                if (FrontendController.IsFrontendActive)
+                {
+                    // Resizing between roomy and compact changes the presentation,
+                    // never the remembered roomy preference (issue #214): a chat
+                    // opened as a compact replacement collapses back to the
+                    // remembered preference when the window becomes roomy again.
+                    if (IsRoomyWindow() && !wasRoomy && _expanded && !_dockOpen)
+                        SetExpanded(false, false);
+                    else if (IsRoomyWindow() && !wasRoomy && !_expanded && _dockOpen)
+                    {
+                        // Widening into roomy restores the remembered dock: the
+                        // player never chose to close it (issue #215).
+                        SetExpanded(true, false);
+                    }
+                    else
+                    {
+                        bool enteredReplace = !IsRoomyWindow() && wasRoomy && _expanded;
+                        ApplyPresentation();
+                        // A dock shrunk into the compact replacement keeps the
+                        // conversation interactive: put the composer in focus
+                        // (issue #215).
+                        if (enteredReplace)
+                            _root?.schedule.Execute(() => _draft?.Focus()).StartingIn(0);
+                    }
+                }
             }
             if (!enterHeld || _enterConsumed)
                 return;
             _enterConsumed = true;
             if (!ChatInputGate.IsGameplayScene)
                 return;
+            if (UiModalState.Presented)
+            {
+                // The pause menu wins over chat (issue #216): chat neither
+                // opens over the modal nor keeps strip focus, so the pause
+                // owner's Escape is never swallowed by an armed gate.
+                if (IsFocusInsideChatSurface())
+                {
+                    (_root?.panel?.focusController?.focusedElement as VisualElement)?.Blur();
+                    ChatInputGate.End();
+                }
+                return;
+            }
             if (!_expanded && !IsEditorFocused())
             {
                 SetExpanded(true, true);
@@ -177,6 +389,193 @@ namespace SlopArena.Client.UI
             {
                 SendDraft(true);
             }
+        }
+
+        private static bool IsRoomyWindow() => Screen.width >= DockMinWindowWidth;
+
+        /// <summary>
+        /// Whether the chat surface owns the current back press (issue #215).
+        /// The topmost modal always wins over chat. In menus the chat owns the
+        /// press only while the focus — or the replaced page — is inside the
+        /// chat surface; a page-focused press falls through to the page's
+        /// Back. In gameplay an open panel always owns the press.
+        /// </summary>
+        private bool OwnsBackPress()
+        {
+            if (UiModalState.Presented)
+                return false;
+            if (ChatInputGate.IsGameplayScene)
+            {
+                // An open panel always owns the press; collapsed strip focus
+                // is explicit chat navigation, so the first press exits it
+                // and the next fresh press reaches the pause owner (issue
+                // #216).
+                return _expanded || IsFocusInsideChatSurface();
+            }
+            if (!_expanded || !FrontendController.IsFrontendActive)
+                return false;
+            if (!IsRoomyWindow())
+                return true;
+            return _root?.panel?.focusController?.focusedElement is VisualElement focused
+                && _root.Contains(focused);
+        }
+
+        /// <summary>
+        /// The explicit Page/Social region switch (issue #215): Q on the
+        /// keyboard, the north face button (Y / Triangle) on controller.
+        /// Tab keeps UI Toolkit's own focus cycling, which stays inside the
+        /// active region because the inactive region is not focusable, so the
+        /// switch needs a key the panel does not consume pre-dispatch.
+        /// Skipped while a text field is typing and while a modal owns the
+        /// surface; gameplay keeps the legacy composer interaction.
+        /// </summary>
+        private void PollRegionSwitch()
+        {
+            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+                return;
+            if (UiModalState.Presented)
+                return;
+            bool pad = Gamepad.current?.buttonNorth.wasPressedThisFrame == true;
+            bool qKey = !IsEditorFocused() && Keyboard.current?.qKey.wasPressedThisFrame == true;
+            if (!pad && !qKey)
+                return;
+            SetActiveRegion(_region == UiRegion.Page ? UiRegion.Social : UiRegion.Page, focusTarget: true);
+            UISFX.PlayClick();
+        }
+
+        /// <summary>
+        /// Switch the active focus region (issue #215). The inactive region's
+        /// controls stop being focusable, so directional navigation can never
+        /// leave the active region; each region's last valid focus is
+        /// remembered and restored on the next switch.
+        /// </summary>
+        private void SetActiveRegion(UiRegion region, bool focusTarget)
+        {
+            if (_region != region)
+            {
+                CaptureRegionFocus(_region);
+                _region = region;
+                ApplyRegionFocusability();
+                UpdateRegionHint();
+            }
+            if (focusTarget)
+                FocusRegionDefault(region);
+        }
+
+        /// <summary>Remember a region's currently focused control, if the
+        /// focus actually sits inside that region (issue #215).</summary>
+        private void CaptureRegionFocus(UiRegion region)
+        {
+            if (_root?.panel?.focusController?.focusedElement is not VisualElement focused)
+                return;
+            bool inChat = _root.Contains(focused);
+            bool inPage = _hostPageRoot != null && _hostPageRoot.Contains(focused);
+            if (region == UiRegion.Social && inChat)
+                _regionFocus[(int)UiRegion.Social] = focused;
+            else if (region == UiRegion.Page && inPage)
+                _regionFocus[(int)UiRegion.Page] = focused;
+        }
+
+        /// <summary>Restore the remembered focus of a region, falling back to
+        /// the region's conventional entry point (issue #215).</summary>
+        private void FocusRegionDefault(UiRegion region)
+        {
+            if (TryFocus(_regionFocus[(int)region]))
+                return;
+            if (region == UiRegion.Page)
+            {
+                if (TryFocus(MenuNavigation.PageInitialFocus))
+                    return;
+                TryFocus(_hostPageRoot == null ? null : FindFirstFocusable(_hostPageRoot));
+                return;
+            }
+            if (!_expanded)
+            {
+                TryFocus(_open);
+                return;
+            }
+            if (!TryFocus(_session?.NeedsDisplayName == true ? _name : _draft))
+                TryFocus(_panel == null ? null : FindFirstFocusable(_panel));
+        }
+
+        private static bool TryFocus(VisualElement? element)
+        {
+            if (element == null || element.panel == null || !element.focusable || !element.enabledSelf)
+                return false;
+            element.Focus();
+            return true;
+        }
+
+        private static VisualElement? FindFirstFocusable(VisualElement root)
+        {
+            foreach (var element in root.Query<VisualElement>().ToList())
+            {
+                if (element is Focusable focusable && focusable.focusable && element.enabledSelf
+                    && element.style.display != DisplayStyle.None)
+                    return element;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Region-local navigation (issue #215): only the active region's
+        /// controls are focusable, so keyboard/controller navigation stays
+        /// inside it. Gameplay keeps the legacy behavior — the HUD surface is
+        /// not region-split, so everything there stays focusable.
+        /// </summary>
+        private void ApplyRegionFocusability()
+        {
+            bool social, page;
+            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+            {
+                // Gameplay keeps the open panel's controls focusable, but a
+                // closed chat takes no navigation focus at all (user
+                // decision, issue #216): Enter is the only route to the
+                // combat composer, and the collapsed strip is click-only.
+                social = ChatInputGate.IsGameplayScene ? _expanded : true;
+                page = true;
+            }
+            else if (!IsRoomyWindow() && _expanded)
+            {
+                // Compact chat replaced the page; the page has no controls to
+                // navigate and the conversation owns the input (issue #215).
+                social = true;
+                page = false;
+            }
+            else
+            {
+                social = _region == UiRegion.Social;
+                page = !social;
+            }
+            SetRegionFocusable(_root, social);
+            SetRegionFocusable(_hostPageRoot, page);
+            if (_history != null)
+                _history.focusable = social;
+        }
+
+        /// <summary>Buttons and text fields are the only focusable controls in
+        /// these surfaces; toggling exactly those keeps scroll views and
+        /// labels out of the navigation ring (issue #215).</summary>
+        private static void SetRegionFocusable(VisualElement? root, bool focusable)
+        {
+            if (root == null)
+                return;
+            root.Query<Button>().ForEach(button => button.focusable = focusable);
+            root.Query<TextField>().ForEach(field => field.focusable = focusable);
+        }
+
+        /// <summary>The visible region-switch affordance (issue #215): a small
+        /// chip naming the region the switch reaches. Hidden in gameplay and
+        /// while no host surface is attached.</summary>
+        private void UpdateRegionHint()
+        {
+            if (_regionHint == null)
+                return;
+            bool frontend = FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene;
+            _regionHint.style.display = frontend ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!frontend)
+                return;
+            _regionHint.text = _region == UiRegion.Page ? "Q/Y // SOCIAL" : "Q/Y // PAGE";
         }
 
         private void BindView()
@@ -193,6 +592,7 @@ namespace SlopArena.Client.UI
             _root.pickingMode = PickingMode.Ignore;
             var frame = _root.Q<VisualElement>("chat-root");
             if (frame != null) frame.pickingMode = PickingMode.Ignore;
+            _frame = frame;
             _collapsed = _root.Q<VisualElement>("chat-collapsed");
             _panel = _root.Q<VisualElement>("chat-panel");
             _setup = _root.Q<VisualElement>("chat-setup");
@@ -222,9 +622,12 @@ namespace SlopArena.Client.UI
             _draft = _root.Q<TextField>("chat-draft");
             _name = _root.Q<TextField>("display-name");
             _renameField = _root.Q<TextField>("rename-name");
+            _regionHint = _root.Q<Label>("chat-region-hint");
+            if (_regionHint != null)
+                _regionHint.pickingMode = PickingMode.Ignore;
 
-            if (_open != null) _open.clicked += () => SetExpanded(true, false);
-            if (_close != null) _close.clicked += () => SetExpanded(false, false);
+            if (_open != null) _open.clicked += OpenChat;
+            if (_close != null) _close.clicked += CloseChat;
             if (_newest != null) _newest.clicked += ScrollToNewest;
             if (_refreshDirectory != null) _refreshDirectory.clicked += RefreshDirectory;
             if (_send != null) _send.clicked += () => SendDraft(ChatInputGate.IsGameplayScene);
@@ -235,11 +638,18 @@ namespace SlopArena.Client.UI
             if (_directTab != null) _directTab.clicked += SelectDirectTab;
             if (_history != null)
             {
+                // Controller navigation of the retained history (issue #215):
+                // a focused scroll view scrolls with directional input.
+                _history.focusable = true;
                 _history.contentContainer.RegisterCallback<GeometryChangedEvent>(_ =>
                 {
                     if (_pinToNewest) ScrollToNewest();
                 });
-                _history.verticalScroller.valueChanged += _ => _pinToNewest = IsAtNewest();
+                _history.verticalScroller.valueChanged += _ =>
+                {
+                    UpdateScrollAnchor();
+                    TryMarkActiveRead();
+                };
             }
 
             if (_draft != null)
@@ -266,6 +676,19 @@ namespace SlopArena.Client.UI
             }
 
             _root.RegisterCallback<KeyDownEvent>(OnRootKeyDown, TrickleDown.TrickleDown);
+            // Explicit chat interaction arms the gameplay input gate (issue
+            // #216): any chat control gaining focus during a match suppresses
+            // fighter input until focus leaves the chat surface. The
+            // collapsed strip is unfocusable, so combat focus only reaches
+            // the panel after the player explicitly opens it. Focus events
+            // bubble, so these handlers cover the whole surface.
+            _root.RegisterCallback<FocusInEvent>(OnChatSurfaceFocusIn);
+            _root.RegisterCallback<FocusOutEvent>(OnChatSurfaceFocusOut);
+            // Gamepad B (and keyboard cancel) with focus inside the chat
+            // surface: one press leaves the interaction (issue #215). The page
+            // root is not an ancestor of the chat surface, so this handler is
+            // the only cancel path for chat-focused presses.
+            _root.RegisterCallback<NavigationCancelEvent>(OnRootNavigationCancel);
             _compactTick = _compactFeed?.schedule.Execute(UpdateCompactFeed).Every(200);
             _viewBound = true;
             SetExpanded(false, false);
@@ -292,6 +715,7 @@ namespace SlopArena.Client.UI
 
             _session = session;
             _session.Changed += OnSessionChanged;
+            _session.ConversationHistoryTrimmed += OnConversationHistoryTrimmed;
             RenderSession();
         }
 
@@ -315,7 +739,7 @@ namespace SlopArena.Client.UI
             }
 
             ChatConversation? active = _session.ActiveConversation;
-            if (_expanded && active?.Unread > 0)
+            if (active?.Unread > 0 && _expanded && ShouldMarkActiveRead())
                 _session.MarkActiveRead();
             bool needsName = _session.NeedsDisplayName;
             bool connected = _session.IsConnected;
@@ -355,6 +779,9 @@ namespace SlopArena.Client.UI
             RenderDirectory(active);
             RenderHistory(active);
             RenderCompactFeed();
+            // Dynamic rows are new Buttons with default focusability; re-apply
+            // the active region's gating after every rebuild (issue #215).
+            ApplyRegionFocusability();
         }
 
         private void RenderTabs(ChatConversation? active, bool connected)
@@ -472,8 +899,21 @@ namespace SlopArena.Client.UI
                 return;
 
             bool changedConversation = active?.Key != _lastConversationKey;
-            bool atNewest = IsAtNewest();
-            Vector2 oldOffset = _history.scrollOffset;
+            // A pending eviction reset (issue #214) wins over the live scroller
+            // state: the live anchor still reflects the evicted reading
+            // position, so return to newest instead of re-capturing it.
+            bool evictionReset = active != null && _evictionReset.Remove(active.Key);
+            if (!evictionReset && !changedConversation && active != null)
+            {
+                // Capture the live anchor before rebuilding so a re-render of
+                // the same conversation keeps its reading position (issue #214).
+                UpdateScrollAnchor();
+            }
+            string key = active?.Key ?? string.Empty;
+            bool atNewest = evictionReset || (changedConversation ? IsPinnedNewest(key) : _pinToNewest);
+            if (evictionReset)
+                _pinnedNewest[key] = true;
+            Vector2 oldOffset = changedConversation ? GetScrollOffset(key) : _history.scrollOffset;
             _history.Clear();
 
             if (active == null)
@@ -494,7 +934,7 @@ namespace SlopArena.Client.UI
             if (_draft.value != active.Draft)
                 _draft.SetValueWithoutNotify(active.Draft);
             _lastDraft = active.Draft;
-            _pinToNewest = changedConversation || atNewest;
+            _pinToNewest = atNewest;
 
             bool canSend = active.CanSend && !active.IsSending && _session.IsConnected;
             _draft.SetEnabled(!active.IsSending);
@@ -505,11 +945,11 @@ namespace SlopArena.Client.UI
 
             _history.schedule.Execute(() =>
             {
-                if (changedConversation || atNewest)
+                if (atNewest)
                     ScrollToNewest();
                 else
                     _history.scrollOffset = oldOffset;
-                _newest?.SetDisplayed(!changedConversation && !atNewest && _history.childCount > 0);
+                _newest?.SetDisplayed(!atNewest && _history.childCount > 0);
             }).StartingIn(0);
 
         }
@@ -603,10 +1043,10 @@ namespace SlopArena.Client.UI
                 evt.StopImmediatePropagation();
                 return;
             }
-            if (evt.keyCode == KeyCode.Escape && _expanded)
+            if (evt.keyCode == KeyCode.Escape && OwnsBackPress())
             {
                 evt.StopImmediatePropagation();
-                SetExpanded(false, false);
+                HandleEscape();
                 return;
             }
 
@@ -616,6 +1056,74 @@ namespace SlopArena.Client.UI
             evt.StopImmediatePropagation();
             SendDraft(false);
         }
+        /// <summary>Cancel with focus inside the chat surface (issue #215):
+        /// one press leaves the interaction; it never reaches a page Back
+        /// handler because the page root is not an ancestor of the chat
+        /// surface.</summary>
+        private void OnRootNavigationCancel(NavigationCancelEvent evt)
+        {
+            if (!OwnsBackPress())
+                return;
+            evt.StopImmediatePropagation();
+            HandleEscape();
+        }
+
+        /// <summary>Combat chat interaction is explicit (issue #216): any
+        /// chat control gaining focus during gameplay arms the input gate.
+        /// The collapsed strip is unfocusable, so focus only lands here
+        /// inside the panel the player explicitly opened — navigation within
+        /// it suppresses fighter input just like typing does.</summary>
+        private void OnChatSurfaceFocusIn(FocusInEvent evt)
+        {
+            if (!ChatInputGate.IsGameplayScene)
+                return;
+            ChatInputGate.Begin();
+        }
+
+        /// <summary>Focus leaving the chat surface ends an unexpanded
+        /// gameplay navigation session. An open panel keeps the gate until it
+        /// is closed — SetExpanded/HandleEscape own that transition.</summary>
+        private void OnChatSurfaceFocusOut(FocusOutEvent evt)
+        {
+            if (!ChatInputGate.IsGameplayScene || _expanded)
+                return;
+            if (evt.relatedTarget is VisualElement next && _root != null && _root.Contains(next))
+                return;
+            ChatInputGate.End();
+        }
+
+        private bool IsFocusInsideChatSurface()
+        {
+            return _root?.panel?.focusController?.focusedElement is VisualElement focused
+                && _root.Contains(focused);
+        }
+
+        /// <summary>Move gameplay focus off the chat surface onto a parked,
+        /// invisible focusable element on the HUD root before the panel
+        /// hides (issue #216). Focus then survives the panel hide, so no
+        /// rescue pass can re-focus the strip and re-arm the gate.</summary>
+        private void ParkFocusOutsideChat()
+        {
+            if (!ChatInputGate.IsGameplayScene)
+                return;
+            var hostRoot = FindFirstObjectByType<HUDManager>()?.Document?.rootVisualElement;
+            if (hostRoot == null)
+                return;
+            if (_focusParker == null)
+            {
+                _focusParker = new VisualElement { name = "chat-focus-parker", focusable = true };
+                _focusParker.pickingMode = PickingMode.Ignore;
+                _focusParker.style.width = 0;
+                _focusParker.style.height = 0;
+            }
+            if (_focusParker.parent != hostRoot)
+            {
+                _focusParker.RemoveFromHierarchy();
+                hostRoot.Add(_focusParker);
+            }
+            _focusParker.Focus();
+        }
+
         private void OnNameKeyDown(KeyDownEvent evt, bool rename)
         {
             if (!IsEnter(evt.keyCode))
@@ -667,7 +1175,7 @@ namespace SlopArena.Client.UI
             {
                 bool accepted = rename
                     ? await _session.RenameAsync(value)
-                    : await _session.SetDisplayNameAsync(value);
+                    : await _session.AcceptDisplayNameLocallyAsync(value);
                 if (!accepted)
                     RenderSession();
             }
@@ -730,36 +1238,287 @@ namespace SlopArena.Client.UI
         private void SetExpanded(bool expanded, bool focusComposer)
         {
             _expanded = expanded;
-            _panel?.SetDisplayed(expanded);
-            _collapsed?.SetDisplayed(!expanded);
             if (!expanded)
             {
+                // Blur whatever the chat surface still holds before restoring
+                // focus: a focused strip CHAT button is chat navigation too,
+                // and its focus must not survive the exit (issue #216).
+                if (_root?.panel?.focusController?.focusedElement is VisualElement focusedInChat
+                    && _root.Contains(focusedInChat))
+                    focusedInChat.Blur();
                 _draft?.Blur();
                 _name?.Blur();
                 _renameField?.Blur();
-                ChatInputGate.End();
-                if (_ownsCursor)
+                if (FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
                 {
-                    UnityEngine.Cursor.lockState = _previousCursorLock;
-                    UnityEngine.Cursor.visible = _previousCursorVisible;
-                    _ownsCursor = false;
+                    // Remember the conversation's focused control and return
+                    // the page region to the page (issue #215).
+                    CaptureRegionFocus(UiRegion.Social);
+                    _region = UiRegion.Page;
                 }
-                return;
+                ChatInputGate.End();
+                ReleaseCursor();
+            }
+            else if (!ChatInputGate.IsGameplayScene)
+            {
+                // Remember where page focus came from so leaving the
+                // conversation can return it without guessing (issue #214).
+                CaptureRegionFocus(UiRegion.Page);
             }
             if (ChatInputGate.IsGameplayScene)
             {
-                ChatInputGate.Begin();
-                if (!_ownsCursor)
+                if (expanded)
                 {
-                    _previousCursorLock = UnityEngine.Cursor.lockState;
-                    _previousCursorVisible = UnityEngine.Cursor.visible;
-                    _ownsCursor = true;
+                    ChatInputGate.Begin();
+                    if (!_ownsCursor)
+                    {
+                        _previousCursorLock = UnityEngine.Cursor.lockState;
+                        _previousCursorVisible = UnityEngine.Cursor.visible;
+                        _ownsCursor = true;
+                    }
+                }
+                else
+                {
+                    // Park gameplay focus off the chat surface BEFORE the
+                    // panel hides: the fixup that re-focuses the strip runs
+                    // only when focus was lost to the hide (issue #216).
+                    ParkFocusOutsideChat();
                 }
             }
-            RenderSession();
+            ApplyPresentation();
+            if (expanded)
+                RenderSession();
+            if (!expanded && !ChatInputGate.IsGameplayScene)
+                RestorePageFocus();
             if (focusComposer)
                 _root?.schedule.Execute(() =>
                     (_session?.NeedsDisplayName == true ? _name : _draft)?.Focus()).StartingIn(0);
+        }
+
+        /// <summary>
+        /// Open chat from the visible entry point. In a roomy frontend this
+        /// opens the Social Dock and persists the preference; in compact
+        /// layouts and gameplay it opens the overlay panel without touching
+        /// the remembered roomy preference (issue #214). The player explicitly
+        /// entered the conversation, so the composer takes focus (issue #215).
+        /// </summary>
+        private void OpenChat()
+        {
+            // The topmost modal wins over chat (issue #216): a presented
+            // modal — e.g. the pause menu or the direct-connect dialog — is
+            // never covered by an opened conversation.
+            if (UiModalState.Presented)
+                return;
+            if (FrontendController.IsFrontendActive && IsRoomyWindow())
+            {
+                _dockOpen = true;
+                PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 1);
+                PlayerPrefs.Save();
+            }
+            SetExpanded(true, true);
+        }
+
+        /// <summary>
+        /// Close chat. At a roomy frontend this collapses the Social Dock and
+        /// persists the preference; compact and gameplay closes only hide the
+        /// panel (issue #214).
+        /// </summary>
+        private void CloseChat()
+        {
+            if (FrontendController.IsFrontendActive && IsRoomyWindow())
+            {
+                _dockOpen = false;
+                PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 0);
+                PlayerPrefs.Save();
+            }
+            SetExpanded(false, false);
+        }
+
+        /// <summary>Escape from chat: leave interaction first. A roomy dock
+        /// stays visible with page focus restored; compact chat and gameplay
+        /// chat close the panel (issue #214).</summary>
+        private void HandleEscape()
+        {
+            if (FrontendController.IsFrontendActive && IsRoomyWindow())
+            {
+                LeaveChatInteraction();
+                return;
+            }
+            SetExpanded(false, false);
+        }
+
+        /// <summary>Leave the interactive chat surface. A roomy dock stays
+        /// visible; the page region becomes active again with its last valid
+        /// focus restored (issues #214, #215).</summary>
+        private void LeaveChatInteraction()
+        {
+            if (FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            {
+                CaptureRegionFocus(UiRegion.Social);
+                SetActiveRegion(UiRegion.Page, focusTarget: true);
+            }
+            _draft?.Blur();
+            _name?.Blur();
+            _renameField?.Blur();
+            ChatInputGate.End();
+            ReleaseCursor();
+        }
+
+        private void ReleaseCursor()
+        {
+            if (!_ownsCursor)
+                return;
+            UnityEngine.Cursor.lockState = _previousCursorLock;
+            UnityEngine.Cursor.visible = _previousCursorVisible;
+            _ownsCursor = false;
+        }
+
+        private void RestorePageFocus()
+        {
+            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+                return;
+            // The remembered page focus — or the page's conventional entry
+            // point — returns focus without guessing (issues #214, #215).
+            FocusRegionDefault(UiRegion.Page);
+        }
+
+        /// <summary>
+        /// Apply the current presentation mode (issue #214):
+        /// roomy frontend + expanded → reserved right-hand dock band with the
+        /// page shrunk beside it; roomy + collapsed → bottom-right strip;
+        /// compact + expanded → chat replaces the page content temporarily;
+        /// compact + collapsed → strip; gameplay → the legacy overlay panel.
+        /// </summary>
+        private void ApplyPresentation()
+        {
+            if (_root == null)
+                return;
+
+            bool frontend = FrontendController.IsFrontendActive;
+            bool roomy = IsRoomyWindow();
+            bool dock = frontend && roomy && _expanded;
+            bool replace = frontend && !roomy && _expanded;
+
+            ApplyPageReservation(dock, replace);
+
+            if (_frame != null)
+            {
+                if (dock)
+                {
+                    // Reserved band: full height on the right of the page.
+                    _frame.style.position = Position.Absolute;
+                    _frame.style.left = StyleKeyword.Auto;
+                    _frame.style.right = 0;
+                    _frame.style.top = 0;
+                    _frame.style.bottom = 0;
+                    _frame.style.width = Length.Percent(DockWidthPercent);
+                    _frame.style.height = StyleKeyword.Auto;
+                }
+                else if (replace)
+                {
+                    // Compact chat replaces the page content temporarily.
+                    _frame.style.position = Position.Absolute;
+                    _frame.style.left = 0;
+                    _frame.style.right = 0;
+                    _frame.style.top = 0;
+                    _frame.style.bottom = 0;
+                    _frame.style.width = StyleKeyword.Auto;
+                    _frame.style.height = StyleKeyword.Auto;
+                }
+                else
+                {
+                    // Legacy overlay (collapsed strip, compact strip, gameplay
+                    // chat): inline styles mirror the .chat-root USS defaults.
+                    _frame.style.position = Position.Absolute;
+                    _frame.style.left = StyleKeyword.Auto;
+                    _frame.style.top = StyleKeyword.Auto;
+                    _frame.style.right = 24;
+                    _frame.style.bottom = 94;
+                    _frame.style.width = 540;
+                    _frame.style.height = 620;
+                }
+            }
+
+            bool opaque = dock || replace;
+            _panel?.EnableInClassList("chat-panel--solid", opaque);
+            _panel?.SetDisplayed(_expanded);
+            _collapsed?.SetDisplayed(!_expanded);
+            ApplyRegionFocusability();
+            UpdateRegionHint();
+        }
+
+        private void ApplyPageReservation(bool dock, bool replace)
+        {
+            if (_hostPageRoot == null)
+                return;
+            // Shrink the page root itself: page containers are absolutely
+            // positioned against its border box, so a width reservation moves
+            // backdrops, headers and content together (issue #214). The shell
+            // root is a column flex container: flex-grow sizes the page's
+            // height and must stay; the dock band is reserved on the cross
+            // axis through the width alone.
+            _hostPageRoot.style.width = dock ? Length.Percent(100f - DockWidthPercent) : StyleKeyword.Auto;
+            // Compact chat replaces the page content temporarily; selections
+            // live in the page controllers and survive the hide (issue #214).
+            _hostPageRoot.style.display = replace ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// The unread contract (issue #214): the selected conversation counts
+        /// as read only while it is visible (dock/panel open), the application
+        /// is focused, no modal obscures the surface and the view sits at the
+        /// conversation's newest messages.
+        /// </summary>
+        private bool ShouldMarkActiveRead()
+        {
+            if (_session?.ActiveConversation is not ChatConversation active)
+                return false;
+            if (!Application.isFocused || UiModalState.Presented)
+                return false;
+            return _pinToNewest || IsAtNewest();
+        }
+
+        private void TryMarkActiveRead()
+        {
+            if (_session?.ActiveConversation?.Unread > 0 && _expanded && ShouldMarkActiveRead())
+                _session.MarkActiveRead();
+        }
+
+        /// <summary>Store the active conversation's reading anchor.</summary>
+        private void UpdateScrollAnchor()
+        {
+            var active = _session?.ActiveConversation;
+            if (active == null || _history == null)
+                return;
+            bool pinned = IsAtNewest();
+            _pinToNewest = pinned;
+            _pinnedNewest[active.Key] = pinned;
+            _scrollOffsets[active.Key] = _history.scrollOffset;
+        }
+
+        private bool IsPinnedNewest(string key) =>
+            _pinnedNewest.TryGetValue(key, out bool pinned) ? pinned : true;
+
+        private Vector2 GetScrollOffset(string key) =>
+            _scrollOffsets.TryGetValue(key, out Vector2 offset) ? offset : Vector2.zero;
+
+        /// <summary>
+        /// The bounded history buffer evicted older messages the player was
+        /// reading (issue #214). Record a pending return-to-newest for the
+        /// next render; the explanation lives on the conversation Feedback.
+        /// The normal read rule applies afterwards.
+        /// </summary>
+        private void OnConversationHistoryTrimmed(string key)
+        {
+            if (_session == null)
+                return;
+            if (IsPinnedNewest(key))
+                return;
+            _evictionReset.Add(key);
+            var conversation = _session.Conversations.FirstOrDefault(c => c.Key == key);
+            if (conversation != null && string.IsNullOrEmpty(conversation.Feedback))
+                conversation.Feedback =
+                    "Older messages left the history buffer (the newest 50 are kept). Returned to the newest messages.";
         }
 
         private void ScrollToNewest()
