@@ -78,7 +78,8 @@ public sealed record CharacterPresentationSource(
     float HurtboxBoneScale = 1f,
     float ModelYOffset = 0f,
     float ModelSoleOffset = 0f,
-    bool AutoModelYOffset = false);
+    bool AutoModelYOffset = false,
+    string Tumble = "");
 
 public sealed record HurtboxCapsuleSource(
     float StartX,
@@ -168,11 +169,35 @@ public sealed record StartCapabilityOperationSource(
     string CapabilityId,
     string CapabilityVersion,
     TypedCapabilityParameters Parameters) : CharacterTimelineOperationSource(Tick, Unit);
+public enum AuthoringPresentationAttachmentMode : byte
+{
+    World = 0,
+    Bone = 1,
+}
+
+public sealed record PresentationPlacement(
+    AuthoringPresentationAttachmentMode AttachmentMode = AuthoringPresentationAttachmentMode.World,
+    string? BoneId = null,
+    float LocalPositionX = 0f,
+    float LocalPositionY = 0f,
+    float LocalPositionZ = 0f,
+    float LocalRotationX = 0f,
+    float LocalRotationY = 0f,
+    float LocalRotationZ = 0f,
+    float LocalScaleX = 1f,
+    float LocalScaleY = 1f,
+    float LocalScaleZ = 1f,
+    ushort DurationTicks = 28);
 
 public sealed record EmitPresentationOperationSource(
     ushort Tick,
     AuthoringUnit Unit,
-    string PresentationId) : CharacterTimelineOperationSource(Tick, Unit);
+    string PresentationId,
+    PresentationPlacement Placement) : CharacterTimelineOperationSource(Tick, Unit)
+{
+    public EmitPresentationOperationSource(ushort tick, AuthoringUnit unit, string presentationId)
+        : this(tick, unit, presentationId, new PresentationPlacement()) { }
+}
 
 public sealed record CompleteTimelineOperationSource(
     ushort Tick,
@@ -306,7 +331,8 @@ public sealed record MankiRoundBombCapabilityParameters(
     float ExplosionKbGrowth,
     ushort ExplosionStunTicks,
     ushort ExplosionDurationTicks,
-    float ExplosionKbAngle) : TypedCapabilityParameters;
+    float ExplosionKbAngle,
+    string ExplosionPresentationId = "") : TypedCapabilityParameters;
 public sealed record MankiJetpackBoostCapabilityParameters(
     ushort StartupTicks,
     float VerticalSpeed,
@@ -317,7 +343,8 @@ public sealed record MankiJetpackBoostCapabilityParameters(
     float ExplosionKbBase,
     float ExplosionKbGrowth,
     ushort ExplosionStunTicks,
-    ushort ExplosionDurationTicks) : TypedCapabilityParameters;
+    ushort ExplosionDurationTicks,
+    string ExplosionPresentationId = "") : TypedCapabilityParameters;
 public sealed record MankiBazookaCapabilityParameters(
     ushort FireTriggerTick,
     float ProjectileSpeed,
@@ -334,7 +361,8 @@ public sealed record MankiBazookaCapabilityParameters(
     ushort ExplosionDurationTicks,
     float ExplosionKbAngle,
     ushort CastDuration,
-    ushort RecoveryDuration) : TypedCapabilityParameters;
+    ushort RecoveryDuration,
+    string ExplosionPresentationId = "") : TypedCapabilityParameters;
 
 public enum AuthoringAbilityBehavior : byte
 {

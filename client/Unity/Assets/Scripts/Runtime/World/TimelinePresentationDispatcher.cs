@@ -13,6 +13,17 @@ namespace SlopArena.Client.World
     public sealed class TimelinePresentationDispatcher
     {
         internal const int DefaultPresentationLifetimeTicks = 28;
+        internal const int ExplosionPresentationLifetimeTicks = 150;
+
+        internal static int LifetimeTicks(PresentationEventSource source)
+            => source == PresentationEventSource.CapabilityExplosion
+                ? ExplosionPresentationLifetimeTicks
+                : DefaultPresentationLifetimeTicks;
+
+        internal static int LifetimeTicks(TimelinePresentationEvent presentationEvent)
+            => presentationEvent.Source == PresentationEventSource.Timeline
+                ? Mathf.Max(1, presentationEvent.Placement?.DurationTicks ?? DefaultPresentationLifetimeTicks)
+                : LifetimeTicks(presentationEvent.Source);
 
         private readonly Dictionary<ulong, Entry> _entries = new();
         private readonly List<ActivePresentation> _active = new();
@@ -60,16 +71,24 @@ namespace SlopArena.Client.World
 
                 CharacterAnimationCatalog.PresentationEntry binding = FindBinding(
                     entry.Catalog.Presentations, presentationEvent.PresentationId);
-                if (binding?.Prefab == null) continue;
+                if (binding?.Prefab == null)
+                {
+                    Debug.LogError($"[Presentation] Missing binding '{presentationEvent.PresentationId}' for owner {presentationEvent.EntityId}.");
+                    continue;
+                }
 
-                GameObject instance = Object.Instantiate(
-                    binding.Prefab,
-                    entry.Renderer.transform.position,
-                    entry.Renderer.transform.rotation);
+                GameObject instance = PresentationPlacementResolver.Instantiate(
+                    binding,
+                    presentationEvent.Placement,
+                    entry.Renderer,
+                    entry.Renderer.transform,
+                    new Vector3(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ),
+                    Quaternion.Euler(0f, presentationEvent.WorldYaw * Mathf.Rad2Deg, 0f));
+                if (instance == null) continue;
                 _active.Add(new ActivePresentation
                 {
                     Instance = instance,
-                    RemainingTicks = DefaultPresentationLifetimeTicks,
+                    RemainingTicks = LifetimeTicks(presentationEvent),
                 });
             }
         }

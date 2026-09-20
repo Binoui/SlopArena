@@ -61,12 +61,11 @@ public class ShortHopTests
     [Fact]
     public void HoldThroughSquat_FullJump()
     {
-        // Holding the jump key (JumpHeld) past the window = full jump force. The Jump
-        // edge is one tick; the hold continues through the squat (holding the edge itself
-        // would re-trigger jump detection on the fire tick and consume a second jump).
+        // Hold beyond both squat expiry and the short-hop decision window.
         var sim = SimWithGroundedPlayer();
         TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
-        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true),
+            Math.Max(Move.JumpSquatTicks, Simulation.ShortHopWindowTicks));
         var s = sim.GetState(1);
 
         Assert.False(s.IsGrounded);
@@ -83,7 +82,8 @@ public class ShortHopTests
 
         TestHelpers.TickN(tapSim, TestHelpers.Input(jump: true, jumpHeld: true), Move.JumpSquatTicks + 1);
         TestHelpers.TickN(fullSim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
-        TestHelpers.TickHold(fullSim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
+        TestHelpers.TickHold(fullSim, TestHelpers.Input(jumpHeld: true),
+            Math.Max(Move.JumpSquatTicks, Simulation.ShortHopWindowTicks));
 
         float tapPeak = 0f, fullPeak = 0f;
         for (int i = 0; i < 90; i++)
@@ -150,7 +150,9 @@ public class ShortHopTests
         // air (issue #116), but ADR-0020 scales it by AirJumpVMultiplier.
         var sim = SimWithGroundedPlayer();
         TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
-        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
+        // Finish the full ground jump before testing the independent air-jump edge.
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true),
+            Math.Max(Move.JumpSquatTicks, Simulation.ShortHopWindowTicks));
 
         var doubled = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
         Assert.Equal(0u, doubled.JumpsLeft);

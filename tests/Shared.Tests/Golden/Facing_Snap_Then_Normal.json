@@ -8,7 +8,7 @@
     "PY": 0.85,
     "PZ": 100,
     "AttackSlot": 3,
-    "HitstopTicks": 4,
+    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -17,7 +17,7 @@
     "PY": 0.85,
     "PZ": 98.7,
     "DamagePercent": 4,
-    "HitstopTicks": 4,
+    "HitstopTicks": 5,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

@@ -2,25 +2,28 @@ using System;
 
 namespace SlopArena.Shared.Abilities;
 
-/// <summary>
-/// Kistu's R — Rising Slash (signature). A homing rising uppercut-slash that launches.
+/// Kistu's E — Rising Slash (signature). A camera-directed rising recovery.
 ///
 /// - Rises vertically for "rise_ticks", carrying Kistu up (doubles as vertical recovery).
-/// - Homes horizontally toward the nearest enemy within "homing_range" so it tracks for juggles.
+/// - Moves horizontally in the camera direction captured when the move starts, so the
+///   recovery remains controllable and does not pull Kistu toward a target.
 /// - Spawns its launcher hitbox from the spec's Stages[0].HitboxEvents (authored in Kistu's
-///   package), like every other slot — the launch angle/damage/knockback live in the spec, not in code.
+///   package), like every other slot — the launch angle/damage/knockback live in the spec,
+///   not in code.
 /// - Limited by a refundable charge pool (see ServerSimulation charge-stock gate): each cast
 ///   spends one charge; landing a hit refunds it (OnHitEntity) so a connected juggle sustains,
 ///   while whiffing in empty air burns charges — capping recovery to the pool size.
 ///
 /// Charge-pool params (read by the sim): "max_charges", "charge_regen_ticks".
-/// Movement params: "rise_speed", "rise_ticks", "homing_range", "homing_speed".
+/// Movement params: "rise_speed", "rise_ticks", "homing_speed" (horizontal recovery speed).
+/// "homing_range" remains in the cooked compatibility schema but is no longer used for targeting.
 /// </summary>
 public sealed class KistuRisingSlash : ServerAbility
 {
     private readonly CookedKistuRisingSlashCapabilityParameters _parameters;
     private ushort _ticks;
     private ushort _duration;
+    private float _recoveryYaw;
 
     public KistuRisingSlash(CookedKistuRisingSlashCapabilityParameters parameters)
         => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
@@ -28,9 +31,11 @@ public sealed class KistuRisingSlash : ServerAbility
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
         _ticks = 0;
+        _recoveryYaw = s.AimYaw;
 
         s.State = ActionState.Attacking;
         s.AttackSlot = (byte)(Slot + 1);
+        s.FacingYaw = _recoveryYaw;
         AnimIndex = 0;
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
@@ -53,20 +58,10 @@ public sealed class KistuRisingSlash : ServerAbility
         // Vertical rise for the rise window, then hold (gravity resumes when the ability ends).
         s.VY = _ticks <= riseTicks ? riseSpeed : 0f;
 
-        // Horizontal homing toward the nearest enemy in range.
-        float homingRange = _parameters.HomingRange;
-        float homingSpeed = _parameters.HomingSpeed;
-        ulong closest = FindClosestEnemy(ref s, homingRange, out float cdx, out float cdz, out float cdist);
-        if (closest != 0 && cdist > 0.1f)
-        {
-            s.VX = (cdx / cdist) * homingSpeed;
-            s.VZ = (cdz / cdist) * homingSpeed;
-        }
-        else
-        {
-            s.VX = 0f;
-            s.VZ = 0f;
-        }
+        // Recovery direction is chosen from the camera at activation, never from target position.
+        float horizontalSpeed = _parameters.HomingSpeed;
+        s.VX = MathF.Sin(_recoveryYaw) * horizontalSpeed;
+        s.VZ = MathF.Cos(_recoveryYaw) * horizontalSpeed;
 
         var spec = def.GetSlotAbility(Slot, airborne: false);
         var events = spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
@@ -107,29 +102,5 @@ public sealed class KistuRisingSlash : ServerAbility
         s.VX = 0f;
         s.VY = 0f;
         s.VZ = 0f;
-    }
-
-    private ulong FindClosestEnemy(ref CharacterState s, float range, out float dx, out float dz, out float dist)
-    {
-        dx = 0f; dz = 0f; dist = 0f;
-        if (SimulationStates == null) return 0;
-
-        ulong best = 0;
-        float bestSq = range * range;
-        foreach (var kvp in SimulationStates)
-        {
-            if (kvp.Key == s.EntityId) continue;
-            float ex = kvp.Value.PX - s.PX;
-            float ez = kvp.Value.PZ - s.PZ;
-            float sq = ex * ex + ez * ez;
-            if (sq <= bestSq)
-            {
-                bestSq = sq;
-                best = kvp.Key;
-                dx = ex; dz = ez;
-            }
-        }
-        if (best != 0) dist = MathF.Sqrt(dx * dx + dz * dz);
-        return best;
     }
 }

@@ -55,6 +55,32 @@ public class ArenaShippingTests
     }
 
     [Fact]
+    public void DirectLoad_CollisionQueriesCullDistantGeometry()
+    {
+        var source = new ArenaDefinition
+        {
+            MinX = 0, MaxX = 24, MinZ = 0, MaxZ = 4, KillHeight = -4,
+            CollisionTriangles = new[]
+            {
+                new CollisionTriangle { AX = 0, AZ = 0, BX = 0, BZ = 2, CX = 2, CZ = 0 },
+                new CollisionTriangle { AX = 20, AZ = 0, BX = 20, BZ = 2, CX = 22, CZ = 0 }
+            }
+        };
+        var loaded = ArenaBinaryFormat.Deserialize(ArenaBinaryFormat.Serialize(source));
+        Assert.True(loaded.HasValue);
+        var arena = loaded.Value;
+        var candidates = new int[source.CollisionTriangles.Length];
+
+        int count = ArenaCollision.GetCandidateTrianglesForAabb(
+            0, -1, 0, 2, 1, 2, in arena, candidates);
+
+        Assert.Equal(new[] { 0 }, candidates.AsSpan(0, count).ToArray());
+        Assert.Equal(0, ArenaCollision.GetCandidateTrianglesForAabb(
+            40, -1, 0, 42, 1, 2, in arena, candidates));
+        Assert.Equal(ArenaBinaryFormat.Serialize(source), ArenaBinaryFormat.Serialize(arena));
+    }
+
+    [Fact]
     public void Registry_AfterLoadFromDirectory_ServesBakedArenas()
     {
         ArenaRegistry.LoadFromDirectory(Path.Combine(RepoRoot(), "data", "arenas"));
@@ -97,6 +123,136 @@ public class ArenaShippingTests
         Assert.True(lines.KillMaxZ > arena.MaxZ,
             $"{fileName}: max Z line {lines.KillMaxZ} not beyond mesh {arena.MaxZ}");
     }
+    [Theory]
+    [InlineData(CharacterClass.FightGuy, -7.5f, 1f)]
+    [InlineData(CharacterClass.Manki, -7.5f, 1f)]
+    [InlineData(CharacterClass.Kistu, -7.5f, 1f)]
+    [InlineData(CharacterClass.Bonk, -7.5f, 1f)]
+    [InlineData(CharacterClass.FightGuy, 7.5f, -1f)]
+    [InlineData(CharacterClass.Manki, 7.5f, -1f)]
+    [InlineData(CharacterClass.Kistu, 7.5f, -1f)]
+    [InlineData(CharacterClass.Bonk, 7.5f, -1f)]
+    public void ScifiCity_HeldRunCrossesRoofJoinsAndBridge(
+        CharacterClass cls, float startX, float direction)
+    {
+        const float roofY = 13.25f;
+        const float bridgeY = 13.37f;
+        const float bridgeZ = -2.96f;
+        var arena = LoadScifiCityDemo();
+        var def = TestHelpers.ResolveDef(cls);
+        var state = TestHelpers.PlayerState(startX, bridgeZ);
+        state.PY = TestHelpers.GroundPY(def, roofY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var input = TestHelpers.Input(moveX: direction);
+        var inputs = new Dictionary<ulong, InputState> { [1] = input };
+
+        const float endpointX = 6f;
+        const int maxTicks = 120;
+        int reachedTick = -1;
+        for (int tick = 0; tick < maxTicks; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded,
+                Trace(cls, "city roof joins and bridge", tick, input, current, "lost groundedness"));
+            Assert.InRange(current.PY,
+                TestHelpers.GroundPY(def, roofY) - 0.05f,
+                TestHelpers.GroundPY(def, bridgeY) + 0.05f);
+            if (direction * current.PX >= endpointX)
+            {
+                reachedTick = tick;
+                break;
+            }
+        }
+
+        var final = sim.GetState(1);
+        int finalTick = reachedTick >= 0 ? reachedTick : maxTicks - 1;
+        Assert.True(reachedTick >= 0,
+            $"{cls}: city bridge route stalled before opposite roof; final={Trace(cls, "city roof joins and bridge", finalTick, input, final, "progress")}");
+        Assert.InRange(final.PY,
+            TestHelpers.GroundPY(def, roofY) - 0.03f,
+            TestHelpers.GroundPY(def, roofY) + 0.03f);
+    }
+    [Fact]
+    public void ScifiCity_HeldRunTraversesStairsWithoutJump()
+    {
+        var arena = LoadScifiCityDemo();
+        var def = TestHelpers.FightGuyDef;
+
+        ExerciseCityStairRoute(arena, def, "west stair", -6.8f, 2.94f, -0.3f, 1f);
+        ExerciseCityStairRoute(arena, def, "east stair", 6.5f, 2.6f, 0.3f, -1f);
+    }
+
+    private static void ExerciseCityStairRoute(
+        ArenaDefinition arena, CharacterDefinition def, string route,
+        float startX, float startZ, float plateauX, float direction)
+    {
+        const float roofY = 13.25f;
+        const float upperY = 16.543003f;
+        const int maxTicks = 180;
+        var state = TestHelpers.PlayerState(startX, startZ);
+        state.PY = TestHelpers.GroundPY(def, roofY);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = TestHelpers.Input(moveX: direction),
+        };
+
+        int upTick = -1;
+        for (int tick = 0; tick < maxTicks; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded,
+                Trace(CharacterClass.FightGuy, route, tick, inputs[1], current, "stair ascent lost groundedness"));
+            Assert.InRange(current.PY,
+                TestHelpers.GroundPY(def, roofY) - 0.05f,
+                TestHelpers.GroundPY(def, upperY) + 0.05f);
+            if (direction * (current.PX - plateauX) >= 0f)
+            {
+                upTick = tick;
+                break;
+            }
+        }
+
+        var upper = sim.GetState(1);
+        Assert.True(upTick >= 0,
+            $"{route}: held run stalled before upper plateau; final={Trace(CharacterClass.FightGuy, route, maxTicks - 1, inputs[1], upper, "stair ascent progress")}");
+        Assert.InRange(upper.PY,
+            TestHelpers.GroundPY(def, upperY) - 0.03f,
+            TestHelpers.GroundPY(def, upperY) + 0.03f);
+
+        inputs[1] = TestHelpers.Input(moveX: -direction);
+        int downTick = -1;
+        for (int tick = upTick + 1; tick <= upTick + maxTicks; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded,
+                Trace(CharacterClass.FightGuy, route, tick, inputs[1], current, "stair descent lost groundedness"));
+            Assert.InRange(current.PY,
+                TestHelpers.GroundPY(def, roofY) - 0.05f,
+                TestHelpers.GroundPY(def, upperY) + 0.05f);
+            if (direction * (current.PX - startX) <= 0f)
+            {
+                downTick = tick;
+                break;
+            }
+        }
+
+        var roof = sim.GetState(1);
+        Assert.True(downTick >= 0,
+            $"{route}: reverse held run stalled before roof; final={Trace(CharacterClass.FightGuy, route, upTick + maxTicks, inputs[1], roof, "stair descent progress")}");
+        Assert.InRange(roof.PY,
+            TestHelpers.GroundPY(def, roofY) - 0.03f,
+            TestHelpers.GroundPY(def, roofY) + 0.03f);
+    }
+
+
 
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
@@ -318,6 +474,46 @@ public class ArenaShippingTests
         Assert.InRange(direction * landed.PZ, 5.5f, 10.5f);
     }
 
+    [Fact]
+    public void SlopPit_RisingPlatformContact_DoesNotLaunchFightGuy()
+    {
+        var arena = ArenaBinaryFormat.LoadFromFile(
+            Path.Combine(RepoRoot(), "data", "arenas", "slop_pit.arena"))!.Value;
+        var def = TestHelpers.FightGuyDef;
+        var state = TestHelpers.PlayerState(5.75f, 8f);
+        state.PY = TestHelpers.GroundPY(def);
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, def, state);
+        var inputs = new Dictionary<ulong, InputState>();
+        for (int tick = 0; tick < 140; tick++)
+        {
+            var before = sim.GetState(1);
+            inputs[1] = TestHelpers.Input(moveX: before.PX < 9f ? 1f : 0f,
+                jump: tick == 0, jumpHeld: tick < 10);
+            sim.Tick(inputs);
+            var after = sim.GetState(1);
+            if (tick > 8 && before.VY > 0f)
+                Assert.True(after.VY <= before.VY + 0.001f,
+                    $"tick={tick}: platform accelerated ascent {before.VY} -> {after.VY}");
+            Assert.True(after.PY <= TestHelpers.GroundPY(def, 2f) + 0.1f,
+                $"tick={tick}: launched above platform to {after.PY}");
+            if (after.VY > 0f && tick > 8)
+                Assert.True(after.AirTimeTicks >= def.Movement.FloatWindowTicks,
+                    $"tick={tick}: rising contact refreshed float");
+        }
+    }
+
+    private static ArenaDefinition LoadScifiCityDemo()
+    {
+        string path = Path.Combine(RepoRoot(), "data", "arenas", "scifi_city_demo.arena");
+        var arenaOpt = ArenaBinaryFormat.LoadFromFile(path);
+        Assert.True(arenaOpt.HasValue, "scifi_city_demo: failed to parse shipped arena");
+        ArenaDefinition arena = arenaOpt.Value;
+        Assert.Equal("scifi_city_demo", arena.Name);
+        Assert.NotEmpty(arena.CollisionTriangles);
+        return arena;
+    }
+
     private static ArenaDefinition LoadIndustrialRooftop()
     {
         string path = Path.Combine(RepoRoot(), "data", "arenas", "industrial_rooftop.arena");
@@ -326,7 +522,6 @@ public class ArenaShippingTests
         ArenaDefinition arena = arenaOpt.Value;
         Assert.Equal("industrial_rooftop", arena.Name);
         Assert.NotEmpty(arena.CollisionTriangles);
-        arena.SpatialGrid = ArenaCollision.BuildSpatialGrid(in arena);
         return arena;
     }
 

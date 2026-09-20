@@ -168,6 +168,10 @@ namespace SlopArena.Shared.Abilities
                     StunTicks = explosionStunTicks,
                     DurationTicks = explosionDurationTicks,
                     CanHitOwner = true,
+                    ExplosionPresentationId = _parameters?.ExplosionPresentationId ?? "",
+                    PresentationAttackSequence = PresentationAttackSequence,
+                    PresentationOperationIndex = PresentationOperationIndex,
+                    PresentationYaw = s.FacingYaw,
                 },
             });
         }

@@ -24,6 +24,11 @@ with their `.meta` files. Record licensing and stop if a source asset is not red
 
 ## 2. Validate and bind assets
 
+For generated-model cleanup or an existing-model replacement, follow the
+[character model polish guide](character-model-polish.md) before final integration.
+It separates surface repairs from rig changes and defines visual, retargeting and
+cooked-pose acceptance.
+
 Import the rig as Humanoid when the character is an ordinary humanoid fighter. Inspect the
 Avatar before binding clips. Reject invalid orientation, scale, root motion, required-bone,
 or non-finite-pose diagnostics. Do not remap a bad rig at runtime or own a standalone

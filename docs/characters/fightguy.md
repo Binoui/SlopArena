@@ -39,6 +39,17 @@ FightGuy specials are cooked timeline and capability bindings:
 - R: Cyclone Kick
 - F: Fist of Fury
 
+Cyclone Kick's longer tuning uses 12 units/s for 60 ticks, then brakes horizontal
+velocity once and releases velocity ownership during the remaining 12 recovery ticks.
+The outer timeline ends at tick 72 (1.2 s); hitboxes spawn on ticks 7–48, with one
+hit per opponent. Ground and air variants share this tuning. Airborne gravity resumes
+when propulsion ends, and interruption preserves incoming knockback.
+The capability duration bounds propulsion independently of the outer recovery timeline;
+bot travel estimates use that bounded duration too. From rest on flat ground with no hits
+or further input, the intended live Training trace is approximately 12 units of total
+travel.
+This is a local feel-test tuning; animation/gamefeel acceptance remains pending.
+
 Fist of Fury uses `fightguy_spell_f_2` for its full two-phase presentation:
 six inward-stunning punches followed by a right-foot knockback finisher.
 The cooked timeline and hitbox direction are authoritative.

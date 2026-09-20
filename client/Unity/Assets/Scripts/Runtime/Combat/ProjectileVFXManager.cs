@@ -32,8 +32,6 @@ namespace SlopArena.Client.Combat
         // Active projectile visuals keyed by stable hash from (ownerId + spawn origin)
         private readonly Dictionary<int, GameObject> _activeVisuals = new();
         private readonly Dictionary<int, CharacterClass> _activeProjectileClasses = new();
-        // Static Manki E ignition hitboxes use the same explosion prefab as Q.
-        private readonly HashSet<int> _activeStartupExplosionVisuals = new();
 
         public void SetSimulation(ServerSimulation sim)
         {
@@ -51,54 +49,25 @@ namespace SlopArena.Client.Combat
 
             var hitboxes = _resolver.GetActiveHitboxes();
             var matched = new HashSet<int>();
-
-            var activeStartupExplosionVisuals = new HashSet<int>();
             for (int i = 0; i < hitboxes.Count; i++)
             {
                 var hb = hitboxes[i];
                 float speedSq = hb.VX * hb.VX + hb.VY * hb.VY + hb.VZ * hb.VZ;
                 CharacterClass character = _sim.GetDefinition(hb.OwnerId)?.Class ?? CharacterClass.None;
-
                 if (speedSq <= 0.0001f)
-                {
-                    if (character == CharacterClass.Manki && hb.Slot == 3)
-                    {
-                        int key = ComputeStaticHitboxKey(hb);
-                        activeStartupExplosionVisuals.Add(key);
-                        if (_activeStartupExplosionVisuals.Add(key))
-                        {
-                            Hitbox visualHitbox = hb;
-                            visualHitbox.Explosion = new ProjectileExplosion { Radius = hb.Radius };
-                            SpawnExplosion(visualHitbox, new Vector3(hb.X, hb.Y, hb.Z));
-                        }
-                    }
                     continue;
-                }
 
                 int projectileKey = ComputeHitboxKey(hb);
                 matched.Add(projectileKey);
-
                 if (!_activeVisuals.TryGetValue(projectileKey, out var vis))
                 {
                     vis = CreateProjectileVisual(hb);
                     _activeVisuals[projectileKey] = vis;
                     _activeProjectileClasses[projectileKey] = character;
                 }
-
                 vis.transform.position = new Vector3(hb.X, hb.Y, hb.Z);
             }
 
-            List<int> staleStartup = null;
-            foreach (int key in _activeStartupExplosionVisuals)
-            {
-                if (activeStartupExplosionVisuals.Contains(key)) continue;
-                (staleStartup ??= new List<int>()).Add(key);
-            }
-            if (staleStartup != null)
-                foreach (int key in staleStartup) _activeStartupExplosionVisuals.Remove(key);
-
-            // Remove visuals for hitboxes that disappeared (hit, expired, ground-collided)
-            // Impact VFX is handled by OnHitboxRemoved callback with the correct removal position.
             List<int> gone = null;
             foreach (var kv in _activeVisuals)
             {
@@ -110,6 +79,7 @@ namespace SlopArena.Client.Combat
             if (gone != null)
                 foreach (var id in gone) _activeVisuals.Remove(id);
         }
+
 
         /// <summary>
         /// Stable hash key for a hitbox across ticks.
@@ -128,16 +98,6 @@ namespace SlopArena.Client.Combat
             hash = hash * 31 + Mathf.RoundToInt(ox * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oy * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oz * 10f);
-            return hash;
-        }
-        private static int ComputeStaticHitboxKey(in Hitbox hb)
-        {
-            int hash = 17;
-            hash = hash * 31 + (int)hb.OwnerId;
-            hash = hash * 31 + hb.AttackSlot;
-            hash = hash * 31 + Mathf.RoundToInt(hb.X * 10f);
-            hash = hash * 31 + Mathf.RoundToInt(hb.Y * 10f);
-            hash = hash * 31 + Mathf.RoundToInt(hb.Z * 10f);
             return hash;
         }
 
@@ -241,6 +201,8 @@ namespace SlopArena.Client.Combat
         {
             if (hb.Explosion.HasValue)
             {
+                if (_sim.GetDefinition(hb.OwnerId)?.Class == CharacterClass.Manki)
+                    return;
                 SpawnExplosion(hb, new Vector3(lastX, lastY, lastZ));
                 return;
             }

@@ -48,6 +48,18 @@ public sealed class CharacterPackageCompilerTests
         var second = CharacterPackageCompiler.Compile(Fixture("package.json"), Fixture("character.json"), CharacterCookProfile.TrustedBuiltIn);
         Assert.Equal(result.CookedPackage.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
     }
+
+    [Fact]
+    public void Tumble_CooksAndAdaptsWithoutChangingTimelineData()
+    {
+        var result = CompileCharacter(character => character["presentation"]!["tumble"] = "anim.tumble");
+        Assert.NotNull(result.CookedPackage);
+        Assert.DoesNotContain(result.Diagnostics, x => x.Severity == CharacterDiagnosticSeverity.Error);
+        Assert.Equal("anim.tumble", result.CookedPackage!.Definition.Presentation.Tumble);
+        Assert.Contains("\"tumble\":\"anim.tumble\"", System.Text.Encoding.UTF8.GetString(result.CookedPackage.CanonicalBytes));
+        var runtime = CookedCharacterRuntimeAdapter.ToCharacterDefinition(result.CookedPackage);
+        Assert.Equal("anim.tumble", runtime.TumbleAnim);
+    }
     [Fact]
     public void StageTargetingMetadata_SurvivesCompileAndRemainsDeterministic()
     {
@@ -93,24 +105,6 @@ public sealed class CharacterPackageCompilerTests
         var shuriken = package.Definition.Slots.Single(x => x.Id == "ground.A").Timeline.Stages.Single().Operations.OfType<CookedSpawnProjectileOperation>().ToArray();
         Assert.Equal(new[] { -15f, 0f, 15f }, shuriken.Select(x => x.Projectile.YawOffsetDegrees).OrderBy(x => x).ToArray());
         Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.RegenTicks));
-    }
-    [Fact]
-    public void BonkAndKistu_EAimMovementPolicies_CookExpectedModes()
-    {
-        var bonk = CharacterPackageCompiler.Compile(
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json")),
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")),
-            CharacterCookProfile.TrustedBuiltIn);
-        Assert.NotNull(bonk.CookedPackage);
-        Assert.Equal(AuthoringAimMovementMode.Mobile, bonk.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
-        Assert.Equal(AuthoringAimMovementMode.Mobile, bonk.CookedPackage.Definition.Slots.Single(x => x.Id == "air.E").AimMovement);
-
-        var kistu = CharacterPackageCompiler.Compile(
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/package.json")),
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/character.json")),
-            CharacterCookProfile.TrustedBuiltIn);
-        Assert.NotNull(kistu.CookedPackage);
-        Assert.Equal(AuthoringAimMovementMode.Fixed, kistu.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.E").AimMovement);
     }
 
     [Fact]

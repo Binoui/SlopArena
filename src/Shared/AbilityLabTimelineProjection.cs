@@ -32,6 +32,13 @@ public sealed record AbilityLabTimelineProjection
         return Math.Clamp(durationTicks, 1, maxDuration);
     }
 
+    public static int ClampPresentationDuration(int triggerTick, int durationTicks, int stageDurationTicks)
+    {
+        if (stageDurationTicks <= 0) return 0;
+        var maxDuration = stageDurationTicks - ClampOperationTick(triggerTick, stageDurationTicks);
+        return Math.Clamp(durationTicks, 1, maxDuration);
+    }
+
 
     public static AbilityLabTimelineProjection Build(CharacterSlotSource slot)
     {
@@ -54,6 +61,7 @@ public sealed record AbilityLabTimelineProjection
                 {
                     SpawnHitboxOperationSource hitbox => operationStart + hitbox.Hitbox.DurationTicks,
                     ForwardLungeOperationSource lunge => operationStart + lunge.DurationTicks,
+                    EmitPresentationOperationSource presentation => operationStart + presentation.Placement.DurationTicks,
                     _ => operationStart + 1,
                 };
                 operations.Add(new AbilityLabOperationProjection(

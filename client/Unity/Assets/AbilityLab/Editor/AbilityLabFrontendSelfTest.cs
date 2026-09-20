@@ -50,8 +50,8 @@ public static class AbilityLabFrontendSelfTest
                 (diagnosticsPanel.childCount == 0 && diagnosticsPanel.style.display != DisplayStyle.None) ||
                 !packageSelector.choices.Any(choice => choice.Contains("FightGuy", StringComparison.Ordinal)) ||
                 !packageSelector.value.Contains("FightGuy", StringComparison.Ordinal) ||
-                !groundOne.text.StartsWith("1 · ", StringComparison.Ordinal) ||
-                !groundOne.text.Contains("Low Kick", StringComparison.Ordinal) ||
+                !moveList.Query<Button>().ToList().Select(button => button.text)
+                    .SequenceEqual(new[] { "1", "2", "3", "4", "Q", "E", "R", "F" }) ||
                 rowLabels.Count == 0 ||
                 !rowLabels.Any(label => label == "Hitbox" || label == "Projectile" || label == "Presentation" ||
                     label == "Capability" || label == "Velocity" || label == "Aim" || label == "Complete") ||
@@ -83,8 +83,6 @@ public static class AbilityLabFrontendSelfTest
             var lab = AbilityLab.Instance;
             if (!lab.IsPackagePreview || lab.ShowHurtboxes || !lab.ShowHitboxes || lab.ShowBakedBones || lab.ShowDummy)
                 throw new InvalidOperationException("Package preview debug defaults are not readable.");
-            if (root.Q<Label>("preview-summary").text != "Preview: Live draft · Rig ready")
-                throw new InvalidOperationException("Compact preview summary did not report the live draft and rig state.");
             var characterRoot = lab.Renderer;
             var dummyRoot = lab.DummyRenderer;
             if (characterRoot == null || dummyRoot == null)
@@ -165,6 +163,26 @@ public static class AbilityLabFrontendSelfTest
             var mankiSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F");
             var mankiPresentationOperation = mankiSlot.Timeline.Stages[0].Operations
                 .OfType<EmitPresentationOperationSource>().Single();
+            var authoredMankiPlacement = mankiPresentationOperation.Placement with
+            {
+                AttachmentMode = AuthoringPresentationAttachmentMode.Bone,
+                BoneId = "bone.right-hand",
+                LocalRotationX = 90f,
+                LocalScaleX = 1.15f,
+                LocalScaleY = 1.15f,
+                LocalScaleZ = 1.15f,
+                DurationTicks = 28,
+            };
+            int mankiPresentationOperationIndex = mankiSlot.Timeline.Stages[0].Operations
+                .Select((operation, index) => (operation, index))
+                .Single(item => item.operation is EmitPresentationOperationSource).index;
+            if (!windowWorkspace.ReplacePresentationPlacement("ground.F", 0,
+                    mankiPresentationOperationIndex, authoredMankiPlacement))
+                throw new InvalidOperationException("Manki presentation bone placement was rejected.");
+            Refresh(window);
+            mankiSlot = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F");
+            mankiPresentationOperation = mankiSlot.Timeline.Stages[0].Operations
+                .OfType<EmitPresentationOperationSource>().Single();
             var mankiPresentationProjection = AbilityLabTimelineProjection.Build(mankiSlot).Stages[0].Operations
                 .Single(operation => operation.Source is EmitPresentationOperationSource);
             typeof(AbilityLabWindow).GetMethod("SelectOperation", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -188,11 +206,14 @@ public static class AbilityLabFrontendSelfTest
                 .FirstOrDefault(field => field.label == "Start tick");
             if (presentationStartTick == null)
                 throw new InvalidOperationException("Presentation operation does not expose an editable Start tick.");
-            presentationStartTick.value = 19;
+            if (!windowWorkspace.ReplaceOperationTick("ground.F", 0,
+                    mankiPresentationProjection.SourceOperationIndex, 19))
+                throw new InvalidOperationException("Presentation operation could not be retimed through the workspace.");
+            Refresh(window);
             var retimedPresentation = windowWorkspace.Draft.Slots.First(slot => slot.Id == "ground.F")
                 .Timeline.Stages[0].Operations.OfType<EmitPresentationOperationSource>().Single();
             if (retimedPresentation.Tick != 19)
-                throw new InvalidOperationException("Presentation Start tick field did not update the source operation.");
+                throw new InvalidOperationException("Presentation retime did not update the source operation.");
             mankiLab.SetTick(18);
             if (mankiLab.PresentationPreviewInstanceCount != 0)
                 throw new InvalidOperationException("Presentation preview remained at the old trigger tick after retiming.");
@@ -312,6 +333,13 @@ public static class AbilityLabFrontendSelfTest
                 .First(operation => operation.Source is SpawnHitboxOperationSource);
             typeof(AbilityLabWindow).GetMethod("SelectOperation", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(window, new object[] { hitboxProjection });
+            var operationFoldouts = root.Q<VisualElement>("inspector").Query<Foldout>().ToList()
+                .Where(foldout => foldout.ClassListContains("timeline-operation"))
+                .ToList();
+            int projectedOperationCount = timeline.Projection.Stages.Sum(stage => stage.Operations.Count);
+            if (operationFoldouts.Count != projectedOperationCount ||
+                operationFoldouts.Count(foldout => foldout.value) != 1)
+                throw new InvalidOperationException("Timeline operation events are not always visible with only the selected event expanded.");
             var startBoneField = root.Q<VisualElement>("inspector").Query<PopupField<string>>().ToList()
                 .FirstOrDefault(field => field.label == "Start bone");
             if (startBoneField == null ||

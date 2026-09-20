@@ -33,6 +33,7 @@
     "dash": "anim.kistu.dash",
     "jump": "anim.kistu.jump",
     "fall": "anim.kistu.fall",
+    "tumble": "anim.kistu.tumble",
     "hitSmall": "anim.kistu.hit-small",
     "hitMedium": "anim.kistu.hit-medium",
     "hitHard": "anim.kistu.hit-hard",
@@ -209,7 +210,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -268,7 +269,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -323,11 +324,11 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 11,
+                "tick": 13,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -445,7 +446,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -504,7 +505,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -563,7 +564,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -622,7 +623,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.25,
+                  "radius": 0.35,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -836,7 +837,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 80,
+            "durationTicks": 16,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -860,32 +861,6 @@
                   "dashDistance": 5,
                   "dashDurationTicks": 16,
                   "maxAimTicks": 60
-                }
-              },
-              {
-                "kind": "spawnHitbox",
-                "tick": 22,
-                "unit": "meters",
-                "hitbox": {
-                  "shape": "capsule",
-                  "radius": 0.5,
-                  "offsetX": 0,
-                  "offsetY": 0,
-                  "offsetZ": 0,
-                  "endOffsetX": 0,
-                  "endOffsetY": 0,
-                  "endOffsetZ": 0,
-                  "startBoneId": "_weapon_hilt",
-                  "endBoneId": "_weapon_tip",
-                  "damage": 1,
-                  "angle": 45,
-                  "baseKnockback": 5,
-                  "knockbackGrowth": 80,
-                  "stunTicks": 8,
-                  "durationTicks": 10,
-                  "interruptible": false,
-                  "hitGroup": 0,
-                  "knockbackDirection": "awayFromOwner"
                 }
               }
             ]

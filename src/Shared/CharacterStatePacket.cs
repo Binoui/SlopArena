@@ -74,8 +74,10 @@ namespace SlopArena.Shared
         /// <summary>Ledge re-grab suppression (walk-off self-grab guard) — on-wire so the rollback
         /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
         public ushort LedgeRegrabLockTicks;
-        /// <summary>110 bytes: fixed state fields, eleven cooldown slots, rollback resources, and attack sequence.</summary>
-        public const int Size = 110;
+        /// <summary>Remaining landing-lag lock ticks. Authoritative so local and remote presentation/rollback tracks agree.</summary>
+        public ushort LandingLagTicks;
+        /// <summary>112 bytes: fixed state fields, eleven cooldown slots, rollback resources, attack sequence, and landing lag.</summary>
+        public const int Size = 112;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -131,9 +133,10 @@ namespace SlopArena.Shared
                 BurstCooldownTicks = s.BurstCooldownTicks,
                 BurstRecoveryTicks = s.BurstRecoveryTicks,
                 LedgeRegrabLockTicks = s.LedgeRegrabLockTicks,
+                LandingLagTicks = s.LandingLagTicks,
             };
         }
-
+ 
         public CharacterState ToState()
         {
             return new CharacterState
@@ -186,6 +189,7 @@ namespace SlopArena.Shared
                 BurstCooldownTicks = BurstCooldownTicks,
                 BurstRecoveryTicks = BurstRecoveryTicks,
                 LedgeRegrabLockTicks = LedgeRegrabLockTicks,
+                LandingLagTicks = LandingLagTicks,
             };
         }
 
@@ -243,6 +247,7 @@ namespace SlopArena.Shared
             buffer[106] = LockOn ? (byte)1 : (byte)0;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), LedgeRegrabLockTicks);
             buffer[109] = AttackSequence;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(110, 2), LandingLagTicks);
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -300,6 +305,7 @@ namespace SlopArena.Shared
             packet.LockOn = buffer[106] != 0;
             packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
             packet.AttackSequence = buffer[109];
+            packet.LandingLagTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(110, 2));
             return packet;
         }
 
@@ -347,6 +353,7 @@ namespace SlopArena.Shared
             s.BurstCooldownTicks = BurstCooldownTicks;
             s.BurstRecoveryTicks = BurstRecoveryTicks;
             s.LedgeRegrabLockTicks = LedgeRegrabLockTicks;
+            s.LandingLagTicks = LandingLagTicks;
         }
     }
 }

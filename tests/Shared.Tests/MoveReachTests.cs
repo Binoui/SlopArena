@@ -173,7 +173,7 @@ public class MoveReachTests
         var fallbackSamples = MoveReach.SampleHit(def, evt, slot: 2, airborne: false, def.Slot1.AnimationNames, 0, baked: null);
         var fallbackMid = MoveReach.BandExtent(fallbackSamples, midMin, midMax);
         Assert.NotNull(fallbackMid);
-        TestHelpers.AssertNear(0.25f, fallbackMid.Value.MaxZ, Tol);
+        TestHelpers.AssertNear(0.35f, fallbackMid.Value.MaxZ, Tol);
         Assert.True(bakedMid.Value.MaxZ > fallbackMid.Value.MaxZ,
             $"baked reach ({bakedMid.Value.MaxZ:F2}) must exceed the fallback ({fallbackMid.Value.MaxZ:F2})");
     }

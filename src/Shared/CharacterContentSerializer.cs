@@ -43,6 +43,7 @@ public static class CharacterContentSerializer
         public string? HitSmallAnim;
         public string? HitMediumAnim;
         public string? HitHardAnim;
+        public string? TumbleAnim;
         public float LandStartOffset;
         public AnimationClipConfig[]? ClipOverrides;
         public Dictionary<string, AbilitySpec?>? Abilities;
@@ -112,6 +113,7 @@ public static class CharacterContentSerializer
             HitSmallAnim = document.HitSmallAnim ?? "hit_light",
             HitMediumAnim = document.HitMediumAnim ?? "hit_medium",
             HitHardAnim = document.HitHardAnim ?? "hit_hard",
+            TumbleAnim = document.TumbleAnim ?? "tumble",
             LandStartOffset = document.LandStartOffset,
             ClipOverrides = document.ClipOverrides,
         };
@@ -192,6 +194,7 @@ public static class CharacterContentSerializer
             HitSmallAnim = definition.HitSmallAnim,
             HitMediumAnim = definition.HitMediumAnim,
             HitHardAnim = definition.HitHardAnim,
+            TumbleAnim = definition.TumbleAnim,
             LandStartOffset = definition.LandStartOffset,
             ClipOverrides = definition.ClipOverrides,
             Abilities = CreateAbilityMap(definition, out var aliases),

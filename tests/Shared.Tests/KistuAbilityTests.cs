@@ -117,6 +117,24 @@ public class KistuAbilityTests
         Assert.True(s.PY > GroundPY + 1f, $"expected Kistu to rise above {GroundPY + 1f:F2}, got {s.PY:F2}");
     }
 
+    [Fact]
+    public void E_RecoveryUsesCameraDirection_NotTargetDirection()
+    {
+        var sim = SimWithPlayer(out _);
+        var target = TestHelpers.NpcState(0f, 4f);
+        target.PY = GroundPY;
+        TestHelpers.RegisterNpc(sim, Def, target);
+
+        // Camera yaw +90° points along +X; the target is straight ahead on +Z.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 4, AimYaw = 9000 } }, { 100, default } });
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var s = sim.GetState(1);
+        Assert.True(s.PX > 1f, $"expected recovery movement along camera +X, got PX={s.PX:F2}");
+        Assert.True(MathF.Abs(s.PZ) < 0.1f, $"recovery must not home toward target +Z, got PZ={s.PZ:F2}");
+    }
+
 
     // ── F: blade flurry deals damage ──
 

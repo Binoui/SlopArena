@@ -73,6 +73,10 @@ The GameServer validates and loads the exact package set before simulation start
 verify the same package IDs, versions, dependencies, capability versions, and hashes. A
 match never observes a later recook.
 
+Arena binary deserialization builds the derived collision spatial grid once, so direct
+match loads and registry loads both use Shared's broadphase queries. The grid is not
+serialized; callers must not rebuild it after loading an `.arena` file.
+
 ## Ability boundary
 
 Package abilities are fixed timelines of typed, versioned operations on the canonical

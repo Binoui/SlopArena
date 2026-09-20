@@ -26,44 +26,50 @@ Raw FBX, Unity `.meta`, and catalog bindings are source. `content-cooked/` and g
 ## Before authoring
 
 1. Identify the package, semantic animation ID, catalog entry, FBX asset, take name, clip duration/fps/frame range, and the ability event tick(s).
-2. Map timing before posing:
-  ```text
-   clipFrame = tick / 60 * clipFps
-   tick      = clipFrame / clipFps * 60
-  ```
+2. Map authoritative event ticks to source frames before posing. For constant forward playback:
+   ```text
+   sourceFrame = startFrame + (tick - playbackStartTick) / 60 * sourceFps * playbackSpeed
+   tick = playbackStartTick + (sourceFrame - startFrame) / (sourceFps * playbackSpeed) * 60
+   ```
 
-   Example: at 30 fps, frame 3 occurs at tick 6.
+   `startFrame` is the source frame at playback entry; `playbackSpeed` is the actual runtime multiplier, not an assumed 1. At 30 fps and 1x speed, playback starting at source frame 1 on tick 0 reaches frame 4 on tick 6. For variable speed, offsets, or holds, trace the actual playback mapping instead of applying this constant-speed formula.
 3. Record the current Unity import state: Humanoid/Generic rig mode, avatar validity, root-motion settings, clip name, and embedded clip `fileID`.
 4. Preserve a byte-identical FBX and `.meta` backup before reimporting. Do not overwrite a working source asset without a recovery copy.
 5. Define pose invariants: start/end neutral pose, no unapproved root translation, fire/active-frame silhouette, recoil/settle, and transition compatibility with the adjacent animation.
 
-Before editing, write the intended presentation beats:
-
-tick    frame    beat
-
-0       0        entry
-
-3       3        anticipation
-
-6       6        maximum compression
-
-8       8        launch
-
-10      10       gameplay active/fire
-
-14      14       recoil
-
-22      22       settle
-
-24      24       handoff
+Before editing, record a `tick | source frame | beat` plan using the actual playback mapping. Mark authoritative contact/fire events separately from optional presentation beats: entry, anticipation/load, compression, follow-through/recoil, settle, and handoff. Use only the beats that explain this move; short attacks, holds, loops, and airborne actions need not share a phase count. Fit presentation inside the gameplay envelope; never import generic attack durations or cancel-window percentages.
 
 ## Blender authoring
 
 - Work from the known-good source rig/action. Keep the hierarchy, rest pose, scale, bone names, and take identity stable unless the change explicitly includes a rig migration.
 - Pose a readable fighting-game arc: anticipation, active/impact, recoil or follow-through, settle. Favor clear silhouettes and short contrast over physically realistic weapon handling.
-- Keep frame 0 and the intended handoff/end frame exact when the move blends from/to an existing pose.
+- Keep the source entry frame and intended handoff/end pose exact when the move blends from/to an existing pose.
 - The Blender action timing is authoritative in seconds. Preserve the intended action duration and authored FPS. Unity's reported `AnimationClip.frameRate` is verification data, not permission to resample or retime the source.
 - Treat root translation as gameplay-sensitive presentation data. Do not add it unless the move contract explicitly permits it.
+
+### Authoring passes
+
+Inspect the current action, frame range, FPS, relevant bones, and existing keys first. New motions and major reworks start at blocking; bounded changes enter at the relevant pass and preserve accepted poses and curves.
+
+1. **Blocking:** use sparse semantic poses with stepped/constant interpolation. Inspect them from the normal gameplay camera for action direction, silhouette, pose contrast, plausible weight transfer, and entry/handoff compatibility. Establish readable anticipation and a distinct active pose where applicable before adding transitions.
+2. **Breakdowns:** add only poses needed to establish body mechanics, arcs, limb/weapon trajectories, recoil, and recovery. Choose spacing around authoritative events deliberately; do not change gameplay timing to improve the animation.
+3. **Interpolation:** interpolate only proven primary motion. Choose interpolation per channel and phase, preserving attack snap and pose contrast rather than uniformly smoothing everything. Inspect resulting trajectories for overshoot, foot sliding, root drift, and silhouette collapse; diagnose responsible curves before adding corrective keys.
+4. **Polish:** add overlap, drag, settling, secondary motion, and asymmetry only when primary motion and timing already read. Extra movement must support rather than compete with the gameplay event.
+
+A pass is accepted when its visible criteria are met; this is not a mandatory user approval gate. Make routine decisions within the approved move contract. Ask only for unresolved artistic direction or requested checkpoints.
+
+### Visual evidence and repair
+
+Work in coherent passes: author → capture → inspect → identify a defect and likely cause → bounded repair → inspect affected evidence again. Do not rebuild accepted motion because another interval fails.
+
+- For a new or substantially reworked clip, inspect a semantic-frame contact sheet and complete timed gameplay-camera preview before final Unity import. Viewport captures are sufficient; polished rendering is not required.
+- For a bounded correction, inspect the affected frames/interval first, then the complete action and entry/handoff before acceptance. Replay at the intended runtime speed, not merely the source FPS.
+- Use the presentation acceptance criteria below for still poses. Use playback to judge acceleration, attack snap, arcs, continuity, contact, weight, recoil, foot sliding, interpolation overshoot, and secondary-motion timing. Stills cannot prove motion quality.
+- Add diagnostic angles only when the gameplay view cannot establish the suspected defect. For unusually extreme poses, inspect affected joints/accessories for collapse, volume loss, clipping, twisting, or apparent detachment; this is not a full rig audit.
+- Tie each repair to an observed view, frame range, and likely bones/channels. User critique identifies the failed dimension—pose, timing, trajectory, weight, silhouette, deformation, transition, or secondary motion—not automatic permission to rewrite the clip.
+- Keep the current source recoverable and associate evidence with its action revision/pass. Repeat expensive checks only when relevant changes invalidate them.
+
+Open and inspect the evidence. Existing keys, successful rendering/export, and successful Unity import alone do not establish animation quality. Blender evidence does not replace the actual-prefab and Ability Lab/Training gates below.
 
 ## Unity import gate
 
@@ -71,7 +77,7 @@ tick    frame    beat
 2. Inspect the imported clip on the actual character prefab, not only in Blender:
   - avatar and Humanoid import are valid;
   - mesh stays at expected scale and origin;
-  - frame 0 and end-frame neutral poses are correct;
+  - clip entry and end poses match the intended transition contract;
   - clip duration, fps, and binding count are expected;
   - fire, recoil, and settle frames read at gameplay camera scale.
 3. Reject the candidate if Unity changes bind pose, root offset, scale, facing, or Avatar validity. Do not compensate with client-side transforms.

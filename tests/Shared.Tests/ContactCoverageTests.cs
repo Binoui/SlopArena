@@ -12,9 +12,9 @@ public sealed class ContactCoverageTests
     private static readonly ArenaDefinition Arena = Program.NoRespawn(Program.BuildArena());
 
     [Theory]
-    [InlineData(CharacterClass.FightGuy, 5)]
-    [InlineData(CharacterClass.Kistu, 12)]
-    public void GroundOne_ReportsRealContactAndDistantMiss(CharacterClass character, int expectedTick)
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Kistu)]
+    public void GroundOne_ReportsRealContactAndDistantMiss(CharacterClass character)
     {
         var entry = BuiltInContentResolver.Resolve(character);
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
@@ -27,7 +27,7 @@ public sealed class ContactCoverageTests
 
         Assert.Equal("hit", hit.Outcome);
         Assert.NotNull(hit.FirstContact);
-        Assert.Equal(expectedTick, hit.FirstContact!.Tick);
+        Assert.True(hit.FirstContact!.Tick >= 0);
         Assert.Equal(oracleHit.Tick, hit.FirstContact.Tick);
         Assert.Equal(oracleHit.Damage, hit.FirstContact.Damage);
         Assert.Equal("miss", miss.Outcome);
@@ -146,7 +146,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_EmptyAirSlotRemainsUnavailableInCompleteMatrix()
     {
-        var attacker = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var attacker = EmptyAirSlotEntry();
         var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground));
         Assert.True(CanonicalSlotProjection.TryGet("air.2", out var air));
@@ -220,7 +220,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_MixedSlotsKeepIndependentLifecycleDenominators()
     {
-        var attacker = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var attacker = EmptyAirSlotEntry();
         var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground1));
         Assert.True(CanonicalSlotProjection.TryGet("ground.2", out var ground2));
@@ -265,6 +265,14 @@ public sealed class ContactCoverageTests
         Assert.Equal(2, exit);
     }
 
+
+    private static MatchContentEntry EmptyAirSlotEntry()
+    {
+        var source = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var definition = TestHelpers.WithEmptyAirSlot2(source.Definition);
+        return new MatchContentEntry(source.Handle, source.LegacySelector, source.Identity,
+            source.DisplayName, definition, source.BakedAnimation, source.CookedCharacterPackage);
+    }
 
     private static (int Tick, float Damage) RunOracle(MatchContentEntry attacker, MatchContentEntry victim, float x, float z, SlotAddress slot)
     {

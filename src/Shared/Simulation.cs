@@ -230,10 +230,12 @@ namespace SlopArena.Shared
                 else if (attacking) DoOffensiveBurst(ref s);
             }
 
-            // Apply combat aim yaw from input (degrees * 100 → radians)
-            // FacingYaw (movement-facing) is handled by ProcessNormalMovement via Atan2
-            float aimDeg = input.AimYaw * 0.01f;
-            s.AimYaw = aimDeg * (MathF.PI / 180f);
+            // Preserve the last committed aim when a neutral input omits aim data.
+            if (input.AimYaw != 0 || input.IsAiming || input.FaceToCamera)
+            {
+                float aimDeg = input.AimYaw * 0.01f;
+                s.AimYaw = aimDeg * (MathF.PI / 180f);
+            }
             // Store aim target distance (cm → m) for projectile abilities
             s.AimTargetDistance = input.AimDistance * 0.01f;
             s.AimPitch = input.AimPitch * 0.01f * (MathF.PI / 180f);
@@ -577,6 +579,7 @@ namespace SlopArena.Shared
                 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
             {
                 s.FacingYaw = input.AimYaw * 0.01f * (MathF.PI / 180f);
+                s.AimYaw = s.FacingYaw;
                 s.LockOn = false;
             }
 
@@ -821,12 +824,42 @@ namespace SlopArena.Shared
             }
 
             bool wasGrounded = s.IsGrounded;
+            bool followingGround = wasGrounded && MathF.Abs(dy) <= 0.000001f;
+            bool followedSlope = false;
 
             int[] candidates = TriangleCandidates(in arena);
             ArenaCollision.RecoverCapsule(ref s.PX, ref s.PY, ref s.PZ,
                 def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
+            // A grounded capsule follows an upward support plane for horizontal travel.
+            // The support query is the gate: edge normals from a nearby triangle do not
+            // invent a slope, while an interior ramp normal gives continuous uphill and
+            // downhill movement without weakening wall contacts.
+            if (followingGround
+                && dx * dx + dz * dz > 0.000001f
+                && ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ,
+                    def.CapsuleRadius, def.CapsuleHeight, in arena, candidates, out var support)
+                && support.NormalY > 0.5f
+                && ArenaCollision.IsTriangleInteriorContact(s.PX, s.PY, s.PZ,
+                    def.CapsuleRadius, def.CapsuleHeight, in arena, in support)
+                && ArenaCollision.TryGetTriangleNormal(support.TriangleIndex, in arena,
+                    out float faceX, out float faceY, out float faceZ))
+            {
+                float normalAlignment = support.NormalX * faceX
+                    + support.NormalY * faceY + support.NormalZ * faceZ;
+                float horizontalNormalSq = faceX * faceX + faceZ * faceZ;
+                // A closest-point edge normal is not a walkable support plane. Requiring
+                // alignment with the triangle face keeps platform perimeters blocking.
+                if (normalAlignment > 0.99999f && horizontalNormalSq > 0.000001f)
+                {
+                    float normalMotion = dx * faceX + dy * faceY + dz * faceZ;
+                    dx -= faceX * normalMotion;
+                    dy -= faceY * normalMotion;
+                    dz -= faceZ * normalMotion;
+                    followedSlope = true;
+                }
+            }
+
             float remainingX = dx, remainingY = dy, remainingZ = dz;
-            bool supported = false;
             for (int iteration = 0; iteration < 4; iteration++)
             {
                 float length = MathF.Sqrt(remainingX * remainingX + remainingY * remainingY + remainingZ * remainingZ);
@@ -845,8 +878,9 @@ namespace SlopArena.Shared
                     remainingX = remainingY = remainingZ = 0f;
                     break;
                 }
+                bool upwardFace = ArenaCollision.IsUpwardFacingTriangle(contact.TriangleIndex, in arena);
                 if (contact.NormalY > 0.5f
-                    && !ArenaCollision.IsUpwardFacingTriangle(contact.TriangleIndex, in arena)
+                    && !upwardFace
                     && remainingY <= 0f)
                 {
                     s.PX += remainingX;
@@ -866,6 +900,11 @@ namespace SlopArena.Shared
                 remainingY *= after;
                 remainingZ *= after;
 
+                // Keep the actual contact normal: grounded feet can roll over a
+                // walkable face's crest, but walls and airborne impacts cannot climb.
+                bool enteringSupportFace = wasGrounded && contact.NormalY > 0.5f && upwardFace;
+                followedSlope |= enteringSupportFace && contact.NormalY < 0.99999f;
+
                 float inward = remainingX * contact.NormalX
                     + remainingY * contact.NormalY + remainingZ * contact.NormalZ;
                 float verticalDisplacementBeforeProjection = remainingY;
@@ -874,7 +913,8 @@ namespace SlopArena.Shared
                     remainingX -= contact.NormalX * inward;
                     remainingY -= contact.NormalY * inward;
                     remainingZ -= contact.NormalZ * inward;
-                    if (verticalDisplacementBeforeProjection <= 0f && remainingY > verticalDisplacementBeforeProjection)
+                    if (!enteringSupportFace && verticalDisplacementBeforeProjection <= 0f
+                        && remainingY > verticalDisplacementBeforeProjection)
                         remainingY = verticalDisplacementBeforeProjection;
                 }
 
@@ -882,22 +922,60 @@ namespace SlopArena.Shared
                 float knockbackVelocityYBeforeProjection = s.KVY;
                 ProjectVelocity(ref s.VX, ref s.VY, ref s.VZ, contact.NormalX, contact.NormalY, contact.NormalZ);
                 ProjectVelocity(ref s.KVX, ref s.KVY, ref s.KVZ, contact.NormalX, contact.NormalY, contact.NormalZ);
-                if (velocityYBeforeProjection <= 0f && s.VY > velocityYBeforeProjection)
+                if (s.VY > velocityYBeforeProjection)
                     s.VY = velocityYBeforeProjection;
-                if (knockbackVelocityYBeforeProjection <= 0f && s.KVY > knockbackVelocityYBeforeProjection)
+                if (s.KVY > knockbackVelocityYBeforeProjection)
                     s.KVY = knockbackVelocityYBeforeProjection;
-                float approach = dx * contact.NormalX + dy * contact.NormalY + dz * contact.NormalZ;
-                if (contact.NormalY > 0.5f
-                    && ArenaCollision.IsUpwardFacingTriangle(contact.TriangleIndex, in arena)
-                    && (approach < -0.0001f || s.IsGrounded))
-                    supported = true;
                 if (remainingX * remainingX + remainingY * remainingY + remainingZ * remainingZ <= 0.000001f)
                     break;
             }
 
-            if (ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ, def.CapsuleRadius,
-                    def.CapsuleHeight, in arena, candidates, out _))
-                supported = true;
+            // Rising contact with a lip is not a landing and must not refresh float.
+            bool supported = s.VY <= 0f && s.KVY <= 0f
+                && ArenaCollision.TryFindSupport(s.PX, s.PY, s.PZ, def.CapsuleRadius,
+                def.CapsuleHeight, in arena, candidates, out _);
+            if (!supported && followingGround)
+            {
+                // Follow a descending ramp or rounded crest without manufacturing an
+                // airborne frame. Flat ledges still use the ordinary walk-off path.
+                int count = ArenaCollision.GetCandidateTrianglesForSweep(
+                    s.PX, s.PY, s.PZ, s.PX, s.PY - PlatformSnapTolerance, s.PZ,
+                    def.CapsuleRadius, def.CapsuleHeight, in arena, candidates);
+                if (ArenaCollision.SweepCapsule(
+                        s.PX, s.PY, s.PZ, s.PX, s.PY - PlatformSnapTolerance, s.PZ,
+                        def.CapsuleRadius, def.CapsuleHeight, in arena, candidates, count, out var ground)
+                    && ground.NormalY > 0.5f
+                    && ArenaCollision.TryGetTriangleNormal(ground.TriangleIndex, in arena,
+                        out _, out float groundFaceY, out _)
+                    && groundFaceY > 0.5f)
+                {
+                    bool slopeConnection = followedSlope || groundFaceY < 0.99999f;
+                    if (!slopeConnection)
+                    {
+                        // At a flat-to-ramp crest the closest hit can be the flat
+                        // perimeter. Require a real ramp under the same capsule path;
+                        // a plain ledge over a lower flat floor must not snap down.
+                        int slopeCount = 0;
+                        for (int i = 0; i < count; i++)
+                        {
+                            int triangle = candidates[i];
+                            if (ArenaCollision.TryGetTriangleNormal(triangle, in arena,
+                                    out _, out float normalY, out _)
+                                && normalY > 0.5f && normalY < 0.99999f)
+                                candidates[slopeCount++] = triangle;
+                        }
+                        slopeConnection = ArenaCollision.SweepCapsule(
+                            s.PX, s.PY, s.PZ, s.PX, s.PY - PlatformSnapTolerance, s.PZ,
+                            def.CapsuleRadius, def.CapsuleHeight, in arena,
+                            candidates, slopeCount, out var ramp) && ramp.NormalY > 0.5f;
+                    }
+                    if (slopeConnection)
+                    {
+                        s.PY -= PlatformSnapTolerance * ground.Time;
+                        supported = true;
+                    }
+                }
+            }
             s.IsGrounded = supported;
             if (supported)
             {
@@ -1335,16 +1413,16 @@ namespace SlopArena.Shared
                     // held direction has already been reduced to a single tangent by
                     // stage collision. Re-adding the blocked component at full speed
                     // every tick would make wall slides lose tangent speed geometrically.
-                    float perp = (s.VX * dirZ) - (s.VZ * dirX);
                     bool sameInput = MathF.Abs(s.LastDirX - dirX) <= 0.001f
                         && MathF.Abs(s.LastDirZ - dirZ) <= 0.001f;
-                    bool tangentSlide = sameInput
+                    float perp = (s.VX * dirZ) - (s.VZ * dirX);
+                    bool tangentSlide = sameInput && MathF.Abs(perp) > VelocityDeadZone
                         && ((MathF.Abs(s.VX) <= VelocityDeadZone && MathF.Abs(s.VZ) > VelocityDeadZone)
                             || (MathF.Abs(s.VZ) <= VelocityDeadZone && MathF.Abs(s.VX) > VelocityDeadZone));
-                    if (MathF.Abs(perp) > VelocityDeadZone && !tangentSlide)
+                    if (!tangentSlide)
                     {
-                        s.VX = dirX * speed;
-                        s.VZ = dirZ * speed;
+                        s.VX = dirX * stats.RunSpeed;
+                        s.VZ = dirZ * stats.RunSpeed;
                     }
                     else
                     {

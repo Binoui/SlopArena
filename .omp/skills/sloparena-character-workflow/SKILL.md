@@ -82,6 +82,12 @@ Import the rig and clips through Unity. Bind them in `CharacterAssetCatalog.asse
 
 Use Humanoid for ordinary humanoid fighters when built-in retargeting helps. Custom rigs remain valid when they provide the required package-owned animation data. Keep art and naming rules in [`docs/contributing/conventions.md`](../../../docs/contributing/conventions.md).
 
+For generated-model cleanup or replacement, use the [character model polish guide](../../../docs/characters/character-model-polish.md) and `blender-character-polish`. Keep surface polish separate from approved rig changes.
+
+After structural repairs, check the candidate early in Unity with target-material backface culling, relevant raised-arm/underside/rear views and actual bound clips. Use the installed Unity CLI/Pipeline on the main checkout. Validate attachments, animation-aware bounds, skin influences and gameplay-distance appearance; maintain `TESTING-UNITY.md`. Controlled Blender poses are not runtime acceptance.
+
+When the rig, rest transforms or import/binding settings change, compare old/new retargeted output at matching clip times, including relevant attachment and authoritative pose tracks. A valid Avatar, unchanged bone names or byte-identical gameplay JSON does not prove pose equivalence. If presentation-only scope is required, investigate differences before promotion; otherwise obtain explicit approval for changed authoritative content and verify affected behavior. Report changed cooked poses without calling them cosmetic or hand-editing them. Local preview does not require a publishing cook on every iteration; accepted integration still follows the persistence boundary below.
+
 ### 4. Validate source and choose persistence boundary
 
 For local iteration, resolve the source through the transient development catalog

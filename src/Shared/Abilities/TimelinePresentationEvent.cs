@@ -1,15 +1,32 @@
 namespace SlopArena.Shared;
 
+public enum PresentationEventSource : byte
+{
+    Timeline = 0,
+    CapabilityExplosion = 1,
+}
+
 public readonly record struct PresentationEventKey(
     uint MatchTick,
     ulong EntityId,
+    byte AttackSequence,
+    PresentationEventSource Source,
     int OperationIndex);
 
 public readonly record struct TimelinePresentationEvent(
     uint MatchTick,
     ulong EntityId,
     int OperationIndex,
-    string PresentationId)
+    string PresentationId,
+    byte AttackSequence,
+    PresentationEventSource Source,
+    float WorldX,
+    float WorldY,
+    float WorldZ,
+    float WorldYaw)
 {
-    public PresentationEventKey Key => new(MatchTick, EntityId, OperationIndex);
+    public PresentationPlacement Placement { get; init; } = new PresentationPlacement();
+
+    public PresentationEventKey Key =>
+        new(MatchTick, EntityId, AttackSequence, Source, OperationIndex);
 }

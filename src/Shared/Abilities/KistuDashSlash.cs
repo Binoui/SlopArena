@@ -2,8 +2,7 @@ using System;
 
 namespace SlopArena.Shared.Abilities;
 
-/// <summary>
-/// Kistu's E — Directional Dash Slash (aim-on-ground, release-to-dash).
+/// Kistu's R — Directional Dash Slash (aim-on-ground, release-to-dash).
 ///
 /// Two phases:
 ///   Aim:   State = ActionState.Aiming — walk/run stays unlocked (SimulateTick runs
@@ -13,17 +12,16 @@ namespace SlopArena.Shared.Abilities;
 ///          (input.AimYaw, camera locked client-side), and she turns to FACE it.
 ///   Dash:  State = ActionState.Attacking — constant velocity toward the cached aim
 ///          yaw for dash_duration_ticks, covering exactly dash_distance meters.
-///          A single capsule hitbox sweeps along the aim axis from dash start (hits
-///          her sides + the path, deactivates on its first victim). Plays the E attack
-///          clip (AnimationNames[0] = "spell_e").
+///          A single bone-tracked capsule hitbox follows the slash from dash start.
+///          Plays the R attack clip (AnimationNames[0] = "anim.kistu.r").
 ///
 /// The aim yaw is cached on every aim tick — on the release tick the client sends
 /// camera yaw instead of the mouse aim (InputController default), so reading s.AimYaw
 /// at release would snap the dash to the camera. The cache is the last mouse aim.
 ///
-/// All damage/knockback/timing data comes from the spec (Params + Stages[0].HitboxEvents).
+/// All damage/knockback/timing data comes from the cooked R hitbox and capability params.
 /// </summary>
-public sealed class KistuDashSlash : ServerAbility
+public sealed class KistuDashSlash : ServerAbility, IAimHoldCapability
 {
     private readonly CookedKistuDashSlashCapabilityParameters _parameters;
     private enum Phase { Aim, Dash }
@@ -31,7 +29,6 @@ public sealed class KistuDashSlash : ServerAbility
     private Phase _phase;
     private int _phaseTicks;
     private float _dashYaw;
-    private bool _hitboxSpawned;
 
     public KistuDashSlash(CookedKistuDashSlashCapabilityParameters parameters)
         => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
@@ -39,6 +36,7 @@ public sealed class KistuDashSlash : ServerAbility
     {
         _phase = Phase.Aim;
         _phaseTicks = 0;
+        _dashYaw = s.AimYaw;
 
         s.State = ActionState.Aiming;
         s.AttackSlot = (byte)(Slot + 1);
@@ -48,6 +46,7 @@ public sealed class KistuDashSlash : ServerAbility
         s.IsAiming = true;
         s.StateTicks = 0;
     }
+
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
     {
@@ -70,11 +69,6 @@ public sealed class KistuDashSlash : ServerAbility
             : 0f;
         s.VX = MathF.Sin(_dashYaw) * speed;
         s.VZ = MathF.Cos(_dashYaw) * speed;
-        if (!_hitboxSpawned)
-        {
-            SpawnDashHitbox(ref s, def, speed, _parameters.DashDurationTicks);
-            _hitboxSpawned = true;
-        }
         if (_phaseTicks > _parameters.DashDurationTicks)
             EndAbility(ref s);
     }
@@ -82,73 +76,92 @@ public sealed class KistuDashSlash : ServerAbility
     private void StartDash(ref CharacterState s, CharacterDefinition def)
     {
         _phase = Phase.Dash;
-        _phaseTicks = 0;
+        _phaseTicks = 1; // StartDash applies the first velocity tick immediately.
 
+        float speed = _parameters.DashDurationTicks > 0
+            ? _parameters.DashDistance / (_parameters.DashDurationTicks * Simulation.TickDt)
+            : 0f;
         s.State = ActionState.Attacking;
         s.AttackElapsedTicks = 0;
         s.IsAiming = false;
+        s.FacingYaw = _dashYaw;
+        s.VX = MathF.Sin(_dashYaw) * speed;
+        s.VZ = MathF.Cos(_dashYaw) * speed;
         AnimIndex = 0;
+        SpawnDashHitbox(ref s, def);
 
         ushort dashDuration = _parameters.DashDurationTicks;
         // Keep the lock one tick longer than the dash so the final velocity tick cannot be IASA-cancelled.
         s.AnimLockTicks = (ushort)(dashDuration + 1);
     }
+    
 
-    /// <summary>
-    /// Capsule sweep along the aim axis, spawned once at dash start: covers her sides
-    /// (radius) plus a forward reach (OffZ → EndOffZ from the spec) and travels at the
-    /// character's effective velocity so it stays glued to her for the whole dash.
-    /// </summary>
-    private void SpawnDashHitbox(ref CharacterState s, CharacterDefinition def, float followSpeed, ushort durationTicks)
+
+    /// <summary>Spawn the authored bone-tracked slash at dash start.</summary>
+    private void SpawnDashHitbox(ref CharacterState s, CharacterDefinition def)
     {
-        var spec = def.GetSlotAbility(Slot, false);
-        HitboxEvent evt = spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 }
-            ? spec.Stages[0].HitboxEvents[0]
-            : new HitboxEvent
-            {
-                Shape = HitboxShape.Capsule, Radius = 0.5f, OffY = 0.7f, OffZ = 0.5f, EndOffY = 0.7f, EndOffZ = 1.3f,
-                Damage = 9f, Knockback = new KnockbackData { Profile = KnockbackProfile.Medium }, StunTicks = 16, Interruptible = true
-            };
-        float cos = MathF.Cos(_dashYaw);
-        float sin = MathF.Sin(_dashYaw);
-
-        float sx = s.PX + (evt.OffZ * sin);
-        float sz = s.PZ + (evt.OffZ * cos);
-        float ex = s.PX + (evt.EndOffZ * sin);
-        float ez = s.PZ + (evt.EndOffZ * cos);
-
-        float damage = evt.Damage;
-        float radius = evt.Radius;
-
-        var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
-
-        SpawnResolverHitbox(new Hitbox
+        HitboxEvent evt = default;
+        bool found = false;
+        var cooked = def.GetCookedSlotAbility((byte)(Slot + 1), airborne: false);
+        if (cooked != null)
         {
-            X = sx,
-            Y = s.PY + evt.OffY,
-            Z = sz,
-            // Follow the dash so the swept capsule stays glued to the character.
-            // followSpeed is the dash speed itself — no friction acts during the dash
-            // (momentum-preserve, issue #115).
-            VX = MathF.Sin(_dashYaw) * followSpeed,
-            VY = 0f,
-            VZ = MathF.Cos(_dashYaw) * followSpeed,
-            Radius = radius,
-            Shape = evt.Shape,
-            EndX = ex,
-            EndY = s.PY + evt.OffY,
-            EndZ = ez,
-            Damage = damage,
-            BaseKnockback = kbBase,
-            KnockbackGrowth = kbGrowth,
-            KnockbackAngle = kbAngle,
-            StunTicks = evt.StunTicks,
-            DurationTicks = durationTicks > 0 ? durationTicks : (ushort)1,
-            OwnerId = s.EntityId,
-            AttackSlot = (byte)(Slot + 1),
-            FreezesOwner = true,
-            HitsMultipleOpponents = true,
-        });
+            foreach (var operation in cooked.Timeline.Stages[0].Operations)
+            {
+                if (operation is not CookedSpawnHitboxOperation spawn)
+                    continue;
+                var hitbox = spawn.Hitbox;
+                evt = new HitboxEvent
+                {
+                    Shape = hitbox.Shape == AuthoringHitboxShape.Capsule ? HitboxShape.Capsule : HitboxShape.Sphere,
+                    Radius = hitbox.Radius,
+                    OffX = hitbox.OffsetX,
+                    OffY = hitbox.OffsetY,
+                    OffZ = hitbox.OffsetZ,
+                    EndOffX = hitbox.EndOffsetX,
+                    EndOffY = hitbox.EndOffsetY,
+                    EndOffZ = hitbox.EndOffsetZ,
+                    BoneName = hitbox.StartBoneId,
+                    EndBoneName = hitbox.EndBoneId,
+                    Damage = hitbox.Damage,
+                    Knockback = new KnockbackData
+                    {
+                        Profile = KnockbackProfile.Custom,
+                        Angle = (sbyte)hitbox.Angle,
+                        BaseKnockback = hitbox.BaseKnockback,
+                        KnockbackGrowth = hitbox.KnockbackGrowth,
+                    },
+                    StunTicks = hitbox.StunTicks,
+                    DurationTicks = hitbox.DurationTicks,
+                    Interruptible = hitbox.Interruptible,
+                    HitGroup = hitbox.HitGroup,
+                    KnockbackDirection = hitbox.KnockbackDirection,
+                };
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            evt = new HitboxEvent
+            {
+                Shape = HitboxShape.Capsule,
+                Radius = 0.5f,
+                BoneName = "_weapon_hilt",
+                EndBoneName = "_weapon_tip",
+                Damage = 1f,
+                Knockback = new KnockbackData
+                {
+                    Profile = KnockbackProfile.Custom,
+                    Angle = 45,
+                    BaseKnockback = 5f,
+                    KnockbackGrowth = 80f,
+                },
+                StunTicks = 8,
+                DurationTicks = 10,
+                Interruptible = false,
+            };
+        }
+        SpawnHitbox(ref s, evt);
     }
 
     /// <summary>

@@ -89,6 +89,13 @@ public sealed class MankiJetpackBoost : ServerAbility
             Interruptible = true,
             HitGroup = 0,
         });
+            PresentationSink?.Invoke(new TimelinePresentationEvent(
+                0, s.EntityId, PresentationOperationIndex, _parameters.ExplosionPresentationId,
+                PresentationAttackSequence, PresentationEventSource.CapabilityExplosion,
+                s.PX, s.PY - def.CapsuleHeight * 0.5f, s.PZ, s.FacingYaw)
+            {
+                Placement = new PresentationPlacement(DurationTicks: 150),
+            });
     }
 
     public override void OnEnd(ref CharacterState s)

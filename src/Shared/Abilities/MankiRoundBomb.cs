@@ -89,6 +89,10 @@ namespace SlopArena.Shared.Abilities
                     Radius = explosionRadius, Damage = explosionDamage,
                     Knockback = new() { Profile = KnockbackProfile.Custom, Angle = (sbyte)explosionKbAngle, BaseKnockback = explosionKbBase, KnockbackGrowth = explosionKbGrowth },
                     StunTicks = explosionStunTicks, DurationTicks = explosionDurationTicks,
+                    ExplosionPresentationId = _parameters?.ExplosionPresentationId ?? "",
+                    PresentationAttackSequence = PresentationAttackSequence,
+                    PresentationOperationIndex = PresentationOperationIndex,
+                    PresentationYaw = s.FacingYaw,
                 },
             });
         }

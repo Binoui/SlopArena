@@ -150,6 +150,8 @@ namespace SlopArena.Shared
         public string HitMediumAnim = "hit_medium";
         /// <summary>Hard hit reaction clip. Default: "hard_hit"</summary>
         public string HitHardAnim = "hit_hard";
+        /// <summary>Tumble animation clip. Legacy definitions default to "tumble".</summary>
+        public string TumbleAnim = "tumble";
         /// <summary>Landing uses JumpAnim clip with this start offset (seconds). Default: 0.49f</summary>
         public float LandStartOffset = 0.49f;
         /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>

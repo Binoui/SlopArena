@@ -296,7 +296,7 @@ public static class CharacterPackageAssembler
                     EnsureFields(metadata.GetProperty("compatibility"), new[] { "runtimeApiMin", "runtimeApiMax" }, RuntimePath + ".metadata.compatibility", d);
                 EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
                 if (HasObject(root.GetProperty("character"), "presentation"))
-                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
+                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
                 EnsureFields(root.GetProperty("budget"), new[] { "slotCount", "stageCount", "operationCount", "hitboxCount", "projectileCount", "capabilityCount", "maxTimelineDurationTicks" }, RuntimePath + ".budget", d);
                 if (GetString(metadata, "packageId") != manifest.PackageId || GetString(metadata, "version") != manifest.Version || GetUInt16(metadata, "cookedSchemaVersion") != manifest.CookedSchemaVersion)
                     d.Add(Error("package.runtime.metadata-mismatch", RuntimePath, "Runtime metadata does not match manifest."));
@@ -331,6 +331,7 @@ public static class CharacterPackageAssembler
         Add(required, package.Definition.Presentation.HitSmall, d, "character.presentation");
         Add(required, package.Definition.Presentation.HitMedium, d, "character.presentation");
         Add(required, package.Definition.Presentation.HitHard, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Tumble, d, "character.presentation");
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId))
@@ -350,6 +351,8 @@ public static class CharacterPackageAssembler
         {
             var presentation = character.GetProperty("presentation");
             foreach (string name in new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard" }) Add(required, GetString(presentation, name), d, "character.presentation");
+            if (presentation.TryGetProperty("tumble", out var tumble) && tumble.ValueKind == JsonValueKind.String)
+                AddOptional(required, tumble.GetString() ?? "", d, "character.presentation");
         }
         if (character.TryGetProperty("slots", out var slots) && slots.ValueKind == JsonValueKind.Array)
             foreach (var slot in slots.EnumerateArray())
@@ -569,6 +572,7 @@ public static class CharacterPackageAssembler
     private static byte[] Concat(byte[] first, byte[] second) { var result = new byte[first.Length + second.Length]; Buffer.BlockCopy(first, 0, result, 0, first.Length); Buffer.BlockCopy(second, 0, result, first.Length, second.Length); return result; }
     private static bool IsLowerHash(string value) => value.Length == 64 && value.All(x => (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f'));
     private static bool StringEquals(string a, string b) => string.Equals(a, b, StringComparison.Ordinal);
+    private static void AddOptional(HashSet<string> set, string value, List<CharacterDiagnostic> d, string path) { if (!string.IsNullOrEmpty(value)) set.Add(value); }
     private static CharacterDiagnostic Error(string code, string path, string message) => new(CharacterDiagnosticSeverity.Error, code, path, message);
     private static void Add(HashSet<string> set, string value, List<CharacterDiagnostic> d, string path) { if (string.IsNullOrEmpty(value)) d.Add(Error("package.animation.invalid", path, "Animation ID is empty.")); else set.Add(value); }
     private static void ValidateUniqueMetadata(IEnumerable<string> values, string path, List<CharacterDiagnostic> d) { var seen = new HashSet<string>(StringComparer.Ordinal); foreach (var value in values) if (string.IsNullOrEmpty(value) || !seen.Add(value)) d.Add(Error("package.metadata.duplicate", path, "Metadata contains a duplicate or empty identifier.")); }

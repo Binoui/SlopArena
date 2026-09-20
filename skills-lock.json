@@ -91,6 +91,12 @@
       "skillPath": "skills/engineering/triage/SKILL.md",
       "computedHash": "7c923b6a677cfe689500721f08307e2a4c46797ff169dc55ef6c34a431a0d533"
     },
+    "typesafe-ai": {
+      "source": "typesafe-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/typesafe-ai/SKILL.md",
+      "computedHash": "9cd84c5e535dec8dec59917c110f9c00b4a61faadb86b432ec7e41051170af12"
+    },
     "unity-skills": {
       "source": "Besty0728/Unity-Skills",
       "sourceType": "github",

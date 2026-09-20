@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SlopArena.Shared;
 using Xunit;
 
@@ -88,6 +89,32 @@ public sealed class CharacterPackageAssemblerTests
         Assert.Contains("\"severity\":\"warning\",\"code\":\"warning.one\"", manifest, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Assemble_RequiresDeclaredTumbleBinding()
+    {
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
+        var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
+        character["presentation"]!["tumble"] = "anim.tumble";
+        var compile = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compile.CookedPackage);
+        var package = compile.CookedPackage!;
+        var input = BuildInput(package, Array.Empty<PackageDependencySource>(), Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>());
+        var binding = JsonNode.Parse(input.BindingBytes)!.AsObject();
+        var animations = binding["animations"]!.AsArray();
+        var tumble = animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.tumble");
+        animations.Remove(tumble);
+        var broken = new CharacterPackageAssemblyInput(
+            input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
+            input.AuthoringSchemaVersion, input.CookedSchemaVersion, input.RuntimeApiMin, input.RuntimeApiMax,
+            input.SourceHash, input.Dependencies, input.CapabilityRequirements, input.CookerVersion, input.UnityVersion,
+            input.BindingSchemaVersion, input.PoseFormat, input.PoseVersion, input.SampleRate, input.Warnings,
+            input.RuntimeBytes, input.PoseBytes, Encoding.UTF8.GetBytes(binding.ToJsonString()), input.CookedPackage);
+        var result = CharacterPackageAssembler.Assemble(broken);
+        Assert.Contains(result.Diagnostics, x => x.Code == "package.binding.missing");
+    }
+
     private static CharacterPackageAssemblyResult AssembleFixture()
     {
         var package = Compile();
@@ -103,6 +130,8 @@ public sealed class CharacterPackageAssemblerTests
             package.Definition.Presentation.Jump, package.Definition.Presentation.Fall, package.Definition.Presentation.HitSmall,
             package.Definition.Presentation.HitMedium, package.Definition.Presentation.HitHard,
         };
+        if (!string.IsNullOrEmpty(package.Definition.Presentation.Tumble))
+            names.Add(package.Definition.Presentation.Tumble);
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId)) names.Add(slot.AimAnimationId);

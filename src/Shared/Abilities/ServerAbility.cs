@@ -75,6 +75,10 @@ namespace SlopArena.Shared.Abilities
 
         /// <summary>Unique server-local identity for this ability activation.</summary>
         public ulong ActivationId { get; set; }
+        /// <summary>Attack sequence captured when this ability activation started.</summary>
+        public byte PresentationAttackSequence { get; set; }
+        /// <summary>Flattened authored operation index for a capability-originated event.</summary>
+        public int PresentationOperationIndex { get; set; } = -1;
         // ── Animation (set during Tick, synced to client via CharacterState.AnimIndex) ──
 
         /// <summary>

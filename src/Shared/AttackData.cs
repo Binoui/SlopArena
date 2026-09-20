@@ -134,5 +134,13 @@ namespace SlopArena.Shared
         /// pulses every N ticks and survives contact until its DurationTicks expires.
         /// </summary>
         public ushort RehitIntervalTicks;
+        /// <summary>Optional semantic presentation emitted when this explosion is spawned.</summary>
+        public string ExplosionPresentationId;
+        /// <summary>Attack sequence captured by the originating capability activation.</summary>
+        public byte PresentationAttackSequence;
+        /// <summary>Flattened timeline operation index captured by the originating capability.</summary>
+        public int PresentationOperationIndex;
+        /// <summary>Facing yaw captured by the originating capability activation, in radians.</summary>
+        public float PresentationYaw;
     }
 }

@@ -76,6 +76,31 @@ public class KistuDashSlashTests
     }
 
     [Fact]
+    public void R_AimHold_DoesNotSpawnHitboxBeforeRelease()
+    {
+        var sim = MakeSim();
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 9000 } } });
+        HoldAim(sim, 9000, 30);
+
+        Assert.Equal(ActionState.Aiming, sim.GetState(1).State);
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+    }
+
+    [Fact]
+    public void R_Release_SpawnsOneAuthoredBoneHitbox()
+    {
+        var sim = MakeSim();
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 9000 } } });
+        HoldAim(sim, 9000, 10);
+        sim.Tick(new() { { 1, new InputState { IsAiming = false, AimYaw = 9000 } } });
+
+        var hitbox = Assert.Single(sim.Resolver.GetActiveHitboxes());
+        Assert.Equal((byte)5, hitbox.AttackSlot);
+        Assert.Equal("_weapon_hilt", hitbox.SourceEvent.BoneName);
+        Assert.Equal("_weapon_tip", hitbox.SourceEvent.EndBoneName);
+    }
+
+    [Fact]
     public void R_Release_DashesExactDistance_TowardAimYaw()
     {
         var sim = MakeSim();

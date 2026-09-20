@@ -411,7 +411,10 @@ namespace SlopArena.Server
 			var presentationPackets = new List<(byte[] buffer, int length)>();
 			foreach (var evt in _sim.GetPresentationEvents(clear: true))
 			{
-				var eventPacket = new PresentationEventPacket(evt.MatchTick, evt.EntityId, evt.OperationIndex, evt.PresentationId);
+				var eventPacket = new PresentationEventPacket(
+					evt.MatchTick, evt.EntityId, evt.OperationIndex, evt.PresentationId,
+					evt.AttackSequence, evt.Source, evt.WorldX, evt.WorldY, evt.WorldZ, evt.WorldYaw,
+					evt.Placement);
 				var eventBuffer = new byte[eventPacket.WireSize];
 				eventPacket.Serialize(eventBuffer);
 				presentationPackets.Add((eventBuffer, eventBuffer.Length));

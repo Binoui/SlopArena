@@ -54,6 +54,7 @@ namespace SlopArena.Client.World
 
         private void Start()
         {
+            UISFX.PlayMatchMusic();
             _pauseMenu = gameObject.AddComponent<MatchPauseMenu>();
             _pauseMenu.Init(_cameraMount, _inputController, LeaveMatch);
             OnMatchStart();
@@ -119,6 +120,7 @@ namespace SlopArena.Client.World
             renderer.SetBakedData(entry.BakedAnimation);
             renderer.SetCharacterDefinition(def);
             renderer.SetAnimationCatalog(animationCatalog);
+            FindFirstObjectByType<CombatFeedback>()?.RegisterRenderer(renderer);
             _timelinePresentations.Register(entityId, renderer, animationCatalog);
 
             if (local && _playerAnimConfig != null && entry.CookedCharacterPackage == null)

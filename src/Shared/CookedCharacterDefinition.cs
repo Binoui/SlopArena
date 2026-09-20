@@ -143,7 +143,8 @@ public sealed record CookedPresentation(
     float HurtboxBoneScale = 1f,
     float ModelYOffset = 0f,
     float ModelSoleOffset = 0f,
-    bool AutoModelYOffset = false);
+    bool AutoModelYOffset = false,
+    string Tumble = "");
 
 public sealed record CookedHurtboxCapsule(
     float StartX,
@@ -400,12 +401,25 @@ public sealed class CookedEmitPresentationOperation : CookedTimelineOperation
 {
     public string PresentationId { get; }
     public int OperationIndex { get; }
-    public CookedEmitPresentationOperation(ushort tick, AuthoringUnit unit, string presentationId, int operationIndex)
+    public PresentationPlacement Placement { get; }
+    public CookedEmitPresentationOperation(
+        ushort tick,
+        AuthoringUnit unit,
+        string presentationId,
+        int operationIndex,
+        PresentationPlacement placement)
         : base(tick, unit, CookedOperationKind.EmitPresentation)
     {
         PresentationId = presentationId;
         OperationIndex = operationIndex;
+        Placement = placement ?? new PresentationPlacement();
     }
+    public CookedEmitPresentationOperation(
+        ushort tick,
+        AuthoringUnit unit,
+        string presentationId,
+        int operationIndex)
+        : this(tick, unit, presentationId, operationIndex, new PresentationPlacement()) { }
 }
 
 public sealed class CookedCompleteTimelineOperation : CookedTimelineOperation
@@ -470,7 +484,8 @@ public sealed record CookedMankiRoundBombCapabilityParameters(
     float ExplosionKbGrowth,
     ushort ExplosionStunTicks,
     ushort ExplosionDurationTicks,
-    float ExplosionKbAngle) : CookedCapabilityParameters;
+    float ExplosionKbAngle,
+    string ExplosionPresentationId = "") : CookedCapabilityParameters;
 public sealed record CookedMankiJetpackBoostCapabilityParameters(
     ushort StartupTicks,
     float VerticalSpeed,
@@ -481,7 +496,8 @@ public sealed record CookedMankiJetpackBoostCapabilityParameters(
     float ExplosionKbBase,
     float ExplosionKbGrowth,
     ushort ExplosionStunTicks,
-    ushort ExplosionDurationTicks) : CookedCapabilityParameters;
+    ushort ExplosionDurationTicks,
+    string ExplosionPresentationId = "") : CookedCapabilityParameters;
 public sealed record CookedMankiBazookaCapabilityParameters(
     ushort FireTriggerTick,
     float ProjectileSpeed,
@@ -498,7 +514,8 @@ public sealed record CookedMankiBazookaCapabilityParameters(
     ushort ExplosionDurationTicks,
     float ExplosionKbAngle,
     ushort CastDuration,
-    ushort RecoveryDuration) : CookedCapabilityParameters;
+    ushort RecoveryDuration,
+    string ExplosionPresentationId = "") : CookedCapabilityParameters;
 
 public sealed record CookedBudget(
     int SlotCount,

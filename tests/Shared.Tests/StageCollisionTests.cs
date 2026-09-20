@@ -42,6 +42,121 @@ public sealed class StageCollisionTests
             Def.CapsuleHeight * 0.5f + 0.02f);
     }
 
+    [Fact]
+    public void WalkingOffFlatLedge_DoesNotSnapToLowerFlatFloor()
+    {
+        var arena = FiniteArena(
+            new[]
+            {
+                Floor(0f, -10f, 0f, -10f, 10f),
+                FloorOther(0f, -10f, 0f, -10f, 10f),
+                Floor(-0.3f, 0f, 10f, -10f, 10f),
+                FloorOther(-0.3f, 0f, 10f, -10f, 10f),
+            },
+            (0f, -10f, 0f, -10f, 10f),
+            (-0.3f, 0f, 10f, -10f, 10f));
+        var state = Grounded(-0.25f, 0f);
+        var input = TestHelpers.Input(moveX: 1f);
+
+        for (int tick = 0; tick < 8; tick++)
+        {
+            Simulation.SimulateTick(ref state, Def, input, arena, out _);
+            if (!state.IsGrounded)
+            {
+                Assert.True(state.PY > TestHelpers.GroundPY(Def) - 0.05f,
+                    "Walking off a flat ledge must become airborne before dropping to the lower floor.");
+                return;
+            }
+        }
+
+        Assert.Fail("A flat ledge must not acquire the slope-following ground snap.");
+    }
+
+    [Fact]
+    public void HeldRunAcrossCoplanarFloorSeam_PreservesGroundedTraversal()
+    {
+        const float seamOffset = 0.008f;
+        var arena = FiniteArena(
+            new[]
+            {
+                Floor(0f, -10f, 0f, -10f, 10f),
+                FloorOther(0f, -10f, 0f, -10f, 10f),
+                Floor(0f, 0f, 10f, -10f, 10f),
+                FloorOther(0f, 0f, 10f, -10f, 10f),
+            },
+            (0f, -10f, 10f, -10f, 10f));
+        var state = TestHelpers.PlayerState(-seamOffset, 0f);
+        state.PY = TestHelpers.GroundPY(Def);
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, Def, state);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = TestHelpers.Input(moveX: 1f),
+        };
+
+        for (int tick = 0; tick < 30; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded, $"tick={tick}: lost support at x={current.PX:F4}");
+            Assert.InRange(MathF.Abs(current.PY - TestHelpers.GroundPY(Def)), 0f, 0.03f);
+        }
+
+        Assert.True(sim.GetState(1).PX > 1f);
+    }
+
+    [Fact]
+    public void HeldRunAcrossContinuousRamp_RemainsGroundedUphillAndDownhill()
+    {
+        const float slope = 0.8f;
+        const float startX = -5f;
+        const float startZ = 8f;
+        var arena = FiniteArena(
+            new[]
+            {
+                SlopeFloor(slope, -10f, 10f, -10f, 10f),
+                SlopeFloorOther(slope, -10f, 10f, -10f, 10f),
+            },
+            (0f, -10f, 10f, -10f, 10f));
+        var state = TestHelpers.PlayerState(startX, startZ);
+        float supportOffset = Def.CapsuleHeight * 0.5f - Def.CapsuleRadius
+            + Def.CapsuleRadius * MathF.Sqrt(1f + slope * slope);
+        state.PY = slope * (startX + 10f) + supportOffset;
+        state.IsGrounded = true;
+        var sim = TestHelpers.MakeSim(arena);
+        sim.RegisterEntity(1, Def, state);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = TestHelpers.Input(moveX: 1f),
+        };
+
+        for (int tick = 0; tick < 30; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded, $"uphill tick={tick}: lost support at x={current.PX:F3}");
+            float expectedY = slope * (current.PX + 10f) + supportOffset;
+            Assert.InRange(MathF.Abs(current.PY - expectedY), 0f, 0.05f);
+        }
+
+        float uphillX = sim.GetState(1).PX;
+        Assert.True(uphillX > startX + 1f);
+
+        inputs[1] = TestHelpers.Input(moveX: -1f);
+        for (int tick = 0; tick < 30; tick++)
+        {
+            sim.Tick(inputs);
+            var current = sim.GetState(1);
+            Assert.True(current.IsGrounded, $"downhill tick={tick}: lost support at x={current.PX:F3}");
+            float expectedY = slope * (current.PX + 10f) + supportOffset;
+            Assert.InRange(MathF.Abs(current.PY - expectedY), 0f, 0.05f);
+        }
+
+        var downhill = sim.GetState(1);
+        Assert.True(downhill.PX < uphillX - 1f);
+    }
+
 
     [Fact]
     public void HorizontalContactWithPlatformEdge_DoesNotCreateUpwardMomentum()
@@ -601,6 +716,24 @@ public sealed class StageCollisionTests
             AX = maxX, AY = y, AZ = maxZ,
             BX = maxX, BY = y, BZ = minZ,
             CX = minX, CY = y, CZ = maxZ,
+        };
+
+    private static CollisionTriangle SlopeFloor(float slope,
+        float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = minX, AY = 0f, AZ = minZ,
+            BX = minX, BY = 0f, BZ = maxZ,
+            CX = maxX, CY = slope * (maxX - minX), CZ = minZ,
+        };
+
+    private static CollisionTriangle SlopeFloorOther(float slope,
+        float minX, float maxX, float minZ, float maxZ)
+        => new()
+        {
+            AX = maxX, AY = slope * (maxX - minX), AZ = maxZ,
+            BX = maxX, BY = slope * (maxX - minX), BZ = minZ,
+            CX = minX, CY = 0f, CZ = maxZ,
         };
     private static CollisionTriangle TraversalFloor(float y, float minX, float maxX, float minZ, float maxZ)
         => new()

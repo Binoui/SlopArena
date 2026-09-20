@@ -223,6 +223,25 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
+    public void MankiE_IgnitionPresentationEvent_IsAuthoritativeAndPositional()
+    {
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState();
+        state.PY = TestHelpers.MankiGroundPY;
+        TestHelpers.RegisterPlayer(sim, Def, state);
+
+        float expectedFeetY = state.PY - Def.CapsuleHeight * 0.5f;
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 4);
+
+        var presentation = Assert.Single(sim.GetPresentationEvents());
+        Assert.Equal((ulong)1, presentation.EntityId);
+        Assert.Equal("presentation.manki.jetpack-boost.ignition", presentation.PresentationId);
+        Assert.Equal(PresentationEventSource.CapabilityExplosion, presentation.Source);
+        Assert.Equal(expectedFeetY, presentation.WorldY, 5);
+        Assert.Equal(0f, presentation.WorldYaw);
+    }
+
+    [Fact]
     public void MankiE_IgnitionHitbox_UsesSmallQExplosionAtFeet()
     {
         var sim = TestHelpers.MakeSim();

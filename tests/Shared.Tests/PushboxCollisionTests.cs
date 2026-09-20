@@ -23,6 +23,31 @@ public sealed class PushboxCollisionTests
     }
 
     [Fact]
+    public void RunningIntoStationaryFighterDoesNotTransferHorizontalVelocity()
+    {
+        var def = TestHelpers.CombatDef;
+        var sim = TestHelpers.MakeSim();
+        var attacker = TestHelpers.PlayerState(-0.2f, 0f) with
+        {
+            PY = TestHelpers.CombatGroundPY,
+            VX = 1f
+        };
+        var defender = TestHelpers.NpcState(0.2f, 0f) with
+        {
+            PY = TestHelpers.CombatGroundPY,
+            VX = 0f
+        };
+        sim.RegisterEntity(1, def, attacker);
+        sim.RegisterEntity(100, def, defender);
+
+        sim.Tick(new() { { 1, default }, { 100, default } });
+
+        var result = sim.GetState(100);
+        Assert.InRange(result.VX, -0.0001f, 0.0001f);
+        Assert.InRange(result.VZ, -0.0001f, 0.0001f);
+    }
+
+    [Fact]
     public void VerticallySeparatedFightersDoNotPushEachOther()
     {
         var def = TestHelpers.CombatDef;

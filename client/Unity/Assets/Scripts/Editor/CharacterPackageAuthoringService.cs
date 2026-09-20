@@ -26,8 +26,8 @@ public sealed class CharacterPackageAuthoringService
         var ids = new[]
         {
             character.Presentation.Idle, character.Presentation.Run, character.Presentation.Dash,
-            character.Presentation.Jump, character.Presentation.Fall, character.Presentation.HitSmall,
-            character.Presentation.HitMedium, character.Presentation.HitHard,
+            character.Presentation.Jump, character.Presentation.Fall, character.Presentation.Tumble,
+            character.Presentation.HitSmall, character.Presentation.HitMedium, character.Presentation.HitHard,
         }.Concat((character.Slots ?? Array.Empty<CharacterSlotSource>())
             .SelectMany(slot => slot.Timeline?.Stages ?? Array.Empty<CharacterStageSource>())
             .SelectMany(stage => stage.AnimationIds ?? Array.Empty<string>()))

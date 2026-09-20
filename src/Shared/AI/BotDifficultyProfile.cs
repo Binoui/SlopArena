@@ -26,7 +26,8 @@ public readonly struct BotDifficultyProfile
     public readonly float RangeError;
     public readonly float PunishChance;
     public readonly float ComboChance;
-
+    /// <summary>Chance of selecting a special when a usable normal is also in range.</summary>
+    public readonly float SpecialChance;
     private BotDifficultyProfile(
         int decisionIntervalTicks,
         int reactionDelayTicks,
@@ -36,7 +37,8 @@ public readonly struct BotDifficultyProfile
         float jumpChance,
         float rangeError,
         float punishChance,
-        float comboChance)
+        float comboChance,
+        float specialChance)
     {
         DecisionIntervalTicks = decisionIntervalTicks;
         ReactionDelayTicks = reactionDelayTicks;
@@ -47,6 +49,7 @@ public readonly struct BotDifficultyProfile
         RangeError = rangeError;
         PunishChance = punishChance;
         ComboChance = comboChance;
+        SpecialChance = specialChance;
     }
 
     /// <summary>
@@ -73,9 +76,9 @@ public readonly struct BotDifficultyProfile
     {
         return Normalize(difficulty) switch
         {
-            CpuDifficulty.Easy => new(30, 24, 0.20f, 0.35f, 0.05f, 0.10f, 0.45f, 0.00f, 0.00f),
-            CpuDifficulty.Normal => new(14, 18, 0.56f, 0.21f, 0.30f, 0.30f, 0.20f, 0.32f, 0.22f),
-            _ => new(4, 12, 0.88f, 0.10f, 0.62f, 0.50f, 0.05f, 0.85f, 0.72f),
+            CpuDifficulty.Easy => new(30, 24, 0.20f, 0.35f, 0.05f, 0.20f, 0.45f, 0.00f, 0.00f, 0.08f),
+            CpuDifficulty.Normal => new(14, 18, 0.56f, 0.21f, 0.30f, 0.50f, 0.20f, 0.32f, 0.22f, 0.15f),
+            _ => new(4, 12, 0.88f, 0.10f, 0.62f, 0.60f, 0.05f, 0.85f, 0.72f, 0.25f),
         };
     }
 }

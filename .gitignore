@@ -162,6 +162,10 @@ client/Unity/Assets/Resources/VFX/SlopArena/
 client/Unity/Assets/Resources/VFX/SlopArena.meta
 
 # Character art (models, textures, materials — non-redistributable)
+# Solo-dev local audio; keep licensed/downloaded source assets out of Git.
+client/Unity/Assets/Resources/Audio/
+client/Unity/Assets/Resources/Audio.meta
+/.pi/
 client/Unity/Assets/Art/
 client/Unity/Assets/Art.meta
 

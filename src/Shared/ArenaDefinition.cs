@@ -239,8 +239,10 @@ namespace SlopArena.Shared
         /// <summary>Returns true when the arena has authoritative triangle collision.</summary>
         public static bool HasTriangles(in ArenaDefinition arena)
             => arena.CollisionTriangles is { Length: > 0 };
-        internal static bool IsUpwardFacingTriangle(int triangleIndex, in ArenaDefinition arena)
+        internal static bool TryGetTriangleNormal(int triangleIndex, in ArenaDefinition arena,
+            out float normalX, out float normalY, out float normalZ)
         {
+            normalX = normalY = normalZ = 0f;
             if (arena.CollisionTriangles == null
                 || triangleIndex < 0 || triangleIndex >= arena.CollisionTriangles.Length)
                 return false;
@@ -251,11 +253,25 @@ namespace SlopArena.Shared
             float acx = triangle.CX - triangle.AX;
             float acy = triangle.CY - triangle.AY;
             float acz = triangle.CZ - triangle.AZ;
-            float normalY = abz * acx - abx * acz;
-            float normalX = aby * acz - abz * acy;
-            float normalZ = abx * acy - aby * acx;
+            normalX = aby * acz - abz * acy;
+            normalY = abz * acx - abx * acz;
+            normalZ = abx * acy - aby * acx;
             float length = MathF.Sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
-            return length > 0.000001f && normalY / length > 0.5f;
+            if (length <= 0.000001f)
+            {
+                normalX = normalY = normalZ = 0f;
+                return false;
+            }
+            normalX /= length;
+            normalY /= length;
+            normalZ /= length;
+            return true;
+        }
+
+        internal static bool IsUpwardFacingTriangle(int triangleIndex, in ArenaDefinition arena)
+        {
+            return TryGetTriangleNormal(triangleIndex, in arena,
+                out _, out float normalY, out _) && normalY > 0.5f;
         }
 
 
@@ -351,7 +367,11 @@ namespace SlopArena.Shared
             float dx = endX - startX, dy = endY - startY, dz = endZ - startZ;
             float displacementSq = dx * dx + dy * dy + dz * dz;
             const float tolerance = 0.0001f;
-            float contactRadius = radius + tolerance;
+            // Keep the sweep boundary at the true capsule radius. Expanding it by the
+            // numerical tolerance makes a nearby triangle edge a zero-time lateral
+            // contact even when a coplanar neighboring triangle already supports the
+            // capsule. The tolerance remains a classification margin below.
+            float contactRadius = radius;
             float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
             float bestTime = float.PositiveInfinity;
             int bestTriangle = int.MaxValue;
@@ -528,6 +548,25 @@ namespace SlopArena.Shared
                 }
             }
             return found;
+        }
+
+        internal static bool IsTriangleInteriorContact(
+            float px, float py, float pz, float radius, float capsuleHeight,
+            in ArenaDefinition arena, in CollisionContact contact)
+        {
+            int triangleIndex = contact.TriangleIndex;
+            if (arena.CollisionTriangles == null
+                || triangleIndex < 0 || triangleIndex >= arena.CollisionTriangles.Length)
+                return false;
+            float halfLine = MathF.Max(0f, capsuleHeight * 0.5f - radius);
+            var triangle = arena.CollisionTriangles[triangleIndex];
+            if (!TryCapsuleTriangleDistance(px, py, pz, halfLine,
+                    in triangle, out var closest)
+                || !TryGetTriangleNormal(triangleIndex, in arena,
+                    out float normalX, out float normalY, out float normalZ))
+                return false;
+            return PointInTriangleInterior(closest.TriangleX, closest.TriangleY,
+                closest.TriangleZ, in triangle, normalX, normalY, normalZ);
         }
 
         private static bool TryCapsuleTriangleDistance(
@@ -715,6 +754,25 @@ namespace SlopArena.Shared
             float d3 = c3x * nx + c3y * ny + c3z * nz;
             return d1 >= -0.0001f && d2 >= -0.0001f && d3 >= -0.0001f;
         }
+
+        private static bool PointInTriangleInterior(float px, float py, float pz,
+            in CollisionTriangle t, float nx, float ny, float nz)
+        {
+            float abx = t.BX - t.AX, aby = t.BY - t.AY, abz = t.BZ - t.AZ;
+            float bcx = t.CX - t.BX, bcy = t.CY - t.BY, bcz = t.CZ - t.BZ;
+            float cax = t.AX - t.CX, cay = t.AY - t.CY, caz = t.AZ - t.CZ;
+            float apx = px - t.AX, apy = py - t.AY, apz = pz - t.AZ;
+            float bpx = px - t.BX, bpy = py - t.BY, bpz = pz - t.BZ;
+            float cpx = px - t.CX, cpy = py - t.CY, cpz = pz - t.CZ;
+            float c1x = aby * apz - abz * apy, c1y = abz * apx - abx * apz, c1z = abx * apy - aby * apx;
+            float c2x = bcy * bpz - bcz * bpy, c2y = bcz * bpx - bcx * bpz, c2z = bcx * bpy - bcy * bpx;
+            float c3x = cay * cpz - caz * cpy, c3y = caz * cpx - cax * cpz, c3z = cax * cpy - cay * cpx;
+            float d1 = c1x * nx + c1y * ny + c1z * nz;
+            float d2 = c2x * nx + c2y * ny + c2z * nz;
+            float d3 = c3x * nx + c3y * ny + c3z * nz;
+            return d1 > 0.0001f && d2 > 0.0001f && d3 > 0.0001f;
+        }
+
 
 
         /// <summary>
@@ -935,7 +993,6 @@ namespace SlopArena.Shared
                     if (arena.HasValue)
                     {
                         var a = arena.Value;
-                        a.SpatialGrid = ArenaCollision.BuildSpatialGrid(in a);
                         loaded.Add(a);
                         Console.WriteLine($"[ArenaRegistry] Loaded: {a.Name} ({file})");
                     }

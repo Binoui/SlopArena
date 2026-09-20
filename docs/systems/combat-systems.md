@@ -50,6 +50,12 @@ A Duration Lock prevents action during an authored move commitment. The engine o
 
 `IasaTicks = 0` and `LandingLagTicks = 0` preserve the default no-early-out/no-landing-commitment behavior. Auto-cancel windows are per air stage.
 
+During positive grounded landing lag, Unity blends the current aerial pose into idle
+over the remaining replicated `LandingLagTicks / 60` seconds. Ordinary and
+auto-cancelled landings do not trigger the blend. Hitstun interrupts it, and zero
+landing lag returns animation ownership to locomotion immediately. This presentation
+never extends the gameplay lock.
+
 ## Hitboxes and projectiles
 
 The Shared resolver owns collision. A move can issue fixed-position, capsule, sphere, bone-attached, or projectile operations through its cooked timeline or an approved trusted capability. The resolver handles:

@@ -29,6 +29,7 @@ namespace SlopArena.Client.UI
 
         private void OnEnable()
         {
+            UISFX.PlayMenuMusic();
             _root = _uiDocument.rootVisualElement;
             _winnerCard = _root.Q<VisualElement>("results-winner");
             _standings = _root.Q<VisualElement>("results-standings");

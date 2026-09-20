@@ -86,6 +86,109 @@ The package weapon config attaches the sword to the source rig's `hand_r` bone.
 Source licensing remains an approval prerequisite before release, not before the
 current built-in roster admission.
 
+## Air 2 design — Rising Greatsword Sweep
+
+Design agreed 2026-09-15. The animation candidate is authored and bound;
+gameplay is not implemented. `air.2` still has the 30-tick, hitbox-free probe
+timeline. The 42-tick specification below is the gameplay creation target,
+not a claim about current runtime behavior.
+
+Animation candidate: `Assets/Art/Characters/bonk/Animations/bonk_a2_rising_sweep.FBX`,
+bound as `anim.bonk.a2`. Source frames 1–22 at 30 fps span 0.7 seconds.
+Entry and handoff use the first pose of `jump_loop.FBX`, sampled on Bonk's
+actual rig. The normal Blender FBX export imports as Humanoid with a
+reference pose derived from Bonk's existing Avatar; no binary FBX patching
+or gameplay-root correction is used.
+
+Ability Lab resolved the binding through transient compiled content.
+Its unchanged 30-tick timeline compresses the clip to 0.5 seconds
+(1.4× intended speed): Lab tick 14 sampled clip time 0.326667 seconds.
+Judge the intended timing from the 0.7-second source preview until the
+separate gameplay timing change is implemented.
+
+Editable source and review evidence:
+`art/blender/exports/bonk-a2-37jjjrkv/bonk-a2-source.blend`,
+`bonk-a2-preview.mp4`, `motion-sheet.jpg`, and `ability-lab.png`.
+These local authoring artifacts include recovery copies of the prior Blender
+session, original rig/import settings, and catalog. Unity checks sampled
+43 times: zero root translation/rotation/scale drift and start/end bone
+positions matching within 0.000001 m. Human motion/feel approval is pending.
+
+### Role and counterplay
+
+An aerial anti-air / juggling tool: a two-handed rising greatsword sweep
+through the space in front of and above Bonk. It complements `air.1` forward
+spacing, `air.3` downward spike, and `air.4` aerial kill read.
+
+The sword tip draws one upward arc, not a full helicopter spin. Below and
+behind Bonk remain vulnerable. Whiffing commits him through recovery; the
+move is not an all-direction defensive bubble or a promised true-combo starter.
+
+### Animation and timing target
+
+All intervals below use zero-based 60 Hz gameplay ticks. Endpoints shown
+as ranges are inclusive; tick 42 is the duration boundary.
+
+| Phase | Ticks | Required pose / motion |
+| --- | --- | --- |
+| Startup | 0–11 | Gather the blade low and slightly across the body, with a compact, readable two-handed windup. No damaging contact. |
+| Active | 12–19 | Sweep upward from in front of the chest to overhead in one continuous strike. |
+| Recovery | 20–35 | Finish with the sword high, then visibly recover toward the airborne pose. No damaging contact. |
+| Actionable / IASA | 36 | Bonk may act again. |
+| Visual settle | 36–41 | Complete the return toward the airborne pose if uninterrupted. |
+| Duration boundary | 42 | End of the 0.7-second timeline. |
+
+Author the contact poses first: at tick 12 the blade enters useful
+front-upper space; by tick 19 it has swept overhead.
+
+First contact is at 200 ms. The active window lasts 8 ticks (about 133 ms).
+At 30 fps, zero-based animation frame positions are: first contact 6,
+active-window end boundary 10, IASA 18, duration boundary 21.
+At 60 fps, frame positions match gameplay ticks. Preserve the 0.7-second
+duration on export rather than confusing inclusive sample count with duration.
+
+### Hitbox contract
+
+- One moving capsule from `_weapon_hilt` to `_weapon_tip`, following the
+  authoritative baked sword pose throughout ticks 12–19.
+- Initial radius: 0.35 m, subject to visible-blade alignment in Ability Lab.
+- One hit per opponent for the entire sweep. The moving capsule must not
+  repeatedly damage an opponent as it passes through them.
+- No stationary overhead sphere, extra torso hitbox, or added rear/below
+  coverage. Close opponents are hit only where the sword capsule reaches.
+- If implementation later splits the contact into multiple hitboxes, preserve
+  the same one-hit-per-opponent contract through shared hit grouping.
+
+### Provisional reward and landing cost
+
+| Parameter | Initial target |
+| --- | --- |
+| Damage | 8 |
+| Launch angle | 75° upward |
+| Landing lag | 18 ticks |
+| Early autocancel | Disabled |
+| Late autocancel | Starts at tick 36 |
+
+Reward intent is useful vertical lift, not strong sideways knockback.
+Base knockback, growth, and actual hitstun remain undecided until the
+authored move can be measured through Shared simulation. Damage, angle,
+radius, and landing cost are starting values, not validated balance.
+Do not claim a guaranteed follow-up or true combo without real-simulation evidence.
+
+### Acceptance before gameplay approval
+
+- Scrub ticks 12–19 in Ability Lab: the capsule follows the blade and the
+  front-upper-to-overhead arc reads clearly at gameplay distance.
+- Verify no damaging contact before tick 12 or from tick 20 onward, and
+  exactly one hit per opponent across the sweep.
+- Check representative front-upper and overhead targets, plus rear/below
+  targets outside the blade path; there must be no invisible body coverage.
+- Exercise whiff recovery, tick-36 actionability, landing lag, and the
+  late-autocancel boundary through the authoritative runtime.
+- Measure launch and follow-up opportunities at representative damage
+  percentages; then playtest whether coverage, commitment, and reward
+  distinguish it from Bonk's other aerials.
+
 ## Rig and bindings
 
 `bonk.FBX.meta` reports `animationType: 3` (Humanoid). The catalog rig resolves to the

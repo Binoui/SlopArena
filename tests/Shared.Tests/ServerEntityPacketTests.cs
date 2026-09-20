@@ -3,7 +3,7 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(110)
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(112)
 /// + hasInput(1) + InputState(20) when the server consumed input that tick.
 /// Input relay for client rollback prediction (issue #80, ADR-0010).
 /// </summary>
@@ -32,6 +32,7 @@ public class ServerEntityPacketTests
             Deaths = 2,
             DamagePercent = 87,
             LockOn = true,
+            LandingLagTicks = 18,
             Cooldown0 = 1,
             Cooldown1 = 12,
             Cooldown2 = 33,
@@ -97,12 +98,10 @@ public class ServerEntityPacketTests
         Assert.Equal(statePacket.StateDurationFrames, restored.State.StateDurationFrames);
         Assert.Equal(statePacket.AttackSlot, restored.State.AttackSlot);
         Assert.Equal(statePacket.ComboStage, restored.State.ComboStage);
-        Assert.Equal(statePacket.AnimIndex, restored.State.AnimIndex);
-        Assert.Equal(statePacket.FacingYaw, restored.State.FacingYaw);
         Assert.Equal(statePacket.MatchState, restored.State.MatchState);
         Assert.Equal(statePacket.DamagePercent, restored.State.DamagePercent);
+        Assert.Equal(statePacket.LandingLagTicks, restored.State.LandingLagTicks);
         Assert.True(restored.State.LockOn);
-
         Assert.Equal(input.MoveX, restored.Input.MoveX);
         Assert.Equal(input.MoveY, restored.Input.MoveY);
         Assert.Equal(input.Up, restored.Input.Up);
@@ -176,13 +175,13 @@ public class ServerEntityPacketTests
     public void SizeConstants_AssertWireLayout()
     {
         // Downlink max packet size is a wire contract: 8 entityId + 4 tick
-        // + 110 CharacterStatePacket + 1B flag + 20B input.
+        // + 112 CharacterStatePacket + 1B flag + 20B input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(122, ServerEntityPacket.BaseSize);
+        Assert.Equal(124, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(143, ServerEntityPacket.MaxSize);
-        Assert.Equal(123, ServerEntityPacket.NoInputSize);
+        Assert.Equal(145, ServerEntityPacket.MaxSize);
+        Assert.Equal(125, ServerEntityPacket.NoInputSize);
         // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
         // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
         Assert.Equal(20, InputState.Size);

@@ -45,7 +45,7 @@ namespace SlopArena.Shared
 
         /// <summary>ADR-0019 §6: airborne from a launch, post-hitstun — flight gravity 8,
         /// horizontal friction 10 until landing or any action (jump/ability). Server-local
-        /// state, never on the wire (CSP stays 113).</summary>
+        /// state, never on the wire.</summary>
         public bool InPostHitstunFlight;
 
         public byte Deaths;              // match death counter, server authority
@@ -94,8 +94,8 @@ namespace SlopArena.Shared
         /// character is planted — no ability input, no jump/dash/burst, no input movement —
         /// after touching ground while an air-started attack whose stage declared
         /// LandingLagTicks is still active (unless the landing tick fell in an auto-cancel
-        /// window). Sim-internal like AnimLockTicks: applied server-side, not on the wire;
-        /// the client renders the state the packet says and the authority enforces the lock.
+        /// window). Authoritative and serialized so local and remote presentation/rollback
+        /// tracks render and replay the same commitment.
         /// Cleared by hitstun (ApplyKnockback) — being hit ends the commitment.
         /// </summary>
         public ushort LandingLagTicks;

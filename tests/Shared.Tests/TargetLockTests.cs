@@ -14,8 +14,9 @@ namespace SlopArena.Shared.Tests;
 /// (10m), or an accepted LMB facing snap, and the owner's LockOn resets on death
 /// (fresh respawn state). Target death re-targets through the resolver.
 ///
-/// The golden scenarios pin the lock lifecycle (LockOn, positions, deaths). Facing
-/// angles are deliberately excluded from the golden schema, so steering is asserted
+/// The golden scenarios pin lock lifecycle (LockOn, snap, deaths); range disengagement
+/// and movement continuation are asserted behaviorally below.
+/// Facing angles are deliberately excluded from the golden schema, so steering is asserted
 /// behaviorally in companion tests.
 /// </summary>
 public class TargetLockTests : KitScenarioTests
@@ -35,30 +36,43 @@ public class TargetLockTests : KitScenarioTests
         return arena;
     }
 
-    // ────────────────────────── Golden scenarios ──────────────────────────
+    // ────────────────────────── Golden and behavioral scenarios ──────────────────────────
 
     [Fact]
-    public void Golden_LockOn_Disengages_OutOfRange()
+    public void LockOn_Disengages_OutOfRange_AndMovementContinues()
     {
-        // Locked, then walks +X perpendicular to the NPC at +Z: separation passes 10m
-        // (~t64 at WalkSpeed 9 m/s) → LockOn clears, player keeps moving. (+X keeps the
-        // walk inside the test arena's heightmap grid; a -Z walk exits it.)
-        var inputs = new InputSequence().Set(0, new InputState { ToggleLock = true });
-        for (int t = 1; t < 200; t++) inputs.Set(t, new InputState { MoveX = 1f });
-        AssertGoldenScenario(new KitScenario
+        // Range is a behavioral boundary: once the target exceeds 10m, LockOn clears,
+        // but the player's ordinary ground movement continues without interruption.
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
+        Assert.True(sim.GetState(1).LockOn, "lock should engage while target is in range");
+
+        bool disengaged = false;
+        float disengagedX = 0f;
+        for (int tick = 1; tick < 200; tick++)
         {
-            Name = "Target Lock Out Of Range Disengage",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = inputs,
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState(0f, 3f) with { PY = Gpy },
-            NpcAssert = _ => { },
-            NpcDef = Def,
-            SnapshotTick = 120,
-            TotalTicks = 200,
-        });
+            sim.Tick(new() { { 1, new InputState { MoveX = 1f } } });
+            var state = sim.GetState(1);
+            if (!disengaged && !state.LockOn)
+            {
+                disengaged = true;
+                disengagedX = state.PX;
+                Assert.Equal(100UL, state.TargetEntityId);
+                Assert.True(state.PX * state.PX + 9f > 100f,
+                    $"lock cleared before the target exceeded 10m: x={state.PX:F3}");
+            }
+        }
+
+        var final = sim.GetState(1);
+        Assert.True(disengaged, "lock must clear after the target exceeds lock range");
+        Assert.False(final.LockOn);
+        Assert.True(final.PX > disengagedX + 0.1f,
+            $"movement must continue after disengagement: crossing={disengagedX:F3}, final={final.PX:F3}");
     }
+
 
     [Fact]
     public void Golden_LockOn_LmbSnapExitsLock()

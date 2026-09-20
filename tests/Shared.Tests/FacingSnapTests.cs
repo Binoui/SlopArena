@@ -7,9 +7,9 @@ namespace SlopArena.Shared.Tests;
 /// Facing model (ADR-0017 / issue #126) — the unlocked-mode rules the persistent
 /// target lock (ADR-0018) overrides: air facing is sticky (no velocity re-facing),
 /// ground facing follows movement, and LMB snaps facing to the camera azimuth at the
-/// input gate. Golden scenarios pin drift-no-reface, snap-then-normal (hit-confirm
-/// along the snapped facing) and both rejection gates; behavioral tests cover the
-/// same seams with angle asserts. The lock tests live in <see cref="TargetLockTests"/>.
+/// input gate. Golden scenarios pin snap-then-normal and both rejection gates;
+/// behavioral tests cover air drift and the same facing seams with angle asserts.
+/// The lock tests live in <see cref="TargetLockTests"/>.
 /// </summary>
 public class FacingSnapTests : KitScenarioTests
 {
@@ -17,28 +17,6 @@ public class FacingSnapTests : KitScenarioTests
     private static float Gpy => TestHelpers.CombatGroundPY;
 
     // ────────────────────────── Golden scenarios (issue #126) ──────────────────────────
-
-    [Fact]
-    public void Golden_AirDrift_DoesNotReface()
-    {
-        // Sticky air facing: drift +X during the airborne window (ticks 0-3) must not
-        // re-face the fighter — the snapshot pins takeoff yaw (PI/4) while drifting.
-        // Input stops before landing (~t4); with no input the ground rule never writes
-        // facing either, so the final tick pins the same yaw.
-        var inputs = new InputSequence();
-        for (int t = 0; t <= 3; t++) inputs.Set(t, new InputState { MoveX = 1f });
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Facing Air Drift Without Reface",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState()
-                with { PY = 2f, IsGrounded = false, JumpsLeft = 0, FacingYaw = MathF.PI / 4f },
-            Inputs = inputs,
-            Assert = _ => { },
-            SnapshotTick = 2,   // airborne, drifting, facing unchanged
-            TotalTicks = 40,
-        });
-    }
 
     [Fact]
     public void Golden_SnapThenNormal_FiresAlongSnappedFacing()
@@ -158,31 +136,6 @@ public class FacingSnapTests : KitScenarioTests
         TestHelpers.AssertNear(MathF.PI, state.FacingYaw, 1e-4f);
     }
 
-    [Fact]
-    public void SnapThenNormal_FiresAlongSnappedFacing()
-    {
-        // The #126 playtest: jump, rotate camera, LMB, press a slot — the normal fires
-        // behind the drift. FightGuy's E has an air variant (AirE); Manki's Slot1 has
-        // none, so use FightGuy to prove the air attack fires along the snapped facing.
-        var fg = TestHelpers.FightGuyDef;
-        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var player = TestHelpers.PlayerState(100f, 100f) with
-        {
-            PY = 2f, IsGrounded = false, JumpsLeft = 0, FacingYaw = 0f,
-        };
-        sim.RegisterEntity(1, fg, player);
-
-        sim.Tick(new() { { 1, new InputState { FaceToCamera = true, AimYaw = 18000 } } }); // snap → PI (-Z)
-        var snapped = sim.GetState(1);
-        TestHelpers.AssertNear(MathF.PI, snapped.FacingYaw, 1e-3f);
-
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.E } } });          // air normal
-
-        var state = sim.GetState(1);
-        Assert.True(state.State is ActionState.Attacking, "attack started");
-        Assert.Equal(AbilitySlots.E, state.AttackSlot);
-        TestHelpers.AssertNear(MathF.PI, state.FacingYaw, 1e-3f); // snapped facing held through the attack start
-    }
 
     [Fact]
     public void Snap_Rejected_MidAttack()

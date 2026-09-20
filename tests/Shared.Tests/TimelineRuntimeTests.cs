@@ -36,7 +36,7 @@ public sealed class TimelineRuntimeTests
         Assert.Equal(0u, presentation.MatchTick);
         Assert.Equal(1ul, presentation.EntityId);
         Assert.Equal(4, presentation.OperationIndex);
-        Assert.Equal(new PresentationEventKey(0, 1, 4), presentation.Key);
+        Assert.Equal(new PresentationEventKey(0, 1, 1, PresentationEventSource.Timeline, 4), presentation.Key);
         Assert.Equal("presentation.hit", presentation.PresentationId);
 
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
@@ -44,7 +44,7 @@ public sealed class TimelineRuntimeTests
     }
 
     [Fact]
-    public void ForwardLungeCapturesFacingForItsFullDurationAndPreservesMomentum()
+    public void ForwardLungeCapturesFacingAndStopsAfterAuthoredDuration()
     {
         var slot = Slot(10,
             new CookedForwardLungeOperation(2, AuthoringUnit.MetersPerSecond, 12f, 3));
@@ -66,18 +66,61 @@ public sealed class TimelineRuntimeTests
         TestHelpers.AssertNear(12f, state.VX);
         TestHelpers.AssertNear(0f, state.VZ);
 
+        // Tick 5: lunge duration (3 ticks) has completed; horizontal velocity stops.
         sim.TickAbilities(inputs);
         state = sim.GetState(1);
-        TestHelpers.AssertNear(12f, state.VX);
+        TestHelpers.AssertNear(0f, state.VX);
         TestHelpers.AssertNear(0f, state.VZ);
+    }
 
-        state.State = ActionState.Hitstun;
-        sim.SetState(1, state);
-        sim.TickAbilities(inputs);
-        Assert.Null(sim.GetActiveAbility(1));
+    [Fact]
+    public void OutOfOrderCookedOperationsAreSortedAndExecutedInChronologicalTickOrder()
+    {
+        var manifest = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/fightguy/package.json"));
+        var character = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/fightguy/character.json")))!.AsObject();
+        var stage = (System.Text.Json.Nodes.JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
+        stage["operations"] = new System.Text.Json.Nodes.JsonArray
+        {
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["kind"] = "spawnHitbox", ["tick"] = 4, ["unit"] = "meters",
+                ["hitbox"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["shape"] = "sphere", ["radius"] = 0.5, ["offsetX"] = 0, ["offsetY"] = 0, ["offsetZ"] = 0,
+                    ["endOffsetX"] = 0, ["endOffsetY"] = 0, ["endOffsetZ"] = 0, ["startBoneId"] = null, ["endBoneId"] = null,
+                    ["damage"] = 10, ["angle"] = 45, ["baseKnockback"] = 5, ["knockbackGrowth"] = 20, ["stunTicks"] = 10,
+                    ["durationTicks"] = 2, ["interruptible"] = false, ["hitGroup"] = 0, ["knockbackDirection"] = "awayFromOwner"
+                }
+            },
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["kind"] = "forwardLunge", ["tick"] = 2, ["unit"] = "metersPerSecond", ["speed"] = 10, ["durationTicks"] = 2
+            }
+        };
+
+        var compileResult = CharacterPackageCompiler.Compile(manifest, character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        Assert.True(compileResult.CookedPackage != null, string.Join("; ", compileResult.Diagnostics.Select(d => $"{d.Code}: {d.Message} ({d.Path})")));
+        var cookedSlot = compileResult.CookedPackage!.Definition.Slots[0];
+        Assert.Equal(2, cookedSlot.Timeline.Stages[0].Operations.Count);
+        Assert.Equal(2, cookedSlot.Timeline.Stages[0].Operations[0].Tick);
+        Assert.IsType<CookedForwardLungeOperation>(cookedSlot.Timeline.Stages[0].Operations[0]);
+        Assert.Equal(4, cookedSlot.Timeline.Stages[0].Operations[1].Tick);
+        Assert.IsType<CookedSpawnHitboxOperation>(cookedSlot.Timeline.Stages[0].Operations[1]);
+
+        var (sim, def) = Create(cookedSlot, TestHelpers.PlayerState() with { FacingYaw = MathF.PI / 2f });
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+        sim.ActivateAbility(1, new CookedTimelineAbility(cookedSlot, Array.Empty<string>()), 0, def);
+        sim.TickAbilities(inputs); // tick 1
+        sim.TickAbilities(inputs); // tick 2: lunge begins
+        var state = sim.GetState(1);
+        TestHelpers.AssertNear(10f, state.VX);
+
+        sim.TickAbilities(inputs); // tick 3: lunge tick 2
+        sim.TickAbilities(inputs); // tick 4: lunge completes (stops), hitbox triggers
         state = sim.GetState(1);
-        TestHelpers.AssertNear(12f, state.VX);
-        TestHelpers.AssertNear(0f, state.VZ);
+        TestHelpers.AssertNear(0f, state.VX);
+        Assert.Single(sim.Resolver.GetActiveHitboxes());
     }
 
     [Fact]
@@ -125,6 +168,66 @@ public sealed class TimelineRuntimeTests
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
         Assert.Null(sim.GetActiveAbility(1));
         Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+    }
+
+    [Fact]
+    public void CycloneStopsPropulsionAtCapabilityDurationWithoutEndingRecovery()
+    {
+        var slot = Slot(8, new CookedStartCapabilityOperation(0, AuthoringUnit.Ticks,
+            "slop.internal.fightguy.cyclone-kick.v1", "1",
+            new CookedCycloneKickCapabilityParameters(8.5f, 1, 3, 3, 1, 1, 1, 7, 15, 8, 5, 6, 1, 1)));
+        var (sim, def) = Create(slot);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        for (var tick = 0; tick < 2; tick++)
+            sim.TickAbilities(inputs);
+        TestHelpers.AssertNear(8.5f, sim.GetState(1).VZ);
+
+        var state = sim.GetState(1);
+        state.VY = -2f;
+        sim.SetState(1, state);
+        sim.TickAbilities(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(0f, state.VX);
+        TestHelpers.AssertNear(0f, state.VZ);
+        TestHelpers.AssertNear(-2f, state.VY);
+        Assert.Equal(ActionState.Attacking, state.State);
+
+        // After braking once, the expired capability no longer owns velocity.
+        state.VX = 3f;
+        state.VZ = 4f;
+        sim.SetState(1, state);
+        sim.TickAbilities(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(3f, state.VX);
+        TestHelpers.AssertNear(4f, state.VZ);
+        TestHelpers.AssertNear(-2f, state.VY);
+        for (var tick = 4; tick < 8; tick++)
+            sim.TickAbilities(inputs);
+        Assert.Null(sim.GetActiveAbility(1));
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+    }
+
+    [Fact]
+    public void CycloneInterruptionDoesNotBrakeIncomingKnockback()
+    {
+        var slot = Slot(8, new CookedStartCapabilityOperation(0, AuthoringUnit.Ticks,
+            "slop.internal.fightguy.cyclone-kick.v1", "1",
+            new CookedCycloneKickCapabilityParameters(8.5f, 1, 3, 3, 1, 1, 1, 7, 15, 8, 5, 6, 1, 1)));
+        var (sim, def) = Create(slot);
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        var state = sim.GetState(1);
+        state.State = ActionState.Hitstun;
+        state.VX = -4f;
+        state.VY = 6f;
+        state.VZ = -5f;
+        sim.SetState(1, state);
+        sim.TickAbilities(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.Null(sim.GetActiveAbility(1));
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(-4f, state.VX);
+        TestHelpers.AssertNear(6f, state.VY);
+        TestHelpers.AssertNear(-5f, state.VZ);
     }
 
     [Fact]
@@ -241,7 +344,7 @@ public sealed class TimelineRuntimeTests
         sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState { ActiveSlot = 5 } });
 
         var evt = Assert.Single(sim.GetPresentationEvents());
-        Assert.Equal(new PresentationEventKey(1, 1, 10), evt.Key);
+        Assert.Equal(new PresentationEventKey(1, 1, 1, PresentationEventSource.Timeline, 10), evt.Key);
         Assert.Equal("presentation.cyclone-kick.start", evt.PresentationId);
     }
 
@@ -268,5 +371,16 @@ public sealed class TimelineRuntimeTests
         var sim = TestHelpers.MakeSim();
         sim.RegisterEntity(1, def, state ?? TestHelpers.PlayerState());
         return (sim, def);
+    }
+    private static string RepoFile(string relative)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            string candidate = Path.Combine(directory.FullName, relative);
+            if (File.Exists(candidate) || Directory.Exists(candidate)) return candidate;
+            directory = directory.Parent;
+        }
+        throw new FileNotFoundException(relative);
     }
 }

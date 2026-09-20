@@ -102,6 +102,16 @@ MonoBehaviour:
     _clip: {fileID: -203655887218126122, guid: 409aa855fd0381170b05371efe0b7439, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.a4
+  - _semanticId: anim.manki.tumble
+    _clip: {fileID: -623603649343465320, guid: b79032c6c9e8aa56ab188264f01fff1c, type: 3}
+    _extrapolation: 0
+    _poseTrackId: anim.manki.tumble
   _presentations:
   - _semanticId: presentation.manki.aerosol-inferno.start
-    _prefab: {fileID: 2398608829508964987, guid: cb1ad5ee3fc411307aa4e833297bc755, type: 3}
+    _prefab: {fileID: 2053101587433184381, guid: 2db9d01ecccd44ec1be8bb5a8287dcd7, type: 3}
+  - _semanticId: presentation.manki.bazooka.explosion
+    _prefab: {fileID: 6964989176759731854, guid: 179dd3c7da190920fba973988a9e92d1, type: 3}
+  - _semanticId: presentation.manki.jetpack-boost.ignition
+    _prefab: {fileID: 7426718004780168451, guid: 532e7411ae49bb9848f1a677d3d0bd4c, type: 3}
+  - _semanticId: presentation.manki.round-bomb.explosion
+    _prefab: {fileID: 1621577324978609086, guid: 5a05e652b58df8f4b9c144db709ec648, type: 3}

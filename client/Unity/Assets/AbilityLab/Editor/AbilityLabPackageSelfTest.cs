@@ -197,6 +197,41 @@ public static class AbilityLabPackageSelfTest
             workspace.Undo();
             if (((SpawnHitboxOperationSource)workspace.Draft.Slots.First(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations[retimeOperationIndex]).Hitbox.DurationTicks != retimeHitbox.Hitbox.DurationTicks)
                 throw new InvalidOperationException("Hitbox endpoint undo did not restore the source duration.");
+            var presentationSlot = workspace.Draft.Slots.First(slot => slot.Id == "ground.R");
+            var presentationStage = presentationSlot.Timeline.Stages[0];
+            int presentationOperationIndex = presentationStage.Operations
+                .Select((operation, index) => (operation, index))
+                .First(item => item.operation is EmitPresentationOperationSource).index;
+            var presentationOperation = (EmitPresentationOperationSource)presentationStage.Operations[presentationOperationIndex];
+            ushort presentationDuration = (ushort)Math.Max(1, Math.Min(
+                presentationOperation.Placement.DurationTicks,
+                presentationStage.DurationTicks - presentationOperation.Tick));
+            var authoredPlacement = presentationOperation.Placement with
+            {
+                AttachmentMode = AuthoringPresentationAttachmentMode.World,
+                BoneId = null,
+                LocalPositionX = 0.15f,
+                LocalRotationY = 22f,
+                LocalScaleX = 1.2f,
+                LocalScaleY = 0.9f,
+                LocalScaleZ = 1.1f,
+                DurationTicks = presentationDuration,
+            };
+            if (!workspace.ReplacePresentationPlacement("ground.R", 0, presentationOperationIndex, authoredPlacement))
+                throw new InvalidOperationException("Presentation placement edit was rejected.");
+            var editedPresentation = (EmitPresentationOperationSource)workspace.Draft.Slots
+                .First(slot => slot.Id == "ground.R").Timeline.Stages[0].Operations[presentationOperationIndex];
+            if (editedPresentation.Placement != authoredPlacement)
+                throw new InvalidOperationException("Presentation placement edit did not persist all authored fields.");
+            var presentationPreview = workspace.Preview;
+            if (workspace.ReplacePresentationPlacement("ground.R", 0, presentationOperationIndex,
+                    authoredPlacement with { DurationTicks = 0 }) ||
+                !ReferenceEquals(presentationPreview, workspace.Preview))
+                throw new InvalidOperationException("Invalid presentation edit did not preserve the last valid preview.");
+            workspace.Undo();
+            if (((EmitPresentationOperationSource)workspace.Draft.Slots.First(slot => slot.Id == "ground.R")
+                    .Timeline.Stages[0].Operations[presentationOperationIndex]).Placement != presentationOperation.Placement)
+                throw new InvalidOperationException("Presentation placement undo did not restore the prior source.");
 
         }
         finally

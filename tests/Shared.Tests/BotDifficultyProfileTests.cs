@@ -42,6 +42,21 @@ public sealed class BotDifficultyProfileTests
     }
 
     [Fact]
+    public void ProfilesKeepSpecialUseBelowNormalUse()
+    {
+        var easy = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Easy);
+        var normal = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Normal);
+        var hard = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Hard);
+
+        Assert.InRange(easy.SpecialChance, 0f, 1f);
+        Assert.InRange(normal.SpecialChance, 0f, 1f);
+        Assert.InRange(hard.SpecialChance, 0f, 1f);
+        Assert.True(easy.SpecialChance < normal.SpecialChance);
+        Assert.True(normal.SpecialChance < hard.SpecialChance);
+        Assert.All(new[] { easy, normal, hard }, profile => Assert.True(profile.SpecialChance < 0.5f));
+    }
+
+    [Fact]
     public void HardRetainsNonZeroRangeError()
     {
         var hard = BotDifficultyProfile.ForDifficulty(CpuDifficulty.Hard);

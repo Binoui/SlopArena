@@ -267,6 +267,9 @@ namespace SlopArena.Shared
                 arena.CollisionTriangles = null;
             }
 
+            // The grid is derived at load time, not serialized. Direct match loads
+            // need the same broadphase as registry loads.
+            arena.SpatialGrid = ArenaCollision.BuildSpatialGrid(in arena);
             return arena;
         }
 

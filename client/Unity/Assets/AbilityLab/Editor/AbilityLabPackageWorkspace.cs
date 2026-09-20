@@ -401,6 +401,15 @@ public sealed class AbilityLabPackageWorkspace
             return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
         return ApplyEdit(CharacterPackageSourceCodec.ReplaceHitboxDuration(new CharacterPackageSource(Manifest, Draft), slotIndex, stageIndex, operationIndex, durationTicks));
     }
+    public bool ReplacePresentationPlacement(string canonicalSlotId, int stageIndex, int operationIndex, PresentationPlacement placement)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out _))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        return ApplyEdit(CharacterPackageSourceCodec.ReplacePresentationPlacement(
+            new CharacterPackageSource(Manifest, Draft), slotIndex, stageIndex, operationIndex, placement));
+    }
+
 
 
     public bool ReplaceHitbox(string canonicalSlotId, int stageIndex, int operationIndex, HitboxSource hitbox)

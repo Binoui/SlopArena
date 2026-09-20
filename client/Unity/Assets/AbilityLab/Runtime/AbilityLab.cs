@@ -108,6 +108,7 @@ namespace SlopArena.Client.Tools
         private CharacterPackageSource? _sourceDocument;
         private CharacterAssetCatalog.PresentationBinding[] _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
         private readonly AbilityLabPresentationPreviewer _presentationPreviewer = new();
+        private readonly AbilityLabSimulationController _simulationPreviewer = new();
         public int PresentationPreviewInstanceCount => _presentationPreviewer.ActiveInstanceCount;
         public IReadOnlyCollection<GameObject> PresentationPreviewInstances => _presentationPreviewer.ActiveInstances;
 
@@ -155,6 +156,7 @@ namespace SlopArena.Client.Tools
         private void OnDestroy()
         {
             _presentationPreviewer.Clear();
+            _simulationPreviewer.Clear();
             ReleaseRendererAttachments();
             DestroyPreviewCatalog();
             if (Instance == this) Instance = null;
@@ -333,6 +335,7 @@ namespace SlopArena.Client.Tools
             ShowDummy = false;
             _sourceDocument = null;
             _presentationPreviewer.Clear();
+            _simulationPreviewer.Clear();
             _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
             DestroyPreviewCatalog();
             _previewRig = null;
@@ -526,6 +529,7 @@ namespace SlopArena.Client.Tools
         public void ApplyPreviewUnavailable(IReadOnlyList<CharacterDiagnostic> diagnostics)
         {
             _presentationPreviewer.Clear();
+            _simulationPreviewer.Clear();
             _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
             ReleaseRendererAttachments();
             DestroyPreviewCatalog();
@@ -817,11 +821,12 @@ namespace SlopArena.Client.Tools
             string animName = AnimNameFor(spec, StageIndex);
             if (!ResolvePose(animName, stage.DurationTicks, out string resolvedAnim, out int bakedFrame)) return _hurtboxes;
 
+            Vector3 lungeDisplacement = CalculateLungeDisplacement();
             var state = new CharacterState
             {
-                PX = transform.position.x,
+                PX = transform.position.x + lungeDisplacement.x,
                 PY = BasePosition().y,
-                PZ = transform.position.z,
+                PZ = transform.position.z + lungeDisplacement.z,
                 FacingYaw = FacingYaw,
             };
             _hurtboxes.AddRange(ServerSimulation.BuildEntitiesFromState(state, DisplayDef, Baked, resolvedAnim, bakedFrame, 0));
@@ -834,11 +839,12 @@ namespace SlopArena.Client.Tools
             var spec = CurrentSpec();
             if (spec == null || !TryGetStage(out var stage)) return _hitboxes;
 
+            Vector3 lungeDisplacement = CalculateLungeDisplacement();
             var state = new CharacterState
             {
-                PX = transform.position.x,
+                PX = transform.position.x + lungeDisplacement.x,
                 PY = BasePosition().y,
-                PZ = transform.position.z,
+                PZ = transform.position.z + lungeDisplacement.z,
                 FacingYaw = FacingYaw,
                 AttackElapsedTicks = Tick,
             };
@@ -978,6 +984,30 @@ namespace SlopArena.Client.Tools
             return null;
         }
 
+        public Vector3 CalculateLungeDisplacement()
+        {
+            var sourceStage = CurrentSourceStage();
+            if (sourceStage?.Operations == null) return Vector3.zero;
+
+            float totalDistance = 0f;
+            foreach (var op in sourceStage.Operations)
+            {
+                if (op is ForwardLungeOperationSource lunge)
+                {
+                    if (Tick > lunge.Tick)
+                    {
+                        int activeTicks = Math.Min((int)Tick - lunge.Tick, (int)lunge.DurationTicks);
+                        totalDistance += lunge.Speed * (activeTicks / TickRate);
+                    }
+                }
+            }
+
+            return new Vector3(
+                Mathf.Sin(FacingYaw) * totalDistance,
+                0f,
+                Mathf.Cos(FacingYaw) * totalDistance);
+        }
+
         public void SetSourceDocument(CharacterPackageSource source)
         {
             _sourceDocument = source ?? throw new ArgumentNullException(nameof(source));
@@ -1003,6 +1033,7 @@ namespace SlopArena.Client.Tools
             if (_previewRenderer == null || Def == null)
             {
                 _presentationPreviewer.Clear();
+                _simulationPreviewer.Clear();
                 QueueEditorRefresh();
                 return;
             }
@@ -1010,12 +1041,15 @@ namespace SlopArena.Client.Tools
             if (spec == null || !TryGetStage(out var stage))
             {
                 _presentationPreviewer.Clear();
+                _simulationPreviewer.Clear();
                 QueueEditorRefresh();
                 return;
             }
             _previewRenderer.EnsureModel();
             if (_previewRenderer.transform.childCount == 0)
                 ConfigureRenderer(_previewRenderer, DisplayDef, "LabCharacter");
+            Vector3 lungeDisplacement = CalculateLungeDisplacement();
+            _previewRenderer.transform.position = BasePosition() + lungeDisplacement;
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
             _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
             _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick);
@@ -1030,10 +1064,28 @@ namespace SlopArena.Client.Tools
                 }
             }
             var sourceStage = CurrentSourceStage();
-            if (sourceStage == null)
-                _presentationPreviewer.Clear();
+            if (IsPackagePreview && Def.GetCookedSlotAbility((byte)(SlotIndex + 1), Airborne) != null)
+            {
+                int simulationTick = Tick;
+                for (int index = 0; index < StageIndex && index < spec.Stages.Length; index++)
+                    simulationTick += spec.Stages[index].DurationTicks;
+                _simulationPreviewer.Simulate(
+                    Def,
+                    Baked,
+                    (byte)(SlotIndex + 1),
+                    Airborne,
+                    BasePosition(),
+                    FacingYaw,
+                    simulationTick);
+                _presentationPreviewer.SetSimulationFrame(
+                    _simulationPreviewer.PresentationEvents,
+                    (uint)simulationTick,
+                    _presentationBindings,
+                    _previewRenderer,
+                    _previewRenderer.transform);
+            }
             else
-                _presentationPreviewer.SetFrame(sourceStage, Tick, _presentationBindings, _previewRenderer.transform);
+                _presentationPreviewer.SetFrame(sourceStage, Tick, _presentationBindings, _previewRenderer.transform, _previewRenderer);
             QueueEditorRefresh();
         }
 

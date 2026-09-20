@@ -10,6 +10,7 @@ public enum TimelineDragMode
 {
     Move,
     ResizeHitboxEnd,
+    ResizePresentationEnd,
 }
 
 public readonly struct AbilityLabTimelineDrag
@@ -184,11 +185,19 @@ public sealed class AbilityLabTimelineElement : VisualElement
     private void BeginDrag(AbilityLabOperationProjection operation, Vector2 point, int pointerId)
     {
         _dragOperation = operation;
-        _dragStartTick = operation.Source.Tick;
-        _dragStartDuration = operation.Source is SpawnHitboxOperationSource hitbox ? hitbox.Hitbox.DurationTicks : 0;
+        _dragStartDuration = operation.Source switch
+        {
+            SpawnHitboxOperationSource hitbox => hitbox.Hitbox.DurationTicks,
+            EmitPresentationOperationSource presentation => presentation.Placement.DurationTicks,
+            _ => 0,
+        };
         _pendingTick = _dragStartTick;
         _pendingDuration = _dragStartDuration;
-        _dragMode = IsHitboxEndHandle(operation, point.x) ? TimelineDragMode.ResizeHitboxEnd : TimelineDragMode.Move;
+        _dragMode = IsHitboxEndHandle(operation, point.x)
+            ? TimelineDragMode.ResizeHitboxEnd
+            : IsPresentationEndHandle(operation, point.x)
+                ? TimelineDragMode.ResizePresentationEnd
+                : TimelineDragMode.Move;
         _dragging = true;
         _pointerId = pointerId;
         PointerCaptureHelper.CapturePointer(this, _pointerId);
@@ -202,15 +211,17 @@ public sealed class AbilityLabTimelineElement : VisualElement
         var stage = _projection.Stages[_dragOperation.SourceStageIndex];
         int cumulativeTick = AbilityLabTimelineProjection.SnapTick(Mathf.Clamp01((x - LabelColumnWidth) / plotWidth), _projection.DurationTicks);
         int localTick = cumulativeTick - stage.StartTick;
-        if (_dragMode == TimelineDragMode.ResizeHitboxEnd)
+        if (_dragMode == TimelineDragMode.ResizeHitboxEnd || _dragMode == TimelineDragMode.ResizePresentationEnd)
         {
             int endTick = Mathf.Clamp(localTick, 0, stage.DurationTicks);
-            _pendingDuration = AbilityLabTimelineProjection.ClampHitboxDuration(_dragStartTick, endTick - _dragStartTick, stage.DurationTicks);
+            _pendingDuration = _dragMode == TimelineDragMode.ResizeHitboxEnd
+                ? AbilityLabTimelineProjection.ClampHitboxDuration(_dragStartTick, endTick - _dragStartTick, stage.DurationTicks)
+                : AbilityLabTimelineProjection.ClampPresentationDuration(_dragStartTick, endTick - _dragStartTick, stage.DurationTicks);
         }
         else
         {
             int maxTick = stage.DurationTicks - 1;
-            if (_dragOperation.Source is SpawnHitboxOperationSource)
+            if (_dragOperation.Source is SpawnHitboxOperationSource || _dragOperation.Source is EmitPresentationOperationSource)
                 maxTick = stage.DurationTicks - _dragStartDuration;
             _pendingTick = Mathf.Clamp(localTick, 0, Mathf.Max(0, maxTick));
         }
@@ -278,6 +289,12 @@ public sealed class AbilityLabTimelineElement : VisualElement
             _rowLabels.Add(label);
             row++;
         }
+    }
+    private bool IsPresentationEndHandle(AbilityLabOperationProjection operation, float x)
+    {
+        if (operation.Source is not EmitPresentationOperationSource) return false;
+        float endX = LabelColumnWidth + Mathf.Clamp01(operation.EndTick / (float)_projection.DurationTicks) * PlotWidth;
+        return Mathf.Abs(x - endX) <= 7f;
     }
 
 

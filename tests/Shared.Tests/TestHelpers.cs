@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
 namespace SlopArena.Shared.Tests;
 
@@ -401,6 +402,23 @@ public static class TestHelpers
             HurtboxBoneScale = src.HurtboxBoneScale,
             CookedSlots = null,
         };
+    }
+
+    public static CharacterDefinition WithEmptyAirSlot2(CharacterDefinition source)
+    {
+        var def = CloneDef(source);
+        var slots = source.CookedSlots!.ToArray();
+        slots[9] = new CookedSlotDefinition(
+            9, "air.2", true, "Empty aerial", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None,
+            0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(30, 0, 0, 0, 0,
+                    Array.Empty<string>(), Array.Empty<CookedTimelineOperation>()),
+            }));
+        def.CookedSlots = slots;
+        return def;
     }
 
     /// <summary>

@@ -520,8 +520,8 @@ public sealed class HeuristicBotPolicy
         input.MoveY = 0f;
 
         bool targetIsHigherOrAirborne = !target.IsGrounded || dy > JumpGap;
-        if (self.IsGrounded && targetIsHigherOrAirborne && !targetOffstage
-            && rng.NextDouble() < profile.JumpChance)
+        float jumpChance = targetIsHigherOrAirborne ? profile.JumpChance : profile.JumpChance * 0.18f;
+        if (self.IsGrounded && !targetOffstage && rng.NextDouble() < jumpChance)
         {
             input.Jump = true;
             input.JumpHeld = true;
@@ -530,7 +530,7 @@ public sealed class HeuristicBotPolicy
 
         bool targetThreatening = target.IsThreatening;
         var candidate = ChooseSlot(self, target, dist, rangeScale, rng,
-            allowRecoveryMove: !IsNearEdge(self, in arena), in arena);
+            profile.SpecialChance, allowRecoveryMove: !IsNearEdge(self, in arena), in arena);
         bool canDash = self.DashCooldownTicks == 0
             && self.DashDurationTicks == 0
             && self.BurstRecoveryTicks == 0;
@@ -676,7 +676,7 @@ public sealed class HeuristicBotPolicy
         float rangeScale = 1f + (((float)rng.NextDouble() * 2f) - 1f) * profile.RangeError;
         bool allowRecoveryMove = !IsNearEdge(self, in arena);
         var trueCombo = ChooseTrueCombo(self, hit, memory.RemainingHitstun(hit),
-            rangeScale, rng, allowRecoveryMove, in arena);
+            rangeScale, profile.SpecialChance, rng, allowRecoveryMove, in arena);
         if (trueCombo.HasValue && rng.NextDouble() < profile.ComboChance)
         {
             var selected = trueCombo.GetValueOrDefault();
@@ -691,7 +691,8 @@ public sealed class HeuristicBotPolicy
         float dx = target.PX - self.PX;
         float dz = target.PZ - self.PZ;
         float dist = Distance(dx, dz);
-        var pressure = ChooseSlot(self, target, dist, rangeScale, rng, allowRecoveryMove, in arena);
+        var pressure = ChooseSlot(self, target, dist, rangeScale, rng,
+            profile.SpecialChance, allowRecoveryMove, in arena);
         if (!pressure.HasValue || (!target.IsThreatening && memory.RemainingHitstun(hit) == 0))
             return;
         if (!target.IsThreatening && rng.NextDouble() >= profile.AttackChance)
@@ -704,8 +705,8 @@ public sealed class HeuristicBotPolicy
     }
 
     private MoveCandidate? ChooseTrueCombo(in CharacterState self, in CpuHitObservation hit,
-        int remainingHitstun, float rangeScale, Random rng, bool allowRecoveryMove,
-        in ArenaDefinition arena)
+        int remainingHitstun, float rangeScale, float specialChance, Random rng,
+        bool allowRecoveryMove, in ArenaDefinition arena)
     {
         if (remainingHitstun <= 0)
             return null;
@@ -748,6 +749,19 @@ public sealed class HeuristicBotPolicy
 
         if (count == 0)
             return null;
+        int normalCount = 0;
+        for (int i = 0; i < count; i++)
+            if (IsNormalSlot(viable[i].Slot))
+                normalCount++;
+        if (normalCount > 0 && rng.NextDouble() >= specialChance)
+        {
+            int write = 0;
+            for (int i = 0; i < count; i++)
+                if (IsNormalSlot(viable[i].Slot))
+                    viable[write++] = viable[i];
+            count = write;
+        }
+
 
         float bestScore = float.NegativeInfinity;
         for (int i = 0; i < count; i++)
@@ -765,6 +779,9 @@ public sealed class HeuristicBotPolicy
     private static float Distance(float x, float z)
         => MathF.Sqrt(x * x + z * z);
 
+    private static bool IsNormalSlot(byte slot)
+        => slot is AbilitySlots.Slot1 or AbilitySlots.Slot2
+            or AbilitySlots.Slot3 or AbilitySlots.Slot4;
     private static bool PlanInvalidated(in CharacterState self, BotMemory memory)
         => self.Deaths != memory.PlanDeaths
             || self.HitstunTicks > 0
@@ -847,24 +864,28 @@ public sealed class HeuristicBotPolicy
             && self.GetCooldown(candidate.Slot) == 0
             && !IsChargePoolExhausted(self, candidate.Slot, air)
             && HasSafeAttackTravel(self, candidate, in arena);
-
     private float MaxConnectReach(in CharacterState self, float rangeScale,
         bool allowRecoveryMove, in ArenaDefinition arena)
     {
         bool air = !self.IsGrounded;
-        float max = 0f;
+        float normalMax = 0f;
+        float specialMax = 0f;
         for (int i = 0; i < Slots.Length; i++)
         {
             var candidate = air ? _airProfile[i] : _profile[i];
-            if (IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena))
-                max = MathF.Max(max, (candidate.Reach + VictimRadiusMargin) * rangeScale);
+            if (!IsCandidateAvailable(self, candidate, air, allowRecoveryMove, in arena))
+                continue;
+            float reach = (candidate.Reach + VictimRadiusMargin) * rangeScale;
+            if (IsNormalSlot(candidate.Slot))
+                normalMax = MathF.Max(normalMax, reach);
+            else
+                specialMax = MathF.Max(specialMax, reach);
         }
-        return max;
+        return normalMax > 0f ? normalMax : specialMax;
     }
-
-
     private MoveCandidate? ChooseSlot(in CharacterState self, in CpuObservation target,
-        float dist, float rangeScale, Random rng, bool allowRecoveryMove, in ArenaDefinition arena)
+        float dist, float rangeScale, Random rng, float specialChance,
+        bool allowRecoveryMove, in ArenaDefinition arena)
     {
         bool air = !self.IsGrounded;
         Span<MoveCandidate> viable = stackalloc MoveCandidate[Slots.Length];
@@ -907,6 +928,19 @@ public sealed class HeuristicBotPolicy
 
         if (count == 0)
             return null;
+        int normalCount = 0;
+        for (int i = 0; i < count; i++)
+            if (IsNormalSlot(viable[i].Slot))
+                normalCount++;
+        if (normalCount > 0 && normalCount < count)
+        {
+            int write = 0;
+            for (int i = 0; i < count; i++)
+                if (IsNormalSlot(viable[i].Slot))
+                    viable[write++] = viable[i];
+            count = write;
+        }
+
 
         // Keep all similarly good options in the seeded tie pool. There is no per-slot memory,
         // so a clearly strong response remains eligible to repeat.
@@ -926,7 +960,7 @@ public sealed class HeuristicBotPolicy
     private static float Score(in MoveCandidate candidate, float dist, bool threatening)
         => (candidate.HasDamage ? 100f : 10f)
             + (threatening && candidate.HasDamage ? 5f : 0f)
-            + candidate.Damage
+            + candidate.Damage * 0.1f
             - MathF.Abs(candidate.Reach - dist) * 0.2f
             - candidate.StartupTicks * 0.05f;
 
@@ -985,7 +1019,6 @@ public sealed class HeuristicBotPolicy
                                 MathF.Max(0f, projectile.Projectile.LaunchOffsetZ)
                                 + projectile.Projectile.Radius);
                             functional = true;
-                            hasDamage |= projectile.Projectile.Damage > 0f;
                             damage += MathF.Max(0f, projectile.Projectile.Damage);
                             hitReach = MathF.Max(hitReach,
                                 travelOffset + projectile.Projectile.Speed
@@ -1020,8 +1053,9 @@ public sealed class HeuristicBotPolicy
                                 ref recoveryRequiresDelayedOpponent);
                             if (capability.Parameters is CookedCycloneKickCapabilityParameters cyclone)
                             {
-                                // Cyclone writes forward velocity until the owning timeline ends.
-                                float committed = cyclone.ForwardSpeed * (timelineTicks - operationTick) / 60f;
+                                // Cyclone brakes when its capability expires, before timeline recovery ends.
+                                float committed = cyclone.ForwardSpeed
+                                    * Math.Min(cyclone.DurationTicks, timelineTicks - operationTick) / 60f;
                                 forwardTravel = MathF.Max(forwardTravel, committed);
                                 hitReach = MathF.Max(hitReach, committed
                                     + MathF.Max(cyclone.BodyRadius, cyclone.SideOffset + cyclone.SideRadius));

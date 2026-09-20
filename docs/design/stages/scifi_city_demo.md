@@ -14,7 +14,9 @@ presentation_prefab: client/Unity/Assets/Resources/Stages/scifi_city_demo.prefab
 
 ## Gameplay shell
 
-The authoritative shell is the stage-owned copy of the 19 source-scene objects tagged `Floor` when the design was locked. It includes the central multilevel roof, stairs, and bridge. Four grounded spawns support the current 2-4-player contract. The user will deliberately revise this selection after the first playable integration.
+The authoritative shell preserves the central rooftop cluster using `WestRoof`, `EastRoof`, `UpperDeck`, a continuous `BridgeDeck`, and `WestStairRamp`/`EastStairRamp`. The roof solids use primitive meshes; the bridge and ramps use stage-owned subassets in `CollisionMeshes.asset`. Shallow bridge joins and stair ramps provide continuous walking routes instead of exposing decorative triangle seams or stair risers to collision.
+
+The four spawn positions and overall horizontal arena bounds are preserved. This repair does not enlarge the arena. Small art-panel height offsets and facade trim are intentionally excluded from the simple collision surfaces. The surrounding city remains presentation-only.
 
 ## Presentation
 
@@ -26,6 +28,14 @@ Run bake and inspect after every gameplay-shell change. Human acceptance require
 
 ## Current progress
 
+**2026-09-16 — approved playability repair**
+
+- Replaced art-derived collision meshes with simple stage-owned surfaces and restored the previously cosmetic-only final bridge segment.
+- Fixed Shared capsule sweeps catching separated coplanar floor edges, including replay against the original dense rooftop mesh.
+- Verified both bridge directions for every admitted character, stair ascent/descent, wall blocking, and ordinary flat-ledge walk-off behavior. Live Training routes crossed the bridge and both stair routes without losing groundedness.
+- Bake and inspection pass with matching source/baked hashes, valid spawns, and no cosmetic colliders or missing asset references.
+- The city presentation prefab is unchanged by this repair. Human two-player and four-player PVP acceptance remains outstanding.
+
 **2026-09-03 — initial scene-integration milestone**
 
 - The user considers the imported SciFi City world and its full background satisfactory for this stage's current goal.
@@ -35,7 +45,7 @@ Run bake and inspect after every gameplay-shell change. Human acceptance require
 
 ## Next iteration
 
-1. The user adjusts the source scene's `Floor` tags to tune the playable layout.
-2. Regenerate the stage-owned collision source from that selection, then bake and inspect.
-3. Keep the existing presentation prefab unchanged for gameplay-only tag changes. Refresh it only after intentional world-visual edits.
-4. Complete human 2-player and 4-player PVP acceptance before treating the stage as accepted.
+1. Human reviewers exercise roof movement, both bridge directions, stairs, jumping, recovery, and free camera rotation.
+2. Reassess roof fighting space and route widths only after movement and crossings feel reliable; arena expansion is not part of this repair.
+3. Author any accepted layout changes in the simplified stage-owned collision scene, then bake, inspect, and rerun the authoritative route regressions.
+4. Keep the presentation prefab unchanged unless a visual change is intentional. Complete normal two-player and four-player PVP acceptance before treating the stage as accepted.

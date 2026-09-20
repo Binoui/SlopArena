@@ -532,6 +532,7 @@ public static class UnityCharacterAssetCooker
         Add(p.Dash, "character.presentation.dash");
         Add(p.Jump, "character.presentation.jump");
         Add(p.Fall, "character.presentation.fall");
+        Add(p.Tumble, "character.presentation.tumble");
         Add(p.HitSmall, "character.presentation.hitSmall");
         Add(p.HitMedium, "character.presentation.hitMedium");
         Add(p.HitHard, "character.presentation.hitHard");

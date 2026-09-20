@@ -1,5 +1,6 @@
 using System;
 using SlopArena.Client.Input;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace SlopArena.Client.UI
@@ -12,6 +13,13 @@ namespace SlopArena.Client.UI
         {
             if (root == null)
                 throw new ArgumentNullException(nameof(root));
+
+            // Pre-match screens own the pointer. Match cameras may have left it locked.
+            UnityEngine.Cursor.lockState = UnityEngine.CursorLockMode.None;
+            UnityEngine.Cursor.visible = true;
+            root.RegisterCallback<ClickEvent>(_ => UISFX.PlayClick());
+            UISFX.PlayMenuMusic();
+
 
             root.RegisterCallback<NavigationCancelEvent>(evt =>
             {

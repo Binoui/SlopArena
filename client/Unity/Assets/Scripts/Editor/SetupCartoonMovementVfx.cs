@@ -1,12 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using SlopArena.Client.Combat;
-using SlopArena.Shared;
 using UnityEngine;
-
 namespace SlopArena.Client.Editor
 {
     /// <summary>
@@ -25,9 +21,7 @@ namespace SlopArena.Client.Editor
             string ringSource = FindPrefab("CFXR Water Ripples");
             string groundSource = FindPrefab("CFXR2 Ground Hit");
             string smashSource = FindPrefab("CFXR Hit A (Red) + Text") ?? FindPrefab("CFXR _SMASH_");
-            string fireExplosionSource = FindPrefab("CFXR3 Fire Explosion A (no smoke)");
-            if (poofSource == null || windSource == null || ringSource == null || groundSource == null
-                || fireExplosionSource == null)
+            if (poofSource == null || windSource == null || ringSource == null || groundSource == null)
                 throw new InvalidOperationException(
                     "Cartoon FX Remaster Free is missing. Import it from the Unity Asset Store first.");
 
@@ -40,7 +34,6 @@ namespace SlopArena.Client.Editor
             if (smashSource != null)
                 Copy(smashSource, "MatchTextSmash");
             TunePoof();
-            CopyAndConfigureMankiExplosion(fireExplosionSource);
             TuneWind();
             TuneRing();
             TuneGroundRing();
@@ -49,22 +42,6 @@ namespace SlopArena.Client.Editor
             Debug.Log($"[SlopArena] Cartoon movement VFX generated under {Destination}.");
         }
 
-        [MenuItem("Tools/SlopArena/Setup Manki R Explosion VFX")]
-        public static void SetupMankiRExplosionVfx()
-        {
-            string source = FindPrefab("CFXR Explosion Smoke 2 (HDR)");
-            if (source == null)
-                throw new InvalidOperationException(
-                    "CFXR Explosion Smoke 2 (HDR) is missing. Import Cartoon FX Remaster first.");
-
-            ConfigureShaders(source);
-            Directory.CreateDirectory(Destination);
-            CopyAndConfigureMankiRExplosion(source);
-            RegisterMankiExplosionOverride(AbilitySlots.R, "MankiRExplosionSmoke", 0.65f);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            Debug.Log($"[SlopArena] Manki R explosion VFX configured from {source}.");
-        }
 
         private static string FindPrefab(string name)
         {
@@ -203,133 +180,6 @@ namespace SlopArena.Client.Editor
             });
         }
 
-        private static void CopyAndConfigureMankiExplosion(string source)
-        {
-            const string name = "MankiQExplosionFire";
-            Copy(source, name);
-            string path = $"{Destination}/{name}.prefab";
-            EditPrefab(name, root =>
-            {
-                if (PrefabUtility.IsPartOfPrefabInstance(root))
-                    PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-
-                Shader shader = Shader.Find("SlopArena/Particles/CFXR3 Fire Explosion");
-                if (shader == null)
-                    throw new InvalidOperationException("SlopArena CFXR3 fire explosion shader was not found.");
-
-                var materials = new Dictionary<int, Material>();
-                foreach (ParticleSystemRenderer renderer in root.GetComponentsInChildren<ParticleSystemRenderer>(true))
-                {
-                    Material[] sourceMaterials = renderer.sharedMaterials;
-                    var replacementMaterials = new Material[sourceMaterials.Length];
-                    for (int i = 0; i < sourceMaterials.Length; i++)
-                    {
-                        Material sourceMaterial = sourceMaterials[i];
-                        if (sourceMaterial == null)
-                            continue;
-
-                        int key = sourceMaterial.GetInstanceID();
-                        if (!materials.TryGetValue(key, out Material replacement))
-                        {
-                            replacement = new Material(sourceMaterial)
-                            {
-                                name = $"MankiQExplosionFire_{materials.Count}"
-                            };
-                            replacement.shader = shader;
-                            string materialPath = $"{Destination}/{replacement.name}.mat";
-                            AssetDatabase.DeleteAsset(materialPath);
-                            AssetDatabase.CreateAsset(replacement, materialPath);
-                            materials.Add(key, replacement);
-                        }
-                        replacementMaterials[i] = replacement;
-                    }
-                    renderer.sharedMaterials = replacementMaterials;
-                }
-            });
-
-            ProjectileVFXConfig config = Resources.Load<ProjectileVFXConfig>("VFXConfigs/ProjectileVisuals");
-            if (config == null)
-                throw new InvalidOperationException("Resources/VFXConfigs/ProjectileVisuals.asset was not found.");
-
-            SerializedObject serializedConfig = new SerializedObject(config);
-            SerializedProperty overrides = serializedConfig.FindProperty("ExplosionOverrides");
-            for (int i = overrides.arraySize - 1; i >= 0; i--)
-            {
-                SerializedProperty entry = overrides.GetArrayElementAtIndex(i);
-                if (entry.FindPropertyRelative("Character").intValue == (int)CharacterClass.Manki
-                    && entry.FindPropertyRelative("AttackSlot").intValue == AbilitySlots.A)
-                    overrides.DeleteArrayElementAtIndex(i);
-            }
-
-            int index = overrides.arraySize;
-            overrides.InsertArrayElementAtIndex(index);
-            SerializedProperty added = overrides.GetArrayElementAtIndex(index);
-            added.FindPropertyRelative("Character").intValue = (int)CharacterClass.Manki;
-            added.FindPropertyRelative("AttackSlot").intValue = AbilitySlots.A;
-            added.FindPropertyRelative("Prefab").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            added.FindPropertyRelative("Scale").floatValue = 0.2f;
-            serializedConfig.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(config);
-        }
-
-        private static void CopyAndConfigureMankiRExplosion(string source)
-        {
-            Copy(source, "MankiRExplosionSmoke", removeRuntimeEffect: true);
-            EditPrefab("MankiRExplosionSmoke", root =>
-            {
-                AssignMaterial(root, "Sparks smoke", "cfxr stretch trait hdr ab");
-                AssignMaterial(root, "Sub smoke", "cfxr smoke cloud x4 ab");
-            });
-        }
-
-        private static void AssignMaterial(GameObject root, string rendererObjectName, string materialName)
-        {
-            ParticleSystemRenderer renderer = root.GetComponentsInChildren<ParticleSystemRenderer>(true)
-                .FirstOrDefault(x => x.gameObject.name == rendererObjectName);
-            if (renderer == null)
-                throw new InvalidOperationException($"Renderer '{rendererObjectName}' was not found.");
-
-            string materialPath = AssetDatabase.FindAssets($"{materialName} t:Material")
-                .Select(AssetDatabase.GUIDToAssetPath)
-                .FirstOrDefault(path => Path.GetFileNameWithoutExtension(path) == materialName);
-            Material material = materialPath == null ? null : AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-            if (material == null)
-                throw new InvalidOperationException($"Material '{materialName}' was not found.");
-            SerializedObject serializedRenderer = new SerializedObject(renderer);
-            SerializedProperty materialArray = serializedRenderer.FindProperty("m_Materials");
-            materialArray.arraySize = 1;
-            materialArray.GetArrayElementAtIndex(0).objectReferenceValue = material;
-            serializedRenderer.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        private static void RegisterMankiExplosionOverride(byte attackSlot, string prefabName, float scale)
-        {
-            ProjectileVFXConfig config = Resources.Load<ProjectileVFXConfig>("VFXConfigs/ProjectileVisuals");
-            if (config == null)
-                throw new InvalidOperationException("Resources/VFXConfigs/ProjectileVisuals.asset was not found.");
-
-            SerializedObject serializedConfig = new SerializedObject(config);
-            SerializedProperty overrides = serializedConfig.FindProperty("ExplosionOverrides");
-            for (int i = overrides.arraySize - 1; i >= 0; i--)
-            {
-                SerializedProperty entry = overrides.GetArrayElementAtIndex(i);
-                if (entry.FindPropertyRelative("Character").intValue == (int)CharacterClass.Manki
-                    && entry.FindPropertyRelative("AttackSlot").intValue == attackSlot)
-                    overrides.DeleteArrayElementAtIndex(i);
-            }
-
-            int index = overrides.arraySize;
-            overrides.InsertArrayElementAtIndex(index);
-            SerializedProperty added = overrides.GetArrayElementAtIndex(index);
-            added.FindPropertyRelative("Character").intValue = (int)CharacterClass.Manki;
-            added.FindPropertyRelative("AttackSlot").intValue = attackSlot;
-            added.FindPropertyRelative("Prefab").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<GameObject>($"{Destination}/{prefabName}.prefab");
-            added.FindPropertyRelative("Scale").floatValue = scale;
-            serializedConfig.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(config);
-        }
 
         private static void EditPrefab(string name, Action<GameObject> edit)
         {

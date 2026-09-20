@@ -50,6 +50,7 @@ public class CharacterStatePacketTests
             HitstopTicks = 17,
             BurstCooldownTicks = 1234,
             BurstRecoveryTicks = 25,
+            LandingLagTicks = 18,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -101,14 +102,15 @@ public class CharacterStatePacketTests
         Assert.Equal(original.HitstopTicks, restored.HitstopTicks);
         Assert.Equal(original.BurstCooldownTicks, restored.BurstCooldownTicks);
         Assert.Equal(original.BurstRecoveryTicks, restored.BurstRecoveryTicks);
+        Assert.Equal(original.LandingLagTicks, restored.LandingLagTicks);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 110 bytes: the fixed state fields, eleven cooldown slots, rollback resources,
-        // and the attack animation restart marker.
-        Assert.Equal(110, CharacterStatePacket.Size);
+        // 112 bytes: the fixed state fields, eleven cooldown slots, rollback resources,
+        // attack animation restart marker, and authoritative landing lag.
+        Assert.Equal(112, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });

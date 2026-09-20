@@ -15,10 +15,10 @@ A compact neon rooftop fight is carved from a complete living sci-fi city rather
 ## Composition decisions
 
 1. `Assets/LowPolySciFiCity/Scenes/LP_SciFiCity_DEMO.unity` is the visual world source and remains vendor-owned and unmodified.
-2. The initial gameplay shell is exactly the 19 GameObjects currently tagged `Floor` in the source scene's central multilevel rooftop cluster; that selection includes roof pieces, stairs, and the existing bridge run.
+2. The gameplay shell follows the central multilevel rooftop cluster originally selected by the 19 `Floor`-tagged source objects. Following the approved playability repair, stage-owned simple roof, bridge, and stair-ramp meshes represent that footprint. Bridge and stair joins are continuous; decorative panel seams and trim do not block movement.
 3. The selected floor cluster is the visual and gameplay focus; surrounding source-scene geometry supplies the close city, distant skyline, and vertical context without a new city-composition pass.
 4. Preserve the source scene's native URP materials, neon emissives, city lighting, and atmosphere for this first integration demo.
-5. This is an integration proof: the user will deliberately revise the tagged floor selection after the first playable result rather than require the initial shell to match Industrial Rooftop.
+5. This remains an integration proof, not an Industrial Rooftop replica. Further layout changes are authored deliberately in the stage-owned collision scene after playable review; do not regenerate its simplified shell from vendor art meshes or tags.
 
 ## Negative decisions
 

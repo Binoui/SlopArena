@@ -15,7 +15,7 @@ public sealed class CookedTimelineAbility : ServerAbility
     private float _forwardLungeSpeed;
     private float _forwardLungeYaw;
     private ushort _forwardLungeTicksRemaining;
-
+    private bool _forwardLungeActive;
 
     public CookedTimelineAbility(CookedSlotDefinition slot, string[] animationNames)
     {
@@ -45,7 +45,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeSpeed = 0f;
         _forwardLungeYaw = 0f;
         _forwardLungeTicksRemaining = 0;
-
+        _forwardLungeActive = false;
         s.State = ActionState.Attacking;
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
@@ -109,8 +109,9 @@ public sealed class CookedTimelineAbility : ServerAbility
     {
         CompleteCapabilities(ref s, cancel: true);
         s.IsAiming = false;
+        _forwardLungeActive = false;
+        _forwardLungeTicksRemaining = 0;
     }
-
     public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
         CharacterDefinition attackerDef, CharacterDefinition targetDef, ref float damage, ref float knockbackForce)
     {
@@ -126,6 +127,9 @@ public sealed class CookedTimelineAbility : ServerAbility
         while (_operationCursor < operations.Count && operations[_operationCursor].Tick == _stageTick)
         {
             var operation = operations[_operationCursor++];
+            int flattenedOperationIndex = _operationCursor - 1;
+            for (int i = 0; i < _stageIndex; i++)
+                flattenedOperationIndex += _slot.Timeline.Stages[i].Operations.Count;
             switch (operation)
             {
                 case CookedSetVelocityOperation velocity:
@@ -156,10 +160,13 @@ public sealed class CookedTimelineAbility : ServerAbility
                     s.State = s.IsAiming ? ActionState.Aiming : ActionState.Attacking;
                     break;
                 case CookedStartCapabilityOperation capability:
-                    StartCapability(ref s, def, capability);
+                    StartCapability(ref s, def, capability, flattenedOperationIndex);
                     break;
                 case CookedEmitPresentationOperation presentation:
-                    PresentationSink?.Invoke(new TimelinePresentationEvent(0, s.EntityId, presentation.OperationIndex, presentation.PresentationId));
+                    PresentationSink?.Invoke(new TimelinePresentationEvent(0, s.EntityId, presentation.OperationIndex, presentation.PresentationId, PresentationAttackSequence, PresentationEventSource.Timeline, s.PX, s.PY, s.PZ, s.FacingYaw)
+                    {
+                        Placement = presentation.Placement,
+                    });
                     break;
                 case CookedCompleteTimelineOperation:
                     Complete(ref s);
@@ -172,17 +179,27 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeSpeed = operation.Speed;
         _forwardLungeYaw = s.FacingYaw;
         _forwardLungeTicksRemaining = operation.DurationTicks;
+        _forwardLungeActive = true;
         ApplyForwardLunge(ref s);
     }
 
     private void ApplyForwardLunge(ref CharacterState s)
     {
-        if (_forwardLungeTicksRemaining == 0)
+        if (!_forwardLungeActive)
             return;
 
-        s.VX = MathF.Sin(_forwardLungeYaw) * _forwardLungeSpeed;
-        s.VZ = MathF.Cos(_forwardLungeYaw) * _forwardLungeSpeed;
-        _forwardLungeTicksRemaining--;
+        if (_forwardLungeTicksRemaining > 0)
+        {
+            s.VX = MathF.Sin(_forwardLungeYaw) * _forwardLungeSpeed;
+            s.VZ = MathF.Cos(_forwardLungeYaw) * _forwardLungeSpeed;
+            _forwardLungeTicksRemaining--;
+        }
+        else
+        {
+            s.VX = 0f;
+            s.VZ = 0f;
+            _forwardLungeActive = false;
+        }
     }
 
 
@@ -252,7 +269,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         });
     }
 
-    private void StartCapability(ref CharacterState s, CharacterDefinition def, CookedStartCapabilityOperation operation)
+    private void StartCapability(ref CharacterState s, CharacterDefinition def, CookedStartCapabilityOperation operation, int flattenedOperationIndex)
     {
         if (!InternalCapabilityRegistry.TryCreate(operation.CapabilityId, operation.CapabilityVersion, operation.Parameters, out var capability))
             throw new InvalidOperationException($"Capability '{operation.CapabilityId}' version '{operation.CapabilityVersion}' is not admitted.");
@@ -265,14 +282,16 @@ public sealed class CookedTimelineAbility : ServerAbility
         capability.Slot = Slot;
         capability.Cooldown = Cooldown;
         capability.ActivationId = ActivationId;
+        capability.PresentationAttackSequence = PresentationAttackSequence;
+        capability.PresentationOperationIndex = flattenedOperationIndex;
         capability.AirborneAtStart = AirborneAtStart;
         capability.AnimationNames = AnimationNames;
+        capability.PresentationSink = PresentationSink;
         // Aim-hold capabilities own their hold/release lifecycle: freeze the stage
         // clock while they hold ActionState.Aiming so an authored stage timeout can
         // never cancel the aim, and resume (stage time reset) on their release.
         if (capability is IAimHoldCapability)
             _unlimitedAimHold = true;
-        capability.PresentationSink = PresentationSink;
         _capabilities.Add(capability);
         capability.OnStart(ref s, def);
     }

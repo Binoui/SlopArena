@@ -31,7 +31,14 @@ namespace SlopArena.Shared.Abilities
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
             _ticks++;
-            SetVelocityInFacing(ref s, _parameters.ForwardSpeed);
+            if (_ticks > _parameters.DurationTicks)
+                return;
+            // Movement integrates before ability ticks: brake after the last travel step.
+            // Recovery must leave gravity and externally applied velocity alone.
+            if (_ticks == _parameters.DurationTicks)
+                s.VX = s.VZ = 0f;
+            else
+                SetVelocityInFacing(ref s, _parameters.ForwardSpeed);
             if (_ticks <= _parameters.WindupTicks || _ticks > _parameters.HitboxEndTick)
                 return;
 

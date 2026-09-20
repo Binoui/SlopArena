@@ -331,12 +331,44 @@ namespace SlopArena.Client.Entities
         private string _lastHitstunAnimName = "";
         // ── Airborne launch tumble tracking ──
         private bool _tumbleActive;
+        // ── Aerial landing-lag presentation ──
+        private bool _landingLagActive;
         private float _tumbleReleaseNormalizedTime = float.PositiveInfinity;
         // ── Hitstop freeze tracking (ADR-0012) ──
         // True while the current clip is paused at Speed 0 for a hitstop freeze;
         // _hitstopPausedSpeed holds the pre-freeze speed for the resume frame.
         private bool _hitstopPaused;
         private float _hitstopPausedSpeed = 1f;
+        private AudioSource _sfxSource;
+        private AudioClip _jumpSfx;
+        private readonly AudioClip[] _kistuSwordHitboxSfx = new AudioClip[7];
+        private int _kistuSwordSfxSequence;
+        private readonly AudioClip[] _bonkSwooshSfx = new AudioClip[7];
+        private readonly AudioClip[] _commonSwooshSfx = new AudioClip[13];
+
+
+        private void Awake()
+        {
+            if (_animancer == null)
+                _animancer = GetComponent<AnimancerComponent>();
+            if (_modelInstance == null && transform.childCount > 0)
+                _modelInstance = transform.GetChild(0).gameObject;
+            _sfxSource = gameObject.AddComponent<AudioSource>();
+            _sfxSource.playOnAwake = false;
+            for (int i = 0; i < _kistuSwordHitboxSfx.Length; i++)
+                _kistuSwordHitboxSfx[i] = Resources.Load<AudioClip>(
+                    $"Audio/SFX/Kistu/hit_{i + 1:00}");
+            for (int i = 0; i < _bonkSwooshSfx.Length; i++)
+                _bonkSwooshSfx[i] = Resources.Load<AudioClip>(
+                    $"Audio/SFX/Bonk/bonk_swoosh_{i + 1:00}");
+            for (int i = 0; i < _commonSwooshSfx.Length; i++)
+                _commonSwooshSfx[i] = Resources.Load<AudioClip>(
+                    $"Audio/SFX/Whoosh/whoosh_{i + 1:00}");
+            _sfxSource.spatialBlend = 0f;
+            _sfxSource.volume = 0.7f;
+            _jumpSfx = Resources.Load<AudioClip>("Audio/SFX/jump");
+            MovementFeedbackEffect.Prewarm();
+        }
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
@@ -386,14 +418,6 @@ namespace SlopArena.Client.Entities
 
         // ── Lifecycle ──
 
-        private void Awake()
-        {
-            if (_animancer == null)
-                _animancer = GetComponent<AnimancerComponent>();
-            if (_modelInstance == null && transform.childCount > 0)
-                _modelInstance = transform.GetChild(0).gameObject;
-            MovementFeedbackEffect.Prewarm();
-        }
 
         private void OnDisable()
         {
@@ -427,6 +451,47 @@ namespace SlopArena.Client.Entities
         /// Updates position, rotation, and drives animation state.
         /// Call from Update() after reconciliation.
         /// </summary>
+        private void EmitSwordHitboxSfx(CharacterState state)
+        {
+            bool kistu = _charDef?.Class == CharacterClass.Kistu;
+            bool bonk = _charDef?.Class == CharacterClass.Bonk;
+            bool common = _charDef?.Class is CharacterClass.Manki or CharacterClass.FightGuy;
+            if (!_hasAppliedState
+                || (!kistu && !bonk && !common)
+                || state.AttackSlot == 0
+                || (state.State != ActionState.Attacking && state.State != ActionState.Aiming))
+                return;
+
+            if (state.AttackElapsedTicks == _lastState.AttackElapsedTicks
+                && state.AttackSequence == _lastState.AttackSequence)
+                return;
+
+            var ability = _charDef.GetSlotAbility(
+                (byte)(state.AttackSlot - 1), airborne: !state.IsGrounded);
+            if (ability?.Stages is not { Length: > 0 })
+                return;
+
+            int stageIndex = Math.Min(state.ComboStage, ability.Stages.Length - 1);
+            var hitboxes = ability.Stages[stageIndex].HitboxEvents;
+            if (hitboxes == null)
+                return;
+
+            foreach (var hitbox in hitboxes)
+            {
+                if (_lastState.AttackElapsedTicks > hitbox.TriggerTick
+                    || state.AttackElapsedTicks < hitbox.TriggerTick)
+                    continue;
+
+                AudioClip[] pool = kistu
+                    ? _kistuSwordHitboxSfx
+                    : bonk ? _bonkSwooshSfx : _commonSwooshSfx;
+                AudioClip clip = pool[_kistuSwordSfxSequence++ % pool.Length];
+                if (clip != null)
+                    _sfxSource.PlayOneShot(clip);
+                return;
+            }
+        }
+
         public void ApplyServerState(CharacterState state)
         {
             Vector3 targetPos = new Vector3(state.PX, state.PY + _modelYOffset, state.PZ);
@@ -440,10 +505,14 @@ namespace SlopArena.Client.Entities
                 _lastPresentedDeaths = state.Deaths;
                 _hasPresentedDeaths = true;
             }
+            if (_hasAppliedState
+                && state.JumpsLeft < _lastState.JumpsLeft
+                && _jumpSfx != null)
+                _sfxSource.PlayOneShot(_jumpSfx);
+            EmitSwordHitboxSfx(state);
 
             if (state.HitstunTicks > 0)
             {
-                // Smooth knockback: lerp toward server position
                 transform.position = Vector3.Lerp(transform.position, targetPos, 0.6f);
             }
             else
@@ -627,6 +696,11 @@ namespace SlopArena.Client.Entities
             return (float)frameCount / durationTicks;
         }
 
+        private void ClearLandingLagPresentation()
+        {
+            _landingLagActive = false;
+        }
+
         /// <summary>
         /// Play the ability clip for a combo stage with baked-frame speed and
         /// extrapolation overrides. Returns true when a clip played.
@@ -733,14 +807,14 @@ namespace SlopArena.Client.Entities
 
         private bool TryPlayTumble()
         {
-            if (!TryGetAnimation("tumble", out var clip, out _))
+            if (!TryGetAnimation(_charDef.TumbleAnim, out var clip, out _))
                 return false;
 
             // Tumble loops while hitstun is active. Once the server makes the
             // fighter actionable, the current cycle is allowed to finish before
             // falling. The explicit release time handles Loop Time-enabled clips.
             clip.wrapMode = WrapMode.Loop;
-            var tumbleState = _animancer.Play(clip, 0.1f);
+            var tumbleState = _animancer.Play(clip, 0.5f);
             tumbleState.Speed = 1f;
             _tumbleActive = true;
             _tumbleReleaseNormalizedTime = float.PositiveInfinity;
@@ -760,6 +834,11 @@ namespace SlopArena.Client.Entities
             _activeExtrapolator = null;
             _currentExtrapolationMode = ExtrapolationMode.None;
             _currentAnimState = null;
+            if (_landingLagActive
+                && (state.State == ActionState.Hitstun
+                    || state.HitstunTicks > 0
+                    || !state.IsGrounded))
+                ClearLandingLagPresentation();
 
             // ── Hitstop (ADR-0012): freeze the animation in place — the pose holds at the
             // impact frame for the freeze's duration. The server timeline pauses
@@ -861,9 +940,8 @@ namespace SlopArena.Client.Entities
             }
 
             // ── Hitstun extrapolation guard ──
-            // Let the hitstun clip finish naturally before transitioning. This guard
-            // also covers the server's actionable Idle state while post-hitstun flight
-            // still carries an airborne launch.
+            // Play the full hit reaction before blending. This guard also
+            // covers actionable Idle while post-hitstun flight still carries a launch.
             if (_inHitstunAnim)
             {
                 float elapsed = Time.time - _hitstunAnimStartTime;
@@ -909,7 +987,7 @@ namespace SlopArena.Client.Entities
                 else if (actionable && !state.IsGrounded)
                 {
                     var tumble = _animancer.States.Current;
-                    if (tumble != null && TryGetAnimation("tumble", out var tumbleClip, out _) && tumble.Clip == tumbleClip)
+                    if (tumble != null && TryGetAnimation(_charDef.TumbleAnim, out var tumbleClip, out _) && tumble.Clip == tumbleClip)
                     {
                         if (float.IsPositiveInfinity(_tumbleReleaseNormalizedTime))
                         {
@@ -939,6 +1017,42 @@ namespace SlopArena.Client.Entities
                     _wasGrounded = state.IsGrounded;
                     return;
                 }
+                if (_tumbleActive)
+                {
+                    _lastAnimState = state.State;
+                    _wasGrounded = state.IsGrounded;
+                    return;
+                }
+            }
+            // Landing lag blends the current aerial pose into idle for the
+            // authoritative remaining lock duration. Auto-cancel/ordinary
+            // landings carry zero ticks and fall straight through to idle/run.
+            bool landingLag = state.IsGrounded
+                && state.LandingLagTicks > 0
+                && state.HitstunTicks == 0
+                && state.State != ActionState.Hitstun;
+            if (landingLag)
+            {
+                if (!_landingLagActive
+                    && TryGetAnimation(_charDef.IdleAnim, out var idleClip, out _))
+                {
+                    float fadeDuration = state.LandingLagTicks / 60f;
+                    var idleState = _animancer.Play(idleClip, fadeDuration);
+                    idleState.Speed = 1f;
+                    _landingLagActive = true;
+                }
+                if (_landingLagActive)
+                {
+                    _lastAnimState = state.State;
+                    _wasGrounded = state.IsGrounded;
+                    return;
+                }
+            }
+            else if (_landingLagActive)
+            {
+                // The authoritative zero is the handoff tick. Do not hold the
+                // landing fade or wait for clip completion before locomotion resumes.
+                ClearLandingLagPresentation();
             }
 
             // ── Non-combat: ground/air state machine ──
@@ -1079,13 +1193,14 @@ namespace SlopArena.Client.Entities
         {
             if (!_tumbleActive
                 || !(_animancer?.States.Current is { } tumble)
+                || !float.IsPositiveInfinity(_tumbleReleaseNormalizedTime)
                 || tumble.IsLooping
                 || tumble.Length <= 0f
                 || tumble.Time < tumble.Length)
                 return;
 
-            // Imported clips can arrive with Loop Time unset. Keep the presentation
-            // loop safe at runtime until the supplied tumble asset is configured.
+            // Loop non-looping imports only while hitstun owns the phase.
+            // Keep release time monotonic so the pending cycle boundary can be reached.
             tumble.Time %= tumble.Length;
             tumble.IsPlaying = true;
         }
@@ -1434,6 +1549,7 @@ namespace SlopArena.Client.Entities
             _currentAnimState = null;
             _hitstopPaused = false;
             _tumbleActive = false;
+            ClearLandingLagPresentation();
             _wasAttacking = false;
             _attackStartedGrounded = false;
             DisableAttackAccents();
@@ -1500,6 +1616,12 @@ namespace SlopArena.Client.Entities
             => _animancer?.States.Current?.Clip != null
                 ? _animancer.States.Current.Clip.name
                 : "none";
+
+        public Transform ResolvePresentationBone(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            return FindBone(name);
+        }
 
         private Transform FindBone(string name)
         {

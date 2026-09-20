@@ -180,9 +180,16 @@ namespace SlopArena.Shared
                 state.VX = 0f;
                 state.VZ = 0f;
             }
-            // Presentation-only restart marker: same-slot IASA keeps the attacking
-            // state, slot, and stage unchanged, so clients need an explicit edge.
-            unchecked { state.AttackSequence++; }
+            // Activation aim is the camera direction for moves that consume it on start.
+            // Apply it before OnStart so capabilities cache the current input, not the
+            // previous tick's state.
+            if (activationAimYaw.HasValue)
+                state.AimYaw = activationAimYaw.Value * 0.01f * (MathF.PI / 180f);
+			// Presentation-only restart marker: same-slot IASA keeps the attacking
+			// state, slot, and stage unchanged, so clients need an explicit edge.
+			unchecked { state.AttackSequence++; }
+			ability.PresentationAttackSequence = state.AttackSequence;
+			ability.PresentationOperationIndex = -1;
 			ability.OnStart(ref state, def);
             bool aimingAbility = cookedSlot != null
                 ? cookedSlot.AimMode != AuthoringAimMode.None
@@ -1011,26 +1018,25 @@ namespace SlopArena.Shared
 					second.PX += dx * penetration * secondCorrection;
 					second.PZ += dz * penetration * secondCorrection;
 
-					float relativeVelocity = (second.VX - first.VX) * dx + (second.VZ - first.VZ) * dz;
-					if (relativeVelocity < 0f)
+					// Body contact is a positional stop, not momentum transfer. Remove
+					// only each fighter's velocity component directed into the other
+					// pushbox; preserve separating and tangential velocity.
+					if (!firstWarping)
 					{
-						if (!firstWarping && !secondWarping)
+						float firstNormalVelocity = first.VX * dx + first.VZ * dz;
+						if (firstNormalVelocity > 0f)
 						{
-							float impulse = relativeVelocity * 0.5f;
-							first.VX += dx * impulse;
-							first.VZ += dz * impulse;
-							second.VX -= dx * impulse;
-							second.VZ -= dz * impulse;
+							first.VX -= dx * firstNormalVelocity;
+							first.VZ -= dz * firstNormalVelocity;
 						}
-						else if (!firstWarping)
+					}
+					if (!secondWarping)
+					{
+						float secondNormalVelocity = second.VX * dx + second.VZ * dz;
+						if (secondNormalVelocity < 0f)
 						{
-							first.VX += dx * relativeVelocity;
-							first.VZ += dz * relativeVelocity;
-						}
-						else if (!secondWarping)
-						{
-							second.VX -= dx * relativeVelocity;
-							second.VZ -= dz * relativeVelocity;
+							second.VX -= dx * secondNormalVelocity;
+							second.VZ -= dz * secondNormalVelocity;
 						}
 					}
 
@@ -1514,6 +1520,14 @@ namespace SlopArena.Shared
 					CanHitOwner = explosion.CanHitOwner,
 					RehitIntervalTicks = explosion.RehitIntervalTicks,
 				});
+                if (!string.IsNullOrEmpty(explosion.ExplosionPresentationId))
+                    _presentationEvents.Add(new TimelinePresentationEvent(
+                        _tick, ownerId, explosion.PresentationOperationIndex,
+                        explosion.ExplosionPresentationId, explosion.PresentationAttackSequence,
+                        PresentationEventSource.CapabilityExplosion, ex, ey, ez, explosion.PresentationYaw)
+                    {
+                        Placement = new PresentationPlacement(DurationTicks: 150),
+                    });
 			}
 		}
 

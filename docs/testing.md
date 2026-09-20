@@ -39,6 +39,12 @@ dotnet test tests/Shared.Tests/ --nologo
 
 Use a focused test filter while iterating, then run the full Shared suite before delivery. Tests should assert observable simulation behavior: state transitions, timing boundaries, collision, damage/Knockback, interruption, deterministic serialization, and catalog identity. Avoid assertions tied only to implementation details or volatile test totals.
 
+Keep mechanic and reporting tests independent of incidental roster tuning. Use explicit
+empty-slot fixtures rather than assuming a work-in-progress move remains empty, and assert
+facing/lock transitions directly instead of pinning unrelated movement distances. Full-jump
+setups must hold through both JumpSquat and the short-hop decision window. Multi-hit tests
+should count accepted contacts, not gaps between hitboxes whose active windows may overlap.
+
 ### Targeted contract tests
 
 Choose tests that cover the changed boundary:
@@ -109,8 +115,9 @@ For integrated Unity-facing changes and accepted package verification:
    requirement and hashes. Keep the existing `content-cooked` package/release verification.
 4. Open the affected package in Ability Lab, preview a valid persisted cooked draft,
    then open Training and exercise movement, the changed move, collision, interruption,
-   and landing behavior. For the Editor `edit → Play` path, observe the changed source
-   behavior and semantic animation/rig without running a publishing cook.
+   and landing behavior. Landing presentation crossfades the current aerial pose into
+   idle over the replicated `LandingLagTicks / 60` seconds; ordinary zero-lag landings
+   transition directly to locomotion, and hitstun interrupts the blend.
 
 Local iteration uses the transient development catalog and affected runtime path; it
 does not require this persisted-catalog self-test for every numerical tuning edit.

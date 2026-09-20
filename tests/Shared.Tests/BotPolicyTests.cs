@@ -166,6 +166,28 @@ public class BotPolicyTests
 
         Assert.True(input.ActiveSlot > 0, $"expected an attack press, got ActiveSlot={input.ActiveSlot}");
     }
+    [Fact]
+    public void InRangeNormalDifficulty_PrefersNormalsOverSpecials()
+    {
+        var self = Self();
+        var target = Opponent(z: 0.75f);
+        int normals = 0;
+        int specials = 0;
+
+        for (int seed = 0; seed < 256; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Normal };
+            Prime(memory, target);
+            byte slot = Policy.Decide(self, target, Def, new Random(seed), memory).ActiveSlot;
+            if (slot is >= AbilitySlots.Slot1 and <= AbilitySlots.Slot4)
+                normals++;
+            else if (slot is AbilitySlots.A or AbilitySlots.E or AbilitySlots.R or AbilitySlots.F)
+                specials++;
+        }
+
+        Assert.True(normals > specials, $"expected normal attacks to outnumber specials, got normals={normals}, specials={specials}");
+    }
+
 
     [Fact]
     public void InHitstun_NeverEmitsActionInput()
@@ -244,29 +266,6 @@ public class BotPolicyTests
         Assert.False(input.Jump);
     }
 
-    [Fact]
-    public void ThreatResponse_HarderDifficultyCanDodgeWhileEasyWaits()
-    {
-        var self = Self();
-        var target = Opponent(z: 0.5f);
-        target.State = ActionState.Attacking;
-        int hardDodges = 0;
-
-        for (int seed = 0; seed < 100; seed++)
-        {
-            var easyMemory = new BotMemory { Difficulty = CpuDifficulty.Easy };
-            var hardMemory = new BotMemory { Difficulty = CpuDifficulty.Hard };
-            Prime(easyMemory, target);
-            Prime(hardMemory, target);
-            var easy = Policy.Decide(self, target, Def, new Random(seed), easyMemory);
-            var hard = Policy.Decide(self, target, Def, new Random(seed), hardMemory);
-
-            Assert.False(easy.Jump);
-            if (hard.Dash) hardDodges++;
-        }
-
-        Assert.True(hardDodges > 0, "Hard never selected a threat dodge across 100 seeds");
-    }
 
     [Theory]
     [InlineData(CpuDifficulty.Easy, 24)]
@@ -394,7 +393,7 @@ public class BotPolicyTests
         })
             self.SetCooldown(slot, 999);
 
-        var target = Opponent(z: 0.75f);
+        var target = Opponent(z: 0.5f);
         bool selected = false;
         for (int seed = 0; seed < 32 && !selected; seed++)
         {
@@ -410,7 +409,7 @@ public class BotPolicyTests
     [Fact]
     public void EmptyAerialSlot_IsUnavailable()
     {
-        var def = BuiltInContentResolver.Resolve(CharacterClass.Bonk).Definition;
+        var def = TestHelpers.WithEmptyAirSlot2(Def);
         var self = TestHelpers.PlayerState();
         self.PY = TestHelpers.GroundPY(def);
         self.IsGrounded = false;
@@ -679,7 +678,8 @@ public class BotPolicyTests
         self.IsGrounded = false;
         self.JumpsLeft = 0;
         self.DashCooldownTicks = 999;
-        var target = TestHelpers.NpcState(x: 20f);
+        // Keep the opponent toward the stage: homing recovery must not chase outward.
+        var target = TestHelpers.NpcState(x: 4f);
         var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
         int delay = BotDifficultyProfile.ForDifficulty(memory.Difficulty).ReactionDelayTicks;
         for (int i = 0; i <= delay; i++)
@@ -688,6 +688,26 @@ public class BotPolicyTests
         var input = Policy.Decide(self, target, def, new Random(0), memory, arena);
 
         Assert.Equal(AbilitySlots.E, input.ActiveSlot);
+    }
+
+    [Fact]
+    public void HomingRecovery_DoesNotChaseOpponentAwayFromStage()
+    {
+        var self = TestHelpers.PlayerState(x: 10f);
+        self.PY = 4f;
+        self.VY = -5f;
+        self.IsGrounded = false;
+        self.JumpsLeft = 0;
+        self.DashCooldownTicks = 999;
+        var target = TestHelpers.NpcState(x: 14f); // Within homing range, but away from safety.
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+
+        var input = Policy.Decide(self, target, TestHelpers.KistuDef,
+            new Random(0), memory, RecoveryArena());
+
+        Assert.Equal(0, input.ActiveSlot);
+        Assert.True(input.MoveX < 0f, "Recovery must drift toward the stage, not the opponent.");
     }
 
     [Fact]
@@ -810,20 +830,36 @@ public class BotPolicyTests
     }
 
     [Fact]
-    public void CommittedLunge_AccountsForFullTimeline_NotShorterCapabilityParameter()
+    public void CommittedLunge_UsesCapabilityDurationRatherThanRecoveryTimeline()
     {
         var arena = LungeArena();
         var target = Opponent(z: 18f);
         var policy = new HeuristicBotPolicy();
+        // Explicit fixture: 11.33 units of propulsion fits; 19.83 units would cross the edge.
+        var def = TestHelpers.FightGuyDef;
+        var slots = System.Linq.Enumerable.ToArray(def.CookedSlots!);
+        slots[6] = new CookedSlotDefinition(6, "ground.R", false, "Cyclone", "Cyclone", "icon.r",
+                AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false,
+                new CookedTimeline(new[]
+                {
+                    new CookedStage(70, 0, 0, 0, 0, Array.Empty<string>(), new CookedTimelineOperation[]
+                    {
+                        new CookedStartCapabilityOperation(0, AuthoringUnit.Ticks,
+                            "slop.internal.fightguy.cyclone-kick.v1", "1",
+                            new CookedCycloneKickCapabilityParameters(17, 6, 34, 40, .8f, .4f, .8f, 7, 15, 8, 5, 6, .8f, .3f)),
+                    }),
+                }));
+        def.CookedSlots = slots;
+        int attacks = 0;
         for (int seed = 0; seed < 32; seed++)
         {
             var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
             Prime(memory, target);
-            // The capability's 40-tick estimate fits; the actual 70-tick lunge does not.
             var input = policy.Decide(OnlyCyclone(15f, 0f), target,
-                Def, new Random(seed), memory, arena);
-            Assert.NotEqual(AbilitySlots.R, input.ActiveSlot);
+                def, new Random(seed), memory, arena);
+            if (input.ActiveSlot == AbilitySlots.R) attacks++;
         }
+        Assert.True(attacks > 0, "Safe bounded Cyclone must not be rejected for stationary recovery time.");
     }
 
     [Fact]

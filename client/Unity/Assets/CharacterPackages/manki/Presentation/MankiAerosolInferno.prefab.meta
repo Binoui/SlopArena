@@ -1,7 +1,15 @@
 fileFormatVersion: 2
-guid: cb1ad5ee3fc411307aa4e833297bc755
+guid: 2db9d01ecccd44ec1be8bb5a8287dcd7
 PrefabImporter:
   externalObjects: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 23634
+  packageName: Cartoon FX 4 Remaster
+  packageVersion: R 1.5.0
+  assetPath: Assets/~AnimationPacks/JMO Assets/Cartoon FX Remaster/CFXR Prefabs/Fire/CFXR4
+    Flamethrower.prefab
+  uploadId: 836234

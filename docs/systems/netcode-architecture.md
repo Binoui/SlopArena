@@ -250,8 +250,10 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(109) + h
 | 105    | byte    | JumpHeldTicks                | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
 | 106    | byte    | LockOn                      | Persistent target-lock flag (ADR-0018) |
 | 107-108| ushort  | LedgeRegrabLockTicks         | Walk-off self-grab suppression — on-wire so rollback reproduces a walk-off |
+| 109    | byte    | AttackSequence              | Changes for each ability activation |
+| 110-111| ushort  | LandingLagTicks             | Authoritative landing lock for reconciliation and presentation |
 
-**Packet sizes:** `CharacterStatePacket` is 109 bytes. `ServerEntityPacket` is 121 bytes before the relay section, 122 bytes with the no-input marker, and 142 bytes with relayed input.
+**Packet sizes:** `CharacterStatePacket` is 112 bytes. `ServerEntityPacket` is 124 bytes before the relay section, 125 bytes with the no-input marker, and 145 bytes with relayed input. Client and server must use the same layout.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

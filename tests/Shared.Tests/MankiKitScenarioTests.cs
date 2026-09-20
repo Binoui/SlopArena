@@ -60,13 +60,13 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             package.Definition.CapabilityRequirements.Select(x => x.CapabilityId).OrderBy(x => x).ToArray());
         var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
         {
-            ["ground.1"] = (30, 13, 8, 5, .35f, 4, 8, 4, 20, 14, 0, 0, 0),
-            ["ground.2"] = (50, 22, 8, 5, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
-            ["ground.3"] = (38, 25, 8, 10, .4f, 7, 25, 5, 26, 18, 0, 0, 0),
+            ["ground.1"] = (30, 13, 8, 5, .5f, 4, 8, 4, 20, 14, 0, 0, 0),
+            ["ground.2"] = (50, 22, 8, 5, .5f, 7, 25, 5, 26, 18, 0, 0, 0),
+            ["ground.3"] = (38, 25, 8, 10, .5f, 7, 25, 5, 26, 18, 0, 0, 0),
             ["ground.4"] = (60, 56, 10, 7, .5f, 14, 28, 9, 42, 26, 0, 0, 0),
-            ["air.1"] = (33, 29, 6, 5, .30f, 3, 55, 5, 24, 12, 9, 5, 23),
-            ["air.3"] = (44, 41, 14, 6, .35f, 8, 65, 5, 26, 20, 9, 5, 30),
-            ["air.4"] = (54, 50, 20, 7, .4f, 13, 25, 8, 42, 26, 12, 5, 38),
+            ["air.1"] = (33, 29, 6, 5, .5f, 3, 55, 5, 24, 12, 9, 5, 23),
+            ["air.3"] = (44, 41, 14, 6, .5f, 8, 65, 5, 26, 20, 9, 5, 30),
+            ["air.4"] = (54, 50, 20, 7, .5f, 13, 25, 8, 42, 26, 12, 5, 38),
         };
         foreach (var pair in expected)
         {
@@ -207,6 +207,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal((ushort)18, bomb.ExplosionStunTicks);
         Assert.Equal((ushort)8, bomb.ExplosionDurationTicks);
         Assert.Equal(30f, bomb.ExplosionKbAngle);
+        Assert.Equal("presentation.manki.round-bomb.explosion", bomb.ExplosionPresentationId);
 
         var jetpack = Assert.IsType<CookedMankiJetpackBoostCapabilityParameters>(
             Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations)).Parameters);
@@ -220,6 +221,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(24f, jetpack.ExplosionKbGrowth);
         Assert.Equal((ushort)18, jetpack.ExplosionStunTicks);
         Assert.Equal((ushort)8, jetpack.ExplosionDurationTicks);
+        Assert.Equal("presentation.manki.jetpack-boost.ignition", jetpack.ExplosionPresentationId);
 
         var bazooka = Assert.IsType<CookedMankiBazookaCapabilityParameters>(
             Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.R").Timeline.Stages.Single().Operations)).Parameters);
@@ -239,7 +241,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(25f, bazooka.ExplosionKbAngle);
         Assert.Equal((ushort)20, bazooka.CastDuration);
         Assert.Equal((ushort)15, bazooka.RecoveryDuration);
-
+        Assert.Equal("presentation.manki.bazooka.explosion", bazooka.ExplosionPresentationId);
         var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
         Assert.Equal((ushort)52, aerosol.Timeline.Stages.Single().DurationTicks);
         var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[0]);

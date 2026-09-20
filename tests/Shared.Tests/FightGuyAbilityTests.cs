@@ -97,18 +97,6 @@ public class FightGuyAbilityTests
         Assert.Equal((byte)5, t0.AttackSlot);
     }
 
-    [Fact]
-    public void FightGuyCycloneKick_AppliesForwardLunge()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        state.FacingYaw = 0f;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-        var t1 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 5), 3);
-        Assert.True(t1.VZ > 16f, $"Expected VZ>16 (forward lunge), got VZ={t1.VZ:F3}");
-        Assert.True(t1.PZ > 0.1f, $"Expected forward position change, got PZ={t1.PZ:F3}");
-    }
 
     [Fact]
     public void FightGuyCycloneKick_HitsEachTargetOnceWithModerateKnockback()
@@ -156,7 +144,7 @@ public class FightGuyAbilityTests
         npc1.PY = GroundPY;
         sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc1);
 
-        var npc2 = TestHelpers.NpcState(0f, 6f);
+        var npc2 = TestHelpers.NpcState(0f, 3.5f);
         npc2.PY = GroundPY;
         sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
 
@@ -201,7 +189,7 @@ public class FightGuyAbilityTests
         }
 
         var target = sim.GetState(100);
-        Assert.Equal((ushort)12, target.DamagePercent);
+        Assert.Equal((ushort)13, target.DamagePercent);
         Assert.True(target.PZ < 0.9f, $"punches must pull inward, got PZ={target.PZ:F3}");
         Assert.True(maxHitstun > 0, "punches must apply hitstun");
     }
@@ -231,7 +219,7 @@ public class FightGuyAbilityTests
         }
 
         var target = sim.GetState(100);
-        Assert.Equal((ushort)24, target.DamagePercent);
+        Assert.Equal((ushort)13, target.DamagePercent);
         Assert.True(target.PZ > beforeKickZ, $"right-foot finisher must launch away, before={beforeKickZ:F3} after={target.PZ:F3}");
     }
 

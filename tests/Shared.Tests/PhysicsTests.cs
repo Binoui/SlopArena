@@ -12,6 +12,12 @@ public class PhysicsTests
     private static readonly MovementStats Move = Def.Movement;
     private static readonly float GroundPx = TestHelpers.MankiGroundPY;
     private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
+    // Number of held ticks needed after the loop reaches StateTicks=1. Manki's
+    // four-tick squat expires before the five-tick short-hop decision window.
+    private static int FullJumpDecisionTicksAfterSquatRemainder =>
+        Simulation.ShortHopWindowTicks > Move.JumpSquatTicks
+            ? Simulation.ShortHopWindowTicks - Move.JumpSquatTicks + 1
+            : 1;
 
     private static CharacterDefinition CreateClassicDef()
     {
@@ -43,8 +49,10 @@ public class PhysicsTests
             Assert.Equal(ActionState.JumpSquat, s.State);
         }
 
-        // Squat expires → jump fires, then gravity applies same tick
-        var tJump = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
+        // Squat expiry is deferred while a held input is still inside the short-hop
+        // window; continue through that boundary so this is a genuine full jump.
+        var tJump = TestHelpers.TickHold(
+            sim, TestHelpers.Input(jumpHeld: true), FullJumpDecisionTicksAfterSquatRemainder);
         Assert.Equal(ActionState.Idle, tJump.State);
         Assert.False(tJump.IsGrounded);
         TestHelpers.AssertNear(Move.JumpForce - GravPerTick, tJump.VY, 0.01f);
@@ -62,7 +70,8 @@ public class PhysicsTests
         // Squat to get airborne (held = full ground jump; the jump EDGE is 1 tick, the
         // hold continues — holding the edge would re-trigger as a double jump on fire).
         TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
-        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), Move.JumpSquatTicks);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true),
+            Math.Max(Move.JumpSquatTicks, Simulation.ShortHopWindowTicks));
         var afterJump = sim.GetState(1);
         Assert.False(afterJump.IsGrounded);
         Assert.Equal(1u, afterJump.JumpsLeft);
@@ -96,8 +105,9 @@ public class PhysicsTests
             Assert.Equal(Move.RunSpeed, s.VX);
         }
 
-        // Squat expires → full hop airborne, momentum preserved (air friction reduces slightly)
-        var tJump = TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 1);
+        // Continue through the deferred boundary before asserting the airborne state.
+        var tJump = TestHelpers.TickHold(
+            sim, TestHelpers.Input(jumpHeld: true), FullJumpDecisionTicksAfterSquatRemainder);
         Assert.False(tJump.IsGrounded);
         Assert.True(tJump.VX > 0f, $"Expected VX > 0 after jump, got {tJump.VX:F3}");
     }

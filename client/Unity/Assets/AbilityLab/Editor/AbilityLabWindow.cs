@@ -11,6 +11,7 @@ using UnityEngine.UIElements;
 using SlopArena.Client.Tools;
 using SlopArena.Client.Animation;
 using SlopArena.Shared;
+using SlopArena.Client.World;
 
 namespace SlopArena.EditorTools;
 
@@ -75,9 +76,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private VisualElement _groundAirSelector = null!;
     private Button _groundMovesButton = null!;
     private Button _airMovesButton = null!;
-    private Label _previewSummary = null!;
     private Button _createLabRig = null!;
-    private Label _sceneViewGuidance = null!;
     private VisualElement _inspector = null!;
     private Label _timelineTick = null!;
     private Button _timelinePlay = null!;
@@ -136,6 +135,10 @@ public sealed class AbilityLabWindow : EditorWindow
     private float _sceneRadiusPending;
     private int _sceneRadiusStageIndex = -1;
     private int _sceneRadiusOperationIndex = -1;
+    private bool _scenePresentationEditing;
+    private PresentationPlacement _scenePresentationPending = new();
+    private int _scenePresentationStageIndex = -1;
+    private int _scenePresentationOperationIndex = -1;
     private CharacterPackageInspectionResult? _inspection;
     private bool _updatingControls;
 
@@ -200,9 +203,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _groundAirSelector = Required<VisualElement>("ground-air-selector");
         _groundMovesButton = Required<Button>("ground-moves-button");
         _airMovesButton = Required<Button>("air-moves-button");
-        _previewSummary = Required<Label>("preview-summary");
         _createLabRig = Required<Button>("create-lab-rig");
-        _sceneViewGuidance = Required<Label>("scene-view-guidance");
         _inspector = Required<VisualElement>("inspector");
         _timelineTick = Required<Label>("timeline-tick");
         _timelinePlay = Required<Button>("timeline-play");
@@ -429,18 +430,8 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void BindMovesPage()
     {
-        _groundMovesButton.clicked += () =>
-        {
-            if (_updatingControls) return;
-            _airborneSelector = false;
-            BuildMoveButtons(false);
-        };
-        _airMovesButton.clicked += () =>
-        {
-            if (_updatingControls) return;
-            _airborneSelector = true;
-            BuildMoveButtons(true);
-        };
+        _groundMovesButton.clicked += () => SelectMoveMode(false);
+        _airMovesButton.clicked += () => SelectMoveMode(true);
         _timelinePlay.clicked += () =>
         {
             if (_lab == null || !_lab.IsPackagePreview) return;
@@ -464,6 +455,25 @@ public sealed class AbilityLabWindow : EditorWindow
                 RefreshInspector();
             }
         });
+    }
+    private void SelectMoveMode(bool airborne)
+    {
+        if (_updatingControls || _lab == null) return;
+        _airborneSelector = airborne;
+        if (CanonicalSlotProjection.TryGet(_lab.SelectedSlotId, out var current) &&
+            CanonicalSlotProjection.TryGet(airborne, current.InputLabel, out var target))
+            _lab.SetSlot(target);
+        UpdateMoveModeButtons();
+        UpdateTimelineControls();
+        RefreshInspector();
+        BuildMoveButtons(airborne);
+    }
+
+    private void UpdateMoveModeButtons()
+    {
+        _groundMovesButton.EnableInClassList("ground-air-selected", !_airborneSelector);
+        _airMovesButton.EnableInClassList("ground-air-selected", false);
+        _airMovesButton.EnableInClassList("ground-air-air-selected", _airborneSelector);
     }
     private void BindCharacterPage()
     {
@@ -506,6 +516,7 @@ public sealed class AbilityLabWindow : EditorWindow
         BindPresentationSelector("presentation-dash", (current, value) => current with { Dash = value });
         BindPresentationSelector("presentation-jump", (current, value) => current with { Jump = value });
         BindPresentationSelector("presentation-fall", (current, value) => current with { Fall = value });
+        BindPresentationSelector("presentation-tumble", (current, value) => current with { Tumble = value });
         BindPresentationSelector("presentation-hit-small", (current, value) => current with { HitSmall = value });
         BindPresentationSelector("presentation-hit-medium", (current, value) => current with { HitMedium = value });
         BindPresentationSelector("presentation-hit-hard", (current, value) => current with { HitHard = value });
@@ -634,6 +645,7 @@ public sealed class AbilityLabWindow : EditorWindow
             yield return presentation.Dash;
             yield return presentation.Jump;
             yield return presentation.Fall;
+            yield return presentation.Tumble;
             yield return presentation.HitSmall;
             yield return presentation.HitMedium;
             yield return presentation.HitHard;
@@ -712,6 +724,7 @@ public sealed class AbilityLabWindow : EditorWindow
         SetAnimation("presentation-dash", presentation.Dash, animationChoices);
         SetAnimation("presentation-jump", presentation.Jump, animationChoices);
         SetAnimation("presentation-fall", presentation.Fall, animationChoices);
+        SetAnimation("presentation-tumble", presentation.Tumble, animationChoices);
         SetAnimation("presentation-hit-small", presentation.HitSmall, animationChoices);
         SetAnimation("presentation-hit-medium", presentation.HitMedium, animationChoices);
         SetAnimation("presentation-hit-hard", presentation.HitHard, animationChoices);
@@ -790,6 +803,33 @@ public sealed class AbilityLabWindow : EditorWindow
         return result;
     }
 
+    private List<AnimationChoice> BuildPresentationChoices(IEnumerable<string> semanticIds)
+    {
+        var ids = (_workspace.Catalog?.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+            .Where(binding => binding != null && !string.IsNullOrEmpty(binding.SemanticId))
+            .Select(binding => binding.SemanticId)
+            .Concat(semanticIds ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var choices = new List<AnimationChoice>(ids.Count + 1)
+        {
+            new AnimationChoice("", "None"),
+        };
+        choices.AddRange(ids.Select(id => new AnimationChoice(id, FriendlyPresentationLabel(id))));
+        return choices;
+    }
+
+    private string FriendlyPresentationLabel(string semanticId)
+    {
+        var binding = (_workspace.Catalog?.Presentations ?? Array.Empty<CharacterAssetCatalog.PresentationBinding>())
+            .FirstOrDefault(candidate => candidate != null && candidate.SemanticId == semanticId);
+        string prefabName = binding?.Prefab != null && !string.IsNullOrEmpty(binding.Prefab.name)
+            ? binding.Prefab.name
+            : "Unknown";
+        return $"{prefabName} ({semanticId})";
+    }
+
     private string FriendlyAnimationLabel(string semanticId)
     {
         var binding = (_workspace.Catalog?.Bindings ?? Array.Empty<CharacterAssetCatalog.AnimationBinding>())
@@ -804,6 +844,7 @@ public sealed class AbilityLabWindow : EditorWindow
             if (semanticId == presentation.Dash) return "Dash";
             if (semanticId == presentation.Jump) return "Jump";
             if (semanticId == presentation.Fall) return "Fall";
+            if (semanticId == presentation.Tumble) return "Tumble";
             if (semanticId == presentation.HitSmall) return "HitSmall";
             if (semanticId == presentation.HitMedium) return "HitMedium";
             if (semanticId == presentation.HitHard) return "HitHard";
@@ -959,18 +1000,13 @@ public sealed class AbilityLabWindow : EditorWindow
             return;
         if (_workspace.LiveDraftPackage != null && _preview?.IsAvailable == true)
         {
-            _sceneViewGuidance.text = "Live draft preview; save and cook to publish.";
             _lab?.ApplyPackageDraftPreview(_workspace.LiveDraftPackage, _preview);
             _airborneSelector = _lab?.SelectedSlotId.StartsWith("air.", StringComparison.Ordinal) ?? false;
-            _updatingControls = true;
-            _groundMovesButton.EnableInClassList("ground-air-selected", !_airborneSelector);
-            _airMovesButton.EnableInClassList("ground-air-selected", _airborneSelector);
-            _updatingControls = false;
+            UpdateMoveModeButtons();
             BuildMoveButtons(_airborneSelector);
         }
         else if (_workspace.LiveDraftInvalid)
         {
-            _sceneViewGuidance.text = "Draft invalid; fix diagnostics before previewing hitboxes.";
             _lab?.MarkPackageDraftInvalid();
             _moveList.Clear();
         }
@@ -986,15 +1022,11 @@ public sealed class AbilityLabWindow : EditorWindow
                 if (CanonicalSlotProjection.TryGet(priorSlot, out var priorAddress))
                     _lab.SetSlot(priorAddress);
             }
-            _updatingControls = true;
-            _groundMovesButton.EnableInClassList("ground-air-selected", !_airborneSelector);
-            _airMovesButton.EnableInClassList("ground-air-selected", _airborneSelector);
-            _updatingControls = false;
+            UpdateMoveModeButtons();
             BuildMoveButtons(_airborneSelector);
         }
         else
         {
-            _sceneViewGuidance.text = "Select a verified cooked package.";
             _moveList.Clear();
         }
         RefreshRigState();
@@ -1101,15 +1133,20 @@ public sealed class AbilityLabWindow : EditorWindow
                 BuildMoveButtons(airborne);
             })
             {
-                text = $"{address.InputLabel} · {sourceName}",
+                text = MoveButtonLabel(address),
                 userData = address,
             };
             button.name = address.Id == "ground.1" ? "selected-ground-1" : address.Id;
-            button.AddToClassList("move-slot");
-            if (_lab?.SelectedSlotId == address.Id) button.AddToClassList("move-slot-selected");
+            if (_lab?.SelectedSlotId == address.Id)
+            {
+                button.AddToClassList("move-slot-selected");
+                if (airborne) button.AddToClassList("move-slot-air-selected");
+            }
             _moveList.Add(button);
         }
     }
+    private static string MoveButtonLabel(SlotAddress address)
+        => address.InputLabel == "A" ? "Q" : address.InputLabel;
 
     private void RefreshAssets()
     {
@@ -1144,6 +1181,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _assetsHitReactionBindings.Clear();
         if (presentation != null)
         {
+            AddBindingRow(_assetsHitReactionBindings, "Tumble", presentation.Tumble);
             AddBindingRow(_assetsHitReactionBindings, "HitSmall", presentation.HitSmall);
             AddBindingRow(_assetsHitReactionBindings, "HitMedium", presentation.HitMedium);
             AddBindingRow(_assetsHitReactionBindings, "HitHard", presentation.HitHard);
@@ -1370,16 +1408,9 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshRigState()
     {
         _lab = FindLab();
-        bool previewAvailable = _preview?.IsAvailable == true && !_workspace.LiveDraftInvalid;
-        bool rigReady = _lab != null;
-        string previewKind = _workspace.LiveDraftPackage != null ? "Live draft" : previewAvailable ? "Cooked" : "Unavailable";
-        _previewSummary.text = $"Preview: {previewKind} · Rig {(rigReady ? "ready" : "needed")}";
-        _previewSummary.tooltip = _workspace.HasPackage
-            ? $"{_workspace.Draft.DisplayName} · {_workspace.PackageId}"
-            : "No package selected";
-        _createLabRig.style.display = rigReady ? DisplayStyle.None : DisplayStyle.Flex;
+        bool showCreateRig = _activePage != "compatibility-page" && _lab == null;
+        _createLabRig.style.display = showCreateRig ? DisplayStyle.Flex : DisplayStyle.None;
     }
-
     private void UpdateTimelineControls()
     {
         _timelineProjection = BuildTimelineProjection();
@@ -1568,9 +1599,13 @@ public sealed class AbilityLabWindow : EditorWindow
     private void CompleteTimelineDrag(AbilityLabTimelineDrag drag)
     {
         if (_lab == null || !_lab.IsPackagePreview || !_workspace.HasPackage) return;
-        bool accepted = drag.Mode == TimelineDragMode.Move
-            ? _workspace.ReplaceOperationTick(_lab.SelectedSlotId, drag.SourceStageIndex, drag.SourceOperationIndex, drag.Tick)
-            : _workspace.ReplaceHitboxDuration(_lab.SelectedSlotId, drag.SourceStageIndex, drag.SourceOperationIndex, drag.DurationTicks);
+        bool accepted = drag.Mode switch
+        {
+            TimelineDragMode.Move => _workspace.ReplaceOperationTick(_lab.SelectedSlotId, drag.SourceStageIndex, drag.SourceOperationIndex, drag.Tick),
+            TimelineDragMode.ResizeHitboxEnd => _workspace.ReplaceHitboxDuration(_lab.SelectedSlotId, drag.SourceStageIndex, drag.SourceOperationIndex, drag.DurationTicks),
+            TimelineDragMode.ResizePresentationEnd => TryReplacePresentationDuration(drag),
+            _ => false,
+        };
         if (!accepted) return;
 
         _lab.SetStage(drag.SourceStageIndex);
@@ -1580,6 +1615,19 @@ public sealed class AbilityLabWindow : EditorWindow
         _timelineTrack.SelectedOperation = _selectedOperation;
         RefreshInspector();
         SceneView.RepaintAll();
+    }
+
+    private bool TryReplacePresentationDuration(AbilityLabTimelineDrag drag)
+    {
+        if (!_workspace.TryResolveCanonicalSlot(_lab!.SelectedSlotId, out _, out var slot) ||
+            drag.SourceStageIndex < 0 || drag.SourceStageIndex >= slot.Timeline.Stages.Count)
+            return false;
+        var operations = slot.Timeline.Stages[drag.SourceStageIndex].Operations;
+        if (drag.SourceOperationIndex < 0 || drag.SourceOperationIndex >= operations.Count ||
+            operations[drag.SourceOperationIndex] is not EmitPresentationOperationSource presentation)
+            return false;
+        return _workspace.ReplacePresentationPlacement(_lab.SelectedSlotId, drag.SourceStageIndex, drag.SourceOperationIndex,
+            presentation.Placement with { DurationTicks = (ushort)Mathf.Clamp(drag.DurationTicks, 1, ushort.MaxValue) });
     }
 
     private AbilityLabOperationProjection? FindProjectedOperation(int stageIndex, int operationIndex)
@@ -1621,6 +1669,14 @@ public sealed class AbilityLabWindow : EditorWindow
             CommitStage(current => current with { DurationTicks = (ushort)duration }, _lab.StageIndex);
         });
         moveGroup.Add(durationField);
+        var iasaField = new IntegerField("IASA ticks") { value = stage.IasaTicks, isDelayed = true };
+        iasaField.RegisterValueChangedCallback(evt =>
+        {
+            if (_updatingControls || _lab == null) return;
+            int iasa = Mathf.Clamp(evt.newValue, 0, stage.DurationTicks);
+            CommitStage(current => current with { IasaTicks = (ushort)iasa }, _lab.StageIndex);
+        });
+        moveGroup.Add(iasaField);
         moveGroup.Add(new Label($"Auto-cancel before {stage.AutoCancelBeforeTicks} · after {stage.AutoCancelAfterTicks}"));
         var animationIds = (_preview?.AnimationCatalog?.Animations ?? Array.Empty<CharacterAnimationCatalog.AnimationEntry>())
             .Where(animation => animation != null && !string.IsNullOrEmpty(animation.SemanticId))
@@ -1706,20 +1762,37 @@ public sealed class AbilityLabWindow : EditorWindow
         addPresentation.SetEnabled(presentationIds.Count > 0);
         moveGroup.Add(addPresentation);
         _inspector.Add(moveGroup);
-        var selected = _selectedOperation;
-        if (selected?.Source is SpawnHitboxOperationSource)
+        foreach (var operation in stage.Operations.Select((_, index) =>
+                     FindProjectedOperation(_lab.StageIndex, index)).Where(operation => operation != null))
         {
-            var hitbox = ((SpawnHitboxOperationSource)selected.Source).Hitbox;
-            var group = new Foldout { text = "Hitbox", value = true };
-            AddHitboxTiming(group, selected.Source.Tick, hitbox);
-            AddHitboxCombat(group, hitbox);
-            AddHitboxShape(group, hitbox);
-            AddHitboxAttachment(group, hitbox);
-            _inspector.Add(group);
+            var projected = operation!;
+            bool expanded = _selectedOperation != null &&
+                _selectedOperation.SourceStageIndex == projected.SourceStageIndex &&
+                _selectedOperation.SourceOperationIndex == projected.SourceOperationIndex;
+            _inspector.Add(BuildOperationFoldout(projected, expanded));
         }
-        else if (selected?.Source is ForwardLungeOperationSource lunge)
+    }
+
+    private Foldout BuildOperationFoldout(AbilityLabOperationProjection operation, bool expanded)
+    {
+        string range = $"[{operation.StartTick}, {operation.EndTick})";
+        var group = new Foldout { text = $"{operation.Summary} · {range}", value = expanded };
+        group.AddToClassList("timeline-operation");
+        group.RegisterValueChangedCallback(evt =>
         {
-            var group = new Foldout { text = "Forward lunge", value = true };
+            if (evt.newValue && !expanded)
+                SelectOperation(operation);
+        });
+
+        if (operation.Source is SpawnHitboxOperationSource hitboxOperation)
+        {
+            AddHitboxTiming(group, operation.Source.Tick, hitboxOperation.Hitbox);
+            AddHitboxCombat(group, hitboxOperation.Hitbox);
+            AddHitboxShape(group, hitboxOperation.Hitbox);
+            AddHitboxAttachment(group, hitboxOperation.Hitbox);
+        }
+        else if (operation.Source is ForwardLungeOperationSource lunge)
+        {
             group.Add(new Label("Direction is captured from facing when the lunge begins."));
             AddDelayedInteger(group, "Start tick", lunge.Tick, CommitForwardLungeStart);
             AddDelayedInteger(group, "Duration ticks", lunge.DurationTicks,
@@ -1730,40 +1803,207 @@ public sealed class AbilityLabWindow : EditorWindow
                 }));
             AddDelayedFloat(group, "Speed (m/s)", lunge.Speed,
                 value => CommitForwardLunge(current => current with { Speed = Mathf.Max(0.01f, value) }));
-            _inspector.Add(group);
         }
-
-        else if (selected?.Source is EmitPresentationOperationSource presentationOperation)
+        else if (operation.Source is StartCapabilityOperationSource capability)
         {
-            var group = new Foldout { text = "Presentation", value = true };
+            AddCapabilityPresentationSelector(group, operation, capability);
+        }
+        else if (operation.Source is EmitPresentationOperationSource presentationOperation)
+        {
             var ids = (_workspace.Draft.PresentationIds ?? Array.Empty<string>())
                 .Concat(new[] { presentationOperation.PresentationId })
                 .Where(id => !string.IsNullOrEmpty(id))
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
-            var choices = BuildAnimationChoices(ids);
+            var choices = BuildPresentationChoices(ids);
             var labels = choices.Select(choice => choice.Label).ToList();
-            var selectedChoice = choices.FirstOrDefault(choice => choice.SemanticId == presentationOperation.PresentationId);
+            var selectedChoice = choices.FirstOrDefault(choice => choice.SemanticId == presentationOperation.PresentationId) ?? choices[0];
             var field = new PopupField<string>(
                 "Presentation",
                 labels,
-                selectedChoice == null ? 0 : labels.IndexOf(selectedChoice.Label));
+                labels.IndexOf(selectedChoice.Label));
             field.RegisterValueChangedCallback(evt =>
             {
                 var choice = choices.FirstOrDefault(item => item.Label == evt.newValue);
                 if (choice != null)
-                    CommitPresentationOperationId(selected, choice.SemanticId);
+                    CommitPresentationOperationId(operation, choice.SemanticId);
             });
             group.Add(field);
             AddDelayedInteger(group, "Start tick", presentationOperation.Tick,
-                value => CommitPresentationOperationStart(selected, value));
-            _inspector.Add(group);
+                value => CommitPresentationOperationStart(operation, value));
+            AddPresentationPlacement(group, operation, presentationOperation.Placement);
         }
-        else if (selected != null)
+
+
+        return group;
+    }
+
+    private void AddPresentationPlacement(Foldout group, AbilityLabOperationProjection operation, PresentationPlacement placement)
+    {
+        var placementGroup = new Foldout { text = "Placement", value = true };
+        var mode = new EnumField("Attachment", placement.AttachmentMode);
+        mode.RegisterValueChangedCallback(evt =>
+            CommitPresentationPlacement(operation, current => current with
+            {
+                AttachmentMode = (AuthoringPresentationAttachmentMode)evt.newValue,
+                BoneId = (AuthoringPresentationAttachmentMode)evt.newValue == AuthoringPresentationAttachmentMode.Bone
+                    ? current.BoneId ?? AuthoringBoneChoices().FirstOrDefault(id => !string.IsNullOrEmpty(id))
+                    : null,
+            }));
+        placementGroup.Add(mode);
+        AddBonePopup(placementGroup, "Bone", placement.BoneId,
+            boneId => CommitPresentationPlacement(operation, current => current with
+            {
+                AttachmentMode = string.IsNullOrEmpty(boneId) ? AuthoringPresentationAttachmentMode.World : AuthoringPresentationAttachmentMode.Bone,
+                BoneId = boneId,
+            }));
+        AddDelayedFloat(placementGroup, "Local position X", placement.LocalPositionX,
+            value => CommitPresentationPlacement(operation, current => current with { LocalPositionX = value }));
+        AddDelayedFloat(placementGroup, "Local position Y", placement.LocalPositionY,
+            value => CommitPresentationPlacement(operation, current => current with { LocalPositionY = value }));
+        AddDelayedFloat(placementGroup, "Local position Z", placement.LocalPositionZ,
+            value => CommitPresentationPlacement(operation, current => current with { LocalPositionZ = value }));
+        AddDelayedFloat(placementGroup, "Local rotation X", placement.LocalRotationX,
+            value => CommitPresentationPlacement(operation, current => current with { LocalRotationX = value }));
+        AddDelayedFloat(placementGroup, "Local rotation Y", placement.LocalRotationY,
+            value => CommitPresentationPlacement(operation, current => current with { LocalRotationY = value }));
+        AddDelayedFloat(placementGroup, "Local rotation Z", placement.LocalRotationZ,
+            value => CommitPresentationPlacement(operation, current => current with { LocalRotationZ = value }));
+        AddDelayedFloat(placementGroup, "Local scale X", placement.LocalScaleX,
+            value => CommitPresentationPlacement(operation, current => current with { LocalScaleX = Mathf.Max(0.0001f, value) }));
+        AddDelayedFloat(placementGroup, "Local scale Y", placement.LocalScaleY,
+            value => CommitPresentationPlacement(operation, current => current with { LocalScaleY = Mathf.Max(0.0001f, value) }));
+        AddDelayedFloat(placementGroup, "Local scale Z", placement.LocalScaleZ,
+            value => CommitPresentationPlacement(operation, current => current with { LocalScaleZ = Mathf.Max(0.0001f, value) }));
+        AddDelayedInteger(placementGroup, "Duration ticks", placement.DurationTicks,
+            value => CommitPresentationPlacement(operation, current => current with
+            {
+                DurationTicks = (ushort)Mathf.Clamp(value, 1,
+                    Mathf.Max(1, CurrentStage().DurationTicks - operation.Source.Tick)),
+            }));
+        group.Add(placementGroup);
+    }
+
+    private void AddCapabilityPresentationSelector(
+        Foldout group,
+        AbilityLabOperationProjection operation,
+        StartCapabilityOperationSource capability)
+    {
+        string presentationId = capability.Parameters switch
         {
-            _inspector.Add(new Foldout { text = selected.Summary, value = true });
-            _inspector.Add(new Label($"Authored range [{selected.StartTick}, {selected.EndTick}) · {selected.Source.Unit}"));
+            MankiRoundBombCapabilityParameters parameters => parameters.ExplosionPresentationId,
+            MankiJetpackBoostCapabilityParameters parameters => parameters.ExplosionPresentationId,
+            MankiBazookaCapabilityParameters parameters => parameters.ExplosionPresentationId,
+            _ => "",
+        };
+        var choices = BuildPresentationChoices(new[] { presentationId });
+        var labels = choices.Select(choice => choice.Label).ToList();
+        var selectedChoice = choices.FirstOrDefault(choice => choice.SemanticId == presentationId) ?? choices[0];
+        var field = new PopupField<string>(
+            "Explosion VFX",
+            labels,
+            labels.IndexOf(selectedChoice.Label))
+        {
+            tooltip = "Package-owned explosion presentation emitted by this capability.",
+        };
+        field.RegisterValueChangedCallback(evt =>
+        {
+            var choice = choices.FirstOrDefault(item => item.Label == evt.newValue);
+            if (choice != null)
+                CommitCapabilityPresentationId(operation, choice.SemanticId);
+        });
+        group.Add(new Label($"Capability · {capability.CapabilityId}"));
+        group.Add(field);
+        AddDelayedInteger(group, "Start tick", capability.Tick,
+            value => CommitCapabilityStart(operation, value));
+    }
+
+
+    private void CommitCapabilityPresentationId(AbilityLabOperationProjection selected, string semanticId)
+    {
+        if (_updatingControls || _lab == null ||
+            selected.Source is not StartCapabilityOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+
+        var updatedParameters = original.Parameters switch
+        {
+            MankiRoundBombCapabilityParameters parameters => parameters with { ExplosionPresentationId = semanticId },
+            MankiJetpackBoostCapabilityParameters parameters => parameters with { ExplosionPresentationId = semanticId },
+            MankiBazookaCapabilityParameters parameters => parameters with { ExplosionPresentationId = semanticId },
+            _ => original.Parameters,
+        };
+        if (ReferenceEquals(updatedParameters, original.Parameters)) return;
+
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex,
+                selected.SourceStageIndex,
+                selected.SourceOperationIndex,
+                original with { Parameters = updatedParameters });
         }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void CommitCapabilityStart(AbilityLabOperationProjection selected, int startTick)
+    {
+        if (_updatingControls || _lab == null ||
+            selected.Source is not StartCapabilityOperationSource)
+            return;
+        CharacterStageSource stage = CurrentStage();
+        startTick = Mathf.Clamp(startTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperationTick(
+                _lab.SelectedSlotId,
+                selected.SourceStageIndex,
+                selected.SourceOperationIndex,
+                startTick);
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void CommitPresentationPlacement(
+        AbilityLabOperationProjection selected,
+        Func<PresentationPlacement, PresentationPlacement> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            selected.Source is not EmitPresentationOperationSource original)
+            return;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplacePresentationPlacement(
+                _lab.SelectedSlotId,
+                selected.SourceStageIndex,
+                selected.SourceOperationIndex,
+                edit(original.Placement));
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
     }
 
     private void CommitPresentationOperationId(AbilityLabOperationProjection selected, string semanticId)
@@ -2044,10 +2284,8 @@ public sealed class AbilityLabWindow : EditorWindow
 
         var hitboxes = _lab.ResolveHitboxes();
         if (hitboxes.Count == 0)
-        {
             _sceneRadiusEditing = false;
-            return;
-        }
+        DrawPresentationHandles();
 
         Handles.BeginGUI();
         GUILayout.Label("Ability Lab package preview · click a hitbox to select", EditorStyles.miniLabel);
@@ -2084,8 +2322,128 @@ public sealed class AbilityLabWindow : EditorWindow
             CommitSceneRadius();
     }
 
+    private void DrawPresentationHandles()
+    {
+        if (_selectedOperation?.Source is not EmitPresentationOperationSource presentation ||
+            _lab?.Renderer == null)
+            return;
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+        {
+            _scenePresentationEditing = false;
+            _scenePresentationStageIndex = -1;
+            _scenePresentationOperationIndex = -1;
+            Event.current.Use();
+            SceneView.RepaintAll();
+            return;
+        }
+
+        PresentationPlacement placement = _scenePresentationEditing
+            ? _scenePresentationPending
+            : presentation.Placement;
+        Transform root = _lab.Renderer.transform;
+        Vector3 eventPosition = root.position;
+        Quaternion eventRotation = Quaternion.Euler(0f, _lab.FacingYaw * Mathf.Rad2Deg, 0f);
+        if (!PresentationPlacementResolver.TryResolveWorldTransform(
+                placement, _lab.Renderer, root, eventPosition, eventRotation,
+                out Vector3 position, out Quaternion rotation, out Vector3 scale))
+            return;
+
+        Transform? parent = placement.AttachmentMode == AuthoringPresentationAttachmentMode.Bone
+            ? _lab.Renderer.ResolvePresentationBone(placement.BoneId)
+            : null;
+        EditorGUI.BeginChangeCheck();
+        Vector3 moved = Handles.PositionHandle(position, rotation);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Vector3 local = parent != null
+                ? parent.InverseTransformPoint(moved)
+                : Quaternion.Inverse(eventRotation) * (moved - eventPosition);
+            placement = placement with
+            {
+                LocalPositionX = local.x,
+                LocalPositionY = local.y,
+                LocalPositionZ = local.z,
+            };
+            BeginPresentationSceneEdit(placement);
+        }
+
+        EditorGUI.BeginChangeCheck();
+        Quaternion turned = Handles.RotationHandle(rotation, position);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Quaternion local = parent != null
+                ? Quaternion.Inverse(parent.rotation) * turned
+                : Quaternion.Inverse(eventRotation) * turned;
+            Vector3 euler = local.eulerAngles;
+            placement = placement with
+            {
+                LocalRotationX = euler.x,
+                LocalRotationY = euler.y,
+                LocalRotationZ = euler.z,
+            };
+            BeginPresentationSceneEdit(placement);
+        }
+
+        EditorGUI.BeginChangeCheck();
+        Vector3 resized = Handles.ScaleHandle(scale, position, rotation);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Vector3 local = parent == null ? resized : new Vector3(
+                resized.x / Mathf.Max(0.0001f, parent.lossyScale.x),
+                resized.y / Mathf.Max(0.0001f, parent.lossyScale.y),
+                resized.z / Mathf.Max(0.0001f, parent.lossyScale.z));
+            placement = placement with
+            {
+                LocalScaleX = Mathf.Max(0.0001f, local.x),
+                LocalScaleY = Mathf.Max(0.0001f, local.y),
+                LocalScaleZ = Mathf.Max(0.0001f, local.z),
+            };
+            BeginPresentationSceneEdit(placement);
+        }
+
+        if (_scenePresentationEditing && Event.current.type == EventType.MouseUp && Event.current.button == 0)
+            CommitScenePresentation();
+    }
+    private void BeginPresentationSceneEdit(PresentationPlacement placement)
+    {
+        if (!_scenePresentationEditing)
+        {
+            if (_selectedOperation?.Source is not EmitPresentationOperationSource ||
+                _selectedOperation.SourceStageIndex < 0 || _selectedOperation.SourceOperationIndex < 0)
+                return;
+            _scenePresentationStageIndex = _selectedOperation.SourceStageIndex;
+            _scenePresentationOperationIndex = _selectedOperation.SourceOperationIndex;
+        }
+        _scenePresentationPending = placement;
+        _scenePresentationEditing = true;
+    }
+
+    private void CommitScenePresentation()
+    {
+        if (!_scenePresentationEditing || _lab == null || !_workspace.HasPackage ||
+            _scenePresentationStageIndex < 0 || _scenePresentationOperationIndex < 0)
+        {
+            _scenePresentationEditing = false;
+            return;
+        }
+        int stageIndex = _scenePresentationStageIndex;
+        int operationIndex = _scenePresentationOperationIndex;
+        bool accepted = _workspace.ReplacePresentationPlacement(
+            _lab.SelectedSlotId, stageIndex, operationIndex, _scenePresentationPending);
+        _scenePresentationEditing = false;
+        _scenePresentationStageIndex = -1;
+        _scenePresentationOperationIndex = -1;
+        if (accepted)
+        {
+            UpdateTimelineControls();
+            _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+            RefreshInspector();
+            SceneView.RepaintAll();
+        }
+    }
     private AbilityLabOperationProjection? FindSourceHitboxOperation(int hitboxIndex)
     {
+
         if (_lab == null || _timelineProjection == null || _lab.StageIndex < 0 || _lab.StageIndex >= _timelineProjection.Stages.Count)
             return null;
         int index = 0;

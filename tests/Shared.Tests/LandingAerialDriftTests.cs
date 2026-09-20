@@ -157,7 +157,7 @@ public class LandingAerialDriftTests
         var sim = TestHelpers.MakeSim();
         var p = TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def), PZ = 0f };
         TestHelpers.RegisterPlayer(sim, def, p);
-        TestHelpers.RegisterNpc(sim, def, TestHelpers.NpcState(0, 5f) with { PY = TestHelpers.GroundPY(def) });
+        TestHelpers.RegisterNpc(sim, def, TestHelpers.NpcState(0, 4f) with { PY = TestHelpers.GroundPY(def) });
 
         var inputs = new Dictionary<ulong, InputState>();
         var pz = new List<float>();
@@ -181,7 +181,7 @@ public class LandingAerialDriftTests
         int landing = -1;
         for (int t = takeoff; t < grounded.Count; t++) if (grounded[t]) { landing = t; break; }
         Assert.True(landing > 0, "should land");
-        Assert.True(pz[landing] > 5f, $"should land PAST the enemy (cross-up): pz={pz[landing]:F2}");
+        Assert.True(pz[landing] > 4f, $"should land PAST the enemy (cross-up): pz={pz[landing]:F2}");
 
         // 40 ticks after landing, fully stopped — no persistent drift.
         int check = Math.Min(landing + 40, vz.Count - 1);

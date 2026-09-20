@@ -57,6 +57,29 @@ public sealed class CharacterPackageSourceCodecTests
         Assert.Equal(CharacterPackageSourceCodec.SerializeManifest(first.Source.Manifest), CharacterPackageSourceCodec.SerializeManifest(second.Source!.Manifest));
         Assert.Equal(CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character), CharacterPackageSourceCodec.SerializeCharacter(second.Source.Character));
     }
+
+    [Fact]
+    public void Tumble_IsOptionalAndRoundTripsWhenDeclared()
+    {
+        var legacyJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)legacyJson["presentation"]!).Remove("tumble");
+        var legacy = CharacterPackageSourceCodec.Load(Fixture("package.json"), legacyJson.ToJsonString());
+        Assert.True(legacy.IsValid, string.Join("\n", legacy.Diagnostics));
+        Assert.Equal("", legacy.Source!.Character.Presentation.Tumble);
+        Assert.DoesNotContain("\"tumble\"", CharacterPackageSourceCodec.SerializeCharacter(legacy.Source.Character));
+
+        var json = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)json["presentation"]!)["tumble"] = "anim.tumble";
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        Assert.Equal("anim.tumble", parsed.Source!.Character.Presentation.Tumble);
+        string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source.Character);
+        Assert.Contains("\"tumble\": \"anim.tumble\"", serialized);
+        var reparsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
+        Assert.True(reparsed.IsValid, string.Join("\n", reparsed.Diagnostics));
+        Assert.Equal("anim.tumble", reparsed.Source!.Character.Presentation.Tumble);
+    }
+
     [Fact]
     public void AimMovementPolicy_RoundTripsAndMissingDefaultsToFixed()
     {
@@ -76,9 +99,29 @@ public sealed class CharacterPackageSourceCodecTests
 
         var unknownJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
         ((JsonObject)unknownJson["slots"]![0]!)["aimMovement"] = "unknown";
+
         var unknown = CharacterPackageSourceCodec.Load(Fixture("package.json"), unknownJson.ToJsonString());
         Assert.Contains(unknown.Diagnostics, x => x.Code == "enum.unknown");
     }
+    [Fact]
+    public void RenameUpdatesOptionalTumbleReference()
+    {
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        var source = parsed.Source! with
+        {
+            Character = parsed.Source.Character with
+            {
+                Presentation = parsed.Source.Character.Presentation with { Tumble = "anim.tumble" }
+            }
+        };
+        var renamed = CharacterPackageSourceCodec.RenameSemanticId(
+            source, "anim.tumble", "anim.fall-tumble",
+            new[] { new CharacterAssetCatalogBindingSnapshot("anim.tumble", "anim.tumble") });
+        Assert.True(renamed.IsValid, string.Join("\n", renamed.Diagnostics));
+        Assert.Equal("anim.fall-tumble", renamed.Source!.Character.Presentation.Tumble);
+    }
+
     [Fact]
     public void StageTargetingMetadata_RoundTripsAndSerializesExplicitly()
     {

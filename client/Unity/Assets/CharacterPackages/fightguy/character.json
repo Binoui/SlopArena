@@ -36,6 +36,7 @@
     "hitSmall": "anim.hit-light",
     "hitMedium": "anim.hit-medium",
     "hitHard": "anim.hit-hard",
+    "tumble": "anim.tumble",
     "landStartOffsetSeconds": 0.49,
     "modelResourcePath": "Characters/FightGuy",
     "visualScale": 1,
@@ -208,7 +209,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.35,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0.21,
@@ -267,7 +268,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.3,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -293,7 +294,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -352,10 +353,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetZ": 0,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -411,7 +412,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.35,
+                  "radius": 0.4,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -437,7 +438,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
-                  "radius": 0.35,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0,
@@ -496,10 +497,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.21,
+                  "offsetZ": 0,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -555,7 +556,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.35,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0.14,
@@ -673,7 +674,7 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
                   "offsetZ": 0.24,
@@ -799,10 +800,10 @@
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
-                  "radius": 0.4,
+                  "radius": 0.5,
                   "offsetX": 0,
                   "offsetY": 0,
-                  "offsetZ": 0.23,
+                  "offsetZ": 0,
                   "endOffsetX": 0,
                   "endOffsetY": 0,
                   "endOffsetZ": 0,
@@ -890,7 +891,7 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 70,
+            "durationTicks": 60,
             "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -911,10 +912,10 @@
                 "capabilityId": "slop.internal.fightguy.cyclone-kick.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "forwardSpeed": 17,
+                  "forwardSpeed": 12,
                   "windupTicks": 6,
-                  "hitboxEndTick": 34,
-                  "durationTicks": 40,
+                  "hitboxEndTick": 48,
+                  "durationTicks": 60,
                   "bodyRadius": 0.8,
                   "sideRadius": 0.4,
                   "sideOffset": 0.8,
@@ -931,7 +932,21 @@
                 "kind": "emitPresentation",
                 "tick": 0,
                 "unit": "ticks",
-                "presentationId": "presentation.cyclone-kick.start"
+                "presentationId": "presentation.cyclone-kick.start",
+                "placement": {
+                  "attachmentMode": "world",
+                  "boneId": null,
+                  "localPositionX": 0,
+                  "localPositionY": 0,
+                  "localPositionZ": 0,
+                  "localRotationX": 0,
+                  "localRotationY": 0,
+                  "localRotationZ": 0,
+                  "localScaleX": 1,
+                  "localScaleY": 1,
+                  "localScaleZ": 1,
+                  "durationTicks": 28
+                }
               }
             ]
           }

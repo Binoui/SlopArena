@@ -4,6 +4,7 @@
       <ui:Label name="package-label" text="Package:" class="toolbar-label" />
       <ui:DropdownField name="package-selector" class="package-selector" />
       <ui:Button name="package-status-toggle" text="No package" class="package-status-toggle" />
+      <ui:Button name="create-lab-rig" text="Create Lab Rig" />
       <ui:Button name="toolbar-undo" text="Undo" />
       <ui:Button name="toolbar-redo" text="Redo" />
       <ui:Button name="toolbar-save" text="SAVE + COOK" class="save-button" />
@@ -17,42 +18,33 @@
     </ui:VisualElement>
     <ui:ScrollView name="diagnostics-panel" class="diagnostics-panel" />
     <ui:Label name="compatibility-banner" text="Compatibility mode is read-only and uses the legacy authority. Package SAVE + COOK is unavailable here." class="legacy-banner" />
-    <ui:VisualElement name="moves-page" class="page">
-      <ui:TwoPaneSplitView name="moves-split" fixed-pane-initial-dimension="220" orientation="Horizontal" class="split-view">
-        <ui:VisualElement name="move-selector" class="move-selector">
-          <ui:VisualElement name="ground-air-selector" class="ground-air-selector">
-            <ui:Button name="ground-moves-button" text="Ground" class="ground-air-button" />
-            <ui:Button name="air-moves-button" text="Air" class="ground-air-button" />
-          </ui:VisualElement>
-          <ui:VisualElement name="move-list" class="move-list" />
+    <ui:VisualElement name="moves-page" class="page moves-page">
+      <ui:VisualElement name="move-selector" class="move-selector">
+        <ui:VisualElement name="ground-air-selector" class="ground-air-selector">
+          <ui:Button name="ground-moves-button" text="Ground" class="ground-air-button" />
+          <ui:Button name="air-moves-button" text="Air" class="ground-air-button" />
         </ui:VisualElement>
-        <ui:VisualElement name="moves-content" class="moves-content">
-          <ui:TwoPaneSplitView name="preview-inspector-split" fixed-pane-initial-dimension="260" orientation="Horizontal" class="split-view preview-inspector-split">
-            <ui:VisualElement name="preview-bridge" class="preview-bridge">
-              <ui:Label name="preview-summary" text="Preview: Unavailable · Rig needed" class="preview-summary" />
-              <ui:Button name="create-lab-rig" text="Create Lab Rig" />
-              <ui:Label name="scene-view-guidance" text="Select a verified cooked package." class="scene-view-guidance" />
-            </ui:VisualElement>
-            <ui:ScrollView name="inspector" class="inspector">
-              <ui:DropdownField name="stage-selector" label="Stage" />
-            </ui:ScrollView>
-          </ui:TwoPaneSplitView>
-          <ui:VisualElement name="move-timeline" class="move-timeline">
-            <ui:VisualElement name="timeline-controls" class="timeline-controls">
-              <ui:Label name="timeline-tick" text="Tick 0" />
-              <ui:Button name="timeline-play" text="Play" />
-              <ui:Button name="timeline-step-back" text="−1" />
-              <ui:Button name="timeline-step-forward" text="+1" />
-              <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
-              <ui:Label name="timeline-duration" text="Duration —" />
-              <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
-            </ui:VisualElement>
-            <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
-              <ui:VisualElement name="timeline-track" class="timeline-track" />
-            </ui:ScrollView>
+        <ui:VisualElement name="move-list" class="move-list" />
+      </ui:VisualElement>
+      <ui:VisualElement name="moves-content" class="moves-content">
+        <ui:ScrollView name="inspector" class="inspector">
+          <ui:DropdownField name="stage-selector" label="Stage" />
+        </ui:ScrollView>
+        <ui:VisualElement name="move-timeline" class="move-timeline">
+          <ui:VisualElement name="timeline-controls" class="timeline-controls">
+            <ui:Label name="timeline-tick" text="Tick 0" />
+            <ui:Button name="timeline-play" text="Play" />
+            <ui:Button name="timeline-step-back" text="−1" />
+            <ui:Button name="timeline-step-forward" text="+1" />
+            <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
+            <ui:Label name="timeline-duration" text="Duration —" />
+            <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
           </ui:VisualElement>
+          <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
+            <ui:VisualElement name="timeline-track" class="timeline-track" />
+          </ui:ScrollView>
         </ui:VisualElement>
-      </ui:TwoPaneSplitView>
+      </ui:VisualElement>
     </ui:VisualElement>
     <ui:ScrollView name="character-page" class="page character-page">
       <ui:Label text="Character" class="page-title" />
@@ -106,6 +98,7 @@
         <ui:DropdownField name="presentation-dash" label="Dash" />
         <ui:DropdownField name="presentation-jump" label="Jump" />
         <ui:DropdownField name="presentation-fall" label="Fall" />
+        <ui:DropdownField name="presentation-tumble" label="Tumble" />
         <ui:DropdownField name="presentation-hit-small" label="HitSmall" />
         <ui:DropdownField name="presentation-hit-medium" label="HitMedium" />
         <ui:DropdownField name="presentation-hit-hard" label="HitHard" />

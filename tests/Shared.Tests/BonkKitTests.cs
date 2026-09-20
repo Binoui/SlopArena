@@ -80,7 +80,7 @@ public sealed class BonkKitTests
         var lunge = Assert.IsType<CookedForwardLungeOperation>(
             Assert.Single(loaded.Package.Definition.Slots.Single(x => x.Id == "ground.A")
                 .Timeline.Stages.Single().Operations.OfType<CookedForwardLungeOperation>()));
-        Assert.Equal((16f, (ushort)16, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick));
+        Assert.Equal((14f, (ushort)8, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick));
 
     }
 
@@ -230,29 +230,34 @@ public sealed class BonkKitTests
     {
         var def = BonkDefinition();
         var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
+        var state = TestHelpers.PlayerState(x: 100f, z: 100f);
         state.PY = TestHelpers.GroundPY(def);
         sim.RegisterEntity(1, def, state);
-        var lightWindows = 0;
-        var wasLight = false;
-        var heavySeen = false;
-        for (var i = 0; i < 60; i++)
+        var targetDef = TestHelpers.CombatDef;
+        // Oversized hurtbox isolates per-hit identity from blade reach and body separation.
+        targetDef.HurtboxCapsules = new[]
         {
-            sim.Tick(new Dictionary<ulong, InputState> { [1] = i == 0 ? TestHelpers.Input(activeSlot: 6) : default });
-            var active = sim.Resolver.GetActiveHitboxes();
-            var light = active.Any(x => x.OwnerId == 1 && x.Damage == 2.5f);
-            if (light && !wasLight) lightWindows++;
-            wasLight = light;
-            heavySeen |= active.Any(x => x.OwnerId == 1 && x.Damage == 12f);
-            Assert.All(active.Where(x => x.OwnerId == 1), x =>
+            new HurtboxCapsule(0f, -0.65f, 0f, 0f, 0.65f, 0f, 1f),
+        };
+        var target = TestHelpers.NpcState(x: 100f, z: 100.1f);
+        target.PY = TestHelpers.GroundPY(targetDef);
+        sim.RegisterEntity(100, targetDef, target);
+        var damage = new List<float>();
+        for (var i = 0; i < 200; i++)
+        {
+            // Hold a damageable dummy in contact to test hit identity, not knockback escape.
+            sim.SetState(100, target with { DamagePercent = sim.GetState(100).DamagePercent });
+            sim.Tick(new Dictionary<ulong, InputState>
             {
-                Assert.Equal(HitboxShape.Capsule, x.Shape);
-                Assert.Equal(0f, x.VX);
-                Assert.Equal(0f, x.VZ);
+                [1] = i == 0 ? TestHelpers.Input(activeSlot: AbilitySlots.F) : default,
+                [100] = default,
             });
+            damage.AddRange(sim.LastTickHits
+                .Where(x => x.OwnerEntityId == 1 && x.TargetEntityId == 100)
+                .Select(x => x.Damage));
         }
-        Assert.Equal(4, lightWindows);
-        Assert.True(heavySeen);
+        Assert.Equal(new[] { 2.5f, 2.5f, 2.5f, 2.5f, 12f }, damage);
+        Assert.Null(sim.GetActiveAbility(1));
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using SlopArena.Client.Entities;
 using SlopArena.Client.Simulation;
 using SlopArena.Shared;
 using UnityEngine;
@@ -6,7 +8,7 @@ namespace SlopArena.Client.Combat
 {
     /// <summary>
     /// Converts accepted simulation hits into the shared light/medium/heavy/launch grammar.
-    /// Character-specific particles layer over this component rather than redefining strength.
+    /// Character-specific impact sounds layer over this component without changing gameplay.
     /// </summary>
     public sealed class CombatFeedback : MonoBehaviour
     {
@@ -15,6 +17,19 @@ namespace SlopArena.Client.Combat
         private const float LaunchForce = 12f;
 
         private ISimulationBridge _bridge;
+        private CombatSFX _sfx;
+        private readonly Dictionary<ulong, CharacterClass> _characters = new();
+
+        private void Awake()
+        {
+            _sfx = GetComponent<CombatSFX>() ?? gameObject.AddComponent<CombatSFX>();
+        }
+
+        public void RegisterRenderer(PlayerRenderer renderer)
+        {
+            if (renderer?.CharacterDef != null)
+                _characters[renderer.EntityId] = renderer.CharacterDef.Class;
+        }
 
         public void SetSimulation(ISimulationBridge bridge)
         {
@@ -29,7 +44,14 @@ namespace SlopArena.Client.Combat
                 return;
 
             foreach (var hit in _bridge.LastTickHits)
-                GraphicHitEffect.Spawn(in hit, Classify(in hit));
+            {
+                ImpactTier tier = Classify(in hit);
+                GraphicHitEffect.Spawn(in hit, tier);
+                _sfx.Play(tier, _characters.TryGetValue(
+                    hit.OwnerEntityId, out var character)
+                    ? character
+                    : CharacterClass.FightGuy);
+            }
         }
 
         public static ImpactTier Classify(in SpellResolver.HitResult hit)
