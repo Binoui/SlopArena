@@ -6,15 +6,20 @@ using UnityEngine.UIElements;
 using SlopArena.Client.UI;
 
 /// <summary>
-/// One-shot builder for the single frontend scene (ADR-0032, issues #210, #212).
-/// Creates Assets/Scenes/Frontend.unity with the shared shell and the six
-/// page hosts, cuts over the build scene list, and deletes the migrated
-/// scene-per-page scenes. Run through the Unity CLI Pipeline, e.g.
+/// One-shot builder for the single frontend scene (ADR-0032; issues #210,
+/// #212, #219). Creates Assets/Scenes/Frontend.unity with the stable
+/// FrontendShell document and the six page hosts. Migrated pages (Home,
+/// Fighter Select) carry only their controller: the shell clones their
+/// fragment source into its hosts on every activation. Unmigrated pages keep
+/// their per-page UIDocument until they migrate (issues #221/#222) — a
+/// temporary coexistence, not a compatibility router. Run through the Unity
+/// CLI Pipeline, e.g.
 /// `unity command --project-path client/Unity eval 'FrontendSceneBuilder.Build();'`.
 /// </summary>
 public static class FrontendSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/Frontend.unity";
+    private const string ShellUxmlPath = "Assets/UI/FrontendShell.uxml";
     private const string PanelSettingsGuid = "375219e0f9be73791af68905fab77544";
 
     private static readonly (string Name, string Uxml, System.Type Controller, bool Active)[] Pages =
@@ -46,6 +51,18 @@ public static class FrontendSceneBuilder
         var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
         var shellObject = new GameObject("Frontend");
+        // The stable shell document first, so its visual tree exists when the
+        // controller binds and activates the pending page in Start (issue #219).
+        var shellDocument = shellObject.AddComponent<UIDocument>();
+        var panelPath = AssetDatabase.GUIDToAssetPath(PanelSettingsGuid);
+        shellDocument.panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
+        shellDocument.visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(ShellUxmlPath);
+
+        var shellView = shellObject.AddComponent<FrontendShellView>();
+        var shellViewSerialized = new SerializedObject(shellView);
+        shellViewSerialized.FindProperty("_uiDocument").objectReferenceValue = shellDocument;
+        shellViewSerialized.ApplyModifiedPropertiesWithoutUndo();
+
         var shell = shellObject.AddComponent<FrontendController>();
 
         var pageObjects = new GameObject[Pages.Length];
@@ -55,20 +72,29 @@ public static class FrontendSceneBuilder
             var page = new GameObject(name);
             page.transform.SetParent(shellObject.transform, false);
 
-            // UIDocument first so its visual tree exists when the page
-            // controller's OnEnable runs during activation.
-            var document = page.AddComponent<UIDocument>();
-            var panelPath = AssetDatabase.GUIDToAssetPath(PanelSettingsGuid);
-            document.panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
-            document.visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxml);
+            if (FrontendController.IsMigratedPage((FrontendPage)i))
+            {
+                // Fragment-mounted pages own no document (issue #219): the
+                // shell clones the fragment source into its hosts on every
+                // activation and injects the per-activation page context.
+                page.AddComponent(controllerType);
+            }
+            else
+            {
+                // Unmigrated pages keep their per-page document until they
+                // migrate; the controller's OnEnable still binds it.
+                var document = page.AddComponent<UIDocument>();
+                document.panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(panelPath);
+                document.visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxml);
 
-            var controller = page.AddComponent(controllerType);
-            var serialized = new SerializedObject(controller);
-            var documentProperty = serialized.FindProperty("_uiDocument");
-            if (documentProperty == null)
-                throw new System.InvalidOperationException($"{controllerType.Name} has no _uiDocument field.");
-            documentProperty.objectReferenceValue = document;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
+                var controller = page.AddComponent(controllerType);
+                var serialized = new SerializedObject(controller);
+                var documentProperty = serialized.FindProperty("_uiDocument");
+                if (documentProperty == null)
+                    throw new System.InvalidOperationException($"{controllerType.Name} has no _uiDocument field.");
+                documentProperty.objectReferenceValue = document;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
 
             page.SetActive(active);
             pageObjects[i] = page;
@@ -81,6 +107,11 @@ public static class FrontendSceneBuilder
         shellSerialized.FindProperty("_resultsPage").objectReferenceValue = pageObjects[3];
         shellSerialized.FindProperty("_serverBrowserPage").objectReferenceValue = pageObjects[4];
         shellSerialized.FindProperty("_lobbyRoomPage").objectReferenceValue = pageObjects[5];
+        shellSerialized.FindProperty("_shell").objectReferenceValue = shellView;
+        shellSerialized.FindProperty("_homeFragment").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Pages[0].Uxml);
+        shellSerialized.FindProperty("_fighterSelectFragment").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Pages[1].Uxml);
         shellSerialized.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -98,7 +129,7 @@ public static class FrontendSceneBuilder
         }
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[FrontendSceneBuilder] Built {ScenePath} with {Pages.Length} pages; "
-            + $"removed migrated scene-per-page scenes: {string.Join(", ", RemovedScenes)}.");
+        Debug.Log($"[FrontendSceneBuilder] Built {ScenePath} with the stable shell document and {Pages.Length} pages "
+            + $"(Home + Fighter Select fragment-mounted; unmigrated pages keep per-page documents).");
     }
 }

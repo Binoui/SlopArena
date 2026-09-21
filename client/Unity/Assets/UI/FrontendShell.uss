@@ -1,0 +1,517 @@
+/* FrontendShell (issues #218/#219): the permanent frontend frame. One stable
+   document: top bar, page header/body hosts, lower row with the reserved
+   bottom-left conversation cell and the page summary/actions cell, plus
+   hidden expanded-social and modal hosts. Flex layout only — no absolute
+   placement except decorative art and the later expanded/modal surfaces.
+   Density classes live on the stable shell root and change only when the
+   selected mode changes; PanelSettings use ConstantPhysicalSize (96 dpi),
+   so USS px ≈ physical pixels and the size targets below are physical. */
+
+.frontend-shell {
+    flex-grow: 1;
+    color: rgb(240, 238, 232);
+    font-size: 18px;
+    background-color: rgb(23, 19, 27);
+}
+
+.shell-backdrop {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgb(23, 19, 27);
+    border-right-width: 14px;
+    border-right-color: rgb(224, 92, 42);
+    -unity-text-align: middle-left;
+}
+
+.shell-hidden {
+    display: none;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+
+.shell-top-bar {
+    height: 64px;
+    min-height: 64px;
+    padding-left: 24px;
+    padding-right: 24px;
+    flex-direction: row;
+    align-items: center;
+    border-bottom-width: 2px;
+    border-bottom-color: rgb(255, 200, 33);
+}
+
+.shell-wordmark {
+    color: rgb(255, 200, 33);
+    font-size: 20px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+}
+
+.shell-page-context {
+    margin-left: 20px;
+    color: rgb(196, 189, 197);
+    font-size: 13px;
+    letter-spacing: 2px;
+}
+
+.shell-top-bar-spacer {
+    flex-grow: 1;
+}
+
+.shell-identity {
+    color: rgb(76, 221, 136);
+    font-size: 13px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+/* Reserved slot: renders nothing until a working settings surface exists. */
+.shell-settings-slot {
+    width: 0;
+    min-width: 0;
+}
+
+/* ── Workspace and page hosts ─────────────────────────────────────────── */
+
+.shell-workspace {
+    flex-grow: 1;
+    min-height: 0;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-top: 16px;
+    flex-direction: column;
+}
+
+.shell-host {
+    min-width: 0;
+    min-height: 0;
+}
+
+.shell-header-host {
+    flex-shrink: 0;
+}
+
+.shell-body-host {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.shell-lower-row {
+    flex-shrink: 0;
+    margin-top: 16px;
+    padding-bottom: 24px;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+/* Reserved bottom-left conversation cell: a real layout cell, floating only
+   through spacing and the presenter's own translucent surface. The lower row
+   itself carries no background or border. */
+.shell-social-host {
+    width: 480px;
+    height: 230px;
+    margin-right: 20px;
+    position: relative;
+}
+
+.shell-page-lower-host {
+    flex-grow: 1;
+    flex-basis: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.shell-summary-host {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.shell-actions-host {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+/* ── Compact density (1280×720/800-class windows) ────────────────────── */
+
+.frontend-shell--compact .shell-top-bar {
+    height: 56px;
+    min-height: 56px;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.frontend-shell--compact .shell-wordmark {
+    font-size: 16px;
+}
+
+.frontend-shell--compact .shell-workspace {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 10px;
+}
+
+.frontend-shell--compact .shell-social-host {
+    width: 380px;
+    height: 190px;
+    margin-right: 16px;
+}
+
+.frontend-shell--compact .shell-lower-row {
+    margin-top: 10px;
+    padding-bottom: 16px;
+}
+
+/* ── Presenter sizing inside the reserved cell ─────────────────────────
+   The chat presenter keeps its own stylesheet. The shell cell's size, the
+   top bar height and the outer spacing are applied from
+   `FrontendShellView` in panel coordinates derived from the physical size
+   targets (PanelSettings use ConstantPhysicalSize, and the runtime scale
+   factor is read from `panel.scaledPixelsPerPoint`, so USS px cannot express
+   physical pixels). Only content-density tweaks stay here; the blanket
+   history min-height override is deliberately absent — the presenter's own
+   chrome needs its minimums inside the cell. */
+
+.frontend-shell--compact .chat-panel {
+    padding: 8px;
+}
+
+.frontend-shell--compact .chat-header {
+    min-height: 28px;
+    padding-bottom: 4px;
+}
+
+.frontend-shell--compact .chat-title {
+    font-size: 13px;
+    margin-top: 0;
+}
+
+.frontend-shell--compact .chat-tabs {
+    height: 24px;
+    margin-top: 4px;
+}
+
+.frontend-shell--compact .chat-tab {
+    min-height: 20px;
+    font-size: 9px;
+}
+
+.frontend-shell--compact .chat-body {
+    margin-top: 4px;
+}
+
+.frontend-shell--compact .conversation-list {
+    width: 104px;
+    min-width: 104px;
+    margin-right: 6px;
+}
+
+.frontend-shell--compact .chat-message {
+    min-height: 0;
+    margin-bottom: 2px;
+    padding: 2px 2px;
+}
+
+.frontend-shell--compact .chat-message__text {
+    font-size: 11px;
+}
+
+.frontend-shell--compact .chat-compose {
+    min-height: 28px;
+    margin-top: 4px;
+}
+
+.frontend-shell--compact .chat-draft {
+    min-height: 26px;
+    font-size: 12px;
+}
+
+.frontend-shell--compact .chat-compose .chat-action {
+    width: 52px;
+    min-height: 26px;
+}
+
+.frontend-shell--compact .chat-feedback {
+    font-size: 10px;
+    min-height: 14px;
+}
+
+/* Fit the presenter inside the 380×190 cell: the header actions share one
+   row, the history keeps a small scrolling floor, and the rename section
+   compresses (issue #219 density handling). */
+.frontend-shell--compact .chat-header-actions {
+    flex-direction: row;
+    align-items: center;
+}
+
+.frontend-shell--compact .chat-history {
+    min-height: 50px;
+}
+
+.frontend-shell--compact .chat-feedback {
+    min-height: 0;
+}
+
+.frontend-shell--compact .chat-rename {
+    min-height: 0;
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+/* ── Migrated page fragments ────────────────────────────────────────────
+   Mounted sections keep their existing element-scoped styles from
+   SlopArena.uss; only their former viewport-wide placement is replaced
+   here. */
+
+.page-section {
+    min-width: 0;
+    min-height: 0;
+}
+
+/* Home */
+
+.menu-header-section {
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.menu-header-section .menu-title-wrap {
+    min-height: 0;
+}
+
+/* Body content must never squash under overflow: fragments keep their
+   natural heights and the compact body scrolls instead (issue #219). */
+.menu-header-section .menu-title-rule,
+.menu-header-section .menu-tagline,
+.menu-header-section .menu-copy,
+.menu-body-section .menu-identity,
+.menu-body-section .menu-actions,
+.menu-body-section .menu-action-item,
+.char-select-frag .frag-header,
+.char-body-section .selection-copy,
+.char-summary-section,
+.char-actions-section {
+    flex-shrink: 0;
+}
+
+.menu-header-section .menu-title {
+    font-size: 72px;
+    /* Baloo2's face metrics give ~3.2em line boxes; the glyph band sits in
+       the top half, so a fixed box height crops the dead leading instead
+       of reserving it (issue #219). */
+    height: 108px;
+    overflow: hidden;
+}
+
+.frontend-shell--compact .menu-header-section .menu-title {
+    font-size: 56px;
+    height: 92px;
+}
+
+.frontend-shell--compact .menu-tagline {
+    font-size: 16px;
+}
+
+.frontend-shell--compact .menu-copy {
+    font-size: 14px;
+}
+
+.menu-body-section {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: flex-start;
+    margin-top: 12px;
+}
+
+.menu-body-section .menu-intro {
+    width: 62%;
+    min-width: 0;
+    padding-top: 8px;
+}
+
+.menu-body-section .menu-actions {
+    width: 340px;
+    flex-shrink: 0;
+    flex-direction: column;
+    margin-top: 0;
+}
+
+.menu-body-section .menu-action-item {
+    min-height: 60px;
+    margin-top: 6px;
+}
+
+.menu-body-section .menu-action {
+    min-height: 56px;
+}
+
+.menu-actions-section {
+    flex-shrink: 0;
+}
+
+/* The quiet version label in the lower-right actions cell. */
+.menu-actions-section .menu-version {
+    color: rgb(183, 174, 184);
+    font-size: 12px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.frontend-shell--compact .menu-body-section {
+    flex-direction: column;
+    overflow: auto;
+}
+
+.frontend-shell--compact .menu-body-section .menu-actions {
+    width: 100%;
+}
+
+.frontend-shell--compact .menu-identity {
+    width: 100%;
+    padding: 10px 12px;
+}
+
+.frontend-shell--compact .menu-action {
+    width: 280px;
+    min-height: 44px;
+}
+
+.frontend-shell--compact .menu-action-item {
+    min-height: 48px;
+    margin-top: 6px;
+}
+
+/* Fighter Select */
+
+.char-select-frag .frag-header {
+    min-height: 64px;
+    flex-direction: row;
+    align-items: flex-start;
+    flex-shrink: 0;
+}
+
+.char-select-frag .flow-header-copy {
+    margin-left: 16px;
+    align-items: flex-start;
+    width: 60%;
+    min-width: 0;
+}
+
+.char-select-frag .flow-title {
+    font-size: 34px;
+    margin-top: 2px;
+}
+
+.frontend-shell--compact .char-select-frag .flow-title {
+    font-size: 26px;
+}
+
+.char-select-frag .flow-subtitle {
+    margin-top: 4px;
+    font-size: 15px;
+}
+
+.frontend-shell--compact .char-select-frag .flow-subtitle {
+    font-size: 13px;
+}
+
+.char-select-frag .char-header-status {
+    margin-left: auto;
+    align-items: flex-end;
+}
+
+.char-select-frag .char-select-meta {
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.char-body-section {
+    flex-grow: 1;
+    margin-top: 10px;
+    flex-direction: column;
+    overflow: auto;
+}
+
+/* Portrait cards shrink to the frame's grid area instead of the legacy
+   230px minimum (SlopArena.uss); the body scrolls only when still too
+   tight, with the primary action always reachable (issue #219). */
+.char-body-section .char-card {
+    min-height: 200px;
+}
+.char-body-section .char-grid {
+    flex-grow: 1;
+    min-height: 200px;
+}
+
+.char-body-section .selection-copy {
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.char-select-frag .char-name {
+    font-size: 22px;
+}
+
+.frontend-shell--compact .char-select-frag .char-name {
+    font-size: 17px;
+}
+
+.char-select-frag .char-role {
+    margin-top: 2px;
+    font-size: 14px;
+}
+
+.char-summary-section {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.char-summary-section .roster-panel {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.frontend-shell--compact .char-summary-section .roster-panel .player-card {
+    width: 140px;
+    min-height: 110px;
+}
+
+.frontend-shell--compact .solo-config {
+    width: 300px;
+    min-width: 300px;
+}
+
+.char-actions-section {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: stretch;
+    margin-left: 10px;
+}
+
+.frontend-shell--compact .pvp-action-area {
+    width: 170px;
+    min-width: 170px;
+}
+
+.frontend-shell--compact .solo-next-action {
+    width: 220px;
+    min-width: 220px;
+}
+
+.frontend-shell--compact .solo-next-action > .btn-primary {
+    min-height: 44px;
+}
+
+.frontend-shell--compact .btn-back {
+    width: 84px;
+    min-height: 40px;
+}

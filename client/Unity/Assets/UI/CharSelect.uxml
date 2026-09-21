@@ -1,53 +1,57 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen char-select-screen">
-        <ui:VisualElement name="flow-header" class="flow-header char-select-header">
-            <ui:Button name="btn-back" text="BACK" class="btn-back" />
-            <ui:VisualElement class="flow-header-copy">
-                <ui:Label text="MATCH SETUP" class="flow-eyebrow" />
-                <ui:Label name="title" text="CHARACTER SELECT" class="flow-title" />
-                <ui:Label text="Pick the face you want attached to the problem." class="flow-subtitle" />
+    <!-- Fighter Select page fragment (issue #219). Mounted into the
+         FrontendShell hosts: header → PageHeaderHost, portrait grid and
+         selection copy → PageBodyHost, participant cards and CPU editing →
+         PageSummaryHost, status and primary actions → PageActionsHost. Real
+         selection state lives in CharSelectController. -->
+    <ui:VisualElement name="page-frag">
+        <ui:VisualElement name="page-header" class="page-section frag-header">
+        <ui:Button name="btn-back" text="BACK" class="btn-back" />
+        <ui:VisualElement class="flow-header-copy">
+            <ui:Label text="MATCH SETUP" class="flow-eyebrow" />
+            <ui:Label name="title" text="CHARACTER SELECT" class="flow-title" />
+            <ui:Label text="Pick the face you want attached to the problem." class="flow-subtitle" />
+        </ui:VisualElement>
+        <ui:VisualElement class="char-header-status">
+            <ui:Label name="flow-progress" text="STEP 1 OF 2" class="flow-progress" />
+            <ui:Label name="roster-meta" text="4 FIGHTERS" class="char-select-meta" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="page-body" class="page-section char-body-section">
+        <ui:VisualElement name="char-grid" class="char-grid" />
+        <ui:VisualElement name="selection-copy" class="selection-copy">
+            <ui:Label name="char-name" text="CHOOSE A FIGHTER" class="char-name" />
+            <ui:Label name="char-role" text="Select a portrait to see the brief." class="char-role" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="page-summary" class="page-section char-summary-section">
+        <ui:VisualElement name="roster-panel" class="roster-panel" />
+        <ui:VisualElement name="solo-config" class="solo-config">
+            <ui:Label name="selection-target" text="EDITING PLAYER" class="selection-target" />
+            <ui:VisualElement class="selection-target-buttons">
+                <ui:Button name="btn-edit-player" text="PLAYER" class="selection-target-button active" />
+                <ui:Button name="btn-edit-cpu" text="CPU" class="selection-target-button" />
             </ui:VisualElement>
-            <ui:VisualElement class="char-header-status">
-                <ui:Label name="flow-progress" text="STEP 1 OF 2" class="flow-progress" />
-                <ui:Label name="roster-meta" text="4 FIGHTERS" class="char-select-meta" />
+            <ui:Label name="solo-bot-label" text="Choose who gets the controller." class="pvp-status" />
+            <ui:Label name="solo-difficulty-label" text="CPU DIFFICULTY: NORMAL" class="pvp-status" />
+            <ui:VisualElement name="solo-difficulty-buttons" class="solo-difficulty-buttons">
+                <ui:Button name="btn-cpu-difficulty-easy" text="EASY" class="btn-secondary solo-difficulty-button" />
+                <ui:Button name="btn-cpu-difficulty-normal" text="NORMAL" class="btn-secondary solo-difficulty-button" />
+                <ui:Button name="btn-cpu-difficulty-hard" text="HARD" class="btn-secondary solo-difficulty-button" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="char-main" class="char-main">
-            <ui:VisualElement name="char-grid" class="char-grid" />
-            <ui:VisualElement name="selection-copy" class="selection-copy">
-                <ui:Label name="char-name" text="CHOOSE A FIGHTER" class="char-name" />
-                <ui:Label name="char-role" text="Select a portrait to see the brief." class="char-role" />
+    </ui:VisualElement>
+    <ui:VisualElement name="page-actions" class="page-section char-actions-section">
+        <ui:VisualElement name="pvp-action-area" class="pvp-action-area">
+            <ui:Label name="lbl-pvp-status" text="Choose a fighter, then lock in." class="pvp-status" />
+            <ui:VisualElement name="pvp-buttons" class="pvp-buttons">
+                <ui:Button name="btn-lockin" text="LOCK IN" class="btn-secondary pvp-btn" />
+                <ui:Button name="btn-start-match" text="SELECT STAGE" class="btn-primary pvp-btn" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="pvp-panel" class="pvp-panel">
-            <ui:VisualElement name="player-cards-area" class="player-cards-area">
-                <ui:VisualElement name="roster-panel" class="roster-panel" />
-            </ui:VisualElement>
-            <ui:VisualElement name="solo-config" class="solo-config">
-                <ui:Label name="selection-target" text="EDITING PLAYER" class="selection-target" />
-                <ui:VisualElement class="selection-target-buttons">
-                    <ui:Button name="btn-edit-player" text="PLAYER" class="selection-target-button active" />
-                    <ui:Button name="btn-edit-cpu" text="CPU" class="selection-target-button" />
-                </ui:VisualElement>
-                <ui:Label name="solo-bot-label" text="Choose who gets the controller." class="pvp-status" />
-                <ui:Label name="solo-difficulty-label" text="CPU DIFFICULTY: NORMAL" class="pvp-status" />
-                <ui:VisualElement name="solo-difficulty-buttons" class="solo-difficulty-buttons">
-                    <ui:Button name="btn-cpu-difficulty-easy" text="EASY" class="btn-secondary solo-difficulty-button" />
-                    <ui:Button name="btn-cpu-difficulty-normal" text="NORMAL" class="btn-secondary solo-difficulty-button" />
-                    <ui:Button name="btn-cpu-difficulty-hard" text="HARD" class="btn-secondary solo-difficulty-button" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:VisualElement name="pvp-action-area" class="pvp-action-area">
-                <ui:Label name="lbl-pvp-status" text="Choose a fighter, then lock in." class="pvp-status" />
-                <ui:VisualElement name="pvp-buttons" class="pvp-buttons">
-                    <ui:Button name="btn-lockin" text="LOCK IN" class="btn-secondary pvp-btn" />
-                    <ui:Button name="btn-start-match" text="SELECT STAGE" class="btn-primary pvp-btn" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:VisualElement class="solo-next-action">
-                <ui:Button name="btn-select" text="SELECT STAGE" class="btn-primary" />
-            </ui:VisualElement>
+        <ui:VisualElement class="solo-next-action">
+            <ui:Button name="btn-select" text="SELECT STAGE" class="btn-primary" />
         </ui:VisualElement>
+    </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

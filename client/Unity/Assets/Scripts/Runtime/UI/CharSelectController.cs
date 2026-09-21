@@ -11,19 +11,25 @@ using SlopArena.Client.Network;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Character select screen (issue #34) with Training, Solo, and PvP flows.
+    /// Fighter Select page (issue #219): a fragment mounted into the
+    /// FrontendShell hosts — portrait grid and selection brief in the body,
+    /// participant cards and CPU editing in the lower-right summary, and the
+    /// primary action outside the conversation cell. Training, Solo, and PvP
+    /// flows are unchanged:
     /// <list type="bullet">
     /// <item><b>Training</b> — single-player: pick a character, click ENTER TRAINING,
     /// launch the training scene directly.</item>
     /// <item><b>Solo</b> — single-player: assign a player and CPU character,
     /// choose a difficulty, then select a stage.</item>
     /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
-    /// lock in, and the host starts the match when everyone is locked in (min 2).
+    /// lock in, and the host starts the match when everyone is locked in (min 2).</item>
     /// </list>
     /// </summary>
-    public class CharSelectController : MonoBehaviour
+    public class CharSelectController : MonoBehaviour, IFrontendPageController
     {
-        [SerializeField] private UIDocument _uiDocument;
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
 
         private CharacterClass _selected = CharacterClass.None;
         private bool _selectingCpu;
@@ -41,12 +47,22 @@ namespace SlopArena.Client.UI
         private bool _lockedIn;
         private LobbySnapshot _snapshot;
 
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
         private void OnEnable()
         {
             _gridButtons.Clear();
             _selectingCpu = false;
-            var root = _uiDocument.rootVisualElement;
-            var grid = root.Q<VisualElement>("char-grid");
+            if (_context == null)
+            {
+                Debug.LogError("[CharSelectController] No page context was injected; fighter select stays blank.");
+                enabled = false;
+                return;
+            }
+            var grid = _context.Q<VisualElement>("char-grid");
             grid?.Clear();
 
             CharacterClass[] classes = MenuRoster.Classes;
@@ -64,7 +80,7 @@ namespace SlopArena.Client.UI
                 foreach (var cls in classes)
                 {
                     var capturedCls = cls;
-                    var btn = new Button(() => SelectCharacter(capturedCls, root))
+                    var btn = new Button(() => SelectCharacter(capturedCls, _context))
                     {
                         name = $"char-{cls}"
                     };
@@ -90,28 +106,32 @@ namespace SlopArena.Client.UI
             }
 
             if (_selected != CharacterClass.None)
-                SelectCharacter(_selected, root);
+                SelectCharacter(_selected, _context);
 
             if (MatchConfig.Mode == GameMode.PvP)
-                InitPvP(root);
+                InitPvP(_context);
             else if (MatchConfig.Mode == GameMode.Solo)
-                InitSolo(root);
+                InitSolo(_context);
             else
             {
                 AddTrainingMarker();
-                InitTraining(root);
+                InitTraining(_context);
             }
         }
-        private void InitTraining(VisualElement root)
+        private void InitTraining(FrontendPageContext context)
         {
-            SetModeChrome(root, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 1  /  FIGHTER");
-            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
-                ? "NO ADMITTED FIGHTERS"
-                : $"{MenuRoster.Classes.Length} FIGHTERS // TRAINING";
-            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
-            root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
+            SetModeChrome(context, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 1  /  FIGHTER");
+            var rosterMeta = context.Q<Label>("roster-meta");
+            if (rosterMeta != null)
+                rosterMeta.text = MenuRoster.Classes.Length == 0
+                    ? "NO ADMITTED FIGHTERS"
+                    : $"{MenuRoster.Classes.Length} FIGHTERS // TRAINING";
+            // Training shows one participant card and the single primary
+            // action; the CPU editing column and PvP status stay hidden.
+            context.Q<VisualElement>("solo-config")?.style.SetDisplay(false);
+            context.Q<VisualElement>("pvp-action-area")?.style.SetDisplay(false);
 
-            var selectButton = root.Q<Button>("btn-select");
+            var selectButton = context.Q<Button>("btn-select");
             if (selectButton != null)
             {
                 selectButton.style.display = DisplayStyle.Flex;
@@ -125,29 +145,32 @@ namespace SlopArena.Client.UI
                 };
             }
 
-            _rosterPanel = root.Q<VisualElement>("roster-panel");
+            _rosterPanel = context.Q<VisualElement>("roster-panel");
             RenderTrainingRoster();
 
-            var btnBack = root.Q<Button>("btn-back");
+            var btnBack = context.Q<Button>("btn-back");
             Action back = () => FrontendController.Show(FrontendPage.Home);
             if (btnBack != null)
                 btnBack.clicked += back;
-            ConfigureNavigation(root, MenuRoster.Classes.Length > 0 ? selectButton : null, btnBack, back);
+            ConfigureNavigation(context, MenuRoster.Classes.Length > 0 ? selectButton : null, btnBack, back);
 
             if (MenuRoster.Classes.Length == 0)
-                ShowRosterUnavailable(root, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
+                ShowRosterUnavailable(context, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
         }
 
-        private void InitSolo(VisualElement root)
+        private void InitSolo(FrontendPageContext context)
         {
-            SetModeChrome(root, "SOLO // CHOOSE YOUR FIGHTERS", "STEP 1 OF 2  /  FIGHTERS");
-            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
-                ? "NO ADMITTED FIGHTERS"
-                : $"{MenuRoster.Classes.Length} FIGHTERS // SOLO";
-            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
-            root.Q<VisualElement>("pvp-action-area").style.display = DisplayStyle.None;
+            SetModeChrome(context, "SOLO // CHOOSE YOUR FIGHTERS", "STEP 1 OF 2  /  FIGHTERS");
+            var rosterMeta = context.Q<Label>("roster-meta");
+            if (rosterMeta != null)
+                rosterMeta.text = MenuRoster.Classes.Length == 0
+                    ? "NO ADMITTED FIGHTERS"
+                    : $"{MenuRoster.Classes.Length} FIGHTERS // SOLO";
+            // Solo shows both participant cards plus CPU editing; the PvP
+            // status column stays hidden.
+            context.Q<VisualElement>("pvp-action-area")?.style.SetDisplay(false);
 
-            var selectButton = root.Q<Button>("btn-select");
+            var selectButton = context.Q<Button>("btn-select");
             if (selectButton != null)
             {
                 selectButton.style.display = DisplayStyle.Flex;
@@ -155,41 +178,41 @@ namespace SlopArena.Client.UI
                 selectButton.SetEnabled(MenuRoster.Classes.Length > 0);
             }
 
-            _rosterPanel = root.Q<VisualElement>("roster-panel");
+            _rosterPanel = context.Q<VisualElement>("roster-panel");
             RenderSoloRoster();
 
-            var config = root.Q<VisualElement>("solo-config");
+            var config = context.Q<VisualElement>("solo-config");
             if (config != null)
                 config.style.display = DisplayStyle.Flex;
 
-            _btnEditPlayer = root.Q<Button>("btn-edit-player");
-            _btnEditCpu = root.Q<Button>("btn-edit-cpu");
-            _selectionTarget = root.Q<Label>("selection-target");
+            _btnEditPlayer = context.Q<Button>("btn-edit-player");
+            _btnEditCpu = context.Q<Button>("btn-edit-cpu");
+            _selectionTarget = context.Q<Label>("selection-target");
             if (_btnEditPlayer != null)
-                _btnEditPlayer.clicked += () => SetSelectionTarget(root, selectingCpu: false);
+                _btnEditPlayer.clicked += () => SetSelectionTarget(context, selectingCpu: false);
             if (_btnEditCpu != null)
-                _btnEditCpu.clicked += () => SetSelectionTarget(root, selectingCpu: true);
-            SetSelectionTarget(root, selectingCpu: false);
+                _btnEditCpu.clicked += () => SetSelectionTarget(context, selectingCpu: true);
+            SetSelectionTarget(context, selectingCpu: false);
 
-            var difficultyLabel = root.Q<Label>("solo-difficulty-label");
+            var difficultyLabel = context.Q<Label>("solo-difficulty-label");
             MatchConfig.SoloCpuDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
             if (difficultyLabel != null)
                 difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}";
             foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
                 var capturedDifficulty = difficulty;
-                var button = root.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
+                var button = context.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
                 if (button == null) continue;
                 button.clicked += () =>
                 {
                     MatchConfig.SoloCpuDifficulty = capturedDifficulty;
                     if (difficultyLabel != null)
                         difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(capturedDifficulty)}";
-                    UpdateDifficultyButtons(root);
+                    UpdateDifficultyButtons(context);
                     RenderSoloRoster();
                 };
             }
-            UpdateDifficultyButtons(root);
+            UpdateDifficultyButtons(context);
 
             if (selectButton != null)
             {
@@ -200,64 +223,64 @@ namespace SlopArena.Client.UI
                 };
             }
 
-            var btnBack = root.Q<Button>("btn-back");
+            var btnBack = context.Q<Button>("btn-back");
             Action back = () => FrontendController.Show(FrontendPage.Home);
             if (btnBack != null)
                 btnBack.clicked += back;
-            ConfigureNavigation(root, MenuRoster.Classes.Length > 0
+            ConfigureNavigation(context, MenuRoster.Classes.Length > 0
                 ? _btnEditPlayer ?? _gridButtons.FirstOrDefault()
                 : null, btnBack, back);
 
             if (MenuRoster.Classes.Length == 0)
-                ShowRosterUnavailable(root, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
+                ShowRosterUnavailable(context, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
         }
 
-        private static void SetModeChrome(VisualElement root, string title, string progress)
+        private static void SetModeChrome(FrontendPageContext context, string title, string progress)
         {
-            var titleLabel = root.Q<Label>("title");
+            var titleLabel = context.Q<Label>("title");
             if (titleLabel != null)
                 titleLabel.text = title;
-            var progressLabel = root.Q<Label>("flow-progress");
+            var progressLabel = context.Q<Label>("flow-progress");
             if (progressLabel != null)
                 progressLabel.text = progress;
         }
 
         private static void ConfigureNavigation(
-            VisualElement root,
+            FrontendPageContext context,
             Button initial,
             Button backButton,
             Action back)
         {
             if (backButton != null && initial != null)
-                MenuNavigation.Configure(root, initial, back);
+                MenuNavigation.Configure(context, initial, back);
             else if (backButton != null)
-                MenuNavigation.Configure(root, backButton, back);
+                MenuNavigation.Configure(context, backButton, back);
         }
 
-        private static void ShowRosterUnavailable(VisualElement root, string heading, string detail)
+        private static void ShowRosterUnavailable(FrontendPageContext context, string heading, string detail)
         {
-            var nameLabel = root.Q<Label>("char-name");
+            var nameLabel = context.Q<Label>("char-name");
             if (nameLabel != null)
                 nameLabel.text = heading;
-            var roleLabel = root.Q<Label>("char-role");
+            var roleLabel = context.Q<Label>("char-role");
             if (roleLabel != null)
                 roleLabel.text = detail;
-            var statusLabel = root.Q<Label>("lbl-pvp-status");
+            var statusLabel = context.Q<Label>("lbl-pvp-status");
             if (statusLabel != null)
                 statusLabel.text = detail;
         }
 
-        private static void UpdateDifficultyButtons(VisualElement root)
+        private static void UpdateDifficultyButtons(FrontendPageContext context)
         {
             CpuDifficulty current = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
             foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
-                var button = root.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
+                var button = context.Q<Button>($"btn-cpu-difficulty-{difficulty.ToString().ToLowerInvariant()}");
                 button?.EnableInClassList("active", difficulty == current);
             }
         }
 
-        private void SetSelectionTarget(VisualElement root, bool selectingCpu)
+        private void SetSelectionTarget(FrontendPageContext context, bool selectingCpu)
         {
             if (MatchConfig.Mode != GameMode.Solo)
                 return;
@@ -274,15 +297,15 @@ namespace SlopArena.Client.UI
             }
             _btnEditPlayer?.EnableInClassList("active", !selectingCpu);
             _btnEditCpu?.EnableInClassList("active", selectingCpu);
-            var botLabel = root.Q<Label>("solo-bot-label");
+            var botLabel = context.Q<Label>("solo-bot-label");
             if (botLabel != null)
                 botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
             if (_selected != CharacterClass.None)
-                UpdateSelectionVisuals(_selected, root);
+                UpdateSelectionVisuals(_selected, context);
             RenderSoloRoster();
         }
 
-        private void UpdateSelectionVisuals(CharacterClass cls, VisualElement root)
+        private void UpdateSelectionVisuals(CharacterClass cls, FrontendPageContext context)
         {
             foreach (var btn in _gridButtons)
             {
@@ -291,10 +314,10 @@ namespace SlopArena.Client.UI
                     btn.AddToClassList("char-card--selected");
             }
 
-            var nameLabel = root.Q<Label>("char-name");
+            var nameLabel = context.Q<Label>("char-name");
             if (nameLabel != null)
                 nameLabel.text = cls.ToString().ToUpperInvariant();
-            var roleLabel = root.Q<Label>("char-role");
+            var roleLabel = context.Q<Label>("char-role");
             if (roleLabel != null)
                 roleLabel.text = MenuRoster.Description(cls);
         }
@@ -312,20 +335,24 @@ namespace SlopArena.Client.UI
                 $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}", local: false, host: false));
         }
 
-        private void InitPvP(VisualElement root)
+        private void InitPvP(FrontendPageContext context)
         {
-            SetModeChrome(root, "ONLINE // CHOOSE YOUR FIGHTER", "STEP 1 OF 2  /  FIGHTER");
-            root.Q<Button>("btn-select").style.display = DisplayStyle.None;
-            root.Q<VisualElement>("pvp-panel").style.display = DisplayStyle.Flex;
+            SetModeChrome(context, "ONLINE // CHOOSE YOUR FIGHTER", "STEP 1 OF 2  /  FIGHTER");
+            // PvP shows the participant cards and the lock-in/status actions;
+            // the solo continue action stays hidden.
+            context.Q<Button>("btn-select")?.style.SetDisplay(false);
+            context.Q<VisualElement>("solo-config")?.style.SetDisplay(false);
 
+            var rosterMeta = context.Q<Label>("roster-meta");
             _snapshot = ClientSession.LobbyRoster;
-            root.Q<Label>("roster-meta").text = MenuRoster.Classes.Length == 0
-                ? "NO ADMITTED FIGHTERS"
-                : $"{MenuRoster.Classes.Length} FIGHTERS // {_snapshot?.Players.Count ?? 0} PLAYERS";
-            _rosterPanel   = root.Q<VisualElement>("roster-panel");
-            _btnLockIn     = root.Q<Button>("btn-lockin");
-            _btnStartMatch = root.Q<Button>("btn-start-match");
-            _lblPvPStatus  = root.Q<Label>("lbl-pvp-status");
+            if (rosterMeta != null)
+                rosterMeta.text = MenuRoster.Classes.Length == 0
+                    ? "NO ADMITTED FIGHTERS"
+                    : $"{MenuRoster.Classes.Length} FIGHTERS // {_snapshot?.Players.Count ?? 0} PLAYERS";
+            _rosterPanel   = context.Q<VisualElement>("roster-panel");
+            _btnLockIn     = context.Q<Button>("btn-lockin");
+            _btnStartMatch = context.Q<Button>("btn-start-match");
+            _lblPvPStatus  = context.Q<Label>("lbl-pvp-status");
             _lockedIn = false;
 
             bool isHost = IsLocalHost();
@@ -353,10 +380,10 @@ namespace SlopArena.Client.UI
                 }
             }
 
-            var btnBack = root.Q<Button>("btn-back");
+            var btnBack = context.Q<Button>("btn-back");
             if (btnBack != null)
                 btnBack.clicked += OnPvPBackClicked;
-            ConfigureNavigation(root, _gridButtons.FirstOrDefault() ?? _btnLockIn, btnBack, OnPvPBackClicked);
+            ConfigureNavigation(context, _gridButtons.FirstOrDefault() ?? _btnLockIn, btnBack, OnPvPBackClicked);
 
             _lobby = ClientSession.ActiveLobby;
             if (_lobby == null)
@@ -613,7 +640,7 @@ namespace SlopArena.Client.UI
             foreach (var button in _gridButtons)
                 button.Q<VisualElement>("char-markers")?.Clear();
 
-            var card = _uiDocument.rootVisualElement.Q<Button>($"char-{_selected}");
+            var card = _context.Q<Button>($"char-{_selected}");
             var markers = card?.Q<VisualElement>("char-markers");
             if (markers == null) return;
 
@@ -625,7 +652,7 @@ namespace SlopArena.Client.UI
 
 
 
-        private void SelectCharacter(CharacterClass cls, VisualElement root)
+        private void SelectCharacter(CharacterClass cls, FrontendPageContext context)
         {
             if (cls == CharacterClass.None)
                 return;
@@ -636,7 +663,7 @@ namespace SlopArena.Client.UI
             else
                 MatchConfig.PlayerClass = cls;
 
-            UpdateSelectionVisuals(cls, root);
+            UpdateSelectionVisuals(cls, context);
             if (MatchConfig.Mode == GameMode.Training && _rosterPanel != null)
             {
                 RenderTrainingRoster();
@@ -645,7 +672,7 @@ namespace SlopArena.Client.UI
             else if (MatchConfig.Mode == GameMode.Solo && _rosterPanel != null)
             {
                 RenderSoloRoster();
-                SetSelectionTarget(root, _selectingCpu);
+                SetSelectionTarget(context, _selectingCpu);
             }
         }
 
@@ -661,7 +688,7 @@ namespace SlopArena.Client.UI
                 if (!System.Enum.TryParse<CharacterClass>(player.CharacterSelection, true, out var cls))
                     continue;
 
-                var card = _uiDocument.rootVisualElement.Q<Button>($"char-{cls}");
+                var card = _context.Q<Button>($"char-{cls}");
                 var markers = card?.Q<VisualElement>("char-markers");
                 if (markers == null) continue;
 

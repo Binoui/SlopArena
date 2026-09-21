@@ -22,7 +22,21 @@ See [ADR-0032](../adr/0032-single-frontend-scene-with-persistent-social-ui.md) f
 
 ## Social presentation
 
-### Menus and Results
+> **Amendment (2026-09-21, #218/#219).** The bottom-left reserved conversation
+> panel replaces the two presentations below: the right-hand Social Dock and
+> the automatic compact replacement. The conversation panel is a permanent
+> layout cell in the `FrontendShell` lower row — the shell reserves the cell
+> structurally, so pages no longer need per-page offsets, a percentage split,
+> or host-page discovery. The presenter attaches once to the shell's social
+> host and keeps its state across page changes; an explicit expanded social
+> view (not an automatic width replacement) is the only deliberate occlusion,
+> using the same presenter. The architecture and nonvisual social/identity
+> contracts of this brief — social/session ownership, read rules, draft and
+> retention rules, identity rules, navigation and operation lifetime, return
+> destinations, and acceptance honesty — remain in force. The bullets below
+> are retained as superseded history.
+
+### Menus and Results (superseded presentations)
 
 - At roomy sizes, reserve a right-hand Social Dock in normal page layout. It is initially open; remember the player's open/collapsed preference across launches.
 - At compact widths, retain a social strip. Opening chat temporarily replaces page content rather than squeezing both regions or covering clickable page actions. Closing chat restores the page and its selections.

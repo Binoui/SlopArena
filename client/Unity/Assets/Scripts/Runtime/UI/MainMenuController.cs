@@ -8,13 +8,17 @@ using UnityEngine.SceneManagement;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Main menu with the shared first-run identity entry (issue #209). All
-    /// mode actions stay disabled until a locally valid display name is
-    /// accepted, so first launch cannot skip name setup.
+    /// Home page (issue #219): a fragment mounted into the FrontendShell
+    /// hosts. Large branding plus exactly three mode actions; no roster
+    /// showcase. All mode actions stay disabled until a locally valid display
+    /// name is accepted (issue #209), so first launch cannot skip name setup.
+    /// Identity presentation moves to the shell in Pass 2 (#220).
     /// </summary>
-    public class MainMenuController : MonoBehaviour
+    public class MainMenuController : MonoBehaviour, IFrontendPageController
     {
-        [SerializeField] private UIDocument _uiDocument;
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
 
         private ChatSession? _session;
         private VisualElement? _entryRow;
@@ -29,19 +33,23 @@ namespace SlopArena.Client.UI
         private bool _initialFocusPending;
         private bool _refocusPending;
 
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
         private void OnEnable()
         {
             MatchConfig.Reset();
-            if (_uiDocument == null || _uiDocument.rootVisualElement == null)
+            if (_context == null)
             {
-                Debug.LogError("[MainMenuController] UIDocument is missing; menu actions stay locked until identity renders.");
+                Debug.LogError("[MainMenuController] No page context was injected; menu actions stay locked until identity renders.");
                 enabled = false;
                 return;
             }
-            var root = _uiDocument.rootVisualElement;
-            _btnTraining = root.Q<Button>("btn-training");
-            _btnSolo = root.Q<Button>("btn-solo");
-            _btnMultiplayer = root.Q<Button>("btn-multiplayer");
+            _btnTraining = _context.Q<Button>("btn-training");
+            _btnSolo = _context.Q<Button>("btn-solo");
+            _btnMultiplayer = _context.Q<Button>("btn-multiplayer");
 
             if (_btnTraining != null)
                 _btnTraining.clicked += OpenTraining;
@@ -55,14 +63,11 @@ namespace SlopArena.Client.UI
             // Single focus owner: while the first-run name gate holds, the
             // identity field owns focus; MenuNavigation gets no initial button.
             bool gated = _session == null || _session.NeedsDisplayName;
-            if (initial != null)
-                MenuNavigation.Configure(root, gated ? null : initial, ReturnToMainMenu);
-
-            BuildRoster(root);
+            MenuNavigation.Configure(_context, gated ? null : initial, ReturnToMainMenu);
 
             if (_session != null)
                 _session.Changed += OnSessionChanged;
-            BuildIdentityCard(root);
+            BuildIdentityCard();
             RenderIdentity();
         }
 
@@ -82,9 +87,9 @@ namespace SlopArena.Client.UI
             _btnMultiplayer = null;
         }
 
-        private void BuildIdentityCard(VisualElement root)
+        private void BuildIdentityCard()
         {
-            var panel = root.Q<VisualElement>("identity-panel");
+            var panel = _context.Q<VisualElement>("identity-panel");
             if (panel == null)
                 return;
 
@@ -146,8 +151,7 @@ namespace SlopArena.Client.UI
 
         private void RenderIdentity()
         {
-            var root = _uiDocument != null ? _uiDocument.rootVisualElement : null;
-            var panel = root?.Q<VisualElement>("identity-panel");
+            var panel = _context.Q<VisualElement>("identity-panel");
 
             // Fail closed: without a locally valid name, every mode action
             // stays locked even if the identity panel itself is missing.
@@ -184,7 +188,7 @@ namespace SlopArena.Client.UI
 
             if (_session == null)
                 return;
-            var savedName = root.Q<Label>("identity-saved-name");
+            var savedName = panel.Q<Label>("identity-saved-name");
             if (savedName != null)
                 savedName.text = $"FIGHTING AS {_session.SavedDisplayName.ToUpperInvariant()}";
             if (_savedFeedback != null)
@@ -199,7 +203,7 @@ namespace SlopArena.Client.UI
             if (_refocusPending && initial != null && initial.enabledSelf)
             {
                 _refocusPending = false;
-                root.schedule.Execute(() => initial.Focus());
+                panel.schedule.Execute(() => initial.Focus());
             }
         }
 
@@ -255,56 +259,5 @@ namespace SlopArena.Client.UI
         {
             // MainMenu is the root of this flow; Escape here is intentionally a no-op.
         }
-
-        private static void BuildRoster(VisualElement root)
-        {
-            var rosterPanel = root.Q<VisualElement>("roster-panel");
-            var countLabel = root.Q<Label>("online-count");
-            if (rosterPanel == null)
-                return;
-
-            rosterPanel.Clear();
-            var classes = MenuRoster.Classes;
-            if (countLabel != null)
-                countLabel.text = $"{classes.Length} CHARACTERS";
-
-            for (int i = 0; i < classes.Length; i++)
-            {
-                CharacterClass fighter = classes[i];
-                var card = new VisualElement { name = "menu-roster-card" };
-                card.AddToClassList("menu-roster-card");
-                card.AddToClassList($"menu-roster-card--{ColorClass(i)}");
-
-                var portrait = new VisualElement { name = "menu-portrait" };
-                portrait.AddToClassList("menu-portrait");
-                var texture = Resources.Load<Texture2D>($"UI/Portraits/{fighter}");
-                if (texture != null)
-                    portrait.style.backgroundImage = new StyleBackground(texture);
-
-                var copy = new VisualElement { name = "menu-roster-copy" };
-                copy.AddToClassList("menu-roster-copy");
-                var name = new Label(DisplayName(fighter)) { name = "menu-fighter-name" };
-                name.AddToClassList("menu-fighter-name");
-                var role = new Label(MenuRoster.Description(fighter)) { name = "menu-fighter-role" };
-                role.AddToClassList("menu-fighter-role");
-                copy.Add(name);
-                copy.Add(role);
-
-                card.Add(portrait);
-                card.Add(copy);
-                rosterPanel.Add(card);
-            }
-        }
-
-        private static string DisplayName(CharacterClass fighter) =>
-            fighter == CharacterClass.FightGuy ? "FIGHTGUY" : fighter.ToString().ToUpperInvariant();
-
-        private static string ColorClass(int index) => (index % 4) switch
-        {
-            0 => "orange",
-            1 => "blue",
-            2 => "green",
-            _ => "yellow"
-        };
     }
 }
