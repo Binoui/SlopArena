@@ -249,6 +249,7 @@
     min-width: 0;
     flex-direction: column;
     align-items: stretch;
+    align-self: stretch;
 }
 
 .shell-summary-host {
@@ -299,13 +300,44 @@
    `FrontendShellView` in panel coordinates derived from the physical size
    targets (PanelSettings use ConstantPhysicalSize, and the runtime scale
    factor is read from `panel.scaledPixelsPerPoint`, so USS px cannot express
-   physical pixels). Only content-density tweaks stay here; the blanket
-   history min-height override is deliberately absent — the presenter's own
-   chrome needs its minimums inside the cell. */
+   physical pixels). Shell chat history may shrink and scroll when its header
+   grows, so the composer remains inside the reserved cell. */
 
-.frontend-shell--compact .chat-panel {
+.frontend-shell .chat-panel {
     padding: 8px;
 }
+
+.frontend-shell .chat-tabs {
+    height: 24px;
+    margin-top: 4px;
+}
+
+.frontend-shell .chat-tab {
+    min-height: 20px;
+}
+
+.frontend-shell .chat-body {
+    margin-top: 4px;
+}
+
+.frontend-shell .chat-compose {
+    min-height: 28px;
+    margin-top: 4px;
+}
+
+.frontend-shell .chat-draft,
+.frontend-shell .chat-compose .chat-action {
+    min-height: 26px;
+}
+
+.frontend-shell .chat-feedback {
+    min-height: 0;
+}
+
+.frontend-shell--roomy .chat-history {
+    min-height: 0;
+}
+
 
 .frontend-shell--compact .chat-header {
     min-height: 28px;
@@ -317,19 +349,11 @@
     margin-top: 0;
 }
 
-.frontend-shell--compact .chat-tabs {
-    height: 24px;
-    margin-top: 4px;
-}
 
 .frontend-shell--compact .chat-tab {
-    min-height: 20px;
     font-size: 9px;
 }
 
-.frontend-shell--compact .chat-body {
-    margin-top: 4px;
-}
 
 .frontend-shell--compact .conversation-list {
     width: 104px;
@@ -347,24 +371,17 @@
     font-size: 11px;
 }
 
-.frontend-shell--compact .chat-compose {
-    min-height: 28px;
-    margin-top: 4px;
-}
 
 .frontend-shell--compact .chat-draft {
-    min-height: 26px;
     font-size: 12px;
 }
 
 .frontend-shell--compact .chat-compose .chat-action {
     width: 52px;
-    min-height: 26px;
 }
 
 .frontend-shell--compact .chat-feedback {
     font-size: 10px;
-    min-height: 14px;
 }
 
 /* Fit the presenter inside the 380×190 cell: the header actions share one
@@ -379,9 +396,6 @@
     min-height: 50px;
 }
 
-.frontend-shell--compact .chat-feedback {
-    min-height: 0;
-}
 
 /* ── Migrated page fragments ────────────────────────────────────────────
    Mounted sections keep their existing element-scoped styles from
@@ -448,11 +462,6 @@
     margin-top: 12px;
 }
 
-.menu-body-section .menu-intro {
-    width: 62%;
-    min-width: 0;
-    padding-top: 8px;
-}
 
 .menu-body-section .menu-actions {
     width: 340px;
@@ -627,4 +636,347 @@
 .frontend-shell--compact .btn-back {
     width: 84px;
     min-height: 40px;
+}
+
+/* ── Stage Select fragment (issue #221) ────────────────────────────────
+   The stage grid lives in the body's intentional scroll region; the
+   participant summary and the selected-stage/start action sit in the
+   lower-right cells as match context. */
+
+.stage-header-section {
+    flex-shrink: 0;
+    min-height: 72px;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.stage-header-section .flow-header-copy {
+    margin-left: 16px;
+    align-items: flex-start;
+}
+
+.stage-header-section .flow-title {
+    font-size: 34px;
+    margin-top: 2px;
+}
+
+.stage-header-section .flow-subtitle {
+    margin-top: 4px;
+    font-size: 15px;
+}
+
+.stage-header-section .stage-host-status {
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.stage-body-section {
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 10px;
+}
+
+.stage-body-section .stage-scroll {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.stage-summary-section {
+    flex-shrink: 0;
+    margin-top: 10px;
+    margin-right: 12px;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.stage-summary-section .stage-player-cards {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.stage-actions-section {
+    flex-shrink: 0;
+    width: 260px;
+    min-width: 260px;
+    padding: 12px;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
+    background-color: rgb(13, 13, 20);
+    border-width: 2px;
+    border-color: rgb(240, 238, 232);
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(255, 200, 33);
+}
+
+.frontend-shell--compact .stage-header-section {
+    min-height: 56px;
+}
+
+.frontend-shell--compact .stage-header-section .flow-title {
+    font-size: 26px;
+}
+
+.frontend-shell--compact .stage-header-section .flow-subtitle {
+    font-size: 13px;
+}
+
+.frontend-shell--compact .stage-body-section .stage-card {
+    width: 30%;
+    height: 150px;
+}
+
+.frontend-shell--compact .stage-summary-section .stage-player-cards .player-card {
+    width: 140px;
+    min-height: 110px;
+}
+
+.frontend-shell--compact .stage-actions-section {
+    width: 220px;
+    min-width: 220px;
+}
+
+/* ── Server Browser fragment (issue #221) ──────────────────────────────
+   Room list plus the compact hosting/address tools in the body; connection
+   and operation feedback in the lower-right summary; the host/join actions
+   outside the conversation cell. The direct-connect form opens from the
+   page-modal section in the shell modal host. */
+
+.browser-header-section {
+    flex-shrink: 0;
+    min-height: 72px;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.browser-header-section .flow-header-copy {
+    margin-left: 16px;
+    align-items: flex-start;
+}
+
+.browser-header-section .flow-title {
+    font-size: 34px;
+    margin-top: 2px;
+}
+
+.browser-header-section .flow-subtitle {
+    margin-top: 4px;
+    font-size: 15px;
+}
+
+.browser-body-section {
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 10px;
+}
+
+.browser-body-section .browser-panel {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.browser-summary-section {
+    flex-grow: 1;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.browser-summary-section .host-status {
+    color: rgb(240, 238, 232);
+}
+
+.browser-actions-section {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.browser-actions-section .btn-hot,
+.browser-actions-section .btn-secondary {
+    width: 210px;
+    min-height: 48px;
+}
+
+.browser-actions-section .btn-secondary {
+    margin-left: 10px;
+}
+
+.browser-actions-section .host-cancel {
+    margin-left: 0;
+}
+
+/* The page-modal section lives in the shell modal host; the direct-connect
+   form keeps its absolute full-cover backdrop there. */
+.frontend-shell--compact .direct-connect-card {
+    max-width: 92%;
+}
+
+.frontend-shell--compact .browser-header-section {
+    min-height: 56px;
+}
+
+.frontend-shell--compact .browser-header-section .flow-title {
+    font-size: 26px;
+}
+
+.frontend-shell--compact .browser-header-section .flow-subtitle {
+    font-size: 13px;
+}
+
+.frontend-shell--compact .browser-body-section .browser-layout {
+    flex-direction: column;
+    overflow: auto;
+}
+
+.frontend-shell--compact .browser-body-section .browser-tools {
+    width: auto;
+    min-width: 0;
+    margin-left: 0;
+    margin-top: 12px;
+}
+
+.frontend-shell--compact .browser-actions-section .btn-hot,
+.frontend-shell--compact .browser-actions-section .btn-secondary {
+    min-height: 44px;
+}
+
+/* ── Lobby Room fragment (issue #221) ──────────────────────────────────
+   Roster and room details in the body; readiness/host state in the
+   lower-right summary; leave/continue controls respecting authority in
+   the actions cell. */
+
+.lobby-header-section {
+    flex-shrink: 0;
+    min-height: 72px;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.lobby-header-section .flow-header-copy {
+    margin-left: 16px;
+    align-items: flex-start;
+}
+
+.lobby-header-section .flow-title {
+    font-size: 34px;
+    margin-top: 2px;
+}
+
+.lobby-header-section .flow-subtitle {
+    margin-top: 4px;
+    font-size: 15px;
+}
+
+.lobby-header-section .flow-context {
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+.lobby-body-section {
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 10px;
+}
+
+.lobby-body-section .lobby-panel {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.lobby-body-section .player-list-scroll {
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 12px;
+}
+
+.lobby-summary-section {
+    flex-grow: 1;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.lobby-actions-section {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+}
+
+.lobby-actions-section .lobby-action--leave {
+    margin-left: 0;
+}
+
+.frontend-shell--compact .lobby-header-section {
+    min-height: 56px;
+}
+
+.frontend-shell--compact .lobby-header-section .flow-title {
+    font-size: 26px;
+}
+
+.frontend-shell--compact .lobby-header-section .flow-subtitle {
+    font-size: 13px;
+}
+
+.frontend-shell--compact .lobby-body-section .player-slot {
+    min-height: 54px;
+}
+
+/* ── Results fragment (issue #221) ─────────────────────────────────────
+   The distinctive winner/standings broadcast composition fills the body;
+   the decorative art stays inside it; the existing result context and the
+   return action sit in the lower-right cells. */
+
+.results-header-section {
+    flex-shrink: 0;
+    min-height: 88px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 2;
+}
+
+.results-header-section .results-headline {
+    font-size: 40px;
+}
+
+.results-body-section {
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 10px;
+    position: relative;
+}
+
+.results-body-section .results-winner {
+    margin-top: 4px;
+}
+
+.results-actions-section.results-actions {
+    flex-grow: 1;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.frontend-shell--compact .results-header-section {
+    min-height: 64px;
+}
+
+.frontend-shell--compact .results-header-section .results-headline {
+    font-size: 30px;
+}
+
+.frontend-shell--compact .results-body-section {
+    overflow: auto;
+}
+
+.frontend-shell--compact .results-winner-card {
+    min-height: 190px;
+}
+
+.frontend-shell--compact .results-return {
+    width: 220px;
+    min-height: 46px;
 }

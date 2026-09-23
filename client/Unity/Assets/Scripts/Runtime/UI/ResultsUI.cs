@@ -9,14 +9,20 @@ using SlopArena.Client;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Post-fight broadcast presentation. It consumes only the immutable result
-    /// snapshot prepared by ClientSession; fighter GameObjects are never queried.
+    /// Results page (issue #221): a fragment mounted into the FrontendShell
+    /// hosts — the winner/standings broadcast composition in the body and the
+    /// existing return action outside the conversation cell. It consumes only
+    /// the immutable result snapshot prepared by ClientSession; fighter
+    /// GameObjects are never queried.
     /// </summary>
-    public sealed class ResultsUI : MonoBehaviour
+    public sealed class ResultsUI : MonoBehaviour, IFrontendPageController
     {
-        [SerializeField] private UIDocument _uiDocument = null!;
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
 
-        private VisualElement _root = null!;
+        private VisualElement _bodyRoot = null!;
+        private VisualElement _actionsRoot = null!;
         private VisualElement _winnerCard = null!;
         private Label _standingsLabel = null!;
 
@@ -26,18 +32,24 @@ namespace SlopArena.Client.UI
         private Label _headline = null!;
         private Button _returnButton = null!;
 
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
         private void OnEnable()
         {
             UISFX.PlayMenuMusic();
-            _root = _uiDocument.rootVisualElement;
-            _winnerCard = _root.Q<VisualElement>("results-winner");
-            _standings = _root.Q<VisualElement>("results-standings");
-            _stage = _root.Q<Label>("results-stage");
-            _metadata = _root.Q<Label>("results-metadata");
-            _standingsLabel = _root.Q<Label>("results-standings-label");
+            _bodyRoot = _context.Q<VisualElement>("page-body");
+            _actionsRoot = _context.Q<VisualElement>("page-actions");
+            _winnerCard = _context.Q<VisualElement>("results-winner");
+            _standings = _context.Q<VisualElement>("results-standings");
+            _stage = _context.Q<Label>("results-stage");
+            _metadata = _context.Q<Label>("results-metadata");
+            _standingsLabel = _context.Q<Label>("results-standings-label");
 
-            _headline = _root.Q<Label>("results-headline");
-            _returnButton = _root.Q<Button>("btn-return-lobby");
+            _headline = _context.Q<Label>("results-headline");
+            _returnButton = _context.Q<Button>("btn-return-lobby");
 
             // Local modes end at Home; only PvP has a lobby to return to.
             bool isLocal = MatchConfig.Mode != GameMode.PvP;
@@ -45,7 +57,7 @@ namespace SlopArena.Client.UI
             _returnButton.clicked += ReturnFromResults;
             // Page activation contract (issue #210): focus the page action and
             // give Escape the page's flow-specific back (return) action.
-            MenuNavigation.Configure(_root, _returnButton, ReturnFromResults);
+            MenuNavigation.Configure(_context, _returnButton, ReturnFromResults);
             RenderResults();
         }
 
@@ -101,9 +113,9 @@ namespace SlopArena.Client.UI
                 return;
             }
 
-            _root.EnableInClassList("results-count-2", results.PlayerCount == 2);
-            _root.EnableInClassList("results-count-3", results.PlayerCount == 3);
-            _root.EnableInClassList("results-count-4", results.PlayerCount >= 4);
+            _bodyRoot.EnableInClassList("results-count-2", results.PlayerCount == 2);
+            _bodyRoot.EnableInClassList("results-count-3", results.PlayerCount == 3);
+            _bodyRoot.EnableInClassList("results-count-4", results.PlayerCount >= 4);
 
             string stage = string.IsNullOrEmpty(results.StageName)
                 ? MatchConfig.ArenaName
@@ -124,7 +136,14 @@ namespace SlopArena.Client.UI
             for (int i = 1; i < ordered.Count; i++)
                 _standings.Add(BuildStandingRow(ordered[i]));
 
-            _root.schedule.Execute(() => _root.AddToClassList("results-ready")).StartingIn(40);
+            // The reveal animation spans two hosts (winner/standings in the
+            // body, the return action in the lower row), so the ready class
+            // lands on both page-owned roots (issue #221).
+            _bodyRoot.schedule.Execute(() =>
+            {
+                _bodyRoot.AddToClassList("results-ready");
+                _actionsRoot.AddToClassList("results-ready");
+            }).StartingIn(40);
         }
 
         private void BuildWinnerCard(ClientSession.ResultEntry entry, bool sharedVictory)

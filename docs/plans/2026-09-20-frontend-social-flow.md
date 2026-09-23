@@ -33,23 +33,30 @@ See [ADR-0032](../adr/0032-single-frontend-scene-with-persistent-social-ui.md) f
 > using the same presenter. The architecture and nonvisual social/identity
 > contracts of this brief — social/session ownership, read rules, draft and
 > retention rules, identity rules, navigation and operation lifetime, return
-> destinations, and acceptance honesty — remain in force. The bullets below
-> are retained as superseded history.
+destinations, and acceptance honesty — remain in force. The superseded
+presentation baseline below is retained as historical context only.
 
-### Menus and Results (superseded presentations)
+### Superseded presentation baseline (historical)
 
-- At roomy sizes, reserve a right-hand Social Dock in normal page layout. It is initially open; remember the player's open/collapsed preference across launches.
-- At compact widths, retain a social strip. Opening chat temporarily replaces page content rather than squeezing both regions or covering clickable page actions. Closing chat restores the page and its selections.
-- Compact presentation must not overwrite the remembered roomy-layout preference.
+The following two bullets describe the presentation baseline considered before the
+2026-09-21 amendment. They are retained only to explain what #218/#219 replaced;
+they are not current requirements:
+
+- The pre-amendment roomy-layout proposal reserved a right-hand Social Dock in normal page layout, initially open, with an open/collapsed preference remembered across launches.
+- The pre-amendment compact-layout proposal retained a social strip whose opened chat temporarily replaced page content; closing chat restored the page and its selections. That proposal also kept the compact presentation from overwriting the remembered roomy-layout preference.
+
+### Menus and Results
+
+The following social/session contracts remain current:
 - Reuse Global Chat, Server Chat, Direct Messages, conversation switching, online-player access and composer capabilities. Server Chat remains GameServer-wide, not room- or match-only.
 - Distinguish unavailable/disconnected directory state from a genuine zero-player result. Social readiness, GameServer membership and gameplay connectivity are distinct; do not present one as proof of the others.
 - Within a launch, preserve the selected conversation, drafts and per-conversation scroll anchors through page changes, gameplay and reconnects, subject to existing bounded retention.
 - If incoming messages evict the viewed history anchor from the existing 50-message buffer, return to newest with an explanation. Do not expand retention merely to preserve the anchor. The normal read rule then applies.
-- Do not persist conversation history, drafts or scroll state to disk. Display Name and dock preference are the cross-launch preferences in this scope.
+- Do not persist conversation history, drafts or scroll state to disk. Display Name and social-layout preference are the cross-launch preferences in this scope.
 
 ### Read state and combat
 
-- A conversation clears unread only when selected, unobscured, at its newest messages and in the focused application. An underlying dock beneath a modal, an unfocused window, another selected conversation or an older scroll position does not satisfy this rule.
+- A conversation clears unread only when selected, unobscured, at its newest messages and in the focused application. An underlying social view beneath a modal, an unfocused window, another selected conversation or an older scroll position does not satisfy this rule.
 - A brief combat preview alone does not clear unread. Preserve personal mute behavior.
 - During combat, show brief Global/Server message text and Direct Message unread indicators. Do not automatically expose private-message text.
 - Interactive chat is explicitly opened. Merely displaying the brief feed never captures gameplay input.
@@ -67,8 +74,8 @@ See [ADR-0032](../adr/0032-single-frontend-scene-with-persistent-social-ui.md) f
 
 - Support mouse, keyboard and full gamepad navigation across all scoped pages and social controls. Name and message text entry require a physical keyboard.
 - Provide an explicit, visible Page/Social region-switch action. Navigation stays within the active region; remember each region's last valid focused control.
-- Visibility is not input ownership. A dock may remain visible while the player selects fighters or stages.
-- Back/Escape first closes the topmost modal. Otherwise, if interacting with chat, one press leaves editing/navigation and returns page focus without discarding the draft. Close a compact chat view, but leave a roomy dock visible. Only a subsequent press invokes page Back.
+- Visibility is not input ownership. The social view may remain visible while the player selects fighters or stages.
+- Back/Escape first closes the topmost modal. Otherwise, if interacting with chat, one press leaves editing/navigation and returns page focus without discarding the draft. Close an explicitly expanded social view before invoking page Back. Only a subsequent press invokes page Back.
 - One cancel press performs one action. Restore focus to its valid origin; never retain focus or callbacks to a deactivated page.
 - Interactive combat chat suppresses gameplay input while navigating or typing, not only when a text field has focus. Online simulation continues; this is not a pause request.
 - Preserve held-input release protection when returning control, including after a match transition. Do not leak the opening/closing input into gameplay.
@@ -112,7 +119,7 @@ Do not silently restore online readiness from local preferences or invent a rema
 
 Implementation acceptance requires the actual Unity surface, not browser mockups, source inspection or compilation alone. Use the installed Unity CLI/Pipeline workflow and the applicable local verification mode in [testing.md](../testing.md).
 
-1. Inspect at 1280 × 720, 1280 × 800 and a roomy desktop viewport. Required actions remain legible and accessible; chat does not obscure them. Compact/full transitions preserve preference, page state and draft.
+1. Inspect at 1280 × 720, 1280 × 800 and a roomy desktop viewport. Required actions remain legible and accessible; chat does not obscure them. Expanded/collapsed transitions preserve preference, page state and draft.
 2. Exercise real controller navigation, keyboard focus, Page/Social switching, modal cancel and focus restoration. Text entry still uses a keyboard. One cancel input must not both leave chat and navigate Back.
 3. Launch Solo and Training through the consolidated frontend, enter gameplay, leave to their mode-appropriate selection page and re-enter. Verify frontend recreation and no duplicate input/event subscriptions.
 4. Verify available local Results flow returns Home; shared social presentation restores its menu state. Home resets preparation without erasing the current social session.
@@ -123,15 +130,17 @@ Implementation acceptance requires the actual Unity surface, not browser mockups
 
 **Deferred proof:** a successful live host/guest preparation → match → Results → lobby loop, live host promotion/non-host authority, and server-driven transitions/races requiring multiple connected clients. These behaviors remain implementation requirements, but successful live multi-client verification is outside the selected acceptance gate. Report them as unverified until exercised.
 
-## Current-code evidence behind the decisions
+## Historical code evidence behind the decisions
 
-These are pre-implementation observations, not claims that the approved design already exists:
+These source observations were recorded during design approval on 2026-09-20,
+before implementation. They describe the historical baseline and are not claims
+about current runtime behavior:
 
-- `Runtime/UI/ChatOverlay.cs`: collapses on scene changes, attaches to a scene document and captures gameplay when expanded; it does not own a reserved menu region.
-- `Runtime/Network/ChatSession.cs`: already owns launch-persistent social state and loads saved names, but currently saves a new name only after remote acceptance.
-- `Runtime/UI/ServerBrowserUI.cs` and `LobbyRoomUI.cs`: page lifetimes carry meaningful cancellation, subscription, membership and hosting cleanup.
-- `Runtime/UI/MatchPauseMenu.cs`: unrestricted `UIDocument` discovery conflicts with adding a persistent document.
-- `Runtime/World/MatchBase.cs` and `PvPMatch.cs`: early match exit currently changes to Training Stage Select; the agreed mode-specific routes deliberately replace that behavior.
-- `Runtime/UI/ResultsUI.cs`: Results currently has its own scene/document and routes Solo to Home, other modes to LobbyRoom.
+- `Runtime/UI/ChatOverlay.cs`: at that baseline, it collapsed on scene changes, attached to a scene document and captured gameplay when expanded; it did not own a reserved menu region.
+- `Runtime/Network/ChatSession.cs`: at that baseline, it already owned launch-persistent social state and loaded saved names, but saved a new name only after remote acceptance.
+- `Runtime/UI/ServerBrowserUI.cs` and `LobbyRoomUI.cs`: at that baseline, page lifetimes carried meaningful cancellation, subscription, membership and hosting cleanup.
+- `Runtime/UI/MatchPauseMenu.cs`: at that baseline, unrestricted `UIDocument` discovery conflicted with adding a persistent document.
+- `Runtime/World/MatchBase.cs` and `PvPMatch.cs`: at that baseline, early match exit changed to Training Stage Select; the agreed mode-specific routes deliberately replaced that behavior.
+- `Runtime/UI/ResultsUI.cs`: at that baseline, Results had its own scene/document and routed Solo to Home, other modes to LobbyRoom.
 
 Paths above are under `client/Unity/Assets/Scripts/`. Canonical social terminology is recorded in [CONTEXT.md](../../CONTEXT.md).

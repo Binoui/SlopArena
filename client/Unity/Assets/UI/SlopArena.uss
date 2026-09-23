@@ -6,19 +6,13 @@
 }
 
 .menu-screen,
-.server-browser-screen,
-.lobby-room-screen,
-.char-select-screen,
-.stage-select-screen {
+.char-select-screen {
     background-color: rgb(23, 19, 27);
     color: rgb(240, 238, 232);
     font-size: 18px;
 }
 
-.menu-backdrop,
-.server-browser-backdrop,
-.lobby-backdrop,
-.stage-backdrop {
+.menu-backdrop {
     position: absolute;
     left: 0;
     right: 0;
@@ -33,22 +27,6 @@
     border-right-color: rgb(224, 92, 42);
 }
 
-.server-browser-backdrop,
-.lobby-backdrop,
-.stage-backdrop {
-    background-color: rgb(20, 17, 24);
-}
-
-.flow-header {
-    position: absolute;
-    left: 4%;
-    right: 4%;
-    top: 4%;
-    min-height: 104px;
-    flex-direction: row;
-    align-items: flex-start;
-}
-
 .flow-header-copy {
     margin-left: 128px;
     align-items: flex-start;
@@ -58,8 +36,6 @@
 .flow-progress,
 .char-select-meta,
 .stage-host-status,
-.menu-roster-title,
-.menu-status-pill,
 .panel-note,
 .lobby-panel__capacity,
 .footer-label,
@@ -71,7 +47,6 @@
 
 .flow-eyebrow,
 .flow-progress,
-.menu-roster-title,
 .footer-label {
     color: rgb(255, 200, 33);
 }
@@ -220,22 +195,6 @@
     font-size: 13px;
 }
 
-.menu-content {
-    position: absolute;
-    left: 5%;
-    right: 5%;
-    top: 7%;
-    bottom: 9%;
-    flex-direction: row;
-    align-items: stretch;
-}
-
-.menu-intro {
-    width: 54%;
-    min-width: 0;
-    padding-top: 2%;
-    align-items: flex-start;
-}
 
 
 .menu-title-wrap {
@@ -329,148 +288,17 @@
     color: rgb(23, 19, 27);
 }
 
-.menu-action-copy {
-    flex-grow: 1;
-    min-width: 0;
-    margin-left: 16px;
-    color: rgb(211, 204, 211);
-    font-size: 18px;
-    white-space: normal;
-}
 
-.menu-roster-column {
-    width: 42%;
-    min-width: 0;
-    margin-left: 4%;
-    padding: 20px;
-    background-color: rgb(13, 13, 20);
-    border-width: 3px;
-    border-color: rgb(240, 238, 232);
-    border-bottom-width: 9px;
-    border-bottom-color: rgb(224, 92, 42);
-    rotate: 1deg;
-}
-
-.menu-roster-heading {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.menu-roster-title {
-    font-size: 22px;
-    letter-spacing: 1px;
-}
-
-.menu-status-pill {
-    padding: 7px 10px;
-    background-color: rgb(25, 19, 27);
-    color: rgb(76, 221, 136);
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.menu-roster-intro {
-    margin-top: 10px;
-    padding-bottom: 13px;
-    border-bottom-width: 1px;
-    border-bottom-color: rgba(240, 238, 232, 0.25);
-    color: rgb(183, 174, 184);
-    font-size: 17px;
-    white-space: normal;
-}
-
-.menu-roster {
-    flex-grow: 1;
-    min-height: 0;
-    margin-top: 13px;
-    flex-direction: column;
-}
-
-.menu-roster-card {
-    position: relative;
-    flex-grow: 1;
-    min-height: 126px;
-    margin-top: 9px;
-    padding: 8px;
-    flex-direction: row;
-    align-items: center;
-    background-color: rgb(35, 30, 40);
-    border-left-width: 7px;
-    border-left-color: rgb(255, 200, 33);
-    border-bottom-width: 4px;
-    border-bottom-color: rgb(224, 92, 42);
-}
-
-.menu-portrait {
-    width: 122px;
-    height: 122px;
-    flex-shrink: 0;
-    margin-right: 14px;
-    border-width: 2px;
-    border-color: rgb(240, 238, 232);
-    background-color: rgb(44, 40, 49);
-    -unity-background-scale-mode: scale-and-crop;
-}
-
-.menu-roster-copy {
-    min-width: 0;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.menu-fighter-name {
-    color: rgb(240, 238, 232);
-    font-size: 24px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-}
-
-.menu-fighter-role {
-    margin-top: 3px;
-    color: rgb(211, 204, 211);
-    font-size: 17px;
-    white-space: normal;
-}
-
-.menu-player-badge {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    padding: 4px 7px;
-    background-color: rgb(240, 238, 232);
-    color: rgb(25, 19, 27);
-    font-size: 12px;
-    -unity-font-style: bold;
-}
-
-.menu-footer {
-    position: absolute;
-    left: 5%;
-    right: 5%;
-    bottom: 3%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.menu-version,
-.menu-footer-note {
+.menu-version {
     color: rgb(183, 174, 184);
     font-size: 14px;
     letter-spacing: 1px;
 }
 
-.menu-footer-note {
-    color: rgb(255, 200, 33);
-}
 
 .browser-layout {
-    position: absolute;
-    left: 4%;
-    right: 4%;
-    top: 23%;
-    bottom: 6%;
+    flex-grow: 1;
+    min-height: 0;
     flex-direction: row;
     align-items: stretch;
 }
@@ -484,11 +312,6 @@
     border-color: rgb(240, 238, 232);
     border-bottom-width: 9px;
     border-bottom-color: rgb(224, 92, 42);
-}
-
-.browser-panel {
-    width: 61%;
-    flex-direction: column;
 }
 
 .browser-panel__header,
@@ -616,9 +439,10 @@
 }
 
 .browser-tools {
-    width: 36%;
+    width: 340px;
     min-width: 0;
-    margin-left: 3%;
+    margin-left: 12px;
+    flex-shrink: 0;
     flex-direction: column;
 }
 
@@ -694,27 +518,6 @@
     white-space: normal;
 }
 
-.host-actions {
-    margin-top: 12px;
-    flex-direction: row;
-    justify-content: flex-end;
-}
-
-.host-actions > .btn-hot,
-.host-actions > .btn-secondary {
-    width: 48%;
-    min-width: 0;
-}
-
-.host-actions > .btn-hot {
-    margin-left: 8px;
-}
-
-.direct-connect-panel .btn-secondary {
-    width: 100%;
-    margin-top: 16px;
-}
-
 .direct-connect-modal {
     position: absolute;
     left: 0;
@@ -784,23 +587,9 @@
     margin-left: 10px;
 }
 
-.lobby-panel {
-    position: absolute;
-    left: 4%;
-    right: 4%;
-    top: 24%;
-    bottom: 7%;
-    flex-direction: column;
-}
-
 .lobby-panel__capacity {
     color: rgb(183, 174, 184);
     font-size: 14px;
-}
-
-.lobby-status-copy {
-    width: 42%;
-    min-width: 0;
 }
 
 .lobby-retry {
@@ -808,13 +597,6 @@
     min-height: 45px;
     margin-top: 8px;
     font-size: 15px;
-}
-
-.lobby-buttons {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-end;
-    flex-grow: 1;
 }
 
 .lobby-action {
@@ -1217,14 +999,6 @@
     min-height: 57px;
 }
 
-.stage-select-screen {
-    background-color: rgb(20, 17, 24);
-}
-
-.stage-header {
-    min-height: 96px;
-}
-
 .stage-host-status {
     margin-top: 14px;
     padding: 8px 11px;
@@ -1234,16 +1008,10 @@
 }
 
 .stage-grid {
-    position: absolute;
-    left: 4%;
-    right: 4%;
-    top: 16%;
-    bottom: 24%;
     flex-direction: row;
     flex-wrap: wrap;
-    align-content: center;
+    align-content: flex-start;
     justify-content: center;
-    align-items: center;
     padding: 4px;
 }
 
@@ -1301,16 +1069,6 @@
     -unity-text-align: middle-center;
 }
 
-.stage-bottom-panel {
-    position: absolute;
-    left: 4%;
-    right: 4%;
-    bottom: 5%;
-    min-height: 144px;
-    flex-direction: row;
-    align-items: stretch;
-}
-
 .stage-player-cards {
     flex-grow: 1;
     min-width: 0;
@@ -1321,20 +1079,6 @@
 .stage-player-cards .player-card {
     width: 176px;
     min-height: 174px;
-}
-
-.stage-action-area {
-    width: 260px;
-    min-width: 260px;
-    margin-left: 12px;
-    padding: 12px;
-    justify-content: flex-end;
-    align-items: stretch;
-    background-color: rgb(13, 13, 20);
-    border-width: 2px;
-    border-color: rgb(240, 238, 232);
-    border-bottom-width: 6px;
-    border-bottom-color: rgb(255, 200, 33);
 }
 
 .stage-selected-label,
@@ -1356,13 +1100,6 @@
     font-size: 17px;
 }
 
-
-.results-screen {
-    flex-grow: 1;
-    position: relative;
-    overflow: hidden;
-    background-color: rgb(20, 17, 24);
-}
 
 .results-background {
     position: absolute;
@@ -1434,18 +1171,6 @@
     rotate: 7deg;
 }
 
-.results-header {
-    position: absolute;
-    left: 48px;
-    right: 48px;
-    top: 34px;
-    height: 100px;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-    z-index: 2;
-}
-
 .results-header-copy {
     flex-direction: column;
     align-items: flex-start;
@@ -1489,11 +1214,9 @@
 }
 
 .results-content {
-    position: absolute;
-    left: 48px;
-    right: 48px;
-    top: 154px;
-    bottom: 238px;
+    flex-grow: 1;
+    min-width: 0;
+    position: relative;
     flex-direction: row;
     z-index: 2;
 }
@@ -1709,18 +1432,6 @@
     font-size: 8px;
 }
 
-.results-footer {
-    position: absolute;
-    left: 48px;
-    right: 48px;
-    bottom: 24px;
-    height: 190px;
-    flex-direction: row;
-    align-items: stretch;
-    z-index: 3;
-}
-
-
 .results-actions {
     flex-grow: 1;
     min-width: 0;
@@ -1732,7 +1443,7 @@
     transition-property: opacity, translate;
 }
 
-.results-ready .results-actions {
+.results-actions.results-ready {
     opacity: 1;
     translate: 0 0;
 }
@@ -1793,15 +1504,4 @@
 .results-count-4 .results-row-portrait {
     width: 46px;
     height: 52px;
-}
-
-.menu-scroll {
-    flex-grow: 1;
-    width: 100%;
-}
-
-.menu-scroll .unity-scroll-view__content-container {
-    flex-direction: row;
-    align-items: stretch;
-    width: 100%;
 }

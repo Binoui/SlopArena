@@ -1,8 +1,12 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen server-browser-screen">
-        <ui:VisualElement name="backdrop" class="server-browser-backdrop" />
-        <ui:VisualElement name="flow-header" class="flow-header">
+    <!-- Server Browser page fragment (issue #221). Mounted into the
+         FrontendShell hosts: header → PageHeaderHost, room list plus the
+         compact hosting/address tools → PageBodyHost, connection/operation
+         feedback → PageSummaryHost, host/join actions → PageActionsHost.
+         The direct-connect form mounts into the shell modal host as the
+         page-modal section and opens through ServerBrowserUI. -->
+    <ui:VisualElement name="page-frag">
+        <ui:VisualElement name="page-header" class="page-section browser-header-section">
             <ui:Button name="btn-back" text="BACK" class="btn-back" />
             <ui:VisualElement class="flow-header-copy">
                 <ui:Label text="ONLINE PLAY" class="flow-eyebrow" />
@@ -10,39 +14,47 @@
                 <ui:Label text="Find a room, or make one for the crew." class="flow-subtitle" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="browser-layout" class="browser-layout">
-            <ui:VisualElement name="browser-panel" class="browser-panel">
-                <ui:VisualElement class="browser-panel__header">
-                    <ui:Label text="ROOMS TO JOIN" class="panel-title" />
-                    <ui:Label text="PUBLIC LIST" class="panel-note" />
-                </ui:VisualElement>
-                <ui:Label name="lbl-status" text="Loading the room list…" class="browser-status" />
-                <ui:ScrollView name="server-list" class="server-list" mode="Vertical" horizontal-scroller-visibility="Hidden" />
-                <ui:VisualElement class="browser-panel__footer">
-                    <ui:Label text="Nothing here? Refresh, host, or use an address." class="browser-hint" />
-                    <ui:Button name="btn-refresh" text="REFRESH" class="btn-secondary browser-refresh" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:VisualElement name="browser-tools" class="browser-tools">
-                <ui:VisualElement name="host-panel" class="browser-tool browser-host-panel">
-                    <ui:Label text="MAKE A ROOM" class="panel-title" />
-                    <ui:Label text="Start the room here, then invite your friends with the address." class="tool-copy" />
-                    <ui:Label text="PUBLIC ADDRESS (OPTIONAL)" class="field-label" />
-                    <ui:TextField name="host-ip-field" placeholdertext="auto-detect" class="browser-input" />
-                    <ui:Label text="Leave blank to advertise the server's detected address." class="field-help" />
-                    <ui:Label name="lbl-host-status" class="host-status" />
-                    <ui:VisualElement class="host-actions">
-                        <ui:Button name="btn-host-cancel" text="CANCEL HOST" class="btn-secondary host-cancel" style="display: none;" />
-                        <ui:Button name="btn-host" text="HOST MATCH" class="btn-hot" />
+        <ui:VisualElement name="page-body" class="page-section browser-body-section">
+            <ui:VisualElement name="browser-layout" class="browser-layout">
+                <ui:VisualElement name="browser-panel" class="browser-panel">
+                    <ui:VisualElement class="browser-panel__header">
+                        <ui:Label text="ROOMS TO JOIN" class="panel-title" />
+                        <ui:Label text="PUBLIC LIST" class="panel-note" />
+                    </ui:VisualElement>
+                    <ui:ScrollView name="server-list" class="server-list" mode="Vertical" horizontal-scroller-visibility="Hidden" />
+                    <ui:VisualElement class="browser-panel__footer">
+                        <ui:Label text="Nothing here? Refresh, host, or use an address." class="browser-hint" />
+                        <ui:Button name="btn-refresh" text="REFRESH" class="btn-secondary browser-refresh" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="direct-connect-panel" class="browser-tool browser-direct-panel">
-                    <ui:Label text="JOIN BY ADDRESS" class="panel-title" />
-                    <ui:Label text="Have a registered server address from a friend? Enter it directly." class="tool-copy" />
-                    <ui:Button name="btn-direct-connect" text="JOIN BY ADDRESS" class="btn-secondary" />
+                <ui:VisualElement name="browser-tools" class="browser-tools">
+                    <ui:VisualElement name="host-panel" class="browser-tool browser-host-panel">
+                        <ui:Label text="MAKE A ROOM" class="panel-title" />
+                        <ui:Label text="Start the room here, then invite your friends with the address." class="tool-copy" />
+                        <ui:Label text="PUBLIC ADDRESS (OPTIONAL)" class="field-label" />
+                        <ui:TextField name="host-ip-field" placeholdertext="auto-detect" class="browser-input" />
+                        <ui:Label text="Leave blank to advertise the server's detected address." class="field-help" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="direct-connect-panel" class="browser-tool browser-direct-panel">
+                        <ui:Label text="JOIN BY ADDRESS" class="panel-title" />
+                        <ui:Label text="Have a registered server address from a friend? Enter it directly." class="tool-copy" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
+        <ui:VisualElement name="page-summary" class="page-section browser-summary-section">
+            <ui:Label name="lbl-status" text="Loading the room list…" class="browser-status" />
+            <ui:Label name="lbl-host-status" class="host-status" style="display: none;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="page-actions" class="page-section browser-actions-section">
+            <ui:Button name="btn-host-cancel" text="CANCEL HOST" class="btn-secondary host-cancel" style="display: none;" />
+            <ui:Button name="btn-host" text="HOST MATCH" class="btn-hot" />
+            <ui:Button name="btn-direct-connect" text="JOIN BY ADDRESS" class="btn-secondary" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <!-- The page modal mounts into the shell modal host (issue #221);
+         ServerBrowserUI presents it over the page while the lookup runs. -->
+    <ui:VisualElement name="page-modal">
         <ui:VisualElement name="direct-connect-modal" class="direct-connect-modal" style="display: none;">
             <ui:VisualElement class="direct-connect-card">
                 <ui:Label text="JOIN BY ADDRESS" class="direct-connect-title" />
@@ -52,7 +64,7 @@
                 <ui:Label name="direct-connect-status" class="direct-connect-status" />
                 <ui:VisualElement class="direct-connect-actions">
                     <ui:Button name="btn-modal-close" text="CANCEL" class="btn-secondary" />
-                    <ui:Button name="btn-join" text="JOIN FIGHT" class="btn-hot" />
+                    <ui:Button name="btn-modal-join" text="JOIN FIGHT" class="btn-hot" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

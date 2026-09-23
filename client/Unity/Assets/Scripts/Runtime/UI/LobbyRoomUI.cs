@@ -11,13 +11,26 @@ using SlopArena.Client;
 
 namespace SlopArena.Client.UI
 {
-    /// <summary>Live lobby room driven by the existing master-server lobby connection.</summary>
-    public class LobbyRoomUI : MonoBehaviour
+    /// <summary>
+    /// Live lobby room page (issue #221): a fragment mounted into the
+    /// FrontendShell hosts — roster and room details in the body, readiness/
+    /// host state in the lower-right summary, and the leave/continue controls
+    /// respecting authority outside the conversation cell. Driven by the
+    /// existing master-server lobby connection.
+    /// </summary>
+    public class LobbyRoomUI : MonoBehaviour, IFrontendPageController
     {
         private const int MaxSlots = 4;
         private const float LobbyTimeoutSeconds = 12f;
 
-        [SerializeField] private UIDocument _uiDocument;
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
+
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
 
         private LobbyClient? _lobby;
         private VisualElement? _playerList;
@@ -47,14 +60,13 @@ namespace SlopArena.Client.UI
             _startPending = false;
             _lifecycleCts = new CancellationTokenSource();
             int generation = ++_attempt;
-            var root = _uiDocument.rootVisualElement;
-            _playerList = root.Q<VisualElement>("player-list");
-            _btnStart = root.Q<Button>("btn-start");
-            _btnLeave = root.Q<Button>("btn-leave");
-            _btnRetry = root.Q<Button>("btn-retry");
-            _backButton = root.Q<Button>("btn-back");
-            _lblStatus = root.Q<Label>("lbl-status");
-            _lblServer = root.Q<Label>("lbl-server");
+            _playerList = _context.Q<VisualElement>("player-list");
+            _btnStart = _context.Q<Button>("btn-start");
+            _btnLeave = _context.Q<Button>("btn-leave");
+            _btnRetry = _context.Q<Button>("btn-retry");
+            _backButton = _context.Q<Button>("btn-back");
+            _lblStatus = _context.Q<Label>("lbl-status");
+            _lblServer = _context.Q<Label>("lbl-server");
 
             if (_lblServer != null)
                 _lblServer.text = string.IsNullOrEmpty(ClientSession.SelectedServerName)
@@ -73,7 +85,7 @@ namespace SlopArena.Client.UI
                 _btnStart.style.display = DisplayStyle.None;
             }
             // Leave is always visible; never focus a hidden recovery action first.
-            MenuNavigation.Configure(root, _btnLeave ?? _btnStart ?? _btnRetry, Leave);
+            MenuNavigation.Configure(_context, _btnLeave ?? _btnStart ?? _btnRetry, Leave);
 
             RenderPlayers();
             var chat = ChatSession.Instance;

@@ -1,8 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen stage-select-screen">
-        <ui:VisualElement name="backdrop" class="stage-backdrop" />
-        <ui:VisualElement name="flow-header" class="flow-header stage-header">
+    <!-- Stage Select page fragment (issue #221). Mounted into the
+         FrontendShell hosts: header → PageHeaderHost, the stage grid in an
+         intentional scroll region → PageBodyHost, participant summary →
+         PageSummaryHost, selected-stage label and the primary start action →
+         PageActionsHost. Real selection state lives in StageSelectController. -->
+    <ui:VisualElement name="page-frag">
+        <ui:VisualElement name="page-header" class="page-section stage-header-section">
             <ui:Button name="btn-back" text="BACK" class="btn-back" />
             <ui:VisualElement class="flow-header-copy">
                 <ui:Label text="MATCH SETUP" class="flow-eyebrow" />
@@ -14,14 +17,18 @@
                 <ui:Label name="lbl-host" text="CHOOSE YOUR STAGE" class="stage-host-status" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="stage-grid" class="stage-grid" />
-        <ui:VisualElement name="bottom-panel" class="stage-bottom-panel">
+        <ui:VisualElement name="page-body" class="page-section stage-body-section">
+            <ui:ScrollView name="stage-scroll" class="stage-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden">
+                <ui:VisualElement name="stage-grid" class="stage-grid" />
+            </ui:ScrollView>
+        </ui:VisualElement>
+        <ui:VisualElement name="page-summary" class="page-section stage-summary-section">
             <ui:VisualElement name="player-cards-area" class="stage-player-cards" />
-            <ui:VisualElement name="stage-action-area" class="stage-action-area">
-                <ui:Label name="lbl-selected-stage" text="NO STAGE SELECTED" class="stage-selected-label" />
-                <ui:Label name="lbl-waiting" text="WAITING FOR HOST" class="stage-waiting" style="display: none;" />
-                <ui:Button name="btn-confirm" text="START MATCH" class="btn-primary stage-confirm" style="display: none;" />
-            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="page-actions" class="page-section stage-actions-section">
+            <ui:Label name="lbl-selected-stage" text="NO STAGE SELECTED" class="stage-selected-label" />
+            <ui:Label name="lbl-waiting" text="WAITING FOR HOST" class="stage-waiting" style="display: none;" />
+            <ui:Button name="btn-confirm" text="START MATCH" class="btn-primary stage-confirm" style="display: none;" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

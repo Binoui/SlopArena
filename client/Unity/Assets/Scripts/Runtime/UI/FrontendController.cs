@@ -23,13 +23,9 @@ namespace SlopArena.Client.UI
     /// navigation. Gameplay scenes stay separate: the frontend unloads for a
     /// match and is recreated on return through a pending page.
     ///
-    /// Since #219 the shell is also the frame: migrated pages (Home, Fighter
-    /// Select) are fragment sources cloned into the FrontendShell hosts once
-    /// per activation through a per-activation <see cref="FrontendPageContext"/>;
-    /// unmigrated pages keep their per-page documents until they migrate
-    /// (issues #221/#222) and are temporary coexistence, not a compatibility
-    /// router. The navigation controller keeps sole ownership of page
-    /// routing, pending returns and gameplay handoff.
+    /// All six page fragments mount into the stable FrontendShell hosts once
+    /// per activation through a per-activation <see cref="FrontendPageContext"/>.
+    /// Navigation retains sole ownership of routing, pending returns and gameplay handoff.
     /// </summary>
     public sealed class FrontendController : MonoBehaviour
     {
@@ -44,6 +40,10 @@ namespace SlopArena.Client.UI
         [SerializeField] private FrontendShellView? _shell;
         [SerializeField] private VisualTreeAsset? _homeFragment;
         [SerializeField] private VisualTreeAsset? _fighterSelectFragment;
+        [SerializeField] private VisualTreeAsset? _stageSelectFragment;
+        [SerializeField] private VisualTreeAsset? _resultsFragment;
+        [SerializeField] private VisualTreeAsset? _serverBrowserFragment;
+        [SerializeField] private VisualTreeAsset? _lobbyRoomFragment;
 
         private FrontendShellIdentityView? _identity;
         private FrontendFocusRouter? _focusRouter;
@@ -53,11 +53,7 @@ namespace SlopArena.Client.UI
         private FrontendPage _current;
         private FrontendPageContext? _currentContext;
         private int _generation;
-        /// <summary>
-        /// Raised after the active page switched. Persistent shell guests
-        /// (e.g. chat presentation) reconcile their host attachment here;
-        /// departed pages no longer receive callbacks.
-        /// </summary>
+        /// <summary>Raised after the active page switches; the shell's persistent guests can bind once.</summary>
         public static event Action<FrontendPage>? PageChanged;
 
         /// <summary>The currently active page; Home before the shell starts.</summary>
@@ -67,10 +63,7 @@ namespace SlopArena.Client.UI
         /// <summary>True while the frontend shell is loaded (issue #214).</summary>
         public static bool IsFrontendActive => _instance != null;
 
-        /// <summary>
-        /// The live page context of the active activation; null for legacy
-        /// per-page-document pages and outside the frontend scene.
-        /// </summary>
+        /// <summary>The live page context of the active activation.</summary>
         public static FrontendPageContext? CurrentContext => _instance?._currentContext;
 
         /// <summary>The stable shell view; null outside the frontend scene.</summary>
@@ -86,47 +79,6 @@ namespace SlopArena.Client.UI
         /// <summary>The shell focus router (issue #220); null outside the frontend scene.</summary>
         public static FrontendFocusRouter? FocusRouter => _instance?._focusRouter;
 
-        /// <summary>Whether the given page is fragment-mounted into the shell.</summary>
-        public static bool IsMigratedPage(FrontendPage page) =>
-            page is FrontendPage.Home or FrontendPage.FighterSelect;
-
-        /// <summary>
-        /// The active page's UI document — the explicit host for shell
-        /// overlays on pages that still own a full-screen document. Null for
-        /// fragment-mounted pages (the shell document hosts those) and
-        /// outside the frontend scene.
-        /// </summary>
-        public static UIDocument? ActivePageDocument
-        {
-            get
-            {
-                var shell = _instance;
-                if (shell == null)
-                    return null;
-                if (IsMigratedPage(shell._current))
-                    return null;
-                var pageObject = shell.PageObject(shell._current);
-                if (pageObject == null || !pageObject.activeInHierarchy)
-                    return null;
-                return pageObject.GetComponent<UIDocument>();
-            }
-        }
-
-        /// <summary>
-        /// The chat presenter's shell hosting surfaces (issue #219): the
-        /// reserved bottom-left social cell and the page content region.
-        /// Available only while a fragment-mounted page is active.
-        /// </summary>
-        public static bool TryGetShellChatHost(
-            out VisualElement socialHost, out VisualElement pageContentRoot)
-        {
-            socialHost = null!;
-            pageContentRoot = null!;
-            var shell = _instance;
-            if (shell == null || shell._shell == null || !IsMigratedPage(shell._current))
-                return false;
-            return shell._shell.TryGetChatHosts(out socialHost, out pageContentRoot);
-        }
 
         private void Awake()
         {
@@ -147,15 +99,10 @@ namespace SlopArena.Client.UI
         private void Start()
         {
             _shell?.Bind();
-            // The shell-owned identity surface and focus router are created
-            // here so existing scenes built before Pass 2 (#220) keep working
-            // without a rebuild; the scene builder adds them explicitly too.
-            _identity = GetComponent<FrontendShellIdentityView>()
-                ?? gameObject.AddComponent<FrontendShellIdentityView>();
-            _focusRouter = GetComponent<FrontendFocusRouter>()
-                ?? gameObject.AddComponent<FrontendFocusRouter>();
-            _identity.Bind(_shell);
-            _focusRouter.Bind(_shell);
+            _identity = GetComponent<FrontendShellIdentityView>();
+            _focusRouter = GetComponent<FrontendFocusRouter>();
+            _identity?.Bind(_shell);
+            _focusRouter?.Bind(_shell);
             Show(_pendingPage ?? FrontendPage.Home);
             _pendingPage = null;
         }
@@ -215,50 +162,40 @@ namespace SlopArena.Client.UI
             MenuNavigation.ClearPageInitialFocus();
             _shell?.ClearPageHosts();
 
-            if (IsMigratedPage(page))
+            var fragment = page switch
             {
-                var fragment = page == FrontendPage.Home ? _homeFragment : _fighterSelectFragment;
-                if (fragment == null)
-                {
-                    Debug.LogError($"[FrontendController] No fragment source assigned for {page}; page stays blank.");
-                }
+                FrontendPage.Home => _homeFragment,
+                FrontendPage.FighterSelect => _fighterSelectFragment,
+                FrontendPage.StageSelect => _stageSelectFragment,
+                FrontendPage.Results => _resultsFragment,
+                FrontendPage.ServerBrowser => _serverBrowserFragment,
+                FrontendPage.LobbyRoom => _lobbyRoomFragment,
+                _ => null
+            };
+            if (fragment == null)
+            {
+                Debug.LogError($"[FrontendController] No fragment source assigned for {page}; page stays blank.");
+            }
+            else
+            {
+                var context = _shell!.MountPage(page, fragment);
+                _currentContext = context;
+                if (PageObject(page) is not { } pageObject
+                    || pageObject.GetComponent<IFrontendPageController>() is not { } controller)
+                    Debug.LogError($"[FrontendController] {page} has no {nameof(IFrontendPageController)}; its fragment renders but the page stays inert.");
                 else
-                {
-                    var context = _shell!.MountPage(page, fragment);
-                    _currentContext = context;
-                    if (PageObject(page) is not { } pageObject
-                        || pageObject.GetComponent<IFrontendPageController>() is not { } controller)
-                    {
-                        Debug.LogError($"[FrontendController] {page} has no {nameof(IFrontendPageController)}; its fragment renders but the page stays inert.");
-                    }
-                    else
-                    {
-                        controller.InjectPageContext(context);
-                    }
-                }
+                    controller.InjectPageContext(context);
             }
 
             // The destination/current-page generation is set before the
             // controller activates (issue #218), so the controller's context
             // is already valid inside its OnEnable.
             _current = page;
-            _shell?.ApplyPageMode(page, IsMigratedPage(page));
+            _shell?.ApplyPageMode(page);
 
             int generationAtMount = _generation;
             PageObject(page)?.SetActive(true);
 
-            // Legacy coexistence (issue #219): unmigrated page documents keep
-            // their full-screen composition. Their document container must
-            // fill the panel the way the pre-shell page documents did — the
-            // shell root's flex growth would otherwise collapse them. The
-            // container exists only after activation, so this runs here;
-            // Pass 4 removes the adapter with the legacy hosting.
-            if (!IsMigratedPage(page)
-                && PageObject(page)?.GetComponent<UIDocument>() is { } legacyDocument
-                && legacyDocument.rootVisualElement != null)
-            {
-                legacyDocument.rootVisualElement.style.flexGrow = 1;
-            }
 
             // A nested Show() from the activation (e.g. Fighter Select
             // without a lobby connection) supersedes this activation: never

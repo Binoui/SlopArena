@@ -34,10 +34,12 @@ namespace SlopArena.Client.UI
         private VisualElement? _pageActionsHost;
         private VisualElement? _expandedSocialHost;
         private VisualElement? _modalHost;
+        private VisualElement? _pageModalSection;
         private VisualElement? _lowerRow;
         private bool _compact;
         private bool _densityBound;
         private bool _densityGeometryApplied;
+        private float _lastPanelScale;
 
         /// <summary>The stable shell root; null before the document binds.</summary>
         public VisualElement? Root => _root;
@@ -65,6 +67,14 @@ namespace SlopArena.Client.UI
         private void OnEnable()
         {
             Bind();
+        }
+
+        private void Update()
+        {
+            // ConstantPhysicalSize may change scale without changing the
+            // shell's layout rect, so GeometryChangedEvent alone misses resizes.
+            if (_root?.panel != null && !Mathf.Approximately(_root.panel.scaledPixelsPerPoint, _lastPanelScale))
+                EvaluateDensity();
         }
 
         /// <summary>
@@ -116,9 +126,8 @@ namespace SlopArena.Client.UI
 
         /// <summary>
         /// Density handling registers once on the stable shell root (issue
-        /// #218): the density class changes only when the selected mode
-        /// changes, so resizing never thrashes layout. The root's size is set
-        /// by the panel, not by its content, so no feedback loop exists.
+        /// #218). Geometry and panel-scale changes update physical targets;
+        /// unchanged frames do not touch layout.
         /// </summary>
         private void RegisterDensityHandling()
         {
@@ -146,17 +155,17 @@ namespace SlopArena.Client.UI
                 return;
             bool compact = physicalWidth < CompactMaxWidth || physicalHeight < CompactMaxHeight;
             bool modeChanged = compact != _compact;
+            bool scaleChanged = !Mathf.Approximately(scale, _lastPanelScale);
             _compact = compact;
-            if (modeChanged)
+            _lastPanelScale = scale;
+            // The first usable layout must apply the class as well as geometry:
+            // the initial roomy mode matches the default bool value.
+            if (modeChanged || scaleChanged || !_densityGeometryApplied)
             {
                 _root.EnableInClassList("frontend-shell--compact", compact);
                 _root.EnableInClassList("frontend-shell--roomy", !compact);
-            }
-            // The first usable layout always applies the geometry (issue
-            // #219); later layouts only re-apply when the mode changed, so
-            // resizing never thrashes and no feedback loop exists.
-            if (modeChanged || !_densityGeometryApplied)
                 ApplyDensityGeometry();
+            }
         }
 
         /// <summary>
@@ -164,8 +173,8 @@ namespace SlopArena.Client.UI
         /// top bar and ~380×190 px conversation cell with ~16 px outer
         /// spacing compact; ~64 px, ~480×230 px, ~24 px roomy. PanelSettings
         /// run in scaled points, so targets divide by the panel's scale
-        /// factor. Re-evaluated only when the mode changes or on the first
-        /// usable layout.
+        /// factor. Re-evaluated when the mode or panel scale changes, or on
+        /// the first usable layout.
         /// </summary>
         private void ApplyDensityGeometry()
         {
@@ -207,9 +216,8 @@ namespace SlopArena.Client.UI
         public bool IsCompact => _compact;
 
         /// <summary>
-        /// Removes mounted page sections from the page hosts. The social
-        /// host, expanded-social host, modal host and top bar are never
-        /// cleared by page teardown (issue #218).
+        /// Removes mounted page sections. The social, expanded-social, top
+        /// bar, and shell-owned identity modal survive page navigation.
         /// </summary>
         public void ClearPageHosts()
         {
@@ -217,18 +225,10 @@ namespace SlopArena.Client.UI
             _pageBodyHost?.Clear();
             _pageSummaryHost?.Clear();
             _pageActionsHost?.Clear();
+            _pageModalSection?.RemoveFromHierarchy();
+            _pageModalSection = null;
         }
 
-        /// <summary>
-        /// The shell's social cell only hosts the conversation for
-        /// shell-mounted pages; legacy per-page documents keep their own
-        /// temporary coexistence hosting (issue #219 non-goal note).
-        /// </summary>
-        public void SetSocialHostVisible(bool visible)
-        {
-            _socialHost?.style.SetDisplay(visible);
-            _pageLowerHost?.style.SetDisplay(visible);
-        }
 
         private bool _socialExpanded;
 
@@ -289,18 +289,9 @@ namespace SlopArena.Client.UI
             }
         }
 
-        /// <summary>
-        /// Per-page shell chrome (issue #219): fragment-mounted pages render
-        /// inside the frame with the reserved social cell; legacy per-page
-        /// documents keep their own full-screen composition until they
-        /// migrate (issues #221/#222), so the shell stands down entirely
-        /// there — the frame is temporary coexistence, not a compatibility
-        /// router.
-        /// </summary>
-        public void ApplyPageMode(FrontendPage page, bool shellMounted)
+        /// <summary>Update the shell's page context without hiding its persistent frame.</summary>
+        public void ApplyPageMode(FrontendPage page)
         {
-            _root?.style.SetDisplay(shellMounted);
-            SetSocialHostVisible(shellMounted);
             SetPageContext(page switch
             {
                 FrontendPage.Home => "HOME",
@@ -313,28 +304,22 @@ namespace SlopArena.Client.UI
             });
         }
 
-        /// <summary>
-        /// The chat presenter's shell hosting surfaces; valid only after
-        /// binding and on fragment-mounted pages.
-        /// </summary>
+        /// <summary>The persistent chat host and page focus region.</summary>
         public bool TryGetChatHosts(out VisualElement socialHost, out VisualElement pageContentRoot)
         {
-            socialHost = null!;
-            pageContentRoot = null!;
-            if (_root == null || _socialHost == null || PageContentRoot == null)
-                return false;
-            socialHost = _socialHost;
-            pageContentRoot = PageContentRoot;
-            return true;
+            socialHost = _socialHost!;
+            pageContentRoot = PageContentRoot!;
+            return _root != null && socialHost != null && pageContentRoot != null;
         }
 
         /// <summary>
         /// Clones the page's fragment source once for this activation and
         /// mounts its named sections into the shell hosts (issue #218 page
-        /// contract): <c>page-header</c>, <c>page-body</c>, <c>page-summary</c>
-        /// and <c>page-actions</c>. Unnamed extra children mount into the
-        /// body host with a warning — silent content loss is never
-        /// acceptable.
+        /// contract): <c>page-header</c>, <c>page-body</c>, <c>page-summary</c>,
+        /// <c>page-actions</c> — plus an optional <c>page-modal</c> section
+        /// that mounts into the shell modal host as a page-owned modal
+        /// (issue #221). Unnamed extra children mount into the body host with
+        /// a warning — silent content loss is never acceptable.
         /// </summary>
         public FrontendPageContext MountPage(FrontendPage page, VisualTreeAsset fragment)
         {
@@ -350,7 +335,8 @@ namespace SlopArena.Client.UI
                          ("page-header", _pageHeaderHost),
                          ("page-body", _pageBodyHost),
                          ("page-summary", _pageSummaryHost),
-                         ("page-actions", _pageActionsHost)
+                         ("page-actions", _pageActionsHost),
+                         ("page-modal", _modalHost)
                      })
             {
                 if (host == null)
@@ -359,6 +345,8 @@ namespace SlopArena.Client.UI
                 if (section == null)
                     continue;
                 host.Add(section);
+                if (sectionName == "page-modal")
+                    _pageModalSection = section;
                 context.AttachRoot(section);
                 anySection = true;
             }
@@ -389,6 +377,7 @@ namespace SlopArena.Client.UI
             _pageActionsHost = null;
             _expandedSocialHost = null;
             _modalHost = null;
+            _pageModalSection = null;
             _lowerRow = null;
             PageContentRoot = null;
             _densityBound = false;

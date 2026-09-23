@@ -9,40 +9,51 @@ using SlopArena.Client.Network;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Stage select for Solo and PvP. The stage registry remains file-driven;
-    /// this screen owns only presentation and the existing start-match flow.
-    /// Training does not route through stage select (issue #211).
+    /// Stage select page (issue #221): a fragment mounted into the
+    /// FrontendShell hosts — the stage grid in an intentional scroll region,
+    /// the participant summary in the lower-right summary cell, and the
+    /// selected-stage label plus start action outside the conversation cell.
+    /// The stage registry remains file-driven; this screen owns only
+    /// presentation and the existing start-match flow. Training does not
+    /// route through stage select (issue #211).
     /// </summary>
-    public class StageSelectController : MonoBehaviour
+    public class StageSelectController : MonoBehaviour, IFrontendPageController
     {
-        [SerializeField] private UIDocument _uiDocument;
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
 
         private string _selectedArena = "";
         private Button _btnConfirm;
         private Label _lblSelectedStage;
         private Label _lblWaiting;
         private VisualElement _playerCards;
+        private VisualElement _grid;
         private LobbyClient _lobby;
+
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
 
         private void OnEnable()
         {
             _selectedArena = "";
-            var root = _uiDocument.rootVisualElement;
-            var grid = root.Q<VisualElement>("stage-grid");
-            grid?.Clear();
-            _btnConfirm = root.Q<Button>("btn-confirm");
-            _lblSelectedStage = root.Q<Label>("lbl-selected-stage");
-            _lblWaiting = root.Q<Label>("lbl-waiting");
-            _playerCards = root.Q<VisualElement>("player-cards-area");
+            _grid = _context.Q<VisualElement>("stage-grid");
+            _grid?.Clear();
+            _btnConfirm = _context.Q<Button>("btn-confirm");
+            _lblSelectedStage = _context.Q<Label>("lbl-selected-stage");
+            _lblWaiting = _context.Q<Label>("lbl-waiting");
+            _playerCards = _context.Q<VisualElement>("player-cards-area");
 
             bool isOnline = MatchConfig.Mode == GameMode.PvP;
             bool isHost = !isOnline || ClientSession.IsLobbyHost;
-            SetModeChrome(root, isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
+            SetModeChrome(isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
                 "STEP 2 OF 2  /  STAGE");
-            root.Q<Label>("subtitle").text = isHost
+            _context.Q<Label>("subtitle").text = isHost
                 ? "CHOOSE YOUR BATTLEGROUND"
                 : "THE HOST WILL CHOOSE THE BATTLEGROUND";
-            root.Q<Label>("lbl-host").text = isOnline
+            _context.Q<Label>("lbl-host").text = isOnline
                 ? (isHost ? "HOST CHOOSES THE STAGE" : "WAITING FOR HOST")
                 : "YOU CHOOSE THE STAGE";
 
@@ -76,7 +87,7 @@ namespace SlopArena.Client.UI
                 if (Resources.Load<GameObject>($"Stages/{arena.Name}") == null) continue;
 
                 string capturedName = arena.Name;
-                var card = new Button(() => SelectStage(capturedName, root))
+                var card = new Button(() => SelectStage(capturedName))
                 {
                     name = $"stage-{arena.Name}"
                 };
@@ -96,7 +107,7 @@ namespace SlopArena.Client.UI
                 card.Add(swatch);
                 card.Add(label);
                 card.SetEnabled(isHost);
-                grid?.Add(card);
+                _grid?.Add(card);
                 firstStageButton ??= card;
                 stageCount++;
             }
@@ -120,18 +131,18 @@ namespace SlopArena.Client.UI
             // restored preference left by a previous flow (issue #213).
             else if (MatchConfig.Mode == GameMode.Solo && !string.IsNullOrEmpty(MatchConfig.ArenaName) &&
                 MatchConfig.ArenaName != "training" &&
-                grid?.Q<VisualElement>($"stage-{MatchConfig.ArenaName}") != null)
+                _grid?.Q<VisualElement>($"stage-{MatchConfig.ArenaName}") != null)
             {
-                SelectStage(MatchConfig.ArenaName, root);
+                SelectStage(MatchConfig.ArenaName);
             }
 
-            var btnBack = root.Q<Button>("btn-back");
+            var btnBack = _context.Q<Button>("btn-back");
             Action back = BackToFighterSelect;
             if (btnBack != null)
                 btnBack.clicked += back;
             Button initial = isHost && firstStageButton != null ? firstStageButton : btnBack;
             if (initial != null)
-                MenuNavigation.Configure(root, initial, back);
+                MenuNavigation.Configure(_context, initial, back);
 
             _lobby = isOnline ? ClientSession.ActiveLobby : null;
             if (_lobby != null)
@@ -156,12 +167,12 @@ namespace SlopArena.Client.UI
             if (_btnConfirm != null) _btnConfirm.clicked -= OnConfirmClicked;
         }
 
-        private static void SetModeChrome(VisualElement root, string title, string progress)
+        private static void SetModeChrome(string title, string progress)
         {
-            var titleLabel = root.Q<Label>("title");
+            var titleLabel = FrontendController.CurrentContext?.Q<Label>("title");
             if (titleLabel != null)
                 titleLabel.text = title;
-            var progressLabel = root.Q<Label>("flow-progress");
+            var progressLabel = FrontendController.CurrentContext?.Q<Label>("flow-progress");
             if (progressLabel != null)
                 progressLabel.text = progress;
         }
@@ -326,14 +337,14 @@ namespace SlopArena.Client.UI
             }
             Debug.LogWarning($"[StageSelect] PvP error: {message}");
         }
-        private void SelectStage(string name, VisualElement root)
+        private void SelectStage(string name)
         {
             if (MatchConfig.Mode == GameMode.PvP && !ClientSession.IsLobbyHost)
                 return;
 
             _selectedArena = name;
             MatchConfig.ArenaName = name;
-            var grid = root.Q<VisualElement>("stage-grid");
+            var grid = _grid;
             if (grid != null)
             {
                 foreach (var card in grid.Children())

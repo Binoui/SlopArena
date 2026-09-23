@@ -23,14 +23,6 @@ namespace SlopArena.Client.UI
         private const int MaxMessageScalars = 500;
         private const double CompactLifetimeSeconds = 8d;
 
-        /// <summary>
-        /// Reserved right-hand band for the Social Dock at roomy sizes, as a
-        /// percentage of the shell panel (issue #214). Page layout shrinks to
-        /// the remainder, so page controls never sit under the conversation.
-        /// </summary>
-        private const float DockWidthPercent = 21f;
-        /// <summary>Windows narrower than this use the compact strip instead of the dock.</summary>
-        private const float DockMinWindowWidth = 1600f;
         public const string DockOpenPlayerPrefsKey = "SlopArena.Chat.DockOpen";
 
         private static ChatOverlay? _instance;
@@ -99,14 +91,8 @@ namespace SlopArena.Client.UI
         // buffer (issue #214): the next render returns them to newest with
         // the explanation already written to the conversation Feedback.
         private readonly HashSet<string> _evictionReset = new(StringComparer.Ordinal);
-        private VisualElement? _hostPageRoot;
-        private Label? _regionHint;
-        private float _lastWindowWidth = -1f;
-        // Frontend shell hosting (issue #219): when the active page is
-        // fragment-mounted, the presenter attaches ONCE to the shell's
-        // reserved bottom-left social cell and page navigation among shell
-        // pages never re-hosts it. Legacy per-page documents (unmigrated
-        // pages) keep temporary coexistence hosting until they migrate.
+        // Frontend and gameplay are the only presentation hosts. Page changes
+        // retain the same shell attachment; gameplay uses the HUD document.
         private bool _hostIsShell;
         // Zero-size focusable element parked on the gameplay HUD root when
         // the panel collapses (issue #216): focus never rests on the chat
@@ -116,19 +102,6 @@ namespace SlopArena.Client.UI
         // has a lost focus to repair.
         private VisualElement? _focusParker;
 
-        /// <summary>
-        /// Explicit focus regions in the frontend shell (issue #215). Page is
-        /// the active page's controls; Social is the chat surface (the panel
-        /// when open, otherwise the persistent strip). Directional navigation
-        /// stays inside the active region because the inactive region's
-        /// controls are not focusable.
-        /// </summary>
-        private enum UiRegion { Page, Social }
-
-        private UiRegion _region = UiRegion.Page;
-        // Last valid focused control per region; index = (int)UiRegion.
-        // Launch-scoped: validated with panel != null before use.
-        private readonly VisualElement?[] _regionFocus = new VisualElement?[2];
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -197,10 +170,6 @@ namespace SlopArena.Client.UI
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             _ownsCursor = false;
-            // Scene boundaries are hard transitions (issue #215): the page
-            // region owns the next frontend activation. Social focus memory
-            // is launch-scoped and revalidated on restore.
-            _region = UiRegion.Page;
             // Frontend recreation must not reset the conversation view
             // (issue #214): scene loads keep the dock/expanded state and
             // re-attach to the explicit host. Entering gameplay is the one
@@ -218,24 +187,13 @@ namespace SlopArena.Client.UI
         private void AttachToScene(Scene scene)
         {
             if (_root == null) return;
-            // Explicit presentation hosts (issue #214, shell cell from
-            // #219): the shell's reserved bottom-left social cell on
-            // fragment-mounted pages, the legacy page document on unmigrated
-            // pages, and the match HUD document in gameplay. No
-            // first-document discovery; anything else detaches.
             if (FrontendController.IsFrontendActive)
             {
-                if (FrontendController.TryGetShellChatHost(out var socialHost, out var pageContentRoot))
-                {
-                    AttachToShell(socialHost, pageContentRoot);
-                    return;
-                }
-                // Legacy per-page hosting (temporary coexistence until the
-                // remaining pages migrate).
-                AttachToDocumentHost(scene);
+                if (FrontendController.Shell?.TryGetChatHosts(out var socialHost, out _) == true)
+                    AttachToShell(socialHost);
                 return;
             }
-            AttachToDocumentHost(scene);
+            AttachToGameplayHost(scene);
         }
 
         /// <summary>
@@ -246,138 +204,45 @@ namespace SlopArena.Client.UI
         /// player explicitly minimized it, and the remembered preference
         /// decides which presentation re-entry restores.
         /// </summary>
-        private void AttachToShell(VisualElement socialHost, VisualElement pageContentRoot)
+        private void AttachToShell(VisualElement socialHost)
         {
+            if (_root!.parent == socialHost)
+                return;
+            _root.RemoveFromHierarchy();
+            socialHost.Add(_root);
             _hostIsShell = true;
-            if (_root.parent != socialHost)
-            {
-                _root.RemoveFromHierarchy();
-                socialHost.Add(_root);
-            }
-            _hostPageRoot = pageContentRoot;
             _expanded = _dockOpen;
             _socialExpanded = false;
             ApplyPresentation();
             FrontendFocusRouter.NotifyPresentationChanged();
         }
 
-        private void AttachToDocumentHost(Scene scene)
+        private void AttachToGameplayHost(Scene scene)
         {
-            UIDocument? host = FrontendController.IsFrontendActive
-                ? FrontendController.ActivePageDocument
-                : FindFirstObjectByType<HUDManager>()?.Document;
+            var host = FindFirstObjectByType<HUDManager>()?.Document;
             if (host == null || !host.isActiveAndEnabled ||
                 host.gameObject.scene != scene || host.rootVisualElement == null)
             {
-                _hostPageRoot = null;
-                if (_root.panel != null)
+                if (_root!.panel != null)
                     _root.RemoveFromHierarchy();
+                _hostIsShell = false;
                 return;
             }
-            bool wasShell = _hostIsShell;
-            _hostIsShell = false;
-            if (_root.parent != host.rootVisualElement)
+            if (_root!.parent != host.rootVisualElement)
             {
                 _root.RemoveFromHierarchy();
                 host.rootVisualElement.Add(_root);
             }
-            RegisterRegionClickFollow(host.rootVisualElement);
-            // Clear first: a legacy re-hosting that flips presentation (shell
-            // → remembered dock/strip) must not touch the shell workspace.
-            _hostPageRoot = null;
-            if (wasShell)
-                RestoreLegacyPresentation();
-            _hostPageRoot = FindHostPageRoot(host);
+            _hostIsShell = false;
             _root.BringToFront();
             ApplyPresentation();
-        }
-
-        /// <summary>
-        /// Re-entering a legacy full-screen page after a shell page (issue
-        /// #219): the always-visible shell cell is not the remembered dock
-        /// preference, so the legacy presentation honors it (#214).
-        /// </summary>
-        private void RestoreLegacyPresentation()
-        {
-            SetExpanded(IsRoomyWindow() && _dockOpen, false);
-        }
-
-        private VisualElement? FindHostPageRoot(UIDocument host)
-        {
-            if (_root == null || _root.parent != host.rootVisualElement)
-                return null;
-            // The page's UXML root is the host document's first child; the
-            // chat root itself is a later sibling added by this overlay.
-            foreach (var child in host.rootVisualElement.Children())
-            {
-                if (child != _root)
-                    return child;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Input follows the last-touched side (issue #215): a click into the
-        /// page makes the page the active region and a click into the chat
-        /// surface makes Social active, so mouse users get region-local
-        /// navigation without the explicit switch. Registered on the host
-        /// document root, which UI Toolkit re-clones on every page enable, so
-        /// the registration never accumulates across page re-entries. The
-        /// same root consumes the keyboard Tab switch before UI Toolkit's
-        /// focus cycling can move focus inside the old region.
-        /// </summary>
-        private void RegisterRegionClickFollow(VisualElement hostRoot)
-        {
-            if (hostRoot.userData is bool)
-                return;
-            hostRoot.userData = true;
-            hostRoot.RegisterCallback<ClickEvent>(evt =>
-            {
-                if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene
-                    || UiModalState.Presented)
-                    return;
-                if (evt.target is not VisualElement target)
-                    return;
-                if (_root.Contains(target))
-                {
-                    SetActiveRegion(UiRegion.Social, focusTarget: false);
-                    return;
-                }
-                bool inPage = _hostPageRoot != null && _hostPageRoot.Contains(target);
-                bool changed = _region != UiRegion.Page;
-                SetActiveRegion(UiRegion.Page, focusTarget: false);
-                if (changed && inPage)
-                {
-                    // The clicked page control only grabs focus while it was
-                    // focusable, which happened after its pointer-down; focus
-                    // it explicitly so directional input continues there.
-                    FocusClickedPageControl(target);
-                }
-            });
-        }
-
-        private void FocusClickedPageControl(VisualElement target)
-        {
-            for (var element = target; element != null; element = element.parent)
-            {
-                if (element is Focusable && TryFocus(element))
-                    return;
-            }
         }
 
 
         private void OnFrontendPageChanged(FrontendPage page)
         {
-            // Page activation replaces scene-load teardown: re-host the chat on
-            // the newly active page without collapsing it or touching state.
-            // On shell-hosted pages the attach is a no-op when the presenter
-            // already sits in the reserved cell (issue #219).
+            // The shell attachment is stable across every page activation.
             AttachToScene(SceneManager.GetActiveScene());
-            // Roomy legacy menus show the dock open according to the remembered
-            // preference; compact layouts keep the strip (issue #214). Shell
-            // pages keep their own presentation (issue #220).
-            if (!_hostIsShell && FrontendController.IsFrontendActive && !_expanded && _dockOpen && IsRoomyWindow())
-                SetExpanded(true, false);
         }
 
         private void LateUpdate()
@@ -403,54 +268,9 @@ namespace SlopArena.Client.UI
                 HandleEscape();
                 return;
             }
-            // Face-button submit/cancel for controller navigation (issue
-            // #215): the dpad move path is native, these are not. On
-            // shell-hosted pages the focus router is the single pump owner
-            // (issue #220); legacy documents and gameplay keep this pump.
-            bool shellFrontend = _hostIsShell && FrontendController.IsFrontendActive
-                && !ChatInputGate.IsGameplayScene;
-            if (!shellFrontend)
+            // The shell router owns frontend input; the gameplay HUD uses this bridge.
+            if (!FrontendController.IsFrontendActive)
                 GamepadUIBridge.Pump(_root?.panel);
-            PollRegionSwitch();
-            float windowWidth = Screen.width;
-            if (!Mathf.Approximately(windowWidth, _lastWindowWidth))
-            {
-                bool wasRoomy = _lastWindowWidth >= DockMinWindowWidth;
-                _lastWindowWidth = windowWidth;
-                // Presentation transitions are a menu concern (issue #216):
-                // a gameplay window resize never opens or closes the chat
-                // panel by itself; gameplay keeps the legacy overlay at any
-                // width.
-                // Presentation transitions on resize are a legacy-frontend
-                // concern (issues #214/#216): the shell cell owns its geometry
-                // through the shell density classes, and gameplay keeps the
-                // legacy overlay at any width.
-                if (FrontendController.IsFrontendActive && !_hostIsShell)
-                {
-                    // Resizing between roomy and compact changes the presentation,
-                    // never the remembered roomy preference (issue #214): a chat
-                    // opened as a compact replacement collapses back to the
-                    // remembered preference when the window becomes roomy again.
-                    if (IsRoomyWindow() && !wasRoomy && _expanded && !_dockOpen)
-                        SetExpanded(false, false);
-                    else if (IsRoomyWindow() && !wasRoomy && !_expanded && _dockOpen)
-                    {
-                        // Widening into roomy restores the remembered dock: the
-                        // player never chose to close it (issue #215).
-                        SetExpanded(true, false);
-                    }
-                    else
-                    {
-                        bool enteredReplace = !IsRoomyWindow() && wasRoomy && _expanded;
-                        ApplyPresentation();
-                        // A dock shrunk into the compact replacement keeps the
-                        // conversation interactive: put the composer in focus
-                        // (issue #215).
-                        if (enteredReplace)
-                            _root?.schedule.Execute(() => _draft?.Focus()).StartingIn(0);
-                    }
-                }
-            }
             if (!enterHeld || _enterConsumed)
                 return;
             _enterConsumed = true;
@@ -478,225 +298,30 @@ namespace SlopArena.Client.UI
             }
         }
 
-        private static bool IsRoomyWindow() => Screen.width >= DockMinWindowWidth;
 
-        /// <summary>
-        /// Whether the chat surface owns the current back press (issue #215).
-        /// The topmost modal always wins over chat. In menus the chat owns the
-        /// press only while the focus — or the replaced page — is inside the
-        /// chat surface; a page-focused press falls through to the page's
-        /// Back. In gameplay an open panel always owns the press.
-        /// </summary>
+        /// <summary>Gameplay chat owns Back only while its panel or focus is active.</summary>
         private bool OwnsBackPress()
         {
-            if (UiModalState.Presented)
+            if (UiModalState.Presented || !ChatInputGate.IsGameplayScene)
                 return false;
-            if (ChatInputGate.IsGameplayScene)
-            {
-                // An open panel always owns the press; collapsed strip focus
-                // is explicit chat navigation, so the first press exits it
-                // and the next fresh press reaches the pause owner (issue
-                // #216).
-                return _expanded || IsFocusInsideChatSurface();
-            }
-            // Shell pages resolve cancel through the focus router (issue
-            // #220); the overlay handles only legacy documents here.
-            if (!_expanded || !FrontendController.IsFrontendActive || _hostIsShell)
-                return false;
-            if (!IsRoomyWindow())
-                return true;
-            return _root?.panel?.focusController?.focusedElement is VisualElement focused
-                && _root.Contains(focused);
+            return _expanded || IsFocusInsideChatSurface();
         }
 
-        /// <summary>
-        /// The explicit Page/Social region switch (issue #215): Q on the
-        /// keyboard, the north face button (Y / Triangle) on controller.
-        /// Tab keeps UI Toolkit's own focus cycling, which stays inside the
-        /// active region because the inactive region is not focusable, so the
-        /// switch needs a key the panel does not consume pre-dispatch.
-        /// Skipped while a text field is typing and while a modal owns the
-        /// surface; gameplay keeps the legacy composer interaction.
-        /// </summary>
-        private void PollRegionSwitch()
-        {
-            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
-                return;
-            // The focus router owns region switching on shell pages (issue
-            // #220); the chat overlay keeps the legacy document behavior.
-            if (_hostIsShell)
-                return;
-            if (UiModalState.Presented)
-                return;
-            bool pad = Gamepad.current?.buttonNorth.wasPressedThisFrame == true;
-            bool qKey = !IsEditorFocused() && Keyboard.current?.qKey.wasPressedThisFrame == true;
-            if (!pad && !qKey)
-                return;
-            SetActiveRegion(_region == UiRegion.Page ? UiRegion.Social : UiRegion.Page, focusTarget: true);
-            UISFX.PlayClick();
-        }
 
-        /// <summary>
-        /// Switch the active focus region (issue #215). The inactive region's
-        /// controls stop being focusable, so directional navigation can never
-        /// leave the active region; each region's last valid focus is
-        /// remembered and restored on the next switch.
-        /// </summary>
-        private void SetActiveRegion(UiRegion region, bool focusTarget)
-        {
-            if (_region != region)
-            {
-                CaptureRegionFocus(_region);
-                _region = region;
-                ApplyRegionFocusability();
-                UpdateRegionHint();
-            }
-            if (focusTarget)
-                FocusRegionDefault(region);
-        }
-
-        /// <summary>Remember a region's currently focused control, if the
-        /// focus actually sits inside that region (issue #215).</summary>
-        private void CaptureRegionFocus(UiRegion region)
-        {
-            if (_root?.panel?.focusController?.focusedElement is not VisualElement focused)
-                return;
-            bool inChat = _root.Contains(focused);
-            bool inPage = _hostPageRoot != null && _hostPageRoot.Contains(focused);
-            if (region == UiRegion.Social && inChat)
-                _regionFocus[(int)UiRegion.Social] = focused;
-            else if (region == UiRegion.Page && inPage)
-                _regionFocus[(int)UiRegion.Page] = focused;
-        }
-
-        /// <summary>Restore the remembered focus of a region, falling back to
-        /// the region's conventional entry point (issue #215).</summary>
-        private void FocusRegionDefault(UiRegion region)
-        {
-            if (TryFocus(_regionFocus[(int)region]))
-                return;
-            if (region == UiRegion.Page)
-            {
-                if (TryFocus(MenuNavigation.PageInitialFocus))
-                    return;
-                TryFocus(_hostPageRoot == null ? null : FindFirstFocusable(_hostPageRoot));
-                return;
-            }
-            if (!_expanded)
-            {
-                TryFocus(_open);
-                return;
-            }
-            if (!TryFocus(_draft))
-                TryFocus(_panel == null ? null : FindFirstFocusable(_panel));
-        }
-
-        private static bool TryFocus(VisualElement? element)
-        {
-            if (element == null || element.panel == null || !element.focusable || !element.enabledSelf)
-                return false;
-            element.Focus();
-            return true;
-        }
-
-        private static VisualElement? FindFirstFocusable(VisualElement root, VisualElement? exclude = null)
-        {
-            foreach (var element in root.Query<VisualElement>().ToList())
-            {
-                if (exclude != null && exclude.Contains(element))
-                    continue;
-                if (element is Focusable focusable && focusable.focusable && element.enabledSelf
-                    && element.style.display != DisplayStyle.None)
-                    return element;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Region-local navigation (issue #215): only the active region's
-        /// controls are focusable, so keyboard/controller navigation stays
-        /// inside it. Gameplay keeps the legacy behavior — the HUD surface is
-        /// not region-split, so everything there stays focusable.
-        /// </summary>
+        /// <summary>Shell routing owns frontend focus; gameplay chat is
+        /// focusable only while deliberately open.</summary>
         private void ApplyRegionFocusability()
         {
-            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            if (_hostIsShell && FrontendController.IsFrontendActive)
             {
-                // The focus router owns shell-page regions (issue #220); the
-                // presenter re-applies after every dynamic rebuild so new
-                // rows respect the active region.
                 FrontendFocusRouter.Instance?.ApplyRegionFocusability();
                 return;
             }
-            bool social, page;
-            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
-            {
-                // Gameplay keeps the open panel's controls focusable, but a
-                // closed chat takes no navigation focus at all (user
-                // decision, issue #216): Enter is the only route to the
-                // combat composer, and the collapsed strip is click-only.
-                social = ChatInputGate.IsGameplayScene ? _expanded : true;
-                page = true;
-            }
-            else if (!IsRoomyWindow() && _expanded)
-            {
-                // Compact chat replaced the page; the page has no controls to
-                // navigate and the conversation owns the input (issue #215).
-                social = true;
-                page = false;
-            }
-            else
-            {
-                social = _region == UiRegion.Social;
-                page = !social;
-            }
-            SetRegionFocusable(_root, social);
-            SetRegionFocusable(_hostPageRoot, page);
+            bool social = ChatInputGate.IsGameplayScene && _expanded;
+            _root?.Query<Button>().ForEach(button => button.focusable = social);
+            _root?.Query<TextField>().ForEach(field => field.focusable = social);
             if (_history != null)
                 _history.focusable = social;
-        }
-
-        /// <summary>Buttons and text fields are the only focusable controls in
-        /// these surfaces; toggling exactly those keeps scroll views and
-        /// labels out of the navigation ring (issue #215).</summary>
-        private static void SetRegionFocusable(VisualElement? root, bool focusable, VisualElement? exclude = null)
-        {
-            if (root == null)
-                return;
-            root.Query<Button>().ForEach(button =>
-            {
-                if (exclude == null || !exclude.Contains(button))
-                    button.focusable = focusable;
-            });
-            root.Query<TextField>().ForEach(field =>
-            {
-                if (exclude == null || !exclude.Contains(field))
-                    field.focusable = focusable;
-            });
-        }
-
-        /// <summary>The visible region-switch affordance (issue #215): a small
-        /// chip naming the region the switch reaches. Hidden in gameplay and
-        /// while no host surface is attached.</summary>
-        private void UpdateRegionHint()
-        {
-            if (_regionHint == null)
-                return;
-            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
-            {
-                // The focus router owns the shell hint (issue #220).
-                _regionHint.style.display = DisplayStyle.None;
-                return;
-            }
-            bool frontend = FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene;
-            _regionHint.style.display = frontend ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!frontend)
-                return;
-            _regionHint.text = _region == UiRegion.Page ? "Q/Y // SOCIAL" : "Q/Y // PAGE";
-            // Legacy overlay defaults (Chat.uss): bottom-left of the host.
-            _regionHint.style.top = StyleKeyword.Auto;
-            _regionHint.style.bottom = 12;
-            _regionHint.style.left = 16;
         }
 
         private void BindView()
@@ -738,9 +363,6 @@ namespace SlopArena.Client.UI
             _onlineFeedback = _root.Q<Label>("online-feedback");
             _unread = _root.Q<Label>("chat-unread");
             _draft = _root.Q<TextField>("chat-draft");
-            _regionHint = _root.Q<Label>("chat-region-hint");
-            if (_regionHint != null)
-                _regionHint.pickingMode = PickingMode.Ignore;
 
             if (_open != null) _open.clicked += OnOpenButtonClicked;
             if (_close != null) _close.clicked += OnCloseButtonClicked;
@@ -839,8 +461,6 @@ namespace SlopArena.Client.UI
             }
 
             ChatConversation? active = _session.ActiveConversation;
-            if (active?.Unread > 0 && IsConversationShown() && ShouldMarkActiveRead())
-                _session.MarkActiveRead();
             SetText(_statusCollapsed, _session.Status);
             SetText(_statusHeader, _session.Status);
 
@@ -986,7 +606,8 @@ namespace SlopArena.Client.UI
                 {
                     _showDirectory = false;
                     _session.OpenDirect(player);
-                    SetExpanded(true, false);
+                    if (ChatInputGate.IsGameplayScene)
+                        SetExpanded(true, false);
                 });
                 select.text = FormatIdentity(player);
                 select.enableRichText = false;
@@ -1065,6 +686,7 @@ namespace SlopArena.Client.UI
                 // the return-to-newest affordance stays hidden with it
                 // (issue #220).
                 _newest?.SetDisplayed(!atNewest && _history.childCount > 0 && !_showDirectory);
+                TryMarkActiveRead();
             }).StartingIn(0);
 
         }
@@ -1307,36 +929,16 @@ namespace SlopArena.Client.UI
             _expanded = expanded;
             if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
             {
-                // Shell presentation states are owned by the explicit shell
-                // actions (issue #220); this legacy entry point only
-                // re-applies the current presentation.
                 ApplyPresentation();
                 return;
             }
             if (!expanded)
             {
-                // Blur whatever the chat surface still holds before restoring
-                // focus: a focused strip CHAT button is chat navigation too,
-                // and its focus must not survive the exit (issue #216).
-                if (_root?.panel?.focusController?.focusedElement is VisualElement focusedInChat
-                    && _root.Contains(focusedInChat))
-                    focusedInChat.Blur();
+                if (IsFocusInsideChatSurface())
+                    (_root?.panel?.focusController?.focusedElement as VisualElement)?.Blur();
                 _draft?.Blur();
-                if (FrontendController.IsFrontendActive && !_hostIsShell && !ChatInputGate.IsGameplayScene)
-                {
-                    // Remember the conversation's focused control and return
-                    // the page region to the page (issue #215).
-                    CaptureRegionFocus(UiRegion.Social);
-                    _region = UiRegion.Page;
-                }
                 ChatInputGate.End();
                 ReleaseCursor();
-            }
-            else if (!ChatInputGate.IsGameplayScene)
-            {
-                // Remember where page focus came from so leaving the
-                // conversation can return it without guessing (issue #214).
-                CaptureRegionFocus(UiRegion.Page);
             }
             if (ChatInputGate.IsGameplayScene)
             {
@@ -1361,17 +963,11 @@ namespace SlopArena.Client.UI
             ApplyPresentation();
             if (expanded)
                 RenderSession();
-            if (!expanded && !ChatInputGate.IsGameplayScene)
-                RestorePageFocus();
             if (focusComposer)
                 _root?.schedule.Execute(() => _draft?.Focus()).StartingIn(0);
         }
 
-        /// <summary>
-        /// The strip/restore button. Dispatches by context: shell pages
-        /// restore the remembered compact presentation; legacy and gameplay
-        /// open through the existing entry point.
-        /// </summary>
+        /// <summary>Restore the shell cell or open the gameplay chat.</summary>
         private void OnOpenButtonClicked()
         {
             if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
@@ -1382,11 +978,7 @@ namespace SlopArena.Client.UI
             OpenChat();
         }
 
-        /// <summary>
-        /// The header close button. Dispatches by context: on shell pages it
-        /// minimizes the compact cell or collapses the expanded view;
-        /// legacy/gameplay keep the existing close.
-        /// </summary>
+        /// <summary>Minimize the shell cell or close the gameplay chat.</summary>
         private void OnCloseButtonClicked()
         {
             if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
@@ -1400,13 +992,7 @@ namespace SlopArena.Client.UI
             CloseChat();
         }
 
-        /// <summary>
-        /// Open chat from the visible entry point. In a roomy frontend this
-        /// opens the Social Dock and persists the preference; in compact
-        /// layouts and gameplay it opens the overlay panel without touching
-        /// the remembered roomy preference (issue #214). The player explicitly
-        /// entered the conversation, so the composer takes focus (issue #215).
-        /// </summary>
+        /// <summary>Open gameplay chat after a deliberate action.</summary>
         private void OpenChat()
         {
             // The topmost modal wins over chat (issue #216): a presented
@@ -1414,28 +1000,12 @@ namespace SlopArena.Client.UI
             // never covered by an opened conversation.
             if (UiModalState.Presented)
                 return;
-            if (FrontendController.IsFrontendActive && IsRoomyWindow())
-            {
-                _dockOpen = true;
-                PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 1);
-                PlayerPrefs.Save();
-            }
             SetExpanded(true, true);
         }
 
-        /// <summary>
-        /// Close chat. At a roomy frontend this collapses the Social Dock and
-        /// persists the preference; compact and gameplay closes only hide the
-        /// panel (issue #214).
-        /// </summary>
+        /// <summary>Close gameplay chat without rewriting the menu preference.</summary>
         private void CloseChat()
         {
-            if (FrontendController.IsFrontendActive && IsRoomyWindow())
-            {
-                _dockOpen = false;
-                PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 0);
-                PlayerPrefs.Save();
-            }
             SetExpanded(false, false);
         }
 
@@ -1524,33 +1094,10 @@ namespace SlopArena.Client.UI
         /// focusability decisions.</summary>
         public static bool IsExpandedSocialOpen => _instance != null && _instance._socialExpanded;
 
-        /// <summary>Escape from chat: leave interaction first. A roomy dock
-        /// stays visible with page focus restored; compact chat and gameplay
-        /// chat close the panel (issue #214). Shell pages resolve cancel
-        /// through the focus router (issue #220).</summary>
+        /// <summary>Gameplay Escape closes chat; frontend Back belongs to the shell router.</summary>
         private void HandleEscape()
         {
-            if (FrontendController.IsFrontendActive && IsRoomyWindow())
-            {
-                LeaveChatInteraction();
-                return;
-            }
             SetExpanded(false, false);
-        }
-
-        /// <summary>Leave the interactive chat surface. A roomy dock stays
-        /// visible; the page region becomes active again with its last valid
-        /// focus restored (issues #214, #215).</summary>
-        private void LeaveChatInteraction()
-        {
-            if (FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
-            {
-                CaptureRegionFocus(UiRegion.Social);
-                SetActiveRegion(UiRegion.Page, focusTarget: true);
-            }
-            _draft?.Blur();
-            ChatInputGate.End();
-            ReleaseCursor();
         }
 
         private void ReleaseCursor()
@@ -1562,22 +1109,8 @@ namespace SlopArena.Client.UI
             _ownsCursor = false;
         }
 
-        private void RestorePageFocus()
-        {
-            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene || _hostIsShell)
-                return;
-            // The remembered page focus — or the page's conventional entry
-            // point — returns focus without guessing (issues #214, #215).
-            FocusRegionDefault(UiRegion.Page);
-        }
 
-        /// <summary>
-        /// Apply the current presentation mode (issue #214):
-        /// roomy frontend + expanded → reserved right-hand dock band with the
-        /// page shrunk beside it; roomy + collapsed → bottom-right strip;
-        /// compact + expanded → chat replaces the page content temporarily;
-        /// compact + collapsed → strip; gameplay → the legacy overlay panel.
-        /// </summary>
+        /// <summary>Render the stable shell conversation or the gameplay overlay.</summary>
         private void ApplyPresentation()
         {
             if (_root == null)
@@ -1628,114 +1161,51 @@ namespace SlopArena.Client.UI
                 return;
             }
 
-            bool frontend = FrontendController.IsFrontendActive;
-            bool roomy = IsRoomyWindow();
-            bool dock = frontend && roomy && _expanded;
-            bool replace = frontend && !roomy && _expanded;
-
-            ApplyPageReservation(dock, replace);
-
+            // Gameplay keeps its HUD overlay geometry; no frontend page is
+            // resized, replaced, or discovered through a document root.
             if (_frame != null)
             {
-                if (dock)
-                {
-                    // Reserved band: full height on the right of the page.
-                    _frame.style.position = Position.Absolute;
-                    _frame.style.left = StyleKeyword.Auto;
-                    _frame.style.right = 0;
-                    _frame.style.top = 0;
-                    _frame.style.bottom = 0;
-                    _frame.style.width = Length.Percent(DockWidthPercent);
-                    _frame.style.height = StyleKeyword.Auto;
-                }
-                else if (replace)
-                {
-                    // Compact chat replaces the page content temporarily.
-                    _frame.style.position = Position.Absolute;
-                    _frame.style.left = 0;
-                    _frame.style.right = 0;
-                    _frame.style.top = 0;
-                    _frame.style.bottom = 0;
-                    _frame.style.width = StyleKeyword.Auto;
-                    _frame.style.height = StyleKeyword.Auto;
-                }
-                else
-                {
-                    // Legacy overlay (collapsed strip, compact strip, gameplay
-                    // chat): inline styles mirror the .chat-root USS defaults.
-                    _frame.style.position = Position.Absolute;
-                    _frame.style.left = StyleKeyword.Auto;
-                    _frame.style.top = StyleKeyword.Auto;
-                    _frame.style.right = 24;
-                    _frame.style.bottom = 94;
-                    _frame.style.width = 540;
-                    _frame.style.height = 620;
-                }
+                _frame.style.position = Position.Absolute;
+                _frame.style.left = StyleKeyword.Auto;
+                _frame.style.top = StyleKeyword.Auto;
+                _frame.style.right = 24;
+                _frame.style.bottom = 94;
+                _frame.style.width = 540;
+                _frame.style.height = 620;
             }
-
-            bool opaque = dock || replace;
-            // Combat and legacy presentations never carry the menu classes
-            // (issue #220): new dock styling cannot alter the match HUD.
             _panel?.EnableInClassList("chat-panel--menu", false);
             _panel?.EnableInClassList("chat-panel--menu-opaque", false);
             _root?.EnableInClassList("chat-root--menu", false);
             _root?.EnableInClassList("chat-root--expanded", false);
             if (_expand != null)
                 _expand.style.display = DisplayStyle.None;
-            _panel?.EnableInClassList("chat-panel--solid", opaque);
+            _panel?.EnableInClassList("chat-panel--solid", false);
             _panel?.SetDisplayed(_expanded);
             _collapsed?.SetDisplayed(!_expanded);
             ApplyRegionFocusability();
-            UpdateRegionHint();
         }
 
-        private void ApplyPageReservation(bool dock, bool replace)
-        {
-            if (_hostPageRoot == null)
-                return;
-            // Shrink the page root itself: page containers are absolutely
-            // positioned against its border box, so a width reservation moves
-            // backdrops, headers and content together (issue #214). The shell
-            // root is a column flex container: flex-grow sizes the page's
-            // height and must stay; the dock band is reserved on the cross
-            // axis through the width alone.
-            _hostPageRoot.style.width = dock ? Length.Percent(100f - DockWidthPercent) : StyleKeyword.Auto;
-            // Compact chat replaces the page content temporarily; selections
-            // live in the page controllers and survive the hide (issue #214).
-            _hostPageRoot.style.display = replace ? DisplayStyle.None : DisplayStyle.Flex;
-        }
-
-        /// <summary>
-        /// Whether the selected conversation is actually shown right now: the
-        /// panel is visible (compact cell or expanded view, not the minimized
-        /// strip) and no directory view replaces the history. Gameplay keeps
-        /// the legacy panel-visible rule (issue #220).
-        /// </summary>
+        /// <summary>The conversation must be visibly laid out, not minimized,
+        /// detached, replaced by a directory, or a passive gameplay preview.</summary>
         private bool IsConversationShown()
         {
-            if (ChatInputGate.IsGameplayScene)
-                return _expanded;
-            return _expanded && !_showDirectory;
+            return _expanded && !_showDirectory && _root?.panel != null
+                && _history?.contentRect.height > 0f;
         }
 
-        /// <summary>
-        /// The unread contract (issue #214): the selected conversation counts
-        /// as read only while it is visible (dock/panel open), the application
-        /// is focused, no modal obscures the surface and the view sits at the
-        /// conversation's newest messages.
-        /// </summary>
+        /// <summary>Read requires a visible laid-out conversation, focused
+        /// application, unobscured modal state, and the newest messages.</summary>
         private bool ShouldMarkActiveRead()
         {
-            if (_session?.ActiveConversation is not ChatConversation active)
-                return false;
-            if (!Application.isFocused || UiModalState.Presented)
+            if (_session?.ActiveConversation == null || !IsConversationShown()
+                || !Application.isFocused || UiModalState.Presented)
                 return false;
             return _pinToNewest || IsAtNewest();
         }
 
         private void TryMarkActiveRead()
         {
-            if (_session?.ActiveConversation?.Unread > 0 && _expanded && ShouldMarkActiveRead())
+            if (_session?.ActiveConversation?.Unread > 0 && ShouldMarkActiveRead())
                 _session.MarkActiveRead();
         }
 
@@ -1840,6 +1310,7 @@ namespace SlopArena.Client.UI
                 return;
             label.enableRichText = false;
             label.text = text ?? string.Empty;
+            label.SetDisplayed(!string.IsNullOrEmpty(text));
         }
     }
 

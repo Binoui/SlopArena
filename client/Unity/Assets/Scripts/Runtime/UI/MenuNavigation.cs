@@ -23,26 +23,6 @@ namespace SlopArena.Client.UI
         /// </summary>
         public static void ClearPageInitialFocus() => PageInitialFocus = null;
 
-        /// <summary>Focus the first action and route NavigationCancel to this screen's back action.</summary>
-        public static void Configure(VisualElement root, Button initialButton, Action backAction)
-        {
-            if (root == null)
-                throw new ArgumentNullException(nameof(root));
-
-            ConfigureShared(initialButton);
-
-            root.RegisterCallback<ClickEvent>(_ => UISFX.PlayClick());
-            root.RegisterCallback<NavigationCancelEvent>(evt => OnScreenCancel(evt, backAction));
-
-            if (initialButton != null)
-            {
-                root.schedule.Execute(() =>
-                {
-                    if (initialButton.panel != null)
-                        initialButton.Focus();
-                });
-            }
-        }
 
         /// <summary>
         /// Fragment-mounted pages register on their page-owned section roots
@@ -58,10 +38,8 @@ namespace SlopArena.Client.UI
                 throw new ArgumentNullException(nameof(context));
 
             ConfigureShared(initialButton);
-            // The page's flow-specific Back action registers on the context so
-            // the shell focus router can resolve it as the last cancel layer
-            // (issue #220); the page-root handler stays as the legacy
-            // fallback. It is cleared when the context releases.
+            // The page context owns Back; shell routing resolves modal,
+            // expanded social and top-bar layers before this action.
             context.SetBackAction(backAction);
 
             var roots = context.OwnedRoots;
@@ -87,10 +65,12 @@ namespace SlopArena.Client.UI
                 var initial = initialButton;
                 roots[0].schedule.Execute(() =>
                 {
-                    if (initial.panel != null)
+                    if (!context.Valid)
+                        return;
+                    if (!UiModalState.Presented && !ChatOverlay.IsExpandedSocialOpen
+                        && FrontendController.FocusRouter?.SocialRegionActive != true
+                        && initial.panel != null)
                         initial.Focus();
-                    // Focusing can leave the page body scrolled (issue #219);
-                    // a fresh activation always starts at the top.
                     foreach (var root in roots)
                         root.Query<ScrollView>().ForEach(sv => sv.scrollOffset = Vector2.zero);
                 });
@@ -119,9 +99,7 @@ namespace SlopArena.Client.UI
             // social → page Back. The page's back action is invoked only as
             // the last layer, so one press never departs the page and
             // dismisses something else simultaneously.
-            if (FrontendController.IsFrontendActive &&
-                FrontendController.IsMigratedPage(FrontendController.CurrentPage) &&
-                FrontendController.FocusRouter is { } router)
+            if (FrontendController.IsFrontendActive && FrontendController.FocusRouter is { } router)
             {
                 router.HandlePageCancel();
                 return;

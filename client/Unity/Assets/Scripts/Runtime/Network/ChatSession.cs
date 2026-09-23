@@ -26,6 +26,7 @@ namespace SlopArena.Client.Network
 
         private const float InitialRetrySeconds = 2f;
         private const float MaxRetrySeconds = 30f;
+        private const int MaxAutomaticRetries = 5;
         private const float TokenRenewalLeadSeconds = 60f;
 
         private static ChatSession? _instance;
@@ -54,6 +55,8 @@ namespace SlopArena.Client.Network
         private float _nextRetryAt;
         private float _nextRenewalAt;
         private float _retryDelay = InitialRetrySeconds;
+        // Per-launch budget: never reset on success, so a flapping connection cannot retry forever.
+        private int _automaticRetries;
         private Guid? _joinedServerId;
         public static ChatSession? Instance => _instance;
         public event Action? Changed;
@@ -124,11 +127,13 @@ namespace SlopArena.Client.Network
             {
                 _lobby.ClearPendingOverflow();
                 _chatStateReady = false;
-                SetStatus("Chat event backlog overflowed; resyncing from Master.");
-                _ = EnsureConnectedAsync();
+                SetStatus(_automaticRetries >= MaxAutomaticRetries
+                    ? "CHAT OVERFLOW — RETRY PAUSED"
+                    : "Chat event backlog overflowed; resyncing from Master.");
             }
 
-            if (_masterClient?.TokenExpiresAt is DateTimeOffset expires &&
+            if ((_automaticRetries < MaxAutomaticRetries || IsConnected) &&
+                _masterClient?.TokenExpiresAt is DateTimeOffset expires &&
                 DateTimeOffset.UtcNow >= expires.AddSeconds(-TokenRenewalLeadSeconds))
             {
                 if (Time.unscaledTime >= _nextRenewalAt && (_renewTask == null || _renewTask.IsCompleted))
@@ -139,8 +144,10 @@ namespace SlopArena.Client.Network
             }
 
             if (!NeedsDisplayName && !_savedNameRejected && !IsConnected && _connectTask == null &&
+                _automaticRetries < MaxAutomaticRetries &&
                 Time.unscaledTime >= _nextRetryAt && _authAttempted)
             {
+                _automaticRetries++;
                 _nextRetryAt = Time.unscaledTime + _retryDelay;
                 _retryDelay = Math.Min(MaxRetrySeconds, _retryDelay * 2f);
                 _ = EnsureConnectedAsync();
@@ -186,12 +193,18 @@ namespace SlopArena.Client.Network
             lock (_taskSync)
             {
                 if (_connectTask == null)
+                {
+                    _nextRetryAt = Math.Max(_nextRetryAt, Time.unscaledTime + InitialRetrySeconds);
                     _connectTask = ConnectCoreAsync();
+                }
                 task = _connectTask;
             }
             try
             {
-                return await task;
+                bool connected = await task;
+                if (!connected && _automaticRetries >= MaxAutomaticRetries && !_destroyed)
+                    SetStatus("RETRY PAUSED");
+                return connected;
             }
             finally
             {
@@ -489,7 +502,7 @@ namespace SlopArena.Client.Network
                         }
                         else
                         {
-                            SetStatus("Could not apply your saved display name yet. Local play remains available; connection keeps retrying.");
+                            SetStatus("Could not apply your saved display name yet. Local play remains available.");
                         }
                         return false;
                     }
@@ -636,7 +649,9 @@ namespace SlopArena.Client.Network
         private void OnLobbyDisconnected(Exception? exception)
         {
             _chatStateReady = false;
-            SetStatus("Master connection dropped. Retrying without resending messages.");
+            SetStatus(_automaticRetries >= MaxAutomaticRetries
+                ? "RETRY PAUSED"
+                : "Master connection dropped. Retrying without resending messages.");
             NotifyChanged();
         }
 

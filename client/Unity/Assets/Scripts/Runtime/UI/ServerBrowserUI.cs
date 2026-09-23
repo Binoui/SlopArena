@@ -12,8 +12,13 @@ using SlopArena.Client.Network;
 
 namespace SlopArena.Client.UI
 {
-    /// <summary>Server discovery, host-and-play, and advanced address entry.</summary>
-    public class ServerBrowserUI : MonoBehaviour
+    /// <summary>Server discovery, host-and-play, and advanced address entry
+    /// (issue #221): a fragment mounted into the FrontendShell hosts — the
+    /// room list and compact hosting/address tools in the body, connection/
+    /// operation feedback in the lower-right, and the primary host/join
+    /// actions outside the conversation cell. The direct-connect form opens
+    /// as a page-owned modal in the shell modal host.</summary>
+    public class ServerBrowserUI : MonoBehaviour, IFrontendPageController
     {
         private const int DefaultServerPort = 9876;
         private const int HostRegistrationTimeoutMs = 15000;
@@ -28,8 +33,16 @@ namespace SlopArena.Client.UI
         /// <summary>Notice captured for this activation; shown until the scan settles.</summary>
         private string? _pendingReturnNotice;
 
-        [SerializeField] private UIDocument _uiDocument;
         [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
+
+        // Not serialized: the shell injects the per-activation context at
+        // mount time (issue #219).
+        private FrontendPageContext _context = null!;
+
+        public void InjectPageContext(FrontendPageContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
 
         private MasterServerClient _masterClient;
         private VisualElement _serverList;
@@ -68,27 +81,26 @@ namespace SlopArena.Client.UI
             _hostHandedOff = false;
             _lifecycleCts = new CancellationTokenSource();
 
-            var root = _uiDocument.rootVisualElement;
-            _serverList = root.Q<VisualElement>("server-list");
-            _lblStatus = root.Q<Label>("lbl-status");
-            _btnRefresh = root.Q<Button>("btn-refresh");
-            _btnBack = root.Q<Button>("btn-back");
-            _btnHost = root.Q<Button>("btn-host");
-            _btnHostCancel = root.Q<Button>("btn-host-cancel");
-            _hostIpField = root.Q<TextField>("host-ip-field");
-            _lblHostStatus = root.Q<Label>("lbl-host-status");
-            _btnDirectConnect = root.Q<Button>("btn-direct-connect");
-            _directConnectModal = root.Q<VisualElement>("direct-connect-modal");
-            _ipField = root.Q<TextField>("ip-field");
-            _directConnectStatus = root.Q<Label>("direct-connect-status");
+            _serverList = _context.Q<ScrollView>("server-list");
+            _lblStatus = _context.Q<Label>("lbl-status");
+            _btnRefresh = _context.Q<Button>("btn-refresh");
+            _btnBack = _context.Q<Button>("btn-back");
+            _btnHost = _context.Q<Button>("btn-host");
+            _btnHostCancel = _context.Q<Button>("btn-host-cancel");
+            _hostIpField = _context.Q<TextField>("host-ip-field");
+            _lblHostStatus = _context.Q<Label>("lbl-host-status");
+            _btnDirectConnect = _context.Q<Button>("btn-direct-connect");
+            _directConnectModal = _context.Q<VisualElement>("direct-connect-modal");
+            _ipField = _context.Q<TextField>("ip-field");
+            _directConnectStatus = _context.Q<Label>("direct-connect-status");
 
             if (_btnRefresh != null) _btnRefresh.clicked += RefreshServers;
             if (_btnBack != null) _btnBack.clicked += LeaveBrowser;
             if (_btnHost != null) _btnHost.clicked += OnHostClicked;
             if (_btnDirectConnect != null) _btnDirectConnect.clicked += OpenDirectConnect;
             if (_btnHostCancel != null) _btnHostCancel.clicked += CancelHost;
-            _modalClose = root.Q<Button>("btn-modal-close");
-            _modalJoin = root.Q<Button>("btn-join");
+            _modalClose = _context.Q<Button>("btn-modal-close");
+            _modalJoin = _context.Q<Button>("btn-modal-join");
             if (_modalClose != null) _modalClose.clicked += CloseDirectConnect;
             if (_modalJoin != null) _modalJoin.clicked += JoinDirectConnect;
 
@@ -110,16 +122,16 @@ namespace SlopArena.Client.UI
             }
             if (_directConnectModal != null)
             {
-                _directConnectModal.style.display = DisplayStyle.None;
-                // Configure the modal's cancel route separately; its callback stops
-                // NavigationCancel before it can bubble to the browser.
-                MenuNavigation.Configure(_directConnectModal, null, CloseDirectConnect);
+                // The page-modal section lives in the shell modal host
+                // (issue #221): its cancel route resolves through the page
+                // context registration and the focus router's page-modal
+                // layer — no separate page-root registration.
                 _directConnectModal.RegisterCallback<KeyDownEvent>(OnModalKeyDown);
             }
 
             var initial = _btnRefresh ?? _btnHost ?? _btnDirectConnect;
             if (initial != null)
-                MenuNavigation.Configure(root, initial, LeaveBrowser);
+                MenuNavigation.Configure(_context, initial, LeaveBrowser);
 
             ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
             _masterClient = ChatSession.Instance?.MasterClient;
@@ -257,13 +269,19 @@ namespace SlopArena.Client.UI
         {
             if (!_alive || _joining || _hostStarting || _directConnectModal == null)
                 return;
+            // The shell identity surface owns the topmost modal layer while
+            // it is presented; the direct-connect form never stacks over it.
+            if (UiModalState.Presented)
+                return;
             _focusBeforeModal = _directConnectModal.panel?.focusController?.focusedElement;
-            var root = _uiDocument.rootVisualElement;
-            root.Q<VisualElement>("flow-header")?.SetEnabled(false);
-            root.Q<VisualElement>("browser-layout")?.SetEnabled(false);
+            SetPageSectionsEnabled(false);
             _directConnectModal.style.display = DisplayStyle.Flex;
             _modalPresented = true;
             UiModalState.Push();
+            // One Back/Escape press resolves the modal layer first (issue
+            // #221): the page context carries the modal's close action.
+            _context.SetModalAction(CloseDirectConnect);
+            FrontendFocusRouter.NotifyPresentationChanged();
             if (_directConnectStatus != null)
             {
                 _directConnectStatus.text = string.Empty;
@@ -302,18 +320,36 @@ namespace SlopArena.Client.UI
                 _modalJoin?.SetEnabled(true);
             }
             _directConnectModal.style.display = DisplayStyle.None;
+            _context.SetModalAction(null);
             if (_modalPresented)
             {
                 _modalPresented = false;
                 UiModalState.Pop();
             }
-            var root = _uiDocument.rootVisualElement;
-            root.Q<VisualElement>("flow-header")?.SetEnabled(true);
-            root.Q<VisualElement>("browser-layout")?.SetEnabled(true);
+            SetPageSectionsEnabled(true);
+            FrontendFocusRouter.Instance?.NotifyModalClosed();
             if (_focusBeforeModal is VisualElement previous && previous.panel != null)
                 previous.Focus();
             else
                 (_btnDirectConnect ?? _btnRefresh)?.Focus();
+        }
+
+        /// <summary>
+        /// Disables the page's owned sections (except the page-modal section
+        /// that hosts the direct-connect form) while the form is presented,
+        /// so nothing behind the modal backdrop is clickable or focusable —
+        /// the legacy page-region disable, now over the shell hosts (issue
+        /// #221).
+        /// </summary>
+        private void SetPageSectionsEnabled(bool enabled)
+        {
+            foreach (var section in _context.OwnedRoots)
+            {
+                if (section == _directConnectModal
+                    || (_directConnectModal != null && section.Contains(_directConnectModal)))
+                    continue;
+                section.SetEnabled(enabled);
+            }
         }
 
         private async void JoinDirectConnect()

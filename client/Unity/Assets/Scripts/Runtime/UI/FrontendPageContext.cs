@@ -86,12 +86,25 @@ namespace SlopArena.Client.UI
         }
 
         private Action? _backAction;
+        private Action? _modalCloseAction;
+
+        /// <summary>
+        /// The page-owned modal's close action while a page modal is
+        /// presented in the shell modal host (issue #221). The shell focus
+        /// router resolves it as the topmost modal layer, after the shell
+        /// identity surface. Cleared on release and by the page itself when
+        /// the modal closes.
+        /// </summary>
+        internal void SetModalAction(Action? close) => _modalCloseAction = close;
+
+        /// <summary>Invokes the page modal's close action when the shell
+        /// cancel router resolves to the page-modal layer.</summary>
+        internal void InvokeModalAction() => _modalCloseAction?.Invoke();
 
         /// <summary>
         /// The page's flow-specific Back action, registered through
         /// <see cref="MenuNavigation"/>. The shell focus router invokes it as
-        /// the last cancel layer; the page-root NavigationCancel handler
-        /// remains the fallback for legacy documents. Cleared on release.
+        /// the last cancel layer. Cleared on release.
         /// </summary>
         public Action? BackAction => _backAction;
 
@@ -144,6 +157,7 @@ namespace SlopArena.Client.UI
             _releaseActions.Clear();
             _ownedRoots.Clear();
             _backAction = null;
+            _modalCloseAction = null;
         }
     }
 }

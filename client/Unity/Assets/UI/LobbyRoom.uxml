@@ -1,8 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="screen lobby-room-screen">
-        <ui:VisualElement name="backdrop" class="lobby-backdrop" />
-        <ui:VisualElement name="flow-header" class="flow-header">
+    <!-- Lobby Room page fragment (issue #221). Mounted into the FrontendShell
+         hosts: header (with the room identity) → PageHeaderHost, the roster
+         scroll region → PageBodyHost, connection/readiness feedback →
+         PageSummaryHost, leave/continue controls respecting authority →
+         PageActionsHost. Real lobby state lives in LobbyRoomUI. -->
+    <ui:VisualElement name="page-frag">
+        <ui:VisualElement name="page-header" class="page-section lobby-header-section">
             <ui:Button name="btn-back" text="BACK" class="btn-back" />
             <ui:VisualElement class="flow-header-copy">
                 <ui:Label text="ONLINE PLAY" class="flow-eyebrow" />
@@ -11,25 +14,27 @@
             </ui:VisualElement>
             <ui:Label name="lbl-server" class="flow-context" />
         </ui:VisualElement>
-        <ui:VisualElement name="lobby-panel" class="lobby-panel">
-            <ui:VisualElement class="lobby-panel__header">
-                <ui:VisualElement>
-                    <ui:Label text="PLAYER ROSTER" class="panel-title" />
-                    <ui:Label text="Players in this room" class="panel-note" />
+        <ui:VisualElement name="page-body" class="page-section lobby-body-section">
+            <ui:VisualElement name="lobby-panel" class="lobby-panel">
+                <ui:VisualElement class="lobby-panel__header">
+                    <ui:VisualElement>
+                        <ui:Label text="PLAYER ROSTER" class="panel-title" />
+                        <ui:Label text="Players in this room" class="panel-note" />
+                    </ui:VisualElement>
+                    <ui:Label text="2–4 PLAYERS" class="lobby-panel__capacity" />
                 </ui:VisualElement>
-                <ui:Label text="2–4 PLAYERS" class="lobby-panel__capacity" />
+                <ui:ScrollView name="player-list-scroll" class="player-list-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden">
+                    <ui:VisualElement name="player-list" class="player-list lobby-list" />
+                </ui:ScrollView>
             </ui:VisualElement>
-            <ui:VisualElement name="player-list" class="player-list lobby-list" />
-            <ui:VisualElement class="lobby-panel__footer">
-                <ui:VisualElement class="lobby-status-copy">
-                    <ui:Label name="lbl-status" text="Connecting to the room…" class="lobby-status" />
-                    <ui:Button name="btn-retry" text="RETRY CONNECTION" class="btn-secondary lobby-retry" style="display: none;" />
-                </ui:VisualElement>
-                <ui:VisualElement name="button-row" class="lobby-buttons">
-                    <ui:Button name="btn-leave" text="LEAVE ROOM" class="btn-secondary lobby-action lobby-action--leave" />
-                    <ui:Button name="btn-start" text="CHOOSE FIGHTERS" class="btn-primary lobby-action lobby-action--start" />
-                </ui:VisualElement>
-            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="page-summary" class="page-section lobby-summary-section">
+            <ui:Label name="lbl-status" text="Connecting to the room…" class="lobby-status" />
+            <ui:Button name="btn-retry" text="RETRY CONNECTION" class="btn-secondary lobby-retry" style="display: none;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="page-actions" class="page-section lobby-actions-section">
+            <ui:Button name="btn-leave" text="LEAVE ROOM" class="btn-secondary lobby-action lobby-action--leave" />
+            <ui:Button name="btn-start" text="CHOOSE FIGHTERS" class="btn-primary lobby-action lobby-action--start" style="display: none;" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

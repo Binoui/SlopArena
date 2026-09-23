@@ -1,15 +1,12 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Assets/UI/SlopArena.uss?fileID=7433441132597879392&amp;guid=a41ba556d3415bfd586226903c56f69e&amp;type=3#SlopArena" />
-    <ui:VisualElement name="root" class="results-screen">
-        <ui:VisualElement class="results-background">
-            <ui:VisualElement class="results-grid" />
-            <ui:VisualElement class="results-burst results-burst--orange" />
-            <ui:VisualElement class="results-burst results-burst--yellow" />
-            <ui:Label text="SIGNAL // 07" class="results-background-note results-background-note--left" />
-            <ui:Label text="LIVE FEED // POST-FIGHT" class="results-background-note results-background-note--right" />
-        </ui:VisualElement>
-
-        <ui:VisualElement name="results-header" class="results-header">
+    <!-- Results page fragment (issue #221). Mounted into the FrontendShell
+         hosts: broadcast header → PageHeaderHost, the winner/standings
+         composition with its decorative art → PageBodyHost, and the existing
+         result context plus return action → PageActionsHost. Real result
+         state lives in ResultsUI (consumes only the immutable ClientSession
+         snapshot). -->
+    <ui:VisualElement name="page-frag">
+        <ui:VisualElement name="page-header" class="page-section results-header-section">
             <ui:VisualElement class="results-header-copy">
                 <ui:Label text="MATCH COMPLETE" class="results-eyebrow" />
                 <ui:Label name="results-headline" text="FIGHT OVER" class="results-headline" />
@@ -17,21 +14,25 @@
             </ui:VisualElement>
             <ui:Label name="results-metadata" text="DURATION N/A // 0 PLAYERS" class="results-metadata" />
         </ui:VisualElement>
-
-        <ui:VisualElement name="results-content" class="results-content">
-            <ui:VisualElement name="results-winner" class="results-winner" />
-            <ui:VisualElement name="results-standings" class="results-standings">
-                <ui:Label name="results-standings-label" text="FINAL STANDINGS" class="results-standings-label" />
+        <ui:VisualElement name="page-body" class="page-section results-body-section">
+            <ui:VisualElement name="results-background" class="results-background">
+                <ui:VisualElement class="results-grid" />
+                <ui:VisualElement class="results-burst results-burst--orange" />
+                <ui:VisualElement class="results-burst results-burst--yellow" />
+                <ui:Label text="SIGNAL // 07" class="results-background-note results-background-note--left" />
+                <ui:Label text="LIVE FEED // POST-FIGHT" class="results-background-note results-background-note--right" />
+            </ui:VisualElement>
+            <ui:VisualElement name="results-content" class="results-content">
+                <ui:VisualElement name="results-winner" class="results-winner" />
+                <ui:VisualElement name="results-standings" class="results-standings">
+                    <ui:Label name="results-standings-label" text="FINAL STANDINGS" class="results-standings-label" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-
-        <ui:VisualElement name="results-footer" class="results-footer">
-
-            <ui:VisualElement name="results-actions" class="results-actions">
-                <ui:Label text="NEXT BROADCAST" class="results-actions-eyebrow" />
-                <ui:Label text="RUN IT BACK // CHANGE FIGHTERS" class="results-actions-future" />
-                <ui:Button name="btn-return-lobby" text="RETURN TO LOBBY" class="results-return" />
-            </ui:VisualElement>
+        <ui:VisualElement name="page-actions" class="page-section results-actions-section results-actions">
+            <ui:Label text="NEXT BROADCAST" class="results-actions-eyebrow" />
+            <ui:Label text="RUN IT BACK // CHANGE FIGHTERS" class="results-actions-future" />
+            <ui:Button name="btn-return-lobby" text="RETURN TO LOBBY" class="results-return" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

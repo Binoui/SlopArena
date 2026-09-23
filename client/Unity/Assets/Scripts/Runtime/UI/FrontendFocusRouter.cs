@@ -6,19 +6,8 @@ using SlopArena.Client.Input;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Frontend focus ownership in the shell (issue #220). Owns the
-    /// TopBar/Page/Social focus regions on fragment-mounted pages with modal
-    /// priority: the topmost modal (the shell identity surface) wins, then
-    /// the expanded social view, then top-bar interaction, then social
-    /// interaction, then the page Back action — one Back/Escape press
-    /// resolves exactly one layer.
-    ///
-    /// The router is also the single gamepad bridge pump owner on
-    /// shell-mounted pages; the chat overlay keeps pumping for legacy
-    /// per-page documents and gameplay, so exactly one component pumps any
-    /// panel in a frame. Region-switch and top-bar-route polling never runs
-    /// while any text field owns editing, so typing a name, an address or a
-    /// message never triggers a shell shortcut.
+    /// TopBar/Page/Social focus ownership with modal-first cancel routing.
+    /// This router alone pumps the frontend panel; gameplay uses ChatOverlay.
     /// </summary>
     public sealed class FrontendFocusRouter : MonoBehaviour
     {
@@ -110,8 +99,7 @@ namespace SlopArena.Client.UI
         private void Update()
         {
             var shell = FrontendController.Shell;
-            if (shell?.Root == null || !FrontendController.IsFrontendActive
-                || !FrontendController.IsMigratedPage(FrontendController.CurrentPage))
+            if (shell?.Root == null || !FrontendController.IsFrontendActive)
                 return;
 
             // Exactly one pump owner on shell pages: the chat overlay skips
@@ -287,8 +275,7 @@ namespace SlopArena.Client.UI
         public void ApplyRegionFocusability()
         {
             var shell = _shell ?? FrontendController.Shell;
-            if (shell?.Root == null || !FrontendController.IsFrontendActive
-                || !FrontendController.IsMigratedPage(FrontendController.CurrentPage))
+            if (shell?.Root == null || !FrontendController.IsFrontendActive)
                 return;
 
             bool expanded = ChatOverlay.IsExpandedSocialOpen;
@@ -329,8 +316,7 @@ namespace SlopArena.Client.UI
         /// Input follows the last-touched side: a click into the top bar, the
         /// page or the chat surface makes that region active, so mouse users
         /// get region-local navigation without the explicit switch.
-        /// Registered once on the stable shell root; the chat overlay keeps
-        /// its own registration for legacy documents and gameplay.
+        /// Registered once on the stable shell root.
         /// </summary>
         private void OnShellClick(ClickEvent evt)
         {
@@ -379,13 +365,11 @@ namespace SlopArena.Client.UI
         /// One Back/Escape press resolves one layer (issue #220): the
         /// topmost modal, then the expanded social view, then top-bar
         /// interaction, then social interaction, then the page Back action.
-        /// The handler on the stable shell root is the single entry point on
-        /// shell pages; legacy documents keep their own handlers until they
-        /// migrate.
+        /// The handler on the stable shell root is the frontend entry point.
         /// </summary>
         private void OnShellNavigationCancel(NavigationCancelEvent evt)
         {
-            if (!FrontendController.IsFrontendActive || !FrontendController.IsMigratedPage(FrontendController.CurrentPage))
+            if (!FrontendController.IsFrontendActive)
                 return;
             evt.StopImmediatePropagation();
             HandlePageCancel();
@@ -423,6 +407,14 @@ namespace SlopArena.Client.UI
             if (FrontendController.Identity is { } identity && identity.IsPresented)
             {
                 identity.HandleCancel();
+                return;
+            }
+            // Layer 1b: a page-owned modal presented in the shell modal host
+            // (issue #221, the direct-connect form). One Back/Escape press
+            // closes it and never also departs the page.
+            if (UiModalState.Presented && FrontendController.CurrentContext != null)
+            {
+                FrontendController.CurrentContext.InvokeModalAction();
                 return;
             }
             // Layer 2: the expanded social view — closing restores the page
@@ -466,8 +458,7 @@ namespace SlopArena.Client.UI
         private void UpdateHints()
         {
             var shell = FrontendController.Shell;
-            bool active = shell?.Root != null && FrontendController.IsFrontendActive
-                && FrontendController.IsMigratedPage(FrontendController.CurrentPage);
+            bool active = shell?.Root != null && FrontendController.IsFrontendActive;
             bool show = active && !UiModalState.Presented && !IsEditingAnyField(shell!.Root!.panel);
 
             if (_topBarHint == null && _shell?.Root != null)
