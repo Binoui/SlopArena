@@ -230,6 +230,55 @@ namespace SlopArena.Client.UI
             _pageLowerHost?.style.SetDisplay(visible);
         }
 
+        private bool _socialExpanded;
+
+        /// <summary>True while the explicit expanded social view is open.</summary>
+        public bool IsSocialExpanded => _socialExpanded;
+
+        /// <summary>
+        /// The deliberate expanded social view (issue #220): the single
+        /// attached social host is re-presented as the larger surface below
+        /// the top bar — presentation-only on that one subtree. The presenter
+        /// is never detached, reparented or rehosted, and the page beneath
+        /// keeps its controller and selections alive. Geometry is applied
+        /// inline because the density geometry already owns the cell's
+        /// inline width/height; USS cannot override it.
+        /// </summary>
+        public void SetSocialExpanded(bool expanded)
+        {
+            if (_socialExpanded == expanded)
+                return;
+            _socialExpanded = expanded;
+            if (_root != null)
+                _root.EnableInClassList("frontend-shell--social-expanded", expanded);
+            if (_socialHost != null)
+            {
+                if (expanded)
+                {
+                    // The social host resolves against the positioned shell
+                    // workspace, so the expanded surface sits below the top
+                    // bar and occludes the page without a second store.
+                    _socialHost.style.position = Position.Absolute;
+                    _socialHost.style.left = 0;
+                    _socialHost.style.right = 0;
+                    _socialHost.style.top = 0;
+                    _socialHost.style.bottom = 0;
+                    _socialHost.style.width = StyleKeyword.Auto;
+                    _socialHost.style.height = StyleKeyword.Auto;
+                    _socialHost.style.marginRight = 0;
+                }
+                else
+                {
+                    _socialHost.style.position = Position.Relative;
+                    _socialHost.style.left = StyleKeyword.Auto;
+                    _socialHost.style.right = StyleKeyword.Auto;
+                    _socialHost.style.top = StyleKeyword.Auto;
+                    _socialHost.style.bottom = StyleKeyword.Auto;
+                    ApplyDensityGeometry();
+                }
+            }
+        }
+
         /// <summary>Sets the concise page/mode context in the top bar.</summary>
         public void SetPageContext(string? text)
         {
@@ -344,6 +393,7 @@ namespace SlopArena.Client.UI
             PageContentRoot = null;
             _densityBound = false;
             _densityGeometryApplied = false;
+            _socialExpanded = false;
         }
     }
 

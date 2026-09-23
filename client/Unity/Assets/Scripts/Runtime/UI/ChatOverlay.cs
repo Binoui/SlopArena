@@ -35,26 +35,27 @@ namespace SlopArena.Client.UI
 
         private static ChatOverlay? _instance;
 
+        /// <summary>The persistent presenter instance; the focus router uses
+        /// it for shell-page cancel layers and social presentation.</summary>
+        public static ChatOverlay? Instance => _instance;
+
         private VisualElement? _root;
         private VisualElement? _frame;
         private VisualElement? _collapsed;
         private VisualElement? _panel;
-        private VisualElement? _setup;
         private VisualElement? _main;
-        private VisualElement? _rename;
         private VisualElement? _conversationList;
         private VisualElement? _onlineList;
         private VisualElement? _compactFeed;
         private Label? _historyFeedback;
-        private Label? _setupFeedback;
         private ScrollView? _history;
         private Button? _open;
         private Button? _close;
         private Button? _newest;
         private Button? _refreshDirectory;
         private Button? _send;
-        private Button? _setName;
-        private Button? _renameButton;
+        private Button? _identity;
+        private Button? _expand;
         private Button? _globalTab;
         private Button? _serverTab;
         private Button? _directTab;
@@ -64,13 +65,16 @@ namespace SlopArena.Client.UI
         private Label? _onlineFeedback;
         private Label? _unread;
         private TextField? _draft;
-        private TextField? _name;
-        private TextField? _renameField;
 
         private ChatSession? _session;
         private IVisualElementScheduledItem? _compactTick;
         private bool _viewBound;
         private bool _expanded;
+        // The deliberate expanded social view (issue #220): presentation-only
+        // on the one attached subtree; the presenter is never rehosted and
+        // the state is transient — relaunch returns to the remembered
+        // compact/minimized presentation.
+        private bool _socialExpanded;
         private bool _suppressDraftChanged;
         private string _lastConversationKey = string.Empty;
         private string _lastDraft = string.Empty;
@@ -81,8 +85,10 @@ namespace SlopArena.Client.UI
         private CursorLockMode _previousCursorLock;
         private bool _previousCursorVisible;
 
-        // Social Dock state (issue #214). The open/collapsed preference
-        // persists across launches; compact presentation never rewrites it.
+        // Social presentation preference (issues #214/#220). On shell-hosted
+        // pages this is the remembered manual minimization: true keeps the
+        // compact cell visible, false keeps it minimized. Manual
+        // minimize/restore rewrites it; resizing never does.
         private bool _dockOpen;
         // Per-conversation scroll anchors, launch-scoped presentation state:
         // key -> pinned-to-newest and last scroll offset survive page changes,
@@ -199,9 +205,13 @@ namespace SlopArena.Client.UI
             // (issue #214): scene loads keep the dock/expanded state and
             // re-attach to the explicit host. Entering gameplay is the one
             // deliberate collapse — match entry ends interactive chat while
-            // ChatSession keeps drafts and selection.
+            // ChatSession keeps drafts and selection. The transient expanded
+            // state is reset with it (issue #220).
             if (!FrontendController.IsFrontendActive && ChatInputGate.IsGameplayScene)
+            {
+                _socialExpanded = false;
                 SetExpanded(false, false);
+            }
             AttachToScene(scene);
         }
 
@@ -231,8 +241,10 @@ namespace SlopArena.Client.UI
         /// <summary>
         /// The one shell attach (issue #219): the presenter moves into the
         /// reserved social cell and stays there for every shell-hosted page
-        /// change; the compact conversation is always visible inside the
-        /// cell until the shell-owned minimize lands in Pass 2 (#220).
+        /// change. Compact ↔ expanded is presentation-only on this one
+        /// subtree (issue #220) — the compact cell is visible unless the
+        /// player explicitly minimized it, and the remembered preference
+        /// decides which presentation re-entry restores.
         /// </summary>
         private void AttachToShell(VisualElement socialHost, VisualElement pageContentRoot)
         {
@@ -242,12 +254,11 @@ namespace SlopArena.Client.UI
                 _root.RemoveFromHierarchy();
                 socialHost.Add(_root);
             }
-            var shellRoot = FrontendController.Shell?.Root;
-            if (shellRoot != null)
-                RegisterRegionClickFollow(shellRoot);
             _hostPageRoot = pageContentRoot;
-            _expanded = true;
+            _expanded = _dockOpen;
+            _socialExpanded = false;
             ApplyPresentation();
+            FrontendFocusRouter.NotifyPresentationChanged();
         }
 
         private void AttachToDocumentHost(Scene scene)
@@ -363,7 +374,8 @@ namespace SlopArena.Client.UI
             // already sits in the reserved cell (issue #219).
             AttachToScene(SceneManager.GetActiveScene());
             // Roomy legacy menus show the dock open according to the remembered
-            // preference; compact layouts keep the strip (issue #214).
+            // preference; compact layouts keep the strip (issue #214). Shell
+            // pages keep their own presentation (issue #220).
             if (!_hostIsShell && FrontendController.IsFrontendActive && !_expanded && _dockOpen && IsRoomyWindow())
                 SetExpanded(true, false);
         }
@@ -391,9 +403,14 @@ namespace SlopArena.Client.UI
                 HandleEscape();
                 return;
             }
-            // Face-button submit/cancel for controller navigation (issue #215):
-            // the dpad move path is native, these are not.
-            GamepadUIBridge.Pump(_root?.panel);
+            // Face-button submit/cancel for controller navigation (issue
+            // #215): the dpad move path is native, these are not. On
+            // shell-hosted pages the focus router is the single pump owner
+            // (issue #220); legacy documents and gameplay keep this pump.
+            bool shellFrontend = _hostIsShell && FrontendController.IsFrontendActive
+                && !ChatInputGate.IsGameplayScene;
+            if (!shellFrontend)
+                GamepadUIBridge.Pump(_root?.panel);
             PollRegionSwitch();
             float windowWidth = Screen.width;
             if (!Mathf.Approximately(windowWidth, _lastWindowWidth))
@@ -482,15 +499,9 @@ namespace SlopArena.Client.UI
                 // #216).
                 return _expanded || IsFocusInsideChatSurface();
             }
-            if (_hostIsShell)
-            {
-                // The compact cell never collapses by itself in Pass 1
-                // (#219): a chat-focused press leaves the interaction (the
-                // cell stays visible); a page-focused press falls through
-                // to the page's Back.
-                return _expanded && IsFocusInsideChatSurface();
-            }
-            if (!_expanded || !FrontendController.IsFrontendActive)
+            // Shell pages resolve cancel through the focus router (issue
+            // #220); the overlay handles only legacy documents here.
+            if (!_expanded || !FrontendController.IsFrontendActive || _hostIsShell)
                 return false;
             if (!IsRoomyWindow())
                 return true;
@@ -510,6 +521,10 @@ namespace SlopArena.Client.UI
         private void PollRegionSwitch()
         {
             if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+                return;
+            // The focus router owns region switching on shell pages (issue
+            // #220); the chat overlay keeps the legacy document behavior.
+            if (_hostIsShell)
                 return;
             if (UiModalState.Presented)
                 return;
@@ -547,15 +562,6 @@ namespace SlopArena.Client.UI
             if (_root?.panel?.focusController?.focusedElement is not VisualElement focused)
                 return;
             bool inChat = _root.Contains(focused);
-            if (inChat)
-            {
-                // The chat surface is inside the shell workspace too, so the
-                // chat check must win or a chat focus would be remembered as
-                // page focus on shell-hosted pages (issue #219).
-                if (region == UiRegion.Social)
-                    _regionFocus[(int)UiRegion.Social] = focused;
-                return;
-            }
             bool inPage = _hostPageRoot != null && _hostPageRoot.Contains(focused);
             if (region == UiRegion.Social && inChat)
                 _regionFocus[(int)UiRegion.Social] = focused;
@@ -573,8 +579,7 @@ namespace SlopArena.Client.UI
             {
                 if (TryFocus(MenuNavigation.PageInitialFocus))
                     return;
-                TryFocus(_hostPageRoot == null ? null : FindFirstFocusable(
-                    _hostPageRoot, exclude: _hostIsShell ? _root : null));
+                TryFocus(_hostPageRoot == null ? null : FindFirstFocusable(_hostPageRoot));
                 return;
             }
             if (!_expanded)
@@ -582,7 +587,7 @@ namespace SlopArena.Client.UI
                 TryFocus(_open);
                 return;
             }
-            if (!TryFocus(_session?.NeedsDisplayName == true ? _name : _draft))
+            if (!TryFocus(_draft))
                 TryFocus(_panel == null ? null : FindFirstFocusable(_panel));
         }
 
@@ -615,16 +620,16 @@ namespace SlopArena.Client.UI
         /// </summary>
         private void ApplyRegionFocusability()
         {
-            bool social, page;
             if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
             {
-                // The compact cell is a layout neighbor of the page (#219):
-                // the page stays navigable while the Social region holds
-                // input, mirroring the roomy dock behavior.
-                social = _region == UiRegion.Social;
-                page = !social;
+                // The focus router owns shell-page regions (issue #220); the
+                // presenter re-applies after every dynamic rebuild so new
+                // rows respect the active region.
+                FrontendFocusRouter.Instance?.ApplyRegionFocusability();
+                return;
             }
-            else if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+            bool social, page;
+            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
             {
                 // Gameplay keeps the open panel's controls focusable, but a
                 // closed chat takes no navigation focus at all (user
@@ -646,10 +651,7 @@ namespace SlopArena.Client.UI
                 page = !social;
             }
             SetRegionFocusable(_root, social);
-            // On shell-hosted pages the chat subtree sits inside the page
-            // content region too; exclude it from the page toggle (issue
-            // #219).
-            SetRegionFocusable(_hostPageRoot, page, exclude: _hostIsShell ? _root : null);
+            SetRegionFocusable(_hostPageRoot, page);
             if (_history != null)
                 _history.focusable = social;
         }
@@ -680,26 +682,21 @@ namespace SlopArena.Client.UI
         {
             if (_regionHint == null)
                 return;
+            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            {
+                // The focus router owns the shell hint (issue #220).
+                _regionHint.style.display = DisplayStyle.None;
+                return;
+            }
             bool frontend = FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene;
             _regionHint.style.display = frontend ? DisplayStyle.Flex : DisplayStyle.None;
             if (!frontend)
                 return;
             _regionHint.text = _region == UiRegion.Page ? "Q/Y // SOCIAL" : "Q/Y // PAGE";
-            if (_hostIsShell)
-            {
-                // The chip floats just above the reserved cell so it never
-                // covers the composer or the history feedback (#219).
-                _regionHint.style.top = -24;
-                _regionHint.style.bottom = StyleKeyword.Auto;
-                _regionHint.style.left = 0;
-            }
-            else
-            {
-                // Legacy overlay defaults (Chat.uss): bottom-left of the host.
-                _regionHint.style.top = StyleKeyword.Auto;
-                _regionHint.style.bottom = 12;
-                _regionHint.style.left = 16;
-            }
+            // Legacy overlay defaults (Chat.uss): bottom-left of the host.
+            _regionHint.style.top = StyleKeyword.Auto;
+            _regionHint.style.bottom = 12;
+            _regionHint.style.left = 16;
         }
 
         private void BindView()
@@ -719,9 +716,7 @@ namespace SlopArena.Client.UI
             _frame = frame;
             _collapsed = _root.Q<VisualElement>("chat-collapsed");
             _panel = _root.Q<VisualElement>("chat-panel");
-            _setup = _root.Q<VisualElement>("chat-setup");
             _main = _root.Q<VisualElement>("chat-main");
-            _rename = _root.Q<VisualElement>("chat-rename");
             _conversationList = _root.Q<VisualElement>("conversation-list");
             _onlineList = _root.Q<VisualElement>("online-list");
             _compactFeed = _root.Q<VisualElement>("chat-public-feed");
@@ -732,31 +727,28 @@ namespace SlopArena.Client.UI
             _newest = _root.Q<Button>("chat-newest");
             _refreshDirectory = _root.Q<Button>("directory-refresh");
             _send = _root.Q<Button>("chat-send");
-            _setName = _root.Q<Button>("name-submit");
-            _renameButton = _root.Q<Button>("rename-submit");
+            _identity = _root.Q<Button>("chat-identity");
+            _expand = _root.Q<Button>("chat-expand");
             _globalTab = _root.Q<Button>("chat-tab-global");
             _serverTab = _root.Q<Button>("chat-tab-server");
             _directTab = _root.Q<Button>("chat-tab-direct");
             _statusCollapsed = _root.Q<Label>("chat-status-collapsed");
             _statusHeader = _root.Q<Label>("chat-status-header");
             _titleHeader = _root.Q<Label>("chat-title-header");
-            _setupFeedback = _root.Q<Label>("setup-feedback");
             _onlineFeedback = _root.Q<Label>("online-feedback");
             _unread = _root.Q<Label>("chat-unread");
             _draft = _root.Q<TextField>("chat-draft");
-            _name = _root.Q<TextField>("display-name");
-            _renameField = _root.Q<TextField>("rename-name");
             _regionHint = _root.Q<Label>("chat-region-hint");
             if (_regionHint != null)
                 _regionHint.pickingMode = PickingMode.Ignore;
 
-            if (_open != null) _open.clicked += OpenChat;
-            if (_close != null) _close.clicked += CloseChat;
+            if (_open != null) _open.clicked += OnOpenButtonClicked;
+            if (_close != null) _close.clicked += OnCloseButtonClicked;
+            if (_expand != null) _expand.clicked += ExpandSocial;
+            if (_identity != null) _identity.clicked += OpenShellIdentitySurface;
             if (_newest != null) _newest.clicked += ScrollToNewest;
             if (_refreshDirectory != null) _refreshDirectory.clicked += RefreshDirectory;
             if (_send != null) _send.clicked += () => SendDraft(ChatInputGate.IsGameplayScene);
-            if (_setName != null) _setName.clicked += () => SubmitName(false);
-            if (_renameButton != null) _renameButton.clicked += () => SubmitName(true);
             if (_globalTab != null) _globalTab.clicked += SelectGlobal;
             if (_serverTab != null) _serverTab.clicked += SelectServer;
             if (_directTab != null) _directTab.clicked += SelectDirectTab;
@@ -781,22 +773,6 @@ namespace SlopArena.Client.UI
                 _draft.maxLength = -1;
                 _draft.RegisterValueChangedCallback(OnDraftChanged);
                 RegisterEditorFocus(_draft);
-            }
-
-            if (_name != null)
-            {
-                _name.maxLength = -1;
-                _name.RegisterValueChangedCallback(OnNameChanged);
-                RegisterEditorFocus(_name);
-                _name.RegisterCallback<KeyDownEvent>(evt => OnNameKeyDown(evt, false));
-            }
-
-            if (_renameField != null)
-            {
-                _renameField.maxLength = -1;
-                _renameField.RegisterValueChangedCallback(OnRenameChanged);
-                RegisterEditorFocus(_renameField);
-                _renameField.RegisterCallback<KeyDownEvent>(evt => OnNameKeyDown(evt, true));
             }
 
             _root.RegisterCallback<KeyDownEvent>(OnRootKeyDown, TrickleDown.TrickleDown);
@@ -863,14 +839,10 @@ namespace SlopArena.Client.UI
             }
 
             ChatConversation? active = _session.ActiveConversation;
-            if (active?.Unread > 0 && _expanded && ShouldMarkActiveRead())
+            if (active?.Unread > 0 && IsConversationShown() && ShouldMarkActiveRead())
                 _session.MarkActiveRead();
-            bool needsName = _session.NeedsDisplayName;
-            bool connected = _session.IsConnected;
-            _setup?.SetDisplayed(needsName);
             SetText(_statusCollapsed, _session.Status);
             SetText(_statusHeader, _session.Status);
-            SetText(_setupFeedback, _session.Status);
 
             SetText(_titleHeader, active?.Title ?? "CHAT");
             int directUnread = 0;
@@ -884,21 +856,13 @@ namespace SlopArena.Client.UI
                 _unread.text = directUnread > 0 ? directUnread.ToString() : string.Empty;
                 _unread.EnableInClassList("chat-unread--visible", directUnread > 0);
             }
-            _main?.SetDisplayed(!needsName);
-            _rename?.SetDisplayed(!needsName && !_session.JoinedServerId.HasValue);
-            if (_setName != null)
-                _setName.text = needsName ? "SET DISPLAY NAME" : "NAME SAVED";
-            if (_setName != null)
-                _setName.SetEnabled(needsName && IsNameValid(_name?.value ?? string.Empty));
+            _main?.SetDisplayed(true);
+            // Identity presentation and renaming moved to the shared shell
+            // identity surface (issue #220); the presenter only routes there.
+            if (_identity != null)
+                _identity.SetDisplayed(FrontendController.IsFrontendActive);
 
-            if (_renameField != null && !IsEditorFocused(_renameField) && !needsName)
-            {
-                string displayName = _session.Self?.DisplayName ?? string.Empty;
-                if (_renameField.value != displayName)
-                    _renameField.SetValueWithoutNotify(displayName);
-            }
-
-            RenderTabs(active, connected);
+            RenderTabs(active, _session.IsConnected);
             RenderConversations(active);
             RenderDirectory(active);
             RenderHistory(active);
@@ -929,32 +893,40 @@ namespace SlopArena.Client.UI
 
             _conversationList.Clear();
             foreach (ChatConversation conversation in _session.Conversations)
+                _conversationList.Add(BuildConversationRow(conversation, active));
+        }
+
+        /// <summary>
+        /// One conversation row shared by the expanded view's management
+        /// column and the directory view (issue #220): conversation
+        /// management is behind explicit controls, not a permanently visible
+        /// list.
+        /// </summary>
+        private VisualElement BuildConversationRow(ChatConversation conversation, ChatConversation? active)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("conversation-row");
+            row.EnableInClassList("conversation-row--active", active != null && conversation.Key == active.Key);
+
+            var select = new Button(() =>
             {
-                var row = new VisualElement();
-                row.AddToClassList("conversation-row");
-                row.EnableInClassList("conversation-row--active", active != null && conversation.Key == active.Key);
+                _showDirectory = false;
+                _session.SelectConversation(conversation.Key);
+                RenderSession();
+            });
+            select.text = conversation.Title;
+            select.enableRichText = false;
+            select.AddToClassList("conversation-select");
+            row.Add(select);
 
-                var select = new Button(() =>
-                {
-                    _showDirectory = false;
-                    _session.SelectConversation(conversation.Key);
-                    SetExpanded(true, false);
-                });
-                select.text = conversation.Title;
-                select.enableRichText = false;
-                select.AddToClassList("conversation-select");
-                row.Add(select);
-
-                if (conversation.Unread > 0 && active?.Key != conversation.Key)
-                {
-                    var unread = new Label(conversation.Unread.ToString());
-                    unread.enableRichText = false;
-                    unread.AddToClassList("conversation-unread");
-                    row.Add(unread);
-                }
-
-                _conversationList.Add(row);
+            if (conversation.Unread > 0 && active?.Key != conversation.Key)
+            {
+                var unread = new Label(conversation.Unread.ToString());
+                unread.enableRichText = false;
+                unread.AddToClassList("conversation-unread");
+                row.Add(unread);
             }
+            return row;
         }
 
         private void RenderDirectory(ChatConversation? active)
@@ -963,10 +935,26 @@ namespace SlopArena.Client.UI
             _onlineList?.SetDisplayed(showDirectory);
             _refreshDirectory?.SetDisplayed(showDirectory);
             _onlineFeedback?.SetDisplayed(showDirectory);
+            // The directory view replaces the history while it is shown, so
+            // read acknowledgement is suppressed for it (issue #218).
+            _history?.SetDisplayed(!showDirectory);
             if (!showDirectory || _onlineList == null || _session == null)
                 return;
 
             _onlineList.Clear();
+
+            // Conversation management lives behind the explicit DIRECT view
+            // (issue #220): switching conversations never needs a persistent
+            // list next to the messages.
+            var conversationsLabel = new Label("CONVERSATIONS") { enableRichText = false };
+            conversationsLabel.AddToClassList("chat-section-label");
+            _onlineList.Add(conversationsLabel);
+            foreach (ChatConversation conversation in _session.Conversations)
+                _onlineList.Add(BuildConversationRow(conversation, active));
+
+            var mutedLabel = new Label("MUTED PLAYERS") { enableRichText = false };
+            mutedLabel.AddToClassList("chat-section-label");
+            _onlineList.Add(mutedLabel);
             foreach (var player in _session.MutedPlayers)
             {
                 var unmute = new Button(() => _session.SetMuted(player.PlayerId, false))
@@ -1073,34 +1061,24 @@ namespace SlopArena.Client.UI
                     ScrollToNewest();
                 else
                     _history.scrollOffset = oldOffset;
-                _newest?.SetDisplayed(!atNewest && _history.childCount > 0);
+                // The directory view replaces history while it is shown, so
+                // the return-to-newest affordance stays hidden with it
+                // (issue #220).
+                _newest?.SetDisplayed(!atNewest && _history.childCount > 0 && !_showDirectory);
             }).StartingIn(0);
 
         }
 
         private VisualElement BuildMessageRow(ChatMessage message)
         {
+            // Per-line mute buttons are gone (issue #220): personal mute is
+            // the explicit sender action in the directory view.
             var row = new VisualElement();
             row.AddToClassList("chat-message");
             var text = new Label($"{message.Sender.DisplayName} [{message.Sender.SessionTag}]: {message.Text}");
             text.enableRichText = false;
             text.AddToClassList("chat-message__text");
             row.Add(text);
-
-            ChatPlayer? self = _session?.Self;
-            if (self == null || message.Sender.PlayerId != self.PlayerId)
-            {
-                var mute = new Button(() =>
-                {
-                    if (_session == null)
-                        return;
-                    _session.SetMuted(message.Sender.PlayerId, !_session.IsMuted(message.Sender.PlayerId));
-                    RenderSession();
-                });
-                mute.text = _session != null && _session.IsMuted(message.Sender.PlayerId) ? "UNMUTE" : "MUTE";
-                mute.AddToClassList("chat-mute");
-                row.Add(mute);
-            }
             return row;
         }
 
@@ -1161,8 +1139,7 @@ namespace SlopArena.Client.UI
 
         private void OnRootKeyDown(KeyDownEvent evt)
         {
-            if (IsEnter(evt.keyCode) && ChatInputGate.IsGameplayScene &&
-                !IsEditorFocused(_name) && !IsEditorFocused(_renameField))
+            if (IsEnter(evt.keyCode) && ChatInputGate.IsGameplayScene)
             {
                 evt.StopImmediatePropagation();
                 return;
@@ -1248,12 +1225,16 @@ namespace SlopArena.Client.UI
             _focusParker.Focus();
         }
 
-        private void OnNameKeyDown(KeyDownEvent evt, bool rename)
+        /// <summary>
+        /// Routes the chat's identity affordance to the shared shell identity
+        /// surface (issue #220): first-run entry, rename and the joined-server
+        /// prohibition all live there.
+        /// </summary>
+        private void OpenShellIdentitySurface()
         {
-            if (!IsEnter(evt.keyCode))
+            if (UiModalState.Presented)
                 return;
-            evt.StopImmediatePropagation();
-            SubmitName(rename);
+            FrontendController.Identity?.OpenIdentitySurface(rename: true);
         }
 
         private void OnDraftChanged(ChangeEvent<string> evt)
@@ -1270,44 +1251,6 @@ namespace SlopArena.Client.UI
             _session?.SetDraft(evt.newValue);
             _suppressDraftChanged = false;
             _send?.SetEnabled(_session?.ActiveConversation?.CanSend == true && IsMessageValid(evt.newValue));
-        }
-
-        private void OnNameChanged(ChangeEvent<string> evt)
-        {
-            if (_setName != null)
-                _setName.SetEnabled(IsNameValid(evt.newValue));
-        }
-
-        private void OnRenameChanged(ChangeEvent<string> evt)
-        {
-            if (_renameButton != null)
-                _renameButton.SetEnabled(IsNameValid(evt.newValue));
-        }
-
-        private async void SubmitName(bool rename)
-        {
-            if (_session == null)
-                return;
-            string raw = rename ? _renameField?.value ?? string.Empty : _name?.value ?? string.Empty;
-            if (!ChatTextValidation.TryValidateDisplayName(raw, out string value, out string error))
-            {
-                SetText(rename ? _historyFeedback : _setupFeedback, error);
-                return;
-            }
-
-            try
-            {
-                bool accepted = rename
-                    ? await _session.RenameAsync(value)
-                    : await _session.AcceptDisplayNameLocallyAsync(value);
-                if (!accepted)
-                    RenderSession();
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                RenderSession();
-            }
         }
 
         private async void SendDraft(bool closeAfterSend)
@@ -1362,6 +1305,14 @@ namespace SlopArena.Client.UI
         private void SetExpanded(bool expanded, bool focusComposer)
         {
             _expanded = expanded;
+            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            {
+                // Shell presentation states are owned by the explicit shell
+                // actions (issue #220); this legacy entry point only
+                // re-applies the current presentation.
+                ApplyPresentation();
+                return;
+            }
             if (!expanded)
             {
                 // Blur whatever the chat surface still holds before restoring
@@ -1371,9 +1322,7 @@ namespace SlopArena.Client.UI
                     && _root.Contains(focusedInChat))
                     focusedInChat.Blur();
                 _draft?.Blur();
-                _name?.Blur();
-                _renameField?.Blur();
-                if (FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+                if (FrontendController.IsFrontendActive && !_hostIsShell && !ChatInputGate.IsGameplayScene)
                 {
                     // Remember the conversation's focused control and return
                     // the page region to the page (issue #215).
@@ -1415,8 +1364,40 @@ namespace SlopArena.Client.UI
             if (!expanded && !ChatInputGate.IsGameplayScene)
                 RestorePageFocus();
             if (focusComposer)
-                _root?.schedule.Execute(() =>
-                    (_session?.NeedsDisplayName == true ? _name : _draft)?.Focus()).StartingIn(0);
+                _root?.schedule.Execute(() => _draft?.Focus()).StartingIn(0);
+        }
+
+        /// <summary>
+        /// The strip/restore button. Dispatches by context: shell pages
+        /// restore the remembered compact presentation; legacy and gameplay
+        /// open through the existing entry point.
+        /// </summary>
+        private void OnOpenButtonClicked()
+        {
+            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            {
+                RestoreFromMinimized();
+                return;
+            }
+            OpenChat();
+        }
+
+        /// <summary>
+        /// The header close button. Dispatches by context: on shell pages it
+        /// minimizes the compact cell or collapses the expanded view;
+        /// legacy/gameplay keep the existing close.
+        /// </summary>
+        private void OnCloseButtonClicked()
+        {
+            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+            {
+                if (_socialExpanded)
+                    CollapseSocialFromShell();
+                else
+                    MinimizeChat();
+                return;
+            }
+            CloseChat();
         }
 
         /// <summary>
@@ -1458,18 +1439,97 @@ namespace SlopArena.Client.UI
             SetExpanded(false, false);
         }
 
+        /// <summary>
+        /// Restore the compact cell from the minimized strip (issue #220):
+        /// a manual restore is remembered across launches.
+        /// </summary>
+        private void RestoreFromMinimized()
+        {
+            if (UiModalState.Presented)
+                return;
+            _expanded = true;
+            _socialExpanded = false;
+            _dockOpen = true;
+            PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 1);
+            PlayerPrefs.Save();
+            ApplyPresentation();
+            RenderSession();
+            FrontendFocusRouter.NotifyPresentationChanged();
+            _root?.schedule.Execute(() => _draft?.Focus()).StartingIn(0);
+        }
+
+        /// <summary>
+        /// Explicit manual minimization (issue #220): the compact cell hides
+        /// into the strip inside the reserved cell; the preference is
+        /// remembered and never rewritten by resizing.
+        /// </summary>
+        private void MinimizeChat()
+        {
+            _expanded = false;
+            _socialExpanded = false;
+            _dockOpen = false;
+            PlayerPrefs.SetInt(DockOpenPlayerPrefsKey, 0);
+            PlayerPrefs.Save();
+            _draft?.Blur();
+            ApplyPresentation();
+            RenderSession();
+            FrontendFocusRouter.NotifyPresentationChanged();
+            FrontendFocusRouter.Instance?.RestorePageRegion();
+        }
+
+        /// <summary>
+        /// The explicit Expand action (issue #220): the single attached
+        /// social host is re-presented as the larger surface — presentation
+        /// only, never a detach/rehost, and never a second store.
+        /// </summary>
+        private void ExpandSocial()
+        {
+            if (UiModalState.Presented)
+                return;
+            _socialExpanded = true;
+            _expanded = true;
+            ApplyPresentation();
+            RenderSession();
+            FrontendFocusRouter.NotifyPresentationChanged();
+        }
+
+        /// <summary>
+        /// Close the expanded view (issue #220): the presentation returns to
+        /// the remembered compact/minimized state, the page region gets focus
+        /// back, and the page controller's selections were never disturbed.
+        /// </summary>
+        public void CollapseSocialFromShell()
+        {
+            if (!_socialExpanded)
+                return;
+            _socialExpanded = false;
+            _expanded = _dockOpen;
+            _draft?.Blur();
+            ApplyPresentation();
+            RenderSession();
+            FrontendFocusRouter.Instance?.RestorePageRegion();
+        }
+
+        /// <summary>Blur the chat's text fields without changing state; the
+        /// focus router calls this when leaving the social interaction.</summary>
+        public void BlurChatEditors()
+        {
+            _draft?.Blur();
+            if (FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
+                ChatInputGate.End();
+        }
+
+        /// <summary>True while the deliberate expanded social view is open on
+        /// a shell page; the focus router reads it for cancel-layer and
+        /// focusability decisions.</summary>
+        public static bool IsExpandedSocialOpen => _instance != null && _instance._socialExpanded;
+
         /// <summary>Escape from chat: leave interaction first. A roomy dock
         /// stays visible with page focus restored; compact chat and gameplay
-        /// chat close the panel (issue #214).</summary>
+        /// chat close the panel (issue #214). Shell pages resolve cancel
+        /// through the focus router (issue #220).</summary>
         private void HandleEscape()
         {
-            // Shell cell: the conversation never auto-collapses; the press
-            // leaves the interaction and returns the page region (#219).
-            if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
-            {
-                LeaveChatInteraction();
-                return;
-            }
             if (FrontendController.IsFrontendActive && IsRoomyWindow())
             {
                 LeaveChatInteraction();
@@ -1489,8 +1549,6 @@ namespace SlopArena.Client.UI
                 SetActiveRegion(UiRegion.Page, focusTarget: true);
             }
             _draft?.Blur();
-            _name?.Blur();
-            _renameField?.Blur();
             ChatInputGate.End();
             ReleaseCursor();
         }
@@ -1506,7 +1564,7 @@ namespace SlopArena.Client.UI
 
         private void RestorePageFocus()
         {
-            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene)
+            if (!FrontendController.IsFrontendActive || ChatInputGate.IsGameplayScene || _hostIsShell)
                 return;
             // The remembered page focus — or the page's conventional entry
             // point — returns focus without guessing (issues #214, #215).
@@ -1525,12 +1583,17 @@ namespace SlopArena.Client.UI
             if (_root == null)
                 return;
 
-            // Shell-hosted presentation (issue #219): the presenter fills the
-            // reserved bottom-left cell the shell laid out; the cell — not
-            // the presenter — owns geometry and density, and no page
-            // reservation exists because the reservation is structural.
+            // Shell-hosted presentation (issues #219/#220): the presenter
+            // fills the reserved bottom-left cell the shell laid out; the
+            // cell — not the presenter — owns geometry and density, and no
+            // page reservation exists because the reservation is structural.
+            // Three presentation states on the one attached subtree:
+            // expanded (the deliberate larger surface), compact (the default
+            // cell), minimized (the explicit strip).
             if (_hostIsShell && FrontendController.IsFrontendActive && !ChatInputGate.IsGameplayScene)
             {
+                bool expanded = _socialExpanded;
+                FrontendController.Shell?.SetSocialExpanded(expanded);
                 if (_frame != null)
                 {
                     _frame.style.position = Position.Absolute;
@@ -1540,11 +1603,28 @@ namespace SlopArena.Client.UI
                     _frame.style.bottom = 0;
                     _frame.style.width = StyleKeyword.Auto;
                     _frame.style.height = StyleKeyword.Auto;
+                    // The expanded surface intentionally occludes the page;
+                    // the compact cell lets clicks through to the page.
+                    _frame.pickingMode = expanded ? PickingMode.Position : PickingMode.Ignore;
                 }
-                _panel?.SetDisplayed(true);
-                _collapsed?.SetDisplayed(false);
+                // Menu-vs-combat appearance split (issue #220): the menu
+                // presentation keeps its translucent surface and restrained
+                // accent classes; the combat presenter styling is untouched.
+                _panel?.EnableInClassList("chat-panel--menu", true);
+                _panel?.EnableInClassList("chat-panel--menu-opaque", expanded);
+                _root?.EnableInClassList("chat-root--menu", true);
+                _root?.EnableInClassList("chat-root--expanded", expanded);
+                _panel?.SetDisplayed(_expanded);
+                _collapsed?.SetDisplayed(!_expanded);
+                // Conversation management is an expanded-view surface; the
+                // compact cell keeps the channel row instead (issue #220).
+                _conversationList?.SetDisplayed(expanded);
+                if (_expand != null)
+                    _expand.style.display = !expanded && _expanded
+                        ? DisplayStyle.Flex : DisplayStyle.None;
+                if (_close != null)
+                    _close.text = expanded ? "COLLAPSE" : "MINIMIZE";
                 ApplyRegionFocusability();
-                UpdateRegionHint();
                 return;
             }
 
@@ -1594,6 +1674,14 @@ namespace SlopArena.Client.UI
             }
 
             bool opaque = dock || replace;
+            // Combat and legacy presentations never carry the menu classes
+            // (issue #220): new dock styling cannot alter the match HUD.
+            _panel?.EnableInClassList("chat-panel--menu", false);
+            _panel?.EnableInClassList("chat-panel--menu-opaque", false);
+            _root?.EnableInClassList("chat-root--menu", false);
+            _root?.EnableInClassList("chat-root--expanded", false);
+            if (_expand != null)
+                _expand.style.display = DisplayStyle.None;
             _panel?.EnableInClassList("chat-panel--solid", opaque);
             _panel?.SetDisplayed(_expanded);
             _collapsed?.SetDisplayed(!_expanded);
@@ -1615,6 +1703,19 @@ namespace SlopArena.Client.UI
             // Compact chat replaces the page content temporarily; selections
             // live in the page controllers and survive the hide (issue #214).
             _hostPageRoot.style.display = replace ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// Whether the selected conversation is actually shown right now: the
+        /// panel is visible (compact cell or expanded view, not the minimized
+        /// strip) and no directory view replaces the history. Gameplay keeps
+        /// the legacy panel-visible rule (issue #220).
+        /// </summary>
+        private bool IsConversationShown()
+        {
+            if (ChatInputGate.IsGameplayScene)
+                return _expanded;
+            return _expanded && !_showDirectory;
         }
 
         /// <summary>
@@ -1694,7 +1795,7 @@ namespace SlopArena.Client.UI
         {
             if (_root?.panel?.focusController?.focusedElement is not VisualElement focused)
                 return false;
-            return IsWithin(focused, _draft) || IsWithin(focused, _name) || IsWithin(focused, _renameField);
+            return IsWithin(focused, _draft);
         }
 
         private bool IsEditorFocused(TextField? field)
@@ -1711,11 +1812,6 @@ namespace SlopArena.Client.UI
         private static bool IsEnter(KeyCode keyCode)
         {
             return keyCode == KeyCode.Return || keyCode == KeyCode.KeypadEnter;
-        }
-
-        private static bool IsNameValid(string value)
-        {
-            return ChatTextValidation.TryValidateDisplayName(value, out _, out _);
         }
 
         private static bool IsMessageValid(string value)

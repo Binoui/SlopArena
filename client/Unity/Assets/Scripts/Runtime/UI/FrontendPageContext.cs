@@ -85,6 +85,20 @@ namespace SlopArena.Client.UI
             return only;
         }
 
+        private Action? _backAction;
+
+        /// <summary>
+        /// The page's flow-specific Back action, registered through
+        /// <see cref="MenuNavigation"/>. The shell focus router invokes it as
+        /// the last cancel layer; the page-root NavigationCancel handler
+        /// remains the fallback for legacy documents. Cleared on release.
+        /// </summary>
+        public Action? BackAction => _backAction;
+
+        /// <summary>Invokes the page's Back action when the shell cancel
+        /// router resolves to the page layer.</summary>
+        internal void InvokeBackAction() => _backAction?.Invoke();
+
         /// <summary>
         /// Registers cleanup that runs when the context is released (page
         /// departure). Unsubscribe shared-shell registrations here — page
@@ -103,6 +117,10 @@ namespace SlopArena.Client.UI
                 throw new ArgumentNullException(nameof(root));
             _ownedRoots.Add(root);
         }
+
+        /// <summary>Called by <see cref="MenuNavigation.Configure"/> when the
+        /// page registers its flow-specific Back action.</summary>
+        internal void SetBackAction(Action? back) => _backAction = back;
 
         /// <summary>
         /// Page teardown (issue #218 activation sequence): run release
@@ -125,6 +143,7 @@ namespace SlopArena.Client.UI
             }
             _releaseActions.Clear();
             _ownedRoots.Clear();
+            _backAction = null;
         }
     }
 }

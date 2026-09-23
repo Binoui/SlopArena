@@ -7,7 +7,11 @@
             <ui:Label name="shell-wordmark" text="SLOPARENA" class="shell-wordmark" />
             <ui:Label name="shell-page-context" text="" class="shell-page-context" />
             <ui:VisualElement name="shell-top-bar-spacer" class="shell-top-bar-spacer" />
-            <ui:Label name="shell-identity" text="" class="shell-identity" />
+            <ui:Label name="shell-topbar-hint" text="" class="shell-topbar-hint" picking-mode="Ignore" />
+            <!-- Shared identity entry (issue #220): name plus true social
+                 connection status; activating it opens the shared identity
+                 surface. -->
+            <ui:Button name="shell-identity" text="" class="shell-identity" />
             <ui:VisualElement name="shell-settings-slot" class="shell-settings-slot" />
         </ui:VisualElement>
         <ui:VisualElement name="shell-workspace" class="shell-workspace">
@@ -22,6 +26,6 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="expanded-social-host" class="shell-hidden" picking-mode="Ignore" />
-        <ui:VisualElement name="modal-host" class="shell-hidden" picking-mode="Ignore" />
+        <ui:VisualElement name="modal-host" class="shell-modal-host" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

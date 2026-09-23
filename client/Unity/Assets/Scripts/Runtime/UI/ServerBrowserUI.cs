@@ -156,7 +156,7 @@ namespace SlopArena.Client.UI
                 {
                     if (IsCurrent(operation, ct))
                         ShowBrowserFailure(chat?.NeedsDisplayName == true
-                            ? "Choose a display name on the HOME screen before browsing rooms."
+                            ? "Choose a display name before browsing rooms."
                             : "Couldn’t reach the room directory. Check your connection, then retry.");
                     return;
                 }
@@ -343,7 +343,7 @@ namespace SlopArena.Client.UI
                 {
                     if (_alive && !ct.IsCancellationRequested)
                         SetAddressStatus(chat?.NeedsDisplayName == true
-                            ? "Choose a display name on the HOME screen before browsing rooms."
+                            ? "Choose a display name before browsing rooms."
                             : "Couldn’t reach the room directory. Check your connection, then retry.", true);
                     return;
                 }
@@ -426,7 +426,7 @@ namespace SlopArena.Client.UI
                 if (!authenticated || chat?.AuthToken == null)
                 {
                     FinishHostFailure(chat?.NeedsDisplayName == true
-                        ? "Choose a display name on the HOME screen before hosting a room."
+                        ? "Choose a display name before hosting a room."
                         : "Couldn’t sign in to the room directory. Retry when you’re online.", ct);
                     return;
                 }

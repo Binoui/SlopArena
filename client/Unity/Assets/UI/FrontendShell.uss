@@ -30,6 +30,102 @@
     display: none;
 }
 
+/* ── Shell modal host (issue #220) ─────────────────────────────────────
+   The host stays visible but empty while no modal is presented: it paints
+   nothing and ignores picking, so an empty host is invisible. The identity
+   view presents its modal here; presenting suppresses unread
+   acknowledgement through UiModalState. */
+
+.shell-modal-host {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.shell-modal {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(13, 13, 20, 0.55);
+}
+
+.shell-modal-box {
+    min-width: 420px;
+    max-width: 560px;
+    padding: 20px 24px;
+    background-color: rgb(23, 19, 27);
+    border-width: 2px;
+    border-color: rgb(255, 200, 33);
+}
+
+.shell-modal-title {
+    color: rgb(255, 200, 33);
+    font-size: 16px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+}
+
+.shell-modal-help {
+    margin-top: 8px;
+    margin-bottom: 14px;
+    color: rgb(196, 189, 197);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.shell-modal-row {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.shell-modal-field {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 36px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-width: 1px;
+    border-color: rgb(98, 92, 107);
+    background-color: rgb(240, 238, 232);
+    color: rgb(23, 19, 27);
+    font-size: 13px;
+}
+
+.shell-modal-field:focus {
+    border-color: rgb(255, 200, 33);
+}
+
+.shell-modal-submit {
+    min-width: 140px;
+    min-height: 36px;
+    margin-left: 8px;
+    border-width: 2px;
+    border-color: rgb(13, 13, 20);
+    border-bottom-width: 4px;
+    background-color: rgb(255, 200, 33);
+    color: rgb(23, 19, 27);
+    font-size: 11px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.shell-modal-feedback {
+    min-height: 18px;
+    margin-top: 8px;
+    color: rgb(175, 168, 178);
+    font-size: 12px;
+    white-space: normal;
+}
+
 /* ── Top bar ──────────────────────────────────────────────────────────── */
 
 .shell-top-bar {
@@ -62,9 +158,35 @@
 }
 
 .shell-identity {
+    margin-left: 12px;
+    padding-left: 10px;
+    padding-right: 10px;
+    min-height: 30px;
+    border-width: 1px;
+    border-color: rgba(240, 238, 232, 0.25);
+    background-color: rgba(13, 13, 20, 0.6);
     color: rgb(76, 221, 136);
     font-size: 13px;
     letter-spacing: 1px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+}
+
+.shell-identity:hover,
+.shell-identity:focus {
+    border-color: rgb(255, 200, 33);
+    color: rgb(255, 200, 33);
+}
+
+/* The visible top-bar route (issue #220): text is set by the focus router
+   ("E/X // TOP BAR"); hidden while a text field is editing or a modal is
+   presented. */
+.shell-topbar-hint {
+    margin-right: 12px;
+    color: rgb(196, 189, 197);
+    font-size: 10px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
     white-space: nowrap;
 }
 
@@ -83,6 +205,9 @@
     padding-right: 24px;
     padding-top: 16px;
     flex-direction: column;
+    /* Positioned so the expanded social surface can resolve its absolute
+       geometry against the workspace below the top bar (issue #220). */
+    position: relative;
 }
 
 .shell-host {
@@ -243,8 +368,8 @@
 }
 
 /* Fit the presenter inside the 380×190 cell: the header actions share one
-   row, the history keeps a small scrolling floor, and the rename section
-   compresses (issue #219 density handling). */
+   row, the history keeps a small scrolling floor (issue #219 density
+   handling). */
 .frontend-shell--compact .chat-header-actions {
     flex-direction: row;
     align-items: center;
@@ -256,12 +381,6 @@
 
 .frontend-shell--compact .chat-feedback {
     min-height: 0;
-}
-
-.frontend-shell--compact .chat-rename {
-    min-height: 0;
-    margin-top: 4px;
-    padding-top: 4px;
 }
 
 /* ── Migrated page fragments ────────────────────────────────────────────
@@ -291,7 +410,6 @@
 .menu-header-section .menu-title-rule,
 .menu-header-section .menu-tagline,
 .menu-header-section .menu-copy,
-.menu-body-section .menu-identity,
 .menu-body-section .menu-actions,
 .menu-body-section .menu-action-item,
 .char-select-frag .frag-header,
@@ -371,11 +489,6 @@
 
 .frontend-shell--compact .menu-body-section .menu-actions {
     width: 100%;
-}
-
-.frontend-shell--compact .menu-identity {
-    width: 100%;
-    padding: 10px 12px;
 }
 
 .frontend-shell--compact .menu-action {

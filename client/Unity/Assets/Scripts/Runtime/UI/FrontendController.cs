@@ -45,6 +45,9 @@ namespace SlopArena.Client.UI
         [SerializeField] private VisualTreeAsset? _homeFragment;
         [SerializeField] private VisualTreeAsset? _fighterSelectFragment;
 
+        private FrontendShellIdentityView? _identity;
+        private FrontendFocusRouter? _focusRouter;
+
         private static FrontendController? _instance;
         private static FrontendPage? _pendingPage;
         private FrontendPage _current;
@@ -72,6 +75,16 @@ namespace SlopArena.Client.UI
 
         /// <summary>The stable shell view; null outside the frontend scene.</summary>
         public static FrontendShellView? Shell => _instance?._shell;
+
+        /// <summary>
+        /// The shared shell identity surface (issue #220); null outside the
+        /// frontend scene. Mode gating reads it instead of any page-owned
+        /// identity panel.
+        /// </summary>
+        public static FrontendShellIdentityView? Identity => _instance?._identity;
+
+        /// <summary>The shell focus router (issue #220); null outside the frontend scene.</summary>
+        public static FrontendFocusRouter? FocusRouter => _instance?._focusRouter;
 
         /// <summary>Whether the given page is fragment-mounted into the shell.</summary>
         public static bool IsMigratedPage(FrontendPage page) =>
@@ -134,6 +147,15 @@ namespace SlopArena.Client.UI
         private void Start()
         {
             _shell?.Bind();
+            // The shell-owned identity surface and focus router are created
+            // here so existing scenes built before Pass 2 (#220) keep working
+            // without a rebuild; the scene builder adds them explicitly too.
+            _identity = GetComponent<FrontendShellIdentityView>()
+                ?? gameObject.AddComponent<FrontendShellIdentityView>();
+            _focusRouter = GetComponent<FrontendFocusRouter>()
+                ?? gameObject.AddComponent<FrontendFocusRouter>();
+            _identity.Bind(_shell);
+            _focusRouter.Bind(_shell);
             Show(_pendingPage ?? FrontendPage.Home);
             _pendingPage = null;
         }
@@ -187,6 +209,10 @@ namespace SlopArena.Client.UI
             // page-owned dialogs). Shell, social and identity UI survive.
             _currentContext?.Release();
             _currentContext = null;
+            // Stale initial focus is cleared on page departure (issue #220):
+            // a scheduled old-page focus call can never steal focus after a
+            // navigation or a social/modal switch.
+            MenuNavigation.ClearPageInitialFocus();
             _shell?.ClearPageHosts();
 
             if (IsMigratedPage(page))

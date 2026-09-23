@@ -16,6 +16,13 @@ namespace SlopArena.Client.UI
         /// </summary>
         public static VisualElement? PageInitialFocus { get; private set; }
 
+        /// <summary>
+        /// Clears the stale page initial focus (issue #220): page departure
+        /// invalidates it explicitly, so a superseded focus entry can never
+        /// be restored after a navigation or a social/modal switch.
+        /// </summary>
+        public static void ClearPageInitialFocus() => PageInitialFocus = null;
+
         /// <summary>Focus the first action and route NavigationCancel to this screen's back action.</summary>
         public static void Configure(VisualElement root, Button initialButton, Action backAction)
         {
@@ -51,6 +58,11 @@ namespace SlopArena.Client.UI
                 throw new ArgumentNullException(nameof(context));
 
             ConfigureShared(initialButton);
+            // The page's flow-specific Back action registers on the context so
+            // the shell focus router can resolve it as the last cancel layer
+            // (issue #220); the page-root handler stays as the legacy
+            // fallback. It is cleared when the context releases.
+            context.SetBackAction(backAction);
 
             var roots = context.OwnedRoots;
             EventCallback<ClickEvent> clickHandler = _ => UISFX.PlayClick();
@@ -102,6 +114,18 @@ namespace SlopArena.Client.UI
             evt.StopImmediatePropagation();
             if (ChatInputGate.SuppressShortcuts)
                 return;
+            // On shell-mounted pages the focus router resolves the cancel
+            // layers (issue #220): modal → expanded social → top-bar →
+            // social → page Back. The page's back action is invoked only as
+            // the last layer, so one press never departs the page and
+            // dismisses something else simultaneously.
+            if (FrontendController.IsFrontendActive &&
+                FrontendController.IsMigratedPage(FrontendController.CurrentPage) &&
+                FrontendController.FocusRouter is { } router)
+            {
+                router.HandlePageCancel();
+                return;
+            }
             backAction?.Invoke();
         }
     }

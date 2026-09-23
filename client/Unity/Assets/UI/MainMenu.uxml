@@ -1,9 +1,9 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Home page fragment (issue #219). Mounted into the FrontendShell
-         hosts: page-header → PageHeaderHost, page-body → PageBodyHost,
-         page-actions → PageActionsHost. The roster showcase is gone; the
-         first-run identity entry stays here until the shell identity
-         surface lands in Pass 2 (#220). -->
+    <!-- Home page fragment (issues #219/#220). Mounted into the
+         FrontendShell hosts: page-header → PageHeaderHost,
+         page-body → PageBodyHost, page-actions → PageActionsHost. The
+         roster showcase is gone; identity presentation and mode-button
+         gating live in the shared shell identity surface (issue #220). -->
     <ui:VisualElement name="page-frag">
         <ui:VisualElement name="page-header" class="page-section menu-header-section">
             <ui:VisualElement name="menu-title-wrap" class="menu-title-wrap">
@@ -17,7 +17,6 @@
             <ui:Label text="Pick a way in. The hard part is choosing who gets blamed for the rematch." class="menu-copy" />
         </ui:VisualElement>
         <ui:VisualElement name="page-body" class="page-section menu-body-section">
-            <ui:VisualElement name="identity-panel" class="menu-identity" />
             <ui:VisualElement name="menu-actions" class="menu-actions">
                 <ui:VisualElement class="menu-action-item">
                     <ui:Button name="btn-multiplayer" text="PLAY ONLINE" class="menu-action menu-action--primary" />

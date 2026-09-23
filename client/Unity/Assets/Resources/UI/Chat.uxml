@@ -10,23 +10,20 @@
             <ui:Label name="chat-unread" class="chat-unread" />
         </ui:VisualElement>
 
+        <!-- Compact menu presentation (issue #220): no big CHAT title, no
+             permanent rename form, no per-line mute buttons, no persistent
+             member list. Channel row, history, composer; directory and
+             conversation management behind the explicit DIRECT view and the
+             expanded surface. Identity lives in the shared shell surface. -->
         <ui:VisualElement name="chat-panel" class="chat-panel">
             <ui:VisualElement class="chat-header">
-                <ui:VisualElement class="chat-header-copy">
-                    <ui:Label name="chat-title-header" text="CHAT" class="chat-title" />
-                </ui:VisualElement>
+                <ui:Label name="chat-title-header" text="CHAT" class="chat-title" />
+                <ui:Label name="chat-status-header" class="chat-status chat-status--header" />
                 <ui:VisualElement class="chat-header-actions">
-                    <ui:Label name="chat-status-header" class="chat-status chat-status--header" />
-                    <ui:Button name="chat-close" text="CLOSE" class="chat-close" />
+                    <ui:Button name="chat-identity" text="IDENTITY" class="chat-close" />
+                    <ui:Button name="chat-expand" text="EXPAND" class="chat-close" />
+                    <ui:Button name="chat-close" text="MINIMIZE" class="chat-close" />
                 </ui:VisualElement>
-            </ui:VisualElement>
-
-            <ui:VisualElement name="chat-setup" class="chat-setup">
-                <ui:Label text="CHOOSE A DISPLAY NAME" class="chat-section-label" />
-                <ui:Label text="Your guest identity stays with this launch. Local play remains available while chat connects." class="chat-help" />
-                <ui:TextField name="display-name" label="DISPLAY NAME" placeholdertext="1–24 characters" class="chat-name-field" />
-                <ui:Button name="name-submit" text="SET DISPLAY NAME" class="chat-action chat-action--primary" />
-                <ui:Label name="setup-feedback" class="chat-feedback" />
             </ui:VisualElement>
 
             <ui:VisualElement name="chat-main" class="chat-main">
@@ -49,14 +46,6 @@
                             <ui:Button name="chat-send" text="SEND" class="chat-action chat-action--primary" />
                         </ui:VisualElement>
                         <ui:Label name="history-feedback" class="chat-feedback" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement name="chat-rename" class="chat-rename">
-                    <ui:Label text="RENAME OUTSIDE A GAMESERVER" class="chat-section-label" />
-                    <ui:VisualElement class="chat-rename-row">
-                        <ui:TextField name="rename-name" placeholdertext="New display name" class="chat-name-field" />
-                        <ui:Button name="rename-submit" text="RENAME" class="chat-action chat-action--small" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

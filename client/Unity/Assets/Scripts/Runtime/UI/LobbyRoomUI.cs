@@ -89,7 +89,7 @@ namespace SlopArena.Client.UI
                 SubscribeLobby(_lobby);
             _awaitingLobby = true;
             SetStatus(chat.NeedsDisplayName
-                ? "Choose a display name on the HOME screen before joining a room."
+                ? "Choose a display name before joining a room."
                 : (_lobby?.IsConnected == true ? "Rejoining the room…" : "Connecting to the room…"), false);
             SetRetryVisible(false);
             StartLobbyWatchdog(generation);
@@ -118,7 +118,7 @@ namespace SlopArena.Client.UI
                 {
                     if (IsCurrent(generation, ct))
                         FailLobby(chat?.NeedsDisplayName == true
-                            ? "Choose a display name on the HOME screen before joining a room."
+                            ? "Choose a display name before joining a room."
                             : "Couldn’t connect to the room directory. Retry, or return to the server browser.");
                     return;
                 }

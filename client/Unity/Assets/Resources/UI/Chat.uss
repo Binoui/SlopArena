@@ -224,39 +224,6 @@
     color: var(--chat-acid);
 }
 
-.chat-setup {
-    display: none;
-    flex-grow: 1;
-    justify-content: center;
-    align-items: stretch;
-    padding: 20px 8px;
-}
-
-.chat-help {
-    max-width: 360px;
-    margin-top: 8px;
-    margin-bottom: 18px;
-    color: var(--chat-muted);
-    font-size: 13px;
-    white-space: normal;
-}
-
-.chat-name-field {
-    min-height: 38px;
-    margin-bottom: 8px;
-    padding-left: 8px;
-    padding-right: 8px;
-    border-width: 1px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-paper);
-    color: var(--chat-ink);
-    font-size: 13px;
-}
-
-.chat-name-field:focus {
-    border-color: var(--chat-acid);
-}
-
 .chat-action {
     min-height: 36px;
     border-width: 2px;
@@ -299,6 +266,57 @@
     flex-grow: 1;
     min-height: 0;
     flex-direction: column;
+}
+
+/* ── Menu presentation (issue #220) ────────────────────────────────────
+   The shell-hosted presenter keeps the compact bottom-left look: a
+   translucent surface, one restrained accent, a small conversation title
+   and no big CHAT heading. Combat keeps the default panel styling so dock
+   styling can never alter the match HUD. */
+
+.chat-panel--menu {
+    background-color: rgba(13, 13, 20, 0.84);
+    border-width: 1px;
+    border-color: rgba(240, 238, 232, 0.22);
+    border-bottom-width: 3px;
+    border-bottom-color: var(--chat-acid);
+}
+
+.chat-panel--menu-opaque {
+    background-color: rgb(13, 13, 20);
+}
+
+.chat-panel--menu .chat-header {
+    min-height: 24px;
+    padding-bottom: 4px;
+    align-items: center;
+}
+
+.chat-panel--menu .chat-title {
+    font-size: 12px;
+    margin-top: 0;
+    letter-spacing: 2px;
+    -unity-font-definition: none;
+}
+
+.chat-panel--menu .chat-status--header {
+    max-width: 200px;
+}
+
+.chat-panel--menu .chat-header-actions {
+    flex-direction: row;
+    align-items: center;
+}
+
+.chat-panel--menu .chat-close {
+    min-height: 20px;
+    margin-left: 4px;
+}
+
+/* Directory section labels inside the explicit DIRECT view. */
+.online-list .chat-section-label {
+    margin-top: 6px;
+    margin-bottom: 2px;
 }
 
 .chat-tabs {
@@ -517,31 +535,5 @@
 
 .chat-compose .chat-action {
     width: 68px;
-    margin-left: 5px;
-}
-
-.chat-rename {
-    display: none;
-    min-height: 72px;
-    margin-top: 9px;
-    padding-top: 8px;
-    border-top-width: 1px;
-    border-top-color: var(--chat-border);
-}
-
-.chat-rename-row {
-    margin-top: 5px;
-    flex-direction: row;
-    align-items: stretch;
-}
-
-.chat-rename-row .chat-name-field {
-    flex-grow: 1;
-    min-width: 0;
-    margin-bottom: 0;
-}
-
-.chat-rename-row .chat-action {
-    width: 78px;
     margin-left: 5px;
 }

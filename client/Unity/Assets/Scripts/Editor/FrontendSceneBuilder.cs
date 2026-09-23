@@ -63,6 +63,12 @@ public static class FrontendSceneBuilder
         shellViewSerialized.FindProperty("_uiDocument").objectReferenceValue = shellDocument;
         shellViewSerialized.ApplyModifiedPropertiesWithoutUndo();
 
+        // Shell-owned identity surface and focus router (issue #220). The
+        // frontend controller also creates them at runtime when missing, so
+        // scenes built before Pass 2 keep working.
+        shellObject.AddComponent<FrontendShellIdentityView>();
+        shellObject.AddComponent<FrontendFocusRouter>();
+
         var shell = shellObject.AddComponent<FrontendController>();
 
         var pageObjects = new GameObject[Pages.Length];
@@ -129,7 +135,8 @@ public static class FrontendSceneBuilder
         }
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[FrontendSceneBuilder] Built {ScenePath} with the stable shell document and {Pages.Length} pages "
-            + $"(Home + Fighter Select fragment-mounted; unmigrated pages keep per-page documents).");
+        Debug.Log($"[FrontendSceneBuilder] Built {ScenePath} with the stable shell document, identity surface and focus router (#220), "
+            + $"and {Pages.Length} pages "
+            + "(Home + Fighter Select fragment-mounted; unmigrated pages keep per-page documents).");
     }
 }
