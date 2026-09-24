@@ -3,8 +3,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(112)
-/// + hasInput(1) + InputState(20) when the server consumed input that tick.
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(114)
+/// + hasInput(1) + InputState(21) when the server consumed input that tick.
 /// Input relay for client rollback prediction (issue #80, ADR-0010).
 /// </summary>
 public class ServerEntityPacketTests
@@ -33,6 +33,12 @@ public class ServerEntityPacketTests
             DamagePercent = 87,
             LockOn = true,
             LandingLagTicks = 18,
+            IsFastFalling = true,
+            JumpFromSlide = true,
+            SlideAttackCarryActive = true,
+            CrouchSettled = true,
+            QueuedCrouchBrace = true,
+            InPostHitstunFlight = true,
             Cooldown0 = 1,
             Cooldown1 = 12,
             Cooldown2 = 33,
@@ -48,6 +54,7 @@ public class ServerEntityPacketTests
         MoveX = 0.75f,
         MoveY = -0.25f,
         Up = true,
+        DownPressed = true,
         Down = true,
         Left = true,
         Right = true,
@@ -102,10 +109,17 @@ public class ServerEntityPacketTests
         Assert.Equal(statePacket.DamagePercent, restored.State.DamagePercent);
         Assert.Equal(statePacket.LandingLagTicks, restored.State.LandingLagTicks);
         Assert.True(restored.State.LockOn);
+        Assert.True(restored.State.IsFastFalling);
+        Assert.True(restored.State.JumpFromSlide);
+        Assert.True(restored.State.SlideAttackCarryActive);
+        Assert.True(restored.State.CrouchSettled);
+        Assert.True(restored.State.QueuedCrouchBrace);
+        Assert.True(restored.State.InPostHitstunFlight);
         Assert.Equal(input.MoveX, restored.Input.MoveX);
         Assert.Equal(input.MoveY, restored.Input.MoveY);
         Assert.Equal(input.Up, restored.Input.Up);
         Assert.Equal(input.Down, restored.Input.Down);
+        Assert.Equal(input.DownPressed, restored.Input.DownPressed);
         Assert.Equal(input.Left, restored.Input.Left);
         Assert.Equal(input.Right, restored.Input.Right);
         Assert.Equal(input.Jump, restored.Input.Jump);
@@ -136,7 +150,7 @@ public class ServerEntityPacketTests
         var buffer = new byte[ServerEntityPacket.MaxSize];
         packet.Serialize(buffer);
         Assert.Equal(ServerEntityPacket.NoInputSize, packet.WireSize);
-        var restored = ServerEntityPacket.Deserialize(buffer);
+        var restored = ServerEntityPacket.Deserialize(buffer.AsSpan(0, packet.WireSize));
 
         // Assert: flag reads 0, no stale input is ever carried
         Assert.Equal(1UL, restored.EntityId);
@@ -148,10 +162,8 @@ public class ServerEntityPacketTests
     }
 
     [Fact]
-    public void TruncatedRelay_DecodesAsNoInputMarker()
+    public void TruncatedRelay_IsRejected()
     {
-        // A relay flag=1 whose 19 input bytes never arrived is a protocol violation;
-        // decode leniently to the no-input marker (mirrors InputState.Deserialize guards).
         var packet = new ServerEntityPacket
         {
             EntityId = 1,
@@ -164,27 +176,20 @@ public class ServerEntityPacketTests
         packet.Serialize(buffer);
         var truncated = buffer.AsSpan(0, ServerEntityPacket.NoInputSize).ToArray();
 
-        var restored = ServerEntityPacket.Deserialize(truncated);
-
-        Assert.Equal(1UL, restored.EntityId);
-        Assert.Equal(5u, restored.Tick);
-        Assert.False(restored.HasInput);
+        Assert.Throws<ArgumentException>(() => ServerEntityPacket.Deserialize(truncated));
     }
 
     [Fact]
     public void SizeConstants_AssertWireLayout()
     {
-        // Downlink max packet size is a wire contract: 8 entityId + 4 tick
-        // + 112 CharacterStatePacket + 1B flag + 20B input.
+        // Downlink max packet: 8 entityId + 4 tick + 114 state + 1 marker + 21 input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(124, ServerEntityPacket.BaseSize);
+        Assert.Equal(126, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
-        Assert.Equal(21, ServerEntityPacket.RelaySize);
-        Assert.Equal(145, ServerEntityPacket.MaxSize);
-        Assert.Equal(125, ServerEntityPacket.NoInputSize);
-        // Uplink format: 20B InputState (32B full uplink packet with entityId+tick) — the
-        // ADR-0016 short-hop bit is the only addition; slot count still fits the byte.
-        Assert.Equal(20, InputState.Size);
+        Assert.Equal(22, ServerEntityPacket.RelaySize);
+        Assert.Equal(148, ServerEntityPacket.MaxSize);
+        Assert.Equal(127, ServerEntityPacket.NoInputSize);
+        Assert.Equal(21, InputState.Size);
     }
 
     [Fact]
@@ -193,7 +198,7 @@ public class ServerEntityPacketTests
         var input = new InputState
         {
             MoveX = 0.5f, MoveY = -0.5f,
-            Up = true, Down = true, Left = false, Right = true,
+            Up = true, Down = true, DownPressed = true, Left = false, Right = true,
             Jump = true, JumpHeld = true, Dash = true, Burst = true, IsAiming = true,
             ActiveSlot = AbilitySlots.A,
         };
@@ -204,6 +209,7 @@ public class ServerEntityPacketTests
         Assert.True(restored.JumpHeld);
         Assert.True(restored.Jump);
         Assert.True(restored.Down);
+        Assert.True(restored.DownPressed);
         Assert.Equal(AbilitySlots.A, restored.ActiveSlot);
     }
 
@@ -234,5 +240,34 @@ public class ServerEntityPacketTests
         Assert.False(restoredClean.FaceToCamera);
         Assert.False(restoredClean.ToggleLock);
         Assert.False(restoredClean.JumpHeld);
+    }
+    [Fact]
+    public void CodecBoundaries_RejectTruncationVersionAndRelayMismatch()
+    {
+        var input = new byte[InputState.Size];
+        default(InputState).Write(input);
+        Assert.Throws<ArgumentException>(() => InputState.Deserialize(input.AsSpan(0, InputState.Size - 1)));
+        input[20] = 2;
+        Assert.Throws<InvalidDataException>(() => InputState.Deserialize(input));
+
+        var packet = new ServerEntityPacket
+        {
+            EntityId = 7,
+            Tick = 8,
+            State = SampleState(),
+            HasInput = false,
+        };
+        var noInput = new byte[ServerEntityPacket.NoInputSize];
+        packet.Serialize(noInput);
+        noInput[ServerEntityPacket.BaseSize] = 2;
+        Assert.Throws<InvalidDataException>(() => ServerEntityPacket.Deserialize(noInput));
+
+        var full = new byte[ServerEntityPacket.MaxSize];
+        packet.HasInput = true;
+        packet.Input = SampleInput();
+        packet.Serialize(full);
+        full[ServerEntityPacket.BaseSize] = 0;
+        Assert.Throws<InvalidDataException>(() => ServerEntityPacket.Deserialize(full));
+        Assert.Throws<ArgumentException>(() => ServerEntityPacket.Deserialize(full.AsSpan(0, full.Length - 1)));
     }
 }

@@ -29,13 +29,35 @@ internal static class DeterministicPoseTrackBaker
         public AnimationClip Clip = null!;
         public int FrameCount;
         public byte[] Bytes = Array.Empty<byte>();
+        // Low posture clips are authored in rig-root local space rather than
+        // hips-relative space so the baked pelvis translation survives runtime
+        // BoneYToWorldY reconstruction.
+        public bool IsLowPosture;
     }
 
-    internal static byte[] Bake(GameObject rig, IReadOnlyList<SampledAnimation> animations, int sampleRate, WeaponAttachConfig weaponConfig = null)
+    internal static byte[] Bake(
+        GameObject rig,
+        IReadOnlyList<SampledAnimation> animations,
+        int sampleRate,
+        WeaponAttachConfig weaponConfig = null,
+        float visualScale = 1f,
+        float hurtboxBoneScale = 1f,
+        float modelYOffset = 0f,
+        float capsuleHeight = 0f,
+        float hipHeight = 0f)
     {
         if (sampleRate != 60) throw new InvalidOperationException("Sample rate must be exactly 60 Hz.");
         if (rig == null) throw new InvalidOperationException("Rig is missing.");
         if (animations == null || animations.Count == 0) throw new InvalidOperationException("No animations to bake.");
+
+        bool hasLowPosture = animations.Any(x => x != null && x.IsLowPosture);
+        if (hasLowPosture)
+        {
+            if (!IsPositiveFinite(visualScale) || !IsPositiveFinite(hurtboxBoneScale))
+                throw new InvalidOperationException("Low-posture bake scales must be finite and positive.");
+            if (!IsFinite(modelYOffset) || !IsFinite(capsuleHeight) || !IsFinite(hipHeight))
+                throw new InvalidOperationException("Low-posture bake alignment values must be finite.");
+        }
 
         var sourceAnimator = rig.GetComponent<Animator>();
         if (sourceAnimator == null) throw new InvalidOperationException("Rig has no Animator.");
@@ -137,15 +159,32 @@ internal static class DeterministicPoseTrackBaker
                     Vector3 hipsPosition = hips.position;
                     for (int bone = 0; bone < transforms.Length; bone++)
                     {
-                        Vector3 position = transforms[bone].position - hipsPosition;
+                        Vector3 position = animation.IsLowPosture
+                            ? LowPoseBonePosition(temp.transform.InverseTransformPoint(transforms[bone].position),
+                                visualScale, modelYOffset, capsuleHeight, hipHeight, hurtboxBoneScale)
+                            : transforms[bone].position - hipsPosition;
                         WriteFiniteVector(stream, position, animation.SemanticId, frame, names[bone]);
                     }
                     if (weaponEntry != null)
                     {
                         Vector3 bladePosition = weaponBone.TransformPoint(weaponEntry.PositionOffset);
                         Quaternion bladeRotation = weaponBone.rotation * Quaternion.Euler(weaponEntry.RotationOffset);
-                        WriteFiniteVector(stream, bladePosition + bladeRotation * tipLocal - hipsPosition, animation.SemanticId, frame, "_weapon_tip");
-                        WriteFiniteVector(stream, bladePosition + bladeRotation * hiltLocal - hipsPosition, animation.SemanticId, frame, "_weapon_hilt");
+                        Vector3 tip = bladePosition + bladeRotation * tipLocal;
+                        Vector3 hilt = bladePosition + bladeRotation * hiltLocal;
+                        if (animation.IsLowPosture)
+                        {
+                            tip = LowPoseBonePosition(temp.transform.InverseTransformPoint(tip),
+                                visualScale, modelYOffset, capsuleHeight, hipHeight, hurtboxBoneScale);
+                            hilt = LowPoseBonePosition(temp.transform.InverseTransformPoint(hilt),
+                                visualScale, modelYOffset, capsuleHeight, hipHeight, hurtboxBoneScale);
+                        }
+                        else
+                        {
+                            tip -= hipsPosition;
+                            hilt -= hipsPosition;
+                        }
+                        WriteFiniteVector(stream, tip, animation.SemanticId, frame, "_weapon_tip");
+                        WriteFiniteVector(stream, hilt, animation.SemanticId, frame, "_weapon_hilt");
                     }
                 }
             }
@@ -156,6 +195,25 @@ internal static class DeterministicPoseTrackBaker
             UnityEngine.Object.DestroyImmediate(temp);
         }
     }
+
+    private static Vector3 LowPoseBonePosition(
+        Vector3 rootLocalPosition,
+        float visualScale,
+        float modelYOffset,
+        float capsuleHeight,
+        float hipHeight,
+        float hurtboxBoneScale)
+        => new(
+            rootLocalPosition.x * visualScale / hurtboxBoneScale,
+            (rootLocalPosition.y * visualScale + modelYOffset + capsuleHeight * 0.5f - hipHeight) / hurtboxBoneScale,
+            rootLocalPosition.z * visualScale / hurtboxBoneScale);
+
+    private static bool IsFinite(float value)
+        => !float.IsNaN(value) && !float.IsInfinity(value);
+
+    private static bool IsPositiveFinite(float value)
+        => IsFinite(value) && value > 0f;
+
 
     private static void WriteFiniteVector(Stream stream, Vector3 value, string semanticId, int frame, string bone)
     {

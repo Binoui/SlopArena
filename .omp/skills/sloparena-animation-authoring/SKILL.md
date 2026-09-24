@@ -25,6 +25,11 @@ Raw FBX, Unity `.meta`, and catalog bindings are source. `content-cooked/` and g
 
 ## Before authoring
 
+Choose the applicable path first: static pose, bounded correction, or new/reworked motion.
+Static poses need pose invariants and entry/exit behavior, not a beat plan or blocking,
+breakdown and interpolation passes. For Unity-native `.anim` assets, skip Blender/FBX
+export and reimport steps; retain actual-prefab, binding and applicable cook checks.
+
 1. Identify the package, semantic animation ID, catalog entry, FBX asset, take name, clip duration/fps/frame range, and the ability event tick(s).
 2. Map authoritative event ticks to source frames before posing. For constant forward playback:
    ```text
@@ -62,7 +67,16 @@ A pass is accepted when its visible criteria are met; this is not a mandatory us
 
 Work in coherent passes: author → capture → inspect → identify a defect and likely cause → bounded repair → inspect affected evidence again. Do not rebuild accepted motion because another interval fails.
 
-- For a new or substantially reworked clip, inspect a semantic-frame contact sheet and complete timed gameplay-camera preview before final Unity import. Viewport captures are sufficient; polished rendering is not required.
+Each capture must answer an unresolved visual question. Reuse evidence across skills
+and acceptance criteria: actual-prefab Training footage can satisfy both prefab and
+runtime presentation checks. Start with one useful comparison per changed rig for a
+static pose, plus entry/exit playback; add views only for unresolved defects. Inspect
+the evidence, record the finding, and stop when the criterion is established.
+Use tests/state measurements for timing, input and resources rather than extra images.
+Keep detailed traces for failures and representative cases, not every passing
+permutation, unless explicitly requested. Repeat only checks invalidated by a change.
+
+- For new or substantially reworked motion, inspect a semantic-frame contact sheet and complete timed gameplay-camera preview before final import. Static poses need neither a repeated-frame contact sheet nor an artificial timed motion preview. Viewport captures are sufficient; polished rendering is not required.
 - For a bounded correction, inspect the affected frames/interval first, then the complete action and entry/handoff before acceptance. Replay at the intended runtime speed, not merely the source FPS.
 - Use the presentation acceptance criteria below for still poses. Use playback to judge acceleration, attack snap, arcs, continuity, contact, weight, recoil, foot sliding, interpolation overshoot, and secondary-motion timing. Stills cannot prove motion quality.
 - Add diagnostic angles only when the gameplay view cannot establish the suspected defect. For unusually extreme poses, inspect affected joints/accessories for collapse, volume loss, clipping, twisting, or apparent detachment; this is not a full rig audit.
@@ -79,7 +93,7 @@ Open and inspect the evidence. Existing keys, successful rendering/export, and s
   - mesh stays at expected scale and origin;
   - clip entry and end poses match the intended transition contract;
   - clip duration, fps, and binding count are expected;
-  - fire, recoil, and settle frames read at gameplay camera scale.
+  - relevant event poses, or the static hold and entry/exit, read at gameplay camera scale.
 3. Reject the candidate if Unity changes bind pose, root offset, scale, facing, or Avatar validity. Do not compensate with client-side transforms.
 4. A Blender FBX export that fails this gate is not a valid delivery. Preserve the known-good source asset and diagnose the importer/rig contract first.
 
@@ -127,12 +141,15 @@ Require all of the following for an accepted package:
 - current Unity error console is empty;
 - final package inspect reports `status: valid` and `dirtyOrStale: false`;
 - source and cooked-source hashes match;
-- the real character prefab shows the intended motion at start, anticipation, active, recoil, and end frames;
+- the real character prefab shows the intended static hold and entry/exit, or the motion's applicable semantic beats; do not require anticipation/recoil phases for a static pose;
 - Ability Lab or Training exercises the semantic animation through the normal presentation path when available.
 
 Record Unity-facing verification in the ignored root `TESTING-UNITY.md`.
 
 ## Presentation acceptance:
+
+Apply motion-specific criteria only when that motion exists. For static holds, check
+silhouette, intended foot/contact placement, root stability, clipping and entry/exit.
 
 - anticipation direction is readable before the active event;
 

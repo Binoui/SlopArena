@@ -55,7 +55,12 @@ namespace SlopArena.Shared.Rollback
                 else
                     _sim.SetState(packet.EntityId, confirmedState);
 
-                _lastKnownInput[packet.EntityId] = packet.HasInput ? packet.Input : default;
+                // The relay describes the already-consumed confirmed tick. Reuse only
+                // its held bits on the prediction frontier; never replay this one-tick
+                // edge. The packet itself remains untouched for exact-tick consumers.
+                var frontierInput = packet.HasInput ? packet.Input : default;
+                frontierInput.DownPressed = false;
+                _lastKnownInput[packet.EntityId] = frontierInput;
                 if (packet.Tick > maxConfirmedTick) maxConfirmedTick = packet.Tick;
             }
             _sim.SetTick(maxConfirmedTick);

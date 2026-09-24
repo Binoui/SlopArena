@@ -74,6 +74,7 @@ public class BurstTests
         p.QueuedKBBase = 10f;
         p.QueuedKBGrowth = 5f;
         p.QueuedKBStun = 20;
+        p.QueuedCrouchBrace = true;
         TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, p);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
@@ -84,6 +85,7 @@ public class BurstTests
         Assert.Equal(0, s.QueuedKBAngle);
         Assert.Equal(0f, s.QueuedKBBase); Assert.Equal(0f, s.QueuedKBGrowth);
         Assert.Equal(0, s.QueuedKBStun);
+        Assert.False(s.QueuedCrouchBrace);
         Assert.False(s.QueuedKVOverride);
 
         // Freeze already consumed the burst decision; the queue is gone — no launch ever fires.

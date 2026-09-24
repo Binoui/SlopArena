@@ -114,6 +114,7 @@ public class SimulationInvariantTests
             // Digital inputs: low probability per tick
             Up = rng.Next(4) == 0,
             Down = rng.Next(4) == 0,
+            DownPressed = rng.Next(8) == 0,
             Left = rng.Next(4) == 0,
             Right = rng.Next(4) == 0,
             Jump = rng.Next(8) == 0,

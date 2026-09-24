@@ -20,8 +20,8 @@
     "dashCooldownTicks": 52,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 48,
-    "fastFallSpeed": 58,
+    "maxFallSpeed": 14,
+    "fastFallSpeed": 22,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 35,
@@ -34,6 +34,8 @@
     "jump": "anim.kistu.jump",
     "fall": "anim.kistu.fall",
     "tumble": "anim.kistu.tumble",
+    "crouch": "anim.kistu.crouch",
+    "slide": "anim.kistu.slide",
     "hitSmall": "anim.kistu.hit-small",
     "hitMedium": "anim.kistu.hit-medium",
     "hitHard": "anim.kistu.hit-hard",
@@ -178,6 +180,7 @@
   "slots": [
     {
       "id": "ground.1",
+      "allowSlideCarry": true,
       "name": "Quick Slash",
       "description": "Quick Slash",
       "iconId": "icon.1",
@@ -237,6 +240,7 @@
     },
     {
       "id": "ground.2",
+      "allowSlideCarry": true,
       "name": "Double Slash",
       "description": "Double Slash",
       "iconId": "icon.2",
@@ -296,6 +300,7 @@
     },
     {
       "id": "ground.3",
+      "allowSlideCarry": true,
       "name": "Up Slash",
       "description": "Up Slash",
       "iconId": "icon.3",
@@ -355,6 +360,7 @@
     },
     {
       "id": "ground.4",
+      "allowSlideCarry": true,
       "name": "Heavy Down Slash",
       "description": "Heavy Down Slash",
       "iconId": "icon.4",

@@ -9,6 +9,89 @@ public sealed class StageCollisionTests
     private static CharacterDefinition Def => TestHelpers.MankiDef;
 
     [Fact]
+    public void ElevatedLandingSlide_UsesWallTangent_ThroughJumpSquat()
+    {
+        var def = Def;
+        var arena = FiniteArena(
+            new[] { Floor(2f, -20f, 20f, -20f, 20f), FloorOther(2f, -20f, 20f, -20f, 20f),
+                WallX(2f, 2f, 10f, -20f, 20f), WallXOther(2f, 2f, 10f, -20f, 20f) },
+            (2f, -20f, 20f, -20f, 20f));
+        var initial = Grounded(2f - def.CapsuleRadius - .05f, 0);
+        initial.PY += 2.05f;
+        initial.IsGrounded = false;
+        initial.VY = -10;
+        initial.VX = initial.VZ = def.Movement.RunSpeed;
+        var sim = new ServerSimulation(arena);
+        sim.RegisterEntity(1, def, initial);
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new() { Down = true } });
+        var landed = sim.GetState(1);
+        Assert.Contains(1UL, sim.LastTickTouchdowns);
+        Assert.Equal(ActionState.Sliding, landed.State);
+        TestHelpers.AssertNear(0f, landed.VX, .01f);
+        Assert.True(landed.VZ > .25f * def.Movement.RunSpeed);
+        Assert.InRange(landed.PY, 2f + def.CapsuleHeight * .5f - .03f, 2f + def.CapsuleHeight * .5f + .03f);
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new() { Jump = true, JumpHeld = true, Down = true } });
+        for (int tick = 0; tick < 10 && sim.GetState(1).IsGrounded; tick++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = new() { JumpHeld = true } });
+        var jumped = sim.GetState(1);
+        Assert.False(jumped.IsGrounded);
+        TestHelpers.AssertNear(0, jumped.VX, .01f);
+        Assert.True(jumped.VZ <= landed.VZ);
+    }
+
+    [Fact]
+    public void SlideNormal_WallContactKeepsOnlyLiveTangentVelocity()
+    {
+        var def = Def;
+        var arena = FiniteArena(
+            new[] { Floor(0, -20, 20, -20, 20), FloorOther(0, -20, 20, -20, 20),
+                WallX(2, 0, 10, -20, 20), WallXOther(2, 0, 10, -20, 20) },
+            (0, -20, 20, -20, 20));
+        var initial = Grounded(2 - def.CapsuleRadius - .02f, 0);
+        initial.State = ActionState.Sliding;
+        initial.VX = def.Movement.RunSpeed * .8f;
+        initial.VZ = def.Movement.RunSpeed * .6f;
+        var sim = new ServerSimulation(arena);
+        sim.RegisterEntity(1, def, initial);
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { Down = true, ActiveSlot = AbilitySlots.Slot1 },
+        });
+        var contact = sim.GetState(1);
+        Assert.True(contact.SlideAttackCarryActive);
+        TestHelpers.AssertNear(0, contact.VX, .01f);
+        Assert.True(contact.VZ > 0);
+        for (int tick = 0; tick < 5; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            var state = sim.GetState(1);
+            TestHelpers.AssertNear(0, state.VX, .01f);
+            Assert.True(state.PX <= 2 - def.CapsuleRadius + .02f);
+            Assert.True(state.VZ <= contact.VZ);
+        }
+    }
+
+    [Fact]
+    public void SlidingOffFinitePlatform_ClearsPostureWithoutFastFall()
+    {
+        var arena = FiniteArena(
+            new[] { Floor(0f, -2f, 2f, -2f, 2f), FloorOther(0f, -2f, 2f, -2f, 2f) },
+            (0f, -2f, 2f, -2f, 2f));
+        var state = Grounded(1.8f, 0);
+        state.State = ActionState.Sliding;
+        state.VX = Def.Movement.RunSpeed;
+        var sim = new ServerSimulation(arena);
+        sim.RegisterEntity(1, Def, state);
+        for (int tick = 0; tick < 10 && sim.GetState(1).IsGrounded; tick++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = new() { Down = true } });
+        state = sim.GetState(1);
+        Assert.False(state.IsGrounded);
+        Assert.Equal(ActionState.Idle, state.State);
+        Assert.False(state.CrouchSettled);
+        Assert.False(state.IsFastFalling);
+    }
+
+    [Fact]
     public void WalkingIntoTallWall_StopsWithoutClimbing()
     {
         var arena = Arena(Floor(0f, -10f, 10f, -10f, 10f), WallX(2f, 0f, 4f));
@@ -17,7 +100,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 120f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.InRange(state.PX, 2f - Def.CapsuleRadius - 0.03f, 2f - Def.CapsuleRadius + 0.03f);
         Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.01f, Def.CapsuleHeight * 0.5f + 0.01f);
@@ -34,7 +117,7 @@ public sealed class StageCollisionTests
         state.VX = 12f;
 
         for (int i = 0; i < 3; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena, out _);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
 
         Assert.True(state.PX > 0.5f);
@@ -60,7 +143,7 @@ public sealed class StageCollisionTests
 
         for (int tick = 0; tick < 8; tick++)
         {
-            Simulation.SimulateTick(ref state, Def, input, arena, out _);
+            Simulation.SimulateTick(ref state, Def, input, arena, out _, out _, DownActionTuning.Default, false);
             if (!state.IsGrounded)
             {
                 Assert.True(state.PY > TestHelpers.GroundPY(Def) - 0.05f,
@@ -173,7 +256,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 20f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(state.PY <= 1.501f);
         Assert.True(state.VY <= 0.001f);
@@ -193,7 +276,7 @@ public sealed class StageCollisionTests
         Simulation.ApplyKnockback(ref state, 1f, 0f, 0, 30f, 0f, 0f, 30, 100f);
 
         for (int i = 0; i < 4; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena, out _);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(state.PY <= 1.501f);
         Assert.True(state.VY <= 0.001f);
@@ -212,7 +295,7 @@ public sealed class StageCollisionTests
         state.VX = 120f;
         state.VZ = 60f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(state.PX <= 2f - Def.CapsuleRadius + 0.03f);
         Assert.True(state.PZ <= 2f - Def.CapsuleRadius + 0.03f);
@@ -232,7 +315,7 @@ public sealed class StageCollisionTests
         state.VY = -180f;
 
         for (int i = 0; i < 20; i++)
-            Simulation.SimulateTick(ref state, Def, default, arena, out _);
+            Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(state.IsGrounded);
         Assert.InRange(state.PY, 2f + Def.CapsuleHeight * 0.5f - 0.02f,
@@ -248,7 +331,7 @@ public sealed class StageCollisionTests
         state.AnimLockTicks = 10;
         state.VX = 30f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(state.IsGrounded);
         Assert.InRange(state.PY, Def.CapsuleHeight * 0.5f - 0.02f, Def.CapsuleHeight * 0.5f + 0.02f);
@@ -267,7 +350,7 @@ public sealed class StageCollisionTests
         state.AirTimeTicks = 30;
         state.VY = 120f;
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.False(state.IsGrounded);
         Assert.Equal(0f, state.VY);
@@ -283,13 +366,13 @@ public sealed class StageCollisionTests
         dash.State = ActionState.Dashing;
         dash.DashDurationTicks = 1;
         dash.VX = 240f;
-        Simulation.SimulateTick(ref dash, Def, default, arena, out _);
+        Simulation.SimulateTick(ref dash, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         var knockback = Grounded(0f, 0f);
         knockback.State = ActionState.Idle;
         knockback.IsGrounded = false;
         knockback.KVX = 240f;
-        Simulation.SimulateTick(ref knockback, Def, default, arena, out _);
+        Simulation.SimulateTick(ref knockback, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.True(dash.PX < 2f);
         Assert.True(knockback.PX < 2f);
@@ -305,7 +388,7 @@ public sealed class StageCollisionTests
         state.VX = 30f;
 
 
-        Simulation.SimulateTick(ref state, Def, default, arena, out _);
+        Simulation.SimulateTick(ref state, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
         Assert.False(state.IsGrounded);
         Assert.True(state.PX > 2f);
@@ -345,8 +428,8 @@ public sealed class StageCollisionTests
 
         for (int i = 0; i < 30; i++)
         {
-            Simulation.SimulateTick(ref first, Def, default, arena, out _);
-            Simulation.SimulateTick(ref second, Def, default, arena, out _);
+            Simulation.SimulateTick(ref first, Def, default, arena, out _, out _, DownActionTuning.Default, false);
+            Simulation.SimulateTick(ref second, Def, default, arena, out _, out _, DownActionTuning.Default, false);
         }
 
         Assert.Equal(first.PX, second.PX);

@@ -7,7 +7,7 @@ using SlopArena.Shared;
 
 namespace SlopArena.AerialApproachReport;
 
-internal static class Program
+internal static partial class Program
 {
     private const ulong AttackerId = 1;
     private const ulong TargetId = 100;
@@ -23,7 +23,7 @@ internal static class Program
     private static readonly float[] GridZ = { 0.5f, 1f, 1.5f, 2f, 2.5f, 3f };
     private static readonly float[] TargetDistanceGrid = { 0.75f, 1.25f, 1.75f, 2.25f };
 
-    private sealed record Options(string OutDirectory, int MaxOffset, bool Assert);
+    private sealed record Options(string OutDirectory, int MaxOffset, bool Assert, bool SlideFlow, int SlideDeceleration, string FallProfile, float BraceMultiplier);
     private sealed record JumpTiming(int TakeoffTick, int ApexTick, int LandingTick, float RunupDistance);
     private sealed record Approach(string Id, float X, float Z, string Description);
     private sealed record Motion(string Id, string Description, bool Moving);
@@ -262,6 +262,13 @@ internal static class Program
         try
         {
             var options = ParseArgs(args);
+            if (options.SlideFlow)
+            {
+                var flow = BuildSlideFlow(options);
+                Console.WriteLine($"slide-flow: scenarios={flow.Summary.ScenarioCount} timeouts={flow.Summary.TimeoutCount} landings={flow.Summary.LandingCount} accepted={flow.Summary.AcceptedActionCount}");
+                Console.WriteLine($"wrote {Path.GetFullPath(options.OutDirectory)}/slide-flow.json, slide-traces.csv, aerial-slide-approaches.csv, slide-followups.csv, slide-targets.csv");
+                return 0;
+            }
             var report = BuildReport(options);
             if (options.Assert) SelfCheck(report);
             WriteOutputs(report, options.OutDirectory);
@@ -287,11 +294,16 @@ internal static class Program
         string? output = null;
         int maxOffset = DefaultMaxOffset;
         bool check = false;
+        bool slideFlow = false;
+        int slideDeceleration = 2;
+        string fallProfile = "current";
+        float braceMultiplier = 0.9f;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
                 case "--assert": check = true; break;
+                case "--slide-flow": slideFlow = true; break;
                 case "--out":
                     if (++i >= args.Length || args[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("--out requires a directory");
                     output = args[i];
@@ -300,10 +312,26 @@ internal static class Program
                     if (++i >= args.Length || !int.TryParse(args[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out maxOffset) || maxOffset < 0 || maxOffset > 120)
                         throw new ArgumentException("--max-offset must be an integer from 0 through 120");
                     break;
+                case "--slide-deceleration":
+                    if (++i >= args.Length || (args[i] != "2" && args[i] != "3"))
+                        throw new ArgumentException("--slide-deceleration must be 2 or 3");
+                    slideDeceleration = int.Parse(args[i], CultureInfo.InvariantCulture);
+                    break;
+                case "--fall-profile":
+                    if (++i >= args.Length || (args[i] != "current" && args[i] != "previous"))
+                        throw new ArgumentException("--fall-profile must be current or previous");
+                    fallProfile = args[i];
+                    break;
+                case "--brace-multiplier":
+                    if (++i >= args.Length || (args[i] != "0.9" && args[i] != "1"))
+                        throw new ArgumentException("--brace-multiplier must be 0.9 or 1");
+                    braceMultiplier = float.Parse(args[i], CultureInfo.InvariantCulture);
+                    break;
                 default: throw new ArgumentException($"unknown option '{args[i]}'");
             }
         }
-        return new Options(Path.GetFullPath(output ?? Path.Combine("artifacts", "aerial-approach")), maxOffset, check);
+        return new Options(Path.GetFullPath(output ?? (slideFlow ? Path.Combine("artifacts", "slide-flow") : Path.Combine("artifacts", "aerial-approach"))),
+            maxOffset, check, slideFlow, slideDeceleration, fallProfile, braceMultiplier);
     }
 
     private static Report BuildReport(Options options)

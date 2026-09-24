@@ -20,8 +20,8 @@
     "dashCooldownTicks": 48,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 48,
-    "fastFallSpeed": 58,
+    "maxFallSpeed": 14,
+    "fastFallSpeed": 22,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 35,
@@ -37,6 +37,8 @@
     "hitMedium": "anim.hit-medium",
     "hitHard": "anim.hit-hard",
     "tumble": "anim.tumble",
+    "crouch": "anim.fightguy.crouch",
+    "slide": "anim.fightguy.slide",
     "landStartOffsetSeconds": 0.49,
     "modelResourcePath": "Characters/FightGuy",
     "visualScale": 1,
@@ -186,6 +188,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -245,6 +248,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -330,6 +334,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -389,6 +394,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -474,6 +480,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -533,6 +540,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -592,6 +600,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -651,6 +660,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -711,6 +721,7 @@
       "cooldownTicks": 120,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -765,6 +776,7 @@
       "cooldownTicks": 240,
       "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -888,6 +900,7 @@
       "cooldownTicks": 360,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -964,6 +977,7 @@
       "cooldownTicks": 1200,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -1139,7 +1153,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 85,
+                "tick": 88,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",

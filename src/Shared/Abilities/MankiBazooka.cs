@@ -16,6 +16,8 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public sealed class MankiBazooka : ServerAbility, IAimHoldCapability
     {
+        public override bool OwnsVerticalMotion => true;
+
         private readonly CookedMankiBazookaCapabilityParameters _parameters;
         private enum BazookaPhase { Aiming, Firing, Recovery }
         private BazookaPhase _phase;
@@ -25,6 +27,9 @@ namespace SlopArena.Shared.Abilities
             => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
+            ClearVelocityOwnership(ref s);
+            s.IsFastFalling = false;
+
             _phase = BazookaPhase.Aiming;
             _projectileSpawned = false;
 
@@ -41,6 +46,8 @@ namespace SlopArena.Shared.Abilities
 
         public override void OnEnd(ref CharacterState s)
         {
+            ClearVelocityOwnership(ref s);
+            s.IsFastFalling = false;
             s.IsAiming = false;
             s.VX = 0f;
             s.VY = 0f;

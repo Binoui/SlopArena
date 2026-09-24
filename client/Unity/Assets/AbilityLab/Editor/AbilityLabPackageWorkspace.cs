@@ -451,6 +451,18 @@ public sealed class AbilityLabPackageWorkspace
             new ForwardLungeOperationSource(0, AuthoringUnit.MetersPerSecond, 12f, 6));
     }
 
+    public bool AddGravityWindow(string canonicalSlotId, int stageIndex)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        ushort duration = (ushort)Math.Min(30, (int)sourceSlot.Timeline.Stages[stageIndex].DurationTicks);
+        return AddOperation(slotIndex, stageIndex,
+            new GravityWindowOperationSource(0, AuthoringUnit.Normalized, 0.5f, duration));
+    }
+
 
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
     {

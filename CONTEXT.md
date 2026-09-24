@@ -16,6 +16,13 @@ _Avoid_: air timer, hang time, air duration
 The initial period of AirTime during which reduced (`AirFloatGravity`) gravity applies. Post-ADR-0015: entered only via the RecoveryMove, taking damage, or landing — normal air attacks no longer reset into it (momentum-preserve attacks). Per-character value.
 _Avoid_: hover time, stall window, float duration
 
+
+**GravityWindow**:
+A move-local timeline interval that multiplies the currently active airborne gravity by a
+normalized scale from 0 to 1. It does not reset the FloatWindow or change MaxFallSpeed.
+FastFall overrides it; Hitstop pauses its duration, and interruption ends it.
+_Avoid_: FloatWindow reset, fall-speed cap change
+
 **FallRamp**:
 ~~Deprecated — removed by ADR-0020 (gravity ramp → float-window-only).~~ The old progressive fall-speed acceleration from FloatWindow gravity to full gravity.
 _Avoid_: gravity ramp, fall acceleration curve
@@ -53,8 +60,20 @@ A reduced jump triggered by releasing the jump key within a short window (3–5 
 _Avoid_: mini jump, light jump, tap jump
 
 **FastFall**:
-Holding the dedicated Down key (X by default — deliberately NOT the backward-movement key, so drifting backward never fast-falls; issue #116) while airborne and falling to **set** `VY = -FastFallSpeed` instantly (set-velocity, ADR-0020 — no gravity that tick). The commitment-to-descent tool — what makes aerial gameplay snappy instead of floaty (ADR-0016). Applies in every airborne state except hitstun.
+A fresh press of the dedicated Down action while already descending commits to the character's fast-fall speed until landing or an interrupting action. Release does not cancel it; ascent/apex presses are discarded. Backward movement is independent. Ordinary aerial attacks may coexist; Hitstun, Hitstop, Dash, ledges and authored vertical motion cannot be overridden.
 _Avoid_: dive, plummet, down air
+
+**Crouch**:
+A held-Down grounded low posture. It brakes residual movement without steering or crouch-walking. Release restores ordinary control immediately; legal actions retain their existing admission rules.
+
+**Slide**:
+A grounded low posture that spends existing horizontal momentum without an entry impulse or steering. A fresh Down press while running, or held Down on an actionable moving landing, can enter it. It ends on release, insufficient speed, walk-off or an accepted action.
+
+**SlideJump**:
+An ordinary grounded jump accepted from Slide. It preserves remaining momentum through the normal jump squat without refilling speed or changing jump cost, vertical force or ShortHop timing.
+
+**CrouchBrace**:
+Reduced ordinary launch strength for a fighter already settled motionless in Crouch when a hit connects. The contact snapshot survives Hitstop and release; damage, freeze and Hitstun remain unchanged. Sliding, entry/braking crouch and fixed/custom forces do not qualify.
 
 **Run**:
 The single ground locomotion tier (ADR-0020 §1 — replaces the old walk/sprint split; Melee's "dash" tier is NOT adopted). Reached instantly from the Rush. Releasing brakes to a stop fast (`GroundStopFriction`, 36 m/s² — no semi-truck drift). Changing axis while at run speed is an instant redirect — the perpendicular velocity is cleared, never carried between axes (no diagonal drag), and reversing direction snaps immediately to `RunSpeed`. No selectable walk speed on 8-way input.
@@ -261,11 +280,11 @@ An opponent entity currently in a Predictable ActionState. Rebuilt from Confirme
 _Avoid_: opponent prediction, ghost sim, replayed entity
 
 **RawTrack**:
-An opponent entity currently in a Complex ActionState. No local re-simulation — rendered directly from the latest received packet, identical to pre-rollback (Phase 1) behavior, scoped to just this entity for just this window. Switches to PredictedTrack the tick the entity returns to a Predictable ActionState.
+An opponent rendered from received state rather than local re-simulation while its action or Hitstop requires private simulation state. Returns to prediction only when its confirmed state is reconstructible.
 _Avoid_: unpredicted entity, fallback display, snap-only entity
 
 **Predictable ActionState**:
-An `ActionState` whose per-tick behavior depends only on fields carried by the confirmed-base sync: position/velocity, the generic state timer, and the movement-resource fields added for rollback (`AirTimeTicks`, dash timers/direction, jump/dodge counters, etc.). Currently `Idle`, `Dashing`, `JumpSquat`, `AirDodging`, `Run`. PredictedTrack re-sim is byte-identical for these. (`Sliding` exists in the enum but is unused by any current code — not a member of either partition.)
+An action whose movement can be reproduced from confirmed state and exact input history. Idle, Dashing, JumpSquat, AirDodging, Run, Sliding and Crouching belong to this partition, but active Hitstop still prevents reconstruction or replay because its queued launch is not reconstructible from a snapshot.
 _Avoid_: safe state, simple state, movement state
 
 **Complex ActionState**:

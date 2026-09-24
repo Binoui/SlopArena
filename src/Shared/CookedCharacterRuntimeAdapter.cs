@@ -23,6 +23,7 @@ public static class CookedCharacterRuntimeAdapter
             ModelResourcePath=c.Presentation.ModelResourcePath, VisualScale=c.Presentation.VisualScale, HurtboxBoneScale=c.Presentation.HurtboxBoneScale, ModelYOffset=c.Presentation.ModelYOffset, ModelSoleOffset=c.Presentation.ModelSoleOffset, AutoModelYOffset=c.Presentation.AutoModelYOffset,
             BakedDataPath="",
             IdleAnim=c.Presentation.Idle, RunAnim=c.Presentation.Run, DashAnim=c.Presentation.Dash, JumpAnim=c.Presentation.Jump, FallAnim=c.Presentation.Fall,
+            CrouchAnim=c.Presentation.Crouch, SlideAnim=c.Presentation.Slide,
             HitSmallAnim=c.Presentation.HitSmall, HitMediumAnim=c.Presentation.HitMedium, HitHardAnim=c.Presentation.HitHard, TumbleAnim=c.Presentation.Tumble, LandStartOffset=c.Presentation.LandStartOffsetSeconds,
             CookedSlots = c.Slots,
         };

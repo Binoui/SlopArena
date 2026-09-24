@@ -74,10 +74,162 @@ public sealed class TimelineRuntimeTests
     }
 
     [Fact]
+    public void GravityWindowScalesAirGravityForItsDurationThenRestoresIt()
+    {
+        var slot = Slot(6, new CookedGravityWindowOperation(0, AuthoringUnit.Normalized, 0.5f, 2));
+        var initial = TestHelpers.PlayerState() with
+        {
+            PY = 20f,
+            VY = 0f,
+            AirTimeTicks = 100,
+            IsGrounded = false,
+        };
+        var (sim, def) = Create(slot, initial);
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 0, def);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+
+        sim.Tick(inputs);
+        var state = sim.GetState(1);
+        TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt * 0.5f, state.VY);
+
+        sim.Tick(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt, state.VY);
+
+        sim.Tick(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt * 2f, state.VY);
+    }
+
+    [Fact]
+    public void GravityWindowDoesNotOwnVerticalMotionAndFastFallOverridesIt()
+    {
+        var slot = Slot(6, new CookedGravityWindowOperation(0, AuthoringUnit.Normalized, 0.5f, 3));
+        var initial = TestHelpers.PlayerState() with
+        {
+            PY = 20f,
+            VY = -1f,
+            AirTimeTicks = 100,
+            IsGrounded = false,
+        };
+        var (sim, def) = Create(slot, initial);
+        var ability = new CookedTimelineAbility(slot, Array.Empty<string>());
+        sim.ActivateAbility(1, ability, 0, def);
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new InputState { DownPressed = true },
+        });
+
+        Assert.False(ability.OwnsVerticalMotion);
+        Assert.True(sim.GetState(1).IsFastFalling);
+        TestHelpers.AssertNear(-def.Movement.FastFallSpeed, sim.GetState(1).VY);
+    }
+
+    [Fact]
+    public void GravityWindowIsRemovedImmediatelyWhenItsAbilityIsCancelled()
+    {
+        var slot = Slot(20, new CookedGravityWindowOperation(0, AuthoringUnit.Normalized, 0.5f, 10));
+        var initial = TestHelpers.PlayerState() with
+        {
+            PY = 20f,
+            VY = 0f,
+            AirTimeTicks = 100,
+            IsGrounded = false,
+        };
+        var (sim, def) = Create(slot, initial);
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 0, def);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        sim.Tick(inputs);
+        var state = sim.GetState(1);
+        TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt * 0.5f, state.VY);
+
+        state.State = ActionState.Idle;
+        state.AttackSlot = 0;
+        sim.SetState(1, state);
+        sim.TickAbilities(inputs);
+        Assert.Null(sim.GetActiveAbility(1));
+
+        sim.Tick(inputs);
+        state = sim.GetState(1);
+        TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt * 1.5f, state.VY);
+    }
+
+    [Fact]
+    public void LatestGravityWindowReplacesAnOverlappingWindow()
+    {
+        var slot = Slot(8,
+            new CookedGravityWindowOperation(0, AuthoringUnit.Normalized, 0.5f, 6),
+            new CookedGravityWindowOperation(2, AuthoringUnit.Normalized, 0.25f, 2));
+        var initial = TestHelpers.PlayerState() with
+        {
+            PY = 20f,
+            VY = 0f,
+            AirTimeTicks = 100,
+            IsGrounded = false,
+        };
+        var (sim, def) = Create(slot, initial);
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 0, def);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default };
+        float gravityPerTick = def.Movement.Gravity * Simulation.TickDt;
+        float elapsedGravity = 0f;
+        foreach (float scale in new[] { 0.5f, 0.5f, 0.25f, 0.25f, 1f })
+        {
+            sim.Tick(inputs);
+            elapsedGravity += scale;
+            TestHelpers.AssertNear(-gravityPerTick * elapsedGravity, sim.GetState(1).VY);
+        }
+    }
+
+    [Fact]
+    public void TimelineOwnershipClearsLateVerticalWritesButNotHorizontalLungeFastFall()
+    {
+        var verticalSlot = Slot(6,
+            new CookedSetVelocityOperation(1, AuthoringUnit.MetersPerSecond, AuthoringVelocityMode.Absolute, 2f, 3f, 4f));
+        var initial = TestHelpers.PlayerState() with { IsFastFalling = true, SlideAttackCarryActive = true };
+        var (sim, def) = Create(verticalSlot, initial);
+        sim.ActivateAbility(1, new CookedTimelineAbility(verticalSlot, Array.Empty<string>()), 2, def);
+        sim.TickAbilities(new Dictionary<ulong, InputState> { [1] = default });
+        var state = sim.GetState(1);
+        Assert.False(state.IsFastFalling);
+        Assert.False(state.SlideAttackCarryActive);
+
+        var horizontalSlot = Slot(6,
+            new CookedForwardLungeOperation(1, AuthoringUnit.MetersPerSecond, 8f, 2));
+        initial = TestHelpers.PlayerState() with { IsFastFalling = true, SlideAttackCarryActive = true };
+        (sim, def) = Create(horizontalSlot, initial);
+        var horizontalAbility = new CookedTimelineAbility(horizontalSlot, Array.Empty<string>());
+        sim.ActivateAbility(1, horizontalAbility, 2, def);
+        sim.TickAbilities(new Dictionary<ulong, InputState> { [1] = default });
+        state = sim.GetState(1);
+        Assert.True(state.IsFastFalling);
+        Assert.False(state.SlideAttackCarryActive);
+        Assert.False(horizontalAbility.OwnsVerticalMotion);
+    }
+
+    [Fact]
+    public void LateVerticalCapabilityEntryClearsFastFallAndSlideCarry()
+    {
+        var slot = Slot(6, new CookedStartCapabilityOperation(1, AuthoringUnit.Ticks,
+            "slop.internal.fightguy.cyclone-kick.v1", "1",
+            new CookedCycloneKickCapabilityParameters(8.5f, 1, 3, 3, 1, 1, 1, 7, 15, 8, 5, 6, 1, 1)));
+        var initial = TestHelpers.PlayerState() with { IsFastFalling = true, SlideAttackCarryActive = true };
+        var (sim, def) = Create(slot, initial);
+        var ability = new CookedTimelineAbility(slot, Array.Empty<string>());
+        sim.ActivateAbility(1, ability, 2, def);
+        sim.TickAbilities(new Dictionary<ulong, InputState> { [1] = default });
+        var state = sim.GetState(1);
+        Assert.False(state.IsFastFalling);
+        Assert.False(state.SlideAttackCarryActive);
+        Assert.True(ability.OwnsVerticalMotion);
+    }
+
+    [Fact]
     public void OutOfOrderCookedOperationsAreSortedAndExecutedInChronologicalTickOrder()
     {
         var manifest = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/fightguy/package.json"));
         var character = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/fightguy/character.json")))!.AsObject();
+        character["slots"]![0]!["allowSlideCarry"] = false;
         var stage = (System.Text.Json.Nodes.JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
         stage["operations"] = new System.Text.Json.Nodes.JsonArray
         {

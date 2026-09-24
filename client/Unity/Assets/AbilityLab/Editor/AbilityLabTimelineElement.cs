@@ -189,6 +189,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
         {
             SpawnHitboxOperationSource hitbox => hitbox.Hitbox.DurationTicks,
             EmitPresentationOperationSource presentation => presentation.Placement.DurationTicks,
+            GravityWindowOperationSource gravity => gravity.DurationTicks,
             _ => 0,
         };
         _pendingTick = _dragStartTick;
@@ -221,7 +222,9 @@ public sealed class AbilityLabTimelineElement : VisualElement
         else
         {
             int maxTick = stage.DurationTicks - 1;
-            if (_dragOperation.Source is SpawnHitboxOperationSource || _dragOperation.Source is EmitPresentationOperationSource)
+            if (_dragOperation.Source is SpawnHitboxOperationSource ||
+                _dragOperation.Source is EmitPresentationOperationSource ||
+                _dragOperation.Source is GravityWindowOperationSource)
                 maxTick = stage.DurationTicks - _dragStartDuration;
             _pendingTick = Mathf.Clamp(localTick, 0, Mathf.Max(0, maxTick));
         }
@@ -354,21 +357,27 @@ public sealed class AbilityLabTimelineElement : VisualElement
         foreach (var operation in stage.Operations)
         {
             int tick = operation.Source.Tick;
-            int duration = operation.Source is SpawnHitboxOperationSource hitbox ? hitbox.Hitbox.DurationTicks : 0;
+            int duration = operation.Source switch
+            {
+                SpawnHitboxOperationSource hitbox => hitbox.Hitbox.DurationTicks,
+                GravityWindowOperationSource gravity => gravity.DurationTicks,
+                _ => 0,
+            };
             if (_dragging && _dragOperation != null && operation.SourceStageIndex == _dragOperation.SourceStageIndex && operation.SourceOperationIndex == _dragOperation.SourceOperationIndex)
             {
                 tick = _pendingTick;
                 duration = _pendingDuration;
             }
+            bool timed = operation.Source is SpawnHitboxOperationSource or GravityWindowOperationSource;
             float start = LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick) / (float)_projection.DurationTicks) * width;
-            float end = operation.Source is SpawnHitboxOperationSource
+            float end = timed
                 ? LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick + duration) / (float)_projection.DurationTicks) * width
                 : start;
             float y = axisHeight + row * rowHeight;
-            var renderedRect = operation.Kind == CookedOperationKind.SpawnHitbox
+            var renderedRect = timed
                 ? new Rect(start, y + 4f, Mathf.Max(2f, end - start), 10f)
                 : new Rect(start - 4f, y + 5f, 8f, 8f);
-            _hitRects.Add((operation, operation.Kind == CookedOperationKind.SpawnHitbox
+            _hitRects.Add((operation, timed
                 ? new Rect(renderedRect.xMin - 2f, renderedRect.yMin - 2f, renderedRect.width + 4f, renderedRect.height + 4f)
                 : renderedRect));
             var color = operation.Kind == CookedOperationKind.SpawnHitbox
@@ -376,7 +385,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
                 : new Color(0.35f, 0.7f, 1f);
             if (_selectedOperation is { } selected && selected.SourceStageIndex == operation.SourceStageIndex && selected.SourceOperationIndex == operation.SourceOperationIndex)
                 color = Color.yellow;
-            if (operation.Kind == CookedOperationKind.SpawnHitbox)
+            if (timed)
                 DrawRect(painter, new Rect(start, y + 4f, Mathf.Max(2f, end - start), 10f), color);
             else
                 DrawMarker(painter, new Vector2(start, y + 9f), color);

@@ -77,12 +77,53 @@ public sealed class BonkKitTests
         Assert.Equal(32f, parameters.SlamKnockbackGrowth);
         Assert.Equal((ushort)20, parameters.SlamStunTicks);
         Assert.Equal((ushort)6, parameters.SlamDurationTicks);
-        var lunge = Assert.IsType<CookedForwardLungeOperation>(
-            Assert.Single(loaded.Package.Definition.Slots.Single(x => x.Id == "ground.A")
-                .Timeline.Stages.Single().Operations.OfType<CookedForwardLungeOperation>()));
-        Assert.Equal((14f, (ushort)8, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick));
+        var lunges = loaded.Package.Definition.Slots.Single(x => x.Id == "ground.A")
+            .Timeline.Stages.Single().Operations.OfType<CookedForwardLungeOperation>()
+            .OrderBy(x => x.Tick).ToArray();
+        Assert.Collection(lunges,
+            lunge => Assert.Equal((15f, (ushort)12, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick)),
+            lunge => Assert.Equal((5f, (ushort)5, (ushort)30), (lunge.Speed, lunge.DurationTicks, lunge.Tick)));
+        foreach (string id in new[] { "air.A", "air.R" })
+        {
+            var gravity = Assert.Single(loaded.Package.Definition.Slots.Single(x => x.Id == id)
+                .Timeline.Stages.Single().Operations.OfType<CookedGravityWindowOperation>());
+            Assert.Equal((ushort)0, gravity.Tick);
+            Assert.Equal(0.5f, gravity.GravityScale);
+            Assert.Equal((ushort)30, gravity.DurationTicks);
+        }
 
     }
+    [Fact]
+    public void Bonk_AerialAAndRApplyTheirAuthoredGravityWindow()
+    {
+        var def = BonkDefinition();
+        foreach (byte slot in new[] { AbilitySlots.A, AbilitySlots.R })
+        {
+            var window = Assert.Single(def.GetCookedSlotAbility(slot, airborne: true)!
+                .Timeline.Stages.Single().Operations.OfType<CookedGravityWindowOperation>());
+            Assert.Equal((ushort)0, window.Tick);
+            Assert.Equal(0.5f, window.GravityScale);
+            Assert.Equal((ushort)30, window.DurationTicks);
+            var sim = TestHelpers.MakeSim();
+            sim.RegisterEntity(1, def, TestHelpers.PlayerState() with
+            {
+                PY = 20f,
+                VY = 0f,
+                AirTimeTicks = 100,
+                IsGrounded = false,
+            });
+
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = new InputState { ActiveSlot = slot },
+            });
+
+            var state = sim.GetState(1);
+            Assert.Equal(ActionState.Attacking, state.State);
+            TestHelpers.AssertNear(-def.Movement.Gravity * Simulation.TickDt * 0.5f, state.VY);
+        }
+    }
+
 
     [Fact]
     public void BonkCapabilityParametersRejectUnknownAndMissingFields()
@@ -289,12 +330,15 @@ public sealed class BonkKitTests
 
     private static CharacterCompileResult CompileBonk()
     {
-        return CharacterPackageCompiler.Compile(
+        var result = CharacterPackageCompiler.Compile(
             File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json")),
             File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")),
             CharacterCookProfile.TrustedBuiltIn);
-    }
+        Assert.True(result.CookedPackage != null,
+            string.Join("; ", result.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
+        return result;
 
+    }
     private static CharacterDefinition BonkDefinition()
         => CookedCharacterRuntimeAdapter.ToCharacterDefinition(CompileBonk().CookedPackage!);
 

@@ -32,11 +32,18 @@ Each slot contains a fixed, ordered timeline of stages. A stage owns duration, I
 Supported operation categories include:
 
 - deterministic velocity changes;
+- timed gravity windows that scale airborne gravity;
 - hitbox and projectile spawns;
 - aim-state changes;
 - starts of approved stateful capabilities;
 - semantic presentation events;
 - explicit timeline completion.
+
+`gravityWindow` carries a start tick, positive duration, and normalized `gravityScale`
+from 0 through 1. It scales the active airborne gravity without changing the max-fall
+cap or resetting FloatWindow. FastFall overrides the window. Time pauses during Hitstop;
+the most recently started overlapping window replaces the earlier one. The operation
+is part of runtime API `1.2.0`.
 
 Authoring does not contain arbitrary branches, expressions, or transition predicates. Hold/release and other variable-duration behavior lives in bounded engine capabilities. Ground/air aliases are expanded by the compiler and do not exist as runtime dispatch rules.
 

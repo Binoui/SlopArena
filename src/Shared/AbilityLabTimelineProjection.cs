@@ -60,6 +60,7 @@ public sealed record AbilityLabTimelineProjection
                 int operationEnd = operation switch
                 {
                     SpawnHitboxOperationSource hitbox => operationStart + hitbox.Hitbox.DurationTicks,
+                    GravityWindowOperationSource gravity => operationStart + gravity.DurationTicks,
                     ForwardLungeOperationSource lunge => operationStart + lunge.DurationTicks,
                     EmitPresentationOperationSource presentation => operationStart + presentation.Placement.DurationTicks,
                     _ => operationStart + 1,
@@ -96,6 +97,7 @@ public sealed record AbilityLabTimelineProjection
     {
         SetVelocityOperationSource => CookedOperationKind.SetVelocity,
         ForwardLungeOperationSource => CookedOperationKind.ForwardLunge,
+        GravityWindowOperationSource => CookedOperationKind.GravityWindow,
         SpawnHitboxOperationSource => CookedOperationKind.SpawnHitbox,
         SpawnProjectileOperationSource => CookedOperationKind.SpawnProjectile,
         SetAimStateOperationSource => CookedOperationKind.SetAimState,
@@ -109,6 +111,7 @@ public sealed record AbilityLabTimelineProjection
     {
         SetVelocityOperationSource => "Set velocity",
         ForwardLungeOperationSource => "Forward lunge",
+        GravityWindowOperationSource => "Gravity window",
         SpawnHitboxOperationSource => "Hitbox",
         SpawnProjectileOperationSource => "Projectile",
         SetAimStateOperationSource => "Set aim",

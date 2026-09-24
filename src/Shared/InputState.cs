@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.IO;
 
 namespace SlopArena.Shared
 {
@@ -9,7 +10,7 @@ namespace SlopArena.Shared
     /// </summary>
     public struct InputState
     {
-        public bool Up, Down, Left, Right;
+        public bool Up, Down, DownPressed, Left, Right;
         public bool Jump, Dash, Burst;
         /// <summary>
         /// True while the jump key is physically held (issue #116 / #106). The sim counts
@@ -51,18 +52,22 @@ namespace SlopArena.Shared
         public float WarpSpeed;
         public float WarpAttackRange;
 
-        /// <summary>20 bytes (2 floats + 1 flags + 1 slot + 2 facing + 2 aim + 2 pitch + 2 distance + 1 target + 1 flags2)</summary>
+        /// <summary>21 bytes: 20-byte input payload plus the protocol version.</summary>
         /// <remarks>
         /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=Dash,
         /// 0x40=Burst (ADR-0014; formerly Crouch, deprecated), 0x80=IsAiming.
         /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116),
         /// 2=FaceToCamera (ADR-0017 LMB facing snap, issue #126), 4=ToggleLock
-        /// (ADR-0018 RMB target-lock toggle, issue #127).
+        /// (ADR-0018 RMB target-lock toggle, issue #127), 8=DownPressed.
+        /// Byte 20 is the exact SimulationProtocol version.
         /// </remarks>
-        public const int Size = 8 + 1 + 1 + 2 + 2 + 2 + 2 + 1 + 1;
+        public const int Size = 21;
 
         public void Write(Span<byte> buf)
         {
+            if (buf.Length < Size)
+                throw new ArgumentException("Buffer too small", nameof(buf));
+
             BinaryPrimitives.WriteInt32LittleEndian(buf, BitConverter.SingleToInt32Bits(MoveX));
             BinaryPrimitives.WriteInt32LittleEndian(buf.Slice(4), BitConverter.SingleToInt32Bits(MoveY));
             byte flags = 0;
@@ -85,11 +90,18 @@ namespace SlopArena.Shared
             if (JumpHeld) flags2 |= 1;
             if (FaceToCamera) flags2 |= 2;
             if (ToggleLock) flags2 |= 4;
+            if (DownPressed) flags2 |= 8;
             buf[19] = flags2;
+            buf[20] = SimulationProtocol.Version;
         }
 
         public static InputState Deserialize(ReadOnlySpan<byte> buf)
         {
+            if (buf.Length != Size)
+                throw new ArgumentException($"Input payload must be exactly {Size} bytes.", nameof(buf));
+            if (buf[20] != SimulationProtocol.Version)
+                throw new InvalidDataException($"Unsupported input protocol version {buf[20]}.");
+
             var input = new InputState
             {
                 MoveX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buf)),
@@ -105,17 +117,15 @@ namespace SlopArena.Shared
             input.Burst = (flags & 0x40) != 0;
             input.IsAiming = (flags & 0x80) != 0;
             input.ActiveSlot = buf[9];
-            input.FacingYaw = buf.Length >= 12 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(10)) : (short)0;
-            input.AimYaw = buf.Length >= 14 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(12)) : (short)0;
-            input.AimPitch = buf.Length >= 16 ? BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(14)) : (short)0;
-            input.AimDistance = buf.Length >= 18 ? BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(16)) : (ushort)0;
-            input.TargetEntityId = buf.Length >= 19 ? buf[18] : (byte)0;
-            if (buf.Length >= 20)
-            {
-                input.JumpHeld = (buf[19] & 1) != 0;
-                input.FaceToCamera = (buf[19] & 2) != 0;
-                input.ToggleLock = (buf[19] & 4) != 0;
-            }
+            input.FacingYaw = BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(10));
+            input.AimYaw = BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(12));
+            input.AimPitch = BinaryPrimitives.ReadInt16LittleEndian(buf.Slice(14));
+            input.AimDistance = BinaryPrimitives.ReadUInt16LittleEndian(buf.Slice(16));
+            input.TargetEntityId = buf[18];
+            input.JumpHeld = (buf[19] & 1) != 0;
+            input.FaceToCamera = (buf[19] & 2) != 0;
+            input.ToggleLock = (buf[19] & 4) != 0;
+            input.DownPressed = (buf[19] & 8) != 0;
             return input;
         }
     }

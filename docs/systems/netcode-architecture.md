@@ -172,14 +172,14 @@ Tick():
 ### 4a. Client → Server
 
 ```
-Send packet: entityId(8) + tick(4) + InputState(20) = 32 bytes
+Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
 
 [0..7]   entityId        (ulong)
 [8..11]  tick            (uint)       ← local client frame counter
-[12..31] InputState (20 bytes)
+[12..32] InputState (21 bytes)
 ```
 
-**InputState layout (20 bytes):**
+**InputState layout (21 bytes):**
 | Offset | Type    | Field           | Notes                              |
 |--------|---------|-----------------|------------------------------------|
 | 0-3    | float   | MoveX           | Horizontal analog input            |
@@ -191,25 +191,33 @@ Send packet: entityId(8) + tick(4) + InputState(20) = 32 bytes
 | 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
 | 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
-| 19     | byte    | flags2          | bit0: JumpHeld (ADR-0016 short hop, issue #116) |
+| 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed |
+| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 1` |
 
-Total: 32 bytes (8 + 4 + 20)
+Total: 33 bytes (8 + 4 + 21). Validate the exact envelope and supported version before
+endpoint registration or reconnect/countdown side effects. This is a coordinated cutover,
+not backward-compatible partial decoding.
 
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(109) + hasInput(1) + InputState(20) = up to 142 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(114) + hasInput(1) + InputState(21) = up to 148 bytes
 
 [0..7]    entityId          (ulong)
 [8..11]   tick              (uint)       ← echoes client's tick number
-[12..120] CharacterStatePacket (109 bytes) — fixed state payload; see §4b table below
-[121]     hasInput          (byte)       ← 1 = relayed InputState follows; 0 = no input consumed this tick
-[122..141] InputState       (20 bytes)   ← present iff hasInput == 1 (issue #80 — input relay)
+[12..125] CharacterStatePacket (114 bytes) — fixed state payload; see §4b table below
+[126]     hasInput          (byte)       ← exactly 0 or 1
+[127..147] InputState       (21 bytes)   ← present iff hasInput == 1
 ```
 
-**The relay section** (issue #80, ADR-0010): the server appends the exact `InputState` it consumed for that entity that tick, so clients can replay opponents' inputs — and exact omissions — during rollback re-simulation. `hasInput = 0` means the server's queue for that entity was empty that tick (or the entity is eliminated/disconnected): clients must *omit* the entity from their re-sim inputs, reproducing the server's `default(InputState)` path exactly. The flag is always present: a no-input packet is 122 bytes, a relayed packet 142 bytes. Encoded by `ServerEntityPacket` (`src/Shared/ServerEntityPacket.cs`).
+**The relay section** carries the exact input consumed for that entity/tick. A missing
+exact server input may extend its prior held input, but clears only `DownPressed`.
+`hasInput = 0` denotes no consumed input and is not a truncated relay. The envelope must
+be exactly 127 bytes for marker 0 or 148 bytes for marker 1; mismatches are rejected.
+The client discards malformed/incompatible state datagrams without ending its receive
+loop. Codec owner: `src/Shared/ServerEntityPacket.cs`.
 
-**CharacterStatePacket layout (109 bytes):**
+**CharacterStatePacket layout (114 bytes):**
 | Offset | Type    | Field                       | Notes                              |
 |--------|---------|-----------------------------|------------------------------------|
 | 0-3    | uint    | TickNumber                  | Echoed client tick (for matching)  |
@@ -252,8 +260,12 @@ Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(109) + h
 | 107-108| ushort  | LedgeRegrabLockTicks         | Walk-off self-grab suppression — on-wire so rollback reproduces a walk-off |
 | 109    | byte    | AttackSequence              | Changes for each ability activation |
 | 110-111| ushort  | LandingLagTicks             | Authoritative landing lock for reconciliation and presentation |
+| 112    | byte    | MovementFlags                | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight |
+| 113    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 1` |
 
-**Packet sizes:** `CharacterStatePacket` is 112 bytes. `ServerEntityPacket` is 124 bytes before the relay section, 125 bytes with the no-input marker, and 145 bytes with relayed input. Client and server must use the same layout.
+**Packet sizes:** `CharacterStatePacket` is 114 bytes. `ServerEntityPacket` is 126 bytes
+before its mandatory relay marker, 127 bytes without input and 148 bytes with input.
+Legacy/unversioned peers are rejected; deploy client and server together.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -298,6 +310,16 @@ The client uses the three-track model implemented in
 
 This is narrower than predicting every remote ability: predictable opponents can be
 replayed, while complex or unknown opponents use received state.
+
+Sliding and Crouching are predictable locomotion states. Exact history replay preserves
+DownPressed; every speculative opponent frontier tick clears it, including the first
+tick after a received relay. Held Down remains intact.
+
+An authoritative snapshot or local replay suffix with `HitstopTicks > 0` cannot be
+reconstructed/replayed, even if its ActionState is ordinarily predictable. Frozen
+opponents use RawTrack. Packets preserve QueuedCrouchBrace but do not contain the complete
+queued launch payload or ability instance; only a live full-fidelity simulation resolves
+that launch. This is not arbitrary combat rewind.
 
 ---
 

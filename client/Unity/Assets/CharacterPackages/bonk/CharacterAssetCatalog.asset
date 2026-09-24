@@ -106,12 +106,16 @@ MonoBehaviour:
     _clip: {fileID: 7400000, guid: ae25c3f5ce8678103b5a90a1be9f72be, type: 2}
     _extrapolation: 0
     _poseTrackId: anim.bonk.ar
-  - _semanticId: anim.bonk.af
-    _clip: {fileID: 7400000, guid: 31238d9bd388bf207becd2aff83bb11d, type: 3}
-    _extrapolation: 0
-    _poseTrackId: anim.bonk.af
   - _semanticId: anim.tumble
     _clip: {fileID: -623603649343465320, guid: b79032c6c9e8aa56ab188264f01fff1c, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.tumble
+  - _semanticId: anim.bonk.crouch
+    _clip: {fileID: 7400000, guid: 59558aa450723e16b8afe09733abb55b, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.bonk.crouch
+  - _semanticId: anim.bonk.slide
+    _clip: {fileID: 7400000, guid: 59558aa450723e16b8afe09733abb55b, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.bonk.slide
   _presentations: []

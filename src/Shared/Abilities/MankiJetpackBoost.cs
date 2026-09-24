@@ -7,6 +7,8 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class MankiJetpackBoost : ServerAbility
 {
+    public override bool OwnsVerticalMotion => true;
+
     private readonly CookedMankiJetpackBoostCapabilityParameters _parameters;
     private ushort _elapsedTicks;
     private bool _ignited;
@@ -16,6 +18,9 @@ public sealed class MankiJetpackBoost : ServerAbility
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
+
         _elapsedTicks = 0;
         _ignited = false;
         s.State = ActionState.Attacking;
@@ -48,6 +53,8 @@ public sealed class MankiJetpackBoost : ServerAbility
 
     private void Launch(ref CharacterState s, InputState input, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         float moveMagnitude = MathF.Sqrt(input.MoveX * input.MoveX + input.MoveY * input.MoveY);
         float moveX = 0f;
         float moveY = 0f;

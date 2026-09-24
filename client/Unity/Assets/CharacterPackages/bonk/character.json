@@ -20,8 +20,8 @@
     "dashCooldownTicks": 48,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 48,
-    "fastFallSpeed": 58,
+    "maxFallSpeed": 15,
+    "fastFallSpeed": 24,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 35,
@@ -37,6 +37,8 @@
     "hitMedium": "anim.hit-medium",
     "hitHard": "anim.hit-hard",
     "tumble": "anim.tumble",
+    "crouch": "anim.bonk.crouch",
+    "slide": "anim.bonk.slide",
     "landStartOffsetSeconds": 0.49,
     "modelResourcePath": "",
     "visualScale": 3,
@@ -161,6 +163,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -220,6 +223,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -279,6 +283,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -338,6 +343,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
@@ -397,6 +403,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": true,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -418,8 +425,8 @@
                 "kind": "forwardLunge",
                 "tick": 12,
                 "unit": "metersPerSecond",
-                "speed": 14,
-                "durationTicks": 8
+                "speed": 15,
+                "durationTicks": 12
               },
               {
                 "kind": "spawnHitbox",
@@ -446,6 +453,13 @@
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
                 }
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 30,
+                "unit": "metersPerSecond",
+                "speed": 5,
+                "durationTicks": 5
               }
             ]
           }
@@ -463,6 +477,7 @@
       "cooldownTicks": 240,
       "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -569,6 +584,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -588,10 +604,10 @@
             "operations": [
               {
                 "kind": "forwardLunge",
-                "tick": 10,
+                "tick": 12,
                 "unit": "metersPerSecond",
-                "speed": 5,
-                "durationTicks": 5
+                "speed": 10,
+                "durationTicks": 12
               },
               {
                 "kind": "spawnHitbox",
@@ -662,6 +678,7 @@
       "cooldownTicks": 900,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -705,7 +722,7 @@
                   "baseKnockback": 2,
                   "knockbackGrowth": 8,
                   "stunTicks": 8,
-                  "durationTicks": 90,
+                  "durationTicks": 74,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -814,6 +831,12 @@
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
                 }
+              },
+              {
+                "kind": "setAimState",
+                "tick": 75,
+                "unit": "ticks",
+                "aimState": "none"
               }
             ]
           }
@@ -831,6 +854,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -890,6 +914,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -949,6 +974,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -1008,6 +1034,7 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -1058,19 +1085,20 @@
     },
     {
       "id": "air.A",
-      "name": "Bonk probe air A",
-      "description": "WIP pipeline probe",
+      "name": "Shoulder Bash",
+      "description": "Drive forward shoulder-first, then slam the opponent with Bonk\u0027s head.",
       "iconId": "icon.a",
       "behavior": "meleeCombo",
       "aimMode": "none",
       "aimMovement": "fixed",
       "cooldownTicks": 0,
       "isRecoveryMove": false,
-      "preserveMomentumOnStart": false,
+      "preserveMomentumOnStart": true,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 30,
+            "durationTicks": 64,
             "iasaTicks": 4,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
@@ -1085,11 +1113,51 @@
             ],
             "operations": [
               {
+                "kind": "gravityWindow",
+                "tick": 0,
+                "unit": "normalized",
+                "gravityScale": 0.5,
+                "durationTicks": 30
+              },
+              {
                 "kind": "forwardLunge",
-                "tick": 9,
+                "tick": 12,
                 "unit": "metersPerSecond",
-                "speed": 6,
-                "durationTicks": 3
+                "speed": 15,
+                "durationTicks": 12
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 21,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "sphere",
+                  "radius": 1,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0.4,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "bone.head",
+                  "endBoneId": null,
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 16,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 30,
+                "unit": "metersPerSecond",
+                "speed": 5,
+                "durationTicks": 5
               }
             ]
           }
@@ -1107,6 +1175,7 @@
       "cooldownTicks": 240,
       "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -1152,7 +1221,7 @@
     },
     {
       "id": "air.R",
-      "name": "Bonk probe air R",
+      "name": "Bonk probe ground R",
       "description": "WIP pipeline probe",
       "iconId": "icon.r",
       "behavior": "meleeCombo",
@@ -1161,11 +1230,12 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 30,
-            "iasaTicks": 4,
+            "durationTicks": 120,
+            "iasaTicks": 80,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -1177,43 +1247,83 @@
             "animationIds": [
               "anim.bonk.ar"
             ],
-            "operations": []
-          }
-        ]
-      }
-    },
-    {
-      "id": "air.F",
-      "name": "Bonk probe air F",
-      "description": "WIP pipeline probe",
-      "iconId": "icon.f",
-      "behavior": "meleeCombo",
-      "aimMode": "none",
-      "aimMovement": "fixed",
-      "cooldownTicks": 0,
-      "isRecoveryMove": false,
-      "preserveMomentumOnStart": false,
-      "timeline": {
-        "stages": [
-          {
-            "durationTicks": 30,
-            "iasaTicks": 4,
-            "landingLagTicks": 0,
-            "autoCancelBeforeTicks": 0,
-            "autoCancelAfterTicks": 0,
-            "attackRange": 0,
-            "warpRange": 0,
-            "useTargetLock": false,
-            "rotateTowardTarget": false,
-            "trackingStrength": 0,
-            "animationIds": [
-              "anim.bonk.af"
-            ],
-            "operations": []
+            "operations": [
+              {
+                "kind": "gravityWindow",
+                "tick": 0,
+                "unit": "normalized",
+                "gravityScale": 0.5,
+                "durationTicks": 30
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 12,
+                "unit": "metersPerSecond",
+                "speed": 10,
+                "durationTicks": 12
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 22,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 7,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 42,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 9,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
           }
         ]
       }
     }
   ],
-  "aliases": []
+  "aliases": [
+    {
+      "from": "air.F",
+      "to": "ground.F"
+    }
+  ]
 }

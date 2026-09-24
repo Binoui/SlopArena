@@ -39,6 +39,15 @@ Bind each required semantic animation ID to the exact imported clip in
 ID. Confirm catalog package ID, schema version, sample rate, rig, and binding paths. Do not
 use another character's clip as a fallback.
 
+Optional `presentation.crouch` and `presentation.slide` IDs require real bound clips and
+distinct deterministic pose-track IDs when nonempty. They may share one static low clip.
+The renderer and authoritative hurtboxes hold its frame zero; enter/exit uses zero fade.
+Author planted feet and a lowered articulated skeleton without changing the model root,
+stage capsule or pushbox. Low-track baking inverts the renderer's root/visual-scale mapping
+instead of subtracting the sampled hips; other tracks retain their existing convention.
+Absent legacy bindings remain upright and cannot enable CrouchBrace. Never fabricate
+duck protection with a shrunken hurtbox or a runtime offset.
+
 ## 3. Author the canonical grid
 
 Persist these sixteen slot IDs, in ground-then-air order:
@@ -48,6 +57,11 @@ Persist these sixteen slot IDs, in ground-then-air order:
 not alternate move identity. Author fixed timelines in 60 Hz ticks with engine-owned
 operations. Define damage, hitboxes, recovery, movement, and capability values only from the
 approved kit specification.
+
+`allowSlideCarry` defaults false. Only grounded normals 1–4 may opt in, without aiming,
+recovery designation, positive warp range, SetVelocity, ForwardLunge, SetAimState or
+StartCapability operations. Conflicts fail compilation with
+`slot.slide-carry.motion-conflict`; aliases inherit the resolved target value.
 
 ## 4. Inspect before cook
 
@@ -83,6 +97,13 @@ The generated catalog is a regenerable cache, not a source of gameplay truth. Re
 matching source, cooked-content, package, payload, and dependency hashes. A failed cook
 returns semantic `success: false` and preserves the last valid artifact, generated cache,
 and cook status. It must not promote invalid drafts.
+
+Generated packages require runtime API `1.2.0` (maximum `1.x`); schema version remains 1
+for additive fields. The loader admits known minima `1.0.0`, `1.1.0`, and `1.2.0`.
+Runtime API 1.2.0 adds the timed gravity-window timeline operation. Older runtimes must
+reject packages that require it.
+Semantic animation IDs and pose-track IDs are distinct namespaces: validated client
+bindings map loaded pose tracks to runtime semantic lookup IDs.
 
 ## 6. Admit exact content
 

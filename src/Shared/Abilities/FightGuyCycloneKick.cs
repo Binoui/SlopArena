@@ -9,6 +9,7 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public class FightGuyCycloneKick : ServerAbility
     {
+        public override bool OwnsVerticalMotion => true;
         private readonly CookedCycloneKickCapabilityParameters _parameters;
         private ushort _ticks;
         private readonly HashSet<ulong> _hitEntities = new();
@@ -25,11 +26,15 @@ namespace SlopArena.Shared.Abilities
             AnimIndex = 0;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
+            s.IsFastFalling = false;
+            ClearVelocityOwnership(ref s);
             SetVelocityInFacing(ref s, _parameters.ForwardSpeed);
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
+            s.IsFastFalling = false;
+            ClearVelocityOwnership(ref s);
             _ticks++;
             if (_ticks > _parameters.DurationTicks)
                 return;

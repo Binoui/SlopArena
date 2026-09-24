@@ -4,6 +4,8 @@ namespace SlopArena.Shared.Abilities;
 /// <summary>Hold F to aim the aerosol stream, then release to fire.</summary>
 public sealed class MankiAerosolInferno : ServerAbility, IAimHoldCapability
 {
+    public override bool OwnsVerticalMotion => true;
+
     private readonly CookedMankiAerosolInfernoCapabilityParameters _parameters;
     private bool _fired;
     private bool _released;
@@ -15,6 +17,8 @@ public sealed class MankiAerosolInferno : ServerAbility, IAimHoldCapability
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         _fired = false;
         _released = false;
         s.State = ActionState.Aiming;
@@ -29,6 +33,8 @@ public sealed class MankiAerosolInferno : ServerAbility, IAimHoldCapability
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         if (!_released)
         {
             s.VX = 0f;

@@ -130,18 +130,20 @@ public class LedgeWalkOffTests
         s.VX = def.Movement.RunSpeed;
         s.VZ = 0f;
         sim.RegisterEntity(1, def, s);
-        var input = TestHelpers.Input(moveX: 1f, down: true);
+        var input = TestHelpers.Input(moveX: 1f);
 
         int leaveTick = -1;
         for (int t = 0; t < 60; t++)
         {
+            var before = sim.GetState(1);
+            input.DownPressed = !before.IsGrounded && before.VY < 0f && !before.IsFastFalling;
+            input.Down = !before.IsGrounded;
             sim.Tick(new Dictionary<ulong, InputState> { { 1, input } });
             var st = sim.GetState(1);
             if (leaveTick < 0 && !st.IsGrounded) leaveTick = t;
             if (leaveTick >= 0 && t - leaveTick == 3)
             {
-                // Fast-fall (Down) must engage immediately — pre-fix the float window pinned
-                // VY to 0 so the VY<0 fast-fall gate never opened.
+                // A fresh descending edge must bypass the ordinary float window.
                 Assert.True(st.VY <= -def.Movement.FastFallSpeed + 0.1f,
                     $"fast-fall must engage by 3 ticks after leaving; VY={st.VY:F3}");
                 return;

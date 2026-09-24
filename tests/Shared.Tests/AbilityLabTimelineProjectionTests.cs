@@ -80,6 +80,37 @@ public sealed class AbilityLabTimelineProjectionTests
     }
 
     [Fact]
+    public void GravityWindowProjectsItsDurationAndRetimesWithoutLosingParameters()
+    {
+        var gravity = new GravityWindowOperationSource(3, AuthoringUnit.Normalized, 0.5f, 4);
+        var source = WithSlot(Slot(new CharacterStageSource(
+            10, 0, 0, 0, 0, Array.Empty<string>(), new CharacterTimelineOperationSource[] { gravity })));
+
+        var operation = Assert.Single(AbilityLabTimelineProjection.Build(source.Character.Slots[0]).Stages[0].Operations);
+        Assert.Equal((CookedOperationKind.GravityWindow, "Gravity window", 3, 7),
+            (operation.Kind, operation.Summary, operation.StartTick, operation.EndTick));
+
+        var serialized = CharacterPackageSourceCodec.SerializeCharacter(source.Character);
+        var parsed = CharacterPackageSourceCodec.Load(
+            CharacterPackageSourceCodec.SerializeManifest(source.Manifest), serialized);
+        Assert.True(parsed.IsValid, string.Join("; ", parsed.Diagnostics.Select(x => x.Message)));
+        var roundTripped = Assert.IsType<GravityWindowOperationSource>(
+            parsed.Source!.Character.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal((ushort)3, roundTripped.Tick);
+        Assert.Equal(0.5f, roundTripped.GravityScale);
+        Assert.Equal((ushort)4, roundTripped.DurationTicks);
+
+        var moved = CharacterPackageSourceCodec.ReplaceOperationTick(source, 0, 0, 0, 5);
+        Assert.True(moved.IsValid);
+        var retimed = Assert.IsType<GravityWindowOperationSource>(
+            moved.Source!.Character.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal((ushort)5, retimed.Tick);
+        Assert.Equal((0.5f, (ushort)4), (retimed.GravityScale, retimed.DurationTicks));
+        Assert.Equal("edit.tick.out-of-range",
+            CharacterPackageSourceCodec.ReplaceOperationTick(source, 0, 0, 0, 7).Diagnostics[0].Code);
+    }
+
+    [Fact]
     public void EmptyAndNullTimelinesAreHandledExplicitly()
     {
         var projection = AbilityLabTimelineProjection.Build(Slot(new CharacterStageSource(

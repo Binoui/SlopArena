@@ -55,23 +55,24 @@ namespace SlopArena.Shared.Rollback
 
         }
 
-        /// <summary>Feed one network drain's worth of opponent packets. Splits by ActionState
-        /// (D9): Predictable entities go to PredictedTrack, Complex entities go to RawTrack.</summary>
+        /// <summary>Feed one network drain's worth of opponent packets. Predictable low
+        /// states go to PredictedTrack; Complex or hitstop states stay on RawTrack.</summary>
         public void IngestOpponentBatch(IReadOnlyList<ServerEntityPacket> packets)
         {
             var predictable = new List<ServerEntityPacket>();
             foreach (var packet in packets)
             {
                 var state = packet.State.ToState();
-                if (ActionStateClassifier.IsPredictable(state.State) && _defs.ContainsKey(packet.EntityId))
+                if (ActionStateClassifier.IsPredictable(state) && _defs.ContainsKey(packet.EntityId))
                 {
                     predictable.Add(packet);
                     _rawTrackLatest.Remove(packet.EntityId);
                 }
                 else
                 {
-                    // Unknown def (entity never registered) or Complex state: RawTrack —
-                    // render as received, never simulate an entity we have no definition for.
+                    // Unknown def, hitstop, or any Complex state: RawTrack —
+                    // render as received, never reconstruct missing live ability/
+                    // queued-launch state from the wire snapshot.
                     _predicted.StopTracking(packet.EntityId);
                     state.EntityId = packet.EntityId;
                     _rawTrackLatest[packet.EntityId] = state;

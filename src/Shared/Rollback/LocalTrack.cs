@@ -66,13 +66,16 @@ namespace SlopArena.Shared.Rollback
         /// ability instance) is trusted as-is instead.</summary>
         public void ReconcileWithServer(ServerEntityPacket packet)
         {
+            // Hitstop carries live ability/queued-launch state not represented in the
+            // packet. Never reconstruct from an authoritative frozen snapshot.
+            if (packet.State.HitstopTicks > 0) return;
+
             int idx = _history.FindIndex(h => h.Tick == packet.Tick);
             if (idx < 0) return; // outside the window — trust the continuous sim, self-heals next packet
 
             for (int i = idx; i < _history.Count; i++)
-                if (!ActionStateClassifier.IsSnapSafe(_history[i].State.State))
+                if (!ActionStateClassifier.IsSnapSafe(_history[i].State))
                     return;
-
             CorrectionCount++;
 
             var corrected = _history[idx].State;

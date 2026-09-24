@@ -13,6 +13,7 @@ namespace SlopArena.Shared
         /// <summary>Hold-to-aim phase (Kistu E): ability active, movement unlocked, jump/dash blocked.</summary>
         Aiming = 8,
         Run = 9,
-        LedgeHang = 10
+        LedgeHang = 10,
+        Crouching = 11
     }
 }

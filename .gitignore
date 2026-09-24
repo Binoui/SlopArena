@@ -134,6 +134,7 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 /Logs/
 /UserSettings/
 /Temp/
+/artifacts/
 
 # Third-party animation/model packs (non-redistributable)
 client/Unity/Assets/~AnimationPacks/
@@ -193,6 +194,11 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 *.fbx
 *.FBX
 *.anim
+# Project-authored static Down poses are package source, not imported animation packs.
+!client/Unity/Assets/CharacterPackages/fightguy/Animations/fightguy_crouch.anim
+!client/Unity/Assets/CharacterPackages/manki/Animations/manki_crouch.anim
+!client/Unity/Assets/CharacterPackages/bonk/Animations/bonk_crouch.anim
+!client/Unity/Assets/CharacterPackages/kistu/Animations/kistu_crouch.anim
 *.png
 *.tga
 *.jpg

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using System.IO;
+using System.Text.Json;
 using UnityEngine;
 using SlopArena.Client.Animation;
 using SlopArena.Shared;
@@ -15,14 +16,44 @@ public static class CharacterAssetCookerSelfTest
         "anim.hit-light", "anim.hit-medium", "anim.hit-hard", "anim.low-kick",
         "anim.double-punch", "anim.straight-punch", "anim.floating-kick", "anim.sweeping-kick",
         "anim.high-kick", "anim.double-kick", "anim.air-smash", "anim.ki-shot",
-        "anim.rising-dragon", "anim.cyclone-kick", "anim.dragon-beam",
+        "anim.ki-shot-loop", "anim.rising-dragon", "anim.cyclone-kick", "anim.fist-of-fury",
+        "anim.tumble", "anim.fightguy.crouch", "anim.fightguy.slide",
     };
+    private readonly struct LowPoseBakeContext
+    {
+        public readonly float VisualScale;
+        public readonly float HurtboxBoneScale;
+        public readonly float ModelYOffset;
+        public readonly float CapsuleHeight;
+        public readonly float HipHeight;
+        public readonly string Crouch;
+        public readonly string Slide;
+
+        public LowPoseBakeContext(
+            float visualScale,
+            float hurtboxBoneScale,
+            float modelYOffset,
+            float capsuleHeight,
+            float hipHeight,
+            string crouch,
+            string slide)
+        {
+            VisualScale = visualScale;
+            HurtboxBoneScale = hurtboxBoneScale;
+            ModelYOffset = modelYOffset;
+            CapsuleHeight = capsuleHeight;
+            HipHeight = hipHeight;
+            Crouch = crouch;
+            Slide = slide;
+        }
+    }
 
     [MenuItem("Tools/SlopArena/Tests/Weapon Marker Poses")]
     public static void RunWeaponMarkerSelfTest()
     {
         var catalog = AssetDatabase.LoadAssetAtPath<CharacterAssetCatalog>("Assets/CharacterPackages/bonk/CharacterAssetCatalog.asset");
         var entry = catalog.WeaponConfig.Entries.First(x => x != null);
+        var lowContext = ReadLowPoseBakeContext(catalog);
         var animations = catalog.Bindings.Where(x => x.Clip != null)
             .Select(x => new DeterministicPoseTrackBaker.SampledAnimation
             {
@@ -30,8 +61,13 @@ public static class CharacterAssetCookerSelfTest
                 PoseTrackId = x.PoseTrackId,
                 Clip = x.Clip,
                 FrameCount = Mathf.CeilToInt(x.Clip.length * 60),
+                IsLowPosture = string.Equals(x.SemanticId, lowContext.Crouch, StringComparison.Ordinal)
+                    || string.Equals(x.SemanticId, lowContext.Slide, StringComparison.Ordinal),
             }).ToArray();
-        var baked = BakedAnimationData.LoadFromBin(DeterministicPoseTrackBaker.Bake(catalog.Rig, animations, 60, catalog.WeaponConfig));
+        var baked = BakedAnimationData.LoadFromBin(DeterministicPoseTrackBaker.Bake(
+            catalog.Rig, animations, 60, catalog.WeaponConfig,
+            lowContext.VisualScale, lowContext.HurtboxBoneScale,
+            lowContext.ModelYOffset, lowContext.CapsuleHeight, lowContext.HipHeight));
         var rig = UnityEngine.Object.Instantiate(catalog.Rig);
         var weapon = UnityEngine.Object.Instantiate(entry.Prefab);
         rig.hideFlags = weapon.hideFlags = HideFlags.HideAndDontSave;
@@ -45,6 +81,11 @@ public static class CharacterAssetCookerSelfTest
             int hiltIndex = Array.IndexOf(baked.BoneNames, "_weapon_hilt");
             int tipIndex = Array.IndexOf(baked.BoneNames, "_weapon_tip");
             int frames = 0;
+            Vector3 ExpectedMarkerPosition(Transform marker, bool lowPosture)
+                => lowPosture
+                    ? BakeLowPose(rig.transform.InverseTransformPoint(marker.position), lowContext)
+                    : marker.position - hips.position;
+
             foreach (var animation in animations)
             {
                 for (int frame = 0; frame < animation.FrameCount; frame++)
@@ -53,8 +94,8 @@ public static class CharacterAssetCookerSelfTest
                     // Place an actual prefab instance as WeaponAttach does, including its scale.
                     weapon.transform.position = hand.TransformPoint(entry.PositionOffset);
                     weapon.transform.rotation = hand.rotation * Quaternion.Euler(entry.RotationOffset);
-                    AssertMarkerPose(hiltIndex, hilt.position - hips.position, "_weapon_hilt");
-                    AssertMarkerPose(tipIndex, tip.position - hips.position, "_weapon_tip");
+                    AssertMarkerPose(hiltIndex, ExpectedMarkerPosition(hilt, animation.IsLowPosture), "_weapon_hilt");
+                    AssertMarkerPose(tipIndex, ExpectedMarkerPosition(tip, animation.IsLowPosture), "_weapon_tip");
                     frames++;
 
                     void AssertMarkerPose(int boneIndex, Vector3 expected, string bone)
@@ -69,12 +110,36 @@ public static class CharacterAssetCookerSelfTest
             }
             Debug.Log($"[SlopArena] Weapon marker poses passed: {animations.Length} clips, {frames} frames, both endpoints within 0.1mm.");
         }
+
         finally
         {
             UnityEngine.Object.DestroyImmediate(weapon);
             UnityEngine.Object.DestroyImmediate(rig);
         }
     }
+    private static LowPoseBakeContext ReadLowPoseBakeContext(CharacterAssetCatalog catalog)
+    {
+        string path = UnityCharacterAssetCooker.ResolveFile(
+            $"Assets/CharacterPackages/{catalog.PackageId}", "character.json");
+        var loaded = CharacterPackageSourceCodec.Load(
+            File.ReadAllText(Path.Combine(Path.GetDirectoryName(path), "package.json")),
+            File.ReadAllText(path));
+        if (!loaded.IsValid)
+            throw new InvalidOperationException("Weapon-marker source did not load.");
+        var character = loaded.Source.Character;
+        var presentation = character.Presentation;
+        return new LowPoseBakeContext(
+            presentation.VisualScale, presentation.HurtboxBoneScale,
+            presentation.ModelYOffset, character.CapsuleHeight, character.HipHeight,
+            presentation.Crouch, presentation.Slide);
+    }
+
+    private static Vector3 BakeLowPose(Vector3 rootLocalPosition, LowPoseBakeContext context)
+        => new(
+            rootLocalPosition.x * context.VisualScale / context.HurtboxBoneScale,
+            (rootLocalPosition.y * context.VisualScale + context.ModelYOffset
+                + context.CapsuleHeight * 0.5f - context.HipHeight) / context.HurtboxBoneScale,
+            rootLocalPosition.z * context.VisualScale / context.HurtboxBoneScale);
 
     public static void RunFightGuySelfTest()
     {

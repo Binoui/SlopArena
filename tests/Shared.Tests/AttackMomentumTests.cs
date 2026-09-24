@@ -1,7 +1,9 @@
+using System;
+
 using System.Collections.Generic;
 using Xunit;
 using SlopArena.Shared;
-
+using SlopArena.Shared.Abilities;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
@@ -62,6 +64,116 @@ public class AttackMomentumTests
         Assert.Equal(ActionState.Attacking, t1.State);
         TestHelpers.AssertNear(10f, t1.VX, 0.01f);
         TestHelpers.AssertNear(5f, t1.VZ, 0.01f);
+    }
+
+
+    [Fact]
+    public void OptedInSlideNormal_CapsIncomingVectorAndDecaysOnceBeforeIntegration()
+    {
+        var def = WithSlideCarry(TestHelpers.CombatDef);
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState()
+            with
+            {
+                PY = TestHelpers.GroundPY(def),
+                State = ActionState.Sliding,
+                VX = def.Movement.RunSpeed * 1.2f,
+                VZ = def.Movement.RunSpeed * .3f,
+            };
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new InputState { ActiveSlot = AbilitySlots.Slot1, Down = true },
+        });
+
+        var after = sim.GetState(1);
+        float capped = MathF.Sqrt(after.VX * after.VX + after.VZ * after.VZ);
+        Assert.Equal(ActionState.Attacking, after.State);
+        Assert.True(after.SlideAttackCarryActive);
+        TestHelpers.AssertNear(def.Movement.RunSpeed
+            - DownActionTuning.AttackDecelerationRatio * def.Movement.RunSpeed / 60f,
+            capped, .01f);
+    }
+
+    [Fact]
+    public void SlideCarry_HitstopFreezesDecay()
+    {
+        var def = TestHelpers.CombatDef;
+        var state = TestHelpers.PlayerState()
+            with
+            {
+                PY = TestHelpers.GroundPY(def),
+                State = ActionState.Attacking,
+                AttackSlot = AbilitySlots.Slot1,
+                SlideAttackCarryActive = true,
+                HitstopTicks = 3,
+                VX = def.Movement.RunSpeed,
+            };
+        float before = state.VX;
+
+        Simulation.SimulateTick(ref state, def, default, TestHelpers.TestArena(),
+            out _, out _, DownActionTuning.Default, verticalMotionOwned: false);
+
+        Assert.Equal(before, state.VX);
+        Assert.True(state.SlideAttackCarryActive);
+    }
+
+    [Fact]
+    public void SlideCarry_NaturalAbilityCompletionClearsCarry()
+    {
+        var def = WithSlideCarry(TestHelpers.CombatDef);
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, def, TestHelpers.PlayerState()
+            with
+            {
+                PY = TestHelpers.GroundPY(def),
+                State = ActionState.Sliding,
+                VX = def.Movement.RunSpeed,
+            });
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new InputState { ActiveSlot = AbilitySlots.Slot1, Down = true },
+        });
+        Assert.True(sim.GetState(1).SlideAttackCarryActive);
+
+        for (int i = 0; i < 240 && sim.GetState(1).SlideAttackCarryActive; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+
+        Assert.False(sim.GetState(1).SlideAttackCarryActive);
+    }
+
+    [Fact]
+    public void SlideCarry_DashCancellationClearsCarryWithoutResurrection()
+    {
+        var def = TestHelpers.CombatDef;
+        var state = TestHelpers.PlayerState()
+            with
+            {
+                PY = TestHelpers.GroundPY(def),
+                State = ActionState.Attacking,
+                AttackSlot = AbilitySlots.Slot1,
+                SlideAttackCarryActive = true,
+                VX = def.Movement.RunSpeed,
+            };
+
+        Assert.True(Simulation.StartDash(ref state, def.Movement, 1f, 0f));
+        Assert.Equal(ActionState.Dashing, state.State);
+        Assert.False(state.SlideAttackCarryActive);
+    }
+
+    private static CharacterDefinition WithSlideCarry(CharacterDefinition source)
+    {
+        var slots = new List<CookedSlotDefinition>(source.CookedSlots!);
+        var slot = slots[0];
+        slots[0] = new CookedSlotDefinition(
+            slot.Ordinal, slot.Id, slot.IsAir, slot.Name, slot.Description, slot.IconId,
+            slot.Behavior, slot.AimMode, slot.CooldownTicks, slot.IsRecoveryMove,
+            slot.PreserveMomentumOnStart, slot.Timeline, slot.ChargePool, slot.AimMovement,
+            slot.AimAnimationId, allowSlideCarry: true);
+        source.CookedSlots = slots;
+        return source;
     }
 
     /// <summary>Shallow-clone a spec with the momentum override flag flipped.</summary>

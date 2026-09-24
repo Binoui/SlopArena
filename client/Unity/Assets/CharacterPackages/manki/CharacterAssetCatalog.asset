@@ -110,6 +110,14 @@ MonoBehaviour:
     _clip: {fileID: -623603649343465320, guid: b79032c6c9e8aa56ab188264f01fff1c, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.manki.tumble
+  - _semanticId: anim.manki.crouch
+    _clip: {fileID: 7400000, guid: f236a3ae377739d71a9f571beb74815e, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.manki.crouch
+  - _semanticId: anim.manki.slide
+    _clip: {fileID: 7400000, guid: f236a3ae377739d71a9f571beb74815e, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.manki.slide
   _presentations:
   - _semanticId: presentation.manki.aerosol-inferno.start
     _prefab: {fileID: 2053101587433184381, guid: 2db9d01ecccd44ec1be8bb5a8287dcd7, type: 3}

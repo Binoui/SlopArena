@@ -70,9 +70,19 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException("Source edits did not remain an unsaved authoritative draft.");
             Refresh(window);
             RefreshInspector(window);
-            if (!root.Q<VisualElement>("inspector").Query<Button>().ToList()
-                    .Any(button => button.text == "Add forward lunge"))
-                throw new InvalidOperationException("Forward-lunge control is unavailable in the Move inspector.");
+            var inspector = root.Q<VisualElement>("inspector");
+            var addGravityWindow = inspector.Query<Button>().ToList()
+                .FirstOrDefault(button => button.text == "Add gravity window");
+            if (addGravityWindow == null ||
+                !inspector.Query<Button>().ToList().Any(button => button.text == "Add forward lunge"))
+                throw new InvalidOperationException("Timeline gravity-window or forward-lunge control is unavailable.");
+            InvokeButton(addGravityWindow);
+            if (windowWorkspace.Draft.Slots.Single(slot => slot.Id == "ground.1")
+                    .Timeline.Stages[0].Operations.LastOrDefault() is not GravityWindowOperationSource gravityWindow ||
+                !inspector.Query<FloatField>().ToList().Any(field => field.label == "Gravity scale") ||
+                !inspector.Query<IntegerField>().ToList().Any(field => field.label == "Start tick") ||
+                !inspector.Query<IntegerField>().ToList().Any(field => field.label == "Duration ticks"))
+                throw new InvalidOperationException("Gravity-window insertion or its editable timing/scale controls are unavailable.");
 
             if (root.Q<FloatField>("character-weight").value != priorWeight + 1f ||
                 root.Q<Button>("package-status-toggle").text != "Unsaved" ||

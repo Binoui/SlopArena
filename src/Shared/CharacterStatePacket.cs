@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.IO;
 
 namespace SlopArena.Shared
 {
@@ -13,7 +14,7 @@ namespace SlopArena.Shared
         public float VelocityY;
         public float VelocityZ;
         /// <summary>
-        /// Idle, Dashing, Hitstun, WallCling, Sliding
+        /// ActionState value, including the appended Crouching state.
         /// </summary>
         public byte CurrentActionState;
         /// <summary>
@@ -65,6 +66,13 @@ namespace SlopArena.Shared
         public ushort RushTicks;
         public float LastDirX, LastDirZ;
         public bool WasAirborneDuringKnockback;
+        /// <summary>Replicated low-locomotion and fast-fall flags.</summary>
+        public bool IsFastFalling;
+        public bool JumpFromSlide;
+        public bool SlideAttackCarryActive;
+        public bool CrouchSettled;
+        public bool QueuedCrouchBrace;
+        public bool InPostHitstunFlight;
         /// <summary>Remaining hitstop freeze ticks (ADR-0012).</summary>
         public ushort HitstopTicks;
         /// <summary>Remaining Burst cooldown ticks (ADR-0014) — HUD for both players.</summary>
@@ -76,8 +84,8 @@ namespace SlopArena.Shared
         public ushort LedgeRegrabLockTicks;
         /// <summary>Remaining landing-lag lock ticks. Authoritative so local and remote presentation/rollback tracks agree.</summary>
         public ushort LandingLagTicks;
-        /// <summary>112 bytes: fixed state fields, eleven cooldown slots, rollback resources, attack sequence, and landing lag.</summary>
-        public const int Size = 112;
+        /// <summary>114 bytes: fixed state fields plus replicated movement flags and protocol version.</summary>
+        public const int Size = 114;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -129,6 +137,12 @@ namespace SlopArena.Shared
                 LastDirX = s.LastDirX,
                 LastDirZ = s.LastDirZ,
                 WasAirborneDuringKnockback = s.WasAirborneDuringKnockback,
+                IsFastFalling = s.IsFastFalling,
+                JumpFromSlide = s.JumpFromSlide,
+                SlideAttackCarryActive = s.SlideAttackCarryActive,
+                CrouchSettled = s.CrouchSettled,
+                QueuedCrouchBrace = s.QueuedCrouchBrace,
+                InPostHitstunFlight = s.InPostHitstunFlight,
                 HitstopTicks = s.HitstopTicks,
                 BurstCooldownTicks = s.BurstCooldownTicks,
                 BurstRecoveryTicks = s.BurstRecoveryTicks,
@@ -185,6 +199,12 @@ namespace SlopArena.Shared
                 LastDirX = LastDirX,
                 LastDirZ = LastDirZ,
                 WasAirborneDuringKnockback = WasAirborneDuringKnockback,
+                IsFastFalling = IsFastFalling,
+                JumpFromSlide = JumpFromSlide,
+                SlideAttackCarryActive = SlideAttackCarryActive,
+                CrouchSettled = CrouchSettled,
+                QueuedCrouchBrace = QueuedCrouchBrace,
+                InPostHitstunFlight = InPostHitstunFlight,
                 HitstopTicks = HitstopTicks,
                 BurstCooldownTicks = BurstCooldownTicks,
                 BurstRecoveryTicks = BurstRecoveryTicks,
@@ -248,13 +268,23 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(107, 2), LedgeRegrabLockTicks);
             buffer[109] = AttackSequence;
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(110, 2), LandingLagTicks);
+            byte movementFlags = 0;
+            if (IsFastFalling) movementFlags |= 0x01;
+            if (JumpFromSlide) movementFlags |= 0x02;
+            if (SlideAttackCarryActive) movementFlags |= 0x04;
+            if (CrouchSettled) movementFlags |= 0x08;
+            if (QueuedCrouchBrace) movementFlags |= 0x10;
+            if (InPostHitstunFlight) movementFlags |= 0x20;
+            buffer[112] = movementFlags;
+            buffer[113] = SimulationProtocol.Version;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
         {
-            if (buffer.Length < Size)
-                throw new ArgumentException("Buffer too small");
-
+            if (buffer.Length != Size)
+                throw new ArgumentException($"State payload must be exactly {Size} bytes.", nameof(buffer));
+            if (buffer[113] != SimulationProtocol.Version)
+                throw new InvalidDataException($"Unsupported state protocol version {buffer[113]}.");
             var packet = new CharacterStatePacket();
             packet.TickNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
             packet.PositionX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(4, 4)));
@@ -306,6 +336,13 @@ namespace SlopArena.Shared
             packet.LedgeRegrabLockTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(107, 2));
             packet.AttackSequence = buffer[109];
             packet.LandingLagTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(110, 2));
+            byte movementFlags = buffer[112];
+            packet.IsFastFalling = (movementFlags & 0x01) != 0;
+            packet.JumpFromSlide = (movementFlags & 0x02) != 0;
+            packet.SlideAttackCarryActive = (movementFlags & 0x04) != 0;
+            packet.CrouchSettled = (movementFlags & 0x08) != 0;
+            packet.QueuedCrouchBrace = (movementFlags & 0x10) != 0;
+            packet.InPostHitstunFlight = (movementFlags & 0x20) != 0;
             return packet;
         }
 
@@ -349,6 +386,12 @@ namespace SlopArena.Shared
             s.RushTicks = RushTicks;
             s.LastDirX = LastDirX; s.LastDirZ = LastDirZ;
             s.WasAirborneDuringKnockback = WasAirborneDuringKnockback;
+            s.IsFastFalling = IsFastFalling;
+            s.JumpFromSlide = JumpFromSlide;
+            s.SlideAttackCarryActive = SlideAttackCarryActive;
+            s.CrouchSettled = CrouchSettled;
+            s.QueuedCrouchBrace = QueuedCrouchBrace;
+            s.InPostHitstunFlight = InPostHitstunFlight;
             s.HitstopTicks = HitstopTicks;
             s.BurstCooldownTicks = BurstCooldownTicks;
             s.BurstRecoveryTicks = BurstRecoveryTicks;

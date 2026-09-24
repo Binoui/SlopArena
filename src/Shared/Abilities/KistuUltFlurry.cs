@@ -12,12 +12,17 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuUltFlurry : ServerAbility
 {
+    public override bool OwnsVerticalMotion => true;
+
     private readonly CookedKistuBladeFlurryCapabilityParameters _parameters;
     private ushort _ticks;
     public KistuUltFlurry(CookedKistuBladeFlurryCapabilityParameters parameters)
         => _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
+
         _ticks = 0;
         s.State = ActionState.Attacking;
         s.AttackSlot = (byte)(Slot + 1);
@@ -33,6 +38,8 @@ public sealed class KistuUltFlurry : ServerAbility
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         _ticks++;
 
         var spec = def.GetSlotAbility(Slot, airborne: false);
@@ -77,6 +84,7 @@ public sealed class KistuUltFlurry : ServerAbility
     }
     public override void OnCancel(ref CharacterState s)
     {
+        ClearVelocityOwnership(ref s);
         s.VX = 0f;
         s.VZ = 0f;
     }

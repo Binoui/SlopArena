@@ -102,4 +102,12 @@ MonoBehaviour:
     _clip: {fileID: -623603649343465320, guid: b79032c6c9e8aa56ab188264f01fff1c, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.kistu.tumble
+  - _semanticId: anim.kistu.crouch
+    _clip: {fileID: 7400000, guid: ba8ae8dd5561ad7ed8745a14ff48e752, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.kistu.crouch
+  - _semanticId: anim.kistu.slide
+    _clip: {fileID: 7400000, guid: ba8ae8dd5561ad7ed8745a14ff48e752, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.kistu.slide
   _presentations: []

@@ -22,6 +22,11 @@ namespace SlopArena.Shared.Abilities
         private Dictionary<byte, HashSet<ulong>>? _hitGroups;
         // ── Lifecycle (implement in subclasses) ──
 
+        /// <summary>Whether this activation currently owns vertical motion.</summary>
+        public virtual bool OwnsVerticalMotion => false;
+        /// <summary>Multiplier applied to ordinary airborne gravity while this ability is active.</summary>
+        public virtual float GravityMultiplier => 1f;
+
         /// <summary>Called once when the ability activates.</summary>
         public abstract void OnStart(ref CharacterState s, CharacterDefinition def);
 
@@ -193,10 +198,13 @@ namespace SlopArena.Shared.Abilities
         /// <summary>Set character velocity (world space).</summary>
         protected void SetVelocity(ref CharacterState s, float vx, float vy, float vz)
         {
+            ClearVelocityOwnership(ref s);
+            s.IsFastFalling = false;
             s.VX = vx;
             s.VY = vy;
             s.VZ = vz;
         }
+
         /// <summary>Spawn a raw hitbox while preserving this activation's provenance.</summary>
         protected void SpawnResolverHitbox(Hitbox hitbox)
         {
@@ -211,10 +219,17 @@ namespace SlopArena.Shared.Abilities
         /// </summary>
         protected void SetVelocityInFacing(ref CharacterState s, float forwardSpeed, float vertical = 0f)
         {
+            ClearVelocityOwnership(ref s);
+            if (vertical != 0f)
+                s.IsFastFalling = false;
             s.VX = MathF.Sin(s.FacingYaw) * forwardSpeed;
             s.VZ = MathF.Cos(s.FacingYaw) * forwardSpeed;
             s.VY = vertical;
         }
+
+        /// <summary>Ends slide carry whenever an ability takes velocity ownership.</summary>
+        protected static void ClearVelocityOwnership(ref CharacterState s)
+            => s.SlideAttackCarryActive = false;
 
         /// <summary>
         /// End the ability naturally: calls OnEnd, returns to Idle.
@@ -226,6 +241,7 @@ namespace SlopArena.Shared.Abilities
         protected void EndAbility(ref CharacterState s)
         {
             OnEnd(ref s);
+            s.SlideAttackCarryActive = false;
             s.State = ActionState.Idle;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;

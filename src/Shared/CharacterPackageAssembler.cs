@@ -296,7 +296,7 @@ public static class CharacterPackageAssembler
                     EnsureFields(metadata.GetProperty("compatibility"), new[] { "runtimeApiMin", "runtimeApiMax" }, RuntimePath + ".metadata.compatibility", d);
                 EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
                 if (HasObject(root.GetProperty("character"), "presentation"))
-                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
+                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "crouch", "slide", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
                 EnsureFields(root.GetProperty("budget"), new[] { "slotCount", "stageCount", "operationCount", "hitboxCount", "projectileCount", "capabilityCount", "maxTimelineDurationTicks" }, RuntimePath + ".budget", d);
                 if (GetString(metadata, "packageId") != manifest.PackageId || GetString(metadata, "version") != manifest.Version || GetUInt16(metadata, "cookedSchemaVersion") != manifest.CookedSchemaVersion)
                     d.Add(Error("package.runtime.metadata-mismatch", RuntimePath, "Runtime metadata does not match manifest."));
@@ -332,6 +332,8 @@ public static class CharacterPackageAssembler
         Add(required, package.Definition.Presentation.HitMedium, d, "character.presentation");
         Add(required, package.Definition.Presentation.HitHard, d, "character.presentation");
         AddOptional(required, package.Definition.Presentation.Tumble, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Crouch, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Slide, d, "character.presentation");
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId))
@@ -353,6 +355,10 @@ public static class CharacterPackageAssembler
             foreach (string name in new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard" }) Add(required, GetString(presentation, name), d, "character.presentation");
             if (presentation.TryGetProperty("tumble", out var tumble) && tumble.ValueKind == JsonValueKind.String)
                 AddOptional(required, tumble.GetString() ?? "", d, "character.presentation");
+            if (presentation.TryGetProperty("crouch", out var crouch) && crouch.ValueKind == JsonValueKind.String)
+                AddOptional(required, crouch.GetString() ?? "", d, "character.presentation");
+            if (presentation.TryGetProperty("slide", out var slide) && slide.ValueKind == JsonValueKind.String)
+                AddOptional(required, slide.GetString() ?? "", d, "character.presentation");
         }
         if (character.TryGetProperty("slots", out var slots) && slots.ValueKind == JsonValueKind.Array)
             foreach (var slot in slots.EnumerateArray())

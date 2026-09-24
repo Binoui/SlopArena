@@ -59,25 +59,38 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
-    public void Tumble_IsOptionalAndRoundTripsWhenDeclared()
+    public void TumbleAndLowPoseBindings_AreOptionalAndRoundTripWhenDeclared()
     {
         var legacyJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
         ((JsonObject)legacyJson["presentation"]!).Remove("tumble");
+        ((JsonObject)legacyJson["presentation"]!).Remove("crouch");
+        ((JsonObject)legacyJson["presentation"]!).Remove("slide");
         var legacy = CharacterPackageSourceCodec.Load(Fixture("package.json"), legacyJson.ToJsonString());
         Assert.True(legacy.IsValid, string.Join("\n", legacy.Diagnostics));
         Assert.Equal("", legacy.Source!.Character.Presentation.Tumble);
+        Assert.Equal("", legacy.Source.Character.Presentation.Crouch);
+        Assert.Equal("", legacy.Source.Character.Presentation.Slide);
         Assert.DoesNotContain("\"tumble\"", CharacterPackageSourceCodec.SerializeCharacter(legacy.Source.Character));
+        Assert.DoesNotContain("\"crouch\"", CharacterPackageSourceCodec.SerializeCharacter(legacy.Source.Character));
+        Assert.DoesNotContain("\"slide\"", CharacterPackageSourceCodec.SerializeCharacter(legacy.Source.Character));
 
         var json = JsonNode.Parse(Fixture("character.json"))!.AsObject();
-        ((JsonObject)json["presentation"]!)["tumble"] = "anim.tumble";
+        var presentation = (JsonObject)json["presentation"]!;
+        presentation["tumble"] = "anim.tumble";
+        presentation["crouch"] = "anim.fightguy.crouch";
+        presentation["slide"] = "anim.fightguy.slide";
         var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
         Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
         Assert.Equal("anim.tumble", parsed.Source!.Character.Presentation.Tumble);
+        Assert.Equal("anim.fightguy.crouch", parsed.Source.Character.Presentation.Crouch);
+        Assert.Equal("anim.fightguy.slide", parsed.Source.Character.Presentation.Slide);
         string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source.Character);
-        Assert.Contains("\"tumble\": \"anim.tumble\"", serialized);
+        Assert.Contains("\"crouch\": \"anim.fightguy.crouch\"", serialized);
+        Assert.Contains("\"slide\": \"anim.fightguy.slide\"", serialized);
         var reparsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
         Assert.True(reparsed.IsValid, string.Join("\n", reparsed.Diagnostics));
-        Assert.Equal("anim.tumble", reparsed.Source!.Character.Presentation.Tumble);
+        Assert.Equal("anim.fightguy.crouch", reparsed.Source!.Character.Presentation.Crouch);
+        Assert.Equal("anim.fightguy.slide", reparsed.Source.Character.Presentation.Slide);
     }
 
     [Fact]
@@ -103,8 +116,29 @@ public sealed class CharacterPackageSourceCodecTests
         var unknown = CharacterPackageSourceCodec.Load(Fixture("package.json"), unknownJson.ToJsonString());
         Assert.Contains(unknown.Diagnostics, x => x.Code == "enum.unknown");
     }
+
     [Fact]
-    public void RenameUpdatesOptionalTumbleReference()
+    public void AllowSlideCarry_RoundTripsAndMissingDefaultsFalse()
+    {
+        var missingJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)missingJson["slots"]![0]!).Remove("allowSlideCarry");
+        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), missingJson.ToJsonString());
+        Assert.True(missing.IsValid, string.Join("\n", missing.Diagnostics));
+        Assert.False(missing.Source!.Character.Slots[0].AllowSlideCarry);
+
+        var enabledJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        ((JsonObject)enabledJson["slots"]![0]!)["allowSlideCarry"] = true;
+        var enabled = CharacterPackageSourceCodec.Load(Fixture("package.json"), enabledJson.ToJsonString());
+        Assert.True(enabled.IsValid, string.Join("\n", enabled.Diagnostics));
+        Assert.True(enabled.Source!.Character.Slots[0].AllowSlideCarry);
+        var serialized = CharacterPackageSourceCodec.SerializeCharacter(enabled.Source.Character);
+        Assert.Contains("\"allowSlideCarry\": true", serialized);
+        var reparsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
+        Assert.True(reparsed.IsValid, string.Join("\n", reparsed.Diagnostics));
+        Assert.True(reparsed.Source!.Character.Slots[0].AllowSlideCarry);
+    }
+    [Fact]
+    public void RenameUpdatesOptionalTumbleAndLowPoseReferences()
     {
         var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
         Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
@@ -112,14 +146,27 @@ public sealed class CharacterPackageSourceCodecTests
         {
             Character = parsed.Source.Character with
             {
-                Presentation = parsed.Source.Character.Presentation with { Tumble = "anim.tumble" }
+                Presentation = parsed.Source.Character.Presentation with
+                {
+                    Tumble = "anim.tumble",
+                    Crouch = "anim.crouch",
+                    Slide = "anim.slide"
+                }
             }
         };
-        var renamed = CharacterPackageSourceCodec.RenameSemanticId(
-            source, "anim.tumble", "anim.fall-tumble",
-            new[] { new CharacterAssetCatalogBindingSnapshot("anim.tumble", "anim.tumble") });
-        Assert.True(renamed.IsValid, string.Join("\n", renamed.Diagnostics));
-        Assert.Equal("anim.fall-tumble", renamed.Source!.Character.Presentation.Tumble);
+        var renamedCrouch = CharacterPackageSourceCodec.RenameSemanticId(
+            source, "anim.crouch", "anim.fall-crouch",
+            new[] { new CharacterAssetCatalogBindingSnapshot("anim.crouch", "anim.crouch") });
+        Assert.True(renamedCrouch.IsValid, string.Join("\n", renamedCrouch.Diagnostics));
+        Assert.Equal("anim.fall-crouch", renamedCrouch.Source!.Character.Presentation.Crouch);
+        Assert.Equal("anim.slide", renamedCrouch.Source.Character.Presentation.Slide);
+        var renamedSlide = CharacterPackageSourceCodec.RenameSemanticId(
+            renamedCrouch.Source, "anim.slide", "anim.fall-slide",
+            new[] { new CharacterAssetCatalogBindingSnapshot("anim.slide", "anim.slide") });
+        Assert.True(renamedSlide.IsValid, string.Join("\n", renamedSlide.Diagnostics));
+        Assert.Equal("anim.fall-slide", renamedSlide.Source!.Character.Presentation.Slide);
+        Assert.Equal("anim.fall-crouch", renamedSlide.Source.Character.Presentation.Crouch);
+        Assert.Equal("anim.tumble", renamedSlide.Source.Character.Presentation.Tumble);
     }
 
     [Fact]

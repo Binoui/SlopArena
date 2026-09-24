@@ -86,6 +86,35 @@ public class PredictedTrackTests
     }
 
     [Fact]
+    public void ApplyBatch_DoesNotReplayDownEdgeIntoFrontier()
+    {
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var track = new SlopArena.Shared.Rollback.PredictedTrack(arena);
+        var defs = new Dictionary<ulong, CharacterDefinition> { { OpponentId, def } };
+        var baked = new Dictionary<ulong, BakedAnimationData?> { { OpponentId, null } };
+
+        var descending = TestHelpers.PlayerState();
+        descending.PY = 5f;
+        descending.IsGrounded = false;
+        descending.VY = -1f;
+        var exact = TestHelpers.Input(down: true);
+        exact.DownPressed = true;
+        var packet = MakePacket(10, descending, hasInput: true, exact);
+
+        track.ApplyBatch(new[] { packet }, currentLocalTick: 11, defs, baked);
+
+        var reference = TestHelpers.MakeSim(arena);
+        reference.RegisterEntity(OpponentId, def, descending);
+        var reused = exact;
+        reused.DownPressed = false;
+        reference.Tick(new Dictionary<ulong, InputState> { { OpponentId, reused } });
+
+        Assert.Equal(reference.GetState(OpponentId).VY, track.GetState(OpponentId).VY);
+        Assert.True(packet.Input.DownPressed);
+    }
+
+    [Fact]
     public void StopTracking_RemovesEntityFromPrediction()
     {
         var arena = TestHelpers.TestArena();

@@ -163,6 +163,62 @@ public class HurtboxPoseTests
     }
 
     [Fact]
+    public void SimTick_SelectsGroundedCrouchTrackAtFrameZero()
+    {
+        var def = new CharacterDefinition
+        {
+            Movement = TestHelpers.MankiDef.Movement,
+            CapsuleHeight = 1.5f,
+            HipHeight = 0.5f,
+            HurtboxBoneScale = 1f,
+            IdleAnim = "anim.idle",
+            CrouchAnim = "anim.crouch",
+            HurtboxBoneDefs = new[] { new HurtboxBoneDef("mixamorig:Hips", 0, 0, 0, 0.2f) },
+        };
+        var baked = new BakedAnimationData
+        {
+            BoneNames = new[] { "mixamorig:Hips" },
+            Animations = new[]
+            {
+                new BakedAnimationData.BakedAnim
+                {
+                    Name = "anim.idle",
+                    FrameCount = 1,
+                    Frames = new[] { new[] { 0f, 0f, 0f } },
+                },
+                new BakedAnimationData.BakedAnim
+                {
+                    Name = "anim.crouch",
+                    FrameCount = 2,
+                    Frames = new[]
+                    {
+                        new[] { 0f, -0.2f, 0f },
+                        new[] { 0f, -0.1f, 0f },
+                    },
+                },
+            },
+        };
+
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, def, new CharacterState
+        {
+            PX = 0f,
+            PY = 0.75f,
+            PZ = 0f,
+            IsGrounded = true,
+            State = ActionState.Crouching,
+            JumpsLeft = def.Movement.MaxJumps,
+        }, baked);
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState { Down = true } });
+        float firstY = Assert.Single(sim.GetLastEntityData()).PosY;
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState { Down = true } });
+        float secondY = Assert.Single(sim.GetLastEntityData()).PosY;
+
+        Assert.Equal(0.3f, firstY, 5);
+        Assert.Equal(firstY, secondY, 5);
+    }
+
+    [Fact]
     public void UnifiedPose_AppliesOffsetRotatedByFacing()
     {
         var def = new CharacterDefinition

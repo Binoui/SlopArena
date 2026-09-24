@@ -16,11 +16,46 @@ public sealed class CookedTimelineAbility : ServerAbility
     private float _forwardLungeYaw;
     private ushort _forwardLungeTicksRemaining;
     private bool _forwardLungeActive;
+    private ushort _gravityWindowTicksRemaining;
+    private float _gravityWindowScale = 1f;
+    private readonly bool _timelineOwnsVerticalMotion;
+
+    public override float GravityMultiplier
+        => _gravityWindowTicksRemaining > 0 ? _gravityWindowScale : 1f;
+    public override bool OwnsVerticalMotion
+    {
+        get
+        {
+            if (_timelineOwnsVerticalMotion)
+                return true;
+            for (var i = 0; i < _capabilities.Count; i++)
+                if (_capabilities[i].OwnsVerticalMotion)
+                    return true;
+            return false;
+        }
+    }
+
 
     public CookedTimelineAbility(CookedSlotDefinition slot, string[] animationNames)
     {
         _slot = slot ?? throw new ArgumentNullException(nameof(slot));
         AnimationNames = animationNames ?? Array.Empty<string>();
+        bool ownsVerticalMotion = false;
+        for (var i = 0; i < _slot.Timeline.Stages.Count && !ownsVerticalMotion; i++)
+        {
+            var operations = _slot.Timeline.Stages[i].Operations;
+            for (var j = 0; j < operations.Count; j++)
+            {
+                if (operations[j] is CookedSetVelocityOperation velocity &&
+                    (velocity.VelocityMode == AuthoringVelocityMode.Absolute ||
+                     velocity.Y != 0f))
+                {
+                    ownsVerticalMotion = true;
+                    break;
+                }
+            }
+        }
+        _timelineOwnsVerticalMotion = ownsVerticalMotion;
     }
     internal bool IsHoldingAim => _unlimitedAimHold;
     internal bool ContinuesThroughLanding
@@ -46,6 +81,8 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeYaw = 0f;
         _forwardLungeTicksRemaining = 0;
         _forwardLungeActive = false;
+        _gravityWindowTicksRemaining = 0;
+        _gravityWindowScale = 1f;
         s.State = ActionState.Attacking;
         s.ComboStage = 0;
         s.AttackElapsedTicks = 0;
@@ -62,6 +99,8 @@ public sealed class CookedTimelineAbility : ServerAbility
         if (_completed)
             return;
         ApplyForwardLunge(ref s);
+        if (_gravityWindowTicksRemaining > 0)
+            _gravityWindowTicksRemaining--;
 
 
         bool wasAiming = _unlimitedAimHold && s.State == ActionState.Aiming;
@@ -103,13 +142,19 @@ public sealed class CookedTimelineAbility : ServerAbility
     public override void OnEnd(ref CharacterState s)
     {
         CompleteCapabilities(ref s, cancel: false);
+        s.SlideAttackCarryActive = false;
+        _gravityWindowTicksRemaining = 0;
+        _gravityWindowScale = 1f;
     }
 
     public override void OnCancel(ref CharacterState s)
     {
         CompleteCapabilities(ref s, cancel: true);
+        s.SlideAttackCarryActive = false;
         s.IsAiming = false;
         _forwardLungeActive = false;
+        _gravityWindowTicksRemaining = 0;
+        _gravityWindowScale = 1f;
         _forwardLungeTicksRemaining = 0;
     }
     public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
@@ -133,6 +178,10 @@ public sealed class CookedTimelineAbility : ServerAbility
             switch (operation)
             {
                 case CookedSetVelocityOperation velocity:
+                    ClearVelocityOwnership(ref s);
+                    bool verticalWrite = velocity.VelocityMode == AuthoringVelocityMode.Absolute || velocity.Y != 0f;
+                    if (verticalWrite)
+                        s.IsFastFalling = false;
                     if (velocity.VelocityMode == AuthoringVelocityMode.Absolute)
                     {
                         s.VX = velocity.X;
@@ -147,7 +196,12 @@ public sealed class CookedTimelineAbility : ServerAbility
                     }
                     break;
                 case CookedForwardLungeOperation lunge:
+                    ClearVelocityOwnership(ref s);
                     StartForwardLunge(ref s, lunge);
+                    break;
+                case CookedGravityWindowOperation gravity:
+                    _gravityWindowScale = gravity.GravityScale;
+                    _gravityWindowTicksRemaining = gravity.DurationTicks;
                     break;
                 case CookedSpawnHitboxOperation hitbox:
                     SpawnCookedHitbox(ref s, hitbox.Hitbox);
@@ -190,12 +244,14 @@ public sealed class CookedTimelineAbility : ServerAbility
 
         if (_forwardLungeTicksRemaining > 0)
         {
+            ClearVelocityOwnership(ref s);
             s.VX = MathF.Sin(_forwardLungeYaw) * _forwardLungeSpeed;
             s.VZ = MathF.Cos(_forwardLungeYaw) * _forwardLungeSpeed;
             _forwardLungeTicksRemaining--;
         }
         else
         {
+            ClearVelocityOwnership(ref s);
             s.VX = 0f;
             s.VZ = 0f;
             _forwardLungeActive = false;
@@ -292,8 +348,18 @@ public sealed class CookedTimelineAbility : ServerAbility
         // never cancel the aim, and resume (stage time reset) on their release.
         if (capability is IAimHoldCapability)
             _unlimitedAimHold = true;
+        if (capability.OwnsVerticalMotion)
+        {
+            s.IsFastFalling = false;
+            ClearVelocityOwnership(ref s);
+        }
         _capabilities.Add(capability);
         capability.OnStart(ref s, def);
+        if (capability.OwnsVerticalMotion)
+        {
+            s.IsFastFalling = false;
+            ClearVelocityOwnership(ref s);
+        }
     }
 
     private void Complete(ref CharacterState s)

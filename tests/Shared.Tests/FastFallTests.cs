@@ -1,18 +1,11 @@
+using System.Collections.Generic;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
 
-/// <summary>
-/// Fast-fall tests (issue #116 / #107, ADR-0016 → ADR-0020 set-velocity model): holding
-/// Down in the air sets VY to <see cref="MovementStats.FastFallSpeed"/> directly (no gravity
-/// that tick), only while already falling. Applies in every airborne state except hitstun;
-/// release cancels back to natural gravity; Down on the ground does nothing.
-/// The client maps the Down bit to a dedicated key (X by default, issue #116) — NOT to
-/// the backward-movement key, so drifting backward never fast-falls.
-/// </summary>
+/// <summary>Fast-fall is a descending-only edge that latches until interruption.</summary>
 public class FastFallTests
 {
-    // Classic def: no FloatWindow → full gravity from the first air tick.
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
 
@@ -23,80 +16,154 @@ public class FastFallTests
         return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
     }
 
-    /// <summary>Falling from a high spawn with zero initial VY — must not land during the test.</summary>
-    private static ServerSimulation SimFalling(float py = 15f)
+    private static ServerSimulation SimFalling(float py = 15f, float vy = -5f)
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = py;
+        state.VY = vy;
         state.IsGrounded = false;
-        state.AirTimeTicks = 60; // past any float window — full gravity region
+        state.AirTimeTicks = 60;
         TestHelpers.RegisterPlayer(sim, Def, state);
         return sim;
     }
 
-    [Fact]
-    public void DownHeld_Air_SetsFastFallVelocity()
+    private static InputState DownEdge(bool held = true)
     {
-        var fast = SimFalling();
-        TestHelpers.TickHold(fast, TestHelpers.Input(down: true), 5);
-        TestHelpers.AssertNear(-Move.FastFallSpeed, fast.GetState(1).VY, 0.001f);
+        var input = TestHelpers.Input(down: held);
+        input.DownPressed = true;
+        return input;
+    }
+
+    private static void Tick(ServerSimulation sim, InputState input)
+        => sim.Tick(new Dictionary<ulong, InputState> { { 1, input } });
+
+    [Fact]
+    public void RisingEdge_IsDropped()
+    {
+        var sim = SimFalling(vy: 4f);
+        Tick(sim, DownEdge());
+        var state = sim.GetState(1);
+
+        Assert.False(state.IsFastFalling);
+        Assert.True(state.VY > 0f);
     }
 
     [Fact]
-    public void ReleaseDown_CancelsFastFall()
+    public void ApexEdge_IsDropped()
     {
-        var released = SimFalling(py: 25f);
-        var keptFalling = SimFalling(py: 25f);
+        var sim = SimFalling(vy: 0f);
+        Tick(sim, DownEdge());
 
-        // Both fast-fall for 10 ticks, then one releases.
-        TestHelpers.TickHold(released, TestHelpers.Input(down: true), 10);
-        TestHelpers.TickHold(keptFalling, TestHelpers.Input(down: true), 10);
-        TestHelpers.TickDefault(released, 15);
-        TestHelpers.TickHold(keptFalling, TestHelpers.Input(down: true), 15);
-
-        var a = released.GetState(1);
-        var b = keptFalling.GetState(1);
-        Assert.True(a.VY > b.VY,
-            $"released fall must slow relative to continuing fast fall: released={a.VY:F3} kept={b.VY:F3}");
-        // Released sim returns to natural gravity and clamps at MaxFallSpeed.
-        TestHelpers.AssertNear(-Move.MaxFallSpeed, a.VY, 0.01f);
+        Assert.False(sim.GetState(1).IsFastFalling);
     }
 
     [Fact]
-    public void DownWhileGrounded_NoEffect()
+    public void DescendingEdge_LatchesThroughRelease()
     {
-        var sim = TestHelpers.MakeSim();
+        var sim = SimFalling();
+        Tick(sim, DownEdge());
+        Tick(sim, default);
+        var state = sim.GetState(1);
+
+        Assert.True(state.IsFastFalling);
+        TestHelpers.AssertNear(-Move.FastFallSpeed, state.VY, 0.001f);
+    }
+
+    [Fact]
+    public void OrdinaryAerialAttack_CanFastFall()
+    {
+        var sim = SimFalling();
+        var state = sim.GetState(1);
+        state.State = ActionState.Attacking;
+        state.AttackSlot = 1;
+        state.AnimLockTicks = 10;
+        sim.SetState(1, state);
+
+        Tick(sim, DownEdge());
+
+        Assert.True(sim.GetState(1).IsFastFalling);
+    }
+
+    [Fact]
+    public void VerticalMotionOwner_BlocksEdge()
+    {
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.MankiGroundPY;
-        TestHelpers.RegisterPlayer(sim, Def, state);
+        state.PY = 15f;
+        state.VY = -5f;
+        state.IsGrounded = false;
+        state.AirTimeTicks = 60;
 
-        TestHelpers.TickHold(sim, TestHelpers.Input(down: true), 10);
-        var s = sim.GetState(1);
-        Assert.True(s.IsGrounded);
-        TestHelpers.AssertNear(0f, s.VY, 0.001f);
+        Simulation.SimulateTick(ref state, Def, DownEdge(), TestHelpers.TestArena(),
+            out _, out _, DownActionTuning.Default, verticalMotionOwned: true);
+
+        Assert.False(state.IsFastFalling);
+        Assert.True(state.VY > -Move.FastFallSpeed);
     }
 
+    [Fact]
+    public void Hitstop_DropsFreshEdge_ButPreservesExistingLatch()
+    {
+        var dropped = SimFalling();
+        var droppedState = dropped.GetState(1);
+        droppedState.HitstopTicks = 2;
+        dropped.SetState(1, droppedState);
+        Tick(dropped, DownEdge());
+        Tick(dropped, default);
+        Assert.False(dropped.GetState(1).IsFastFalling);
+
+        var frozen = SimFalling();
+        var frozenState = frozen.GetState(1);
+        frozenState.HitstopTicks = 1;
+        frozenState.IsFastFalling = true;
+        frozen.SetState(1, frozenState);
+        Tick(frozen, default);
+        Assert.True(frozen.GetState(1).IsFastFalling);
+        Tick(frozen, default);
+        TestHelpers.AssertNear(-Move.FastFallSpeed, frozen.GetState(1).VY, 0.001f);
+    }
 
     [Fact]
-    public void DownDuringHitstun_NoFastFall()
+    public void AcceptedJumpAndDash_ResetMovementInterruptions()
     {
-        var control = SimFalling();
-        var hit = SimFalling();
-        foreach (var sim in new[] { control, hit })
-        {
-            var st = sim.GetState(1);
-            st.State = ActionState.Hitstun;
-            st.HitstunTicks = 30;
-            st.VY = -5f;
-            sim.SetState(1, st);
-        }
+        var jump = TestHelpers.PlayerState();
+        jump.PY = TestHelpers.GroundPY(Def);
+        jump.IsFastFalling = true;
+        jump.JumpFromSlide = true;
+        jump.SlideAttackCarryActive = true;
+        jump.CrouchSettled = true;
+        Simulation.SimulateTick(ref jump, Def, TestHelpers.Input(jump: true),
+            TestHelpers.TestArena(), out _, out bool jumpAccepted,
+            DownActionTuning.Default, false);
+        Assert.True(jumpAccepted);
+        Assert.False(jump.IsFastFalling);
+        Assert.False(jump.JumpFromSlide);
+        Assert.False(jump.SlideAttackCarryActive);
+        Assert.False(jump.CrouchSettled);
 
-        TestHelpers.TickDefault(control, 10);
-        TestHelpers.TickHold(hit, TestHelpers.Input(down: true), 10);
+        var dash = TestHelpers.PlayerState();
+        dash.PY = TestHelpers.GroundPY(Def);
+        dash.IsFastFalling = true;
+        Assert.True(Simulation.StartDash(ref dash, Move, 0f, 1f));
+        Assert.False(dash.IsFastFalling);
+    }
 
-        // Hitstun owns the trajectory (ProcessHitstun / knockback); Down must not add
-        // fast-fall acceleration on top of it.
-        TestHelpers.AssertNear(control.GetState(1).VY, hit.GetState(1).VY, 0.001f);
+    [Fact]
+    public void AcceptedHit_ResetsFastFallAndInterruptionFlags()
+    {
+        var state = SimFalling().GetState(1);
+        state.IsFastFalling = true;
+        state.JumpFromSlide = true;
+        state.SlideAttackCarryActive = true;
+        state.CrouchSettled = true;
+        state.QueuedCrouchBrace = true;
+
+        Simulation.ApplyKnockback(ref state, 0f, 1f, 45, 8f, 0f, 1f, 10, Def.Weight);
+
+        Assert.False(state.IsFastFalling);
+        Assert.False(state.JumpFromSlide);
+        Assert.False(state.SlideAttackCarryActive);
+        Assert.False(state.CrouchSettled);
+        Assert.False(state.QueuedCrouchBrace);
     }
 }

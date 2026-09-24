@@ -144,7 +144,9 @@ public sealed record CookedPresentation(
     float ModelYOffset = 0f,
     float ModelSoleOffset = 0f,
     bool AutoModelYOffset = false,
-    string Tumble = "");
+    string Tumble = "",
+    string Crouch = "",
+    string Slide = "");
 
 public sealed record CookedHurtboxCapsule(
     float StartX,
@@ -175,6 +177,7 @@ public sealed class CookedSlotDefinition
     public ushort CooldownTicks { get; }
     public bool IsRecoveryMove { get; }
     public bool PreserveMomentumOnStart { get; }
+    public bool AllowSlideCarry { get; }
     public CookedChargePool? ChargePool { get; }
     public AuthoringAimMovementMode AimMovement { get; }
     public string? AimAnimationId { get; }
@@ -195,7 +198,8 @@ public sealed class CookedSlotDefinition
         CookedTimeline timeline,
         CookedChargePool? chargePool = null,
         AuthoringAimMovementMode aimMovement = AuthoringAimMovementMode.Fixed,
-        string? aimAnimationId = null)
+        string? aimAnimationId = null,
+        bool allowSlideCarry = false)
     {
         Ordinal = ordinal;
         Id = id;
@@ -208,6 +212,7 @@ public sealed class CookedSlotDefinition
         CooldownTicks = cooldownTicks;
         IsRecoveryMove = isRecoveryMove;
         PreserveMomentumOnStart = preserveMomentumOnStart;
+        AllowSlideCarry = allowSlideCarry;
         Timeline = timeline;
         ChargePool = chargePool;
         AimMovement = aimMovement;
@@ -279,6 +284,7 @@ public enum CookedOperationKind : byte
     EmitPresentation = 5,
     CompleteTimeline = 6,
     ForwardLunge = 7,
+    GravityWindow = 8,
 }
 
 public abstract class CookedTimelineOperation
@@ -320,6 +326,18 @@ public sealed class CookedForwardLungeOperation : CookedTimelineOperation
         : base(tick, unit, CookedOperationKind.ForwardLunge)
     {
         Speed = speed;
+        DurationTicks = durationTicks;
+    }
+}
+public sealed class CookedGravityWindowOperation : CookedTimelineOperation
+{
+    public float GravityScale { get; }
+    public ushort DurationTicks { get; }
+
+    public CookedGravityWindowOperation(ushort tick, AuthoringUnit unit, float gravityScale, ushort durationTicks)
+        : base(tick, unit, CookedOperationKind.GravityWindow)
+    {
+        GravityScale = gravityScale;
         DurationTicks = durationTicks;
     }
 }

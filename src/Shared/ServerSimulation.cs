@@ -41,9 +41,22 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
+		private readonly HashSet<ulong> _lastTickAcceptedActions = new();
+		/// <summary>Entity IDs whose actions were accepted during the most recent tick.</summary>
+		public IReadOnlyCollection<ulong> LastTickAcceptedActions
+			=> _lastTickAcceptedActions;
+		private readonly HashSet<ulong> _lastTickTouchdowns = new();
+		/// <summary>Entity IDs with a genuine airborne-to-ground touchdown during the most recent tick.</summary>
+		public IReadOnlyCollection<ulong> LastTickTouchdowns
+			=> _lastTickTouchdowns;
+		private readonly HashSet<ulong> _settledCrouchCandidates = new();
 		private readonly HashSet<ulong> _lastTickOrdinaryActionOpportunities = new();
 		public IReadOnlyCollection<ulong> LastTickOrdinaryActionOpportunities
 			=> _lastTickOrdinaryActionOpportunities;
+		private readonly Dictionary<ulong, DownActionAdmissionReason> _lastTickDownAdmissions = new();
+		/// <summary>Actual grounded Down admission result for the most recent tick.</summary>
+		public IReadOnlyDictionary<ulong, DownActionAdmissionReason> LastTickDownAdmissions
+			=> _lastTickDownAdmissions;
 		private readonly SpellResolver _spellResolver = new();
 		/// <summary>Authoritative KOs credited during the current match.</summary>
 		public byte GetKOs(ulong entityId) => _kos.TryGetValue(entityId, out var kos) ? kos : (byte)0;
@@ -54,6 +67,7 @@ namespace SlopArena.Shared
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
 		private readonly IMatchRule _rule;
+		private readonly DownActionTuning _downActionTuning;
 		private readonly ArenaCollision.BlastLines _blastLines;
 		/// <summary>Ticks of invincibility granted on respawn (60 = 1s at 60Hz). Issue #37.</summary>
 		public ushort RespawnInvincibilityTicks { get; set; } = 60;
@@ -62,11 +76,13 @@ namespace SlopArena.Shared
 	public ulong? NoCooldownsEntityId;
 
 		/// <param name="rule">Win-condition rule (elimination + match end). Defaults to stock mode, 3 stocks.</param>
-		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null)
+		/// <param name="downActionTuning">Immutable down-action tuning. Defaults to the shared production values.</param>
+		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null, DownActionTuning? downActionTuning = null)
 		{
 			_arena = arena;
 			_blastLines = ArenaCollision.ResolveBlastLines(in arena);
 			_rule = rule ?? new StockMatchRule(3);
+			_downActionTuning = downActionTuning ?? DownActionTuning.Default;
 		}
 		private const float WarpConeHalfAngleRad = 120f * MathF.PI / 180f / 2f; // 60° half-cone = 120° total facing cone
 
@@ -172,10 +188,21 @@ namespace SlopArena.Shared
 			ability.AirborneAtStart = !state.IsGrounded;
             var spec = def.GetSlotAbility(slot, !state.IsGrounded);
             var cookedSlot = def.GetCookedSlotAbility((byte)(slot + 1), !state.IsGrounded);
+            bool slideCarry = state.IsGrounded
+                && state.State == ActionState.Sliding
+                && cookedSlot?.AllowSlideCarry == true;
             bool preserveMomentum = cookedSlot?.PreserveMomentumOnStart ?? spec?.PreserveMomentumOnStart ?? false;
+            // Every new activation owns a fresh carry decision. An opted-in grounded
+            // normal is the only path that may retain incoming slide momentum.
+            state.SlideAttackCarryActive = false;
+            if (slideCarry)
+            {
+                Simulation.ClampHorizontalSpeed(ref state, def.Movement.RunSpeed);
+                state.SlideAttackCarryActive = true;
+            }
             // ADR-0015 §2 refinement: grounded activations stop incoming momentum unless
             // the move explicitly preserves it. The move's own OnStart velocity follows.
-            if (state.IsGrounded && !preserveMomentum)
+            if (state.IsGrounded && !preserveMomentum && !slideCarry)
             {
                 state.VX = 0f;
                 state.VZ = 0f;
@@ -207,11 +234,16 @@ namespace SlopArena.Shared
 				return;
 			}
 			state.AttackSlot = (byte)(slot + 1);
+            // An accepted ability leaves low posture immediately; do not carry a
+            // settled stance or a previously captured brace into the attack.
+            state.CrouchSettled = false;
+            state.QueuedCrouchBrace = false;
             // ADR-0015 / issue #115: recovery-designated moves reset the float window.
             if (cookedSlot?.IsRecoveryMove == true || (cookedSlot == null && spec?.IsRecoveryMove == true))
                 state.AirTimeTicks = 0;
 			_states[entityId] = state;
 			_activeAbilities[entityId] = ability;
+			_lastTickAcceptedActions.Add(entityId);
 		}
 
 
@@ -244,6 +276,7 @@ namespace SlopArena.Shared
 				if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 				{
 					ability.OnCancel(ref state);
+					state.SlideAttackCarryActive = false;
 					_states[id] = state;
 					ended.Add(id);
 					if (Simulation.OnDebugLog != null)
@@ -269,6 +302,7 @@ namespace SlopArena.Shared
 				// Check if ability ended itself (EndAbility set AttackSlot=0)
 				if (state.AttackSlot == 0)
 				{
+					state.SlideAttackCarryActive = false;
 					ended.Add(id);
 					_states[id] = state; // Persist EndAbility changes (State=Idle, AttackSlot=0)
 				}
@@ -409,6 +443,22 @@ namespace SlopArena.Shared
 
             if (!_bakedData.TryGetValue(id, out baked!) || def.HurtboxBoneDefs == null || def.HurtboxBoneDefs.Length == 0)
                 return false;
+            // Low posture tracks are static frame-zero poses. They are selected only
+            // when the state is grounded and the baked payload contains the exact
+            // semantic binding; absent legacy content falls through to upright
+            // selection without fabricating low hurtboxes.
+            if (state.IsGrounded && (state.State is ActionState.Crouching or ActionState.Sliding))
+            {
+                string lowAnim = state.State == ActionState.Crouching ? def.CrouchAnim : def.SlideAnim;
+                int lowIdx = string.IsNullOrEmpty(lowAnim) ? -1 : baked.FindAnimIndex(lowAnim);
+                if (lowIdx >= 0)
+                {
+                    targetAnim = lowAnim;
+                    bakedFrame = 0;
+                    return true;
+                }
+            }
+
 
             if (state.State == ActionState.Dashing) targetAnim = def.DashAnim;
             else if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
@@ -593,6 +643,7 @@ namespace SlopArena.Shared
             state.IsGrounded = false;
             state.VX = state.VY = state.VZ = 0f;
             state.KVX = state.KVY = state.KVZ = 0f;
+			Simulation.ClearMovementInterruptionFlags(ref state);
             state.InvincibilityTicks = Simulation.LedgeGrabInvincibilityTicks;
             state.JumpsLeft = def.Movement.MaxJumps;
             state.AirTimeTicks = 0;
@@ -606,7 +657,9 @@ namespace SlopArena.Shared
 				|| state.BurstRecoveryTicks > 0 || state.LandingLagTicks > 0)
 				return false;
 			bool iasaUnlocked = Simulation.IsIasaUnlocked(state, def);
-			if (state.State != ActionState.Idle && state.State != ActionState.Run && !iasaUnlocked)
+			if (state.State != ActionState.Idle && state.State != ActionState.Run
+				&& state.State != ActionState.Crouching && state.State != ActionState.Sliding
+				&& !iasaUnlocked)
 				return false;
 			if (state.AnimLockTicks > 0 && !iasaUnlocked)
 				return false;
@@ -655,8 +708,8 @@ namespace SlopArena.Shared
                 || !Simulation.IsIasaUnlocked(state, def)
                 || !_activeAbilities.TryGetValue(id, out var ability))
                 return false;
-
             ability.OnCancel(ref state);
+            state.SlideAttackCarryActive = false;
             _spellResolver.RemoveOwnedHitboxes(id, ability.ActivationId);
             _activeAbilities.Remove(id);
             if (ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
@@ -702,7 +755,9 @@ namespace SlopArena.Shared
 				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
 					|| state.LandingLagTicks > 0
 					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
-				if (state.State != ActionState.Idle && state.State != ActionState.Attacking && state.State != ActionState.Run) continue;
+				if (state.State != ActionState.Idle && state.State != ActionState.Attacking
+					&& state.State != ActionState.Run && state.State != ActionState.Crouching
+					&& state.State != ActionState.Sliding) continue;
 
 				bool airborne = !state.IsGrounded;
 				var cookedSlot = def.GetCookedSlotAbility(input.ActiveSlot, airborne);
@@ -727,7 +782,9 @@ namespace SlopArena.Shared
 				}
 
 				// ── Warp check: sprint to target if between WarpRange and AttackRange ──
-				if ((state.State == ActionState.Idle || state.State == ActionState.Run) && spec?.Stages is { Length: > 0 })
+				if ((state.State == ActionState.Idle || state.State == ActionState.Run
+					|| state.State == ActionState.Crouching || state.State == ActionState.Sliding)
+					&& spec?.Stages is { Length: > 0 })
 				{
 					var firstStage = spec.Stages[0];
 					if (firstStage.WarpRange > 0f)
@@ -760,6 +817,7 @@ namespace SlopArena.Shared
 								state.WarpSpeed = 1f;
 								state.State = ActionState.Warping;
 								_pendingWarpAttacks[id] = input.ActiveSlot;
+								_lastTickAcceptedActions.Add(id);
 
 								// Consume input (prevent SimulateTick from also starting attack)
 								var ci = input;
@@ -804,8 +862,8 @@ namespace SlopArena.Shared
 				if (_activeAbilities.TryGetValue(id, out var currentAbility))
 				{
 					if (!iasaUnlocked) continue;
-
 					currentAbility.OnCancel(ref state);
+					state.SlideAttackCarryActive = false;
 					_activeAbilities.Remove(id);
 					if (currentAbility.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
 						state.SetCooldown((byte)(currentAbility.Slot + 1), currentAbility.Cooldown);
@@ -861,14 +919,34 @@ namespace SlopArena.Shared
 				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				bool wasGrounded = state.IsGrounded;
-                Simulation.SimulateTick(ref state, def, input, _arena, out bool ordinaryActionOpportunity);
+				_activeAbilities.TryGetValue(id, out var activeAbility);
+				bool verticalMotionOwned = activeAbility?.OwnsVerticalMotion == true;
+                Simulation.SimulateTick(ref state, def, input, _arena,
+					out bool ordinaryActionOpportunity, out bool movementActionAccepted,
+					_downActionTuning, verticalMotionOwned, activeAbility?.GravityMultiplier ?? 1f);
 				if (ordinaryActionOpportunity)
 					_lastTickOrdinaryActionOpportunities.Add(id);
+				if (movementActionAccepted)
+					_lastTickAcceptedActions.Add(id);
+				if (Simulation.LastDownAdmissionReason is DownActionAdmissionReason downReason)
+					_lastTickDownAdmissions[id] = downReason;
+				else if ((input.Down || input.DownPressed) && (wasGrounded || state.IsGrounded))
+				{
+					// The pre-sim ability phase can consume a Down request before the
+					// grounded movement helper runs. Preserve the same gate precedence.
+					_lastTickDownAdmissions[id] = _lastTickAcceptedActions.Contains(id)
+						? DownActionAdmissionReason.ActionAccepted
+						: verticalMotionOwned
+							? DownActionAdmissionReason.MotionOwned
+							: DownActionAdmissionReason.Locked;
+				}
+				if (!wasGrounded && state.IsGrounded
+					&& state.State != ActionState.LedgeHang && state.VY <= 0f)
+					_lastTickTouchdowns.Add(id);
                 TryLedgeGrab(id, ref state, def);
 				// Landing lag (issue #125 / ADR-0021 §3): land mid-aerial → lock, unless the
 				// landing frame falls in an auto-cancel window. Only air-started moves resolve
 				// their airborne variant's landing lag (ground moves keep their ground spec).
-				_activeAbilities.TryGetValue(id, out var activeAbility);
 				ApplyLandingLag(ref state, def, wasGrounded, activeAbility);
 				_states[id] = state;
 			}
@@ -1057,6 +1135,49 @@ namespace SlopArena.Shared
 				_states[id] = state;
 			}
 		}
+
+		/// <summary>
+		/// Capture the only tick boundary that can earn a settled crouch. This runs before
+		/// ability admission, so an attack accepted on the same tick cannot manufacture a
+		/// brace-eligible stance after the fact.
+		/// </summary>
+		private void CaptureSettledCrouchCandidates()
+		{
+			foreach (var (id, state) in _states)
+			{
+				if (!_defs.ContainsKey(id) || _rule.IsEliminated(state)
+					|| !state.IsGrounded || state.State != ActionState.Crouching
+					|| state.VX != 0f || state.VZ != 0f
+					|| state.HitstopTicks != 0
+					|| _activeAbilities.ContainsKey(id)
+					|| !Simulation.IsGroundLowEligible(in state))
+					continue;
+				_settledCrouchCandidates.Add(id);
+			}
+		}
+
+		/// <summary>
+		/// Commit settled crouch only for a candidate that stayed stationary and eligible
+		/// through movement, ability ticks, landing-lag freezing, and pushbox resolution.
+		/// A frozen prior stance is intentionally untouched because it has no candidate.
+		/// </summary>
+		private void FinalizeSettledCrouch()
+		{
+			foreach (var id in _settledCrouchCandidates)
+			{
+				if (!_states.TryGetValue(id, out var state))
+					continue;
+				bool settled = !_lastTickAcceptedActions.Contains(id)
+					&& !_activeAbilities.ContainsKey(id)
+					&& state.HitstopTicks == 0
+					&& state.IsGrounded
+					&& state.State == ActionState.Crouching
+					&& state.VX == 0f && state.VZ == 0f
+					&& Simulation.IsGroundLowEligible(in state);
+				state.CrouchSettled = settled;
+				_states[id] = state;
+			}
+		}
 		/// <summary>
 		/// Find the closest enemy entity ID for target lock.
 		/// Scans all registered entities, skipping self.
@@ -1217,6 +1338,7 @@ namespace SlopArena.Shared
 					state.WarpTargetZ = attackTarget.PZ;
 					state.WarpAttackRange = attackStage.AttackRange;
 					state.WarpSpeed = 1f;
+					_lastTickAcceptedActions.Add(id);
 				}
 				if (attackStage.RotateTowardTarget && attackDx * attackDx + attackDz * attackDz > 0.001f)
 				{
@@ -1267,6 +1389,23 @@ namespace SlopArena.Shared
 		}
 
 
+        private bool IsCrouchBraceEligible(ulong id, in CharacterState state, CharacterDefinition def)
+        {
+            if (!state.IsGrounded
+                || state.State != ActionState.Crouching
+                || state.AttackSlot != 0
+                || !state.CrouchSettled
+                || state.VX != 0f || state.VZ != 0f
+                || !Simulation.IsGroundLowEligible(in state)
+                || _activeAbilities.ContainsKey(id)
+                || string.IsNullOrEmpty(def.CrouchAnim)
+                || def.HurtboxBoneDefs == null || def.HurtboxBoneDefs.Length == 0
+                || !_bakedData.TryGetValue(id, out var baked))
+                return false;
+
+            return baked.FrameCountFor(def.CrouchAnim) > 0;
+        }
+
         private void ResolveHits(List<SpellResolver.EntityData> entityList, Dictionary<ulong, InputState> inputs)
 		{
 			// Bone-tracked hitboxes sweep with their limb: re-resolve positions from
@@ -1302,6 +1441,11 @@ namespace SlopArena.Shared
 						continue;
 					}
 				}
+				// Snapshot settled crouch before reaction cleanup/callbacks. A later
+				// replacement hit may overwrite this queue, but cannot earn a new stance.
+				bool crouchBraceEligible = IsCrouchBraceEligible(
+					hit.TargetEntityId, in targetState, _defs[hit.TargetEntityId]);
+				Simulation.ClearMovementInterruptionFlags(ref targetState);
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
 					_lastHitCredits[hit.TargetEntityId] = (hit.OwnerEntityId, _tick, hit.AttackSlot);
 				if (hit.OwnerEntityId != 0)
@@ -1371,6 +1515,12 @@ namespace SlopArena.Shared
                     hookSuppliedForce = kbForce != kbForceDefault;
                     hookZeroForce = hookSuppliedForce && kbForce <= 0f;
                 }
+                bool hookAppliedLaunch = targetState.KVX != kvBeforeOnHitX
+                    || targetState.KVY != kvBeforeOnHitY
+                    || targetState.KVZ != kvBeforeOnHitZ;
+                bool ordinaryFormulaLaunch = !hookSuppliedForce
+                    && !hookZeroForce
+                    && !hookAppliedLaunch;
                 float launchBase = hookSuppliedForce ? 0f : hit.BaseKnockback;
                 float launchGrowth = hookSuppliedForce ? 0f : hit.KnockbackGrowth;
                 freeze = ComputeHitstopTicks(finalDamage, hitstopSpec);
@@ -1386,10 +1536,8 @@ namespace SlopArena.Shared
                     targetState.QueuedKBZero = hookZeroForce;
                     targetState.QueuedKBDamage = finalDamage;
                     targetState.QueuedKBStun = hit.StunTicks;
-
-                    // Only the LAST hit's queue applies at expiry — reset any previous
-                    // hit's override snapshot on this victim.
                     targetState.QueuedKVOverride = false;
+                    targetState.QueuedCrouchBrace = crouchBraceEligible && ordinaryFormulaLaunch;
                     targetState.QueuedKVX = 0f; targetState.QueuedKVY = 0f; targetState.QueuedKVZ = 0f;
                     if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
                         attackerState.HitstopTicks = freeze;
@@ -1397,9 +1545,6 @@ namespace SlopArena.Shared
                 else
                 {
                     // Tuner zeroed the freeze for this ability — launch immediately.
-                    bool hookAppliedLaunch = targetState.KVX != kvBeforeOnHitX
-                        || targetState.KVY != kvBeforeOnHitY
-                        || targetState.KVZ != kvBeforeOnHitZ;
                     if (hookAppliedLaunch)
                     {
                     }
@@ -1420,6 +1565,9 @@ namespace SlopArena.Shared
                         Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
                             hit.KnockbackAngle, launchBase, launchGrowth,
                             finalDamage, hit.StunTicks, _defs[hit.TargetEntityId].Weight);
+                        Simulation.ApplyCrouchBrace(
+                            ref targetState, crouchBraceEligible && ordinaryFormulaLaunch,
+                            _downActionTuning.CrouchLaunchMultiplier);
                     }
                     if (inputs.TryGetValue(hit.TargetEntityId, out var targetInput)
                         && (targetInput.MoveX != 0f || targetInput.MoveY != 0f))
@@ -1469,9 +1617,12 @@ namespace SlopArena.Shared
 				else
 				{
 					float mass = MathF.Max(0.01f, _defs[hit.TargetEntityId].Weight + 100f);
+					float braceMultiplier = ordinaryFormulaLaunch && crouchBraceEligible
+					    ? _downActionTuning.CrouchLaunchMultiplier : 1f;
 					impactForce = (launchBase
 						+ launchGrowth * (targetState.DamagePercent * 0.01f + 1f)
-						+ finalDamage * 0.1f) * 200f / mass * Simulation.KbScaleFactor;
+						+ finalDamage * 0.1f) * 200f / mass * Simulation.KbScaleFactor
+					    * braceMultiplier;
 				}
 
 				var resolvedHit = hit;
@@ -1640,6 +1791,7 @@ namespace SlopArena.Shared
 				if (_activeAbilities.TryGetValue(id, out var deadAbility))
 				{
 					deadAbility.OnCancel(ref oldState);
+					oldState.SlideAttackCarryActive = false;
 					_activeAbilities.Remove(id);
 				}
 				if (killerEntityId != 0 && _kos[killerEntityId] < byte.MaxValue)
@@ -1671,6 +1823,12 @@ namespace SlopArena.Shared
 					EntityId = id,
 					State = ActionState.Idle,
 					IsGrounded = true,
+					IsFastFalling = false,
+					JumpFromSlide = false,
+					SlideAttackCarryActive = false,
+					CrouchSettled = false,
+					QueuedCrouchBrace = false,
+					InPostHitstunFlight = false,
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
 					Deaths = newDeaths, DamagePercent = 0,
 				};
@@ -1694,11 +1852,43 @@ namespace SlopArena.Shared
 			}
 		}
 
+        private void AdmitLowLandings(Dictionary<ulong, InputState> inputs)
+        {
+            foreach (var id in _lastTickTouchdowns)
+            {
+                var state = _states[id];
+                var def = _defs[id];
+                state.IsFastFalling = false;
+                if (state.IsGrounded && state.State != ActionState.JumpSquat)
+                    Simulation.RefreshGroundResources(ref state, def.Movement);
+
+                if (inputs.TryGetValue(id, out var input))
+                {
+                    bool wasLowState = state.State is ActionState.Crouching or ActionState.Sliding;
+                    bool actionAccepted = _lastTickAcceptedActions.Contains(id);
+                    bool abilityOwned = _activeAbilities.ContainsKey(id);
+                    bool motionOwned = _activeAbilities.TryGetValue(id, out var landingAbility)
+                        && landingAbility.OwnsVerticalMotion;
+                    bool changed = Simulation.TryApplyGroundDown(
+                        ref state, def.Movement, input, _downActionTuning,
+                        actionAccepted, motionOwned, abilityOwned, true, out var reason);
+                    if (input.Down || input.DownPressed || changed || wasLowState)
+                        _lastTickDownAdmissions[id] = reason;
+                }
+                _states[id] = state;
+            }
+        }
+
 		public void Tick(Dictionary<ulong, InputState> inputs)
 		{
 			LastTickDeaths.Clear();
+			_lastTickDownAdmissions.Clear();
 			_lastTickOrdinaryActionOpportunities.Clear();
+			_lastTickAcceptedActions.Clear();
+			_lastTickTouchdowns.Clear();
+			_settledCrouchCandidates.Clear();
 			_tick++;
+			CaptureSettledCrouchCandidates();
 			PreTickAbilities(inputs);
 
 			ProcessTargetLock(inputs);
@@ -1707,6 +1897,10 @@ namespace SlopArena.Shared
 
 			// ── Warp arrival: activate pending attacks ──
 			ProcessWarpArrivals();
+            AdmitLowLandings(inputs);
+			// Settlement is finalized after all movement, ability, lag, and pushbox work,
+			// but before hurtbox construction and hit resolution.
+			FinalizeSettledCrouch();
 
 			var entityList = BuildHurtboxList();
 

@@ -15,7 +15,8 @@ public class ActionStateClassifierTests
     [InlineData(ActionState.Hitstun, false)]
     [InlineData(ActionState.Warping, false)]
     [InlineData(ActionState.LedgeHang, false)] // Complex for opponents (occupancy is multi-entity)
-    [InlineData(ActionState.Sliding, false)] // unused by any code path — not a Predictable member
+    [InlineData(ActionState.Sliding, true)]
+    [InlineData(ActionState.Crouching, true)]
     public void IsPredictable_MatchesADR0011Partition(ActionState state, bool expected)
     {
         Assert.Equal(expected, SlopArena.Shared.Rollback.ActionStateClassifier.IsPredictable(state));
@@ -34,4 +35,16 @@ public class ActionStateClassifierTests
                 SlopArena.Shared.Rollback.ActionStateClassifier.IsSnapSafe(state));
         }
     }
+    [Fact]
+    public void StateAwareClassification_RejectsHitstopButAcceptsLowStates()
+    {
+        var crouching = new CharacterState { State = ActionState.Crouching };
+        Assert.True(SlopArena.Shared.Rollback.ActionStateClassifier.IsPredictable(crouching));
+        Assert.True(SlopArena.Shared.Rollback.ActionStateClassifier.IsSnapSafe(crouching));
+
+        crouching.HitstopTicks = 1;
+        Assert.False(SlopArena.Shared.Rollback.ActionStateClassifier.IsPredictable(crouching));
+        Assert.False(SlopArena.Shared.Rollback.ActionStateClassifier.IsSnapSafe(crouching));
+    }
+
 }

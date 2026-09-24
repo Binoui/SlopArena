@@ -50,21 +50,75 @@ public sealed class CharacterPackageCompilerTests
     }
 
     [Fact]
-    public void Tumble_CooksAndAdaptsWithoutChangingTimelineData()
+    public void SlideCarry_CompilesGroundNormalsAndDefaultsFalseElsewhere()
     {
-        var result = CompileCharacter(character => character["presentation"]!["tumble"] = "anim.tumble");
+        var result = CompileCharacter();
+        Assert.NotNull(result.CookedPackage);
+        Assert.DoesNotContain(result.Diagnostics, x => x.Severity == CharacterDiagnosticSeverity.Error);
+        foreach (var id in new[] { "ground.1", "ground.2", "ground.3", "ground.4" })
+            Assert.True(result.CookedPackage!.Definition.Slots.Single(x => x.Id == id).AllowSlideCarry);
+        Assert.False(result.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.A").AllowSlideCarry);
+        Assert.False(result.CookedPackage.Definition.Slots.Single(x => x.Id == "air.1").AllowSlideCarry);
+    }
+
+    [Fact]
+    public void SlideCarry_AliasProjectsValueAndRejectsMotionConflict()
+    {
+        var aliased = CompileCharacter(character =>
+        {
+            var slots = (JsonArray)character["slots"]!;
+            slots.Remove(slots.Single(slot => slot!["id"]!.GetValue<string>() == "ground.2"));
+            ((JsonArray)character["aliases"]!).Add(new JsonObject { ["from"] = "ground.2", ["to"] = "ground.1" });
+        });
+        Assert.NotNull(aliased.CookedPackage);
+        Assert.True(aliased.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.2").AllowSlideCarry);
+
+        var conflict = CompileCharacter(character =>
+        {
+            var operations = (JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!;
+            operations.Add(new JsonObject
+            {
+                ["kind"] = "setVelocity",
+                ["tick"] = 1,
+                ["unit"] = "metersPerSecond",
+                ["velocityMode"] = "additive",
+                ["x"] = 1,
+                ["y"] = 0,
+                ["z"] = 0,
+            });
+        });
+        AssertError(conflict, "slot.slide-carry.motion-conflict");
+    }
+
+    [Fact]
+    public void TumbleAndLowPoses_CookAndAdaptWithoutChangingTimelineData()
+    {
+        var result = CompileCharacter(character =>
+        {
+            var presentation = (JsonObject)character["presentation"]!;
+            presentation["tumble"] = "anim.tumble";
+            presentation["crouch"] = "anim.fightguy.crouch";
+            presentation["slide"] = "anim.fightguy.slide";
+        });
         Assert.NotNull(result.CookedPackage);
         Assert.DoesNotContain(result.Diagnostics, x => x.Severity == CharacterDiagnosticSeverity.Error);
         Assert.Equal("anim.tumble", result.CookedPackage!.Definition.Presentation.Tumble);
-        Assert.Contains("\"tumble\":\"anim.tumble\"", System.Text.Encoding.UTF8.GetString(result.CookedPackage.CanonicalBytes));
+        Assert.Equal("anim.fightguy.crouch", result.CookedPackage.Definition.Presentation.Crouch);
+        Assert.Equal("anim.fightguy.slide", result.CookedPackage.Definition.Presentation.Slide);
+        string canonical = System.Text.Encoding.UTF8.GetString(result.CookedPackage.CanonicalBytes);
+        Assert.Contains("\"crouch\":\"anim.fightguy.crouch\"", canonical);
+        Assert.Contains("\"slide\":\"anim.fightguy.slide\"", canonical);
         var runtime = CookedCharacterRuntimeAdapter.ToCharacterDefinition(result.CookedPackage);
         Assert.Equal("anim.tumble", runtime.TumbleAnim);
+        Assert.Equal("anim.fightguy.crouch", runtime.CrouchAnim);
+        Assert.Equal("anim.fightguy.slide", runtime.SlideAnim);
     }
     [Fact]
     public void StageTargetingMetadata_SurvivesCompileAndRemainsDeterministic()
     {
         CharacterCompileResult result = CompileCharacter(character =>
         {
+            character["slots"]![0]!["allowSlideCarry"] = false;
             var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
             stage["attackRange"] = 3.5;
             stage["warpRange"] = 4.25;
@@ -82,6 +136,7 @@ public sealed class CharacterPackageCompilerTests
 
         CharacterCompileResult repeated = CompileCharacter(character =>
         {
+            character["slots"]![0]!["allowSlideCarry"] = false;
             var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
             stage["attackRange"] = 3.5;
             stage["warpRange"] = 4.25;
@@ -138,6 +193,59 @@ public sealed class CharacterPackageCompilerTests
             });
         });
         AssertError(pastStage, "value.out-of-range");
+    }
+
+    [Fact]
+    public void GravityWindowCompilesAsNormalizedTimedGravityAndValidatesBounds()
+    {
+        CharacterCompileResult compiled = CompileCharacter(character =>
+        {
+            character["slots"]![0]!["allowSlideCarry"] = false;
+            ((JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!).Add(new JsonObject
+            {
+                ["kind"] = "gravityWindow",
+                ["tick"] = 2,
+                ["unit"] = "normalized",
+                ["gravityScale"] = 0.5,
+                ["durationTicks"] = 4,
+            });
+        });
+
+        Assert.True(compiled.CookedPackage != null,
+            string.Join("; ", compiled.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
+        Assert.Equal("1.2.0", compiled.CookedPackage!.Metadata.RuntimeApiMin);
+        var operation = Assert.Single(compiled.CookedPackage.Definition.Slots
+            .Single(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations
+            .OfType<CookedGravityWindowOperation>());
+        Assert.Equal((AuthoringUnit.Normalized, 2f, 0.5f, (ushort)4),
+            (operation.Unit, (float)operation.Tick, operation.GravityScale, operation.DurationTicks));
+
+        AssertError(CompileCharacter(character =>
+        {
+            character["slots"]![0]!["allowSlideCarry"] = false;
+            ((JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!).Add(new JsonObject
+            {
+                ["kind"] = "gravityWindow",
+                ["tick"] = 2,
+                ["unit"] = "normalized",
+                ["gravityScale"] = 1.01,
+                ["durationTicks"] = 4,
+            });
+        }), "value.out-of-range");
+
+        AssertError(CompileCharacter(character =>
+        {
+            character["slots"]![0]!["allowSlideCarry"] = false;
+            var stage = (JsonObject)character["slots"]![0]!["timeline"]!["stages"]![0]!;
+            ((JsonArray)stage["operations"]!).Add(new JsonObject
+            {
+                ["kind"] = "gravityWindow",
+                ["tick"] = (int)stage["durationTicks"]! - 1,
+                ["unit"] = "normalized",
+                ["gravityScale"] = 0.5,
+                ["durationTicks"] = 2,
+            });
+        }), "value.out-of-range");
     }
 
     [Fact]

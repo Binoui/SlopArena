@@ -700,6 +700,27 @@ namespace SlopArena.Client.Entities
         {
             _landingLagActive = false;
         }
+        private bool TryPlayLowPose(string animationId)
+        {
+            if (string.IsNullOrEmpty(animationId) || _bakedData == null)
+                return false;
+            int bakedIndex = _bakedData.FindAnimIndex(animationId);
+            if (bakedIndex < 0 || _bakedData.Animations[bakedIndex].FrameCount <= 0
+                || !TryGetAnimation(animationId, out var clip, out _))
+                return false;
+
+            var current = _animancer.States.Current;
+            AnimancerState poseState = current != null && current.Clip == clip
+                ? current
+                : _animancer.Play(clip, 0f);
+            poseState.Time = 0f;
+            poseState.Speed = 0f;
+            _currentAnimState = poseState;
+            _activeExtrapolator = null;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            return true;
+        }
+
 
         /// <summary>
         /// Play the ability clip for a combo stage with baked-frame speed and
@@ -744,7 +765,8 @@ namespace SlopArena.Client.Entities
             if (!TryGetAnimation(animName, out var clip, out var extrapolation))
                 return false;
 
-            var animState = _animancer.Play(clip, 0.05f);
+            float fadeDuration = _lastAnimState is ActionState.Crouching or ActionState.Sliding ? 0f : 0.05f;
+            var animState = _animancer.Play(clip, fadeDuration);
             // Animancer intentionally preserves a reused state's time. Attack
             // restarts, including same-slot IASA, must rewind the clip.
             animState.Time = 0;
@@ -1072,7 +1094,11 @@ namespace SlopArena.Client.Entities
                 if (aimLoop)
                 {
                     if (state.State != _lastAnimState)
-                        _animancer.Play(loopClip, 0.1f);
+                    {
+                        float fadeDuration = _lastAnimState is ActionState.Crouching or ActionState.Sliding
+                            ? 0f : 0.1f;
+                        _animancer.Play(loopClip, fadeDuration);
+                    }
                 }
                 else if (fixedAimHold)
                 {
@@ -1083,7 +1109,9 @@ namespace SlopArena.Client.Entities
                 {
                     if (TryGetAnimation(_charDef.JumpAnim, out var clip, out _))
                     {
-                        _animancer.Play(clip, 0.05f);
+                        float fadeDuration = _lastAnimState is ActionState.Crouching or ActionState.Sliding
+                            ? 0f : 0.05f;
+                        _animancer.Play(clip, fadeDuration);
                         _jumpArcActive = true;
                     }
                 }
@@ -1137,11 +1165,26 @@ namespace SlopArena.Client.Entities
                 else
                 {
                     _jumpArcActive = false;
-                    string animationId = hSpeed > _runSpeedThreshold
-                        ? _charDef.RunAnim
-                        : _charDef.IdleAnim;
-                    if (TryGetAnimation(animationId, out var clip, out _))
-                        _animancer.Play(clip, 0.1f);
+                    string lowAnimationId = state.State == ActionState.Crouching
+                        ? _charDef.CrouchAnim
+                        : state.State == ActionState.Sliding ? _charDef.SlideAnim : "";
+                    bool lowPosePlayed = state.IsGrounded
+                        && (state.State is ActionState.Crouching or ActionState.Sliding)
+                        && TryPlayLowPose(lowAnimationId);
+                    if (!lowPosePlayed)
+                    {
+                        // Missing legacy low content intentionally stays upright;
+                        // never fabricate a low visual/hurtbox presentation.
+                        string animationId = hSpeed > _runSpeedThreshold
+                            ? _charDef.RunAnim
+                            : _charDef.IdleAnim;
+                        if (TryGetAnimation(animationId, out var clip, out _))
+                        {
+                            float fadeDuration = _lastAnimState is ActionState.Crouching or ActionState.Sliding
+                                ? 0f : 0.1f;
+                            _animancer.Play(clip, fadeDuration);
+                        }
+                    }
                 }
             }
 

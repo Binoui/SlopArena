@@ -20,6 +20,8 @@ namespace SlopArena.Shared.Abilities;
 /// </summary>
 public sealed class KistuRisingSlash : ServerAbility
 {
+    public override bool OwnsVerticalMotion => true;
+
     private readonly CookedKistuRisingSlashCapabilityParameters _parameters;
     private ushort _ticks;
     private ushort _duration;
@@ -30,6 +32,8 @@ public sealed class KistuRisingSlash : ServerAbility
 
     public override void OnStart(ref CharacterState s, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         _ticks = 0;
         _recoveryYaw = s.AimYaw;
 
@@ -50,6 +54,8 @@ public sealed class KistuRisingSlash : ServerAbility
 
     public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         _ticks++;
 
         float riseSpeed = _parameters.RiseSpeed;
@@ -99,6 +105,8 @@ public sealed class KistuRisingSlash : ServerAbility
     }
     public override void OnCancel(ref CharacterState s)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         s.VX = 0f;
         s.VY = 0f;
         s.VZ = 0f;

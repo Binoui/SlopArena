@@ -51,7 +51,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     {
         var first = CompileManki();
         var second = CompileManki();
-        Assert.NotNull(first.CookedPackage);
+        Assert.True(first.CookedPackage != null, string.Join("; ", first.Diagnostics));
         Assert.DoesNotContain(first.Diagnostics, d => d.Severity == CharacterDiagnosticSeverity.Error);
         Assert.Equal(first.CookedPackage!.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
 

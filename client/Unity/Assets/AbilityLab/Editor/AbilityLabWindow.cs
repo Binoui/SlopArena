@@ -1736,6 +1736,20 @@ public sealed class AbilityLabWindow : EditorWindow
         };
         addForwardLunge.tooltip = "Move in the current facing direction at a fixed speed for a fixed duration.";
         moveGroup.Add(addForwardLunge);
+        var addGravityWindow = new Button(() =>
+        {
+            if (_lab == null || !_workspace.AddGravityWindow(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            UpdateTimelineControls();
+            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _timelineTrack.SelectedOperation = _selectedOperation;
+            RefreshInspector();
+            SceneView.RepaintAll();
+        })
+        {
+            text = "Add gravity window"
+        };
+        addGravityWindow.tooltip = "Temporarily scales airborne gravity over a fixed timeline window.";
+        moveGroup.Add(addGravityWindow);
 
         var presentationIds = _workspace.Draft.PresentationIds ?? Array.Empty<string>();
         var addPresentation = new Button(() =>
@@ -1803,6 +1817,27 @@ public sealed class AbilityLabWindow : EditorWindow
                 }));
             AddDelayedFloat(group, "Speed (m/s)", lunge.Speed,
                 value => CommitForwardLunge(current => current with { Speed = Mathf.Max(0.01f, value) }));
+        }
+        else if (operation.Source is GravityWindowOperationSource gravity)
+        {
+            group.Add(new Label("Scales the active airborne gravity; FastFall overrides the window."));
+            AddDelayedInteger(group, "Start tick", gravity.Tick,
+                value => CommitGravityWindow(current => current with
+                {
+                    Tick = (ushort)Mathf.Clamp(value, 0,
+                        Mathf.Max(0, CurrentStage().DurationTicks - current.DurationTicks))
+                }));
+            AddDelayedInteger(group, "Duration ticks", gravity.DurationTicks,
+                value => CommitGravityWindow(current => current with
+                {
+                    DurationTicks = (ushort)Mathf.Clamp(value, 1,
+                        Mathf.Max(1, CurrentStage().DurationTicks - current.Tick))
+                }));
+            AddDelayedFloat(group, "Gravity scale", gravity.GravityScale,
+                value => CommitGravityWindow(current => current with
+                {
+                    GravityScale = Mathf.Clamp01(value)
+                }));
         }
         else if (operation.Source is StartCapabilityOperationSource capability)
         {
@@ -2106,6 +2141,30 @@ public sealed class AbilityLabWindow : EditorWindow
         {
             Tick = (ushort)Mathf.Clamp(startTick, 0, maxStart)
         });
+    }
+
+    private void CommitGravityWindow(Func<GravityWindowOperationSource, GravityWindowOperationSource> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            _selectedOperation?.Source is not GravityWindowOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex, stageIndex, operationIndex, edit(original));
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
     }
 
     private void CommitHitbox(Func<HitboxSource, HitboxSource> edit)

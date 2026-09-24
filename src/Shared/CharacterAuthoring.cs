@@ -79,7 +79,9 @@ public sealed record CharacterPresentationSource(
     float ModelYOffset = 0f,
     float ModelSoleOffset = 0f,
     bool AutoModelYOffset = false,
-    string Tumble = "");
+    string Tumble = "",
+    string Crouch = "",
+    string Slide = "");
 
 public sealed record HurtboxCapsuleSource(
     float StartX,
@@ -111,7 +113,8 @@ public sealed record CharacterSlotSource(
     CharacterTimelineSource Timeline,
     ChargePoolSource? ChargePool = null,
     AuthoringAimMovementMode AimMovement = AuthoringAimMovementMode.Fixed,
-    string? AimAnimationId = null);
+    string? AimAnimationId = null,
+    bool AllowSlideCarry = false);
 
 public sealed record ChargePoolSource(int MaxCharges, ushort RegenTicks);
 public sealed record CharacterAliasSource(string From, string To);
@@ -145,6 +148,11 @@ public sealed record ForwardLungeOperationSource(
     ushort Tick,
     AuthoringUnit Unit,
     float Speed,
+    ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
+public sealed record GravityWindowOperationSource(
+    ushort Tick,
+    AuthoringUnit Unit,
+    float GravityScale,
     ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
 
 

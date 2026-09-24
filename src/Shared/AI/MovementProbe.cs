@@ -125,11 +125,9 @@ namespace SlopArena.Shared
             int timeToMaxFall = First(natural, s => s.Vy <= -m.MaxFallSpeed * 0.999f, natural.Count - 1);
             int naturalLanding = FirstLanding(natural, 0);
             int fastLanding = FirstLanding(fast, 0);
-            // Fast fall from the straight jump's apex — the landing-mixup number (a 50 m
-            // drop's descent doesn't represent jump play).
+            // Request fast fall once the real pre-step state is descending.
             var jumpFast = RunSim(def, arena, groundY,
-                t => t == straightApex ? Input(down: true) : t < straightApex ? JumpHold(right: false)(t) : Input(down: true),
-                300);
+                JumpHold(right: false), 300, fastFall: true);
             int jumpFastLanding = FirstLanding(jumpFast, straightTakeoff);
             var fallMetrics = new FallMetrics(maxFall, timeToMaxFall, naturalLanding,
                 natural.ToArray(), -Min(fast, s => s.Vy),
@@ -187,7 +185,7 @@ namespace SlopArena.Shared
             : Input(right: right);
 
         private static List<MovementSample> RunSim(CharacterDefinition def, ArenaDefinition arena,
-            float groundY, Func<int, InputState> inputFor, int ticks)
+            float groundY, Func<int, InputState> inputFor, int ticks, bool fastFall = false)
         {
             var sim = new ServerSimulation(arena);
             var state = new CharacterState
@@ -202,9 +200,18 @@ namespace SlopArena.Shared
             sim.RegisterEntity(1, def, state);
             var inputs = new Dictionary<ulong, InputState>();
             var samples = new List<MovementSample>(ticks);
+            bool downPressed = false;
             for (int t = 0; t < ticks; t++)
             {
                 inputs[1] = inputFor(t);
+                if (fastFall)
+                {
+                    var input = inputs[1];
+                    input.DownPressed = !downPressed && !sim.GetState(1).IsGrounded && sim.GetState(1).VY < 0f;
+                    downPressed |= input.DownPressed;
+                    input.Down = downPressed;
+                    inputs[1] = input;
+                }
                 sim.Tick(inputs);
                 var s = sim.GetState(1);
                 samples.Add(new MovementSample(t, s.PX, s.PY,
@@ -231,9 +238,13 @@ namespace SlopArena.Shared
             sim.RegisterEntity(1, def, state);
             var inputs = new Dictionary<ulong, InputState>();
             var samples = new List<MovementSample>(DropTicks);
+            bool downPressed = false;
             for (int t = 0; t < DropTicks; t++)
             {
-                inputs[1] = down ? Input(down: true) : default;
+                var input = down ? Input(down: true) : default;
+                input.DownPressed = down && !downPressed && sim.GetState(1).VY < 0f;
+                downPressed |= input.DownPressed;
+                inputs[1] = input;
                 sim.Tick(inputs);
                 var s = sim.GetState(1);
                 samples.Add(new MovementSample(t, s.PX, s.PY,

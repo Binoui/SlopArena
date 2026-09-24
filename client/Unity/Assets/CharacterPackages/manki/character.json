@@ -20,8 +20,8 @@
     "dashCooldownTicks": 48,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 45,
-    "fastFallSpeed": 54,
+    "maxFallSpeed": 13.5,
+    "fastFallSpeed": 21,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 30,
@@ -37,6 +37,8 @@
     "hitMedium": "anim.manki.hit-medium",
     "hitHard": "anim.manki.hit-hard",
     "tumble": "anim.manki.tumble",
+    "crouch": "anim.manki.crouch",
+    "slide": "anim.manki.slide",
     "landStartOffsetSeconds": 0.49,
     "modelResourcePath": "Characters/Manki",
     "visualScale": 1,
@@ -185,6 +187,7 @@
   "slots": [
     {
       "id": "ground.1",
+      "allowSlideCarry": true,
       "name": "Monkey Punch",
       "description": "Right punch with a target-locking lunge",
       "iconId": "icon.1",
@@ -329,6 +332,7 @@
     },
     {
       "id": "ground.2",
+      "allowSlideCarry": true,
       "name": "Straight Punch",
       "description": "Straight Punch",
       "iconId": "icon.2",
@@ -473,6 +477,7 @@
     },
     {
       "id": "ground.3",
+      "allowSlideCarry": true,
       "name": "Sweeping Kick",
       "description": "Sweeping Kick",
       "iconId": "icon.3",
@@ -591,6 +596,7 @@
     },
     {
       "id": "ground.4",
+      "allowSlideCarry": true,
       "name": "Double Kick",
       "description": "Double Kick",
       "iconId": "icon.4",

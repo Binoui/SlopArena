@@ -19,10 +19,11 @@ Use this skill for movement, input, and universal combat changes. The authoritat
 ## Movement contract
 
 - Input is camera-relative and snaps to eight directions. The camera is a world sibling with absolute yaw.
-- Ground movement has one Run tier. Rush is the fixed reversal-free burst from standstill; Turnaround is the committed reversal from a full Run.
+- Ground movement has one Run tier. Rush is its initial burst; grounded reversals remain immediate after Rush. Turnaround is removed.
 - Ground and double jumps use per-character movement data. ShortHop is release-timed during JumpSquat; double jumps are full jumps.
 - JumpArc is the complete jump animation. Fall starts when the JumpArc finishes while the entity remains airborne, not at the physics apex.
-- FastFall sets the configured downward speed while airborne and falling, except during Hitstun.
+- FastFall requires a fresh Down press while already descending and latches through release. Ascent/apex presses are discarded; locks and authored vertical motion cannot be overridden. Ordinary aerial attacks may coexist.
+- Grounded Down selects Crouch or momentum-spending Slide; actionable held-Down landings may slide. SlideJump retains ordinary squat and jump resources. See the canonical combat guide for thresholds, interruption/reset rules, normal carry and settled CrouchBrace rather than duplicating tuning here.
 - Dash is the Shift-triggered evasion/approach burst. Its opening ticks grant DashInvincibility. Ground Dash hard-stops at expiry; aerial Dash preserves momentum.
 - LedgeHang is occupied and single-occupancy. Drop, ledge jump, and stand are explicit actions.
 - FloatWindow is restored by landing, taking damage, or RecoveryMove. Normal air attacks do not reset it.
@@ -31,7 +32,7 @@ All durations are 60 Hz simulation ticks. Do not implement movement from render-
 
 ## Input boundary
 
-`InputController.Poll()` and `BuildInputState()` produce `SlopArena.Shared.InputState`. The input state carries movement, jump, Dash, Burst, canonical active slot, camera aim, target intent, JumpHeld, facing-camera edge, and target-lock toggle fields. The client may provide intent; the server validates and applies gameplay.
+`InputController.Poll()` and `BuildInputState()` produce `SlopArena.Shared.InputState`. Down hold and the one-shot DownPressed edge are independent of movement axes. The state also carries movement, jump, Dash, Burst, canonical active slot, camera aim, target intent, JumpHeld, facing-camera edge, and target-lock toggle fields. The client supplies intent; Shared simulation validates and applies gameplay.
 
 The canonical move grid is grounded and aerial variants of `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`. Physical controls are remappable adapters. They are not package identity.
 

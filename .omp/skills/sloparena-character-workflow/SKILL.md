@@ -142,6 +142,13 @@ For legacy maintenance, preserve its existing registry and baked-data contracts 
 
 ## Verification checklist
 
+Reuse evidence across this workflow, animation authoring and the build gate. One
+actual-prefab capture on the affected runtime surface can satisfy multiple visual
+criteria; no duplicate capture is required because another skill names the same check.
+Name the unresolved question before adding evidence and stop once it is answered.
+Keep detailed traces for failures and representative cases, not every passing
+permutation, unless explicitly requested. Repeat only checks invalidated by a change.
+
 For local iteration:
 
 - source diagnostics are visible and invalid drafts never fall back to stale content;
@@ -156,5 +163,5 @@ For an accepted package:
 - inspect, cook, and verify succeed; the cook replaces the prior artifact atomically;
 - manifest, runtime definition, pose payload, generated bindings, and hashes agree;
 - roster pins refresh only after accepted verification;
-- Ability Lab and Training consume the persisted cooked definition;
+- the affected Ability Lab or Training surface consumes the persisted cooked definition; exercise both only when each has distinct changed behavior;
 - Shared/server authority remains unchanged and presentation is client-only.

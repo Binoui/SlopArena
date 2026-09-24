@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using SlopArena.Shared;
 using SlopArena.Shared.Rollback;
-
 namespace SlopArena.Server
 {
 	/// <summary>
@@ -234,11 +234,26 @@ namespace SlopArena.Server
 					var remoteEP = new IPEndPoint(IPAddress.Any, 0);
 					byte[] data = _udpServer.Receive(ref remoteEP);
 
-					// Client packet format: entityId(8) + tick(4) + InputState(20) = 32 bytes (ADR-0016 short-hop bit)
-					if (data.Length < 8 + 4 + InputState.Size) continue;
+					// Uplink packet is exactly entityId(8) + tick(4) + InputState(21).
+					// Decode and validate the complete current protocol before any endpoint,
+					// reconnect, or countdown side effects.
+					if (data.Length != 8 + 4 + InputState.Size) continue;
 
 					ulong entityId = BitConverter.ToUInt64(data, 0);
 					uint clientTick = BitConverter.ToUInt32(data, 8);
+					InputState inputState;
+					try
+					{
+						inputState = InputState.Deserialize(data.AsSpan(12, InputState.Size));
+					}
+					catch (ArgumentException)
+					{
+						continue;
+					}
+					catch (InvalidDataException)
+					{
+						continue;
+					}
 
 					var slot = FindSlot(entityId);
 					if (slot == null) continue; // not a rostered player
@@ -270,8 +285,6 @@ namespace SlopArena.Server
 					slot.LastPacket = DateTime.UtcNow;
 
 					if (clientTick <= _serverTick) continue;
-
-					var inputState = InputState.Deserialize(data.AsSpan(12));
 
 					// TickInputBuffer.Push replaces same-tick duplicates.
 					slot.Queue.Push(clientTick, inputState);
@@ -342,9 +355,19 @@ namespace SlopArena.Server
 				if (slot.Queue.Count == 0) continue;
 				anyPending = true;
 
-				InputState input = slot.LastInput;
+				InputState input;
 				if (slot.Queue.TryTake(targetTick, out var queuedInput))
+				{
+					// Exact buffered input retains every edge, including DownPressed.
 					input = queuedInput;
+				}
+				else
+				{
+					// A held input reused for a missing tick may not replay a render-frame
+					// edge. Preserve every other input bit exactly.
+					input = slot.LastInput;
+					input.DownPressed = false;
+				}
 				slot.LastInput = input;
 				inputs[slot.EntityId] = input;
 			}

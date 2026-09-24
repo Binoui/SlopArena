@@ -22,9 +22,10 @@ The package is `client/Unity/Assets/CharacterPackages/bonk/`:
 - `package.json` — package identity and attribution (`bonk`, `0.0.0-dev`, Binoui, MIT,
   SlopArena).
   `character.json` — authoritative gameplay source with the canonical sixteen slots.
-  Seven normals use sword capsules from `_weapon_hilt` to `_weapon_tip`; E is the
-  targeted recovery slam; F is the repeated blade storm. Unlisted slots remain no-op
-  probes.
+  Seven normals use sword capsules from `_weapon_hilt` to `_weapon_tip`; A is Shoulder
+  Bash, E is the targeted recovery slam, R remains a WIP probe, and F is Blade Storm.
+  `air.A` and `air.R` are explicit aerial variants with their own temporary gravity
+  windows; other shared specials remain aliases.
 - `CharacterAssetCatalog.asset` — schema 1, 60 Hz, Bonk rig, presentation bindings,
   independent move-animation bindings, and the package-owned `BonkWeaponAttachConfig.asset`.
 
@@ -58,12 +59,13 @@ authoritative landing for 13 damage at 55°, base/growth 9/32, 20 stun ticks,
 and a 6-tick hitbox. Aim yaw and distance are cached while held, so release
 input cannot replace the selected direction.
 
-`ground.F` is `Blade Storm`: a 56-tick timeline with independent hilt-to-tip
-capsules at ticks 8, 16, 24, and 32 (radius 0.32, damage 2.5, angle 25°,
-base/growth 2/8, 8 stun ticks, 4 active ticks), followed by a tick-44
-finisher (radius 0.42, damage 12, angle 25°, base/growth 10/36, 20 stun
-ticks, 6 active ticks). It has a 900-tick cooldown. `air.F` and the other
-unlisted canonical slots remain no-op probes.
+`ground.F` is `Blade Storm`: a 100-tick timeline with hitboxes at ticks 2, 16, 24,
+32, and 44, and a 900-tick cooldown. Its mobile aim ends at tick 75, locking
+movement for the final 25 ticks. `air.F` aliases this definition.
+
+`air.A` and `air.R` preserve their grounded timelines and add a `gravityWindow`
+at tick 0: 0.5× the active airborne gravity for 30 ticks. FastFall overrides
+this temporary reduction; the operation does not reset FloatWindow.
 
 The capability requirement is
 `slop.internal.bonk.targeted-jump-slam.v1` version `1`. It is admitted only

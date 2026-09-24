@@ -6,6 +6,7 @@ namespace SlopArena.Shared.Abilities;
 /// <summary>Bonk E: hold a ground cursor, jump ballistically to the target, then slam on landing.</summary>
 public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, ILandingContinuationCapability
 {
+    public override bool OwnsVerticalMotion => true;
     private readonly CookedBonkTargetedJumpSlamCapabilityParameters _parameters;
     private enum Phase { Aim, Jump, Slam }
 
@@ -27,6 +28,9 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
         _aimDistance = s.AimTargetDistance;
         _jumpSpeed = 0f;
         _slamSpawned = false;
+
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
 
         s.State = ActionState.Aiming;
         s.AttackSlot = (byte)(Slot + 1);
@@ -82,6 +86,9 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
             flightSeconds = _parameters.MaxFlightTicks * Simulation.TickDt;
         _jumpSpeed = _aimDistance / flightSeconds;
 
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
+
         s.State = ActionState.Attacking;
         s.IsAiming = false;
         s.FacingYaw = _aimYaw;
@@ -110,6 +117,8 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
         }
 
         s.FacingYaw = _aimYaw;
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         s.VX = MathF.Sin(_aimYaw) * _jumpSpeed;
         s.VZ = MathF.Cos(_aimYaw) * _jumpSpeed;
     }
@@ -119,6 +128,9 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
         _phase = Phase.Slam;
         _phaseTicks = 0;
         s.State = ActionState.Attacking;
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
+
         s.IsAiming = false;
         s.VX = 0f;
         s.VY = 0f;
@@ -129,6 +141,8 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
 
     private void TickSlam(ref CharacterState s)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         s.IsAiming = false;
         s.VX = 0f;
         s.VY = 0f;
@@ -165,6 +179,8 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
 
     public override void OnEnd(ref CharacterState s)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         s.IsAiming = false;
         s.VX = 0f;
         s.VY = 0f;
@@ -173,6 +189,8 @@ public sealed class BonkTargetedJumpSlam : ServerAbility, IAimHoldCapability, IL
 
     public override void OnCancel(ref CharacterState s)
     {
+        ClearVelocityOwnership(ref s);
+        s.IsFastFalling = false;
         s.IsAiming = false;
         s.VX = 0f;
         s.VY = 0f;

@@ -3,6 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -173,8 +174,23 @@ namespace SlopArena.Client.Network
                         continue;
                     }
 
-                    if (buf.Length < ServerEntityPacket.BaseSize) continue;
-                    _receivedQueue.Enqueue(ServerEntityPacket.Deserialize(buf));
+                    // State envelopes are a strict protocol cutover. Ignore malformed,
+                    // truncated, or unsupported-version datagrams without killing receive.
+                    if (buf.Length != ServerEntityPacket.NoInputSize &&
+                        buf.Length != ServerEntityPacket.MaxSize)
+                        continue;
+                    try
+                    {
+                        _receivedQueue.Enqueue(ServerEntityPacket.Deserialize(buf));
+                    }
+                    catch (ArgumentException)
+                    {
+                        continue;
+                    }
+                    catch (InvalidDataException)
+                    {
+                        continue;
+                    }
                 }
                 catch
                 {

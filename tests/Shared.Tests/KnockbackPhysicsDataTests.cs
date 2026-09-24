@@ -138,7 +138,7 @@ public class KnockbackPhysicsDataTests
         var arena = TestHelpers.TestArena();
         for (int t = 0; t < 120 && !(s.IsGrounded && s.VX == 0f && s.VZ == 0f && s.VY == 0f); t++)
         {
-            Simulation.SimulateTick(ref s, Def, default, arena, out _);
+            Simulation.SimulateTick(ref s, Def, default, arena, out _, out _, DownActionTuning.Default, false);
             sb.AppendLine(FormattableString.Invariant(
                 $"{name},{pct},{t + 1},{s.State},{s.IsGrounded},{s.PX:F3},{s.PY:F3},{s.VX:F3},{s.VY:F3},{s.KVX:F3},{s.KVY:F3},{s.AirTimeTicks}"));
         }
@@ -174,7 +174,7 @@ public class KnockbackPhysicsDataTests
 
         for (; ticks < 3600; ticks++) // 60 s ceiling
         {
-            Simulation.SimulateTick(ref s, Def, default, arena, out _);
+            Simulation.SimulateTick(ref s, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
             float dHoriz = MathF.Sqrt(((s.PX - prev.PX) * (s.PX - prev.PX)) + ((s.PZ - prev.PZ) * (s.PZ - prev.PZ)));
             totalDist += dHoriz;

@@ -31,7 +31,7 @@ public sealed class CharacterCompileResult
 public static class CharacterPackageCompiler
 {
     private const ushort SchemaVersion = 1;
-    private const string RuntimeApiMin = "1.0.0";
+    private const string RuntimeApiMin = "1.2.0";
     private const string RuntimeApiMax = "1.x";
     private static readonly string[] CanonicalSlots = CanonicalSlotProjection.All
         .Select(slot => slot.Id)
@@ -139,8 +139,9 @@ public static class CharacterPackageCompiler
         for (var ordinal = 0; ordinal < CanonicalSlots.Length; ordinal++)
         {
             if (!resolved.TryGetValue(CanonicalSlots[ordinal], out var slot)) continue;
+            ValidateSlideCarry(CanonicalSlots[ordinal], slot, FindSourceSlotIndex(c.Slots, slot.Id), d);
             var timeline = CookTimeline(slot.Timeline, d, ref stageCount, ref operationCount, ref hitboxCount, ref projectileCount, ref capabilityOperationCount, ref maxDuration, ref operationOrdinal);
-            cookedSlots.Add(new CookedSlotDefinition(ordinal, CanonicalSlots[ordinal], ordinal >= 8, slot.Name, slot.Description, slot.IconId, slot.Behavior, slot.AimMode, slot.CooldownTicks, slot.IsRecoveryMove, slot.PreserveMomentumOnStart, timeline, slot.ChargePool == null ? null : new CookedChargePool(slot.ChargePool.MaxCharges, slot.ChargePool.RegenTicks), slot.AimMovement, slot.AimAnimationId));
+            cookedSlots.Add(new CookedSlotDefinition(ordinal, CanonicalSlots[ordinal], ordinal >= 8, slot.Name, slot.Description, slot.IconId, slot.Behavior, slot.AimMode, slot.CooldownTicks, slot.IsRecoveryMove, slot.PreserveMomentumOnStart, timeline, slot.ChargePool == null ? null : new CookedChargePool(slot.ChargePool.MaxCharges, slot.ChargePool.RegenTicks), slot.AimMovement, slot.AimAnimationId, slot.AllowSlideCarry));
         }
         if (resolved.Count != CanonicalSlots.Length) d.Error("reference.unresolved", "character.slots", "Not all canonical slots resolve.");
         if (d.HasErrors) return;
@@ -178,6 +179,9 @@ public static class CharacterPackageCompiler
                 if (operation is ForwardLungeOperationSource lunge &&
                     (int)lunge.Tick + lunge.DurationTicks > stage.DurationTicks)
                     d.Error("value.out-of-range", "character.forwardLunge.durationTicks", "Forward lunge must end within its stage.");
+                if (operation is GravityWindowOperationSource gravity &&
+                    (int)gravity.Tick + gravity.DurationTicks > stage.DurationTicks)
+                    d.Error("value.out-of-range", "character.gravityWindow.durationTicks", "Gravity window must end within its stage.");
                 if (operation is StartCapabilityOperationSource capability)
                 {
                     if (!capabilities.TryGetValue(capability.CapabilityId, out var version)) d.Error("capability.unknown", "character.operation.capabilityId", "Capability is not declared.");
@@ -187,13 +191,54 @@ public static class CharacterPackageCompiler
             }
         }
     }
+    private static int FindSourceSlotIndex(IReadOnlyList<CharacterSlotSource> slots, string id)
+    {
+        for (var i = 0; i < (slots?.Count ?? 0); i++)
+            if (string.Equals(slots[i].Id, id, StringComparison.Ordinal))
+                return i;
+        return -1;
+    }
+
+    private static void ValidateSlideCarry(string canonicalId, CharacterSlotSource slot, int sourceIndex, DiagnosticBag d)
+    {
+        if (!slot.AllowSlideCarry || slot.Timeline?.Stages == null)
+            return;
+
+        var path = sourceIndex >= 0
+            ? $"character.slots[{sourceIndex}].allowSlideCarry"
+            : $"character.slots.{canonicalId}.allowSlideCarry";
+        const string code = "slot.slide-carry.motion-conflict";
+        if (canonicalId != "ground.1" && canonicalId != "ground.2"
+            && canonicalId != "ground.3" && canonicalId != "ground.4")
+            d.Error(code, path, "Slide carry is only valid on grounded canonical normals 1-4.");
+        if (slot.AimMode != AuthoringAimMode.None)
+            d.Error(code, path, "Slide carry cannot be enabled on an aimed slot.");
+        if (slot.IsRecoveryMove)
+            d.Error(code, path, "Slide carry cannot be enabled on a recovery move.");
+
+        var hasPositiveWarp = false;
+        var hasMotionOperation = false;
+        foreach (var stage in slot.Timeline.Stages)
+        {
+            hasPositiveWarp |= stage.WarpRange > 0f;
+            hasMotionOperation |= stage.Operations.Any(operation => operation is SetVelocityOperationSource
+                or ForwardLungeOperationSource
+                or SetAimStateOperationSource
+                or StartCapabilityOperationSource);
+        }
+        if (hasPositiveWarp)
+            d.Error(code, path, "Slide carry cannot be enabled on a slot with positive warp range.");
+        if (hasMotionOperation)
+            d.Error(code, path, "Slide carry cannot be enabled on a slot with motion-owning timeline operations.");
+    }
+
 
     private static bool IsKnownAnimation(string id, CharacterAuthoringDocument c)
         => id.StartsWith("anim.", StringComparison.Ordinal);
 
     private static void ValidateOperation(CharacterTimelineOperationSource operation, CharacterAuthoringDocument c, DiagnosticBag d)
     {
-        var expected = operation switch { SetVelocityOperationSource or ForwardLungeOperationSource => AuthoringUnit.MetersPerSecond, SpawnHitboxOperationSource => AuthoringUnit.Meters, SpawnProjectileOperationSource => AuthoringUnit.Meters, _ => AuthoringUnit.Ticks };
+        var expected = operation switch { SetVelocityOperationSource or ForwardLungeOperationSource => AuthoringUnit.MetersPerSecond, GravityWindowOperationSource => AuthoringUnit.Normalized, SpawnHitboxOperationSource => AuthoringUnit.Meters, SpawnProjectileOperationSource => AuthoringUnit.Meters, _ => AuthoringUnit.Ticks };
         if (operation.Unit != expected) d.Error("unit.unknown", "character.operation.unit", "Unit does not match operation contract.");
         switch (operation)
         {
@@ -204,6 +249,13 @@ public static class CharacterPackageCompiler
                 ValidateFiniteValues(new[] { lunge.Speed }, "character.forwardLunge.speed", d);
                 if (lunge.Speed <= 0f) d.Error("value.out-of-range", "character.forwardLunge.speed", "Speed must be greater than zero.");
                 if (lunge.DurationTicks == 0) d.Error("value.out-of-range", "character.forwardLunge.durationTicks", "Duration must be greater than zero.");
+                break;
+            case GravityWindowOperationSource gravity:
+                ValidateFiniteValues(new[] { gravity.GravityScale }, "character.gravityWindow.gravityScale", d);
+                if (gravity.GravityScale < 0f || gravity.GravityScale > 1f)
+                    d.Error("value.out-of-range", "character.gravityWindow.gravityScale", "Gravity scale must be between zero and one.");
+                if (gravity.DurationTicks == 0)
+                    d.Error("value.out-of-range", "character.gravityWindow.durationTicks", "Duration must be greater than zero.");
                 break;
             case SpawnHitboxOperationSource hitbox:
                 ValidateFiniteValues(new[] { hitbox.Hitbox.Radius, hitbox.Hitbox.OffsetX, hitbox.Hitbox.OffsetY, hitbox.Hitbox.OffsetZ, hitbox.Hitbox.EndOffsetX, hitbox.Hitbox.EndOffsetY, hitbox.Hitbox.EndOffsetZ, hitbox.Hitbox.Damage, hitbox.Hitbox.Angle, hitbox.Hitbox.BaseKnockback, hitbox.Hitbox.KnockbackGrowth }, "character.hitbox", d);
@@ -322,6 +374,12 @@ public static class CharacterPackageCompiler
             ValidateId(c.Presentation.Tumble, "character.presentation.tumble", d);
             if (!standardAnimations.Add(c.Presentation.Tumble)) d.Error("id.duplicate", "character.presentation", "Duplicate standard animation ID.");
         }
+        foreach (var (id, field) in new[] { (c.Presentation.Crouch, "crouch"), (c.Presentation.Slide, "slide") })
+        {
+            if (string.IsNullOrEmpty(id)) continue;
+            ValidateId(id, $"character.presentation.{field}", d);
+            if (!standardAnimations.Add(id)) d.Error("id.duplicate", "character.presentation", "Duplicate standard animation ID.");
+        }
         foreach (var stageId in c.PresentationIds) if (!PresentationUsed(stageId, c)) d.Warning("presentation.unused-id", "character.presentationIds", "Declared presentation ID is not emitted by a timeline operation.");
     }
 
@@ -398,6 +456,7 @@ public static class CharacterPackageCompiler
         {
             SetVelocityOperationSource x => x with { },
             ForwardLungeOperationSource x => x with { },
+            GravityWindowOperationSource x => x with { },
             SpawnHitboxOperationSource x => x with { Hitbox = x.Hitbox with { } },
             SpawnProjectileOperationSource x => x with { Projectile = x.Projectile with { } },
             SetAimStateOperationSource x => x with { },
@@ -443,6 +502,7 @@ public static class CharacterPackageCompiler
                 {
                     case SetVelocityOperationSource x: cookedOps.Add(new CookedSetVelocityOperation(x.Tick, x.Unit, x.VelocityMode, x.X, x.Y, x.Z)); break;
                     case ForwardLungeOperationSource x: cookedOps.Add(new CookedForwardLungeOperation(x.Tick, x.Unit, x.Speed, x.DurationTicks)); break;
+                    case GravityWindowOperationSource x: cookedOps.Add(new CookedGravityWindowOperation(x.Tick, x.Unit, x.GravityScale, x.DurationTicks)); break;
                     case SpawnHitboxOperationSource x: hitboxes++; cookedOps.Add(new CookedSpawnHitboxOperation(x.Tick, x.Unit, new CookedHitbox(x.Hitbox.Shape, x.Hitbox.Radius, x.Hitbox.OffsetX, x.Hitbox.OffsetY, x.Hitbox.OffsetZ, x.Hitbox.EndOffsetX, x.Hitbox.EndOffsetY, x.Hitbox.EndOffsetZ, x.Hitbox.StartBoneId, x.Hitbox.EndBoneId, x.Hitbox.Damage, x.Hitbox.Angle, x.Hitbox.BaseKnockback, x.Hitbox.KnockbackGrowth, x.Hitbox.StunTicks, x.Hitbox.DurationTicks, x.Hitbox.Interruptible, x.Hitbox.HitGroup, x.Hitbox.KnockbackDirection))); break;
                     case SpawnProjectileOperationSource x: projectiles++; cookedOps.Add(new CookedSpawnProjectileOperation(x.Tick, x.Unit, new CookedProjectile(x.Projectile.LaunchOffsetX, x.Projectile.LaunchOffsetY, x.Projectile.LaunchOffsetZ, x.Projectile.Speed, x.Projectile.Gravity, x.Projectile.Radius, x.Projectile.Damage, x.Projectile.Angle, x.Projectile.BaseKnockback, x.Projectile.KnockbackGrowth, x.Projectile.StunTicks, x.Projectile.MaxFlightTicks, x.Projectile.YawOffsetDegrees))); break;
                     case SetAimStateOperationSource x: cookedOps.Add(new CookedSetAimStateOperation(x.Tick, x.Unit, x.AimState)); break;
@@ -475,7 +535,7 @@ public static class CharacterPackageCompiler
     };
 
     private static CookedMovement CookMovement(CharacterMovementSource x) => new(x.RunSpeed, x.RunAccelerationA, x.RunAccelerationB, x.DashSpeed, x.AirSpeedMax, x.AirAccelStick, x.AirAccelBase, x.JumpForce, x.ShortHopForce, x.AirJumpVMultiplier, x.AirJumpHMultiplier, x.Gravity, x.AirFloatGravity, x.DashDurationTicks, x.DashCooldownTicks, x.GroundFriction, x.AirFriction, x.MaxFallSpeed, x.FastFallSpeed, x.MaxJumps, x.JumpSquatTicks, x.FloatWindowTicks, x.RushTicks);
-    private static CookedPresentation CookPresentation(CharacterPresentationSource x) => new(x.Idle, x.Run, x.Dash, x.Jump, x.Fall, x.HitSmall, x.HitMedium, x.HitHard, x.LandStartOffsetSeconds, x.ModelResourcePath, x.VisualScale, x.HurtboxBoneScale, x.ModelYOffset, x.ModelSoleOffset, x.AutoModelYOffset, x.Tumble);
+    private static CookedPresentation CookPresentation(CharacterPresentationSource x) => new(x.Idle, x.Run, x.Dash, x.Jump, x.Fall, x.HitSmall, x.HitMedium, x.HitHard, x.LandStartOffsetSeconds, x.ModelResourcePath, x.VisualScale, x.HurtboxBoneScale, x.ModelYOffset, x.ModelSoleOffset, x.AutoModelYOffset, x.Tumble, x.Crouch, x.Slide);
 
     private static byte[] WriteCanonical(CookedPackageMetadata metadata, CookedCharacterDefinition definition, CookedBudget budget)
     {
@@ -497,7 +557,7 @@ public static class CharacterPackageCompiler
     }
 
     private static void WriteMovement(Utf8JsonWriter w, CookedMovement x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w, "runSpeed", x.RunSpeed); Number(w, "runAccelerationA", x.RunAccelerationA); Number(w, "runAccelerationB", x.RunAccelerationB); Number(w, "dashSpeed", x.DashSpeed); Number(w, "airSpeedMax", x.AirSpeedMax); Number(w, "airAccelStick", x.AirAccelStick); Number(w, "airAccelBase", x.AirAccelBase); Number(w, "jumpForce", x.JumpForce); Number(w, "shortHopForce", x.ShortHopForce); Number(w, "airJumpVMultiplier", x.AirJumpVMultiplier); Number(w, "airJumpHMultiplier", x.AirJumpHMultiplier); Number(w, "gravity", x.Gravity); Number(w, "airFloatGravity", x.AirFloatGravity); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("dashCooldownTicks", x.DashCooldownTicks); Number(w, "groundFriction", x.GroundFriction); Number(w, "airFriction", x.AirFriction); Number(w, "maxFallSpeed", x.MaxFallSpeed); Number(w, "fastFallSpeed", x.FastFallSpeed); w.WriteNumber("maxJumps", x.MaxJumps); w.WriteNumber("jumpSquatTicks", x.JumpSquatTicks); w.WriteNumber("floatWindowTicks", x.FloatWindowTicks); w.WriteNumber("rushTicks", x.RushTicks); w.WriteEndObject(); }
-    private static void WritePresentation(Utf8JsonWriter w, CookedPresentation x) { w.WritePropertyName("presentation"); w.WriteStartObject(); w.WriteString("idle", x.Idle); w.WriteString("run", x.Run); w.WriteString("dash", x.Dash); w.WriteString("jump", x.Jump); w.WriteString("fall", x.Fall); w.WriteString("hitSmall", x.HitSmall); w.WriteString("hitMedium", x.HitMedium); w.WriteString("hitHard", x.HitHard); if (!string.IsNullOrEmpty(x.Tumble)) w.WriteString("tumble", x.Tumble); Number(w, "landStartOffsetSeconds", x.LandStartOffsetSeconds); w.WriteString("modelResourcePath", x.ModelResourcePath); Number(w, "visualScale", x.VisualScale); Number(w, "hurtboxBoneScale", x.HurtboxBoneScale); Number(w, "modelYOffset", x.ModelYOffset); Number(w, "modelSoleOffset", x.ModelSoleOffset); w.WriteBoolean("autoModelYOffset", x.AutoModelYOffset); w.WriteEndObject(); }
+    private static void WritePresentation(Utf8JsonWriter w, CookedPresentation x) { w.WritePropertyName("presentation"); w.WriteStartObject(); w.WriteString("idle", x.Idle); w.WriteString("run", x.Run); w.WriteString("dash", x.Dash); w.WriteString("jump", x.Jump); w.WriteString("fall", x.Fall); w.WriteString("hitSmall", x.HitSmall); w.WriteString("hitMedium", x.HitMedium); w.WriteString("hitHard", x.HitHard); if (!string.IsNullOrEmpty(x.Tumble)) w.WriteString("tumble", x.Tumble); if (!string.IsNullOrEmpty(x.Crouch)) w.WriteString("crouch", x.Crouch); if (!string.IsNullOrEmpty(x.Slide)) w.WriteString("slide", x.Slide); Number(w, "landStartOffsetSeconds", x.LandStartOffsetSeconds); w.WriteString("modelResourcePath", x.ModelResourcePath); Number(w, "visualScale", x.VisualScale); Number(w, "hurtboxBoneScale", x.HurtboxBoneScale); Number(w, "modelYOffset", x.ModelYOffset); Number(w, "modelSoleOffset", x.ModelSoleOffset); w.WriteBoolean("autoModelYOffset", x.AutoModelYOffset); w.WriteEndObject(); }
     private static void WriteSlot(Utf8JsonWriter w, CookedSlotDefinition x)
     {
         w.WriteStartObject();
@@ -515,6 +575,7 @@ public static class CharacterPackageCompiler
         w.WriteNumber("cooldownTicks", x.CooldownTicks);
         w.WriteBoolean("isRecoveryMove", x.IsRecoveryMove);
         w.WriteBoolean("preserveMomentumOnStart", x.PreserveMomentumOnStart);
+        w.WriteBoolean("allowSlideCarry", x.AllowSlideCarry);
         if (x.ChargePool == null) w.WriteNull("chargePool");
         else
         {
@@ -571,6 +632,10 @@ public static class CharacterPackageCompiler
             case CookedForwardLungeOperation l:
                 Number(w, "speed", l.Speed);
                 w.WriteNumber("durationTicks", l.DurationTicks);
+                break;
+            case CookedGravityWindowOperation gravity:
+                Number(w, "gravityScale", gravity.GravityScale);
+                w.WriteNumber("durationTicks", gravity.DurationTicks);
                 break;
             case CookedCompleteTimelineOperation:
                 break;

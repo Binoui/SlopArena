@@ -47,6 +47,12 @@ public class CharacterStatePacketTests
             LastDirX = 1f,
             LastDirZ = 0f,
             WasAirborneDuringKnockback = true,
+            IsFastFalling = true,
+            JumpFromSlide = true,
+            SlideAttackCarryActive = true,
+            CrouchSettled = true,
+            QueuedCrouchBrace = true,
+            InPostHitstunFlight = true,
             HitstopTicks = 17,
             BurstCooldownTicks = 1234,
             BurstRecoveryTicks = 25,
@@ -93,6 +99,12 @@ public class CharacterStatePacketTests
         Assert.Equal(original.DashDirZ, restored.DashDirZ);
         Assert.Equal(original.DashCooldownTicks, restored.DashCooldownTicks);
         Assert.Equal(original.AirDodgesLeft, restored.AirDodgesLeft);
+        Assert.Equal(original.IsFastFalling, restored.IsFastFalling);
+        Assert.Equal(original.JumpFromSlide, restored.JumpFromSlide);
+        Assert.Equal(original.SlideAttackCarryActive, restored.SlideAttackCarryActive);
+        Assert.Equal(original.CrouchSettled, restored.CrouchSettled);
+        Assert.Equal(original.QueuedCrouchBrace, restored.QueuedCrouchBrace);
+        Assert.Equal(original.InPostHitstunFlight, restored.InPostHitstunFlight);
         Assert.Equal(original.JumpsLeft, restored.JumpsLeft);
         Assert.Equal(original.InvincibilityTicks, restored.InvincibilityTicks);
         Assert.Equal(original.RushTicks, restored.RushTicks);
@@ -108,9 +120,8 @@ public class CharacterStatePacketTests
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 112 bytes: the fixed state fields, eleven cooldown slots, rollback resources,
-        // attack animation restart marker, and authoritative landing lag.
-        Assert.Equal(112, CharacterStatePacket.Size);
+        // 114 bytes: fixed state fields plus replicated movement flags and protocol version.
+        Assert.Equal(114, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
@@ -198,5 +209,18 @@ public class CharacterStatePacketTests
         packet.Serialize(buffer);
         var restored = CharacterStatePacket.Deserialize(buffer).ToState();
         Assert.Equal((byte)7, restored.AnimIndex);
+    }
+    [Fact]
+    public void Deserialize_RejectsTruncatedLegacyAndWrongVersionPayloads()
+    {
+        var packet = CharacterStatePacket.FromState(default);
+        var buffer = new byte[CharacterStatePacket.Size];
+        packet.Serialize(buffer);
+
+        Assert.Throws<ArgumentException>(() => CharacterStatePacket.Deserialize(buffer.AsSpan(0, 112)));
+
+        var wrongVersion = (byte[])buffer.Clone();
+        wrongVersion[113] = 2;
+        Assert.Throws<InvalidDataException>(() => CharacterStatePacket.Deserialize(wrongVersion));
     }
 }

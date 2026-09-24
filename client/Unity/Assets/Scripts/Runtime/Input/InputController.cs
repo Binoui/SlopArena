@@ -43,6 +43,13 @@ namespace SlopArena.Client.Input
         private bool _pendingDash;
         /// <summary>Pending burst: set by Poll, consumed by BuildInputState (ADR-0014).</summary>
         private bool _pendingBurst;
+        /// <summary>Pending dedicated Down press edge: set by Poll/InjectAI and consumed once by BuildInputState.</summary>
+        private bool _pendingDownPressed;
+        /// <summary>
+        /// Prevent a key held through chat/pause/focus suppression from creating a new Down edge
+        /// when gameplay input resumes. Cleared only after the bound key is released.
+        /// </summary>
+        private bool _downReleaseRequired;
         /// <summary>Pending LMB facing snap (ADR-0017, issue #126): set by Poll on the LMB
         /// press edge, consumed by BuildInputState. One tick of FaceToCamera.</summary>
         private bool _pendingFaceToCamera;
@@ -85,6 +92,39 @@ namespace SlopArena.Client.Input
         // ── AI injection ──
         private bool _aiControlled;
         private InputState _aiInput;
+        /// <summary>
+        /// True while the bound fast-fall key is held. Kept separate from InputState.Down so
+        /// release suppression can be enforced across pause/focus transitions.
+        /// </summary>
+        private bool IsFastFallHeld()
+        {
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard[Bind(BindableAction.FastFall)].isPressed;
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            ClearPendingFrameState();
+            // InputSystem can reset device state while unfocused. Re-arm on both
+            // loss and regain so background polling cannot release this guard.
+            _downReleaseRequired = true;
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            ClearPendingFrameState();
+            _downReleaseRequired = true;
+        }
+
+        private void OnDisable()
+        {
+            ClearPendingFrameState();
+            _downReleaseRequired = true;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  AI injection
+        // ════════════════════════════════════════════════════════════════
 
         // ── Slot press (set by Poll, consumed via ConsumePendingSlotPress) ──
         private byte _pendingSlotPress;
@@ -98,6 +138,9 @@ namespace SlopArena.Client.Input
         {
             _aiControlled = true;
             _aiInput = input;
+            // Injection supplies a new edge; BuildInputState consumes it once. Do not
+            // derive Down from MoveY, since backward-moving NPCs must not fast-fall.
+            _pendingDownPressed = input.DownPressed;
         }
 
         /// <summary>
@@ -106,6 +149,7 @@ namespace SlopArena.Client.Input
         public void ClearAI()
         {
             _aiControlled = false;
+            _pendingDownPressed = false;
         }
 
         public bool IsAIControlled() => _aiControlled;
@@ -127,7 +171,8 @@ namespace SlopArena.Client.Input
         {
             if (_aiControlled)
             {
-                // AI-driven: use injected input
+                // AI-driven: use injected input. DownPressed was latched by InjectAI and is
+                // consumed by BuildInputState exactly once for this supplied input.
                 _pendingJump = _aiInput.Jump;
                 _pendingDash = _aiInput.Dash;
                 return;
@@ -144,6 +189,14 @@ namespace SlopArena.Client.Input
             if (kb[Bind(BindableAction.Jump)].wasPressedThisFrame) _pendingJump = true;
             if (kb[Bind(BindableAction.Dash)].wasPressedThisFrame) _pendingDash = true;
             if (kb[Bind(BindableAction.Burst)].wasPressedThisFrame) _pendingBurst = true;
+            var fastFall = kb[Bind(BindableAction.FastFall)];
+            if (_downReleaseRequired)
+            {
+                if (!fastFall.isPressed)
+                    _downReleaseRequired = false;
+            }
+            if (!_downReleaseRequired && fastFall.wasPressedThisFrame)
+                _pendingDownPressed = true;
             // Utility inputs — LMB snaps facing to the camera azimuth (ADR-0017, #126),
             // RMB toggles the persistent target lock (ADR-0018, #127). Neither is
             // an ability slot anymore (8-slot re-tier): the old LMB/RMB ability slots
@@ -182,9 +235,12 @@ namespace SlopArena.Client.Input
             _pendingJump = false;
             _pendingDash = false;
             _pendingBurst = false;
+            _pendingDownPressed = false;
             _pendingFaceToCamera = false;
             _pendingToggleLock = false;
             _pendingSlotPress = 0;
+            if (IsFastFallHeld())
+                _downReleaseRequired = true;
         }
 
         public byte ConsumePendingSlotPress()
@@ -255,14 +311,17 @@ namespace SlopArena.Client.Input
         {
             var input = new InputState();
 
-            // ── NPC path: use injected AI input directly ──
             if (isNPC && _aiControlled)
             {
                 var move = GetMovement();
                 input.MoveX = move.x;
                 input.MoveY = move.y;
                 input.Up = move.y > 0.3f;
-                input.Down = move.y < -0.3f;
+                // Down is an explicit injected hold, not an interpretation of backward
+                // movement. The edge is consumed independently of movement gating.
+                input.Down = _aiInput.Down;
+                input.DownPressed = _pendingDownPressed;
+                _pendingDownPressed = false;
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
                 input.JumpHeld = _aiInput.JumpHeld;
@@ -334,7 +393,6 @@ namespace SlopArena.Client.Input
                 moveDirection = moveDirection.normalized;
             }
 
-            // Populate InputState
             input.MoveX = moveDirection.x;
             input.MoveY = moveDirection.z;
             input.Up = moveDirection.z > 0.3f;
@@ -342,7 +400,9 @@ namespace SlopArena.Client.Input
             // default) — NOT by backward movement. Drifting backward must never fast-fall.
             // Left un-gated by canMove: the sim gates it (airborne + not hitstun), and it
             // must work through air attacks.
-            input.Down = kb[Bind(BindableAction.FastFall)].isPressed;
+            input.Down = !_downReleaseRequired && kb[Bind(BindableAction.FastFall)].isPressed;
+            input.DownPressed = _pendingDownPressed;
+            _pendingDownPressed = false;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
             // Short hop (issue #116): Jump is the press edge; JumpHeld is the physical

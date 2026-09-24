@@ -96,6 +96,7 @@ public class RollbackInvariantTests
             MoveY = (float)(rng.NextDouble() * 2.0 - 1.0),
             Up = rng.Next(4) == 0,
             Down = rng.Next(4) == 0,
+            DownPressed = rng.Next(8) == 0,
             Left = rng.Next(4) == 0,
             Right = rng.Next(4) == 0,
             Jump = rng.Next(8) == 0,

@@ -44,9 +44,19 @@ namespace SlopArena.Shared
         public bool WasAirborneDuringKnockback;
 
         /// <summary>ADR-0019 §6: airborne from a launch, post-hitstun — flight gravity 8,
-        /// horizontal friction 10 until landing or any action (jump/ability). Server-local
-        /// state, never on the wire.</summary>
+        /// horizontal friction 10 until landing or any action (jump/ability). Replicated
+        /// in CharacterStatePacket so reconstruction preserves the flight law.</summary>
         public bool InPostHitstunFlight;
+        /// <summary>Latched deliberate fast-fall action, replicated for reconstruction.</summary>
+        public bool IsFastFalling;
+        /// <summary>True when the current jump originated from a slide.</summary>
+        public bool JumpFromSlide;
+        /// <summary>True while an opted-in sliding attack carries residual momentum.</summary>
+        public bool SlideAttackCarryActive;
+        /// <summary>True after a complete stationary crouch tick.</summary>
+        public bool CrouchSettled;
+        /// <summary>Captured crouch brace state for a deferred ordinary launch.</summary>
+        public bool QueuedCrouchBrace;
 
         public byte Deaths;              // match death counter, server authority
 

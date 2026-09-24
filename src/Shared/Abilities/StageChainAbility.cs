@@ -17,6 +17,10 @@ namespace SlopArena.Shared.Abilities
     public abstract class StageChainAbility : ServerAbility
     {
         private ushort _ticks;
+        private float _currentLungeForce;
+
+        public override bool OwnsVerticalMotion => _currentLungeForce > 0f;
+
         private ushort _lungeDuration;
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
@@ -25,37 +29,49 @@ namespace SlopArena.Shared.Abilities
             _lungeDuration = (ushort)GetParam(def, "lunge_duration", 10f);
 
             var stage = GetStages(def)[0];
+            _currentLungeForce = stage.LungeForce;
 
             s.State = ActionState.Attacking;
             AnimIndex = 0;
             s.AnimLockTicks = stage.DurationTicks;
             s.ComboStage = 0;
             s.AttackElapsedTicks = 0;
-            // Apply initial lunge velocity (the move's own movement override)
             if (stage.LungeForce > 0f)
+            {
+                s.IsFastFalling = false;
+                ClearVelocityOwnership(ref s);
                 SetVelocityInFacing(ref s, stage.LungeForce);
+            }
         }
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
             var stage = GetStages(def)[0];
             _ticks++;
+            _currentLungeForce = stage.LungeForce;
 
-            // Apply lunge velocity for the first N ticks (skip when warp is active — warp handles movement)
             if (s.WarpSpeed <= 0f && _ticks <= _lungeDuration && stage.LungeForce > 0f)
+            {
+                s.IsFastFalling = false;
+                ClearVelocityOwnership(ref s);
                 SetVelocityInFacing(ref s, stage.LungeForce);
+            }
 
-            // Spawn hitboxes at their trigger ticks
             foreach (var evt in stage.HitboxEvents)
             {
                 if (evt.TriggerTick == _ticks)
                     SpawnHitbox(ref s, evt);
             }
 
-            // Single move: end when the stage fully expires. No chain transitions.
             if (_ticks >= stage.DurationTicks)
                 EndAbility(ref s);
         }
+
+        public override void OnEnd(ref CharacterState s)
+            => _currentLungeForce = 0f;
+
+        public override void OnCancel(ref CharacterState s)
+            => _currentLungeForce = 0f;
 
         /// <summary>Return the stage definitions for this ability.</summary>
         protected abstract AttackStage[] GetStages(CharacterDefinition def);

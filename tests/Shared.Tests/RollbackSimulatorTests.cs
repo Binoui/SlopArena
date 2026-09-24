@@ -59,6 +59,24 @@ public class RollbackSimulatorTests
     }
 
     [Fact]
+    public void OpponentHitstopSnapshot_SwitchesToRawTrack()
+    {
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var sim = new SlopArena.Shared.Rollback.RollbackSimulator(arena, SelfId);
+        sim.RegisterEntity(SelfId, def, TestHelpers.PlayerState());
+        sim.RegisterEntity(OpponentId, def, TestHelpers.PlayerState(x: 10f));
+
+        sim.IngestOpponentBatch(new[] { MakePacket(OpponentId, 1, TestHelpers.PlayerState(x: 10f)) });
+        var frozen = TestHelpers.PlayerState(x: 77f);
+        frozen.HitstopTicks = 3;
+        sim.IngestOpponentBatch(new[] { MakePacket(OpponentId, 2, frozen) });
+
+        Assert.Equal(77f, sim.GetState(OpponentId).PX);
+        Assert.Equal((ushort)3, sim.GetState(OpponentId).HitstopTicks);
+    }
+
+    [Fact]
     public void ReconcileSelf_RoutesToLocalTrack_IncrementsCorrectionCount()
     {
         var arena = TestHelpers.TestArena();

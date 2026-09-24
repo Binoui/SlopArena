@@ -427,4 +427,42 @@ public class LandingLagTests : KitScenarioTests
         Assert.Equal((ushort)0, s.LandingLagTicks);
         Assert.Equal(ActionState.Hitstun, s.State);
     }
+
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(18, 26, true)]
+    [InlineData(18, 32, false)]
+    public void DownLanding_UsesResolvedAerialCommitment_WithoutBankingSlide(int lag, int autoAfter, bool slide)
+    {
+        var def = MakeDef((ushort)lag, 6, (ushort)autoAfter);
+        var sim = TestHelpers.MakeSim();
+        var initial = FallingStart(4.7f);
+        initial.PX = initial.PZ = 50;
+        initial.VX = def.Movement.RunSpeed;
+        sim.RegisterEntity(1, def, initial, TestHelpers.LoadBakedData(def));
+        CharacterState landed = default;
+        for (int tick = 0; tick < 100; tick++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = new()
+            {
+                Down = true,
+                ActiveSlot = tick == 0 ? AbilitySlots.Slot1 : (byte)0,
+            } });
+            landed = sim.GetState(1);
+            if (sim.LastTickTouchdowns.Contains(1UL)) break;
+        }
+        Assert.True(landed.IsGrounded);
+        Assert.Equal(slide, landed.State == ActionState.Sliding);
+        Assert.Null(sim.GetActiveAbility(1));
+        if (!slide)
+        {
+            Assert.True(landed.LandingLagTicks > 0);
+            for (int i = 0; i < 60; i++)
+            {
+                sim.Tick(new Dictionary<ulong, InputState> { [1] = new() { Down = true } });
+                Assert.NotEqual(ActionState.Sliding, sim.GetState(1).State);
+            }
+            Assert.Equal(ActionState.Crouching, sim.GetState(1).State);
+        }
+    }
 }

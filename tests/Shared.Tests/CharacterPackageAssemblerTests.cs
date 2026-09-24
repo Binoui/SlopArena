@@ -90,11 +90,13 @@ public sealed class CharacterPackageAssemblerTests
     }
 
     [Fact]
-    public void Assemble_RequiresDeclaredTumbleBinding()
+    public void Assemble_RequiresDeclaredTumbleAndLowPoseBindings()
     {
         string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
         var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
         character["presentation"]!["tumble"] = "anim.tumble";
+        character["presentation"]!["crouch"] = "anim.fightguy.crouch";
+        character["presentation"]!["slide"] = "anim.fightguy.slide";
         var compile = CharacterPackageCompiler.Compile(
             File.ReadAllText(Path.Combine(root, "package.json")),
             character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
@@ -103,8 +105,8 @@ public sealed class CharacterPackageAssemblerTests
         var input = BuildInput(package, Array.Empty<PackageDependencySource>(), Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>());
         var binding = JsonNode.Parse(input.BindingBytes)!.AsObject();
         var animations = binding["animations"]!.AsArray();
-        var tumble = animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.tumble");
-        animations.Remove(tumble);
+        animations.Remove(animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.tumble"));
+        animations.Remove(animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.fightguy.crouch"));
         var broken = new CharacterPackageAssemblyInput(
             input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
             input.AuthoringSchemaVersion, input.CookedSchemaVersion, input.RuntimeApiMin, input.RuntimeApiMax,
@@ -113,6 +115,69 @@ public sealed class CharacterPackageAssemblerTests
             input.RuntimeBytes, input.PoseBytes, Encoding.UTF8.GetBytes(binding.ToJsonString()), input.CookedPackage);
         var result = CharacterPackageAssembler.Assemble(broken);
         Assert.Contains(result.Diagnostics, x => x.Code == "package.binding.missing");
+    }
+
+    [Fact]
+    public void GravityWindowSurvivesCookedAssemblyAndRuntimeLoading()
+    {
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
+        var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
+        character["slots"]![0]!["allowSlideCarry"] = false;
+        ((JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!).Add(new JsonObject
+        {
+            ["kind"] = "gravityWindow",
+            ["tick"] = 0,
+            ["unit"] = "normalized",
+            ["gravityScale"] = 0.5,
+            ["durationTicks"] = 5,
+        });
+
+        var compile = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            character.ToJsonString(),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.True(compile.CookedPackage != null,
+            string.Join("; ", compile.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
+        var assembly = CharacterPackageAssembler.Assemble(BuildInput(
+            compile.CookedPackage, Array.Empty<PackageDependencySource>(),
+            Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>()));
+        Assert.True(assembly.IsValid, string.Join("; ", assembly.Diagnostics.Select(x => x.Message)));
+
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
+        Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
+        var operation = Assert.Single(loaded.Package!.Definition.Slots
+            .Single(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations
+            .OfType<CookedGravityWindowOperation>());
+        Assert.Equal((0.5f, (ushort)5), (operation.GravityScale, operation.DurationTicks));
+    }
+    [Theory]
+    [InlineData("1.0.0", true)]
+    [InlineData("1.1.0", true)]
+    [InlineData("1.2.0", true)]
+    [InlineData("1.3.0", false)]
+    [InlineData("2.0.0", false)]
+    public void Loader_AdmitsOnlyKnownRuntimeMinimums(string minimum, bool supported)
+    {
+        var package = Compile();
+        var input = BuildInput(package, Array.Empty<PackageDependencySource>(),
+            Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>());
+        var runtime = JsonNode.Parse(input.RuntimeBytes)!.AsObject();
+        runtime["metadata"]!["compatibility"]!["runtimeApiMin"] = minimum;
+        var runtimeBytes = Encoding.UTF8.GetBytes(runtime.ToJsonString());
+        var candidatePackage = new CookedCharacterPackage(package.Metadata with { RuntimeApiMin = minimum },
+            package.Definition, package.Budget, package.Diagnostics, runtimeBytes);
+        var candidate = new CharacterPackageAssemblyInput(
+            input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
+            input.AuthoringSchemaVersion, input.CookedSchemaVersion, minimum, input.RuntimeApiMax,
+            input.SourceHash, input.Dependencies, input.CapabilityRequirements, input.CookerVersion, input.UnityVersion,
+            input.BindingSchemaVersion, input.PoseFormat, input.PoseVersion, input.SampleRate, input.Warnings,
+            runtimeBytes, input.PoseBytes, input.BindingBytes, candidatePackage);
+        var assembled = CharacterPackageAssembler.Assemble(candidate);
+        Assert.True(assembled.IsValid, string.Join("\n", assembled.Diagnostics));
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembled);
+        Assert.Equal(supported, loaded.IsValid);
+        if (!supported)
+            Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Code == "package.compatibility.unsupported");
     }
 
     private static CharacterPackageAssemblyResult AssembleFixture()
@@ -132,6 +197,10 @@ public sealed class CharacterPackageAssemblerTests
         };
         if (!string.IsNullOrEmpty(package.Definition.Presentation.Tumble))
             names.Add(package.Definition.Presentation.Tumble);
+        if (!string.IsNullOrEmpty(package.Definition.Presentation.Crouch))
+            names.Add(package.Definition.Presentation.Crouch);
+        if (!string.IsNullOrEmpty(package.Definition.Presentation.Slide))
+            names.Add(package.Definition.Presentation.Slide);
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId)) names.Add(slot.AimAnimationId);

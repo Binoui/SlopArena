@@ -106,4 +106,12 @@ MonoBehaviour:
     _clip: {fileID: -623603649343465320, guid: b79032c6c9e8aa56ab188264f01fff1c, type: 3}
     _extrapolation: 0
     _poseTrackId: anim.tumble
+  - _semanticId: anim.fightguy.crouch
+    _clip: {fileID: 7400000, guid: ec85ad82fa4577ab0908d4e873fdace2, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.fightguy.crouch
+  - _semanticId: anim.fightguy.slide
+    _clip: {fileID: 7400000, guid: ec85ad82fa4577ab0908d4e873fdace2, type: 2}
+    _extrapolation: 0
+    _poseTrackId: pose.fightguy.slide
   _presentations: []

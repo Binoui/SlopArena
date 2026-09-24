@@ -24,6 +24,8 @@ namespace SlopArena.Shared.Abilities
     /// </summary>
     public class FightGuyRisingKick : ServerAbility
     {
+        public override bool OwnsVerticalMotion => true;
+
         private readonly CookedRisingDragonCapabilityParameters _parameters;
         private ushort _ticks;
         private bool _airborne;
@@ -33,6 +35,9 @@ namespace SlopArena.Shared.Abilities
 
         public override void OnStart(ref CharacterState s, CharacterDefinition def)
         {
+            ClearVelocityOwnership(ref s);
+            s.IsFastFalling = false;
+
             _ticks = 0;
             _airborne = !s.IsGrounded;
             s.FacingYaw = s.AimYaw;
@@ -50,6 +55,8 @@ namespace SlopArena.Shared.Abilities
 
         public override void Tick(ref CharacterState s, ref InputState input, CharacterDefinition def)
         {
+            ClearVelocityOwnership(ref s);
+            s.IsFastFalling = false;
             _ticks++;
             if (_ticks < _parameters.RiseDelay)
                 return;
