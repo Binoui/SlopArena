@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:8.0.425-bookworm-slim AS build
+WORKDIR /src
+COPY src/Shared/SlopArena.Shared.csproj src/Shared/
+COPY src/Shared/Directory.Build.props src/Shared/
+COPY src/Server/SlopArena.Server.csproj src/Server/
+RUN dotnet restore src/Server/SlopArena.Server.csproj -r linux-x64
+COPY src/Shared/ src/Shared/
+COPY src/Server/ src/Server/
+COPY content-cooked/ content-cooked/
+# Shared's normal build target copies its DLL to the Unity plugin path.
+RUN mkdir -p client/Unity/Assets/Plugins/SlopArena.Shared && \
+    dotnet publish src/Server/SlopArena.Server.csproj -c Release -r linux-x64 \
+      --self-contained false --no-restore -o /publish && \
+    rm /publish/server.json
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0.31-bookworm-slim
+ARG SOURCE_REVISION
+ARG RELEASE_ID
+LABEL org.opencontainers.image.source="https://github.com/Binoui/SlopArena" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.opencontainers.image.version="${RELEASE_ID}" \
+      org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/runtime:8.0.31-bookworm-slim"
+WORKDIR /app
+COPY --from=build /publish/ ./
+COPY data/arenas/ ./data/arenas/
+USER 1654:1654
+# Supply an absolute config path at runtime. No dev defaults or source mounts.
+ENTRYPOINT ["dotnet", "SlopArena.Server.dll"]

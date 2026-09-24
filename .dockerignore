@@ -1,0 +1,15 @@
+*
+!src/
+!src/Shared/
+!src/Shared/**
+!src/Server/
+!src/Server/**
+!content-cooked/
+!content-cooked/**
+!data/
+!data/arenas/
+!data/arenas/*.arena
+**/bin/
+**/obj/
+artifacts/
+!Dockerfile.gameserver

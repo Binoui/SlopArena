@@ -65,6 +65,42 @@ gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
 
 Send the release URL to friends. They download → unzip → run → Training or Join.
 
+## Off-site image packaging (not a home deploy)
+
+`.github/workflows/gameserver-image.yml` runs on explicit dispatch from `main`
+(`release_id` required) or a published release. It tests Shared and Server,
+builds a Linux amd64 image, then starts the image with only an external test
+config: a real match-start request must load `slop_court` and validate the
+admitted cooked catalog. Only then does it push
+`ghcr.io/binoui/sloparena-gameserver:<game-source-sha>`; no `latest` tag is
+published. The image includes the published runtime, all cooked packages
+selected by `content-cooked/roster/manifest.json`, and `data/arenas/*.arena`.
+The runtime base is .NET 8.0.31; the build SDK is 8.0.425.
+
+The job uploads `gameserver-image.txt` with the image digest, source revision,
+runtime/SDK patches, and operator release ID. Pair it with the independently
+published Master image/migration record from the Master repository under the
+**same operator release ID**; retain both source SHAs and immutable digests in
+the operator-controlled release record. Do not deploy tags or combine images
+from unrelated schema revisions without checking compatibility. Publishing
+does not change home services, player DNS, or the client endpoint.
+
+For a local image-only check with Docker access:
+
+```bash
+docker build --platform linux/amd64 -f Dockerfile.gameserver \
+  --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
+  --build-arg RELEASE_ID=local-test -t sloparena-gameserver:local-test .
+scripts/smoke-gameserver-image.sh sloparena-gameserver:local-test
+```
+
+Production starts with an operator-owned read-only `server.json` at an
+absolute path supplied as the container argument. Set `arenaDataDir` to
+`data/arenas` and supply the required public/control configuration externally;
+the image deliberately contains no development `server.json`. Deployment,
+restricted ingress, credentials, and health/re-registration changes belong
+to separate issues; this image alone must not be exposed publicly.
+
 ## CI
 
 - This repo (`.github/workflows/ci.yml`): on push to main + PR — build

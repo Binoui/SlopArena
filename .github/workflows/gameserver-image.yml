@@ -1,0 +1,74 @@
+name: GameServer image
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Operator release identity (no latest)
+        required: true
+        type: string
+  release:
+    types: [published]
+
+jobs:
+  image:
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test Shared and GameServer
+        run: |
+          dotnet test tests/Shared.Tests/ --nologo
+          dotnet test tests/Server.Tests/ --nologo
+      - uses: docker/setup-buildx-action@v3
+      - name: Identify release
+        id: release
+        env:
+          INPUT_ID: ${{ inputs.release_id }}
+          REF_ID: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          id="${REF_ID:-$INPUT_ID}"
+          if [[ ! "$id" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$ ]]; then
+            echo 'Invalid release identity' >&2; exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPOSITORY,,}-gameserver" >> "$GITHUB_OUTPUT"
+      - name: Build Linux amd64 image
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+        run: |
+          docker buildx build --platform linux/amd64 --load -f Dockerfile.gameserver \
+            --build-arg SOURCE_REVISION="$GITHUB_SHA" --build-arg RELEASE_ID="$RELEASE_ID" \
+            -t "$IMAGE:$GITHUB_SHA" .
+      - name: Smoke fresh image without source mounts
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+        run: scripts/smoke-gameserver-image.sh "$IMAGE:$GITHUB_SHA"
+      - name: Push only after tests and smoke
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ steps.release.outputs.image }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+      - name: Record exact published identity
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+        run: |
+          digest="$(docker image inspect "$IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
+          test -n "$digest"
+          printf 'release_id=%s\ngameserver_image=%s\ngameserver_revision=%s\ngameserver_runtime=8.0.31\ngameserver_sdk=8.0.425\n' \
+            "$RELEASE_ID" "$digest" "$GITHUB_SHA" > gameserver-image.txt
+          cat gameserver-image.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gameserver-image-${{ github.sha }}
+          path: gameserver-image.txt
