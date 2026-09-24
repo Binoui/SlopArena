@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using SlopArena.Shared;
 using SlopArena.Client.Input;
+using SlopArena.Client.Network;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace SlopArena.Client.UI
@@ -17,10 +17,8 @@ namespace SlopArena.Client.UI
     ///    Camera.WorldToScreenPoint → RuntimePanelUtils.ScreenToPanel. Panels are
     ///    built at runtime from the roster, so 1v1, 2/3/4-player PvP all adapt
     ///    with no per-count UXML variants.
-    ///  • Action bar — the local player's cooldowns: Dash + abilities 1-4 + A/E/R/F
-    ///    + Burst (doc §2). Key labels are read live from InputBindings; slot and
-    ///    cooldown data come from the client-side simulation state (read-only —
-    ///    the UI never drives gameplay).
+    ///  • Action bar — the local player's cooldowns: Dash + canonical abilities 1–4/A/E/R/F.
+    ///    Labels use effective Input System bindings; cooldown data remains read-only.
     ///
     /// Juice (spec §3.2): cooldown-ready pulse (1.15x / 0.15s) + white flash,
     /// persistent burst glow while available, and a damage-taken hit-flash on the
@@ -96,9 +94,9 @@ namespace SlopArena.Client.UI
         {
             public readonly string Name;
             public readonly int SlotIndex; // GetSlotAbility index == cooldown index (0-10)
-            public readonly BindableAction Action;
+            public readonly string Action;
 
-            public AbilitySlotDef(string name, int slotIndex, BindableAction action)
+            public AbilitySlotDef(string name, int slotIndex, string action)
             {
                 Name = name;
                 SlotIndex = slotIndex;
@@ -109,19 +107,19 @@ namespace SlopArena.Client.UI
         /// <summary>
         /// The action bar's ability slots, in doc §2 order: abilities 1-4 then A/E/R/F.
         /// SlotIndex is the AbilitySlots/cooldown index (key "1" = 2 … key "A" = 10).
-        /// LMB/RMB and the dead Slot5 are intentionally excluded (they are not
-        /// ability slots in the current re-tier; key "5" has no kit data).
+        /// LMB/RMB remain utility controls, and the former extra key position is outside the
+        /// canonical action grid, so neither is shown as an ability slot.
         /// </summary>
         private static readonly AbilitySlotDef[] AbilitySlotDefs =
         {
-            new("ab-1", 2, BindableAction.Slot1),
-            new("ab-2", 6, BindableAction.Slot2),
-            new("ab-3", 7, BindableAction.Slot3),
-            new("ab-4", 8, BindableAction.Slot4),
-            new("ab-a", 10, BindableAction.SlotA),
-            new("ab-e", 3, BindableAction.SlotE),
-            new("ab-r", 4, BindableAction.SlotR),
-            new("ab-f", 5, BindableAction.SlotF),
+            new("ab-1", 2, "Slot1"),
+            new("ab-2", 6, "Slot2"),
+            new("ab-3", 7, "Slot3"),
+            new("ab-4", 8, "Slot4"),
+            new("ab-a", 10, "SlotA"),
+            new("ab-e", 3, "SlotE"),
+            new("ab-r", 4, "SlotR"),
+            new("ab-f", 5, "SlotF"),
         };
 
         // Stock icons beyond this many become a "×N" count label instead (MaxStocks ≤ 99).
@@ -155,7 +153,6 @@ namespace SlopArena.Client.UI
         private ulong _localEntityId;
         private int _maxStocks;
         private CharacterDefinition _charDef;
-        private InputBindings _bindings;
         private UnityEngine.Camera _camera;
         private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
@@ -164,6 +161,8 @@ namespace SlopArena.Client.UI
             => _uiDocument != null
                 ? _uiDocument.rootVisualElement.Q<VisualElement>("target-lock-indicator")
                 : null;
+        private Label _networkStatsLabel;
+        private NetworkClient _networkClient;
 
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
@@ -194,7 +193,6 @@ namespace SlopArena.Client.UI
             _getState = getState;
             _maxStocks = Mathf.Max(0, maxStocks);
             _localEntityId = 0;
-            _bindings = Resources.Load<InputBindings>("InputBindings");
 
             if (_uiDocument == null)
             {
@@ -208,6 +206,14 @@ namespace SlopArena.Client.UI
             var cam = UnityEngine.Camera.main ?? FindFirstObjectByType<UnityEngine.Camera>();
             if (cam != null)
                 _textVfx.SetCamera(cam);
+            _networkClient = FindFirstObjectByType<NetworkClient>();
+            _networkStatsLabel = new Label();
+            _networkStatsLabel.style.position = Position.Absolute;
+            _networkStatsLabel.style.right = 18;
+            _networkStatsLabel.style.top = 12;
+            _networkStatsLabel.style.color = Color.white;
+            _networkStatsLabel.style.unityTextAlign = TextAnchor.UpperRight;
+            root.Add(_networkStatsLabel);
             _overheadLayer = root.Q<VisualElement>("overhead-layer");
             _billboardLayer = root.Q<VisualElement>("player-billboard");
             _actionBar = root.Q<VisualElement>("action-bar");
@@ -260,11 +266,10 @@ namespace SlopArena.Client.UI
                     $"{d.Name}-cooldown", $"{d.Name}-timer", $"{d.Name}-key", $"{d.Name}-flash");
             }
 
-            // Live key labels from the remappable bindings.
-            _dashSlot.Key.text = KeyLabel(GetBoundKey(BindableAction.Dash));
-            _burstSlot.Key.text = KeyLabel(GetBoundKey(BindableAction.Burst));
+            _dashSlot.Key.text = HumanInputActions.BindingLabel("Dash", HumanInputActions.KeyboardGroup);
+            _burstSlot.Key.text = HumanInputActions.BindingLabel("Burst", HumanInputActions.KeyboardGroup);
             for (int i = 0; i < AbilitySlotDefs.Length; i++)
-                _abilitySlots[i].Key.text = KeyLabel(GetBoundKey(AbilitySlotDefs[i].Action));
+                _abilitySlots[i].Key.text = HumanInputActions.BindingLabel(AbilitySlotDefs[i].Action, HumanInputActions.KeyboardGroup);
         }
 
         private OverheadPanel BuildOverheadPanel(HudPlayer p, int colorIndex)
@@ -581,6 +586,7 @@ namespace SlopArena.Client.UI
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
+            UpdateNetworkStats();
 
             if (_dashSlot != null) TickSlotJuice(_dashSlot, dt);
             if (_burstSlot != null) TickSlotJuice(_burstSlot, dt);
@@ -590,6 +596,29 @@ namespace SlopArena.Client.UI
                 TickPanelJuice(panel, dt);
             foreach (var panel in _billboardPanels.Values)
                 TickPanelJuice(panel, dt);
+        }
+        private void UpdateNetworkStats()
+        {
+            if (_networkStatsLabel == null) return;
+            int mode = ClientSettingsService.Instance.NetworkStats;
+            _networkStatsLabel.style.display = mode == 0 ? DisplayStyle.None : DisplayStyle.Flex;
+            if (mode == 0) return;
+            if (_networkClient == null)
+            {
+                _networkStatsLabel.text = "NETWORK: OFFLINE";
+                return;
+            }
+            if (!_networkClient.IsServerConnected)
+            {
+                _networkStatsLabel.text = "NETWORK: DISCONNECTED";
+                return;
+            }
+            float? ping = _networkClient.LastPingMilliseconds;
+            _networkStatsLabel.text = !ping.HasValue
+                ? "PING: MEASURING…"
+                : mode == 1
+                    ? $"PING: {ping.Value:F0} ms"
+                    : $"PING: {ping.Value:F0} ms\nSERVER: {_networkClient.ServerEndpoint}\nTICK: {_networkClient.LastPingServerTick}";
         }
 
         private static void TickPanelJuice(OverheadPanel panel, float dt)
@@ -685,24 +714,6 @@ namespace SlopArena.Client.UI
 
         // ── Small helpers ───────────────────────────────────────────────────
 
-        private Key GetBoundKey(BindableAction action)
-            => _bindings != null ? _bindings.GetKey(action) : InputBindings.DefaultKey(action);
-
-        private static string KeyLabel(Key key)
-        {
-            if (key >= Key.A && key <= Key.Z)
-                return ((char)((int)key - (int)Key.A + 'A')).ToString();
-            if (key >= Key.Digit0 && key <= Key.Digit9)
-                return ((char)((int)key - (int)Key.Digit0 + '0')).ToString();
-            return key switch
-            {
-                Key.LeftShift => "Shift",
-                Key.RightShift => "R-Shift",
-                Key.Space => "Space",
-                Key.None => "?",
-                _ => key.ToString(),
-            };
-        }
 
         /// <summary>Damage-percent tier colors (spec §3.1): white &lt;40, orange 40-89, crimson 90+.</summary>
         private static Color DamageColor(int percent)

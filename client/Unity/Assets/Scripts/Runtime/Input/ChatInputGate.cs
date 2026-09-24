@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.SceneManagement;
+using SlopArena.Client.UI;
 
 namespace SlopArena.Client.Input
 {
@@ -70,14 +71,13 @@ namespace SlopArena.Client.Input
         }
         private static bool IsChatOpenPressedThisFrame()
         {
-            if (!IsGameplayScene)
+            if (!IsGameplayScene || HumanInputActions.IsCapturing ||
+                SettingsOverlay.Active is { IsOpen: true } || MatchPauseMenu.Active is { IsPaused: true })
                 return false;
 
             var keyboard = Keyboard.current;
-            return (keyboard != null &&
-                    (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) ||
-                   UnityEngine.Input.GetKeyDown(KeyCode.Return) ||
-                   UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter);
+            return keyboard != null &&
+                   (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame);
         }
 
         /// <summary>Begin composing. Idempotent so focus callbacks can safely repeat it.</summary>

@@ -83,7 +83,7 @@ public class DownActionTests
     {
         var sim = Ground(x * 2f * Run, z * 2f * Run);
         var state = Tick(sim, new InputState { Down = true, DownPressed = true, MoveX = -1, FaceToCamera = true, AimYaw = 9000 });
-        float expected = Run * (DownActionTuning.EntryCapRatio - 2f / 60f);
+        float expected = Run * (DownActionTuning.EntryCapRatio - DownActionTuning.Default.SlideDecelerationRatio / 60f);
         Assert.Equal(ActionState.Sliding, state.State);
         TestHelpers.AssertNear(x * expected, state.VX);
         TestHelpers.AssertNear(z * expected, state.VZ);
@@ -193,7 +193,7 @@ public class DownActionTests
         Assert.False(landed.IsFastFalling);
         Assert.Equal(Def.Movement.MaxJumps, landed.JumpsLeft);
         var next = Tick(held, Hold);
-        TestHelpers.AssertNear(landed.VX - 2f * Run / 60f, next.VX);
+        TestHelpers.AssertNear(landed.VX - DownActionTuning.Default.SlideDecelerationRatio * Run / 60f, next.VX);
         TestHelpers.AssertNear(landed.PX + next.VX / 60f, next.PX);
         Assert.Empty(held.LastTickTouchdowns);
     }

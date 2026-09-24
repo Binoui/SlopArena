@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 using SlopArena.Client.Camera;
 using SlopArena.Client.Input;
@@ -20,19 +19,23 @@ namespace SlopArena.Client.UI
     {
         private bool _paused;
         private CameraMount? _cameraMount;
+        private bool _freezeSimulation = true;
         private InputController? _inputController;
         private Action? _onLeaveMatch;
         private VisualElement? _panel;
         private VisualElement? _leftSection;
+        private SettingsOverlay? _settingsOverlay;
 
-        /// <summary>True while the pause menu is open (gameplay frozen).</summary>
+        /// <summary>True while the match menu owns local gameplay input.</summary>
         public bool IsPaused => _paused;
-
-        public void Init(CameraMount? cameraMount, InputController? inputController, Action? onLeaveMatch = null, UIDocument? hostDocument = null)
+        public static MatchPauseMenu? Active { get; private set; }
+        public void Init(CameraMount? cameraMount, InputController? inputController, Action? onLeaveMatch = null, UIDocument? hostDocument = null, bool freezeSimulation = true)
         {
+            _freezeSimulation = freezeSimulation;
             _cameraMount = cameraMount;
             _inputController = inputController;
             _onLeaveMatch = onLeaveMatch;
+            Active = this;
             // Explicit host (issue #210): the match's HUD document is passed in
             // rather than discovered as "whichever UIDocument is first".
             var doc = hostDocument != null ? hostDocument : FindFirstObjectByType<UIDocument>();
@@ -41,6 +44,7 @@ namespace SlopArena.Client.UI
                 Debug.LogWarning("[PauseMenu] No UIDocument host for the pause menu — pause menu unavailable.");
                 return;
             }
+            _settingsOverlay = gameObject.GetComponent<SettingsOverlay>() ?? gameObject.AddComponent<SettingsOverlay>();
             BuildPanel(doc.rootVisualElement);
         }
 
@@ -48,8 +52,12 @@ namespace SlopArena.Client.UI
         {
             if (ChatInputGate.SuppressShortcuts)
                 return;
+            if (SettingsOverlay.ClosedThisFrame)
+                return;
+            if (SettingsOverlay.Active is { IsOpen: true })
+                return;
 
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (HumanInputActions.Get("Pause").WasPressedThisFrame())
                 SetPaused(!_paused);
         }
 
@@ -57,12 +65,12 @@ namespace SlopArena.Client.UI
         {
             if (_paused == paused) return;
             _paused = paused;
-
-            // Freeze the sim: it ticks only in FixedUpdate, which timeScale=0 stops.
-            Time.timeScale = paused ? 0f : 1f;
+            // Local Training/Solo pauses stop simulation; online UI suppresses
+            // local controls while transport and authoritative progress continue.
+            Time.timeScale = paused && _freezeSimulation ? 0f : 1f;
 
             // Discard buffered input so nothing fires on the first frame after resume.
-            if (paused) _inputController?.ClearPendingFrameState();
+            _inputController?.RequireReleaseBeforeHumanInput();
 
             if (_cameraMount != null)
             {
@@ -138,6 +146,7 @@ namespace SlopArena.Client.UI
             title.style.marginBottom = 20;
             box.Add(title);
 
+            box.Add(MakeButton("SETTINGS", OpenSettings));
             box.Add(MakeButton("RESUME", () => SetPaused(false)));
             box.Add(MakeButton("LEAVE MATCH", LeaveMatch));
             box.Add(MakeButton("QUIT GAME", QuitGame));
@@ -157,6 +166,15 @@ namespace SlopArena.Client.UI
             btn.style.marginBottom = 10;
             return btn;
         }
+        private void OpenSettings()
+        {
+            var host = _panel?.parent;
+            if (_settingsOverlay == null || host == null)
+                return;
+            UISFX.PlayClick();
+            _settingsOverlay.Open(host);
+        }
+
 
         private void LeaveMatch()
         {
@@ -182,6 +200,7 @@ namespace SlopArena.Client.UI
             Time.timeScale = 1f;
             if (_paused)
                 UiModalState.Pop(); // match scene unload while paused (issue #214)
+            if (Active == this) Active = null;
         }
     }
 }

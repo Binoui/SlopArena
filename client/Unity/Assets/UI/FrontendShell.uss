@@ -190,10 +190,11 @@
     white-space: nowrap;
 }
 
-/* Reserved slot: renders nothing until a working settings surface exists. */
+/* The Settings action fills the shell's reserved top-bar slot. */
 .shell-settings-slot {
-    width: 0;
-    min-width: 0;
+    width: auto;
+    min-width: auto;
+    margin-left: 12px;
 }
 
 /* ── Workspace and page hosts ─────────────────────────────────────────── */
@@ -413,6 +414,7 @@
     flex-shrink: 0;
     flex-direction: column;
     align-items: flex-start;
+    position: relative;
 }
 
 .menu-header-section .menu-title-wrap {
@@ -453,6 +455,69 @@
 
 .frontend-shell--compact .menu-copy {
     font-size: 14px;
+}
+
+.menu-showcase {
+    position: absolute;
+    top: 16px;
+    right: 0;
+    width: 58%;
+    height: 390px;
+    align-items: stretch;
+}
+
+.menu-showcase-count {
+    margin-bottom: 10px;
+    color: rgb(255, 200, 33);
+    font-size: 13px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+}
+
+.menu-roster-art {
+    flex-grow: 1;
+    min-height: 0;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.menu-roster-card {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    margin-left: 8px;
+    background-color: rgb(35, 30, 40);
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(224, 92, 42);
+    overflow: hidden;
+}
+
+.menu-roster-portrait {
+    flex-grow: 1;
+    min-height: 0;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.menu-roster-name {
+    min-height: 42px;
+    padding-left: 10px;
+    background-color: rgb(28, 25, 33);
+    color: rgb(240, 238, 232);
+    font-size: 16px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+}
+
+.frontend-shell--compact .menu-showcase {
+    top: 12px;
+    height: 280px;
+}
+
+.frontend-shell--compact .menu-roster-name {
+    min-height: 32px;
+    font-size: 12px;
 }
 
 .menu-body-section {
@@ -565,21 +630,23 @@
    230px minimum (SlopArena.uss); the body scrolls only when still too
    tight, with the primary action always reachable (issue #219). */
 .char-body-section .char-card {
-    min-height: 200px;
+    min-height: 255px;
+    max-width: 340px;
 }
 .char-body-section .char-grid {
     flex-grow: 1;
-    min-height: 200px;
+    min-height: 255px;
 }
 
 .char-body-section .selection-copy {
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
+    min-height: 42px;
 }
 
 .char-select-frag .char-name {
-    font-size: 22px;
+    font-size: 19px;
 }
 
 .frontend-shell--compact .char-select-frag .char-name {
@@ -588,8 +655,13 @@
 
 .char-select-frag .char-role {
     margin-top: 2px;
-    font-size: 14px;
+    font-size: 13px;
 }
+.frontend-shell--compact .char-body-section .char-card,
+.frontend-shell--compact .char-body-section .char-grid {
+    min-height: 190px;
+}
+
 
 .char-summary-section {
     flex-shrink: 0;
@@ -680,6 +752,15 @@
     flex-grow: 1;
     min-height: 0;
 }
+.stage-body-section .stage-grid {
+    width: 82%;
+    margin-left: auto;
+}
+
+.stage-body-section .stage-card {
+    height: 170px;
+}
+
 
 .stage-summary-section {
     flex-shrink: 0;
@@ -725,6 +806,10 @@
     width: 30%;
     height: 150px;
 }
+.frontend-shell--compact .stage-body-section .stage-grid {
+    width: 100%;
+}
+
 
 .frontend-shell--compact .stage-summary-section .stage-player-cards .player-card {
     width: 140px;
@@ -774,6 +859,10 @@
     flex-grow: 1;
     flex-direction: column;
 }
+.browser-body-section .browser-tools {
+    width: 420px;
+}
+
 
 .browser-summary-section {
     flex-grow: 1;
@@ -825,15 +914,15 @@
 }
 
 .frontend-shell--compact .browser-body-section .browser-layout {
-    flex-direction: column;
-    overflow: auto;
+    flex-direction: row;
+    overflow: hidden;
 }
 
 .frontend-shell--compact .browser-body-section .browser-tools {
-    width: auto;
-    min-width: 0;
-    margin-left: 0;
-    margin-top: 12px;
+    width: 300px;
+    min-width: 300px;
+    margin-left: 12px;
+    margin-top: 0;
 }
 
 .frontend-shell--compact .browser-actions-section .btn-hot,

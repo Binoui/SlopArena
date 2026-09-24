@@ -74,15 +74,16 @@ for the trusted built-in Bonk profile; Workshop content cannot use it.
 Assets remain in the existing shared Bonk art tree, matching the FightGuy/Kistu convention,
 with their Unity `.meta` files preserved:
 
-- `Assets/Art/Characters/bonk/bonk.FBX`.
+- `Assets/Art/Characters/bonk/Models/bonk.fbx`.
 - `Assets/Art/Characters/bonk/Animations/idle.FBX`, `run.FBX`, `jump_start.FBX`,
   `jump_loop.FBX`, and `jump_end.FBX`.
 - `Assets/Art/Characters/bonk/Animations/bonk_g_1.FBX` through `bonk_g_4.FBX`.
 - `Assets/Art/Characters/bonk/Animations/bonk_a_1.FBX`, `bonk_a_3.FBX`, and `bonk_a_4.FBX`.
 - `Assets/Art/Characters/bonk/Animations/bonk_spell_e.FBX` and `bonk_spell_f.FBX`.
 
-The Bonk sword is `Assets/Art/Characters/bonk/Modeling_Weapon_Big_Sword.FBX` and is
-referenced by `BonkWeaponAttachConfig.asset`. The package now declares `_weapon_hilt` and
+The equipped Bonk sword is `Assets/Art/Characters/bonk/Prefabs/bonk_sword.prefab`,
+sourced from `Assets/Art/Characters/bonk/Models/bonk_sword.fbx` and referenced by
+`BonkWeaponAttachConfig.asset`. The package now declares `_weapon_hilt` and
 `_weapon_tip` attachment points and its probe slash uses a baked hilt-to-tip capsule.
 The package weapon config attaches the sword to the source rig's `hand_r` bone.
 Source licensing remains an approval prerequisite before release, not before the

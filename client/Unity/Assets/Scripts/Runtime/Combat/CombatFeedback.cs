@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SlopArena.Client.Entities;
 using SlopArena.Client.Simulation;
 using SlopArena.Shared;
+using SlopArena.Client.UI;
 using UnityEngine;
 
 namespace SlopArena.Client.Combat
@@ -51,6 +52,7 @@ namespace SlopArena.Client.Combat
                     hit.OwnerEntityId, out var character)
                     ? character
                     : CharacterClass.FightGuy);
+                ClientSettingsService.Instance.PlayConfirmedImpact();
             }
         }
 

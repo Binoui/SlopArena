@@ -52,6 +52,8 @@ namespace SlopArena.Client.Combat
         /// both horizontal AND vertical mouse movement rotate it naturally (1:1 with the mouse).
         /// </summary>
         private Vector2 _aimScreenOffset;
+        private Vector2 _controllerCursorPosition;
+        private bool _controllerCursorActive;
         /// <summary>Dead zone radius (px) — below this the aim keeps its last direction.</summary>
         private const float AimScreenDeadZone = 20f;
         /// <summary>Max cursor offset (px) — clamps runaway spin while keeping the angle.</summary>
@@ -123,6 +125,8 @@ namespace SlopArena.Client.Combat
             _lastAimPitchRad = 0f;
             _lastAimDistanceCm = 0;
             _aimScreenOffset = Vector2.zero;
+            _controllerCursorPosition = Vector2.zero;
+            _controllerCursorActive = false;
             _hasGroundAimTarget = false;
             ShowCrosshair = false;
         }
@@ -138,7 +142,9 @@ namespace SlopArena.Client.Combat
             CharacterDefinition charDef,
             InputController inputController)
         {
-            if (ChatInputGate.SuppressGameplay)
+            if (ChatInputGate.SuppressGameplay || SettingsOverlay.Active is { IsOpen: true } ||
+                SettingsOverlay.ClosedThisFrame || HumanInputActions.IsCapturing ||
+                MatchPauseMenu.Active is { IsPaused: true })
                 return AimContext.None;
 
             // ── 1. Resolve active aim spec ──
@@ -193,10 +199,15 @@ namespace SlopArena.Client.Combat
                 if (_activeMode == CameraMode.Aiming)
                     _aimCameraMount?.Deactivate();
 
-                // Entering GroundCursor — freeze orbital at current angles (cursor controls ground marker)
+                // Entering GroundCursor — preserve mouse position or seed a virtual cursor.
                 if (desired == CameraMode.FreeCursor)
+                {
                     _cameraMount?.FreezeAtCurrentAngles();
-
+                    _controllerCursorPosition = Mouse.current != null
+                        ? Mouse.current.position.ReadValue()
+                        : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                    _controllerCursorActive = Mouse.current == null;
+                }
                 // Entering Frozen (GroundVector) — freeze the camera; mouse delta rotates the
                 // aim direction instead. Inherit the current view yaw as the initial aim.
                 if (desired == CameraMode.Frozen)
@@ -256,9 +267,14 @@ namespace SlopArena.Client.Combat
             {
                 // Screen-space aim: the direction follows the mouse like a hidden cursor
                 // anchored at the character's screen position. Horizontal AND vertical mouse
-                // movement rotate the indicator naturally (1:1 on screen), instead of a raw
-                // yaw delta which only used horizontal input.
-                _aimScreenOffset += Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
+                // movement rotate it naturally (1:1 on screen), instead of a yaw-only delta.
+                Vector2 delta = HumanInputActions.MouseLook.ReadValue<Vector2>()
+                    + HumanInputActions.StickLook.ReadValue<Vector2>() * (600f * Time.deltaTime);
+                var cameraSettings = ClientSettingsService.Instance;
+                delta *= cameraSettings.CameraInputGain;
+                if (cameraSettings.InvertCameraHorizontal) delta.x = -delta.x;
+                if (cameraSettings.InvertCameraVertical) delta.y = -delta.y;
+                _aimScreenOffset += delta;
                 _aimScreenOffset = Vector2.ClampMagnitude(_aimScreenOffset, AimScreenMaxOffset);
                 if (_aimScreenOffset.sqrMagnitude > AimScreenDeadZone * AimScreenDeadZone)
                 {
@@ -307,11 +323,15 @@ namespace SlopArena.Client.Combat
 
                 if (aimMode == AimMode.CameraForward3D && _aimCameraMount != null)
                 {
-                    Vector2 delta = Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
+                    Vector2 delta = HumanInputActions.MouseLook.ReadValue<Vector2>()
+                        + HumanInputActions.StickLook.ReadValue<Vector2>() * (600f * Time.deltaTime);
+                    var cameraSettings = ClientSettingsService.Instance;
+                    if (cameraSettings.InvertCameraHorizontal) delta.x = -delta.x;
+                    if (cameraSettings.InvertCameraVertical) delta.y = -delta.y;
                     _aimCameraMount.Tick(_characterTransform);
                     bool horizontalOnly = charDef.Class == CharacterClass.Manki
                         && (byte)(_aimingSlot + 1) == AbilitySlots.F;
-                    _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity, !horizontalOnly);
+                    _aimCameraMount.ApplyMouseDelta(delta, _aimSensitivity * cameraSettings.CameraInputGain, !horizontalOnly);
 
                     _lastAimYawRad = _aimCameraMount.GetAimYawRad();
                     _lastAimPitchRad = horizontalOnly ? 0f : _aimCameraMount.GetAimPitchRad();
@@ -366,9 +386,21 @@ namespace SlopArena.Client.Combat
             }
 
             var mouse = Mouse.current;
-            Vector2 mousePos = mouse != null
-                ? mouse.position.ReadValue()
-                : UnityEngine.Input.mousePosition;
+            Vector2 stick = HumanInputActions.StickLook.ReadValue<Vector2>();
+            if (stick.sqrMagnitude > 0.01f)
+            {
+                if (!_controllerCursorActive && mouse != null)
+                    _controllerCursorPosition = mouse.position.ReadValue();
+                _controllerCursorPosition += stick * (700f * Time.deltaTime * ClientSettingsService.Instance.CameraInputGain);
+                _controllerCursorPosition.x = Mathf.Clamp(_controllerCursorPosition.x, 0f, Screen.width);
+                _controllerCursorPosition.y = Mathf.Clamp(_controllerCursorPosition.y, 0f, Screen.height);
+                _controllerCursorActive = true;
+            }
+            else if (HumanInputActions.MouseLook.ReadValue<Vector2>().sqrMagnitude > 0.01f)
+                _controllerCursorActive = false;
+            Vector2 mousePos = _controllerCursorActive
+                ? _controllerCursorPosition
+                : mouse != null ? mouse.position.ReadValue() : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
             var mouseRay = unityCam.ScreenPointToRay(mousePos);
 
             float groundY = 0f;

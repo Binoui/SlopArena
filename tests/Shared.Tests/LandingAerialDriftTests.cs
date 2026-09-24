@@ -5,14 +5,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Aerial landing termination (drift fix): landing while an AIR-STARTED ability is still
-/// active must END the move (back to Idle) so ground friction can stop it — even when the
-/// stage declares no LandingLagTicks. Previously a no-landing-lag aerial (Cyclone R,
-/// Rising Dragon E) kept the character in Attacking on the floor: ProcessNormalMovement is
-/// skipped for Attacking, so zero friction applied, and the move kept writing its lunge
-/// velocity every tick — the character slid across the stage at full speed with only dash
-/// able to stop it. Now the landing frame terminates the aerial unconditionally
-/// (LandingLagTicks just controls the lock length; 0 = end with no lock).
+/// Aerial landing behavior: air-started normals terminate on landing so friction can stop
+/// their drift; aerial specials and explicitly landing-triggered capabilities continue.
 /// </summary>
 public class LandingAerialDriftTests
 {
@@ -69,41 +63,29 @@ public class LandingAerialDriftTests
     }
 
     [Fact]
-    public void Cyclone_LandMidMove_EndsOnLanding_NoSlide()
+    public void Cyclone_LandMidMove_ContinuesUntilNaturalEnd()
     {
-        var (pz, vz, states, grounded) = LandMidAerial(AbilitySlots.R, aerialStartTick: 28, releaseTick: 48, totalTicks: 120);
+        var (_, _, states, grounded) = LandMidAerial(AbilitySlots.R, aerialStartTick: 28, releaseTick: 48, totalTicks: 120);
 
         int takeoff = FirstTakeoff(grounded);
         int landing = FirstLanding(grounded, takeoff);
         Assert.True(landing > 0, "should land");
+        Assert.Equal(ActionState.Attacking, states[landing]);
 
-        // On the landing frame the aerial ends: state returns to Idle immediately.
-        Assert.Equal(ActionState.Idle, states[landing]);
-
-        // Momentum is preserved (ADR-0015) but friction resumes: velocity decays to zero
-        // within a bounded window — it must NOT persist at the lunge speed (previously 17).
-        float vzAtLanding = vz[landing];
-        Assert.True(vzAtLanding > 0f, "should retain lunge momentum on landing");
-
-        // 30 ticks after landing the character must be substantially stopped (friction),
-        // not still sliding at full lunge speed.
-        int stopCheck = Math.Min(landing + 30, states.Count - 1);
-        Assert.True(vz[stopCheck] < 2f,
-            $"landing must brake the lunge drift: vz[{stopCheck}]={vz[stopCheck]:F2}");
+        int end = states.FindIndex(landing, s => s != ActionState.Attacking);
+        Assert.True(end > landing, "special should end on its timeline, not touchdown");
     }
 
     [Fact]
     public void AirNormal_LandMidMove_StillEndsOnLanding()
     {
-        // Double Punch (air key 1) declares LandingLagTicks=9 — must still terminate on
-        // landing (pre-existing behavior preserved).
-        var (pz, vz, states, grounded) = LandMidAerial(AbilitySlots.Slot1, aerialStartTick: 40, releaseTick: 60, totalTicks: 100);
+        var (_, vz, states, grounded) = LandMidAerial(AbilitySlots.Slot1, aerialStartTick: 40, releaseTick: 60, totalTicks: 100);
 
         int takeoff = FirstTakeoff(grounded);
         int landing = FirstLanding(grounded, takeoff);
         Assert.True(landing > 0, "should land");
         Assert.Equal(ActionState.Idle, states[landing]);
-        Assert.Equal(0f, vz[landing]); // landing lag plants the aerial
+        Assert.Equal(0f, vz[landing]);
     }
 
     /// <summary>All four Kistu air normals (keys 1-4): none may drift after landing.</summary>

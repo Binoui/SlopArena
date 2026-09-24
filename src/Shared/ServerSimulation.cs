@@ -562,9 +562,11 @@ namespace SlopArena.Shared
 			if (state.VY > 0f) return;                    // ledge snap boost, not a landing
 			if (state.State != ActionState.Attacking && state.State != ActionState.Aiming) return;
 			if (state.AttackSlot == 0 || state.LandingLagTicks > 0) return;
-			// Only AIR-started moves terminate on landing (drift fix). A ground move launched
-			// and landed mid-move keeps its ground behavior — no termination.
+			// Only AIR-started moves terminate on landing (drift fix). Specials continue their
+			// aerial timeline on the ground; a ground move keeps its own ground behavior.
 			if (activeAbility == null || !activeAbility.AirborneAtStart) return;
+			if (state.AttackSlot is AbilitySlots.A or AbilitySlots.E or AbilitySlots.R or AbilitySlots.F)
+				return;
 			// Some capabilities deliberately use landing as their action trigger. They must
 			// survive this frame so their next tick can transition into the landing action.
 			if (activeAbility is CookedTimelineAbility landingContinuation

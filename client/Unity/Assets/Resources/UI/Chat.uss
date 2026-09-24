@@ -470,6 +470,13 @@
     border-width: 1px;
     border-color: rgba(240, 238, 232, 0.22);
 }
+.chat-empty {
+    padding: 8px;
+    color: var(--chat-paper);
+    font-size: 12px;
+    white-space: normal;
+}
+
 
 .chat-message {
     min-height: 30px;

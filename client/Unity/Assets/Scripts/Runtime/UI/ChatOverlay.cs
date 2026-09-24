@@ -648,6 +648,7 @@ namespace SlopArena.Client.UI
                 _pinnedNewest[key] = true;
             Vector2 oldOffset = changedConversation ? GetScrollOffset(key) : _history.scrollOffset;
             _history.Clear();
+            bool hasMessages = false;
 
             if (active == null)
             {
@@ -661,6 +662,15 @@ namespace SlopArena.Client.UI
                 if (!_session.IsMessageVisible(message))
                     continue;
                 _history.Add(BuildMessageRow(message));
+                hasMessages = true;
+            }
+            if (!hasMessages)
+            {
+                var empty = new Label(_session.IsConnected
+                    ? "NO MESSAGES YET"
+                    : "CHAT NOT CONNECTED // Solo and Training still work.");
+                empty.AddToClassList("chat-empty");
+                _history.Add(empty);
             }
 
             _lastConversationKey = active.Key;
@@ -685,7 +695,7 @@ namespace SlopArena.Client.UI
                 // The directory view replaces history while it is shown, so
                 // the return-to-newest affordance stays hidden with it
                 // (issue #220).
-                _newest?.SetDisplayed(!atNewest && _history.childCount > 0 && !_showDirectory);
+                _newest?.SetDisplayed(!atNewest && hasMessages && !_showDirectory);
                 TryMarkActiveRead();
             }).StartingIn(0);
 

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Buffers.Binary;
 using SlopArena.Shared;
 using SlopArena.Shared.Rollback;
 namespace SlopArena.Server
@@ -233,6 +234,28 @@ namespace SlopArena.Server
 
 					var remoteEP = new IPEndPoint(IPAddress.Any, 0);
 					byte[] data = _udpServer.Receive(ref remoteEP);
+					if (data.Length == 12 &&
+						data[0] == (byte)'P' && data[1] == (byte)'I' &&
+						data[2] == (byte)'N' && data[3] == (byte)'G')
+					{
+						var admitted = false;
+						foreach (var admittedSlot in _slots)
+							if (!admittedSlot.Disconnected && admittedSlot.EndPoint != null && admittedSlot.EndPoint.Equals(remoteEP))
+							{
+								admitted = true;
+								break;
+							}
+						if (!admitted) continue;
+						byte[] pong = new byte[16];
+						pong[0] = (byte)'P'; pong[1] = (byte)'O';
+						pong[2] = (byte)'N'; pong[3] = (byte)'G';
+						data.AsSpan(4, 8).CopyTo(pong.AsSpan(4, 8));
+						BinaryPrimitives.WriteUInt32LittleEndian(pong.AsSpan(12, 4), _serverTick);
+						_udpServer.Send(pong, pong.Length, remoteEP);
+						continue;
+					}
+
+					
 
 					// Uplink packet is exactly entityId(8) + tick(4) + InputState(21).
 					// Decode and validate the complete current protocol before any endpoint,

@@ -1,3 +1,4 @@
+using SlopArena.Client.UI;
 using System.Collections.Generic;
 
 using SlopArena.Shared;
@@ -34,6 +35,7 @@ namespace SlopArena.Client.Combat
         private float _holdDuration;
         private float _fadeDuration;
         private float _endScale;
+        private float _flashOpacity = 1f;
 
         public static void Prewarm()
         {
@@ -106,6 +108,7 @@ namespace SlopArena.Client.Combat
                 localLaunch = Vector2.right;
             localLaunch.Normalize();
 
+            _flashOpacity = ClientSettingsService.Instance.ReducedFlashing ? 0.48f : 1f;
             BuildMesh(tier, localLaunch);
             _age = 0f;
             _holdDuration = hit.HitstopTicks * SlopArena.Shared.Simulation.TickDt;
@@ -124,7 +127,7 @@ namespace SlopArena.Client.Combat
                 _ => 2.05f,
             };
 
-            _properties.SetColor("_Color", Color.white);
+            _properties.SetColor("_Color", new Color(1f, 1f, 1f, _flashOpacity));
             _renderer.SetPropertyBlock(_properties);
             gameObject.SetActive(true);
         }
@@ -258,7 +261,7 @@ namespace SlopArena.Client.Combat
             float t = Mathf.Clamp01((_age - _holdDuration) / _fadeDuration);
             float expansion = 1f - Mathf.Pow(1f - t, 3f);
             transform.localScale = Vector3.one * Mathf.Lerp(1f, _endScale, expansion);
-            _properties.SetColor("_Color", new Color(1f, 1f, 1f, 1f - t));
+            _properties.SetColor("_Color", new Color(1f, 1f, 1f, (1f - t) * _flashOpacity));
             _renderer.SetPropertyBlock(_properties);
 
             if (t >= 1f)

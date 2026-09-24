@@ -1,3 +1,4 @@
+using SlopArena.Client.UI;
 using UnityEngine;
 using SlopArena.Client.Entities;
 using UnityEngine.UIElements;
@@ -22,12 +23,19 @@ namespace SlopArena.Client.Combat
         private UnityEngine.Camera _camera;
         private PlayerRenderer _target;
         private readonly Vector3[] _frameSamples = new Vector3[4];
+        private float _authoredOpacity = 1f;
+        private ClientSettingsService _settings;
 
         public void Init(VisualElement root, UnityEngine.Camera camera)
         {
+            if (_settings != null) _settings.Changed -= ApplyOpacity;
             _root = root;
             _damage = root?.Q<Label>("target-lock-damage");
             _camera = camera;
+            _settings = ClientSettingsService.Instance;
+            _authoredOpacity = root != null ? root.resolvedStyle.opacity : 1f;
+            _settings.Changed += ApplyOpacity;
+            ApplyOpacity();
             HideImmediate();
         }
 
@@ -71,6 +79,11 @@ namespace SlopArena.Client.Combat
             _root.style.top = panelHeight - panelPoint.y - _paddingPx - _readoutHeightPx;
         }
 
+        private void ApplyOpacity()
+        {
+            if (_root != null)
+                _root.style.opacity = _authoredOpacity * (_settings != null ? _settings.TargetOpacity : 1f);
+        }
         private void HideImmediate()
         {
             if (_root == null) return;
@@ -91,5 +104,9 @@ namespace SlopArena.Client.Combat
         private void OnEnable() => HideImmediate();
 
         private void OnDisable() => HideImmediate();
+        private void OnDestroy()
+        {
+            if (_settings != null) _settings.Changed -= ApplyOpacity;
+        }
     }
 }

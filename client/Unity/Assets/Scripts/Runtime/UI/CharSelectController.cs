@@ -161,6 +161,9 @@ namespace SlopArena.Client.UI
         private void InitSolo(FrontendPageContext context)
         {
             SetModeChrome(context, "SOLO // CHOOSE YOUR FIGHTERS", "STEP 1 OF 2  /  FIGHTERS");
+            // The active card and editing panel already name this fighter;
+            // keep the kit brief without a duplicate display line.
+            context.Q<Label>("char-name")?.style.SetDisplay(false);
             var rosterMeta = context.Q<Label>("roster-meta");
             if (rosterMeta != null)
                 rosterMeta.text = MenuRoster.Classes.Length == 0
@@ -288,13 +291,7 @@ namespace SlopArena.Client.UI
             _selectingCpu = selectingCpu;
             _selected = selectingCpu ? MatchConfig.SoloBotClass : MatchConfig.PlayerClass;
             if (_selectionTarget != null)
-            {
-                string target = selectingCpu ? "CPU" : "PLAYER";
-                string fighter = _selected == CharacterClass.None
-                    ? "NONE"
-                    : _selected.ToString().ToUpperInvariant();
-                _selectionTarget.text = $"EDITING {target}  /  {fighter}";
-            }
+                _selectionTarget.text = selectingCpu ? "EDITING P2 // CPU" : "EDITING P1 // YOU";
             _btnEditPlayer?.EnableInClassList("active", !selectingCpu);
             _btnEditCpu?.EnableInClassList("active", selectingCpu);
             var botLabel = context.Q<Label>("solo-bot-label");
@@ -329,10 +326,12 @@ namespace SlopArena.Client.UI
             if (MenuRoster.Classes.Length == 0)
                 return;
             _rosterPanel.Add(BuildPlayerCard(
-                "P1", "YOU", MatchConfig.PlayerClass, "SELECTED", local: true, host: true));
+                "P1", "YOU", MatchConfig.PlayerClass,
+                _selectingCpu ? "SELECTED" : "EDITING FIGHTER", local: true, host: true));
             _rosterPanel.Add(BuildPlayerCard(
                 "P2", "CPU", MatchConfig.SoloBotClass,
-                $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}", local: false, host: false));
+                _selectingCpu ? "EDITING FIGHTER" : $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}",
+                local: false, host: false));
         }
 
         private void InitPvP(FrontendPageContext context)
@@ -556,6 +555,8 @@ namespace SlopArena.Client.UI
             var card = new VisualElement();
             card.AddToClassList("player-card");
             if (local) card.AddToClassList("player-card--local");
+            if (MatchConfig.Mode == GameMode.Solo && statusText == "EDITING FIGHTER")
+                card.AddToClassList("player-card--editing");
 
             var identity = new VisualElement();
             identity.AddToClassList("player-card__identity");
@@ -597,7 +598,9 @@ namespace SlopArena.Client.UI
             status.AddToClassList("player-card__status");
             status.AddToClassList(statusText == "LOCKED" || statusText == "BOT"
                 ? "player-card__status--locked"
-                : "player-card__status--picking");
+                : statusText == "EDITING FIGHTER"
+                    ? "player-card__status--editing"
+                    : "player-card__status--picking");
             card.Add(status);
             return card;
         }

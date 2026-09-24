@@ -8,12 +8,9 @@ namespace SlopArena.Client.UI
 {
     /// <summary>
     /// Home page (issues #219/#220): a fragment mounted into the
-    /// FrontendShell hosts — large branding plus exactly three mode actions;
-    /// no roster showcase. All mode actions stay disabled until a locally
-    /// valid display name is accepted (issue #209); the gating reads the
-    /// session state directly (issue #220), never a Home-owned identity
-    /// panel — identity presentation and renaming moved to the shared shell
-    /// identity surface.
+    /// FrontendShell hosts — large branding, three mode actions and decorative
+    /// portraits from the admitted roster. Identity presentation and
+    /// mode-button gating live in the shared shell identity surface.
     /// </summary>
     public class MainMenuController : MonoBehaviour, IFrontendPageController
     {
@@ -44,6 +41,7 @@ namespace SlopArena.Client.UI
             _btnTraining = _context.Q<Button>("btn-training");
             _btnSolo = _context.Q<Button>("btn-solo");
             _btnMultiplayer = _context.Q<Button>("btn-multiplayer");
+            RenderRosterArt();
 
             if (_btnTraining != null)
                 _btnTraining.clicked += OpenTraining;
@@ -80,6 +78,32 @@ namespace SlopArena.Client.UI
             _btnTraining = null;
             _btnSolo = null;
             _btnMultiplayer = null;
+        }
+
+        private void RenderRosterArt()
+        {
+            var art = _context.Q<VisualElement>("menu-roster-art");
+            var count = _context.Q<Label>("menu-roster-count");
+            if (art == null || count == null)
+                return;
+
+            var classes = MenuRoster.Classes;
+            count.text = $"{classes.Length} FIGHTERS // THE CREW";
+            foreach (var fighter in classes)
+            {
+                var card = new VisualElement();
+                card.AddToClassList("menu-roster-card");
+                var portrait = new VisualElement();
+                portrait.AddToClassList("menu-roster-portrait");
+                var texture = Resources.Load<Texture2D>($"UI/Portraits/{fighter}");
+                if (texture != null)
+                    portrait.style.backgroundImage = new StyleBackground(texture);
+                var name = new Label(fighter.ToString().ToUpperInvariant());
+                name.AddToClassList("menu-roster-name");
+                card.Add(portrait);
+                card.Add(name);
+                art.Add(card);
+            }
         }
 
         private void OnSessionChanged()

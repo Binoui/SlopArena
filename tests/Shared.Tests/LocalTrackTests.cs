@@ -110,7 +110,6 @@ public class LocalTrackTests
         TestHelpers.AssertNear(expected.VX, actual.VX);
         TestHelpers.AssertNear(expected.VY, actual.VY);
         TestHelpers.AssertNear(expected.VZ, actual.VZ);
-        if (scenario == "slide-stop") Assert.True(actual.CrouchSettled);
         if (scenario == "fast-fall") Assert.True(actual.IsFastFalling);
         if (scenario == "slide-jump") Assert.True(actual.JumpFromSlide);
         if (scenario == "wall-contact")

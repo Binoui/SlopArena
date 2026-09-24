@@ -2,7 +2,7 @@
     <!-- Home page fragment (issues #219/#220). Mounted into the
          FrontendShell hosts: page-header → PageHeaderHost,
          page-body → PageBodyHost, page-actions → PageActionsHost. The
-         roster showcase is gone; identity presentation and mode-button
+         roster art is decorative; identity presentation and mode-button
          gating live in the shared shell identity surface (issue #220). -->
     <ui:VisualElement name="page-frag">
         <ui:VisualElement name="page-header" class="page-section menu-header-section">
@@ -15,6 +15,10 @@
             <ui:VisualElement class="menu-title-rule" />
             <ui:Label text="AWKWARD FIGHTERS. QUESTIONABLE IDEAS." class="menu-tagline" />
             <ui:Label text="Pick a way in. The hard part is choosing who gets blamed for the rematch." class="menu-copy" />
+            <ui:VisualElement name="menu-showcase" class="menu-showcase" picking-mode="Ignore">
+                <ui:Label name="menu-roster-count" class="menu-showcase-count" />
+                <ui:VisualElement name="menu-roster-art" class="menu-roster-art" picking-mode="Ignore" />
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="page-body" class="page-section menu-body-section">
             <ui:VisualElement name="menu-actions" class="menu-actions">

@@ -416,19 +416,19 @@ public class SlopArenaBaker : EditorWindow
 
             // Derive character name from config directory structure
             string charName = Path.GetFileName(charDir);
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>($"{charDir}/{charName}.fbx");
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>($"{charDir}/Models/{charName}.fbx");
             if (model == null)
             {
                 // Try config dir as char root: config was at {name}/.../{name}_AnimConfig.asset
                 charName = Path.GetFileName(configDir);
-                model = AssetDatabase.LoadAssetAtPath<GameObject>($"{configDir}/{charName}.fbx");
+                model = AssetDatabase.LoadAssetAtPath<GameObject>($"{configDir}/Models/{charName}.fbx");
             }
 
             // Fallback: derive charName from config asset filename.
             if (model == null && config.name.EndsWith("_AnimConfig"))
             {
                 charName = config.name.Replace("_AnimConfig", "").ToLowerInvariant();
-                model = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Art/Characters/{charName}/{charName}.fbx");
+                model = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Art/Characters/{charName}/Models/{charName}.fbx");
             }
 
             if (model == null)

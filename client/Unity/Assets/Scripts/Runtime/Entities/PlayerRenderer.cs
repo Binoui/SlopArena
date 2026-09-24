@@ -7,6 +7,7 @@ using Animancer;
 using UnityEngine;
 using SlopArena.Shared;
 using SlopArena.Client.Animation;
+using SlopArena.Client.UI;
 
 namespace SlopArena.Client.Entities
 {
@@ -354,6 +355,7 @@ namespace SlopArena.Client.Entities
             if (_modelInstance == null && transform.childCount > 0)
                 _modelInstance = transform.GetChild(0).gameObject;
             _sfxSource = gameObject.AddComponent<AudioSource>();
+            _sfxSource.outputAudioMixerGroup = ClientSettingsService.Instance.FindBus("SFX");
             _sfxSource.playOnAwake = false;
             for (int i = 0; i < _kistuSwordHitboxSfx.Length; i++)
                 _kistuSwordHitboxSfx[i] = Resources.Load<AudioClip>(

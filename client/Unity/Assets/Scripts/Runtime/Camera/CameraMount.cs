@@ -1,7 +1,7 @@
 using UnityEngine;
 using Unity.Cinemachine;
-using UnityEngine.InputSystem;
 using SlopArena.Client.Input;
+using SlopArena.Client.UI;
 namespace SlopArena.Client.Camera
 {
     public enum CameraMode
@@ -37,6 +37,8 @@ namespace SlopArena.Client.Camera
             _cmCam = GetComponent<CinemachineCamera>();
             _orbital = GetComponent<CinemachineOrbitalFollow>();
             _inputAxisController = GetComponent<CinemachineInputAxisController>();
+            if (_inputAxisController != null)
+                _inputAxisController.enabled = false;
             if (!TryGetComponent<CameraObstruction>(out _))
                 gameObject.AddComponent<CameraObstruction>();
             // Clamp pitch so camera stays above the stage floor level
@@ -57,10 +59,11 @@ namespace SlopArena.Client.Camera
         {
             if (_orbital == null) return;
 
-            if (ChatInputGate.SuppressGameplay)
+            bool suppressCameraInput = ChatInputGate.SuppressGameplay ||
+                SettingsOverlay.Active is { IsOpen: true } || SettingsOverlay.ClosedThisFrame ||
+                HumanInputActions.IsCapturing || MatchPauseMenu.Active is { IsPaused: true };
+            if (suppressCameraInput)
             {
-                // Keep the existing mode/cursor ownership, but stop Cinemachine and
-                // manual scroll input from moving the camera while chat has focus.
                 if (!_chatInputSuppressed)
                 {
                     _chatSuppressedYaw = _hasStableAngles ? _lastStableYaw : GetCameraYawDeg();
@@ -68,45 +71,51 @@ namespace SlopArena.Client.Camera
                     _chatSuppressedRadial = _hasStableAngles ? _lastStableRadial : _orbital.RadialAxis.Value;
                     _chatInputSuppressed = true;
                 }
-
                 SetCameraYawDeg(_chatSuppressedYaw);
                 SetCameraPitchDeg(_chatSuppressedPitch);
                 _orbital.RadialAxis.Value = _chatSuppressedRadial;
-                if (_inputAxisController != null)
-                    _inputAxisController.enabled = false;
                 return;
             }
 
             if (_chatInputSuppressed)
             {
+                if (HumanInputActions.StickLook.ReadValue<Vector2>().sqrMagnitude > 0.01f ||
+                    HumanInputActions.MouseLook.ReadValue<Vector2>().sqrMagnitude > 0.01f ||
+                    Mathf.Abs(HumanInputActions.Zoom.ReadValue<float>()) > 0.01f)
+                {
+                    SetCameraYawDeg(_chatSuppressedYaw);
+                    SetCameraPitchDeg(_chatSuppressedPitch);
+                    _orbital.RadialAxis.Value = _chatSuppressedRadial;
+                    return;
+                }
                 _chatInputSuppressed = false;
-                if (_inputAxisController != null &&
-                    (_mode == CameraMode.Normal || _mode == CameraMode.FreeCursor))
-                    _inputAxisController.enabled = true;
             }
 
-            // Normal — mouse controls yaw+pitch freely, scroll still works for zoom
+            // Mouse input is a per-frame delta; stick input is a rate.
             if (_mode == CameraMode.Normal)
             {
-                var mouse = Mouse.current;
-                float dy = mouse != null ? mouse.scroll.ReadValue().y : 0f;
-                if (Mathf.Abs(dy) > 0.001f)
-                    _orbital.RadialAxis.Value -= dy * 0.05f;
-                // Pitch and yaw handled by Cinemachine's built-in orbital input
+                Vector2 delta = HumanInputActions.MouseLook.ReadValue<Vector2>()
+                    + HumanInputActions.StickLook.ReadValue<Vector2>() * (90f * Time.deltaTime);
+                var settings = ClientSettingsService.Instance;
+                delta *= settings.CameraInputGain;
+                _orbital.HorizontalAxis.Value += delta.x * (settings.InvertCameraHorizontal ? -1f : 1f);
+                _orbital.VerticalAxis.Value -= delta.y * (settings.InvertCameraVertical ? -1f : 1f);
+
+                float zoom = HumanInputActions.Zoom.ReadValue<float>();
+                if (Mathf.Abs(zoom) > 0.001f)
+                    _orbital.RadialAxis.Value -= zoom * 0.05f;
             }
             else if (_mode == CameraMode.Frozen)
             {
-                // Lock both yaw and pitch — camera stays put, crosshair moves on screen
                 SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
             else if (_mode == CameraMode.FreeCursor)
             {
-                // Re-apply cached angles (cursor controls ground marker, not camera)
                 SetCameraYawDeg(_frozenYaw);
                 SetCameraPitchDeg(_frozenPitch);
             }
-            // CameraMode.Aiming: do nothing — AimCameraMount owns all mouse input
+
         }
 
         private void LateUpdate()
@@ -136,26 +145,18 @@ namespace SlopArena.Client.Camera
                 case CameraMode.Normal:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
-                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Frozen:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
-                    // Disable CinemachineInputAxisController so the orbital camera stops consuming
-                    // mouse input — the caller reads the delta itself (e.g. GroundVector aim).
-                    if (_inputAxisController != null) _inputAxisController.enabled = false;
                     break;
                 case CameraMode.FreeCursor:
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
-                    if (_inputAxisController != null) _inputAxisController.enabled = true;
                     break;
                 case CameraMode.Aiming:
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
-                    // Disable CinemachineInputAxisController so the orbital camera stops consuming
-                    // mouse input in the background while AimCameraMount owns the mouse.
-                    if (_inputAxisController != null) _inputAxisController.enabled = false;
                     // Freeze orbital at current angles so it's ready to blend back to
                     // the right position when aiming ends.
                     FreezeAtCurrentAngles();
@@ -177,8 +178,10 @@ namespace SlopArena.Client.Camera
         public void OrbitFrozen(Vector2 deltaDeg)
         {
             if (_mode != CameraMode.Frozen) return;
-            _frozenYaw += deltaDeg.x;
-            _frozenPitch -= deltaDeg.y;
+            var settings = ClientSettingsService.Instance;
+            deltaDeg *= settings.CameraInputGain;
+            _frozenYaw += deltaDeg.x * (settings.InvertCameraHorizontal ? -1f : 1f);
+            _frozenPitch -= deltaDeg.y * (settings.InvertCameraVertical ? -1f : 1f);
             _frozenPitch = Mathf.Clamp(_frozenPitch, -60f, 60f);
         }
 

@@ -815,6 +815,14 @@
     border-color: rgb(255, 200, 33);
     border-bottom-color: rgb(255, 200, 33);
 }
+.player-card--editing {
+    border-width: 3px;
+    border-color: rgb(240, 238, 232);
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(255, 200, 33);
+    background-color: rgb(52, 45, 55);
+}
+
 
 .player-card__identity {
     flex-direction: row;
@@ -883,6 +891,10 @@
 .player-card__status--picking {
     color: rgb(255, 200, 33);
 }
+.player-card__status--editing {
+    color: rgb(255, 200, 33);
+}
+
 
 .solo-config {
     width: 440px;
@@ -926,7 +938,10 @@
 
 
 .selection-target-button:hover,
-.selection-target-button:focus,
+.selection-target-button:focus {
+    border-color: rgb(240, 238, 232);
+}
+
 .selection-target-button.active {
     background-color: rgb(255, 200, 33);
     border-color: rgb(224, 92, 42);

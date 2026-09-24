@@ -1,40 +1,24 @@
 #nullable enable
 using UnityEngine;
-using UnityEngine.InputSystem;
 using SlopArena.Shared;
 using SlopArena.Client.Camera;
+using SlopArena.Client.UI;
 using System;
 
 namespace SlopArena.Client.Input
 {
     /// <summary>
-    /// Centralized input controller for SlopArena.
-    /// Polls Unity InputSystem once per frame and builds InputState for the sim.
-    ///
-    /// Supports two modes:
-    /// 1. Human input — reads Keyboard.current / Mouse.current through the remappable
-    ///    <see cref="InputBindings"/> config (ADR-0016: ZQSD/WASD movement, Space jump,
-    ///    Shift dodge, C burst, X fast-fall, 10 move slots on 1-5/A/E/R/F + LMB/RMB).
-    /// 2. AI input — injected via InjectAI() for NPCs
-    ///
-    /// Call Poll() at the start of each frame (Update or FixedUpdate)
-    /// before accessing state or calling BuildInputState().
+    /// Centralized human input adapter. Polls the shared Input System action map once
+    /// per frame, buffers discrete edges, and builds the existing InputState contract.
+    /// AI input remains injected separately through InjectAI().
     /// </summary>
     public class InputController : MonoBehaviour
     {
-        /// <summary>Remappable bindings. Assign an asset in the inspector or drop one in
-        /// Resources/InputBindings; without either the layout-preset defaults apply.</summary>
-        [SerializeField] private InputBindings _bindings;
-
         private void Awake()
         {
-            if (_bindings == null)
-                _bindings = Resources.Load<InputBindings>("InputBindings");
+            var settings = ClientSettingsService.Instance;
+            HumanInputActions.Initialize(settings.BindingOverrides);
         }
-
-        /// <summary>Resolved key for a bindable action (override or layout default).</summary>
-        private Key Bind(BindableAction action)
-            => _bindings != null ? _bindings.GetKey(action) : InputBindings.DefaultKey(action);
 
         // ── Frame state (set by Poll) ──
         /// <summary>Pending jump: set by Poll, consumed by BuildInputState.</summary>
@@ -56,38 +40,46 @@ namespace SlopArena.Client.Input
         /// <summary>Pending RMB target-lock toggle (ADR-0018, issue #127): set by Poll on
         /// the RMB press edge, consumed by BuildInputState. One tick of ToggleLock.</summary>
         private bool _pendingToggleLock;
-        /// <summary>
-        /// Returns true if the key/button for the given slot index (0-based) is currently held.
-        /// Slot 0 = LMB, 1 = RMB, 2 = key "1", 3 = E, 4 = R, 5 = F, 6-9 = keys "2"-"5", 10 = A.
-        /// Follows the remapped bindings (ADR-0016).
-        /// </summary>
+        /// <summary>True if the action assigned to the canonical slot index is held.</summary>
         public bool IsSlotKeyHeld(byte slotIdx)
         {
-            if (!_aiControlled && ChatInputGate.SuppressGameplay)
-                return false;
-
-            return slotIdx switch
-            {
-                0 => Mouse.current != null && Mouse.current.leftButton.isPressed,
-                1 => Mouse.current != null && Mouse.current.rightButton.isPressed,
-                _ => Keyboard.current != null && Keyboard.current[Bind(SlotAction(slotIdx))].isPressed,
-            };
+            if (_aiControlled)
+                return _aiInput.ActiveSlot == slotIdx + 1;
+            if (HumanInputBlocked) return false;
+            string action = SlotAction(slotIdx);
+            return action != null && HumanInputActions.Get(action).IsPressed();
         }
 
-        /// <summary>Slot index (0-based) → the bindable action that triggers it (slots 2-10).</summary>
-        private static BindableAction SlotAction(byte slotIdx) => slotIdx switch
+        private static string SlotAction(byte slotIdx) => slotIdx switch
         {
-            2 => BindableAction.Slot1,
-            3 => BindableAction.SlotE,
-            4 => BindableAction.SlotR,
-            5 => BindableAction.SlotF,
-            6 => BindableAction.Slot2,
-            7 => BindableAction.Slot3,
-            8 => BindableAction.Slot4,
-            9 => BindableAction.Slot5,
-            10 => BindableAction.SlotA,
-            _ => BindableAction.Slot1,
+            2 => "Slot1", 3 => "SlotE", 4 => "SlotR", 5 => "SlotF",
+            6 => "Slot2", 7 => "Slot3", 8 => "Slot4", 10 => "SlotA",
+            _ => null,
         };
+
+        private static bool HumanInputSuppressed =>
+            ChatInputGate.SuppressGameplay || SettingsOverlay.Active is { IsOpen: true } ||
+            SettingsOverlay.ClosedThisFrame || HumanInputActions.IsCapturing ||
+            MatchPauseMenu.Active is { IsPaused: true };
+
+        private bool _humanReleaseRequired;
+        private bool HumanInputBlocked => HumanInputSuppressed || _humanReleaseRequired;
+
+        public void RequireReleaseBeforeHumanInput()
+        {
+            _humanReleaseRequired = true;
+            ClearPendingFrameState();
+        }
+
+        private bool AnyHumanControlHeld()
+        {
+            foreach (var name in HumanInputActions.RebindableActions)
+                if (HumanInputActions.Get(name).IsPressed()) return true;
+            return HumanInputActions.Get("MoveStick").ReadValue<Vector2>().sqrMagnitude > 0.01f
+                || HumanInputActions.StickLook.ReadValue<Vector2>().sqrMagnitude > 0.01f
+                || HumanInputActions.MouseLook.ReadValue<Vector2>().sqrMagnitude > 0.01f
+                || Mathf.Abs(HumanInputActions.Zoom.ReadValue<float>()) > 0.01f;
+        }
 
         // ── AI injection ──
         private bool _aiControlled;
@@ -96,11 +88,8 @@ namespace SlopArena.Client.Input
         /// True while the bound fast-fall key is held. Kept separate from InputState.Down so
         /// release suppression can be enforced across pause/focus transitions.
         /// </summary>
-        private bool IsFastFallHeld()
-        {
-            var keyboard = Keyboard.current;
-            return keyboard != null && keyboard[Bind(BindableAction.FastFall)].isPressed;
-        }
+        private bool IsDownHeld() => HumanInputActions.Get("Down").IsPressed();
+
 
         private void OnApplicationFocus(bool hasFocus)
         {
@@ -163,8 +152,8 @@ namespace SlopArena.Client.Input
         /// Call once per frame before BuildInputState() or any property access.
         /// Uses AI input if InjectAI() was called, otherwise reads from InputSystem.
         ///
-        /// Slot presses (ActiveSlot wire values): LMB=1, RMB=2, key"1"=3, E=4, R=5, F=6,
-        /// key"2"=7, key"3"=8, key"4"=9, key"5"=10, A=11 (AbilitySlots, ADR-0016).
+        /// ActiveSlot retains existing wire values: 1→3, E→4, R→5, F→6, 2→7,
+        /// 3→8, 4→9, A→11. LMB/RMB are utility actions, not attack Slots.
         /// Consume via <see cref="ConsumePendingSlotPress"/> after BuildInputState.
         /// </summary>
         public void Poll()
@@ -178,52 +167,51 @@ namespace SlopArena.Client.Input
                 return;
             }
 
-            if (ChatInputGate.SuppressGameplay)
+            if (HumanInputSuppressed)
             {
                 ClearPendingFrameState();
                 return;
             }
+            if (_humanReleaseRequired)
+            {
+                if (AnyHumanControlHeld()) return;
+                _humanReleaseRequired = false;
+            }
 
-            var kb = Keyboard.current;
-            var mouse = Mouse.current;
-            if (kb[Bind(BindableAction.Jump)].wasPressedThisFrame) _pendingJump = true;
-            if (kb[Bind(BindableAction.Dash)].wasPressedThisFrame) _pendingDash = true;
-            if (kb[Bind(BindableAction.Burst)].wasPressedThisFrame) _pendingBurst = true;
-            var fastFall = kb[Bind(BindableAction.FastFall)];
+            var jump = HumanInputActions.Get("Jump");
+            var dash = HumanInputActions.Get("Dash");
+            var burst = HumanInputActions.Get("Burst");
+            var down = HumanInputActions.Get("Down");
+            if (jump.WasPressedThisFrame()) _pendingJump = true;
+            if (dash.WasPressedThisFrame()) _pendingDash = true;
+            if (burst.WasPressedThisFrame()) _pendingBurst = true;
             if (_downReleaseRequired)
             {
-                if (!fastFall.isPressed)
-                    _downReleaseRequired = false;
+                if (!down.IsPressed()) _downReleaseRequired = false;
             }
-            if (!_downReleaseRequired && fastFall.wasPressedThisFrame)
-                _pendingDownPressed = true;
-            // Utility inputs — LMB snaps facing to the camera azimuth (ADR-0017, #126),
-            // RMB toggles the persistent target lock (ADR-0018, #127). Neither is
-            // an ability slot anymore (8-slot re-tier): the old LMB/RMB ability slots
-            // are unreachable from the client. Keyboard slot presses follow (one per frame).
-            if (mouse.leftButton.wasPressedThisFrame)
+            else if (down.WasPressedThisFrame()) _pendingDownPressed = true;
+
+            if (HumanInputActions.Get("FaceToCamera").WasPressedThisFrame())
                 _pendingFaceToCamera = true;
-            else if (mouse.rightButton.wasPressedThisFrame)
+            else if (HumanInputActions.Get("ToggleLock").WasPressedThisFrame())
                 _pendingToggleLock = true;
-            else if (kb[Bind(BindableAction.Slot1)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Slot1;
-            else if (kb[Bind(BindableAction.SlotE)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.E;
-            else if (kb[Bind(BindableAction.SlotR)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.R;
-            else if (kb[Bind(BindableAction.SlotF)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.F;
-            else if (kb[Bind(BindableAction.Slot2)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Slot2;
-            else if (kb[Bind(BindableAction.Slot3)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Slot3;
-            else if (kb[Bind(BindableAction.Slot4)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Slot4;
-            else if (kb[Bind(BindableAction.Slot5)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.Slot5;
-            else if (kb[Bind(BindableAction.SlotA)].wasPressedThisFrame)
-                _pendingSlotPress = AbilitySlots.A;
+            else
+            {
+                foreach (var (action, slot) in SlotActions)
+                    if (HumanInputActions.Get(action).WasPressedThisFrame())
+                    {
+                        _pendingSlotPress = slot;
+                        break;
+                    }
+            }
         }
+
+        private static readonly (string action, byte slot)[] SlotActions =
+        {
+            ("Slot1", AbilitySlots.Slot1), ("SlotE", AbilitySlots.E), ("SlotR", AbilitySlots.R),
+            ("SlotF", AbilitySlots.F), ("Slot2", AbilitySlots.Slot2), ("Slot3", AbilitySlots.Slot3),
+            ("Slot4", AbilitySlots.Slot4), ("SlotA", AbilitySlots.A),
+        };
 
         /// <summary>
         /// Discard buffered jump/dash/slot presses without consuming them. Called
@@ -239,13 +227,13 @@ namespace SlopArena.Client.Input
             _pendingFaceToCamera = false;
             _pendingToggleLock = false;
             _pendingSlotPress = 0;
-            if (IsFastFallHeld())
+            if (IsDownHeld())
                 _downReleaseRequired = true;
         }
 
         public byte ConsumePendingSlotPress()
         {
-            if (!_aiControlled && ChatInputGate.SuppressGameplay)
+            if (!_aiControlled && HumanInputBlocked)
             {
                 _pendingSlotPress = 0;
                 return 0;
@@ -272,17 +260,13 @@ namespace SlopArena.Client.Input
             if (_aiControlled)
                 return new Vector2(_aiInput.MoveX, _aiInput.MoveY);
 
-            if (ChatInputGate.SuppressGameplay)
-                return Vector2.zero;
-
-            var kb = Keyboard.current;
-            float x = 0f;
-            float y = 0f;
-            if (kb[Bind(BindableAction.MoveLeft)].isPressed) x -= 1f;
-            if (kb[Bind(BindableAction.MoveRight)].isPressed) x += 1f;
-            if (kb[Bind(BindableAction.MoveUp)].isPressed) y += 1f;
-            if (kb[Bind(BindableAction.MoveDown)].isPressed) y -= 1f;
-            return new Vector2(x, y);
+            if (HumanInputBlocked) return Vector2.zero;
+            float x = (HumanInputActions.Get("MoveRight").IsPressed() ? 1f : 0f)
+                    - (HumanInputActions.Get("MoveLeft").IsPressed() ? 1f : 0f);
+            float y = (HumanInputActions.Get("MoveUp").IsPressed() ? 1f : 0f)
+                    - (HumanInputActions.Get("MoveDown").IsPressed() ? 1f : 0f);
+            Vector2 stick = HumanInputActions.Get("MoveStick").ReadValue<Vector2>();
+            return Vector2.ClampMagnitude(new Vector2(x, y) + stick, 1f);
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -347,7 +331,7 @@ namespace SlopArena.Client.Input
                 return (input, moveDir, snappedDir);
             }
 
-            if (ChatInputGate.SuppressGameplay)
+            if (HumanInputBlocked)
             {
                 ClearPendingFrameState();
                 input.TargetEntityId = targetEntityId;
@@ -363,13 +347,9 @@ namespace SlopArena.Client.Input
                 camRight = camera.GetRightDirection();
             }
 
-            // Build raw camera-relative direction from the bound movement keys
-            var kb = Keyboard.current;
-            Vector3 rawDir = Vector3.zero;
-            if (kb[Bind(BindableAction.MoveUp)].isPressed) rawDir += camForward;
-            if (kb[Bind(BindableAction.MoveDown)].isPressed) rawDir -= camForward;
-            if (kb[Bind(BindableAction.MoveLeft)].isPressed) rawDir -= camRight;
-            if (kb[Bind(BindableAction.MoveRight)].isPressed) rawDir += camRight;
+            // Build raw camera-relative direction from unified digital and stick input.
+            Vector2 moveInput = GetMovement();
+            Vector3 rawDir = camForward * moveInput.y + camRight * moveInput.x;
 
             Vector3 moveDirection = Vector3.zero;
             Vector2 snappedInputDirection = Vector2.zero;
@@ -396,18 +376,13 @@ namespace SlopArena.Client.Input
             input.MoveX = moveDirection.x;
             input.MoveY = moveDirection.z;
             input.Up = moveDirection.z > 0.3f;
-            // Down (fast fall, issue #116): driven by the DEDICATED FastFall key (X by
-            // default) — NOT by backward movement. Drifting backward must never fast-fall.
-            // Left un-gated by canMove: the sim gates it (airborne + not hitstun), and it
-            // must work through air attacks.
-            input.Down = !_downReleaseRequired && kb[Bind(BindableAction.FastFall)].isPressed;
+            // Dedicated Down remains independent from backward movement.
+            input.Down = !_downReleaseRequired && HumanInputActions.Get("Down").IsPressed();
             input.DownPressed = _pendingDownPressed;
             _pendingDownPressed = false;
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
-            // Short hop (issue #116): Jump is the press edge; JumpHeld is the physical
-            // hold state the sim counts for the release window.
-            input.JumpHeld = kb[Bind(BindableAction.Jump)].isPressed;
+            input.JumpHeld = HumanInputActions.Get("Jump").IsPressed();
             // Burst fires even when the FSM gates movement — it must work during
             // hitstop/hitstun (the gate zeroes Jump/Dash only).
             input.Burst = _pendingBurst;

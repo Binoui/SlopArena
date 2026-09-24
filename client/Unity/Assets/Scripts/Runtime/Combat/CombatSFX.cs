@@ -1,4 +1,5 @@
 using SlopArena.Shared;
+using SlopArena.Client.UI;
 using UnityEngine;
 
 namespace SlopArena.Client.Combat
@@ -48,6 +49,7 @@ namespace SlopArena.Client.Combat
             _source = gameObject.AddComponent<AudioSource>();
             _source.playOnAwake = false;
             _source.spatialBlend = 0f;
+            _source.outputAudioMixerGroup = ClientSettingsService.Instance.FindBus("SFX");
             _source.volume = 0.8f;
             Load(_light, "punch_light");
             Load(_medium, "punch_medium");

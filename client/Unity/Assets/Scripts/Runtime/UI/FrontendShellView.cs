@@ -34,6 +34,8 @@ namespace SlopArena.Client.UI
         private VisualElement? _pageActionsHost;
         private VisualElement? _expandedSocialHost;
         private VisualElement? _modalHost;
+        private VisualElement? _settingsSlot;
+        private SettingsOverlay? _settingsOverlay;
         private VisualElement? _pageModalSection;
         private VisualElement? _lowerRow;
         private bool _compact;
@@ -104,6 +106,14 @@ namespace SlopArena.Client.UI
             _pageSummaryHost = documentRoot.Q<VisualElement>("page-summary-host");
             _pageActionsHost = documentRoot.Q<VisualElement>("page-actions-host");
             _expandedSocialHost = documentRoot.Q<VisualElement>("expanded-social-host");
+            _settingsSlot = documentRoot.Q<VisualElement>("shell-settings-slot");
+            if (_settingsSlot != null)
+            {
+                var settingsButton = new Button(OpenSettings) { text = "SETTINGS" };
+                settingsButton.AddToClassList("shell-identity");
+                _settingsSlot.Add(settingsButton);
+                _settingsOverlay = gameObject.GetComponent<SettingsOverlay>() ?? gameObject.AddComponent<SettingsOverlay>();
+            }
             _modalHost = documentRoot.Q<VisualElement>("modal-host");
 
             if (_root == null || _pageHeaderHost == null || _pageBodyHost == null || _socialHost == null
@@ -184,12 +194,13 @@ namespace SlopArena.Client.UI
             float scale = _root.panel.scaledPixelsPerPoint;
             if (scale <= 0f)
                 scale = 1f;
-            float spacing = (_compact ? 16f : 24f) / scale;
-            float barHeight = (_compact ? 56f : 64f) / scale;
-            float cellWidth = (_compact ? 380f : 480f) / scale;
-            float cellHeight = (_compact ? 190f : 230f) / scale;
-            float topGap = (_compact ? 10f : 16f) / scale;
-            float cellGap = (_compact ? 16f : 20f) / scale;
+            float requestedScale = ClientSettingsService.Instance.UiScale / 100f;
+            float spacing = (_compact ? 16f : 24f) * requestedScale / scale;
+            float barHeight = (_compact ? 56f : 64f) * requestedScale / scale;
+            float cellWidth = (_compact ? 380f : 480f) * requestedScale / scale;
+            float cellHeight = (_compact ? 190f : 230f) * requestedScale / scale;
+            float topGap = (_compact ? 10f : 16f) * requestedScale / scale;
+            float cellGap = (_compact ? 16f : 20f) * requestedScale / scale;
 
             _topBar.style.height = barHeight;
             _topBar.style.minHeight = barHeight;
@@ -360,6 +371,14 @@ namespace SlopArena.Client.UI
             return context;
         }
 
+
+        private void OpenSettings()
+        {
+            if (_settingsOverlay == null || _modalHost == null)
+                return;
+            UISFX.PlayClick();
+            _settingsOverlay.Open(_modalHost);
+        }
 
         private void OnDisable()
         {

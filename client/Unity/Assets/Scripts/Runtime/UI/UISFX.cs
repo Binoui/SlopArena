@@ -84,6 +84,7 @@ namespace SlopArena.Client.UI
             _instance = this;
             _source = gameObject.AddComponent<AudioSource>();
             _source.playOnAwake = false;
+            _source.outputAudioMixerGroup = ClientSettingsService.Instance.FindBus("UI");
             _source.spatialBlend = 0f;
             _source.volume = 0.55f;
 
@@ -92,6 +93,7 @@ namespace SlopArena.Client.UI
             _musicSource.loop = true;
             _musicSource.spatialBlend = 0f;
             _musicSource.volume = 0.35f;
+            _musicSource.outputAudioMixerGroup = ClientSettingsService.Instance.FindBus("Music");
             _menuTheme = Resources.Load<AudioClip>("Audio/Music/MainTheme");
             _matchThemes = new[]
             {

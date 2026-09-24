@@ -72,6 +72,29 @@ public class MatchInputProtocolTests
             Input(1).CopyTo(oversized, 0);
             rejected.Send(oversized, oversized.Length, endpoint);
             var state = AwaitState(accepted, Input(1));
+            var ping = new byte[12];
+            ping[0] = (byte)'P'; ping[1] = (byte)'I'; ping[2] = (byte)'N'; ping[3] = (byte)'G';
+            BinaryPrimitives.WriteInt64LittleEndian(ping.AsSpan(4), 0x102030405060708);
+            accepted.Send(ping, ping.Length, endpoint);
+            var pingTimer = Stopwatch.StartNew();
+            byte[]? pong = null;
+            while (pingTimer.ElapsedMilliseconds < 1500)
+            {
+                if (!accepted.Client.Poll(30_000, SelectMode.SelectRead)) continue;
+                var remote = new IPEndPoint(IPAddress.Any, 0);
+                var received = accepted.Receive(ref remote);
+                if (received.Length == 16 && received[0] == (byte)'P' && received[1] == (byte)'O' &&
+                    received[2] == (byte)'N' && received[3] == (byte)'G')
+                {
+                    pong = received;
+                    break;
+                }
+            }
+            Assert.NotNull(pong);
+            Assert.Equal(0x102030405060708, BinaryPrimitives.ReadInt64LittleEndian(pong!.AsSpan(4, 8)));
+
+            rejected.Send(ping, ping.Length, endpoint);
+            Assert.False(rejected.Client.Poll(200_000, SelectMode.SelectRead), "An unadmitted peer received a ping echo.");
             Assert.Equal(MatchState.Countdown, state.State.MatchState);
             Assert.False(rejected.Client.Poll(0, SelectMode.SelectRead));
         }

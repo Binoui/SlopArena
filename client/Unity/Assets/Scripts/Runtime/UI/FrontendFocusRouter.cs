@@ -401,6 +401,11 @@ namespace SlopArena.Client.UI
 
         private void ResolveCancelLayers()
         {
+            if (SettingsOverlay.Active is { IsOpen: true } settings)
+            {
+                settings.HandleBack();
+                return;
+            }
             // Layer 1: the topmost modal. On shell pages the only modal is
             // the shell identity surface; it consumes the press even when it
             // cannot close (first-run mandatory entry).
