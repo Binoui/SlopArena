@@ -1,0 +1,7 @@
+http://{$MASTER_TEST_HOST} {
+	redir https://{$MASTER_TEST_HOST}{uri} 308
+}
+
+{$MASTER_TEST_HOST} {
+	reverse_proxy master:8080
+}

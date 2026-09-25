@@ -1,0 +1,31 @@
+{
+  "release_id": "replace-with-published-release-id",
+  "source_revisions": {
+    "master": "0000000000000000000000000000000000000000",
+    "gameplay": "0000000000000000000000000000000000000000"
+  },
+  "images": {
+    "master": "ghcr.io/example/sloparena-master@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "gameplay": "ghcr.io/example/sloparena-gameserver@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "migration": "ghcr.io/example/sloparena-migrations@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "schema": {
+    "target_migration": "20260925000000_InitialSchema",
+    "compatible_migrations": [
+      "20260925000000_InitialSchema"
+    ],
+    "upgrade_from": [
+      null
+    ]
+  },
+  "runtime": {
+    "public_ipv4": "203.0.113.10",
+    "public_ipv4_is_provider_nat": false,
+    "master_test_host": "master-test.example.com",
+    "gameplay_test_host": "game-test.example.com",
+    "master_env_file": "/etc/sloparena/private/master.env",
+    "migration_env_file": "/etc/sloparena/private/migration.env",
+    "game_config_file": "/etc/sloparena/private/game.json",
+    "postgres_password_file": "/etc/sloparena/private/postgres-password"
+  }
+}

@@ -112,8 +112,9 @@ network); do not publish GameServer TCP control publicly. The packaged
 `server.json` is intentionally absent. Legacy/local setups must select
 `"development"` explicitly; the local image smoke does so.
 
-This is service authentication, not a substitute for the restricted
-HTTPS/UDP ingress and deployment preflight in the later VPS phase.
+The restricted VPS profile and operator-only ingress, migration, deployment
+and rollback gates are in [`deploy/vps/README.md`](../../deploy/vps/README.md).
+Publishing an image still does not deploy either the VPS or the home host.
 
 ## CI
 

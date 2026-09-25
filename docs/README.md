@@ -19,6 +19,7 @@ Read these in order:
 | [Netcode Architecture](systems/netcode-architecture.md) | GameServer, prediction, reconciliation, and transport |
 | [Release Pipeline](systems/release-pipeline.md) | Build, packaging, and release flow |
 | [Restricted local stack](../deploy/local/README.md) | Caddy/PostgreSQL/GameServer image-only integration without changing the home endpoint |
+| [Restricted VPS release](../deploy/vps/README.md) | Operator bootstrap, pinned deployment, rollback, and external ingress gates |
 | [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands and live Editor verification |
 | [SlopArena Chat design](design/sloparena-chat.md) | Approved Global/Server/Direct chat contract; Master implemented and headless-verified, Unity integration pending |
 
