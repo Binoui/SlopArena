@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using SlopArena.Shared;
 
 namespace SlopArena.Server
@@ -23,26 +24,43 @@ namespace SlopArena.Server
             ArenaRegistry.LoadFromDirectory(config.ArenaDataDir);
 
             var orchestrator = new MultiMatchOrchestrator(config);
+            bool contentReady = orchestrator.ContentReady && ArenaRegistry.Get("slop_court").HasValue;
+            if (!contentReady)
+            {
+                Console.WriteLine("[Content] Required cooked roster or default arena unavailable; readiness disabled.");
+                orchestrator.StopAcceptingMatches();
+            }
             var registration = new GameServerRegistration(config, orchestrator);
-            var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource();
 
             // Report finished-match results (winner steam id) to the master server (issue #40).
             // Fire-and-forget: ReportMatchResultAsync swallows errors; shared victory reports 0.
             orchestrator.ReportMatchResult = (matchId, winner) =>
                 _ = registration.ReportMatchResultAsync(matchId, winner);
 
-            // Match control stays private to the deployment network in VPS mode.
             using var control = new MatchControlServer(orchestrator, config.Port,
-                defaultArena: "slop_court", controlKey: config.IsVps ? config.MatchControlKey : null);
+                defaultArena: "slop_court", controlKey: config.IsVps ? config.MatchControlKey : null,
+                isReady: () => contentReady && registration.IsRegistered);
             control.Start();
 
-            // Handle Ctrl+C for graceful shutdown
-            Console.CancelKeyPress += (sender, e) =>
+            void BeginShutdown()
+            {
+                orchestrator.StopAcceptingMatches();
+                control.Stop();
+                cts.Cancel();
+            }
+
+            Console.CancelKeyPress += (_, e) =>
             {
                 e.Cancel = true;
-                Console.WriteLine("\nCtrl+C received. Shutting down...");
-                cts.Cancel();
+                BeginShutdown();
             };
+            using var sigterm = OperatingSystem.IsWindows() ? null :
+                PosixSignalRegistration.Create(PosixSignal.SIGTERM, e =>
+                {
+                    e.Cancel = true;
+                    BeginShutdown();
+                });
 
             Console.WriteLine("Registering with master server (recovery enabled).");
             try
@@ -51,7 +69,7 @@ namespace SlopArena.Server
             }
             finally
             {
-                control.Stop();
+                BeginShutdown();
                 orchestrator.Shutdown();
                 Console.WriteLine("Server stopped.");
             }

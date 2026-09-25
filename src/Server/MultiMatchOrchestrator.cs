@@ -16,13 +16,24 @@ namespace SlopArena.Server
     {
         private readonly ConcurrentDictionary<int, MatchInstance> _activeMatches = new();
         private readonly ServerConfig _config;
-        private readonly MatchContentCatalogProvider _contentProvider;
+        private readonly MatchContentCatalogProvider? _contentProvider;
+        private readonly object _admissionGate = new();
+        private bool _stopping;
 
+        public bool ContentReady { get; }
 
         public MultiMatchOrchestrator(ServerConfig config)
         {
             _config = config;
-            _contentProvider = new MatchContentCatalogProvider();
+            try
+            {
+                _contentProvider = new MatchContentCatalogProvider();
+                ContentReady = _contentProvider.TryBuild(out _, out _, out _);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("[Content] Cooked roster is unavailable.");
+            }
         }
 
         /// <summary>Optional callback invoked with (match guid, winner steam id) when a match ends (issue #40).</summary>
@@ -33,25 +44,41 @@ namespace SlopArena.Server
             out int port, out MatchContentHandleMap? content, out string? error)
         {
             port = -1; content = null; error = null;
+            lock (_admissionGate)
+                if (_stopping) { error = "GameServer is shutting down."; return false; }
             if (roster == null || roster.Count is < 2 or > 4) { error = "Roster must contain 2-4 players."; return false; }
-            if (!_contentProvider.TryBuild(out var catalog, out content, out error) || catalog == null) return false;
-            for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
+            if (_contentProvider is null ||
+                !_contentProvider.TryBuild(out var catalog, out content, out error) || catalog is null)
             {
-                int candidate = _config.Port + offset;
-                if (_activeMatches.ContainsKey(candidate)) continue;
-                MatchInstance match;
-                try { match = new MatchInstance(candidate, matchId, arenaName, roster, catalog, OnMatchEnd, maxStocks, ReportMatchResult); }
-                catch (Exception ex) { error = ex.Message; return false; }
-                if (_activeMatches.TryAdd(candidate, match))
-                {
-                    match.Start();
-                    port = candidate;
-                    Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
-                    return true;
-                }
+                error ??= "Cooked roster unavailable.";
+                return false;
             }
-            error = $"No ports available for match {matchId} (max {_config.MaxConcurrentMatches}).";
-            return false;
+            lock (_admissionGate)
+            {
+                if (_stopping) { error = "GameServer is shutting down."; return false; }
+                for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
+                {
+                    int candidate = _config.Port + offset;
+                    if (_activeMatches.ContainsKey(candidate)) continue;
+                    MatchInstance match;
+                    try { match = new MatchInstance(candidate, matchId, arenaName, roster, catalog, OnMatchEnd, maxStocks, ReportMatchResult); }
+                    catch (Exception ex) { error = ex.Message; return false; }
+                    if (_activeMatches.TryAdd(candidate, match))
+                    {
+                        match.Start();
+                        port = candidate;
+                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
+                        return true;
+                    }
+                }
+                error = $"No ports available for match {matchId} (max {_config.MaxConcurrentMatches}).";
+                return false;
+            }
+        }
+
+        public void StopAcceptingMatches()
+        {
+            lock (_admissionGate) _stopping = true;
         }
 
         /// <summary>
@@ -68,12 +95,10 @@ namespace SlopArena.Server
         /// </summary>
         public int CurrentMatchCount => _activeMatches.Count;
 
-        /// <summary>
-        /// <summary>
-        /// Graceful shutdown — stop all matches and wait for threads.
-        /// </summary>
+        /// <summary>Graceful shutdown — stop all matches and wait for their sockets.</summary>
         public void Shutdown()
         {
+            StopAcceptingMatches();
             Console.WriteLine("[Orchestrator] Shutting down...");
 
             foreach (var kv in _activeMatches)

@@ -1,0 +1,134 @@
+name: sloparena-local
+services:
+  caddy:
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80/tcp"
+      - "127.0.0.1:8443:443/tcp"
+    environment:
+      MASTER_TEST_HOST: ${MASTER_TEST_HOST:?set a distinct local Master hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      proxy:
+        ipv4_address: 172.30.11.10
+    logging: &bounded_logs
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:15.19-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sloparena
+      POSTGRES_DB: sloparena
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sloparena -d sloparena"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging: *bounded_logs
+
+  migrate:
+    profiles: [migration]
+    image: ${MASTER_MIGRATION_IMAGE:?set the matching migration image}
+    platform: linux/amd64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,uid=1654,gid=1654,size=128m
+    env_file:
+      - ${MIGRATION_ENV_FILE:?set the database-only migration environment file}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - database
+    logging: *bounded_logs
+
+  master:
+    image: ${MASTER_IMAGE:?set the locally built Master image}
+    platform: linux/amd64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    restart: unless-stopped
+    stop_grace_period: 15s
+    env_file:
+      - ${MASTER_ENV_FILE:?set the private Master environment file}
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_ENVIRONMENT: Production
+      Deployment__Profile: vps
+      ApprovedHost__PublicHost: ${GAMEPLAY_TEST_HOST:?set a distinct local gameplay hostname}
+      ApprovedHost__PublicPort: "7777"
+      ApprovedHost__ControlUrl: http://game:7777/match/start
+      Proxy__TrustedAddress: 172.30.11.10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - proxy
+      - database
+      - control
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/8080; printf 'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3; read -r line <&3; [[ $$line == *' 200 '* ]]" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging: *bounded_logs
+
+  game:
+    image: ${GAMESERVER_IMAGE:?set the locally built GameServer image}
+    platform: linux/amd64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=1654,gid=1654
+    restart: unless-stopped
+    stop_grace_period: 15s
+    volumes:
+      - ${GAME_CONFIG_FILE:?set the private GameServer config file}:/run/config/server.json:ro
+    command: ["/run/config/server.json"]
+    ports:
+      - "127.0.0.1:7777-7781:7777-7781/udp"
+    networks:
+      - control
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/7777; printf 'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3; read -r line <&3; [[ $$line == *' 200 '* ]]" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging: *bounded_logs
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:?set a private PostgreSQL password file}
+
+networks:
+  proxy:
+    ipam:
+      config:
+        - subnet: 172.30.11.0/24
+  database:
+    internal: true
+  # Keep bridge NAT for direct UDP. An internal bridge left PortBindings set
+  # but created no host mappings; private TCP control still has no ports entry.
+  control: {}
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

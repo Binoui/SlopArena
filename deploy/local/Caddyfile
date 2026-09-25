@@ -1,0 +1,12 @@
+{
+	auto_https disable_redirects
+}
+
+http://{$MASTER_TEST_HOST} {
+	redir https://{$MASTER_TEST_HOST}:8443{uri} 308
+}
+
+{$MASTER_TEST_HOST} {
+	tls internal
+	reverse_proxy master:8080
+}

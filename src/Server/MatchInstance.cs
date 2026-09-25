@@ -26,7 +26,7 @@ namespace SlopArena.Server
 		private readonly MatchContentCatalog _contentCatalog;
 		private readonly List<PlayerSlot> _slots;
 		private UdpClient? _udpServer;
-		private bool _running = true;
+		private volatile bool _running = true;
 
 		private ArenaDefinition _arena;
 		private ServerSimulation _sim = null!;

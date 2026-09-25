@@ -273,6 +273,10 @@ TESTING-UNITY.md
 __pycache__/
 *.pyc
 /client/Unity/Assets/StreamingAssets/
+
+# Local Compose inputs: never stage runtime credentials or operator DNS.
+/deploy/local/private/
+/deploy/local/stack.env
 .entire/
 
 # Archify visual-check outputs (regenerable QA artifacts)

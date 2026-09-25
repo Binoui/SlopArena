@@ -28,6 +28,7 @@ namespace SlopArena.Server
         private readonly MultiMatchOrchestrator _orchestrator;
         private readonly string _defaultArena;
         private readonly byte[]? _controlKey;
+        private readonly Func<bool> _isReady;
         private const int MaxBodyBytes = 64 * 1024;
         private CancellationTokenSource? _cts;
         private bool _disposed;
@@ -35,11 +36,13 @@ namespace SlopArena.Server
         /// <param name="orchestrator">Receives the parsed roster and assigns the match port.</param>
         /// <param name="port">TCP port to listen on (the game server's registered base port).</param>
         /// <param name="defaultArena">Arena used when the body omits one.</param>
-        public MatchControlServer(MultiMatchOrchestrator orchestrator, int port, string defaultArena, string? controlKey = null)
+        public MatchControlServer(MultiMatchOrchestrator orchestrator, int port, string defaultArena,
+            string? controlKey = null, Func<bool>? isReady = null)
         {
             _orchestrator = orchestrator;
             _defaultArena = defaultArena;
             _controlKey = controlKey is null ? null : Encoding.UTF8.GetBytes(controlKey);
+            _isReady = isReady ?? (() => false);
             if (_controlKey?.Length > 4096)
                 throw new ArgumentException("Control key is too long.", nameof(controlKey));
             _listener.Prefixes.Add($"http://*:{port}/");
@@ -119,6 +122,16 @@ namespace SlopArena.Server
 
         private async Task HandleAsync(HttpListenerContext ctx)
         {
+            if (ctx.Request.HttpMethod == "GET" && ctx.Request.Url?.AbsolutePath == "/health")
+            {
+                ctx.Response.StatusCode = 200;
+                return;
+            }
+            if (ctx.Request.HttpMethod == "GET" && ctx.Request.Url?.AbsolutePath == "/ready")
+            {
+                ctx.Response.StatusCode = _isReady() ? 200 : 503;
+                return;
+            }
             if (ctx.Request.HttpMethod != "POST" || ctx.Request.Url?.AbsolutePath != "/match/start")
             {
                 ctx.Response.StatusCode = 404;

@@ -1,0 +1,13 @@
+{
+  "deploymentProfile": "vps",
+  "hostId": "00000000-0000-0000-0000-000000000000",
+  "registrationKey": "",
+  "matchControlKey": "",
+  "serverName": "Restricted test GameServer",
+  "region": "EU",
+  "port": 7777,
+  "maxConcurrentMatches": 5,
+  "masterServerUrl": "http://master:8080",
+  "publicIp": "game.localhost",
+  "arenaDataDir": "data/arenas"
+}
