@@ -209,11 +209,23 @@ From the allowed external IPv4, trusted public HTTPS returned 200 from
 `/auth/me` returned 200; SignalR negotiation, a fresh WebSocket upgrade
 (101) and long polling (200) passed through Caddy. Public raw TCP
 7777/8080/5432 did not connect. A direct UDP datagram to 7777 incremented
-the allowed Docker ingress-rule packet count from zero to one; this proves
-the network path, **not** a complete gameplay round trip. Direct HTTPS
-over the VPS's global IPv6 timed out from an unallowed IPv6 source.
+the allowed Docker ingress-rule packet count from zero to one. A separate
+authenticated private match-start for Manki and FightGuy then allocated
+UDP 7777 and returned the cooked content map. Two external, allowlisted
+UDP clients sent valid version-1 inputs and both were logged as connected;
+each client received a 127-byte authoritative state packet from 7777.
+The synthetic match was cleared by restarting only GameServer. It
+re-registered; the server directory returned to zero active matches.
+This is not a packaged Unity-client match.
 
-At this checkpoint, still to prove: non-allowlisted **IPv4** cannot use
-HTTPS or gameplay UDP; an allowlisted packaged Unity client can finish a match;
-VPS reboot and off-host restore preserve service operation. Those are
-distinct from this release's readiness and firewall evidence.
+Direct HTTPS over the VPS's global IPv6 timed out from an unallowed IPv6
+source. From mobile data, the operator reported **connection reset** when
+opening the test Master's `/ready` URL; no HTTPS response reached that
+non-allowlisted IPv4 client. The live Docker filter admits gameplay UDP
+only from the configured IPv4 `/32`, but no separate mobile-data UDP packet
+was captured. OVH's provider firewall was not changed.
+
+Still to prove in the later end-to-end acceptance: an allowlisted packaged
+Unity client completes a match, VPS reboot preserves registration/certificates,
+and an off-host database restore succeeds. This test release does not
+establish those behaviors.
