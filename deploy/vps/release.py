@@ -452,9 +452,12 @@ def inspect_image(event: dict[str, Any], reference: str, expected_revision: str 
     canonical_reference = f"{match.group(1)}@sha256:{digest}"
     if canonical_reference not in repo_digests:
         raise ReleaseError(f"image {reference} is not available under that exact RepoDigest")
-    image_id = str(image.get("Id", "")).split(":", 1)[-1]
-    if digest == image_id and not allow_local_image_id:
-        raise ReleaseError(f"{reference} uses the local image ID as a pseudo digest, not registry digest evidence")
+    if not allow_local_image_id:
+        # Docker's image ID may equal a genuine pulled manifest digest (Docker 29).
+        # Ask the registry for the exact reference; local-only pseudo digests
+        # cannot pass this check even when their RepoDigests look identical.
+        step(event, f"registry_manifest_{hashlib.sha256(reference.encode()).hexdigest()[:10]}",
+             ["docker", "manifest", "inspect", reference], env=env)
     labels = (image.get("Config") or {}).get("Labels") or {}
     if expected_revision is not None and labels.get("org.opencontainers.image.revision") != expected_revision:
         raise ReleaseError(f"image {reference} revision label does not match source_revisions")

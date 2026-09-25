@@ -184,10 +184,36 @@ its checksum, and bounded pre-replacement logs for audit and recovery.
 
 From a **non-allowlisted** external network, attempt guest auth, hub WebSocket/long polling, UDP 7777–7781, and TCP 7777, 5432, 8080; none may reach the service. From an allowlisted external client verify trusted HTTPS, guest auth, hub both transports, character catalog, direct UDP match and rematch. Check 80/tcp only redirects or handles ACME validation, and HTTPS certificates are publicly trusted. Verify IPv6 separately or that no AAAA/public IPv6 listener exists. Restart the VPS and verify service readiness/registration and certificate persistence. A failed firewall, readiness, migration, backup, or digest check blocks release rather than falling through to a broader ingress rule.
 
-The local `#231` test is not evidence of these live gates. In this workspace
-the `sloparena` SSH alias offered its configured key, but authentication as
-both the configured `binoui` account and `ubuntu` was rejected
-(`Permission denied (publickey,password)`). No live provisioning, DNS changes
-or off-host ingress probes were performed. Confirm the VPS account and
-`authorized_keys` through the provider console before the live steps; never
-weaken SSH authentication as a workaround.
+## Observed live test release (2026-09-25)
+
+The operator installed the existing SSH public key and opened a new
+key-authenticated session. On `sloparena-prod-1`, Ubuntu Docker 29.1.3 and
+Compose 2.40.3 run with UFW denying unsolicited IPv4/IPv6 ingress, operator
+IPv4 `/32` access to SSH/HTTPS/gameplay UDP, and public TCP 80 for ACME. The
+Docker-aware `DOCKER-USER` filter survived a daemon restart. Password SSH
+remains enabled; the OVH provider firewall was not changed.
+
+Both DNS-only test A records resolved to the VPS IPv4 with no AAAA. Under
+release ID `vps-test-20260925-1`, the immutable GameServer (`5ba1be4`) and
+Master/migration (`263a19d`) images passed the digest/label gate. Before the
+explicit EF migration, `pg_dump` wrote a nonempty, SHA-256-verified backup.
+The active schema is `20260802141019_AddUniqueIndexGameServerIpPort`;
+Master, GameServer and PostgreSQL report healthy, GameServer registered,
+and Master heartbeat updates succeeded. The first deploy attempt was
+rejected before service startup because Docker 29 identifies genuine
+registry-pulled images by their manifest digest; the registry check was
+corrected before the successful retry.
+
+From the allowed external IPv4, trusted public HTTPS returned 200 from
+`/ready`; TCP 80 returned 308 to HTTPS. Guest auth and authenticated
+`/auth/me` returned 200; SignalR negotiation, a fresh WebSocket upgrade
+(101) and long polling (200) passed through Caddy. Public raw TCP
+7777/8080/5432 did not connect. A direct UDP datagram to 7777 incremented
+the allowed Docker ingress-rule packet count from zero to one; this proves
+the network path, **not** a complete gameplay round trip. Direct HTTPS
+over the VPS's global IPv6 timed out from an unallowed IPv6 source.
+
+At this checkpoint, still to prove: non-allowlisted **IPv4** cannot use
+HTTPS or gameplay UDP; an allowlisted packaged Unity client can finish a match;
+VPS reboot and off-host restore preserve service operation. Those are
+distinct from this release's readiness and firewall evidence.
