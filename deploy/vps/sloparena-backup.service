@@ -1,0 +1,9 @@
+[Unit]
+Description=SlopArena off-host PostgreSQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/sloparena/deploy/vps/recovery.py backup --target-dir /var/lib/sloparena --credentials /etc/sloparena/private/s3-curl.conf
+TimeoutStartSec=45min

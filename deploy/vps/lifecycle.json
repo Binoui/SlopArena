@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "id": "expire-sloparena-postgres-backups",
+      "status": "enabled",
+      "filter": { "prefix": "postgres/" },
+      "expiration": { "days": 30 },
+      "noncurrentVersionExpiration": { "noncurrentDays": 30 },
+      "abortIncompleteMultipartUpload": { "daysAfterInitiation": 7 }
+    }
+  ]
+}

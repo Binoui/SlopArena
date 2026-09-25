@@ -1,5 +1,7 @@
 import unittest
 
+import recovery
+
 import release
 
 
@@ -50,6 +52,34 @@ class PublishedPortsTests(unittest.TestCase):
         config["services"]["caddy"]["ports"][1]["host_ip"] = "0.0.0.0"
         with self.assertRaises(release.ReleaseError):
             release.check_published_ports(config, disposable=True)
+
+
+class RestoreSafetyTests(unittest.TestCase):
+    def test_restore_rejects_archive_keys_that_escape_its_isolated_target(self):
+        from pathlib import Path
+        for key in ("postgres/..dump", "postgres/.dump", "postgres/../live.dump",
+                    "postgres/../../live.dump", "other/live.dump"):
+            with self.subTest(key=key), self.assertRaises(release.ReleaseError):
+                recovery.restore(Path("/no-live-state"), Path("/no-credentials"), key)
+
+
+class LogPrivacyTests(unittest.TestCase):
+    def test_proxy_outage_preserves_error_without_token_url_or_authorization(self):
+        raw = (b'caddy-1  | {"logger":"http.log.error","msg":"dial tcp: connection refused",'
+               b'"request":{"uri":"/lobby?access_token=secret-jwt",'
+               b'"headers":{"Authorization":["Bearer secret-jwt"]}},"status":502}\n')
+        safe = release.safe_log_line(raw)
+        self.assertIn(b"connection refused", safe)
+        self.assertIn(b'"status":502', safe)
+        self.assertNotIn(b"secret-jwt", safe)
+        self.assertNotIn(b'"request"', safe)
+
+    def test_prior_master_request_and_token_lines_are_not_archived(self):
+        self.assertEqual(b"", release.safe_log_line(
+            b"master-1  | Request starting HTTP/1.1 GET https://example/lobby?access_token=secret\n"))
+        self.assertEqual(b"", release.safe_log_line(
+            b"master-1  | Authorization: Bearer secret\n"))
+        self.assertIn(b"Registered", release.safe_log_line(b"game-1  | [Registration] Registered\n"))
 
 
 if __name__ == "__main__":

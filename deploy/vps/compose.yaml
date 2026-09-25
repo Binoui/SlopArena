@@ -72,6 +72,8 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: "8080"
       ASPNETCORE_ENVIRONMENT: Production
+      # Hosting request-start/end logs include query strings (SignalR access_token).
+      Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics: Warning
       Deployment__Profile: vps
       ApprovedHost__PublicHost: ${GAMEPLAY_TEST_HOST:?set the public gameplay hostname}
       ApprovedHost__PublicPort: "7777"

@@ -552,11 +552,33 @@ def store_schema(target: Path, migrations: list[str]) -> None:
     atomic_write(target / "schema.json", json_bytes({"observed_at": now(), "migrations": migrations, "current": latest_migration(migrations)}))
 
 
+def safe_log_line(line: bytes) -> bytes:
+    prefix, separator, body = line.partition(b" | ")
+    if separator and b"caddy-" in prefix and body.lstrip().startswith(b"{"):
+        try:
+            event = json.loads(body)
+            if isinstance(event, dict):
+                # Prior Caddy versions may have logged the complete token-bearing URI
+                # and request headers before the Caddyfile log filter was deployed.
+                event.pop("request", None)
+                line = prefix + separator + json.dumps(event, separators=(",", ":")).encode() + b"\n"
+        except (ValueError, UnicodeError):
+            return b""  # Unknown proxy log format: do not archive raw request data.
+    lower = line.lower()
+    if (b"request starting " in lower or b"request finished " in lower
+            or any(secret in lower for secret in (b"access_token", b"authorization:", b"bearer ",
+                                                   b"password=", b"secret=", b"token=", b"cookie:"))
+            or re.search(rb"https?://\S+\?", lower)
+            or re.search(rb"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", line)):
+        return b""
+    return line
+
+
 def capture_logs(event: dict[str, Any], target: Path, env_file: Path, override: Path | None, env: dict[str, str]) -> None:
     event["stage"] = "pre_replacement_logs"
     path = target / "logs" / f"pre-replacement-{event['event_id']}.log"
     private_dir(path.parent)
-    argv = compose_argv(target, env_file, override, ["logs", "--no-color", "--timestamps", f"--tail={MAX_PRE_REPLACEMENT_LOG_LINES}", "master", "game"])
+    argv = compose_argv(target, env_file, override, ["logs", "--no-color", "--timestamps", f"--tail={MAX_PRE_REPLACEMENT_LOG_LINES}", "caddy", "master", "game"])
     started = time.monotonic()
     truncated = False
     total = 0
@@ -564,16 +586,13 @@ def capture_logs(event: dict[str, Any], target: Path, env_file: Path, override: 
     with path.open("xb") as output:
         os.chmod(path, 0o600)
         assert proc.stdout is not None
-        while True:
-            chunk = proc.stdout.read(65536)
-            if not chunk:
-                break
-            if total < MAX_LOG_BYTES:
-                kept = chunk[:MAX_LOG_BYTES - total]
-                output.write(kept)
-                total += len(kept)
-                if len(kept) != len(chunk):
-                    truncated = True
+        for raw_line in proc.stdout:
+            line = safe_log_line(raw_line)
+            if not line:
+                continue
+            if total + len(line) <= MAX_LOG_BYTES:
+                output.write(line)
+                total += len(line)
             else:
                 truncated = True
         code = proc.wait()
@@ -856,9 +875,11 @@ def configure_parser() -> argparse.ArgumentParser:
     rollback_parser.add_argument("--release-id", required=True)
     status_parser = commands.add_parser("status", help="show recorded release and local Compose status")
     status_parser.add_argument("--target-dir", required=True)
-    logs_parser = commands.add_parser("logs", help="show a bounded tail of application logs")
+    logs_parser = commands.add_parser("logs", help="show a bounded tail of a selected service")
     logs_parser.add_argument("--target-dir", required=True)
     logs_parser.add_argument("--tail", type=int, default=100)
+    logs_parser.add_argument("--service", choices=("caddy", "postgres", "master", "game"),
+                             default="master", help="Compose service whose recent logs to view")
     for sub in (deploy_parser, rollback_parser, status_parser, logs_parser):
         sub.add_argument("--compose-override", type=Path, help="disposable-only Compose ports override")
         sub.add_argument("--allow-disposable-host", action="store_true", help="explicit isolated smoke mode; requires loopback override and firewall fixture")
@@ -867,31 +888,109 @@ def configure_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def disk_usage(path: Path) -> dict[str, int | str]:
+    filesystem = os.statvfs(path)
+    block = filesystem.f_frsize
+    return {
+        "path": str(path),
+        "total_bytes": filesystem.f_blocks * block,
+        "used_bytes": (filesystem.f_blocks - filesystem.f_bfree) * block,
+        "available_bytes": filesystem.f_bavail * block,
+    }
+
+
+def service_probe(target: Path, env_file: Path, override: Path | None, env: dict[str, str],
+                  service: str, port: int, route: str) -> bool:
+    script = (
+        f'exec 3<>/dev/tcp/127.0.0.1/{port}; '
+        f'printf "GET {route} HTTP/1.0\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n" >&3; '
+        'IFS= read -r status <&3; [[ "$status" == *" 200 "* ]]'
+    )
+    try:
+        proc = subprocess.run(compose_argv(target, env_file, override, ["exec", "-T", service, "bash", "-ec", script]),
+                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        return proc.returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def registration_status(target: Path, env_file: Path, override: Path | None, env: dict[str, str]) -> dict[str, Any]:
+    sql = (
+        'SELECT COALESCE(json_agg(json_build_object('
+        '\'id\', "Id", \'current_matches\', "CurrentMatches", '
+        '\'last_heartbeat\', "LastHeartbeat", '
+        '\'fresh\', "LastHeartbeat" > now() - interval \'15 seconds\')), \'[]\'::json) '
+        'FROM "GameServers";'
+    )
+    argv = compose_argv(target, env_file, override,
+                        ["exec", "-T", "postgres", "psql", "-U", "sloparena", "-d", "sloparena",
+                         "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql])
+    try:
+        proc = subprocess.run(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5)
+        if proc.returncode:
+            return {"available": False}
+        rows = json.loads(proc.stdout.decode().strip())
+        return {"available": True, "hosts": rows,
+                "registered": any(host["fresh"] for host in rows),
+                "active_matches": sum(host["current_matches"] for host in rows if host["fresh"])}
+    except (subprocess.TimeoutExpired, UnicodeError, ValueError, KeyError, TypeError):
+        return {"available": False}
+
+
 def status_or_logs(args: argparse.Namespace, target: Path, env: dict[str, str]) -> None:
     active = active_manifest(target, args.allow_disposable_host)
     env_file = target / "release.env"
     if args.command == "status":
-        result: dict[str, Any] = {"active_release": active["release_id"] if active else None}
+        result: dict[str, Any] = {
+            "active_release": active["release_id"] if active else None,
+            "images": active["images"] if active else None,
+            "source_revisions": active["source_revisions"] if active else None,
+            "disk": {"root": disk_usage(Path("/")), "state": disk_usage(target)},
+        }
+        docker_root = Path(step_for_readonly(["docker", "info", "--format", "{{.DockerRootDir}}"], env).strip())
+        result["disk"]["docker_data"] = disk_usage(docker_root)
         schema_path = target / "schema.json"
         if schema_path.exists():
             result["schema"] = parse_json(schema_path)
+        latest = target / "last-offhost-backup.json"
+        result["last_offhost_backup"] = parse_json(latest) if latest.exists() else None
+        attempt = target / "last-backup-attempt.json"
+        result["last_backup_attempt"] = parse_json(attempt) if attempt.exists() else None
         if env_file.is_file():
-            output = step_for_readonly(compose_argv(target, env_file, args.compose_override, ["ps", "--format", "json"]), env)
+            output = step_for_readonly(compose_argv(target, env_file, args.compose_override, ["ps", "--all", "--format", "json"]), env)
             result["compose"] = [
                 {key: row.get(key) for key in ("Service", "Image", "State", "Health", "Ports")}
                 for row in (json.loads(line) for line in output.splitlines() if line.strip())
             ]
+            result["services"] = {
+                service: {
+                    "liveness": service_probe(target, env_file, args.compose_override, env, service, port, "/health"),
+                    "readiness": service_probe(target, env_file, args.compose_override, env, service, port, "/ready"),
+                }
+                for service, port in (("master", 8080), ("game", 7777))
+            }
+            result["registration"] = registration_status(target, env_file, args.compose_override, env)
         print(json.dumps(result, indent=2, sort_keys=True))
         return
     if not 1 <= args.tail <= MAX_PRE_REPLACEMENT_LOG_LINES:
         raise ReleaseError(f"--tail must be from 1 to {MAX_PRE_REPLACEMENT_LOG_LINES}")
     if not env_file.is_file():
         raise ReleaseError("no release.env exists in target state")
-    command = compose_argv(target, env_file, args.compose_override, ["logs", "--no-color", "--tail", str(args.tail), "master", "game"])
+    command = compose_argv(target, env_file, args.compose_override, ["logs", "--no-color", "--tail", str(args.tail), args.service])
     proc = subprocess.run(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
-    output = proc.stdout[:MAX_LOG_BYTES].decode("utf-8", errors="replace")
+    lines: list[bytes] = []
+    size = 0
+    truncated = False
+    for raw_line in proc.stdout.splitlines(keepends=True):
+        line = safe_log_line(raw_line)
+        if size + len(line) <= MAX_LOG_BYTES:
+            lines.append(line)
+            size += len(line)
+        else:
+            truncated = True
+    output = b"".join(lines).decode("utf-8", errors="replace")
     print(output, end="" if output.endswith("\n") or not output else "\n")
-    if len(proc.stdout) > MAX_LOG_BYTES:
+    if truncated:
         print("[output truncated at 1 MiB]")
     if proc.returncode != 0:
         raise CommandFailure("logs", proc.returncode, output[-4000:])

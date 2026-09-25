@@ -76,7 +76,8 @@ avoid `sudo`. The installed bootstrap firewall helper must be executable.
 sudo python3 deploy/vps/release.py deploy \
   --target-dir /var/lib/sloparena --config /etc/sloparena/release.json
 sudo python3 deploy/vps/release.py status --target-dir /var/lib/sloparena
-sudo python3 deploy/vps/release.py logs --target-dir /var/lib/sloparena
+sudo python3 deploy/vps/release.py logs --target-dir /var/lib/sloparena --service master
+sudo python3 deploy/vps/release.py logs --target-dir /var/lib/sloparena --service caddy --tail 50
 sudo python3 deploy/vps/release.py rollback \
   --target-dir /var/lib/sloparena --release-id <previous-compatible-release-id>
 ```
@@ -180,6 +181,228 @@ live volume, drop that volume, or remove the Caddy certificate volumes.
 Retain both image/revision records, the migration outcome, the backup path and
 its checksum, and bounded pre-replacement logs for audit and recovery.
 
+## Off-host PostgreSQL recovery (#233)
+
+The OVH SBG bucket `sloparena-vps-db-backups` is separate from VPS snapshots.
+It has AES256 at-rest encryption, versioning, 30-day governance Object Lock for
+new objects, and the `postgres/` lifecycle in `lifecycle.json` (30 days current,
+30 days noncurrent, incomplete multipart uploads after seven days). Public
+Cloud user `808255` has a policy allowing Put/Get under `postgres/` and
+explicitly denying deletion, ACL mutation and governance bypass. The tested
+object/version deletes returned 403. **Do not infer complete public-access
+blocking from that policy:** OVH [does not implement PutPublicAccessBlock in
+Regions](https://docs.ovhcloud.com/en/guides/storage-and-backup/object-storage/s3-s3-compliancy)
+and the uploader-owned probe accepted `PUT ?acl` immediately after an
+explicit deny was installed. After the policy settled, the same ACL change
+returned 403. A temporary `s3:GetObject` deny still allowed reads of both
+an older and a recent uploader-owned object after roughly a minute; a new
+key also read an older object shortly after issuance. Policy propagation
+is therefore a factor, and upload-only protection was **not established**.
+The test-only key was revoked; the working policy intentionally permits
+Put/Get. A known private object returned 403 to an anonymous GET. Keep the
+key private, do not use account IAM user `sloparena-backup` for S3, and
+rotate it separately from the DB password.
+
+**Accepted demo exception (2026-09-25):** keep OVH with this single
+root-owned backup key, which can both upload and read archives. Do not claim
+upload-only access, protection from a stolen key reading the database, or
+AWS-style public-access blocking. Treat key disclosure as database archive
+disclosure, revoke/reissue the key and any exposed GameServer API tokens,
+then review object ACLs. No customer data should be regarded as protected
+from someone who has acquired this key. Object Lock and versioning protect
+the existing versions against the tested deletion path for 30 days, not
+archive confidentiality. A separate operator read key would need a settled
+test proving the uploader can no longer read its own archives; that is not
+the chosen demo contract.
+
+On the **VPS**, review the staged files before installing them into
+`/opt/sloparena/deploy/vps/` alongside the existing `release.py` and
+`compose.yaml`. Python 3, curl with `--aws-sigv4`, and Docker must already
+be present; do not install tools implicitly. The dedicated S3 key belongs
+in `/etc/sloparena/private/s3-curl.conf` as a root-owned mode 0600 curl
+config:
+
+```text
+user = "ACCESS_KEY:SECRET_KEY"
+```
+
+Keep this file and the credential JSON outside Git, images, logs, and chat.
+Use a private transfer rather than a shell command containing either key.
+The generated workstation credential is in
+`~/.config/sloparena/ovh-s3-credential.json`; a prepared local curl config is
+in `~/.config/sloparena/s3-curl.conf`. Only an operator moves the config
+into its root-only VPS destination. The S3 endpoint is
+`https://s3.sbg.io.cloud.ovh.net/` (signing region `sbg`). A single PUT
+supports archives below 5 GiB; larger databases require a multipart-capable
+client before this job can be relied on.
+
+For the current `sloparena` SSH target, all eight non-secret deploy assets
+have been checksum-verified in
+`/home/binoui/.cache/sloparena-233-20260925/` (0700), alongside a temporary
+0600 curl config. From an interactive SSH session as `binoui`, enter the
+sudo password **locally**, verify this staging directory still matches the
+reviewed files, and install:
+
+```bash
+stage="$HOME/.cache/sloparena-233-20260925"
+for file in release.py recovery.py; do
+  sudo install -o root -g root -m 0755 "$stage/$file" "/opt/sloparena/deploy/vps/$file"
+done
+for file in compose.yaml Caddyfile sloparena-backup.service sloparena-backup.timer lifecycle.json README.md; do
+  sudo install -o root -g root -m 0644 "$stage/$file" "/opt/sloparena/deploy/vps/$file"
+done
+sudo install -o root -g root -m 0600 "$stage/s3-curl.conf" /etc/sloparena/private/s3-curl.conf
+rm -- "$stage/s3-curl.conf"
+```
+
+Installing Compose/Caddy configuration does not itself recreate running
+containers. Do not enable the timer or replace Caddy/Master until the first
+off-host backup and isolated restore pass; check the active-match count
+before any service replacement.
+
+After placing the key and code, run one backup and inspect its result before
+attempting the isolated restore:
+
+```bash
+sudo python3 /opt/sloparena/deploy/vps/recovery.py backup \
+  --target-dir /var/lib/sloparena \
+  --credentials /etc/sloparena/private/s3-curl.conf
+```
+
+The daily timer starts at 04:15 UTC plus up to 30 minutes of jitter, catches
+up after downtime, and uses the same deployment lock; systemd also prevents
+overlap of its own service. The dump is PostgreSQL 15 custom format. The job
+uploads the archive, downloads it for SHA-256 verification, uploads a
+non-secret migration/image manifest, then marks success in
+`last-offhost-backup.json` (visible via `release.py status`). Local daily dumps
+are capped at three; pre-migration backups are separate. Inspect
+`systemctl status sloparena-backup.service` and the journal on failure; a
+local `pg_dump` or VPS snapshot alone is **not** off-host success.
+
+OVH has returned a transient 403 to an immediate GET after a successful
+PUT. The verification download retries for at most 24 × 5 seconds; success
+still requires the downloaded SHA-256 to match before the manifest and
+success marker are uploaded. A `.dump` with no paired `.dump.json` from an
+older failed attempt is **not** a completed backup; leave it to the
+30-day lifecycle instead of claiming or restoring it.
+
+To prove recovery, select an actual archive key from a completed backup:
+
+```bash
+sudo python3 /opt/sloparena/deploy/vps/recovery.py restore \
+  --target-dir /var/lib/sloparena \
+  --credentials /etc/sloparena/private/s3-curl.conf \
+  --key postgres/<backup-id>.dump
+```
+
+The restore downloads the archived manifest and dump, checks size/SHA-256,
+creates **new** Docker volume and containers on a new internal-only network
+with no published ports, runs `pg_restore --exit-on-error`, compares EF
+migration IDs, counts persisted Users/Matches/GameServers, and requires an
+isolated Master `/ready` response. The result lists its isolated container,
+network and volume names for inspection and explicit cleanup. It never
+replaces the live database, copies a PostgreSQL data directory, or exposes
+restored host credentials on a live route. A restore against a different
+active Master schema must fail rather than pass readiness by inference.
+
+Only after the downloaded-archive restore and Master readiness checks pass,
+enable the daily timer:
+
+```bash
+sudo install -m 0644 /opt/sloparena/deploy/vps/sloparena-backup.service \
+  /etc/systemd/system/sloparena-backup.service
+sudo install -m 0644 /opt/sloparena/deploy/vps/sloparena-backup.timer \
+  /etc/systemd/system/sloparena-backup.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now sloparena-backup.timer
+sudo systemctl list-timers sloparena-backup.timer
+```
+
+To apply the new Caddy error-log filter and Master request-log suppression,
+first inspect `release.py status` and wait for zero active matches. Then deploy
+the **same saved, schema-compatible release record** through the deploy
+command, which captures the pre-replacement log bundle and runs normal
+image/firewall preflight. This replaces application containers and may
+interrupt an in-progress match; never do it blind. The Caddyfile is a
+bind-mounted file; Compose may retain the existing Caddy container, so
+explicitly reload its running configuration after deploy:
+
+```bash
+sudo python3 /opt/sloparena/deploy/vps/release.py status \
+  --target-dir /var/lib/sloparena
+release_id=$(sudo python3 /opt/sloparena/deploy/vps/release.py status \
+  --target-dir /var/lib/sloparena | python3 -c 'import json,sys; print(json.load(sys.stdin)["active_release"])')
+sudo python3 /opt/sloparena/deploy/vps/release.py deploy \
+  --target-dir /var/lib/sloparena \
+  --config "/var/lib/sloparena/releases/$release_id.json"
+sudo python3 - <<'PY'
+import subprocess
+import sys
+from pathlib import Path
+sys.path.insert(0, "/opt/sloparena/deploy/vps")
+import release
+target = Path("/var/lib/sloparena")
+command = release.compose_argv(
+    target, target / "release.env", None,
+    ["exec", "-T", "caddy", "caddy", "reload", "--config", "/etc/caddy/Caddyfile"],
+)
+subprocess.run(command, env=release.docker_env(target), check=True)
+PY
+sudo python3 /opt/sloparena/deploy/vps/release.py status \
+  --target-dir /var/lib/sloparena
+```
+
+An OVH VPS automated backup is a separate whole-machine recovery aid, not
+evidence of a database restore. Rotating/reissuing database, JWT, approved
+host, registry and storage credentials is separate from restoring data;
+restored GameServer registrations/tokens must not be reused to enroll a new
+host. Do not import home lobby/chat in-memory state or delete home data.
+
+### Operations and credential reissue
+
+`release.py status` reports recorded release/source/image identities, container
+state, `/health` and `/ready` for both applications, the Master registration
+row's heartbeat freshness and reported active-match count, root/state/Docker
+data filesystem use, and the last off-host success **and** last backup attempt.
+The match count comes from the latest Master heartbeat, not a synchronous
+simulation query; an unavailable database reports registration as unavailable
+instead of inventing zero. `logs --service caddy|postgres|master|game --tail N`
+is bounded to 200 lines and 1 MiB. Before replacement the release saves up
+to 200 recent lines/1 MiB across Caddy, Master and GameServer in a private
+history file. Docker `local` logging rotates each long-lived service at
+10 MB × 3. The proxy does not enable access-request logging; its structured
+error logger deletes `request.uri` because upstream failures otherwise log
+SignalR `access_token` query strings. The Master suppresses ASP.NET Hosting
+request-start/end logs for the same reason. The operator logs command and
+pre-replacement bundle also discard legacy request/JWT lines and strip
+structured Caddy request metadata before printing or saving them. This does
+not erase old raw Docker log files; treat them as private until their
+containers are replaced. Check a known event before replacement and in the
+private bundle afterward; never paste raw logs, tokens or chat bodies into
+an issue.
+
+**Reissue is not restore.** Stop writers/deploys as appropriate, prepare each
+replacement in private files, replace one credential domain at a time, check
+readiness/registration, and revoke the old value only after the new path
+works:
+
+| Domain | Reissue boundary |
+| --- | --- |
+| PostgreSQL | Change the `sloparena` role password in PostgreSQL and atomically update the postgres password file plus Master/migration connection files; restart affected services. Changing `POSTGRES_PASSWORD_FILE` alone does **not** update an existing database role. Verify Master `/ready` and a fresh dump. |
+| JWT | Change only the Master's `Jwt__Secret`, restart Master; existing guest sessions become invalid and must authenticate again. A DB restore must not reintroduce the old secret. |
+| Approved host registration and match control | Replace registration and control keys separately in both private Master/GameServer configs, then restart the affected processes during maintenance. Existing VPS `GameServers.ApiToken` survives re-registration: changing only the registration key does **not** revoke it. To reissue a compromised API token, stop GameServer, drain/accept match interruption, invalidate the provisioned registration row under operator control, then re-register and verify a new token; do not delete an active row mid-match. |
+| VPS SSH | Add and verify a new key from an allowed management CIDR in a **new** session before revoking the old key. Preserve provider-console recovery and SSH source restrictions. |
+| GHCR read credential | Rotate the VPS registry read-only credential through the registry; test a pinned manifest pull before revoking the old credential. Do not place it in release JSON. |
+| OVH Object Storage | Create a new S3 access pair/user with the same scoped policy, install a private curl config, prove upload/download and both object/version delete rejection, then revoke the old pair. OVH ACL mutation remains a known limitation despite explicit deny; never treat the scoped policy as an AWS public-access block. Never copy S3 secrets into database archives. |
+
+Home export/import is **not** part of this VPS release. If chosen later,
+`pg_dump` must read the home source without modifying/deleting it; restore to
+a new isolated PostgreSQL target and verify records/migrations before any
+cutover. Do not copy home runtime configs, reusable GameServer registration
+rows/API tokens, or in-memory lobby/chat state into a reachable Master.
+Enroll the target GameServer afresh with new host credentials. A PostgreSQL
+data-directory copy of a running home server is not a safe import.
+
 ## Acceptance on a live target
 
 From a **non-allowlisted** external network, attempt guest auth, hub WebSocket/long polling, UDP 7777–7781, and TCP 7777, 5432, 8080; none may reach the service. From an allowlisted external client verify trusted HTTPS, guest auth, hub both transports, character catalog, direct UDP match and rematch. Check 80/tcp only redirects or handles ACME validation, and HTTPS certificates are publicly trusted. Verify IPv6 separately or that no AAAA/public IPv6 listener exists. Restart the VPS and verify service readiness/registration and certificate persistence. A failed firewall, readiness, migration, backup, or digest check blocks release rather than falling through to a broader ingress rule.
@@ -229,3 +452,44 @@ Still to prove in the later end-to-end acceptance: an allowlisted packaged
 Unity client completes a match, VPS reboot preserves registration/certificates,
 and an off-host database restore succeeds. This test release does not
 establish those behaviors.
+
+## Off-host recovery checkpoint (2026-09-25)
+
+The operator ran `recovery.py backup` on the restricted VPS under release
+`vps-test-20260925-1`. The completed archive
+`postgres/20260925T145904Z-7be3bc12c6b3496dbd5a32255f239b17.dump`
+has 9,116 bytes and SHA-256
+`944da02fac0aa83cd6c32bbcd592191d922d90793961c76cba505ae0516d86f0`.
+Its non-secret manifest was independently downloaded from OVH and matched
+the reported key, size, checksum and three EF migration IDs. Earlier two
+`.dump` objects without manifests failed the immediate read-after-write
+check; they are **not** completed backups. The bounded retry for transient
+403 was exercised against a 403-then-200 HTTPS fixture and a fresh OVH
+upload/download. The operator then downloaded that **live** archive into
+isolated PostgreSQL container `sloparena-restore-115280153537` on internal
+network `sloparena-restore-115280153537-net` with a new Docker data volume.
+`pg_restore` and the three EF migrations passed; the restored database had
+one User, zero Matches and one GameServer, and isolated Master `/ready`
+returned 200. No live database was replaced or exposed. The operator then
+installed and enabled `sloparena-backup.timer`; its next run is scheduled
+for 2026-09-26 06:39:25 CEST. A service-run backup reported success at
+15:05:20 UTC with archive
+`postgres/20260925T150519Z-2118388eb50c482e80c15d92a92a1fdb.dump`
+(9,115 bytes, SHA-256
+`5fcd24c06facf9d067ed191b7818bb7ddfd380d3a4fef92909050e88472933c3`).
+Live `release.py status` reported Master/GameServer liveness and readiness,
+one fresh registration, zero active matches, pinned image identities, disk
+usage and the successful off-host backup. With zero active matches, the
+operator replayed the same release; event
+`cf0deaaa7b854f4eab957fe486b14fb0` succeeded without changing schema
+or image identities. Post-deploy `/health` and `/ready` for both apps
+remained true and registration was fresh with zero active matches. The
+pre-replacement bundle was captured by the deploy path. The operator reports
+reloading live Caddy. The 39,602-byte private bundle contains Caddy, Master
+and GameServer entries; the operator's inspection found neither
+`access_token` nor `Bearer ` markers. The local upstream-failure probe
+also showed the new Caddy filter drops token-bearing request metadata.
+The operator reports cleaning up only the isolated restore containers,
+network and volume after saving their result; the live PostgreSQL/Caddy
+volumes were not part of that cleanup. No further infrastructure expansion
+is needed for the friends playtest.
