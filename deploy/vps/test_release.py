@@ -1,7 +1,11 @@
+import tempfile
 import unittest
+from datetime import datetime as DateTime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import recovery
-
 import release
 
 
@@ -53,6 +57,79 @@ class PublishedPortsTests(unittest.TestCase):
         with self.assertRaises(release.ReleaseError):
             release.check_published_ports(config, disposable=True)
 
+
+class BackupRetentionTests(unittest.TestCase):
+    def test_backup_keeps_newest_three_daily_pairs_and_ignores_pre_migration_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / "release.env").touch()
+            backups = target / "backups"
+            backups.mkdir(mode=0o700)
+            legacy = backups / f"20250101T000000Z-{'0' * 32}.dump"
+            legacy.write_bytes(b"old daily")
+            legacy.with_name(legacy.name + ".json").write_text("{}")
+            older_legacy = backups / f"20250102T000000Z-{'0' * 31}1.dump"
+            older_legacy.write_bytes(b"old daily")
+            older_legacy.with_name(older_legacy.name + ".json").write_text("{}")
+            premigration = backups / "pg-before-migration-release-001.dump"
+            premigration.write_bytes(b"pre-migration")
+            premigration.with_name(premigration.name + ".json").write_text("{}")
+
+            class Clock:
+                current = 0
+
+                @classmethod
+                def now(cls, tz):
+                    value = DateTime(2026, 1, 1, tzinfo=timezone.utc).replace(second=cls.current)
+                    cls.current += 1
+                    return value
+
+            uploads = {}
+
+            def command(argv, *, stdout=None, env=None):
+                stdout.write(f"dump-{Clock.current}".encode())
+                return b""
+
+            def s3(method, key, credentials, file=None, *, verify_upload=False):
+                if method == "PUT":
+                    uploads[key] = file.read_bytes()
+                elif method == "GET":
+                    file.write_bytes(uploads[key])
+                return b""
+
+            credentials = target / "credentials"
+            credentials.touch()
+            with (
+                patch.object(release, "active_manifest", return_value={"release_id": "test", "images": {}}),
+                patch.object(release, "query_migrations", return_value=[]),
+                patch.object(recovery, "command", side_effect=command),
+                patch.object(recovery, "s3", side_effect=s3),
+                patch.object(recovery, "datetime", Clock),
+                patch.object(recovery.uuid, "uuid4", side_effect=[
+                    SimpleNamespace(hex=f"{index:032x}") for index in range(20)
+                ]),
+            ):
+                manifests = [recovery.backup(target, credentials) for _ in range(5)]
+
+            self.assertEqual([manifest["key"] for manifest in manifests], [
+                f"postgres/20260101T00000{second}Z-{second * 3:032x}.dump"
+                for second in range(5)
+            ])
+
+            daily = backups / "daily"
+            surviving = sorted(daily.glob("*.dump"))
+            self.assertEqual([path.name for path in surviving], [
+                f"20260101T00000{second}Z-{second * 3:032x}.dump"
+                for second in (2, 3, 4)
+            ])
+            self.assertEqual(len(uploads), 10)
+            self.assertEqual(sorted(path.name for path in daily.iterdir()),
+                             sorted(name for path in surviving for name in (path.name, path.name + ".json")))
+            self.assertTrue(premigration.is_file())
+            self.assertTrue(premigration.with_name(premigration.name + ".json").is_file())
+            for old in (legacy, older_legacy):
+                self.assertFalse(old.exists())
+                self.assertFalse(old.with_name(old.name + ".json").exists())
 
 class RestoreSafetyTests(unittest.TestCase):
     def test_restore_rejects_archive_keys_that_escape_its_isolated_target(self):

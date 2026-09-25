@@ -274,10 +274,13 @@ up after downtime, and uses the same deployment lock; systemd also prevents
 overlap of its own service. The dump is PostgreSQL 15 custom format. The job
 uploads the archive, downloads it for SHA-256 verification, uploads a
 non-secret migration/image manifest, then marks success in
-`last-offhost-backup.json` (visible via `release.py status`). Local daily dumps
-are capped at three; pre-migration backups are separate. Inspect
-`systemctl status sloparena-backup.service` and the journal on failure; a
-local `pg_dump` or VPS snapshot alone is **not** off-host success.
+`last-offhost-backup.json` (visible via `release.py status`). Local daily
+archives and their manifests live in `backups/daily` and are capped at three
+after successful uploads. Existing timestamp-named daily archives in
+`backups/` are included during retention cutover; pre-migration backups there
+are untouched. Inspect `systemctl status sloparena-backup.service` and the
+journal on failure; a local `pg_dump` or VPS snapshot alone is **not**
+off-host success.
 
 OVH has returned a transient 403 to an immediate GET after a successful
 PUT. The verification download retries for at most 24 × 5 seconds; success
@@ -364,6 +367,13 @@ host. Do not import home lobby/chat in-memory state or delete home data.
 state, `/health` and `/ready` for both applications, the Master registration
 row's heartbeat freshness and reported active-match count, root/state/Docker
 data filesystem use, and the last off-host success **and** last backup attempt.
+
+GameServer `/ready` requires cooked content and a Master registration or heartbeat
+acknowledgement from the last 15 seconds; `/health` remains a listener check.
+An outage can turn readiness to 503 without stopping active fights or dropping
+the registration token. A successful heartbeat restores readiness without
+re-registration; a 401/404 heartbeat still starts re-registration.
+
 The match count comes from the latest Master heartbeat, not a synchronous
 simulation query; an unavailable database reports registration as unavailable
 instead of inventing zero. `logs --service caddy|postgres|master|game --tail N`

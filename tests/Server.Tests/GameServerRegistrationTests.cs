@@ -36,6 +36,88 @@ public class GameServerRegistrationTests
         Content = new StringContent(JsonSerializer.Serialize(new { serverId = id, apiToken = token }), Encoding.UTF8, "application/json")
     };
 
+    private sealed class TestClock : TimeProvider
+    {
+        private long _timestamp = 1;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Interlocked.Read(ref _timestamp);
+        public void Advance(TimeSpan duration) => Interlocked.Add(ref _timestamp, duration.Ticks);
+    }
+
+    [Theory]
+    [InlineData("server-error")]
+    [InlineData("connection-failure")]
+    [InlineData("timeout")]
+    public async Task ReadinessExpiresAfterHeartbeatOutageAndRecoversWithoutLosingSession(string failure)
+    {
+        using var reservation = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        reservation.Start();
+        var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
+        reservation.Stop();
+        var config = TestConfig(vps: true);
+        config.Port = port;
+        var id = Guid.NewGuid();
+        var clock = new TestClock();
+        var failedHeartbeat = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reportedToken = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restored = 0;
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/servers/register") return Registered(id);
+            if (request.RequestUri.AbsolutePath.EndsWith("/heartbeat", StringComparison.Ordinal))
+            {
+                if (Volatile.Read(ref restored) == 0)
+                {
+                    failedHeartbeat.TrySetResult();
+                    return failure switch
+                    {
+                        "connection-failure" => throw new HttpRequestException("unavailable"),
+                        "timeout" => throw new TaskCanceledException("timed out"),
+                        _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            if (request.RequestUri.AbsolutePath == "/match/result")
+                reportedToken.TrySetResult(request.Headers.Authorization?.Parameter);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var orchestrator = new MultiMatchOrchestrator(config);
+        var registration = new GameServerRegistration(config, orchestrator, handler, clock);
+        using var control = new MatchControlServer(orchestrator, port, "slop_court",
+            isReady: () => registration.HasFreshRegistration);
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        control.Start();
+        var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(30));
+        try
+        {
+            Assert.True(SpinWait.SpinUntil(() => registration.HasFreshRegistration, 3000));
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("/ready")).StatusCode);
+            await failedHeartbeat.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("/ready")).StatusCode);
+
+            clock.Advance(TimeSpan.FromSeconds(16));
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("/health")).StatusCode);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await http.GetAsync("/ready")).StatusCode);
+            await registration.ReportMatchResultAsync(Guid.NewGuid(), 1);
+            Assert.Equal("api-token", await reportedToken.Task.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.True(registration.IsRegistered);
+            Assert.Equal(id, registration.ServerId);
+
+            Volatile.Write(ref restored, 1);
+            Assert.True(SpinWait.SpinUntil(() => registration.HasFreshRegistration, 3000));
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("/ready")).StatusCode);
+        }
+        finally
+        {
+            cts.Cancel();
+            await run;
+            control.Stop();
+            orchestrator.Shutdown();
+        }
+    }
+
     [Fact]
     public async Task MasterUnavailableAtStartup_EventuallyRegistersAndDeregisters()
     {

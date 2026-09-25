@@ -40,7 +40,7 @@ namespace SlopArena.Server
 
             using var control = new MatchControlServer(orchestrator, config.Port,
                 defaultArena: "slop_court", controlKey: config.IsVps ? config.MatchControlKey : null,
-                isReady: () => contentReady && registration.IsRegistered);
+                isReady: () => contentReady && registration.HasFreshRegistration);
             control.Start();
 
             void BeginShutdown()

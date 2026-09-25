@@ -18,15 +18,26 @@ namespace SlopArena.Server
         private readonly MultiMatchOrchestrator _orchestrator;
         private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+        private readonly TimeProvider _clock;
+        private static readonly TimeSpan RegistrationFreshness = TimeSpan.FromSeconds(15);
         private RegistrationSession? _session;
         private int _running;
-        private sealed record RegistrationSession(Guid Id, string Token);
+        private sealed record RegistrationSession(Guid Id, string Token, long AcknowledgedAt);
         private enum RegistrationOutcome { Success, Retry, Fatal }
 
         public Guid ServerId => Volatile.Read(ref _session)?.Id ?? Guid.Empty;
         public bool IsRegistered => Volatile.Read(ref _session) is not null;
+        public bool HasFreshRegistration
+        {
+            get
+            {
+                var session = Volatile.Read(ref _session);
+                return session is not null && _clock.GetElapsedTime(session.AcknowledgedAt) < RegistrationFreshness;
+            }
+        }
 
-        public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator, HttpMessageHandler? handler = null)
+        public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator,
+            HttpMessageHandler? handler = null, TimeProvider? clock = null)
         {
             _config = config;
             _orchestrator = orchestrator;
@@ -35,6 +46,7 @@ namespace SlopArena.Server
                 BaseAddress = new Uri(config.MasterServerUrl.TrimEnd('/') + "/"),
                 Timeout = TimeSpan.FromSeconds(5)
             };
+            _clock = clock ?? TimeProvider.System;
         }
 
         /// <summary>Single registration and heartbeat owner; retries transient outages until cancelled.</summary>
@@ -115,7 +127,7 @@ namespace SlopArena.Server
                     await response.Content.ReadAsStringAsync(ct), _jsonOptions);
                 if (result == null || result.ServerId == Guid.Empty || string.IsNullOrWhiteSpace(result.ApiToken))
                     return RegistrationOutcome.Fatal;
-                Volatile.Write(ref _session, new RegistrationSession(result.ServerId, result.ApiToken));
+                Volatile.Write(ref _session, new RegistrationSession(result.ServerId, result.ApiToken, _clock.GetTimestamp()));
                 Console.WriteLine($"[Registration] Registered (ID: {result.ServerId}, public address: {ip})");
                 return RegistrationOutcome.Success;
             }
@@ -178,6 +190,8 @@ namespace SlopArena.Server
                 }
                 else if (!response.IsSuccessStatusCode)
                     Console.WriteLine($"[Heartbeat] Master unavailable: {response.StatusCode}");
+                else
+                    Interlocked.CompareExchange(ref _session, session with { AcknowledgedAt = _clock.GetTimestamp() }, session);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (HttpRequestException)

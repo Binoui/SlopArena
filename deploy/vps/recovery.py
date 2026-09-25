@@ -19,8 +19,23 @@ import release
 BUCKET = "sloparena-vps-db-backups"
 ENDPOINT = "https://s3.sbg.io.cloud.ovh.net"
 PREFIX = "postgres/"
-POSTGRES_IMAGE = "postgres:15.19-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f"
 KEY = re.compile(r"^postgres/[A-Za-z0-9_-][A-Za-z0-9._-]*\.dump$")
+DAILY_DUMP = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{32}\.dump$")
+
+
+def daily_dumps(backup_dir: Path) -> list[Path]:
+    return sorted(
+        [path for path in backup_dir.glob("*.dump") if DAILY_DUMP.fullmatch(path.name)]
+        + [path for path in (backup_dir / "daily").glob("*.dump") if DAILY_DUMP.fullmatch(path.name)],
+        key=lambda path: path.name,
+        reverse=True,
+    )
+
+
+def prune_daily_dumps(backup_dir: Path, keep: int) -> None:
+    for old in daily_dumps(backup_dir)[keep:]:
+        old.unlink()
+        old.with_name(old.name + ".json").unlink(missing_ok=True)
 
 
 def command(argv: list[str], *, stdout=None, env=None) -> bytes:
@@ -68,12 +83,12 @@ def backup(target: Path, credentials: Path) -> dict:
         raise release.ReleaseError("no active VPS release")
     backup_dir = target / "backups"
     release.private_dir(backup_dir)
-    # Retain recent failed attempts for diagnosis without filling the VPS disk.
-    for old in sorted(backup_dir.glob("postgres-*.dump"), reverse=True)[2:]:
-        old.unlink()
-        old.with_name(old.name + ".json").unlink(missing_ok=True)
+    # Keep daily archives separate from pre-migration backups; include legacy daily names during cutover.
+    prune_daily_dumps(backup_dir, 2)
+    daily_dir = backup_dir / "daily"
+    release.private_dir(daily_dir)
     key = f"{PREFIX}{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex}.dump"
-    path = backup_dir / key.rsplit("/", 1)[1]
+    path = daily_dir / key.rsplit("/", 1)[1]
     argv = release.compose_argv(target, target / "release.env", None,
                                 ["exec", "-T", "postgres", "pg_dump", "-U", "sloparena", "-d", "sloparena", "--format=custom"])
     with path.open("xb") as output:
@@ -87,11 +102,11 @@ def backup(target: Path, credentials: Path) -> dict:
     manifest = {"key": key, "timestamp": release.now(), "sha256": digest(path),
                 "bytes": path.stat().st_size, "migrations": migrations,
                 "release_id": active["release_id"], "images": active["images"]}
-    manifest_path = backup_dir / f"{path.name}.json"
+    manifest_path = daily_dir / f"{path.name}.json"
     release.atomic_write(manifest_path, release.json_bytes(manifest))
     s3("PUT", key, credentials, path)
     # A successful upload response alone is not proof that the archive can be recovered.
-    fetched = backup_dir / f".{path.name}.verify"
+    fetched = daily_dir / f".{path.name}.verify"
     try:
         s3("GET", key, credentials, fetched, verify_upload=True)
         if digest(fetched) != manifest["sha256"]:
@@ -101,9 +116,7 @@ def backup(target: Path, credentials: Path) -> dict:
     s3("PUT", key + ".json", credentials, manifest_path)
     release.atomic_write(target / "last-offhost-backup.json", release.json_bytes(manifest))
     # Only successful uploads enter the short local rolling window.
-    for old in sorted(backup_dir.glob("postgres-*.dump"), reverse=True)[3:]:
-        old.unlink()
-        old.with_name(old.name + ".json").unlink(missing_ok=True)
+    prune_daily_dumps(backup_dir, 3)
     return manifest
 
 
