@@ -33,7 +33,6 @@ namespace SlopArena.Client.UI
         /// <summary>Notice captured for this activation; shown until the scan settles.</summary>
         private string? _pendingReturnNotice;
 
-        [SerializeField] private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
 
         // Not serialized: the shell injects the per-activation context at
         // mount time (issue #219).
@@ -133,7 +132,7 @@ namespace SlopArena.Client.UI
             if (initial != null)
                 MenuNavigation.Configure(_context, initial, LeaveBrowser);
 
-            ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
+            ChatSession.ConfigureMasterServerUrl(ClientSession.MasterServerUrl);
             _masterClient = ChatSession.Instance?.MasterClient;
             // The return explanation is captured for this activation and shown
             // until the scan settles; SetBrowserStatus suppresses loading
@@ -454,7 +453,7 @@ namespace SlopArena.Client.UI
             try
             {
                 var chat = ChatSession.Instance;
-                ChatSession.ConfigureMasterServerUrl(_masterServerUrl);
+                ChatSession.ConfigureMasterServerUrl(ClientSession.MasterServerUrl);
                 SetHostStatus("Signing in as a guest…", ct);
                 bool authenticated = chat != null && await chat.EnsureConnectedAsync();
                 if (!IsCurrentHost(ct))

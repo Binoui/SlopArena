@@ -92,6 +92,15 @@ namespace SlopArena.Client.Network
         {
             if (_instance != null)
                 return;
+            var overrideUrl = Environment.GetEnvironmentVariable("SLOPARENA_MASTER_URL");
+            if (overrideUrl != null)
+            {
+                if (!Uri.TryCreate(overrideUrl, UriKind.Absolute, out var uri) ||
+                    uri.Scheme != Uri.UriSchemeHttps || uri.UserInfo.Length != 0 ||
+                    uri.AbsolutePath != "/" || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+                    throw new InvalidOperationException("SLOPARENA_MASTER_URL must be an HTTPS origin without credentials, path, query, or fragment.");
+                ClientSession.MasterServerUrl = uri.GetLeftPart(UriPartial.Authority);
+            }
             var go = new GameObject(nameof(ChatSession));
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<ChatSession>();

@@ -27,7 +27,36 @@ verify_roster_payloads() {
 echo "== Verify complete cooked roster =="
 verify_roster_payloads "$ROOT/content-cooked"
 
-
+# Preserve existing ignored StreamingAssets content, including local skeletons.
+# Only the staging created by this build is disposable.
+git -C "$ROOT" diff --quiet -- client/Unity/ProjectSettings/ProjectSettings.asset \
+  || { echo "error: ProjectSettings.asset has uncommitted changes" >&2; exit 1; }
+mkdir -p "$ROOT/build" "$SA"
+STAGE_BACKUP="$(mktemp -d "$ROOT/build/.release-stage.XXXXXX")"
+cp -p "$PROJ/ProjectSettings/ProjectSettings.asset" "$STAGE_BACKUP/ProjectSettings.asset"
+STAGE_READY=0
+restore_stage() {
+  local name
+  for name in Server arenas data content content-cooked; do
+    if [[ -e "$STAGE_BACKUP/$name" || -L "$STAGE_BACKUP/$name" ]]; then
+      rm -rf "$SA/$name"
+      mv "$STAGE_BACKUP/$name" "$SA/$name"
+    elif (( STAGE_READY )); then
+      rm -rf "$SA/$name"
+    fi
+  done
+  if (( STAGE_READY )); then
+    cp -p "$STAGE_BACKUP/ProjectSettings.asset" "$PROJ/ProjectSettings/ProjectSettings.asset"
+  fi
+  rm -rf "$STAGE_BACKUP"
+}
+trap restore_stage EXIT
+for name in Server arenas data content content-cooked; do
+  if [[ -e "$SA/$name" || -L "$SA/$name" ]]; then
+    mv "$SA/$name" "$STAGE_BACKUP/$name"
+  fi
+done
+STAGE_READY=1
 echo "== Shared build =="
 dotnet build "$ROOT/src/Shared/" --nologo
 
@@ -62,24 +91,17 @@ test ! -e "$SA/data/fightguy_skeleton.bin"
 test ! -e "$SA/Server/data/fightguy_skeleton.bin"
 
 echo "== Version stamp =="
-# The stamp is reverted below with a hard checkout of the committed file; refuse
-# to run if ProjectSettings.asset has uncommitted edits (they would be lost).
-git -C "$ROOT" diff --quiet -- client/Unity/ProjectSettings/ProjectSettings.asset \
-  || { echo "error: ProjectSettings.asset has uncommitted changes -- commit or stash them first (the version stamp is reverted via git checkout)" >&2; exit 1; }
+# The original stamp is restored from the private stage backup on success or failure.
 sed -i "s/^  bundleVersion: .*/  bundleVersion: $VERSION/" "$PROJ/ProjectSettings/ProjectSettings.asset"
 
 echo "== Unity Windows player build =="
 mkdir -p "$REL"
 "$UNITY" -batchmode -quit -projectPath "$PROJ" -buildWindows64Player "$REL/SlopArena.exe"
 
-echo "== Restore committed bundleVersion =="
-git -C "$ROOT" checkout -- client/Unity/ProjectSettings/ProjectSettings.asset
-
-echo "== Unstage build-only artifacts =="
-rm -rf "$SA/Server" "$SA/arenas" "$SA/data" "$SA/content" "$SA/content-cooked"
-
 echo "== Ship docs + zip =="
 cp "$ROOT/docs/release/PLAY_GUIDE.md" "$REL/README.txt"
 cp "$ROOT/docs/release/HOST_GUIDE.md" "$REL/HOSTING.txt"
 (cd "$REL/.." && zip -r "SlopArena-$VERSION.zip" "SlopArena-$VERSION")
+restore_stage
+trap - EXIT
 echo "DONE: build/release/SlopArena-$VERSION.zip"

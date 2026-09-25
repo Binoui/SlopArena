@@ -407,6 +407,22 @@ data-directory copy of a running home server is not a safe import.
 
 From a **non-allowlisted** external network, attempt guest auth, hub WebSocket/long polling, UDP 7777–7781, and TCP 7777, 5432, 8080; none may reach the service. From an allowlisted external client verify trusted HTTPS, guest auth, hub both transports, character catalog, direct UDP match and rematch. Check 80/tcp only redirects or handles ACME validation, and HTTPS certificates are publicly trusted. Verify IPv6 separately or that no AAAA/public IPv6 listener exists. Restart the VPS and verify service readiness/registration and certificate persistence. A failed firewall, readiness, migration, backup, or digest check blocks release rather than falling through to a broader ingress rule.
 
+For a newly built packaged Windows client, set the test Master origin **before
+launch**, in each tester's PowerShell session:
+
+```powershell
+$env:SLOPARENA_MASTER_URL = "https://<test-master-host>"
+.\SlopArena.exe
+Remove-Item Env:SLOPARENA_MASTER_URL
+```
+
+The override requires a bare HTTPS origin; an invalid value stops guest session
+startup rather than silently connecting to the home Master. Without the variable,
+the shipped player continues to use the home endpoint. Set it for both packaged
+clients and confirm the browser/chat connect to the test Master before joining.
+Previously built players do not contain this launch override. Neither this
+override nor the synthetic UDP probe constitutes a completed Unity-client match.
+
 ## Observed live test release (2026-09-25)
 
 The operator installed the existing SSH public key and opened a new
@@ -448,10 +464,9 @@ non-allowlisted IPv4 client. The live Docker filter admits gameplay UDP
 only from the configured IPv4 `/32`, but no separate mobile-data UDP packet
 was captured. OVH's provider firewall was not changed.
 
-Still to prove in the later end-to-end acceptance: an allowlisted packaged
-Unity client completes a match, VPS reboot preserves registration/certificates,
-and an off-host database restore succeeds. This test release does not
-establish those behaviors.
+The packaged-client match, VPS reboot and distinct live release-pair rollback
+remain pending. The off-host database restore was subsequently verified below;
+the synthetic UDP clients above did not run a Unity match.
 
 ## Off-host recovery checkpoint (2026-09-25)
 
@@ -493,3 +508,114 @@ The operator reports cleaning up only the isolated restore containers,
 network and volume after saving their result; the live PostgreSQL/Caddy
 volumes were not part of that cleanup. No further infrastructure expansion
 is needed for the friends playtest.
+
+## Phase 1 handoff status (#234, 2026-09-25)
+
+This is a restricted friends-demo integration environment, **not** clearance
+for unrestricted internet exposure or a cutover of home/player DNS. The
+observations above and the local rehearsal establish only the gates marked
+verified here. Re-run `release.py status` and retain its timestamped output
+before a live play session; the operator VPS SSH key is not available in every
+development shell.
+
+| Gate | State | Evidence or remaining proof |
+| --- | --- | --- |
+| Clean VPS, pinned published pair and explicit schema migration | **Verified** for the current test release | Ubuntu 24.04 amd64, release `vps-test-20260925-1`, GameServer source `5ba1be45603492e944f51f44fe8d8d299054b704`, Master source `263a19dbbad38d79271ff89814d5a044c0923793`. Live status confirms published GameServer digest `62b983660f89d31e5a4c43c5a074ba93e62556665a40b5e5293c2e7428decc48`, Master digest `9fbd739d5f6ddbae4f49207dd25b087bd8b69dbbeb107deabca88c2ee9b9543a`, migration digest `1297e8037b44f3f4d97c21c7197012f00efe018271b0c9a41115a4e03356b94d`, Caddy 2.11.4 and PostgreSQL 15.19. The actual provider/storage monthly quote remains pending. |
+| Allowlisted external HTTPS, guest auth, WebSocket and long polling | **Verified** for protocol probes | `/ready`, `/auth/me`, SignalR negotiation, WebSocket upgrade and long polling passed over trusted HTTPS. The chat exchange and lobby/browser path through two packaged clients remain **pending**. |
+| Direct gameplay UDP | **Verified** for a synthetic match on 7777 | Two authenticated external UDP clients received authoritative state. A packaged Unity match, its completion and rematch remain **pending**. |
+| Non-allowlisted and dual-stack ingress | **Pending** | Mobile IPv4 HTTPS reset and non-allowlisted IPv6 timeout observed, and raw TCP listeners were inaccessible in the allowed-source probe. Independently deny-test guest auth, both hub transports and **each** UDP port 7777–7781 from a non-allowlisted source; verify raw TCP 7777/8080/5432 and provider firewall/IPv6 policy. Password SSH is still enabled; provider firewall was not changed. |
+| Recovery under service order, dependency loss and reboot | **Pending** | Same-release redeploy kept health and registration; GameServer re-registered after clearing a synthetic match. GameServer-first startup, Master restart, PostgreSQL stop/start with liveness/readiness observations and a VPS reboot are not recorded as live proofs. |
+| Off-host archive restoration | **Verified** | OVH archive was downloaded and SHA-256 checked, restored to an isolated PostgreSQL volume; three EF migrations, one User, one GameServer and Master `/ready` passed. The restored database contained zero Matches; do not claim a match record was recovered. |
+| Live second release and compatible rollback | **Pending** | Two-pair deploy/rollback and volume persistence passed only in the local disposable rehearsal; the second pair reused the same binaries. A live second published pair and return to the first pair remain to be exercised with zero active matches. |
+| Five-slot resource observation and final handoff | **Pending** | Record observed CPU/memory/disk and slot allocation without claiming five-match capacity. Capture full release identities, actual monthly spend, command outputs, operator-supplied values, test failures, restore/rollback evidence and explicit pending actions. |
+
+Operator-run `release.py status` on 2026-09-25 reported Caddy, Master,
+GameServer and PostgreSQL running; the latter three have healthy container
+checks. Master and GameServer liveness/readiness were both true, with one
+fresh registered host and zero active matches. Current migration was
+`20260802141019_AddUniqueIndexGameServerIpPort`; the latest successful
+off-host backup was `2026-09-25T15:05:20Z`, 9,115 bytes, SHA-256
+`5fcd24c06facf9d067ed191b7818bb7ddfd380d3a4fef92909050e88472933c3`.
+The VPS root/data filesystem had 4,260,204,544 of 76,887,154,688 bytes used
+at that check. Docker publishes Caddy TCP 80/443 and gameplay UDP 7777–7781
+on both address families; that is **not** proof that the host/provider firewall
+denies unallowlisted sources. The status output does not include test DNS
+names or a monthly bill. This is one live snapshot, not reboot or outage proof.
+
+The operator supplied the two current test names:
+`master-test.sloparena.barakaslurp.fr` and
+`game-test.sloparena.barakaslurp.fr`. Public DNS resolution on this
+workstation returned A `135.125.100.228` for each and no AAAA answers.
+From the allowlisted workstation, trusted HTTPS to the test Master
+returned `/ready` HTTP 200 with `{"status":"ready"}` and certificate
+verification result 0; TCP 80 returned 308 to that HTTPS URL. These
+observations confirm this source can reach the test route, not that
+non-allowlisted sources are blocked or IPv6 listeners are disabled.
+
+The workstation has a global IPv6 route and is **not** in the configured
+tester IPv4 `/32`. Connecting directly to the VPS global IPv6 address with
+the test Master hostname as SNI timed out on TCP 443 after five seconds;
+TCP 7777, 8080 and 5432 did not connect. IPv6 TCP 80 returned the expected
+308 redirect. This confirms source-specific IPv6 TCP behavior from this
+network, not disabled IPv6 exposure, denial of gameplay UDP 7777–7781,
+or denial from a separate non-allowlisted IPv4 network.
+
+The operator prefers to test gameplay on real hardware. A Windows player
+was launched under Wine once and then stopped at the operator's request;
+Wine is not accepted as gameplay or packaged-client acceptance proof and
+must not be retried for this issue.
+
+Current workstation verification: `unity pipeline list` found the Unity
+Editor; `recompile_status` reported `up_to_date`, `failed: false`, no compiler
+errors. In Editor play mode, `SLOPARENA_MASTER_URL=https://example.invalid`
+selected that origin before guest auth (which failed as expected); clearing the
+variable selected the unchanged home origin. An HTTP override raised the
+expected `InvalidOperationException` and left `ChatSession.Instance` absent.
+That is an Editor smoke, not a packaged-client live match. The Unity Console
+also had an unrelated Unity Connect Package Manager access-token error before
+these play-mode checks.
+
+The first read-only SSH status attempt failed after the VPS accepted the
+configured public key because no SSH agent had unlocked the private key.
+After the operator unlocked it locally, key-authenticated login as `binoui`
+worked. The next `sudo -n release.py status` attempt stopped with `sudo: a
+password is required`; `/var/lib/sloparena` is root-only and the Docker socket
+is not available to that unprivileged account. The operator subsequently
+entered the sudo password locally and supplied the live status summarized
+above. The backup
+timer reports `active`, with its next scheduled activation on 2026-09-26
+06:39:25 CEST. From this workstation (an allowlisted source), TCP 80 and 443
+connected to the VPS IP; TCP 7777, 8080 and 5432 did not. This does **not**
+prove non-allowlisted denial or UDP ingress. No live service, provider rule or
+player DNS changed during these checks.
+
+`./scripts/build-release.sh 0.2.0-vps-test.1` passed Shared build and
+1,045 Shared tests (six skipped), published both bundled Windows and
+Linux GameServer binaries and built a Windows player. The ZIP integrity
+check passed; it contains the roster manifest and all four admitted cooked
+package payloads, with no bundled `Server/server.json`. The script now
+preserves pre-existing ignored `StreamingAssets` staging rather than deleting
+it: a tar checksum of `data`, `Server` and `arenas` matched before and after
+the build, and the original `ProjectSettings.asset` version stamp was restored.
+The local ZIP is `build/release/SlopArena-0.2.0-vps-test.1.zip`; it has not
+been run on Windows, distributed or published. A built artifact is not proof
+of guest auth, chat or match completion.
+
+Changed in the game repository for this acceptance slice:
+`client/Unity/Assets/Scripts/Runtime/Network/ChatSession.cs`,
+`client/Unity/Assets/Scripts/Runtime/UI/ServerBrowserUI.cs`,
+`scripts/build-release.sh` and `deploy/vps/README.md`; the ignored local
+`TESTING-UNITY.md` has the packaged-client checklist. No Master repository
+files changed.
+
+Next operator sequence: confirm the test DNS names and source allowlist from
+the private release record without exposing credentials; distribute the newly
+built client to two isolated tester sessions under operator control. Run guest
+auth → chat → browse/join → match completion/rematch and capture client/server
+evidence. Use an independent
+non-allowlisted network for the denied-ingress matrix. Schedule controlled
+recovery/reboot and a second compatible release/rollback when active matches
+are zero. Do not restart live services, alter provider ingress, disable SSH
+authentication or publish a new player endpoint as a side effect of this
+handoff. Phase 2 may revisit player identity/gameplay admission and public
+ingress; those are out of scope for restricted Phase 1.
