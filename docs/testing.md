@@ -172,20 +172,21 @@ do not suppress transaction warnings in production to make an InMemory fixture p
    development-only signing credentials. Record the actual listening URL. Never
    reuse production credentials or point this test at production by accident.
 2. Build the GameServer, then make a temporary copy of `src/Server/server.json`.
-   Set `masterServerUrl` to that listener, `publicIp` to `127.0.0.1` for a same-machine
-   run, and an unused base `port`. Set `arenaDataDir` to an absolute directory of the
-   intended baked arenas. TCP control uses the base port; UDP match ports span the
-   base through `port + maxConcurrentMatches - 1`. For remote clients, use reachable
-   addresses and verify those ports instead of advertising loopback.
+   Select `deploymentProfile: development` explicitly. Set `masterServerUrl` to
+   that listener, `publicIp` to `127.0.0.1` for a same-machine run, an unused base
+   `port`, and `arenaDataDir` to the intended baked arenas. TCP control uses the
+   base port; UDP match ports span `port` through
+   `port + maxConcurrentMatches - 1`. Use reachable public addresses for remote
+   clients; do not advertise loopback.
 3. Launch the real executable with that explicit configuration:
 
    ```bash
    dotnet src/Server/bin/Debug/net8.0/SlopArena.Server.dll /absolute/path/to/test-server.json
    ```
 
-   Confirm successful registration and subsequent heartbeats in the logs, not merely
-   “Orchestrator running.” A failed initial registration leaves the process running
-   without Master integration; fix the cause and restart. Check the selected arena and
+   Confirm successful registration and heartbeats in the logs, not merely a
+   listening control port. An unavailable Master causes bounded retries; bad
+   host credentials or configuration fail startup. Check the selected arena and
    admitted package hashes rather than accepting fallback content as evidence.
 4. Configure both clients' Master endpoint **before launch authentication**. Use two
    packaged clients for the remote acceptance pass. One Unity client plus a real

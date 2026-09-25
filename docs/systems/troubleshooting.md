@@ -58,7 +58,11 @@ sudo ufw status | grep 7777   # confirm
 
 **Cause:** master's `IsValidIpAddress` historically required an IPv4 literal; official servers register with a DNS hostname (`sloparena.barakaslurp.fr`). Fixed in master `Program.cs` (`Uri.CheckHostName is IPv4 or Dns`). If you still see it, the deployed master is stale — redeploy per runbook.
 
-**Note:** the game server registers ONCE at startup and never retries. After any master redeploy: `docker compose restart server-1`.
+**Current binaries:** registration retries transient Master outages and recovers
+from a lost server record. A missing or wrong approved-host credential in the
+VPS profile fails startup rather than retrying. The legacy home deployment
+needs an explicit `development` profile before upgrading either binary;
+do not restart it solely because Master restarted.
 
 ### 2.3 False 429s in the master test suite
 

@@ -1,4 +1,7 @@
 using System.Net;
+using System.Buffers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using SlopArena.Shared;
 
@@ -15,27 +18,30 @@ namespace SlopArena.Server
     /// roster, and replies with <c>{ "port": N, "content": { ... } }</c>. This keeps
     /// the game server stateless between matches (ADR-0008): one shot in, one port out.
     ///
-    /// The prefix binds all interfaces (<c>http://*:{port}/</c>) because the
-    /// master server POSTs to the LAN IP returned by
-    /// <c>GameServerRegistration.GetPublicIpAddress()</c> — a loopback-only
-    /// listener would be connection-refused on the real host.
+    /// VPS mode authenticates with a separate match-control key before reading
+    /// a bounded body. The listener binds the private control network through
+    /// Compose; TCP match control must never be publicly published there.
     /// </summary>
     public sealed class MatchControlServer : IDisposable
     {
         private readonly HttpListener _listener = new();
         private readonly MultiMatchOrchestrator _orchestrator;
         private readonly string _defaultArena;
+        private readonly byte[]? _controlKey;
+        private const int MaxBodyBytes = 64 * 1024;
         private CancellationTokenSource? _cts;
         private bool _disposed;
 
         /// <param name="orchestrator">Receives the parsed roster and assigns the match port.</param>
         /// <param name="port">TCP port to listen on (the game server's registered base port).</param>
         /// <param name="defaultArena">Arena used when the body omits one.</param>
-        public MatchControlServer(MultiMatchOrchestrator orchestrator, int port, string defaultArena)
+        public MatchControlServer(MultiMatchOrchestrator orchestrator, int port, string defaultArena, string? controlKey = null)
         {
             _orchestrator = orchestrator;
             _defaultArena = defaultArena;
-            // '*' binds all interfaces on Linux (no Windows urlacl needed).
+            _controlKey = controlKey is null ? null : Encoding.UTF8.GetBytes(controlKey);
+            if (_controlKey?.Length > 4096)
+                throw new ArgumentException("Control key is too long.", nameof(controlKey));
             _listener.Prefixes.Add($"http://*:{port}/");
         }
 
@@ -63,10 +69,10 @@ namespace SlopArena.Server
                 {
                     await HandleAsync(ctx);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Console.WriteLine($"[MatchControl] Handler error: {ex.Message}");
-                    try { ctx.Response.StatusCode = 500; await ctx.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}")); } catch { }
+                    Console.WriteLine("[MatchControl] Match-start handler failed.");
+                    try { ctx.Response.StatusCode = 500; } catch { }
                 }
                 finally
                 {
@@ -98,32 +104,83 @@ namespace SlopArena.Server
             return (port, content, null);
         }
 
+        private static bool IsAuthorized(string? authorization, byte[] controlKey)
+        {
+            if (authorization is null || authorization.Length > 4103 ||
+                !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                return false;
+            var token = authorization.AsSpan(7).Trim();
+            if (Encoding.UTF8.GetByteCount(token) != controlKey.Length)
+                return false;
+            Span<byte> candidate = stackalloc byte[controlKey.Length];
+            Encoding.UTF8.GetBytes(token, candidate);
+            return CryptographicOperations.FixedTimeEquals(candidate, controlKey);
+        }
+
         private async Task HandleAsync(HttpListenerContext ctx)
         {
-            var path = ctx.Request.Url?.AbsolutePath.TrimEnd('/') ?? "";
-            if (!ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
-                || !path.EndsWith("/match/start", StringComparison.OrdinalIgnoreCase))
+            if (ctx.Request.HttpMethod != "POST" || ctx.Request.Url?.AbsolutePath != "/match/start")
             {
                 ctx.Response.StatusCode = 404;
                 return;
             }
 
-            string body;
-            using (var sr = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding))
-                body = await sr.ReadToEndAsync();
-
-            var result = TryStartMatchWithContent(body);
-            if (result.error is not null)
+            if (_controlKey is not null && !IsAuthorized(ctx.Request.Headers["Authorization"], _controlKey))
             {
-                ctx.Response.StatusCode = 400;
-                ctx.Response.ContentType = "application/json";
-                var errBytes = System.Text.Encoding.UTF8.GetBytes($"{{\"error\":\"{result.error}\"}}");
-                await ctx.Response.OutputStream.WriteAsync(errBytes);
+                ctx.Response.StatusCode = 401;
                 return;
             }
 
+            if (ctx.Request.ContentLength64 > MaxBodyBytes)
+            {
+                ctx.Response.StatusCode = 413;
+                return;
+            }
+
+            var bytes = ArrayPool<byte>.Shared.Rent(MaxBodyBytes + 1);
+            string body;
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                int length = 0, read;
+                do
+                {
+                    read = await ctx.Request.InputStream.ReadAsync(
+                        bytes.AsMemory(length, MaxBodyBytes + 1 - length), timeout.Token);
+                    length += read;
+                } while (read != 0 && length <= MaxBodyBytes);
+                if (length > MaxBodyBytes)
+                {
+                    ctx.Response.StatusCode = 413;
+                    return;
+                }
+                body = new UTF8Encoding(false, true).GetString(bytes, 0, length);
+            }
+            catch (OperationCanceledException)
+            {
+                ctx.Response.StatusCode = 408;
+                return;
+            }
+            catch (DecoderFallbackException)
+            {
+                ctx.Response.StatusCode = 400;
+                return;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(bytes);
+            }
+
+            var result = TryStartMatchWithContent(body);
             ctx.Response.ContentType = "application/json";
-            var ok = System.Text.Encoding.UTF8.GetBytes($"{{\"port\":{result.port},\"content\":{MatchContentHandleMapCodec.Serialize(result.content!)}}}");
+            if (result.error is not null)
+            {
+                ctx.Response.StatusCode = 400;
+                await ctx.Response.OutputStream.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new { error = result.error }));
+                return;
+            }
+
+            var ok = Encoding.UTF8.GetBytes($"{{\"port\":{result.port},\"content\":{MatchContentHandleMapCodec.Serialize(result.content!)}}}");
             await ctx.Response.OutputStream.WriteAsync(ok);
         }
 

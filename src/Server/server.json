@@ -1,4 +1,5 @@
 {
+  "deploymentProfile": "development",
   "serverName": "SlopArena Local Dev",
   "region": "EU",
   "port": 7777,

@@ -102,36 +102,67 @@ namespace SlopArena.Server
     /// </summary>
     public class ServerConfig
     {
+        public string DeploymentProfile { get; set; } = string.Empty;
+        public Guid? HostId { get; set; }
+        public string? RegistrationKey { get; set; }
+        public string? MatchControlKey { get; set; }
         public string ServerName { get; set; } = "SlopArena Server";
         public string Region { get; set; } = "EU";
-        public int Port { get; set; } = 9876;
-        public int MaxConcurrentMatches { get; set; } = 15;
-        public string MasterServerUrl { get; set; } = "http://localhost:5000";
-        /// <summary>
-        /// Public IP or DNS name advertised to the master server (clients connect
-        /// here over UDP). Null → auto-detect LAN IP (correct only for directly
-        /// routable machines). Set behind NAT (e.g. "slop.barakaslurp.fr").
-        /// </summary>
+        public int Port { get; set; }
+        public int MaxConcurrentMatches { get; set; }
+        public string MasterServerUrl { get; set; } = string.Empty;
+        /// <summary>Public IP or DNS name advertised for gameplay UDP.</summary>
         public string? PublicIp { get; set; }
-        public bool IsOfficial { get; set; } = false;
-        /// <summary>Directory containing .arena files. Relative to the server working directory.</summary>
+        public bool IsOfficial { get; set; }
+        /// <summary>Directory containing .arena files relative to the working directory.</summary>
         public string ArenaDataDir { get; set; } = "data/arenas";
         public CustomRules? CustomRules { get; set; }
 
+        public bool IsVps => DeploymentProfile == "vps";
+
+        public void Validate()
+        {
+            if (DeploymentProfile is not ("vps" or "development"))
+                throw new InvalidOperationException("Select deploymentProfile: vps or development explicitly.");
+            if (Port is < 1 or > 65535 || MaxConcurrentMatches is < 1 or > 100 ||
+                Port + MaxConcurrentMatches - 1 > 65535)
+                throw new InvalidOperationException("Invalid GameServer port range.");
+            if (!Uri.TryCreate(MasterServerUrl, UriKind.Absolute, out var master) ||
+                master.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(master.UserInfo) ||
+                !string.IsNullOrEmpty(master.Query) || !string.IsNullOrEmpty(master.Fragment) ||
+                master.AbsolutePath != "/")
+                throw new InvalidOperationException("Invalid masterServerUrl.");
+            if (!IsVps) return;
+            if (HostId is null || HostId == Guid.Empty ||
+                string.IsNullOrWhiteSpace(PublicIp) ||
+                Uri.CheckHostName(PublicIp) is not (UriHostNameType.IPv4 or UriHostNameType.Dns) ||
+                !IsBearerCredential(RegistrationKey) || !IsBearerCredential(MatchControlKey) ||
+                RegistrationKey == MatchControlKey)
+                throw new InvalidOperationException("VPS host identity, public address and distinct credentials are required.");
+        }
+
+        private static bool IsBearerCredential(string? value)
+        {
+            if (value is null || value.Length is < 32 or > 4096) return false;
+            bool padding = false;
+            foreach (char c in value)
+            {
+                if (c == '=') { padding = true; continue; }
+                if (padding || !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or '~' or '+' or '/'))
+                    return false;
+            }
+            return true;
+        }
+
         public static ServerConfig Load(string path)
         {
-            if (!File.Exists(path))
-            {
-                Console.WriteLine($"[Config] {path} not found, using defaults.");
-                return new ServerConfig();
-            }
-
             var json = File.ReadAllText(path);
             var config = JsonSerializer.Deserialize<ServerConfig>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
-            });
-            return config ?? new ServerConfig();
+            }) ?? throw new InvalidOperationException("Empty GameServer configuration.");
+            config.Validate();
+            return config;
         }
     }
 

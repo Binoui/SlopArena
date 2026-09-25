@@ -15,6 +15,9 @@ namespace SlopArena.Shared;
 /// </summary>
 public sealed record HostedServerConfig
 {
+    /// <summary>Embedded hosting explicitly uses the local development profile.</summary>
+    public string DeploymentProfile => "development";
+
     /// <summary>Display name in the server browser (e.g. "Binoui's Server").</summary>
     public string ServerName { get; init; } = "SlopArena Hosted";
 

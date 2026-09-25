@@ -19,7 +19,7 @@ namespace SlopArena.Server
             Console.WriteLine($"Arena data: {config.ArenaDataDir}");
             Console.WriteLine();
 
-            // Load arena definitions from .arena files (fallback to hardcoded)
+            // Gameplay arenas are loaded from the published .arena files.
             ArenaRegistry.LoadFromDirectory(config.ArenaDataDir);
 
             var orchestrator = new MultiMatchOrchestrator(config);
@@ -31,10 +31,9 @@ namespace SlopArena.Server
             orchestrator.ReportMatchResult = (matchId, winner) =>
                 _ = registration.ReportMatchResultAsync(matchId, winner);
 
-            // HTTP control endpoint for master server match-start commands
-            // (issue #35). Listens on the registered base TCP port; UDP matches
-            // bind port+offset, so the two coexist on the same number.
-            using var control = new MatchControlServer(orchestrator, config.Port, defaultArena: "slop_court");
+            // Match control stays private to the deployment network in VPS mode.
+            using var control = new MatchControlServer(orchestrator, config.Port,
+                defaultArena: "slop_court", controlKey: config.IsVps ? config.MatchControlKey : null);
             control.Start();
 
             // Handle Ctrl+C for graceful shutdown
@@ -45,39 +44,17 @@ namespace SlopArena.Server
                 cts.Cancel();
             };
 
-            // Register with master server
-            Console.WriteLine("Registering with master server...");
-            bool registered = await registration.RegisterAsync(cts.Token);
-
-            if (!registered)
+            Console.WriteLine("Registering with master server (recovery enabled).");
+            try
             {
-                Console.WriteLine("WARNING: Failed to register with master server.");
-                Console.WriteLine("The server will run without master server integration.");
-                Console.WriteLine("Matches can still be assigned through POST /match/start.");
+                await registration.RunAsync(cts.Token);
             }
-            else
+            finally
             {
-                Console.WriteLine($"Registered successfully (Server ID: {registration.ServerId}).");
+                control.Stop();
+                orchestrator.Shutdown();
+                Console.WriteLine("Server stopped.");
             }
-
-            Console.WriteLine();
-            Console.WriteLine("Orchestrator running. Press Ctrl+C to stop.");
-            Console.WriteLine();
-
-            // Start heartbeat loop (blocks until Ctrl+C)
-            if (registered)
-            {
-                await registration.RunHeartbeatLoopAsync(cts.Token);
-            }
-            else
-            {
-                // Keep alive without heartbeat
-                try { await Task.Delay(-1, cts.Token); } catch (TaskCanceledException) { }
-            }
-
-            control.Stop();
-            orchestrator.Shutdown();
-            Console.WriteLine("Server stopped.");
 
         }
     }

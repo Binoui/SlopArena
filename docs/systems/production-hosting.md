@@ -105,6 +105,12 @@ rsync -avz --exclude 'appsettings.Production.json' \
 ssh alfred 'cd /root/homelab/sloparena && docker compose restart master'
 ```
 
+> Before upgrading the existing home Master binary, add
+> `"Deployment": {"Profile": "development"}` to its private
+> `appsettings.Production.json`; an unspecified profile now fails startup.
+> This does not change the current running home service or opt it into the
+> VPS trust profile.
+
 ### Redeploy game server (after code change in src/Server)
 
 ```bash
@@ -117,9 +123,12 @@ rsync -avz data/arenas/*.arena alfred:/srv/sloparena/server/arenas/
 ssh alfred 'cd /root/homelab/sloparena && docker compose restart server-1'
 ```
 
-> The game server registers ONCE at startup and does NOT retry on failure —
-> after any master redeploy, `docker compose restart server-1` is required to
-> re-register.
+> Before upgrading the existing home GameServer binary, add
+> `"deploymentProfile": "development"` to its private `server.json`; the new
+> binary refuses an unspecified profile. This is not a VPS authorization
+> profile. The GameServer retries transient registration failures and
+> re-registers if Master loses its record; a restart is still needed when
+> replacing binaries, not merely because Master restarted.
 
 ### Verify registration
 

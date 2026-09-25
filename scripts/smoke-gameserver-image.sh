@@ -7,7 +7,7 @@ name="sloparena-image-smoke-$$"
 cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$tmp"; }
 trap cleanup EXIT
 cat > "$tmp/server.json" <<'JSON'
-{"serverName":"Image smoke","region":"EU","port":7777,"maxConcurrentMatches":1,"masterServerUrl":"http://127.0.0.1:1","publicIp":"127.0.0.1","arenaDataDir":"data/arenas"}
+{"deploymentProfile":"development","serverName":"Image smoke","region":"EU","port":7777,"maxConcurrentMatches":1,"masterServerUrl":"http://127.0.0.1:1","publicIp":"127.0.0.1","arenaDataDir":"data/arenas"}
 JSON
 chmod 644 "$tmp/server.json"
 docker run -d --name "$name" --read-only --tmpfs /tmp:uid=1654,gid=1654 \

@@ -7,10 +7,9 @@ using System.Text.Json;
 namespace SlopArena.Server
 {
     /// <summary>
-    /// Handles game server registration with the master server.
-    /// On startup: registers and obtains server_id + api_token.
-    /// Continuously: sends heartbeats every 10 seconds.
-    /// On match end: reports result to master.
+    /// Owns one GameServer registration session: retries transient startup outages,
+    /// heartbeats the Master, re-registers if the record is lost, and reports
+    /// completed matches with the returned API token.
     /// </summary>
     public class GameServerRegistration
     {
@@ -19,12 +18,13 @@ namespace SlopArena.Server
         private readonly MultiMatchOrchestrator _orchestrator;
         private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-        private Guid _serverId;
-        private string _apiToken = string.Empty;
-        private bool _registered;
+        private RegistrationSession? _session;
+        private int _running;
+        private sealed record RegistrationSession(Guid Id, string Token);
+        private enum RegistrationOutcome { Success, Retry, Fatal }
 
-        public Guid ServerId => _serverId;
-        public bool IsRegistered => _registered;
+        public Guid ServerId => Volatile.Read(ref _session)?.Id ?? Guid.Empty;
+        public bool IsRegistered => Volatile.Read(ref _session) is not null;
 
         public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator, HttpMessageHandler? handler = null)
         {
@@ -37,17 +37,56 @@ namespace SlopArena.Server
             };
         }
 
-        /// <summary>
-        /// Register this game server with the master server.
-        /// Returns true if registration succeeded.
-        /// </summary>
-        public async Task<bool> RegisterAsync(CancellationToken ct = default)
+        /// <summary>Single registration and heartbeat owner; retries transient outages until cancelled.</summary>
+        public async Task RunAsync(CancellationToken ct, TimeSpan? heartbeatInterval = null, TimeSpan? initialRetryDelay = null)
+        {
+            var heartbeat = heartbeatInterval ?? TimeSpan.FromSeconds(10);
+            var firstRetry = initialRetryDelay ?? TimeSpan.FromSeconds(1);
+            if (Interlocked.Exchange(ref _running, 1) != 0)
+                throw new InvalidOperationException("Registration loop is already running.");
+            var retry = firstRetry;
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    if (Volatile.Read(ref _session) is null)
+                    {
+                        var outcome = await TryRegisterAsync(ct);
+                        if (outcome == RegistrationOutcome.Fatal)
+                            throw new InvalidOperationException("GameServer registration rejected; check the deployment profile and approved host credential.");
+                        if (outcome == RegistrationOutcome.Success)
+                        {
+                            retry = firstRetry;
+                            continue;
+                        }
+                        var jitter = TimeSpan.FromMilliseconds(Random.Shared.Next(0, 251));
+                        await Task.Delay(retry + jitter, ct);
+                        retry = TimeSpan.FromMilliseconds(Math.Min(retry.TotalMilliseconds * 2, 30_000));
+                    }
+                    else
+                    {
+                        await Task.Delay(heartbeat, ct);
+                        await SendHeartbeatAsync(ct);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+            finally
+            {
+                // Cancellation must not prevent best-effort deregistration.
+                await DeregisterAsync(CancellationToken.None);
+                Volatile.Write(ref _running, 0);
+            }
+        }
+
+        private async Task<RegistrationOutcome> TryRegisterAsync(CancellationToken ct)
         {
             try
             {
                 var ip = _config.PublicIp ?? GetPublicIpAddress();
                 var payload = new
                 {
+                    hostId = _config.HostId,
                     name = _config.ServerName,
                     ipAddress = ip,
                     port = _config.Port,
@@ -58,169 +97,119 @@ namespace SlopArena.Server
                         ? JsonSerializer.Serialize(_config.CustomRules, _jsonOptions)
                         : null
                 };
-
-                var json = JsonSerializer.Serialize(payload, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _http.PostAsync("servers/register", content, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post, "servers/register")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json")
+                };
+                if (_config.IsVps)
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.RegistrationKey);
+                using var response = await _http.SendAsync(request, ct);
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"[Registration] Failed: {response.StatusCode} — {await response.Content.ReadAsStringAsync()}");
-                    return false;
+                    Console.WriteLine($"[Registration] Rejected: {response.StatusCode}");
+                    return (int)response.StatusCode is 408 or 429 or >= 500
+                        ? RegistrationOutcome.Retry : RegistrationOutcome.Fatal;
                 }
 
-                var responseJson = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<RegistrationResponse>(responseJson, _jsonOptions);
-
-                if (result == null || string.IsNullOrEmpty(result.ApiToken))
-                {
-                    Console.WriteLine($"[Registration] Invalid response: {responseJson}");
-                    return false;
-                }
-
-                _serverId = result.ServerId;
-                _apiToken = result.ApiToken;
-                _registered = true;
-
-                Console.WriteLine($"[Registration] Registered as '{_config.ServerName}' (ID: {_serverId}, IP: {ip})");
-                return true;
+                var result = JsonSerializer.Deserialize<RegistrationResponse>(
+                    await response.Content.ReadAsStringAsync(ct), _jsonOptions);
+                if (result == null || result.ServerId == Guid.Empty || string.IsNullOrWhiteSpace(result.ApiToken))
+                    return RegistrationOutcome.Fatal;
+                Volatile.Write(ref _session, new RegistrationSession(result.ServerId, result.ApiToken));
+                Console.WriteLine($"[Registration] Registered (ID: {result.ServerId}, public address: {ip})");
+                return RegistrationOutcome.Success;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (HttpRequestException)
+            {
+                Console.WriteLine("[Registration] Master unavailable; retrying.");
+                return RegistrationOutcome.Retry;
             }
             catch (TaskCanceledException)
             {
-                Console.WriteLine("[Registration] Timed out.");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Registration] Error: {ex.Message}");
-                return false;
+                Console.WriteLine("[Registration] Master timed out; retrying.");
+                return RegistrationOutcome.Retry;
             }
         }
 
-        /// <summary>
-        /// Start the heartbeat loop. Sends current match count every 10 seconds.
-        /// Blocks until cancellation is requested.
-        /// </summary>
-        public async Task RunHeartbeatLoopAsync(CancellationToken ct = default)
+        /// <summary>Best-effort removal of the current browser record during shutdown.</summary>
+        private async Task DeregisterAsync(CancellationToken ct)
         {
-            if (!_registered)
-            {
-                Console.WriteLine("[Heartbeat] Not registered — cannot start heartbeat loop.");
-                return;
-            }
-
-            Console.WriteLine("[Heartbeat] Loop started (every 10s).");
-
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    await Task.Delay(10_000, ct);
-                    await SendHeartbeatAsync(ct);
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Heartbeat] Error: {ex.Message}");
-                }
-            }
-
-            Console.WriteLine("[Heartbeat] Loop stopped.");
-
-            // Issue #49: deregister on graceful shutdown so the row disappears
-            // from the server browser immediately instead of lingering for the
-            // 15s heartbeat TTL window. Best-effort: ct is already cancelled at
-            // this point, so use a fresh token — the HttpClient's 5s timeout
-            // bounds the wait, and failure never throws (TTL remains the fallback).
-            await DeregisterAsync(CancellationToken.None);
-        }
-
-        /// <summary>
-        /// Deregister this game server with the master server (issue #49): removes
-        /// the GameServers row so the server stops appearing in GET /servers
-        /// immediately. Best-effort — never throws; if the master server is
-        /// unreachable, the heartbeat TTL still clears the row.
-        /// </summary>
-        public async Task DeregisterAsync(CancellationToken ct = default)
-        {
-            if (!_registered) return;
-
+            var session = Volatile.Read(ref _session);
+            if (session is null) return;
             try
             {
-                var request = new HttpRequestMessage(HttpMethod.Delete, $"servers/{_serverId}");
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiToken);
-
-                var response = await _http.SendAsync(request, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Delete, $"servers/{session.Id}");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
+                using var response = await _http.SendAsync(request, ct);
                 if (response.IsSuccessStatusCode)
-                {
-                    _registered = false;
-                    Console.WriteLine($"[Registration] Deregistered (ID: {_serverId}) — removed from server browser.");
-                }
+                    Console.WriteLine($"[Registration] Deregistered (ID: {session.Id}).");
                 else
-                {
-                    Console.WriteLine($"[Registration] Deregister failed: {response.StatusCode} (heartbeat TTL will clear the row).");
-                }
+                    Console.WriteLine($"[Registration] Deregistration failed: {response.StatusCode}");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"[Registration] Deregister error (heartbeat TTL will clear the row): {ex.Message}");
+                Console.WriteLine("[Registration] Deregistration unavailable.");
+            }
+            finally
+            {
+                Interlocked.CompareExchange(ref _session, null, session);
             }
         }
 
         private async Task SendHeartbeatAsync(CancellationToken ct)
         {
-            var payload = new { currentMatches = _orchestrator.CurrentMatchCount };
-            var json = JsonSerializer.Serialize(payload, _jsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var request = new HttpRequestMessage(HttpMethod.Post, $"servers/{_serverId}/heartbeat")
+            var session = Volatile.Read(ref _session);
+            if (session is null) return;
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"servers/{session.Id}/heartbeat")
             {
-                Content = content
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new { currentMatches = _orchestrator.CurrentMatchCount }),
+                    Encoding.UTF8, "application/json")
             };
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiToken);
-
-            var response = await _http.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
+            try
             {
-                Console.WriteLine($"[Heartbeat] Failed: {response.StatusCode}");
+                using var response = await _http.SendAsync(request, ct);
+                if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
+                {
+                    Console.WriteLine("[Heartbeat] Master lost registration; reconnecting.");
+                    Interlocked.CompareExchange(ref _session, null, session);
+                }
+                else if (!response.IsSuccessStatusCode)
+                    Console.WriteLine($"[Heartbeat] Master unavailable: {response.StatusCode}");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (HttpRequestException)
+            {
+                Console.WriteLine("[Heartbeat] Master unavailable.");
+            }
+            catch (TaskCanceledException)
+            {
+                Console.WriteLine("[Heartbeat] Master timed out.");
             }
         }
 
-        /// <summary>
-        /// Report a match result to the master server (ELO MMR update).
-        /// </summary>
+        /// <summary>Report a finished match using the current registration token.</summary>
         public async Task ReportMatchResultAsync(Guid matchId, long winnerSteamId, CancellationToken ct = default)
         {
-            if (!_registered) return;
-
+            var session = Volatile.Read(ref _session);
+            if (session is null) return;
             try
             {
-                var payload = new { matchId, winnerSteamId };
-                var json = JsonSerializer.Serialize(payload, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var request = new HttpRequestMessage(HttpMethod.Post, "match/result")
+                using var request = new HttpRequestMessage(HttpMethod.Post, "match/result")
                 {
-                    Content = content
+                    Content = new StringContent(JsonSerializer.Serialize(new { matchId, winnerSteamId }),
+                        Encoding.UTF8, "application/json")
                 };
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiToken);
-
-                var response = await _http.SendAsync(request, ct);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
+                using var response = await _http.SendAsync(request, ct);
                 if (!response.IsSuccessStatusCode)
-                {
                     Console.WriteLine($"[MatchResult] Failed: {response.StatusCode}");
-                }
-                else
-                {
-                    Console.WriteLine($"[MatchResult] Reported: match={matchId}, winner={winnerSteamId}");
-                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"[MatchResult] Error: {ex.Message}");
+                Console.WriteLine("[MatchResult] Master unavailable.");
             }
         }
 

@@ -52,8 +52,9 @@ release inputs.
 ### 3. Refresh the official game server (mini PC)
 
 Optional if only the client changed. See `docs/systems/production-hosting.md`
-("Redeploy game server"). Reminder: restart `server-1` after any master
-redeploy — it registers once at startup and never retries.
+("Redeploy game server"). Restart `server-1` after replacing its binaries;
+new GameServer binaries recover registration after Master restarts without
+a manual restart.
 
 ### 4. Publish to GitHub Releases
 
@@ -94,12 +95,25 @@ docker build --platform linux/amd64 -f Dockerfile.gameserver \
 scripts/smoke-gameserver-image.sh sloparena-gameserver:local-test
 ```
 
-Production starts with an operator-owned read-only `server.json` at an
-absolute path supplied as the container argument. Set `arenaDataDir` to
-`data/arenas` and supply the required public/control configuration externally;
-the image deliberately contains no development `server.json`. Deployment,
-restricted ingress, credentials, and health/re-registration changes belong
-to separate issues; this image alone must not be exposed publicly.
+The VPS GameServer starts with an operator-owned, read-only `server.json` at
+an absolute path supplied as the container argument. Its
+`deploymentProfile` must be `"vps"`; a missing file/profile is fatal.
+Set `hostId` to the Master-provisioned `ApprovedHost:Id`, `publicIp` to
+the approved gameplay DNS, `port` to its approved UDP base port,
+`maxConcurrentMatches` to the intended slot count, `masterServerUrl` to
+the private Master URL, and `arenaDataDir` to `data/arenas`. Supply distinct
+32–4096 character bearer-token `registrationKey` and `matchControlKey` values
+(independent `openssl rand -base64 48` outputs work) through the private
+read-only configuration file; match them to `ApprovedHost:RegistrationKey`
+and `MatchControl:Key` on Master. Never put this file in an image, client,
+release record or repository. Master owns the advertised public address
+and the private `ApprovedHost:ControlUrl` (`/match/start` on the control
+network); do not publish GameServer TCP control publicly. The packaged
+`server.json` is intentionally absent. Legacy/local setups must select
+`"development"` explicitly; the local image smoke does so.
+
+This is service authentication, not a substitute for the restricted
+HTTPS/UDP ingress and deployment preflight in the later VPS phase.
 
 ## CI
 

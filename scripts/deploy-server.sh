@@ -15,8 +15,7 @@
 #   - the publish output has server.json deleted (csproj copies dev defaults;
 #     the live /srv/sloparena/server/server.json is the source of truth and
 #     must never be clobbered — it holds masterServerUrl + publicIp)
-#   - restarts server-1 AFTER the deploy: the game server registers with the
-#     master ONCE at startup and never retries, so a restart is required
+#   - restarts server-1 AFTER copying binaries so the new version actually runs
 #   - verifies registration + heartbeat freshness at the end
 set -euo pipefail
 
@@ -56,7 +55,7 @@ echo "== Rsync binaries (no --delete: never wipe live config/arenas) =="
 rsync -avz "$OUT/" "$HOST:/srv/sloparena/server/"
 rsync -avz "$ROOT/data/arenas/"*.arena "$HOST:/srv/sloparena/server/arenas/"
 
-echo "== Restart server-1 (required: registers once, never retries) =="
+echo "== Restart server-1 (load published binaries) =="
 ssh "$HOST" "cd /root/homelab/sloparena && docker compose -f $COMPOSE restart server-1"
 sleep 5
 
