@@ -198,6 +198,35 @@ namespace SlopArena.Tests
             Assert.Equal(DateTimeOffset.Parse("2099-01-01T00:00:00Z"), client.TokenExpiresAt);
         }
 
+        [Fact]
+        public async Task SteamRenewal_RequiresFreshTicketAndRejectsDifferentAccount()
+        {
+            int calls = 0;
+            using var client = MakeClient(request =>
+            {
+                calls++;
+                string? ticket = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+                if (calls == 1)
+                {
+                    Assert.Equal("/auth/steam", request.RequestUri!.AbsolutePath);
+                    Assert.Contains("\"ticket\":\"first\"", ticket);
+                    return JsonOk("{\"token\":\"original\",\"steamId\":76561198000000000}");
+                }
+                Assert.Equal("/auth/refresh", request.RequestUri!.AbsolutePath);
+                Assert.Equal("Bearer original", request.Headers.Authorization?.ToString());
+                Assert.Contains("\"ticket\":\"second\"", ticket);
+                return JsonOk("{\"token\":\"wrong\",\"steamId\":76561198000000001}");
+            });
+
+            Assert.True(await client.AuthenticateSteamAsync("first"));
+            Assert.True(client.IsSteamAuthenticated);
+            Assert.False(await client.RefreshAsync());
+            Assert.Equal(1, calls);
+            Assert.False(await client.RefreshAsync("second"));
+            Assert.Equal(2, calls);
+            Assert.Equal("original", client.Token);
+        }
+
         // ── GetMeAsync ──
 
         [Fact]

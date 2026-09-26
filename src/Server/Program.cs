@@ -7,6 +7,19 @@ namespace SlopArena.Server
     {
         static async Task Main(string[] args)
         {
+            if (args.Any(arg => arg.StartsWith("--steam-probe-server", StringComparison.Ordinal)))
+            {
+                if (args.Length != 2 || args[0] != "--steam-probe-server")
+                {
+                    Console.Error.WriteLine("Usage: SlopArena.Server --steam-probe-server <allowed-client-steamid>");
+                    Environment.ExitCode = 2;
+                    return;
+                }
+
+                Environment.ExitCode = await SteamProbeServer.RunAsync(args[1]);
+                return;
+            }
+
             Console.WriteLine("=== SlopArena Game Server ===");
 
             // Load configuration
@@ -23,24 +36,29 @@ namespace SlopArena.Server
             // Gameplay arenas are loaded from the published .arena files.
             ArenaRegistry.LoadFromDirectory(config.ArenaDataDir);
 
-            var orchestrator = new MultiMatchOrchestrator(config);
+            using var cts = new CancellationTokenSource();
+            await using var steamHost = config.IsVps ? new SteamGameServerHost(config.MaxConcurrentMatches) : null;
+            if (steamHost is not null)
+                await steamHost.StartAsync(cts.Token);
+
+            var orchestrator = new MultiMatchOrchestrator(config, steamHost);
+            steamHost?.AttachOrchestrator(orchestrator);
             bool contentReady = orchestrator.ContentReady && ArenaRegistry.Get("slop_court").HasValue;
             if (!contentReady)
             {
                 Console.WriteLine("[Content] Required cooked roster or default arena unavailable; readiness disabled.");
                 orchestrator.StopAcceptingMatches();
             }
-            var registration = new GameServerRegistration(config, orchestrator);
-            using var cts = new CancellationTokenSource();
+            var registration = new GameServerRegistration(config, orchestrator,
+                getSteamId: steamHost is null ? null : () => steamHost.IsReady ? steamHost.CurrentSteamId : 0);
 
-            // Report finished-match results (winner steam id) to the master server (issue #40).
-            // Fire-and-forget: ReportMatchResultAsync swallows errors; shared victory reports 0.
             orchestrator.ReportMatchResult = (matchId, winner) =>
                 _ = registration.ReportMatchResultAsync(matchId, winner);
+            orchestrator.ReportMatchCancellation = registration.QueueMatchCancellation;
 
             using var control = new MatchControlServer(orchestrator, config.Port,
                 defaultArena: "slop_court", controlKey: config.IsVps ? config.MatchControlKey : null,
-                isReady: () => contentReady && registration.HasFreshRegistration);
+                isReady: () => contentReady && registration.CanAdmitMatches, steamHost: steamHost);
             control.Start();
 
             void BeginShutdown()

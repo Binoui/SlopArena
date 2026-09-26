@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Buffers;
 using System.Security.Cryptography;
@@ -8,38 +9,32 @@ using SlopArena.Shared;
 namespace SlopArena.Server
 {
     /// <summary>
-    /// HTTP control server on the game server (issue #35). Listens on TCP
-    /// <c>config.Port</c> (the registered base port; UDP matches bind
-    /// <c>config.Port + offset</c>, so TCP and UDP coexist on the same number)
-    /// and exposes <c>POST /match/start</c> for the master server.
+    /// Private Master-to-GameHost control endpoint. Explicit development profile
+    /// allocates a match UDP port; VPS profile admits protocol-2 matches on the
+    /// single process-wide Steam P2P listener and returns the canonical content map.
     ///
-    /// The handler parses the body with <see cref="MatchStartRequestCodec"/> (the
-    /// pure, unit-tested seam), asks the orchestrator to assign a UDP port with the
-    /// roster, and replies with <c>{ "port": N, "content": { ... } }</c>. This keeps
-    /// the game server stateless between matches (ADR-0008): one shot in, one port out.
-    ///
-    /// VPS mode authenticates with a separate match-control key before reading
-    /// a bounded body. The listener binds the private control network through
-    /// Compose; TCP match control must never be publicly published there.
+    /// VPS requests authenticate with a separate match-control key before the
+    /// bounded body is read. The control listener must remain private.
     /// </summary>
     public sealed class MatchControlServer : IDisposable
     {
         private readonly HttpListener _listener = new();
         private readonly MultiMatchOrchestrator _orchestrator;
+        private readonly SteamGameServerHost? _steamHost;
         private readonly string _defaultArena;
         private readonly byte[]? _controlKey;
         private readonly Func<bool> _isReady;
         private const int MaxBodyBytes = 64 * 1024;
         private CancellationTokenSource? _cts;
         private bool _disposed;
+        private sealed record StartOutcome(int Port, MatchContentHandleMap? Content, string? Error,
+            string? MatchId = null, string? ServerSteamId = null, string? ContentHash = null);
 
-        /// <param name="orchestrator">Receives the parsed roster and assigns the match port.</param>
-        /// <param name="port">TCP port to listen on (the game server's registered base port).</param>
-        /// <param name="defaultArena">Arena used when the body omits one.</param>
         public MatchControlServer(MultiMatchOrchestrator orchestrator, int port, string defaultArena,
-            string? controlKey = null, Func<bool>? isReady = null)
+            string? controlKey = null, Func<bool>? isReady = null, SteamGameServerHost? steamHost = null)
         {
             _orchestrator = orchestrator;
+            _steamHost = steamHost;
             _defaultArena = defaultArena;
             _controlKey = controlKey is null ? null : Encoding.UTF8.GetBytes(controlKey);
             _isReady = isReady ?? (() => false);
@@ -92,19 +87,89 @@ namespace SlopArena.Server
         /// </summary>
         public (int port, MatchContentHandleMap? content, string? error) TryStartMatchWithContent(string jsonBody)
         {
-            MatchStartRequest? req;
+            var result = TryStartMatch(jsonBody);
+            return (result.Port, result.Content, result.Error);
+        }
+
+        private StartOutcome TryStartMatch(string jsonBody)
+        {
+            MatchStartRequest? request;
+            JsonDocument document;
             try
             {
-                using var doc = JsonDocument.Parse(jsonBody);
-                req = MatchStartRequestCodec.TryParse(doc.RootElement);
+                document = JsonDocument.Parse(jsonBody);
+                request = MatchStartRequestCodec.TryParse(document.RootElement);
             }
-            catch (JsonException) { return (0, null, "Malformed JSON body."); }
-            if (req is null)
-                return (0, null, "Invalid match-start body (need matchId, arenaName, and 2-4 players with a known characterClass + entityId).");
-            var arena = string.IsNullOrEmpty(req.ArenaName) ? _defaultArena : req.ArenaName;
-            if (!_orchestrator.TryAssignMatch(req.MatchId, arena, req.Players, (byte)req.MaxStocks, out int port, out var content, out var error))
-                return (0, null, error ?? "Failed to build match content.");
-            return (port, content, null);
+            catch (JsonException) { return new StartOutcome(0, null, "Malformed JSON body."); }
+            using (document)
+            {
+                if (request is null)
+                    return new StartOutcome(0, null, "Invalid match-start body.");
+
+                bool steam = _orchestrator.IsVps;
+                Guid matchGuid = Guid.Empty;
+                ulong serverSteamId = 0;
+                if (steam)
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    serverSteamId = _steamHost?.CurrentSteamId ?? 0;
+                    if (_steamHost is null || serverSteamId == 0 || !_steamHost.IsReady ||
+                        request.ProtocolVersion != SteamMatchDescriptor.CurrentProtocolVersion ||
+                        !Guid.TryParseExact(request.MatchId, "D", out matchGuid) || matchGuid == Guid.Empty ||
+                        request.AdmissionExpiresAtUtc is not DateTimeOffset expiry ||
+                        expiry <= now || expiry > now.AddSeconds(65) ||
+                        !document.RootElement.TryGetProperty("admissionExpiresAtUtc", out var deadline) ||
+                        deadline.ValueKind != JsonValueKind.String ||
+                        deadline.GetString() is not string deadlineText ||
+                        !(deadlineText.EndsWith("Z", StringComparison.OrdinalIgnoreCase) ||
+                          deadlineText.EndsWith("+00:00", StringComparison.Ordinal)))
+                        return new StartOutcome(0, null, "Invalid or expired Steam match admission.");
+                    if (string.IsNullOrWhiteSpace(request.ArenaName))
+                        return new StartOutcome(0, null, "Steam matches require an arena name.");
+                }
+                else if (request.ProtocolVersion != 0)
+                    return new StartOutcome(0, null, "Development matches require the explicit UDP protocol.");
+
+                var arena = string.IsNullOrEmpty(request.ArenaName) ? _defaultArena : request.ArenaName;
+                if (!ArenaRegistry.Get(arena).HasValue)
+                    return new StartOutcome(0, null, $"Unknown arena '{arena}'.");
+                if (steam && (!_orchestrator.TryRefreshCatalogHash(out _) ||
+                    !string.Equals(request.CatalogHash, _orchestrator.CatalogHash, StringComparison.Ordinal) ||
+                    !_isReady()))
+                    return new StartOutcome(0, null, "Master-pinned catalog or GameHost registration is stale.");
+                if (!_orchestrator.TryAssignMatch(request.MatchId, arena, request.Players, (byte)request.MaxStocks,
+                    steam ? request.AdmissionExpiresAtUtc : null,
+                    steam ? request.CatalogHash : null,
+                    out int port, out var content, out var error))
+                    return new StartOutcome(0, null, error ?? "Failed to build match content.");
+                if (steam && _steamHost!.CurrentSteamId != serverSteamId)
+                {
+                    _orchestrator.AbortMatch(matchGuid);
+                    return new StartOutcome(0, null, "Steam game-server identity changed during allocation.");
+                }
+
+                return steam
+                    ? new StartOutcome(port, content, null, matchGuid.ToString("D"),
+                        serverSteamId.ToString(CultureInfo.InvariantCulture),
+                        SteamMatchDescriptor.HashContent(content!))
+                    : new StartOutcome(port, content, null);
+            }
+        }
+
+        public bool TryAbortMatch(string jsonBody)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(jsonBody);
+                if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                    !document.RootElement.TryGetProperty("matchId", out var value) ||
+                    value.ValueKind != JsonValueKind.String ||
+                    !Guid.TryParse(value.GetString(), out var matchId) || matchId == Guid.Empty)
+                    return false;
+                _orchestrator.AbortMatch(matchId);
+                return true;
+            }
+            catch (JsonException) { return false; }
         }
 
         private static bool IsAuthorized(string? authorization, byte[] controlKey)
@@ -132,9 +197,16 @@ namespace SlopArena.Server
                 ctx.Response.StatusCode = _isReady() ? 200 : 503;
                 return;
             }
-            if (ctx.Request.HttpMethod != "POST" || ctx.Request.Url?.AbsolutePath != "/match/start")
+            string? path = ctx.Request.Url?.AbsolutePath;
+            bool abort = path == "/match/abort";
+            if (ctx.Request.HttpMethod != "POST" || path != "/match/start" && !abort)
             {
                 ctx.Response.StatusCode = 404;
+                return;
+            }
+            if (!abort && _steamHost is not null && !_isReady())
+            {
+                ctx.Response.StatusCode = 503;
                 return;
             }
 
@@ -184,17 +256,33 @@ namespace SlopArena.Server
                 ArrayPool<byte>.Shared.Return(bytes);
             }
 
-            var result = TryStartMatchWithContent(body);
             ctx.Response.ContentType = "application/json";
-            if (result.error is not null)
+            if (abort)
             {
-                ctx.Response.StatusCode = 400;
-                await ctx.Response.OutputStream.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new { error = result.error }));
+                ctx.Response.StatusCode = TryAbortMatch(body) ? 200 : 400;
+                await ctx.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes("{\"aborted\":true}"));
                 return;
             }
 
-            var ok = Encoding.UTF8.GetBytes($"{{\"port\":{result.port},\"content\":{MatchContentHandleMapCodec.Serialize(result.content!)}}}");
-            await ctx.Response.OutputStream.WriteAsync(ok);
+            var result = TryStartMatch(body);
+            if (result.Error is not null)
+            {
+                ctx.Response.StatusCode = 400;
+                await ctx.Response.OutputStream.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(new { error = result.Error }));
+                return;
+            }
+            if (result.ServerSteamId is not null)
+            {
+                var steamResponse = Encoding.UTF8.GetBytes(
+                    $"{{\"matchId\":\"{result.MatchId}\",\"serverSteamId\":\"{result.ServerSteamId}\",\"virtualPort\":0,\"protocolVersion\":2,\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)},\"contentHash\":\"{result.ContentHash}\"}}");
+                await ctx.Response.OutputStream.WriteAsync(steamResponse);
+            }
+            else
+            {
+                var udpResponse = Encoding.UTF8.GetBytes(
+                    $"{{\"port\":{result.Port},\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)}}}");
+                await ctx.Response.OutputStream.WriteAsync(udpResponse);
+            }
         }
 
         public void Stop()

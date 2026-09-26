@@ -10,13 +10,11 @@ public sealed class MatchContentCatalogProvider
 {
     private readonly string _cookedRoot;
     private readonly string _manifestPath;
-    private readonly BuiltInRosterManifest _manifest;
 
     public MatchContentCatalogProvider(string cookedRoot = "content-cooked", string manifestPath = "content-cooked/roster/manifest.json")
     {
         _cookedRoot = cookedRoot ?? throw new ArgumentNullException(nameof(cookedRoot));
         _manifestPath = manifestPath ?? throw new ArgumentNullException(nameof(manifestPath));
-        _manifest = BuiltInRosterManifestCodec.Load(_manifestPath);
     }
 
     public bool TryBuild(out MatchContentCatalog? catalog, out MatchContentHandleMap? handleMap, out string? error)
@@ -24,14 +22,15 @@ public sealed class MatchContentCatalogProvider
         catalog = null; handleMap = null; error = null;
         try
         {
+            var manifest = BuiltInRosterManifestCodec.Load(_manifestPath);
             var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal);
-            foreach (var rosterEntry in _manifest.Entries)
+            foreach (var rosterEntry in manifest.Entries)
             {
                 if (rosterEntry.Requirement.Version == "legacy-1") continue;
                 string directory = Path.Combine(_cookedRoot, rosterEntry.PackageId);
                 packages[rosterEntry.PackageId] = CookedCharacterPackageLoader.LoadDirectory(directory, rosterEntry.Requirement);
             }
-            var result = new MatchContentCatalogBuilder().Build(_manifest, packages, new LegacyCharacterCatalogAdapter());
+            var result = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
             if (!result.IsValid || result.Catalog == null)
             {
                 error = string.Join("; ", result.Diagnostics);

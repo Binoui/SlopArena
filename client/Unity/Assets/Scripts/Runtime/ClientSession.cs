@@ -22,13 +22,14 @@ namespace SlopArena.Client
         }
 #endif
 
-        /// <summary>Master server base URL; configure development overrides before launch authentication.</summary>
-        public static string MasterServerUrl = "https://sloparena.barakaslurp.fr";
+        /// <summary>Packaged Playtest Master; development overrides are Editor-only.</summary>
+        public const string DefaultMasterServerUrl = "https://master-test.sloparena.barakaslurp.fr";
+        public static string MasterServerUrl = DefaultMasterServerUrl;
 
-        /// <summary>Guest JWT bearer token; null until guest auth succeeds.</summary>
+        /// <summary>Application JWT bearer token; null until online authentication succeeds.</summary>
         public static string? AuthToken;
 
-        /// <summary>Guest SteamId assigned by the master server.</summary>
+        /// <summary>Verified SteamID, or a development guest identity in Editor mode.</summary>
         public static long SteamId;
 
         /// <summary>Current display name, maintained by ChatSession.</summary>
@@ -157,80 +158,228 @@ namespace SlopArena.Client
         public static void SetLocalMatchResults(MatchResultsData results)
             => CurrentMatchResults = results;
 
-        /// <summary>
-        /// Apply a <c>MatchStarted</c> push: stash the match config (arena, port,
-        /// roster, classes, entity IDs) and load the PvP arena scene. Shared by
-        /// CharSelectController and StageSelectController — the host picks the
-        /// arena on the stage select screen, so the push arrives while both
-        /// clients are on StageSelect (issue: multiplayer stage select).
-        /// </summary>
+        /// <summary>Apply a typed Master match push after validating routing and content.</summary>
         public static void ApplyMatchStarted(Shared.MatchStartedConfig config)
         {
-            MatchContentCatalog = null;
-            MatchContentHandleMap = null;
-            if (config.MatchPort > 0)
+            if (config == null)
             {
-                string failure = null;
-                if (config.Content == null || !TryBuildAndValidateMatchCatalog(config.Content, out var catalog, out failure))
-                {
-                    UnityEngine.Debug.LogError($"[PvP] Match content admission failed: {failure ?? "authoritative content map is missing."}");
-                    UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
-                    return;
-                }
-                MatchContentCatalog = catalog;
-                MatchContentHandleMap = config.Content;
-            }
-            // A new match invalidates every previous result snapshot.
-            CurrentMatchResults = null;
-            // Find the local player in the roster (by SteamId). The master
-            // server assigned entity IDs 1..N by join order (issue #35); the
-            // game server spawns each with the roster's character class, so
-            // every client renders the right chars (issue #36).
-            Shared.LobbyPlayerInfo? local = null;
-            foreach (var p in config.Players)
-            {
-                if (p.SteamId == SteamId)
-                    local = p;
-            }
-
-            if (local == null)
-            {
-                UnityEngine.Debug.LogError("[PvP] Match started but local player missing from roster.");
-                UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
+                RejectMatchStart("Master sent an empty match-start payload.");
                 return;
             }
 
-            UI.MatchConfig.Mode = UI.GameMode.PvP;
-            UI.MatchConfig.ArenaName = string.IsNullOrEmpty(config.ArenaName) ? "slop_court" : config.ArenaName;
-            UI.MatchConfig.ServerPort = config.MatchPort > 0 ? config.MatchPort : UI.MatchConfig.ServerPort;
-            // ServerIP is already set (host: localhost, joiner: server browser IP).
-            UI.MatchConfig.PlayerClass = ParseClass(local.CharacterSelection, Shared.CharacterClass.Manki);
-            UI.MatchConfig.PlayerPackageId = MatchContentCatalog?.Resolve(UI.MatchConfig.PlayerClass)?.Identity.PackageId ?? string.Empty;
-            UI.MatchConfig.LocalEntityId = (ulong)(local.EntityId > 0 ? local.EntityId : 1);
-            // Codec guarantees [1,99] (default 3); assign directly so a stale value
-            // from a previous match can never leak through (issue #38).
-            UI.MatchConfig.MaxStocks = config.MaxStocks;
-            // Every non-local rostered player is an opponent (issue #36).
-            // entityId <= 0 means the master never assigned it, so the game
-            // server never spawned the entity — skip it.
-            UI.MatchConfig.Opponents.Clear();
-            foreach (var p in config.Players)
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            var descriptor = config.Descriptor;
+            bool developmentUdp = IsEditorDevelopmentUdpEnabled();
+            if (descriptor == null)
             {
-                if (p.SteamId == SteamId) continue;
-                if (p.EntityId <= 0) continue;
-                var opponentClass = ParseClass(p.CharacterSelection, Shared.CharacterClass.Manki);
-                UI.MatchConfig.Opponents.Add(new UI.MatchConfig.OpponentInfo(
-                    (ulong)p.EntityId,
-                    opponentClass,
-                    MatchContentCatalog?.Resolve(opponentClass)?.Identity.PackageId ?? string.Empty));
+                if (!developmentUdp || config.MatchPort <= 0)
+                {
+                    RejectMatchStart("This client requires a Steam match descriptor; raw UDP is available only in explicit Editor development mode.");
+                    return;
+                }
+            }
+            else
+            {
+                if (config.MatchPort != 0)
+                {
+                    RejectMatchStart("Steam match descriptor cannot be combined with a UDP port.");
+                    return;
+                }
+                if (!IsValidSteamDescriptor(descriptor, out var descriptorFailure))
+                {
+                    RejectMatchStart(descriptorFailure);
+                    return;
+                }
             }
 
-            // Stash the roster so the results screen can render names/classes.
-            MatchRoster = config.Players;
+            var content = config.Content;
+            if (content == null)
+            {
+                RejectMatchStart("Match content admission failed: authoritative content map is missing.");
+                return;
+            }
+            if (!TryBuildAndValidateMatchCatalog(content, out var catalog, out var contentFailure) ||
+                catalog == null)
+            {
+                RejectMatchStart($"Match content admission failed: {contentFailure ?? "content catalog could not be built."}");
+                return;
+            }
+            if (descriptor != null &&
+                !string.Equals(Shared.SteamMatchDescriptor.HashContent(content), descriptor.ContentHash, StringComparison.Ordinal))
+            {
+                RejectMatchStart("Steam match content hash does not match the authoritative content map.");
+                return;
+            }
+            if (config.Players == null || config.Players.Count is < 2 or > 4)
+            {
+                RejectMatchStart("Master match roster is missing or outside the supported player count.");
+                return;
+            }
 
-            // Go straight to the PvP arena — the master server already launched
-            // the game server and assigned the UDP port (issue #35).
+            Shared.LobbyPlayerInfo? local = null;
+            if (descriptor != null)
+            {
+                var entityIds = new HashSet<int>();
+                var steamIds = new HashSet<long>();
+                foreach (var player in config.Players)
+                {
+                    if (player.SteamId <= 0 || player.EntityId <= 0 ||
+                        !steamIds.Add(player.SteamId) || !entityIds.Add(player.EntityId))
+                    {
+                        RejectMatchStart("Steam match roster has a missing or duplicate Steam/entity identity.");
+                        return;
+                    }
+                }
+            }
+            foreach (var player in config.Players)
+                if (player.SteamId == SteamId)
+                    local = player;
+            if (local == null || local.EntityId <= 0 || (descriptor != null && SteamId <= 0))
+            {
+                RejectMatchStart("Master match roster does not contain this authenticated Steam account with an assigned entity.");
+                return;
+            }
+            MatchContentCatalog = catalog;
+            MatchContentHandleMap = content;
+            CurrentMatchResults = null;
+            UI.MatchConfig.Mode = UI.GameMode.PvP;
+            UI.MatchConfig.Transport = descriptor != null
+                ? UI.MatchTransport.SteamP2P
+                : UI.MatchTransport.DevelopmentUdp;
+            UI.MatchConfig.SteamDescriptor = descriptor;
+            UI.MatchConfig.ArenaName = config.ArenaName;
+            UI.MatchConfig.ServerPort = descriptor != null ? 0 : config.MatchPort;
+            var playerClass = ParseClass(local.CharacterSelection,
+                descriptor == null ? Shared.CharacterClass.Manki : Shared.CharacterClass.None);
+            if (descriptor != null && (playerClass == Shared.CharacterClass.None ||
+                catalog.Resolve(playerClass) == null))
+            {
+                RejectMatchStart("Master roster selected an unavailable player character.");
+                return;
+            }
+            UI.MatchConfig.PlayerClass = playerClass;
+            UI.MatchConfig.PlayerPackageId = catalog.Resolve(playerClass)?.Identity.PackageId ?? string.Empty;
+            UI.MatchConfig.LocalEntityId = (ulong)local.EntityId;
+            UI.MatchConfig.MaxStocks = config.MaxStocks;
+            UI.MatchConfig.Opponents.Clear();
+            foreach (var player in config.Players)
+            {
+                if (player.SteamId == SteamId) continue;
+                if (player.EntityId <= 0) continue;
+                var opponentClass = ParseClass(player.CharacterSelection,
+                    descriptor == null ? Shared.CharacterClass.Manki : Shared.CharacterClass.None);
+                if (descriptor != null && (opponentClass == Shared.CharacterClass.None ||
+                    catalog.Resolve(opponentClass) == null))
+                {
+                    RejectMatchStart("Master roster selected an unavailable opponent character.");
+                    return;
+                }
+                UI.MatchConfig.Opponents.Add(new UI.MatchConfig.OpponentInfo(
+                    (ulong)player.EntityId,
+                    opponentClass,
+                    catalog.Resolve(opponentClass)?.Identity.PackageId ?? string.Empty));
+            }
+
+            MatchRoster = config.Players;
             UnityEngine.SceneManagement.SceneManager.LoadScene("Arena_PvP");
+        }
+
+        public static void RejectMatchStart(string reason)
+        {
+            UnityEngine.Debug.LogError($"[PvP] {reason}");
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            MatchRoster = null;
+            CurrentMatchResults = null;
+            UI.MatchConfig.ClearActiveMatch();
+            UI.FrontendController.Show(SelectedServerId != Guid.Empty
+                ? UI.FrontendPage.LobbyRoom
+                : UI.FrontendPage.ServerBrowser);
+        }
+
+        public static bool ApplyMatchAborted(Guid matchId, string reason)
+        {
+            if (UI.MatchConfig.Transport != UI.MatchTransport.SteamP2P ||
+                UI.MatchConfig.SteamDescriptor is not { } descriptor ||
+                descriptor.MatchId != matchId)
+                return false;
+            EndActiveSteamMatch($"Match aborted ({reason}).");
+            return true;
+        }
+
+        public static void ApplySteamTransportFailure(Guid matchId, string reason)
+        {
+            if (UI.MatchConfig.Transport == UI.MatchTransport.SteamP2P &&
+                UI.MatchConfig.SteamDescriptor is { } descriptor &&
+                descriptor.MatchId == matchId)
+                EndActiveSteamMatch($"Match connection failed: {reason}");
+        }
+
+        private static void EndActiveSteamMatch(string notice)
+        {
+            Network.NetworkClient.DisconnectActiveSteamMatch();
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            MatchRoster = null;
+            CurrentMatchResults = null;
+            UI.MatchConfig.ClearActiveMatch();
+            if (SelectedServerId != Guid.Empty)
+            {
+                UI.FrontendController.Show(UI.FrontendPage.LobbyRoom);
+            }
+            else
+            {
+                UI.ServerBrowserUI.PendingReturnNotice = notice;
+                UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
+            }
+        }
+
+        public static void ClearActiveMatchForAccountChange()
+        {
+            if (UI.MatchConfig.Transport != UI.MatchTransport.SteamP2P)
+                return;
+            Network.NetworkClient.DisconnectActiveSteamMatch();
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            MatchRoster = null;
+            CurrentMatchResults = null;
+            UI.MatchConfig.ClearActiveMatch();
+            UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
+        }
+
+        private static bool IsValidSteamDescriptor(Shared.SteamMatchDescriptor descriptor, out string failure)
+        {
+            failure = "Steam match descriptor is invalid or expired.";
+            if (descriptor.MatchId == Guid.Empty ||
+                descriptor.ServerSteamId == 0 ||
+                descriptor.VirtualPort != Shared.SteamMatchDescriptor.GameplayVirtualPort ||
+                descriptor.ProtocolVersion != Shared.SteamMatchDescriptor.CurrentProtocolVersion ||
+                descriptor.AdmissionExpiresAtUtc <= DateTimeOffset.UtcNow ||
+                !IsLowerSha256(descriptor.ContentHash))
+                return false;
+            failure = string.Empty;
+            return true;
+        }
+
+        private static bool IsLowerSha256(string value)
+        {
+            if (value == null || value.Length != 64)
+                return false;
+            foreach (char c in value)
+                if (c is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
+                    return false;
+            return true;
+        }
+
+        private static bool IsEditorDevelopmentUdpEnabled()
+        {
+#if UNITY_EDITOR
+            return UnityEngine.Application.isEditor &&
+                string.Equals(Environment.GetEnvironmentVariable("SLOPARENA_DEV_UDP"), "1", StringComparison.Ordinal);
+#else
+            return false;
+#endif
         }
         public static void InstallLocalMatchCatalog(Shared.MatchContentCatalog catalog)
         {
@@ -351,7 +500,15 @@ namespace SlopArena.Client
 
         public static void Reset()
         {
-            MasterServerUrl = "https://sloparena.barakaslurp.fr";
+            MasterServerUrl = DefaultMasterServerUrl;
+            ClearAccountData();
+        }
+
+        /// <summary>Drop identity and match state without changing the selected development endpoint.</summary>
+        public static void ClearAccountData()
+        {
+            Network.NetworkClient.DisconnectActiveSteamMatch();
+            UI.MatchConfig.ClearActiveMatch();
             AuthToken = null;
             SteamId = 0;
             Username = null;

@@ -11,6 +11,17 @@ using SlopArena.Shared;
 
 namespace SlopArena.Client.Network
 {
+    public sealed class MatchAbortedNotification
+    {
+        public Guid MatchId { get; }
+        public string Reason { get; }
+        public MatchAbortedNotification(Guid matchId, string reason)
+        {
+            MatchId = matchId;
+            Reason = reason;
+        }
+    }
+
     /// <summary>
     /// One authenticated SignalR connection to the master server. It carries
     /// lobby control and all chat channels; callers keep this instance alive
@@ -22,6 +33,8 @@ namespace SlopArena.Client.Network
         private HubConnection? _conn;
         private readonly string _masterServerUrl;
         private readonly Func<string?> _authTokenProvider;
+        private readonly int _protocolVersion;
+        private Guid _activeMatchId;
         private Guid _joinedServerId;
         private readonly ConcurrentQueue<Action> _pending = new();
         private int _pendingCount;
@@ -47,6 +60,8 @@ namespace SlopArena.Client.Network
         public event Action<MatchStartingConfig>? StageSelect;
         public event Action<LobbyPlayerInfo>? CharacterSelected;
         public event Action<MatchStartedConfig>? MatchStarted;
+        public event Action? MatchStartedRejected;
+        public event Action<MatchAbortedNotification>? MatchAborted;
         public event Action? Connected;
         public event Action<Exception?>? Disconnected;
         public event Action<string>? Error;
@@ -60,16 +75,21 @@ namespace SlopArena.Client.Network
 
         /// <param name="masterServerUrl">Master server base URL (e.g. http://localhost:5000).</param>
         /// <param name="authToken">Guest JWT to send as bearer auth on the connection.</param>
+        /// <param name="protocolVersion">2 for Steam-authenticated play; 0 for explicit Editor development guests.</param>
         public LobbyClient(string masterServerUrl, string authToken)
-            : this(masterServerUrl, () => authToken)
+            : this(masterServerUrl, () => authToken, SteamMatchDescriptor.CurrentProtocolVersion)
         {
         }
 
         /// <summary>Construct with a live token provider so renewal updates the hub credential.</summary>
-        public LobbyClient(string masterServerUrl, Func<string?> authTokenProvider)
+        public LobbyClient(string masterServerUrl, Func<string?> authTokenProvider, int protocolVersion = SteamMatchDescriptor.CurrentProtocolVersion)
         {
+            if (protocolVersion != SteamMatchDescriptor.CurrentProtocolVersion &&
+                !(protocolVersion == 0 && UnityEngine.Application.isEditor))
+                throw new ArgumentOutOfRangeException(nameof(protocolVersion));
             _masterServerUrl = masterServerUrl.TrimEnd('/');
             _authTokenProvider = authTokenProvider ?? throw new ArgumentNullException(nameof(authTokenProvider));
+            _protocolVersion = protocolVersion;
         }
 
         /// <summary>
@@ -141,7 +161,7 @@ namespace SlopArena.Client.Network
             {
                 await _conn!.InvokeCoreAsync(
                     _resumeServerOnly ? "ResumeServer" : "JoinLobby",
-                    new object?[] { _joinedServerId });
+                    new object?[] { _joinedServerId, _protocolVersion });
             }
             catch (Exception ex)
             {
@@ -180,11 +200,35 @@ namespace SlopArena.Client.Network
             _conn.On<JsonElement>("MatchStarted", element =>
             {
                 var cfg = LobbyPayloadCodec.TryParseMatchStarted(element);
-                if (cfg is not null)
+                if (cfg == null)
                 {
-                    _resumeServerOnly = true;
-                    Enqueue(() => MatchStarted?.Invoke(cfg));
+                    Enqueue(() =>
+                    {
+                        _resumeServerOnly = false;
+                        _activeMatchId = Guid.Empty;
+                        MatchStartedRejected?.Invoke();
+                    });
+                    return;
                 }
+                _resumeServerOnly = true;
+                Enqueue(() =>
+                {
+                    _activeMatchId = cfg.Descriptor?.MatchId ?? Guid.Empty;
+                    MatchStarted?.Invoke(cfg);
+                });
+            });
+            _conn.On<JsonElement>("MatchAborted", element =>
+            {
+                var aborted = TryParseMatchAborted(element);
+                if (aborted == null) return;
+                Enqueue(() =>
+                {
+                    if (_activeMatchId != aborted.MatchId)
+                        return;
+                    _activeMatchId = Guid.Empty;
+                    _resumeServerOnly = false;
+                    MatchAborted?.Invoke(aborted);
+                });
             });
             _conn.On<JsonElement>("ChatMessage", element =>
             {
@@ -234,7 +278,7 @@ namespace SlopArena.Client.Network
             _resumeServerOnly = true;
             try
             {
-                await _conn.InvokeCoreAsync("JoinLobby", new object?[] { serverId });
+                await _conn.InvokeCoreAsync("JoinLobby", new object?[] { serverId, _protocolVersion });
                 _resumeServerOnly = false;
             }
             catch (Exception ex)
@@ -262,7 +306,7 @@ namespace SlopArena.Client.Network
             }
             try
             {
-                await _conn.InvokeCoreAsync("ResumeServer", new object?[] { serverId });
+                await _conn.InvokeCoreAsync("ResumeServer", new object?[] { serverId, _protocolVersion });
                 _joinedServerId = serverId;
                 _resumeServerOnly = true;
             }
@@ -373,6 +417,20 @@ namespace SlopArena.Client.Network
                 return default;
             }
         }
+        private static MatchAbortedNotification? TryParseMatchAborted(JsonElement element)
+        {
+            if (element.ValueKind != JsonValueKind.Object ||
+                !element.TryGetProperty("matchId", out var match) || match.ValueKind != JsonValueKind.String ||
+                !Guid.TryParse(match.GetString(), out var matchId) || matchId == Guid.Empty ||
+                !element.TryGetProperty("reason", out var reason) || reason.ValueKind != JsonValueKind.String)
+                return null;
+
+            string? value = reason.GetString();
+            return value is "unfilled" or "absent" or "host_restart" or "host_shutdown" or "content_unavailable"
+                ? new MatchAbortedNotification(matchId, value)
+                : null;
+        }
+
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {

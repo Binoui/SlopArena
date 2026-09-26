@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 
@@ -104,12 +105,9 @@ public static class LobbyPayloadCodec
         return snap is null ? null : new MatchStartingConfig(snap.ServerId, snap.Players);
     }
 
-    /// <summary>
-    /// Parse a <c>MatchStartedConfig</c>-shaped element: a snapshot
-    /// (<c>{ serverId, players[] }</c>) plus the match-start fields
-    /// <c>matchPort</c> (int) and <c>arenaName</c> (string) added by issue #35.
-    /// Both are optional (default 0 / "") so older pushes still parse.
-    /// </summary>
+    /// <summary>Parse a MatchStarted push with exactly one transport route:
+    /// a typed Steam descriptor or an explicit development UDP port. Missing,
+    /// conflicting, or mismatched content never enters a playable match.</summary>
     public static MatchStartedConfig? TryParseMatchStarted(JsonElement element)
     {
         var snap = TryParseSnapshot(element);
@@ -119,23 +117,28 @@ public static class LobbyPayloadCodec
         {
             if (mp.ValueKind != JsonValueKind.Number || !mp.TryGetInt32(out matchPort) || matchPort < 0) return null;
         }
-        string arenaName = string.Empty;
-        if (element.TryGetProperty("arenaName", out var an))
-        {
-            if (an.ValueKind != JsonValueKind.String) return null;
-            arenaName = an.GetString() ?? string.Empty;
-        }
+        if (!element.TryGetProperty("arenaName", out var an) ||
+            an.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(an.GetString()))
+            return null;
+        string arenaName = an.GetString()!;
         int maxStocks = MatchDefaults.DefaultMaxStocks;
         if (element.TryGetProperty("maxStocks", out var ms))
         {
             if (ms.ValueKind != JsonValueKind.Number || !ms.TryGetInt32(out maxStocks) || maxStocks < 1 || maxStocks > 99) return null;
         }
-        MatchContentHandleMap? content = null;
-        if (matchPort > 0)
-        {
-            if (!element.TryGetProperty("content", out var c) || !MatchContentHandleMapCodec.TryParse(c, out content) || content == null) return null;
-        }
-        else if (element.TryGetProperty("content", out var localContent) && !MatchContentHandleMapCodec.TryParse(localContent, out content)) return null;
-        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks, content);
+        SteamMatchDescriptor? descriptor = null;
+        if (element.TryGetProperty("descriptor", out var route) &&
+            !SteamMatchDescriptor.TryParse(route, out descriptor))
+            return null;
+        if ((matchPort > 0) == (descriptor != null))
+            return null;
+        if (!element.TryGetProperty("content", out var c) ||
+            !MatchContentHandleMapCodec.TryParse(c, out var content) || content == null)
+            return null;
+        if (descriptor != null &&
+            !string.Equals(SteamMatchDescriptor.HashContent(content), descriptor.ContentHash, StringComparison.Ordinal))
+            return null;
+        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks, content, descriptor);
     }
 }

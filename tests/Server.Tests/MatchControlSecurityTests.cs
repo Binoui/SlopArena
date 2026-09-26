@@ -40,6 +40,18 @@ public class MatchControlSecurityTests
             using var accepted = await client.PostAsync("/match/start", new StringContent(body));
             Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
             Assert.Contains($"\"port\":{port}", await accepted.Content.ReadAsStringAsync());
+            const string abortBody = """{"matchId":"22222222-2222-2222-2222-222222222222"}""";
+            client.DefaultRequestHeaders.Authorization = null;
+            using var abortMissing = await client.PostAsync("/match/abort", new StringContent(abortBody));
+            Assert.Equal(HttpStatusCode.Unauthorized, abortMissing.StatusCode);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "wrong");
+            using var abortWrong = await client.PostAsync("/match/abort", new StringContent(abortBody));
+            Assert.Equal(HttpStatusCode.Unauthorized, abortWrong.StatusCode);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "control-secret-0123456789abcdef01234567");
+            using var abort = await client.PostAsync("/match/abort", new StringContent(abortBody));
+            Assert.Equal(HttpStatusCode.OK, abort.StatusCode);
+            using var duplicateAbort = await client.PostAsync("/match/abort", new StringContent(abortBody));
+            Assert.Equal(HttpStatusCode.OK, duplicateAbort.StatusCode);
         }
         finally
         {

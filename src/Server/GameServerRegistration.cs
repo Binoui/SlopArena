@@ -1,8 +1,11 @@
+using System.Collections.Concurrent;
 using System.Net;
+using System.Globalization;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
+using SlopArena.Shared;
 
 namespace SlopArena.Server
 {
@@ -16,15 +19,20 @@ namespace SlopArena.Server
         private readonly HttpClient _http;
         private readonly ServerConfig _config;
         private readonly MultiMatchOrchestrator _orchestrator;
+        private readonly Func<ulong>? _getSteamId;
+        private readonly ConcurrentDictionary<Guid, PendingReport> _pendingReports = new();
+        private readonly SemaphoreSlim _reportGate = new(1, 1);
         private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
         private readonly TimeProvider _clock;
         private static readonly TimeSpan RegistrationFreshness = TimeSpan.FromSeconds(15);
         private RegistrationSession? _session;
         private int _running;
-        private sealed record RegistrationSession(Guid Id, string Token, long AcknowledgedAt);
+        private sealed record RegistrationSession(Guid Id, string Token, ulong? SteamId, Guid InstanceId, string CatalogHash, long AcknowledgedAt);
+        private sealed record PendingReport(Guid MatchId, long? WinnerSteamId, string? CancellationReason);
         private enum RegistrationOutcome { Success, Retry, Fatal }
 
+        public Guid InstanceId { get; } = Guid.NewGuid();
         public Guid ServerId => Volatile.Read(ref _session)?.Id ?? Guid.Empty;
         public bool IsRegistered => Volatile.Read(ref _session) is not null;
         public bool HasFreshRegistration
@@ -32,15 +40,24 @@ namespace SlopArena.Server
             get
             {
                 var session = Volatile.Read(ref _session);
-                return session is not null && _clock.GetElapsedTime(session.AcknowledgedAt) < RegistrationFreshness;
+                if (session is null || _clock.GetElapsedTime(session.AcknowledgedAt) >= RegistrationFreshness)
+                    return false;
+                return !_config.IsVps || session.InstanceId == InstanceId &&
+                    session.SteamId is ulong registered && registered != 0 &&
+                    _getSteamId?.Invoke() == registered &&
+                    string.Equals(session.CatalogHash, _orchestrator.CatalogHash, StringComparison.Ordinal);
             }
         }
+        public bool CanAdmitMatches => HasFreshRegistration &&
+            _pendingReports.Count + _orchestrator.CurrentMatchCount < Math.Max(16, _config.MaxConcurrentMatches * 4);
+
 
         public GameServerRegistration(ServerConfig config, MultiMatchOrchestrator orchestrator,
-            HttpMessageHandler? handler = null, TimeProvider? clock = null)
+            HttpMessageHandler? handler = null, TimeProvider? clock = null, Func<ulong>? getSteamId = null)
         {
             _config = config;
             _orchestrator = orchestrator;
+            _getSteamId = getSteamId;
             _http = new HttpClient(handler ?? new HttpClientHandler())
             {
                 BaseAddress = new Uri(config.MasterServerUrl.TrimEnd('/') + "/"),
@@ -79,14 +96,18 @@ namespace SlopArena.Server
                     {
                         await Task.Delay(heartbeat, ct);
                         await SendHeartbeatAsync(ct);
+                        await DrainPendingReportsAsync(ct);
                     }
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             finally
             {
-                // Cancellation must not prevent best-effort deregistration.
-                await DeregisterAsync(CancellationToken.None);
+                _orchestrator.Shutdown("host_restart");
+                using var shutdownDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                try { await DrainPendingReportsAsync(shutdownDeadline.Token); }
+                catch (OperationCanceledException) when (shutdownDeadline.IsCancellationRequested) { }
+                await DeregisterAsync(shutdownDeadline.Token);
                 Volatile.Write(ref _running, 0);
             }
         }
@@ -95,10 +116,20 @@ namespace SlopArena.Server
         {
             try
             {
+                ulong currentSteamId = _getSteamId?.Invoke() ?? 0;
+                if (_config.IsVps && (currentSteamId == 0 || !_orchestrator.TryRefreshCatalogHash(out _)))
+                    return RegistrationOutcome.Retry;
+                string? catalogHash = _orchestrator.CatalogHash;
+                if (_config.IsVps && catalogHash is null)
+                    return RegistrationOutcome.Retry;
                 var ip = _config.PublicIp ?? GetPublicIpAddress();
                 var payload = new
                 {
                     hostId = _config.HostId,
+                    instanceId = _config.IsVps ? InstanceId : (Guid?)null,
+                    steamId = _config.IsVps ? currentSteamId.ToString(CultureInfo.InvariantCulture) : null,
+                    protocolVersion = _config.IsVps ? (int?)SteamMatchDescriptor.CurrentProtocolVersion : null,
+                    catalogHash = _config.IsVps ? catalogHash : null,
                     name = _config.ServerName,
                     ipAddress = ip,
                     port = _config.Port,
@@ -127,7 +158,8 @@ namespace SlopArena.Server
                     await response.Content.ReadAsStringAsync(ct), _jsonOptions);
                 if (result == null || result.ServerId == Guid.Empty || string.IsNullOrWhiteSpace(result.ApiToken))
                     return RegistrationOutcome.Fatal;
-                Volatile.Write(ref _session, new RegistrationSession(result.ServerId, result.ApiToken, _clock.GetTimestamp()));
+                Volatile.Write(ref _session, new RegistrationSession(result.ServerId, result.ApiToken,
+                    _config.IsVps ? currentSteamId : null, InstanceId, catalogHash ?? string.Empty, _clock.GetTimestamp()));
                 Console.WriteLine($"[Registration] Registered (ID: {result.ServerId}, public address: {ip})");
                 return RegistrationOutcome.Success;
             }
@@ -173,25 +205,36 @@ namespace SlopArena.Server
         {
             var session = Volatile.Read(ref _session);
             if (session is null) return;
+            ulong steamId = _getSteamId?.Invoke() ?? 0;
+            bool catalogReady = _orchestrator.TryRefreshCatalogHash(out _);
+            string? catalogHash = _orchestrator.CatalogHash;
+            if (_config.IsVps && (steamId == 0 || !catalogReady || catalogHash is null)) return;
             using var request = new HttpRequestMessage(HttpMethod.Post, $"servers/{session.Id}/heartbeat")
             {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(new { currentMatches = _orchestrator.CurrentMatchCount }),
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    currentMatches = _orchestrator.CurrentMatchCount,
+                    instanceId = _config.IsVps ? InstanceId : (Guid?)null,
+                    steamId = _config.IsVps ? steamId.ToString(CultureInfo.InvariantCulture) : null,
+                    protocolVersion = _config.IsVps ? (int?)SteamMatchDescriptor.CurrentProtocolVersion : null,
+                    catalogHash = _config.IsVps ? catalogHash : null
+                }),
                     Encoding.UTF8, "application/json")
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
             try
             {
                 using var response = await _http.SendAsync(request, ct);
-                if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
+                if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized or HttpStatusCode.Conflict)
                 {
-                    Console.WriteLine("[Heartbeat] Master lost registration; reconnecting.");
+                    Console.WriteLine("[Heartbeat] Master registration identity or catalog changed; reconnecting.");
                     Interlocked.CompareExchange(ref _session, null, session);
                 }
                 else if (!response.IsSuccessStatusCode)
                     Console.WriteLine($"[Heartbeat] Master unavailable: {response.StatusCode}");
                 else
-                    Interlocked.CompareExchange(ref _session, session with { AcknowledgedAt = _clock.GetTimestamp() }, session);
+                    Interlocked.CompareExchange(ref _session,
+                        session with { CatalogHash = catalogHash ?? string.Empty, AcknowledgedAt = _clock.GetTimestamp() }, session);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (HttpRequestException)
@@ -204,27 +247,77 @@ namespace SlopArena.Server
             }
         }
 
-        /// <summary>Report a finished match using the current registration token.</summary>
-        public async Task ReportMatchResultAsync(Guid matchId, long winnerSteamId, CancellationToken ct = default)
+        public Task ReportMatchResultAsync(Guid matchId, long winnerSteamId, CancellationToken ct = default)
         {
-            var session = Volatile.Read(ref _session);
-            if (session is null) return;
+            if (matchId != Guid.Empty)
+                _pendingReports.TryAdd(matchId, new PendingReport(matchId, winnerSteamId, null));
+            return DrainPendingReportsAsync(ct);
+        }
+
+        public void QueueMatchCancellation(Guid matchId, string reason)
+        {
+            if (matchId == Guid.Empty || reason is not ("unfilled" or "absent" or "host_restart" or "host_shutdown" or "content_unavailable"))
+                return;
+            _pendingReports.TryAdd(matchId, new PendingReport(matchId, null, reason));
+            _ = DrainPendingReportsAsync(CancellationToken.None);
+        }
+
+        private async Task DrainPendingReportsAsync(CancellationToken ct)
+        {
+            await _reportGate.WaitAsync(ct);
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, "match/result")
+                foreach (var report in _pendingReports.Values)
                 {
-                    Content = new StringContent(JsonSerializer.Serialize(new { matchId, winnerSteamId }),
-                        Encoding.UTF8, "application/json")
-                };
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
-                using var response = await _http.SendAsync(request, ct);
-                if (!response.IsSuccessStatusCode)
-                    Console.WriteLine($"[MatchResult] Failed: {response.StatusCode}");
+                    var session = Volatile.Read(ref _session);
+                    if (session is null) return;
+                    string path = report.CancellationReason is null ? "match/result" : "match/cancel";
+                    object payload;
+                    if (report.CancellationReason is null)
+                        payload = new { matchId = report.MatchId, winnerSteamId = report.WinnerSteamId ?? 0 };
+                    else
+                        payload = new { matchId = report.MatchId, reason = report.CancellationReason };
+                    using var request = new HttpRequestMessage(HttpMethod.Post, path)
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions),
+                            Encoding.UTF8, "application/json")
+                    };
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.Token);
+                    try
+                    {
+                        using var response = await _http.SendAsync(request, ct);
+                        if (response.IsSuccessStatusCode || response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Conflict)
+                            _pendingReports.TryRemove(report.MatchId, out _);
+                        else if (response.StatusCode == HttpStatusCode.Unauthorized)
+                        {
+                            Interlocked.CompareExchange(ref _session, null, session);
+                            return;
+                        }
+                        else if ((int)response.StatusCode is 408 or 429 or >= 500)
+                        {
+                            Console.WriteLine($"[MatchReport] Master unavailable: {response.StatusCode}");
+                            return;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[MatchReport] Rejected: {response.StatusCode}");
+                            _pendingReports.TryRemove(report.MatchId, out _);
+                        }
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                    catch (HttpRequestException)
+                    {
+                        Console.WriteLine("[MatchReport] Master unavailable; report retained for retry.");
+                        return;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        Console.WriteLine("[MatchReport] Master timed out; report retained for retry.");
+                        return;
+                    }
+                }
             }
-            catch (Exception)
-            {
-                Console.WriteLine("[MatchResult] Master unavailable.");
-            }
+            finally { _reportGate.Release(); }
         }
 
         /// <summary>

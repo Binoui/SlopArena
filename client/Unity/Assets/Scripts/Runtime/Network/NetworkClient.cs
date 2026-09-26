@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Stopwatch = System.Diagnostics.Stopwatch;
 using SlopArena.Shared;
+using Steamworks;
 using UnityEngine;
 
 namespace SlopArena.Client.Network
@@ -18,6 +20,32 @@ namespace SlopArena.Client.Network
         [Header("Connection")]
         [SerializeField] private string _serverIp = "127.0.0.1";
         [SerializeField] private int _serverPort = 9876;
+        private const int MaxSteamMessages = 64;
+        private const int MaxSteamFrameBytes = 1024;
+        private const double SteamConnectionTimeoutSeconds = 30;
+        private const double SteamJoinTimeoutSeconds = 15;
+        private static readonly IntPtr[] SteamMessages = new IntPtr[MaxSteamMessages];
+        private static NetworkClient? _activeSteamMatch;
+
+        private UI.MatchTransport _transport;
+        private SteamMatchDescriptor? _steamDescriptor;
+        private HSteamNetConnection _steamConnection = HSteamNetConnection.Invalid;
+        private IntPtr _steamSendBuffer;
+        private bool _hasSteamConnection;
+        private bool _steamJoinSent;
+        private bool _steamAdmitted;
+        private bool _steamEverAdmitted;
+        private bool _steamResultReceived;
+        private bool _steamFailureReported;
+        private bool _steamRemoteVerified;
+        private long _steamAttemptStartedAt;
+        private long _steamJoinSentAt;
+        private long _steamNextReconnectAt;
+        private long _steamNextPingAt;
+        private double _steamReconnectDelaySeconds = 1;
+        private readonly byte[] _steamReceiveFrame = new byte[MaxSteamFrameBytes];
+        private readonly byte[] _steamInputFrame = new byte[1 + 8 + 4 + InputState.Size];
+        private string _connectionFailure = string.Empty;
 
         private volatile UdpClient? _udp;
         private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876);
@@ -47,7 +75,9 @@ namespace SlopArena.Client.Network
             }
         }
         public uint LastPingServerTick => unchecked((uint)Interlocked.Read(ref _lastPingTick));
-        public string ServerEndpoint => _serverEp.ToString();
+        public string ServerEndpoint => _steamDescriptor != null
+            ? $"Steam P2P {_steamDescriptor.ServerSteamId}"
+            : _serverEp.ToString();
         private static readonly byte[] PongMagic = { (byte)'P', (byte)'O', (byte)'N', (byte)'G' };
         private readonly ConcurrentQueue<ServerEntityPacket> _receivedQueue = new();
         public ulong EntityId { get => _entityId; set => _entityId = value; }
@@ -63,9 +93,9 @@ namespace SlopArena.Client.Network
 
         private void Awake()
         {
-            _serverEp = new IPEndPoint(IPAddress.Parse(_serverIp), _serverPort);
-            CreateSocket();
-            StartReceiveThread();
+            // A scene load alone never opens a socket. PvPMatch explicitly selects
+            // its Steam route or the Editor-only development UDP route.
+            _serverEp = new IPEndPoint(IPAddress.Loopback, 9876);
         }
 
         private void CreateSocket()
@@ -96,23 +126,64 @@ namespace SlopArena.Client.Network
 
         private void OnDestroy()
         {
-            _running = false;
-            _receiveThread?.Join(1000);
-            _udp?.Close();
-            _udp = null;
-            _connected = false;
+            StopSteamTransport();
+            StopUdpTransport();
         }
 
-        /// <summary>
-        /// Re-point the client at a new server address. Safe to call before first SendInput.
-        /// Closes the existing socket and opens a fresh one aimed at the new endpoint.
-        /// </summary>
-        public void Connect(string ip, int port)
+        public static void DisconnectActiveSteamMatch()
+            => _activeSteamMatch?.StopSteamTransport();
+
+        private void StopSteamTransport()
+        {
+            if (_hasSteamConnection)
+            {
+                try { SteamNetworkingSockets.CloseConnection(_steamConnection, 0, "match transport closed", false); }
+                catch { }
+            }
+            _hasSteamConnection = false;
+            _steamConnection = HSteamNetConnection.Invalid;
+            _steamJoinSent = false;
+            _steamAdmitted = false;
+            _connected = false;
+            if (_steamSendBuffer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_steamSendBuffer);
+                _steamSendBuffer = IntPtr.Zero;
+            }
+            ClearReceiveQueues();
+            if (_activeSteamMatch == this)
+                _activeSteamMatch = null;
+            if (_transport == UI.MatchTransport.SteamP2P)
+                _transport = UI.MatchTransport.None;
+            _steamDescriptor = null;
+            Interlocked.Exchange(ref _lastPingReceivedAt, 0);
+        }
+
+        private void StopUdpTransport()
         {
             _running = false;
-            _receiveThread?.Join(500);
-            _udp?.Close();
+            var socket = _udp;
             _udp = null;
+            socket?.Close();
+            _receiveThread?.Join(500);
+            _receiveThread = null;
+        }
+
+        /// <summary>Connect only through the explicit Editor development UDP profile.</summary>
+        public void Connect(string ip, int port)
+        {
+            if (!Application.isEditor ||
+                UI.MatchConfig.Transport != UI.MatchTransport.DevelopmentUdp ||
+                Environment.GetEnvironmentVariable("SLOPARENA_DEV_UDP") != "1" ||
+                port <= 0)
+            {
+                Debug.LogError("[NetworkClient] Raw UDP is restricted to explicit Editor development matches.");
+                return;
+            }
+            StopSteamTransport();
+            StopUdpTransport();
+            ClearReceiveQueues();
+            _transport = UI.MatchTransport.DevelopmentUdp;
             _connected = false;
             Interlocked.Exchange(ref _lastPingReceivedAt, 0);
             Interlocked.Exchange(ref _lastPingRequestAt, 0);
@@ -125,11 +196,58 @@ namespace SlopArena.Client.Network
             StartReceiveThread();
         }
 
+        public void ConnectSteam(SteamMatchDescriptor descriptor)
+        {
+            if (UI.MatchConfig.Transport != UI.MatchTransport.SteamP2P ||
+                UI.MatchConfig.SteamDescriptor != descriptor ||
+                descriptor == null)
+            {
+                FailSteamTransport("Steam match descriptor is not the active validated match.");
+                return;
+            }
+            StopSteamTransport();
+            StopUdpTransport();
+            ClearReceiveQueues();
+            _transport = UI.MatchTransport.SteamP2P;
+            _steamDescriptor = descriptor;
+            _steamFailureReported = false;
+            _steamEverAdmitted = false;
+            _steamResultReceived = false;
+            _steamJoinSent = false;
+            _steamAdmitted = false;
+            _steamRemoteVerified = false;
+            _steamReconnectDelaySeconds = 1;
+            _steamAttemptStartedAt = Stopwatch.GetTimestamp();
+            _connectionFailure = string.Empty;
+            _activeSteamMatch = this;
+            try
+            {
+                _steamSendBuffer = Marshal.AllocHGlobal(MaxSteamFrameBytes);
+                SteamNetworkingUtils.InitRelayNetworkAccess();
+                SteamNetworkingSockets.InitAuthentication();
+            }
+            catch (Exception exception)
+            {
+                FailSteamTransport($"Steam networking initialization failed: {exception.Message}");
+            }
+        }
+
         // ── Send / Receive ──
 
         public void SendInput(InputState input, uint tick)
         {
-            if (_udp == null) return;
+            if (_transport == UI.MatchTransport.SteamP2P)
+            {
+                if (!_steamAdmitted || !_hasSteamConnection || _steamSendBuffer == IntPtr.Zero || _steamResultReceived)
+                    return;
+                _steamInputFrame[0] = SteamGameplayWire.Input;
+                BinaryPrimitives.WriteUInt64LittleEndian(_steamInputFrame.AsSpan(1, 8), _entityId);
+                BinaryPrimitives.WriteUInt32LittleEndian(_steamInputFrame.AsSpan(9, 4), tick);
+                input.Write(_steamInputFrame.AsSpan(13));
+                SendSteamFrame(_steamInputFrame, _steamInputFrame.Length, Constants.k_nSteamNetworkingSend_Unreliable);
+                return;
+            }
+            if (_transport != UI.MatchTransport.DevelopmentUdp || _udp == null) return;
 
             int bufSize = 8 + 4 + InputState.Size;
             byte[] buf = new byte[bufSize];
@@ -143,11 +261,32 @@ namespace SlopArena.Client.Network
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkClient] Send failed: {ex.Message}");
+                _running = false;
                 _udp?.Close();
                 _udp = null;
                 _connected = false;
                 Interlocked.Exchange(ref _lastPingReceivedAt, 0);
             }
+        }
+
+        private bool SendSteamFrame(byte[] frame, int length, int sendFlags)
+        {
+            if (!_hasSteamConnection || _steamSendBuffer == IntPtr.Zero || length is < 1 or > MaxSteamFrameBytes)
+                return false;
+            try
+            {
+                Marshal.Copy(frame, 0, _steamSendBuffer, length);
+                var result = SteamNetworkingSockets.SendMessageToConnection(
+                    _steamConnection, _steamSendBuffer, (uint)length, sendFlags, out _);
+                if (result == EResult.k_EResultOK)
+                    return true;
+                HandleSteamConnectionLoss($"Steam send failed ({result}).");
+            }
+            catch (Exception exception)
+            {
+                HandleSteamConnectionLoss($"Steam send failed: {exception.Message}");
+            }
+            return false;
         }
 
         /// <summary>
@@ -249,6 +388,307 @@ namespace SlopArena.Client.Network
             }
         }
 
+        public event Action<string>? ConnectionFailed;
+        public string ConnectionFailure => _connectionFailure;
+
+        private void UpdateSteam()
+        {
+            if (_steamResultReceived)
+            {
+                if (_hasSteamConnection)
+                    ReceiveSteamMessages();
+                return;
+            }
+            var descriptor = _steamDescriptor;
+            if (descriptor == null)
+            {
+                FailSteamTransport("Steam match descriptor is unavailable.");
+                return;
+            }
+
+            long now = Stopwatch.GetTimestamp();
+            if (!_steamEverAdmitted && DateTimeOffset.UtcNow >= descriptor.AdmissionExpiresAtUtc)
+            {
+                FailSteamTransport("Steam match admission expired before joining.");
+                return;
+            }
+
+            if (_hasSteamConnection)
+            {
+                if (ElapsedSeconds(_steamAttemptStartedAt, now) >= SteamConnectionTimeoutSeconds)
+                {
+                    HandleSteamConnectionLoss("Steam match connection timed out.");
+                    return;
+                }
+                if (!SteamNetworkingSockets.GetConnectionInfo(_steamConnection, out var info))
+                {
+                    HandleSteamConnectionLoss("Steam connection information is unavailable.");
+                    return;
+                }
+                if (info.m_eState == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally ||
+                    info.m_eState == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer)
+                {
+                    HandleSteamConnectionLoss($"Steam connection closed: {info.m_szEndDebug}");
+                    return;
+                }
+                if (info.m_eState != ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected)
+                {
+                    if (_steamAdmitted)
+                        HandleSteamConnectionLoss("Steam match connection is no longer connected.");
+                    return;
+                }
+
+                ulong actualServerId = info.m_identityRemote.GetSteamID64();
+                if (actualServerId != descriptor.ServerSteamId)
+                {
+                    FailSteamTransport($"Steam host identity mismatch; expected {descriptor.ServerSteamId}, got {actualServerId}.");
+                    return;
+                }
+                _steamRemoteVerified = true;
+                if (!_steamJoinSent)
+                    SendSteamJoin();
+                if (!_hasSteamConnection)
+                    return;
+
+                ReceiveSteamMessages();
+                if (!_hasSteamConnection)
+                    return;
+                if (_steamJoinSent && !_steamAdmitted &&
+                    ElapsedSeconds(_steamJoinSentAt, now) >= SteamJoinTimeoutSeconds)
+                {
+                    HandleSteamConnectionLoss("GameHost did not acknowledge the reliable match join.");
+                    return;
+                }
+                if (_steamAdmitted)
+                    UpdateSteamPing(now);
+                return;
+            }
+
+            if (_steamEverAdmitted && now < _steamNextReconnectAt)
+                return;
+            if (!_steamEverAdmitted && ElapsedSeconds(_steamAttemptStartedAt, now) >= SteamConnectionTimeoutSeconds)
+            {
+                FailSteamTransport("Steam authentication, relay, or GameHost connection did not become ready in time.");
+                return;
+            }
+
+            try
+            {
+                if (!SteamUser.BLoggedOn())
+                    return;
+                var authentication = SteamNetworkingSockets.GetAuthenticationStatus(out _);
+                var relay = SteamNetworkingUtils.GetRelayNetworkStatus(out _);
+                if (authentication != ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_Current ||
+                    relay != ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_Current)
+                    return;
+
+                var remoteIdentity = default(SteamNetworkingIdentity);
+                remoteIdentity.SetSteamID64(descriptor.ServerSteamId);
+                _steamConnection = SteamNetworkingSockets.ConnectP2P(
+                    ref remoteIdentity, descriptor.VirtualPort, 0, null!);
+                if (_steamConnection == HSteamNetConnection.Invalid)
+                {
+                    HandleSteamConnectionLoss("Steam ConnectP2P returned an invalid connection.");
+                    return;
+                }
+                _hasSteamConnection = true;
+                _steamJoinSent = false;
+                _steamRemoteVerified = false;
+                _steamAttemptStartedAt = now;
+            }
+            catch (Exception exception)
+            {
+                HandleSteamConnectionLoss($"Steam networking failed: {exception.Message}");
+            }
+        }
+
+        private void SendSteamJoin()
+        {
+            if (_steamJoinSent || !_steamRemoteVerified || _steamDescriptor == null)
+                return;
+            byte[] frame;
+            try { frame = SteamGameplayWire.CreateJoin(_steamDescriptor); }
+            catch (Exception exception)
+            {
+                FailSteamTransport($"Steam join descriptor is invalid: {exception.Message}");
+                return;
+            }
+            if (SendSteamFrame(frame, frame.Length, Constants.k_nSteamNetworkingSend_Reliable))
+            {
+                _steamJoinSent = true;
+                _steamJoinSentAt = Stopwatch.GetTimestamp();
+            }
+        }
+
+        private void ReceiveSteamMessages()
+        {
+            int count;
+            try
+            {
+                count = SteamNetworkingSockets.ReceiveMessagesOnConnection(
+                    _steamConnection, SteamMessages, MaxSteamMessages);
+            }
+            catch (Exception exception)
+            {
+                HandleSteamConnectionLoss($"Steam receive failed: {exception.Message}");
+                return;
+            }
+            if (count < 0)
+            {
+                HandleSteamConnectionLoss($"Steam receive failed ({count}).");
+                return;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                IntPtr pointer = SteamMessages[i];
+                SteamMessages[i] = IntPtr.Zero;
+                try
+                {
+                    if (!_hasSteamConnection)
+                        continue;
+                    var message = Marshal.PtrToStructure<SteamNetworkingMessage_t>(pointer);
+                    if (message.m_cbSize < 1 || message.m_cbSize > _steamReceiveFrame.Length)
+                        continue;
+                    Marshal.Copy(message.m_pData, _steamReceiveFrame, 0, message.m_cbSize);
+                    ProcessSteamFrame(_steamReceiveFrame.AsSpan(0, message.m_cbSize));
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"[NetworkClient] Ignoring invalid Steam match message: {exception.Message}");
+                }
+                finally
+                {
+                    SteamNetworkingMessage_t.Release(pointer);
+                }
+            }
+        }
+
+        private void ProcessSteamFrame(ReadOnlySpan<byte> frame)
+        {
+            if (frame.Length < 1)
+                return;
+            if (frame[0] == SteamGameplayWire.Ack)
+            {
+                if (!_steamJoinSent || !SteamGameplayWire.TryParseAck(frame, out var entityId))
+                    return;
+                if (entityId != _entityId)
+                {
+                    FailSteamTransport($"GameHost acknowledged entity {entityId}, expected {_entityId}.");
+                    return;
+                }
+                _steamAdmitted = true;
+                _steamEverAdmitted = true;
+                _steamReconnectDelaySeconds = 1;
+                _connected = true;
+                return;
+            }
+            if (frame[0] == SteamGameplayWire.Deny)
+            {
+                int code = frame.Length == 2 ? frame[1] : 0;
+                FailSteamTransport($"GameHost denied match admission (code {code}).");
+                return;
+            }
+            if (!_steamAdmitted || frame.Length <= 1)
+                return;
+
+            var payload = frame.Slice(1);
+            switch (frame[0])
+            {
+                case SteamGameplayWire.State:
+                    if (payload.Length != ServerEntityPacket.NoInputSize &&
+                        payload.Length != ServerEntityPacket.MaxSize)
+                        return;
+                    try
+                    {
+                        _receivedQueue.Enqueue(ServerEntityPacket.Deserialize(payload));
+                        Interlocked.Exchange(ref _lastServerPacketAt, Stopwatch.GetTimestamp());
+                    }
+                    catch (ArgumentException) { }
+                    catch (InvalidDataException) { }
+                    break;
+                case SteamGameplayWire.Event:
+                    if (PresentationEventPacket.TryDeserialize(payload, out var presentation))
+                        _presentationEventQueue.Enqueue(presentation!.Value.ToEvent());
+                    break;
+                case SteamGameplayWire.Result:
+                    if (!_steamResultReceived && MatchResultPacket.TryDeserialize(payload, out var result))
+                    {
+                        _matchResultQueue.Enqueue(result!);
+                        _steamResultReceived = true;
+                    }
+                    break;
+            }
+        }
+
+        private void UpdateSteamPing(long now)
+        {
+            if (now < _steamNextPingAt)
+                return;
+            _steamNextPingAt = now + Stopwatch.Frequency;
+            var status = default(SteamNetConnectionRealTimeStatus_t);
+            var lane = default(SteamNetConnectionRealTimeLaneStatus_t);
+            if (SteamNetworkingSockets.GetConnectionRealTimeStatus(
+                    _steamConnection, ref status, 0, ref lane) != EResult.k_EResultOK ||
+                status.m_nPing < 0 || status.m_nPing > 60000)
+                return;
+            Interlocked.Exchange(ref _lastPingMsBits, BitConverter.DoubleToInt64Bits(status.m_nPing));
+            Interlocked.Exchange(ref _lastPingTick, LastServerTick);
+            Interlocked.Exchange(ref _lastPingReceivedAt, now);
+        }
+
+        private void HandleSteamConnectionLoss(string reason)
+        {
+            if (_hasSteamConnection)
+            {
+                try { SteamNetworkingSockets.CloseConnection(_steamConnection, 0, reason, false); }
+                catch { }
+            }
+            _hasSteamConnection = false;
+            _steamConnection = HSteamNetConnection.Invalid;
+            _steamJoinSent = false;
+            _steamAdmitted = false;
+            _steamRemoteVerified = false;
+            _connected = false;
+            Interlocked.Exchange(ref _lastPingReceivedAt, 0);
+            ClearTransientReceiveQueues();
+            if (_steamResultReceived)
+                return;
+            if (_steamEverAdmitted && _steamDescriptor != null)
+            {
+                _steamNextReconnectAt = Stopwatch.GetTimestamp() +
+                    (long)(_steamReconnectDelaySeconds * Stopwatch.Frequency);
+                _steamReconnectDelaySeconds = Math.Min(5, _steamReconnectDelaySeconds * 2);
+                Debug.LogWarning($"[NetworkClient] {reason} Reconnecting to the same Steam match.");
+                return;
+            }
+            FailSteamTransport(reason);
+        }
+
+        private void FailSteamTransport(string reason)
+        {
+            _connectionFailure = reason;
+            Debug.LogError($"[NetworkClient] {reason}");
+            bool notify = !_steamFailureReported;
+            _steamFailureReported = true;
+            StopSteamTransport();
+            if (notify)
+                ConnectionFailed?.Invoke(reason);
+        }
+
+        private void ClearReceiveQueues()
+        {
+            while (_receivedQueue.TryDequeue(out _)) { }
+            while (_presentationEventQueue.TryDequeue(out _)) { }
+            while (_matchResultQueue.TryDequeue(out _)) { }
+        }
+        private void ClearTransientReceiveQueues()
+        {
+            while (_receivedQueue.TryDequeue(out _)) { }
+            while (_presentationEventQueue.TryDequeue(out _)) { }
+        }
+
+
         // ── Socket retry ──
         private void SendPingRequest()
         {
@@ -268,19 +708,26 @@ namespace SlopArena.Client.Network
 
         private void Update()
         {
+            if (_transport == UI.MatchTransport.SteamP2P)
+            {
+                UpdateSteam();
+                return;
+            }
+            if (_transport != UI.MatchTransport.DevelopmentUdp)
+                return;
             if (_udp == null && !_running)
             {
-                Debug.Log("[NetworkClient] Recreating socket...");
                 CreateSocket();
                 StartReceiveThread();
             }
+            long now = Stopwatch.GetTimestamp();
             long lastPingAt = Interlocked.Read(ref _lastPingReceivedAt);
-            if (lastPingAt != 0 && ElapsedSeconds(lastPingAt, Stopwatch.GetTimestamp()) > 3)
+            if (lastPingAt != 0 && ElapsedSeconds(lastPingAt, now) > 3)
             {
                 Interlocked.Exchange(ref _lastPingReceivedAt, 0);
                 _connected = false;
             }
-            if (_lastServerPacketAt != 0 && ElapsedSeconds(_lastServerPacketAt, Stopwatch.GetTimestamp()) > 3)
+            if (_lastServerPacketAt != 0 && ElapsedSeconds(_lastServerPacketAt, now) > 3)
                 _connected = false;
             SendPingRequest();
         }

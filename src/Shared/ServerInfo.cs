@@ -11,6 +11,8 @@ namespace SlopArena.Shared
         public string Name { get; set; } = string.Empty;
         public string IpAddress { get; set; } = string.Empty;
         public int Port { get; set; }
+        public string? ServerSteamId { get; set; }
+        public int ProtocolVersion { get; set; }
         public string Region { get; set; } = string.Empty;
         public int CurrentMatches { get; set; }
         public int MaxConcurrentMatches { get; set; }

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using SlopArena.Client;
 using SlopArena.Shared;
+using Steamworks;
 
 namespace SlopArena.Client.Network
 {
@@ -28,6 +29,8 @@ namespace SlopArena.Client.Network
         private const float MaxRetrySeconds = 30f;
         private const int MaxAutomaticRetries = 5;
         private const float TokenRenewalLeadSeconds = 60f;
+        private const string SteamBackendIdentity = "sloparena-playtest";
+        private const int SteamTicketTimeoutSeconds = 15;
 
         private static ChatSession? _instance;
         private readonly List<ChatConversation> _conversations = new();
@@ -40,7 +43,14 @@ namespace SlopArena.Client.Network
         private Task<bool>? _connectTask;
         private Task<bool>? _authTask;
         private Task<bool>? _renewTask;
-        private string _masterServerUrl = "https://sloparena.barakaslurp.fr";
+        private Callback<GetTicketForWebApiResponse_t>? _ticketCallback;
+        private TaskCompletionSource<string?>? _pendingTicket;
+        private HAuthTicket _ticketHandle;
+        private bool _ownsSteamApi;
+        private bool _developmentGuest;
+        private ulong _authenticatedSteamId;
+        private int _accountGeneration;
+        private string _masterServerUrl = ClientSession.DefaultMasterServerUrl;
         private string _savedDisplayName = string.Empty;
         private string _status = "Offline";
         private string? _selfPlayerId;
@@ -90,9 +100,15 @@ namespace SlopArena.Client.Network
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
         {
-            if (_instance != null)
+            if (_instance != null || SteamProbeClient.IsRequested())
                 return;
-            var overrideUrl = Environment.GetEnvironmentVariable("SLOPARENA_MASTER_URL");
+            if (!Application.isEditor)
+                ClientSession.MasterServerUrl = ClientSession.DefaultMasterServerUrl;
+            // Guest access is an explicit Editor-only development choice, never a packaged fallback.
+            // Set SLOPARENA_DEV_GUEST=1 before Editor launch for a local guest session.
+            var overrideUrl = Application.isEditor
+                ? Environment.GetEnvironmentVariable("SLOPARENA_MASTER_URL")
+                : null;
             if (overrideUrl != null)
             {
                 if (!Uri.TryCreate(overrideUrl, UriKind.Absolute, out var uri) ||
@@ -101,9 +117,12 @@ namespace SlopArena.Client.Network
                     throw new InvalidOperationException("SLOPARENA_MASTER_URL must be an HTTPS origin without credentials, path, query, or fragment.");
                 ClientSession.MasterServerUrl = uri.GetLeftPart(UriPartial.Authority);
             }
+            var guestFlag = Application.isEditor &&
+                Environment.GetEnvironmentVariable("SLOPARENA_DEV_GUEST") == "1";
             var go = new GameObject(nameof(ChatSession));
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<ChatSession>();
+            _instance._developmentGuest = guestFlag;
         }
 
         private void Awake()
@@ -123,6 +142,25 @@ namespace SlopArena.Client.Network
 
         private void Start()
         {
+            if (!_developmentGuest)
+            {
+                try
+                {
+                    if (!SteamAPI.IsSteamRunning() || !SteamAPI.Init())
+                    {
+                        SetStatus("Steam is unavailable. Local play remains available.");
+                        return;
+                    }
+                    _ownsSteamApi = true;
+                    _ticketCallback = Callback<GetTicketForWebApiResponse_t>.Create(OnWebTicket);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"Steam initialization failed: {ex.GetType().Name}");
+                    SetStatus("Steam is unavailable. Local play remains available.");
+                    return;
+                }
+            }
             if (!NeedsDisplayName)
                 _ = EnsureConnectedAsync();
         }
@@ -132,6 +170,13 @@ namespace SlopArena.Client.Network
             if (_destroyed)
                 return;
             _lobby?.Pump(256);
+            if (_ownsSteamApi)
+            {
+                SteamAPI.RunCallbacks();
+                if (_authenticatedSteamId != 0 &&
+                    (!SteamUser.BLoggedOn() || SteamUser.GetSteamID().m_SteamID != _authenticatedSteamId))
+                    ClearAccountSession();
+            }
             if (_lobby?.HasPendingOverflow == true)
             {
                 _lobby.ClearPendingOverflow();
@@ -169,6 +214,9 @@ namespace SlopArena.Client.Network
             if (string.IsNullOrWhiteSpace(url))
                 return;
             var normalized = url.TrimEnd('/');
+            if (!Application.isEditor &&
+                !string.Equals(normalized, ClientSession.DefaultMasterServerUrl, StringComparison.OrdinalIgnoreCase))
+                return;
             if (_instance != null &&
                 _instance._authAttempted &&
                 !string.Equals(_instance._masterServerUrl, normalized, StringComparison.OrdinalIgnoreCase))
@@ -487,8 +535,9 @@ namespace SlopArena.Client.Network
 
         private async Task<bool> ConnectCoreAsync()
         {
+            int accountGeneration = _accountGeneration;
             EnsureMasterClient();
-            if (!await EnsureAuthenticatedAsync())
+            if (!await EnsureAuthenticatedAsync() || accountGeneration != _accountGeneration)
                 return false;
             if (!_nameApplied)
             {
@@ -498,6 +547,8 @@ namespace SlopArena.Client.Network
                 {
                     int generation = _nameGeneration;
                     var profile = await _masterClient!.SetDisplayNameAsync(_savedDisplayName);
+                    if (accountGeneration != _accountGeneration)
+                        return false;
                     if (profile == null)
                     {
                         _nameApplied = false;
@@ -526,17 +577,27 @@ namespace SlopArena.Client.Network
 
             if (_lobby == null)
             {
-                _lobby = new LobbyClient(_masterServerUrl, () => _masterClient?.Token);
+                _lobby = new LobbyClient(
+                    _masterServerUrl,
+                    () => _masterClient?.Token,
+                    _developmentGuest ? 0 : SteamMatchDescriptor.CurrentProtocolVersion);
                 SubscribeLobby(_lobby);
                 ClientSession.ActiveLobby = _lobby;
             }
-            if (!_lobby.IsConnected && !await _lobby.ConnectAsync())
+            var lobby = _lobby;
+            if (!lobby.IsConnected && !await lobby.ConnectAsync())
             {
+                if (accountGeneration != _accountGeneration)
+                    return false;
                 _chatStateReady = false;
                 SetStatus("Master connection unavailable. Local play remains available.");
                 return false;
             }
-            var snapshot = await _lobby.GetChatStateAsync();
+            if (accountGeneration != _accountGeneration)
+                return false;
+            var snapshot = await lobby.GetChatStateAsync();
+            if (accountGeneration != _accountGeneration)
+                return false;
             if (snapshot == null)
             {
                 _chatStateReady = false;
@@ -557,13 +618,19 @@ namespace SlopArena.Client.Network
             if (_masterClient!.IsAuthenticated)
                 return true;
             _authAttempted = true;
-            SetStatus("Signing in as a guest…");
+            if (!_developmentGuest && !_ownsSteamApi)
+            {
+                SetStatus("Steam is unavailable. Local play remains available.");
+                return false;
+            }
+            SetStatus(_developmentGuest ? "Signing in as a development guest…" : "Signing in with Steam…");
             Task<bool>? task;
             lock (_taskSync)
             {
-                _authTask ??= _masterClient.AuthenticateGuestAsync();
+                _authTask ??= AuthenticateCoreAsync();
                 task = _authTask;
             }
+            int generation = _accountGeneration;
             bool authenticated;
             try { authenticated = await task; }
             finally
@@ -573,21 +640,47 @@ namespace SlopArena.Client.Network
                     if (ReferenceEquals(_authTask, task) && task.IsCompleted) _authTask = null;
                 }
             }
+            if (generation != _accountGeneration)
+                return false;
+            if (!_developmentGuest && authenticated &&
+                 (!SteamUser.BLoggedOn() ||
+                  _masterClient?.SteamId != (long)SteamUser.GetSteamID().m_SteamID))
+            {
+                ClearAccountSession();
+                return false;
+            }
             if (!authenticated)
             {
                 SetStatus("Could not authenticate with Master. Local play remains available.");
                 return false;
             }
+            _authenticatedSteamId = _developmentGuest ? 0 : SteamUser.GetSteamID().m_SteamID;
             ClientSession.AuthToken = _masterClient.Token;
             ClientSession.SteamId = _masterClient.SteamId ?? 0;
             return true;
+        }
+
+        private async Task<bool> AuthenticateCoreAsync()
+        {
+            if (_developmentGuest)
+                return await _masterClient!.AuthenticateGuestAsync();
+            var ticket = await RequestWebTicketAsync();
+            try { return ticket != null && await _masterClient!.AuthenticateSteamAsync(ticket); }
+            finally { CancelWebTicket(); }
         }
 
         private async Task<bool> RenewTokenAsync()
         {
             if (_masterClient == null || !_masterClient.IsAuthenticated)
                 return false;
-            bool renewed = await _masterClient.RefreshAsync();
+            var ticket = _developmentGuest ? null : await RequestWebTicketAsync();
+            bool renewed;
+            try
+            {
+                renewed = (_developmentGuest || ticket != null) &&
+                    await _masterClient.RefreshAsync(ticket);
+            }
+            finally { CancelWebTicket(); }
             if (renewed)
             {
                 ClientSession.AuthToken = _masterClient.Token;
@@ -597,11 +690,79 @@ namespace SlopArena.Client.Network
             }
             if (_masterClient.TokenExpiresAt is DateTimeOffset expires && expires <= DateTimeOffset.UtcNow)
             {
+                _masterClient.ClearAuthentication();
+                ClientSession.AuthToken = null;
                 _chatStateReady = false;
-                SetStatus("Authentication expired. Reconnect failed without changing identity.");
-                NotifyChanged();
+                _nameApplied = false;
+                ClientSession.ActiveLobby = null;
+                _ = _lobby?.DisconnectAsync();
+                _lobby = null;
+                SetStatus("Authentication expired. Reconnect requires Steam.");
             }
             return false;
+        }
+
+        private async Task<string?> RequestWebTicketAsync()
+        {
+            if (!_ownsSteamApi || !SteamUser.BLoggedOn() || _pendingTicket != null)
+                return null;
+            _pendingTicket = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ticketHandle = SteamUser.GetAuthTicketForWebApi(SteamBackendIdentity);
+            try
+            {
+                var completed = await Task.WhenAny(_pendingTicket.Task,
+                    Task.Delay(TimeSpan.FromSeconds(SteamTicketTimeoutSeconds)));
+                return completed == _pendingTicket.Task ? await _pendingTicket.Task : null;
+            }
+            finally
+            {
+                _pendingTicket = null;
+            }
+        }
+
+        private void CancelWebTicket()
+        {
+            if (!_ownsSteamApi || _ticketHandle == HAuthTicket.Invalid)
+                return;
+            SteamUser.CancelAuthTicket(_ticketHandle);
+            _ticketHandle = HAuthTicket.Invalid;
+        }
+
+        private void OnWebTicket(GetTicketForWebApiResponse_t response)
+        {
+            if (_pendingTicket == null || response.m_hAuthTicket != _ticketHandle)
+                return;
+            _pendingTicket.TrySetResult(response.m_eResult == EResult.k_EResultOK &&
+                response.m_cubTicket > 0 && response.m_cubTicket <= response.m_rgubTicket.Length
+                    ? BitConverter.ToString(response.m_rgubTicket, 0, response.m_cubTicket).Replace("-", "")
+                    : null);
+        }
+
+        private void ClearAccountSession()
+        {
+            _accountGeneration++;
+            _authenticatedSteamId = 0;
+            _pendingTicket?.TrySetResult(null);
+            CancelWebTicket();
+            ClientSession.ClearActiveMatchForAccountChange();
+            _masterClient?.ClearAuthentication();
+            ClientSession.ClearAccountData();
+            _ = _lobby?.DisconnectAsync();
+            _lobby = null;
+            _authTask = null;
+            _renewTask = null;
+            _nameApplied = false;
+            _chatStateReady = false;
+            _directoryAvailable = false;
+            _joinedServerId = null;
+            Self = null;
+            _selfPlayerId = null;
+            _onlinePlayers.Clear();
+            _mutedProfiles.Clear();
+            _mutedPlayerIds.Clear();
+            _conversations.Clear();
+            _activeConversation = GetOrCreateConversation("global", "GLOBAL");
+            SetStatus("Steam account changed. Connecting with the current account…");
         }
 
         private void EnsureMasterClient()
@@ -632,6 +793,8 @@ namespace SlopArena.Client.Network
             lobby.Connected += OnLobbyConnected;
             lobby.Disconnected += OnLobbyDisconnected;
             lobby.Error += OnLobbyError;
+            lobby.MatchAborted += OnMatchAborted;
+            lobby.MatchStartedRejected += OnMatchStartedRejected;
         }
 
         private void OnLobbyConnected()
@@ -716,6 +879,24 @@ namespace SlopArena.Client.Network
             RefreshConversationStates();
             NotifyChanged();
         }
+        private void OnMatchAborted(MatchAbortedNotification notification)
+        {
+            if (!ClientSession.ApplyMatchAborted(notification.MatchId, notification.Reason) &&
+                ClientSession.SelectedServerId != Guid.Empty &&
+                _lobby is { IsConnected: true } lobby &&
+                lobby.JoinedServerId == ClientSession.SelectedServerId)
+                _ = lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+            SetStatus($"Match aborted ({notification.Reason}). Returned to the lobby.");
+            NotifyChanged();
+        }
+
+        private void OnMatchStartedRejected()
+        {
+            ClientSession.RejectMatchStart("Master sent an invalid match descriptor or content map.");
+            SetStatus("The Master rejected this match descriptor. Returned to the lobby.");
+            NotifyChanged();
+        }
+
 
         private void ApplySnapshot(ChatSnapshot snapshot)
         {
@@ -927,6 +1108,9 @@ namespace SlopArena.Client.Network
             _masterClient?.Dispose();
             _lobby = null;
             _masterClient = null;
+            _ticketCallback?.Dispose();
+            if (_ownsSteamApi)
+                SteamAPI.Shutdown();
             _instance = null;
         }
     }

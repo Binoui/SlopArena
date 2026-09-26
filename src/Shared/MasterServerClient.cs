@@ -9,11 +9,7 @@ using System.Threading.Tasks;
 
 namespace SlopArena.Shared
 {
-    /// <summary>
-    /// HTTP client for the SlopArena master server.
-    /// Handles anonymous guest authentication and includes the JWT as a
-    /// Bearer token in all subsequent master server requests.
-    /// </summary>
+    /// <summary>HTTP client for the master server; carries one application JWT.</summary>
     public class MasterServerClient : IDisposable
     {
         private readonly HttpClient _http;
@@ -27,18 +23,20 @@ namespace SlopArena.Shared
         private string? _token;
         private long? _steamId;
         private DateTimeOffset? _expiresAt;
+        private bool _steamAuthenticated;
+        private int _sessionVersion;
 
-        /// <summary>JWT bearer token, set after a successful AuthenticateGuestAsync.</summary>
+        /// <summary>JWT bearer token for the current application session.</summary>
         public string? Token => _token;
 
-        /// <summary>Guest SteamId assigned by the master server, set after AuthenticateGuestAsync.</summary>
+        /// <summary>Verified Steam identity (or development guest identity).</summary>
         public long? SteamId => _steamId;
 
         /// <summary>UTC expiry returned by the master for the current token.</summary>
         public DateTimeOffset? TokenExpiresAt => _expiresAt;
 
-        /// <summary>True after a successful guest auth call.</summary>
         public bool IsAuthenticated => !string.IsNullOrEmpty(_token);
+        public bool IsSteamAuthenticated => IsAuthenticated && _steamAuthenticated;
 
         /// <summary>HTTP status from the latest failed request, when available.</summary>
         public int? LastStatusCode { get; private set; }
@@ -64,6 +62,44 @@ namespace SlopArena.Shared
         {
             _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _ownsHttpClient = false;
+        }
+        /// <summary>Authenticate with a fresh Steam web ticket, encoded as hex.</summary>
+        public async Task<bool> AuthenticateSteamAsync(string ticket, CancellationToken ct = default)
+        {
+            if (IsAuthenticated || string.IsNullOrWhiteSpace(ticket))
+                return false;
+            return await ApplyAuthAsync("auth/steam", ticket, null, ct, steamLogin: true);
+        }
+
+        private async Task<bool> ApplyAuthAsync(string path, string? ticket, long? expectedSteamId,
+            CancellationToken ct, bool steamLogin = false)
+        {
+            int version = _sessionVersion;
+            try
+            {
+                LastStatusCode = null;
+                using var content = ticket == null ? null : new StringContent(
+                    JsonSerializer.Serialize(new SteamAuthPayload(ticket), ServerJsonOptions),
+                    Encoding.UTF8, "application/json");
+                using var response = await _http.PostAsync(path, content, ct);
+                LastStatusCode = (int)response.StatusCode;
+                if (!response.IsSuccessStatusCode)
+                    return false;
+                var auth = JsonSerializer.Deserialize<GuestAuthResponse>(
+                    await response.Content.ReadAsStringAsync(), ServerJsonOptions);
+                if (version != _sessionVersion || auth == null || string.IsNullOrEmpty(auth.Token) ||
+                    auth.SteamId <= 0 || (expectedSteamId.HasValue && auth.SteamId != expectedSteamId.Value))
+                    return false;
+                _token = auth.Token;
+                _steamId = auth.SteamId;
+                _expiresAt = auth.ExpiresAt == default ? null : auth.ExpiresAt;
+                if (steamLogin)
+                    _steamAuthenticated = true;
+                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+                return true;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { return false; }
         }
 
         /// <summary>
@@ -178,42 +214,15 @@ namespace SlopArena.Shared
             }
         }
 
-        /// <summary>
-        /// Renew the current JWT via POST /auth/refresh without creating a new
-        /// identity. A response for a different identity is rejected.
-        /// </summary>
-        public async Task<bool> RefreshAsync(CancellationToken ct = default)
+        /// <summary>Renew the same account with a fresh Steam ticket; development guests use no ticket.</summary>
+        public Task<bool> RefreshAsync(string? freshSteamTicket, CancellationToken ct = default)
         {
-            if (!IsAuthenticated || !_steamId.HasValue)
-                return false;
-            try
-            {
-                LastStatusCode = null;
-                using var response = await _http.PostAsync("auth/refresh", content: null, ct);
-                LastStatusCode = (int)response.StatusCode;
-                if (!response.IsSuccessStatusCode)
-                    return false;
-                var json = await response.Content.ReadAsStringAsync();
-                var auth = JsonSerializer.Deserialize<GuestAuthResponse>(json, ServerJsonOptions);
-                if (auth == null || string.IsNullOrEmpty(auth.Token) ||
-                    auth.SteamId != _steamId.Value)
-                    return false;
-
-                _token = auth.Token;
-                _expiresAt = auth.ExpiresAt == default ? null : auth.ExpiresAt;
-                _http.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", _token);
-                return true;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return false;
-            }
+            if (!IsAuthenticated || !_steamId.HasValue || (_steamAuthenticated && string.IsNullOrWhiteSpace(freshSteamTicket)))
+                return Task.FromResult(false);
+            return ApplyAuthAsync("auth/refresh", _steamAuthenticated ? freshSteamTicket : null, _steamId, ct);
         }
+
+        public Task<bool> RefreshAsync(CancellationToken ct = default) => RefreshAsync(null, ct);
 
         /// <summary>
         /// Fetch the current user's info: GET /auth/me (requires prior auth).
@@ -278,9 +287,11 @@ namespace SlopArena.Shared
 
         public void ClearAuthentication()
         {
+            _sessionVersion++;
             _token = null;
             _steamId = null;
             _expiresAt = null;
+            _steamAuthenticated = false;
             _http.DefaultRequestHeaders.Authorization = null;
         }
 
@@ -294,6 +305,12 @@ namespace SlopArena.Shared
         {
             public SetDisplayNamePayload(string displayName) => DisplayName = displayName;
             public string DisplayName { get; }
+        }
+
+        private sealed class SteamAuthPayload
+        {
+            public SteamAuthPayload(string ticket) => Ticket = ticket;
+            public string Ticket { get; }
         }
     }
 }

@@ -10,6 +10,24 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared\SlopArena.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Steamworks.NET">
+      <HintPath>third-party/Steamworks.NET/2025.164.1/Steamworks.NET.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="third-party/Steamworks.NET/2025.164.1/LICENSE.txt"
+          Link="Steamworks.NET-LICENSE.txt"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' == 'Unix' and ('$(RuntimeIdentifier)' == '' or '$(RuntimeIdentifier)' == 'linux-x64')">
+    <None Include="third-party/Steamworks.NET/2025.164.1/libsteam_api.so"
+          Link="libsteam_api.so"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="server.json">

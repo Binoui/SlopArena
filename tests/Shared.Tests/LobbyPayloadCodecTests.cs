@@ -148,32 +148,25 @@ public class LobbyPayloadCodecTests
     {
         Assert.Null(LobbyPayloadCodec.TryParseMatchStarting(Parse("""{"players":[]}""")));
     }
-    // ── MatchStarted (same shape as snapshot, issue #34) ──
+    // ── MatchStarted requires one approved route and content ──
 
-    [Fact]
-    public void TryParseMatchStarted_TwoPlayers_ReturnsConfig()
-    {
-        var json = """
-        {"serverId":"22222222-2222-2222-2222-222222222222","players":[
-            {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true},
-            {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false}
-        ]}
-        """;
-
-        var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
-
-        Assert.NotNull(cfg);
-        Assert.Equal(new System.Guid("22222222-2222-2222-2222-222222222222"), cfg!.ServerId);
-        Assert.Equal(2, cfg.Players.Count);
-        Assert.True(cfg.Players.All(p => p.LockedIn));
-        Assert.Equal("Manki", cfg.Players[0].CharacterSelection);
-        Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
-    }
 
     [Fact]
     public void TryParseMatchStarted_Malformed_ReturnsNull()
     {
         Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse("""{"players":[]}""")));
+    }
+
+    [Fact]
+    public void TryParseMatchStarted_RejectsPushWithoutAnAdmittedTransport()
+    {
+        var json = """
+            {"serverId":"22222222-2222-2222-2222-222222222222","arenaName":"slop_court",
+             "content":{"schemaVersion":1,"entries":[]},"players":[
+               {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true,"entityId":1},
+               {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false,"entityId":2}]}
+            """;
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse(json)));
     }
     // ── Player.entityId (issue #35) ──
 
@@ -222,21 +215,4 @@ public class LobbyPayloadCodecTests
         Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
     }
 
-    [Fact]
-    public void TryParseMatchStarted_OmittedMatchPortAndArena_Defaults()
-    {
-        // Older master servers (pre-#35) sent neither field; must still parse.
-        var json = """
-        {"serverId":"22222222-2222-2222-2222-222222222222","players":[
-            {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true},
-            {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false}
-        ]}
-        """;
-
-        var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
-
-        Assert.NotNull(cfg);
-        Assert.Equal(0, cfg!.MatchPort);
-        Assert.Equal(string.Empty, cfg.ArenaName);
-    }
 }

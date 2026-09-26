@@ -100,6 +100,7 @@ TargetMetadata.dat
 *.o.rsp
 *.d
 *.so
+!src/Server/third-party/Steamworks.NET/2025.164.1/libsteam_api.so
 *.so.rsp
 *.so.rsp.old
 *.so.debug
@@ -118,6 +119,7 @@ client/Unity/[Ll]ogs/
 client/Unity/[Uu]serSettings/
 client/Unity/[Mm]emoryCapturer/
 client/Unity/.vs/
+client/Unity/steam_appid.txt
 client/Unity/*.csproj
 client/Unity/*.uid
 client/Unity/*.sln

@@ -6,29 +6,35 @@ using SlopArena.Shared;
 namespace SlopArena.Server
 {
     /// <summary>
-    /// Orchestrates multiple MatchInstance threads on a game server VPS.
-    /// Manages port allocation, match lifecycle, and provides status.
-    ///
-    /// Port allocation: base_port → base_port + max_matches - 1
-    /// Each port handles one match (2-4 players).
+    /// Orchestrates authoritative MatchInstance lifecycles.
+    /// Development explicitly allocates per-match UDP ports; VPS matches route
+    /// through the single process-wide SteamNetworkingSockets listener.
     /// </summary>
     public class MultiMatchOrchestrator
     {
         private readonly ConcurrentDictionary<int, MatchInstance> _activeMatches = new();
+        private readonly ConcurrentDictionary<Guid, MatchInstance> _steamMatches = new();
         private readonly ServerConfig _config;
         private readonly MatchContentCatalogProvider? _contentProvider;
+        private readonly SteamGameServerHost? _steamHost;
         private readonly object _admissionGate = new();
         private bool _stopping;
+        private string? _catalogHash;
 
         public bool ContentReady { get; }
+        public bool IsVps => _config.IsVps;
+        public string? CatalogHash => Volatile.Read(ref _catalogHash);
 
-        public MultiMatchOrchestrator(ServerConfig config)
+        public MultiMatchOrchestrator(ServerConfig config, SteamGameServerHost? steamHost = null)
         {
             _config = config;
+            _steamHost = steamHost;
             try
             {
                 _contentProvider = new MatchContentCatalogProvider();
-                ContentReady = _contentProvider.TryBuild(out _, out _, out _);
+                ContentReady = _contentProvider.TryBuild(out _, out var content, out _) && content is not null;
+                if (ContentReady)
+                    Volatile.Write(ref _catalogHash, SteamMatchDescriptor.HashContent(content!));
             }
             catch (Exception)
             {
@@ -36,26 +42,96 @@ namespace SlopArena.Server
             }
         }
 
-        /// <summary>Optional callback invoked with (match guid, winner steam id) when a match ends (issue #40).</summary>
+        public bool TryRefreshCatalogHash(out string? error)
+        {
+            error = null;
+            if (_contentProvider is not null &&
+                _contentProvider.TryBuild(out _, out var content, out error) && content is not null)
+            {
+                Volatile.Write(ref _catalogHash, SteamMatchDescriptor.HashContent(content));
+                return true;
+            }
+            Volatile.Write(ref _catalogHash, null);
+            error ??= "Cooked roster unavailable.";
+            return false;
+        }
+
+        /// <summary>Optional callback invoked once with (match GUID, winner SteamID) when a match ends.</summary>
         public Action<Guid, long>? ReportMatchResult { get; set; }
+        public Action<Guid, string>? ReportMatchCancellation { get; set; }
 
         /// <summary>Assigns a match only after building its match-scoped catalog.</summary>
         public bool TryAssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks,
+            DateTimeOffset? admissionDeadlineUtc, string? expectedCatalogHash,
             out int port, out MatchContentHandleMap? content, out string? error)
         {
             port = -1; content = null; error = null;
             lock (_admissionGate)
                 if (_stopping) { error = "GameServer is shutting down."; return false; }
             if (roster == null || roster.Count is < 2 or > 4) { error = "Roster must contain 2-4 players."; return false; }
+            bool steamTransport = _config.IsVps;
+            if (steamTransport && (_steamHost is null || !_steamHost.IsReady || admissionDeadlineUtc is null))
+            {
+                error = "Steam game-server listener or match deadline unavailable.";
+                return false;
+            }
+            if (steamTransport && !ArenaRegistry.Get(arenaName).HasValue)
+            {
+                error = $"Arena '{arenaName}' is unavailable.";
+                return false;
+            }
             if (_contentProvider is null ||
                 !_contentProvider.TryBuild(out var catalog, out content, out error) || catalog is null)
             {
                 error ??= "Cooked roster unavailable.";
                 return false;
             }
+            string contentHash = SteamMatchDescriptor.HashContent(content!);
+            Volatile.Write(ref _catalogHash, contentHash);
+            if (steamTransport && !string.Equals(expectedCatalogHash, contentHash, StringComparison.Ordinal))
+            {
+                error = "Master-pinned catalog hash is stale.";
+                return false;
+            }
+            Guid matchGuid = Guid.Empty;
+            if (steamTransport && (!Guid.TryParseExact(matchId, "D", out matchGuid) || matchGuid == Guid.Empty))
+            {
+                error = "Steam match ID must be a non-empty GUID.";
+                return false;
+            }
+
             lock (_admissionGate)
             {
                 if (_stopping) { error = "GameServer is shutting down."; return false; }
+                if (_activeMatches.Count + _steamMatches.Count >= _config.MaxConcurrentMatches ||
+                    _activeMatches.Values.Any(x => x.MatchId == matchId) ||
+                    (steamTransport && _steamMatches.ContainsKey(matchGuid)))
+                {
+                    error = $"No capacity or duplicate match ID for match {matchId}.";
+                    return false;
+                }
+                if (steamTransport)
+                {
+                    MatchInstance match;
+                    try
+                    {
+                        match = new MatchInstance(0, matchId, arenaName, roster, catalog,
+                            _ => { }, maxStocks, ReportMatchResult, OnSteamMatchEnd, ReportMatchCancellation,
+                            admissionDeadlineUtc, contentHash, _steamHost!.SendToMatchEntity,
+                            contentHandleMap: content);
+                    }
+                    catch (Exception ex) { error = ex.Message; return false; }
+                    if (!_steamMatches.TryAdd(matchGuid, match))
+                    {
+                        error = $"Match {matchId} is already active.";
+                        return false;
+                    }
+                    match.Start();
+                    port = SteamMatchDescriptor.GameplayVirtualPort;
+                    Console.WriteLine($"[Orchestrator] Steam match {matchId} assigned ({_steamMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
+                    return true;
+                }
+
                 for (int offset = 0; offset < _config.MaxConcurrentMatches; offset++)
                 {
                     int candidate = _config.Port + offset;
@@ -67,7 +143,7 @@ namespace SlopArena.Server
                     {
                         match.Start();
                         port = candidate;
-                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to port {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
+                        Console.WriteLine($"[Orchestrator] Match {matchId} assigned to UDP {port} ({_activeMatches.Count}/{_config.MaxConcurrentMatches}) — {roster.Count} players");
                         return true;
                     }
                 }
@@ -76,50 +152,80 @@ namespace SlopArena.Server
             }
         }
 
+        public bool TryAdmitSteamPlayer(Guid matchId, ulong steamId, long connectionId, string contentHash,
+            out ulong entityId, out long replacedConnectionId, out byte denialCode)
+        {
+            entityId = 0;
+            replacedConnectionId = 0;
+            denialCode = 1;
+            return _steamMatches.TryGetValue(matchId, out var match) &&
+                match.TryBindSteamPlayer(steamId, connectionId, contentHash, out entityId, out replacedConnectionId, out denialCode);
+        }
+
+        public bool TryQueueSteamInput(Guid matchId, long connectionId, uint tick, InputState input) =>
+            _steamMatches.TryGetValue(matchId, out var match) && match.TryQueueSteamInput(connectionId, tick, input);
+
+        public void DisconnectSteamPlayer(Guid matchId, long connectionId)
+        {
+            if (_steamMatches.TryGetValue(matchId, out var match))
+                match.DisconnectSteamPlayer(connectionId);
+        }
+
+        public bool AbortMatch(Guid matchId)
+        {
+            if (!_steamMatches.TryRemove(matchId, out var match)) return false;
+            _steamHost?.CloseMatch(matchId);
+            match.Stop();
+            return true;
+        }
+
         public void StopAcceptingMatches()
         {
             lock (_admissionGate) _stopping = true;
         }
 
-        /// <summary>
-        /// Called by MatchInstance when a match ends (thread callback).
-        /// </summary>
+        /// <summary>Called by MatchInstance when a development UDP match ends.</summary>
         private void OnMatchEnd(int port)
         {
             if (_activeMatches.TryRemove(port, out _))
-                Console.WriteLine($"[Orchestrator] Match on port {port} ended ({_activeMatches.Count}/{_config.MaxConcurrentMatches})");
+                Console.WriteLine($"[Orchestrator] Match on port {port} ended ({CurrentMatchCount}/{_config.MaxConcurrentMatches})");
         }
 
-        /// <summary>
-        /// Number of currently active matches.
-        /// </summary>
-        public int CurrentMatchCount => _activeMatches.Count;
+        private void OnSteamMatchEnd(Guid matchId)
+        {
+            if (_steamMatches.TryRemove(matchId, out _))
+            {
+                _steamHost?.CloseMatch(matchId);
+                Console.WriteLine($"[Orchestrator] Steam match {matchId} ended ({CurrentMatchCount}/{_config.MaxConcurrentMatches})");
+            }
+        }
 
-        /// <summary>Graceful shutdown — stop all matches and wait for their sockets.</summary>
-        public void Shutdown()
+        public int CurrentMatchCount => _activeMatches.Count + _steamMatches.Count;
+
+        /// <summary>Graceful shutdown — cancel matches and wait for their threads.</summary>
+        public void Shutdown(string cancellationReason = "host_restart")
         {
             StopAcceptingMatches();
             Console.WriteLine("[Orchestrator] Shutting down...");
-
-            foreach (var kv in _activeMatches)
+            foreach (var kv in _activeMatches) kv.Value.Stop();
+            foreach (var kv in _steamMatches)
             {
-                kv.Value?.Stop();
+                _steamHost?.CloseMatch(kv.Key);
+                kv.Value.Stop(cancellationReason);
             }
 
-            // Wait for threads to finish (max 5 seconds)
             var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (_activeMatches.Count > 0 && DateTime.UtcNow < deadline)
+            while (CurrentMatchCount > 0 && DateTime.UtcNow < deadline)
             {
                 Thread.Sleep(100);
                 foreach (var kv in _activeMatches)
-                {
-                    if (kv.Value == null || !kv.Value.IsRunning)
-                        _activeMatches.TryRemove(kv.Key, out _);
-                }
+                    if (!kv.Value.IsRunning) _activeMatches.TryRemove(kv.Key, out _);
+                foreach (var kv in _steamMatches)
+                    if (!kv.Value.IsRunning) _steamMatches.TryRemove(kv.Key, out _);
             }
-
             Console.WriteLine("[Orchestrator] Shutdown complete.");
         }
+
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -221,6 +222,18 @@ namespace SlopArena.Client.UI
             }
         }
 
+        private static bool SupportsMatchTransport(ServerInfo server)
+        {
+            if (server.ProtocolVersion == SteamMatchDescriptor.CurrentProtocolVersion &&
+                !string.IsNullOrEmpty(server.ServerSteamId) &&
+                ulong.TryParse(server.ServerSteamId, NumberStyles.None, CultureInfo.InvariantCulture, out ulong steamId) &&
+                steamId != 0)
+                return true;
+            return Application.isEditor &&
+                string.Equals(Environment.GetEnvironmentVariable("SLOPARENA_DEV_UDP"), "1", StringComparison.Ordinal) &&
+                server.ProtocolVersion == 0;
+        }
+
         private VisualElement CreateServerRow(ServerInfo server)
         {
             var row = new VisualElement { name = "server-row" };
@@ -233,13 +246,16 @@ namespace SlopArena.Client.UI
                 name = "server-info"
             };
             info.AddToClassList("server-info");
+            bool compatible = SupportsMatchTransport(server);
+            if (!compatible)
+                info.text += "  —  INCOMPATIBLE CLIENT";
             var join = new Button(() => JoinServer(server))
             {
-                text = "JOIN",
+                text = compatible ? "JOIN" : "UNSUPPORTED",
                 name = "btn-join"
             };
             join.AddToClassList("server-join");
-
+            join.SetEnabled(compatible);
             row.Add(name);
             row.Add(info);
             row.Add(join);
@@ -250,6 +266,11 @@ namespace SlopArena.Client.UI
         {
             if (!_alive || _joining || _hostStarting)
                 return;
+            if (!SupportsMatchTransport(server))
+            {
+                SetBrowserStatus("This room does not support the required Steam match protocol.", loading: false);
+                return;
+            }
             _joining = true;
             SetBrowserStatus($"Joining {server.Name}…", loading: true);
             SetBrowserActionsEnabled(false);
@@ -260,8 +281,9 @@ namespace SlopArena.Client.UI
             ClientSession.Username = chat?.Self?.DisplayName;
             ClientSession.SelectedServerId = server.Id;
             ClientSession.SelectedServerName = server.Name;
-            Debug.Log($"[ServerBrowser] Joining server: {server.Name} ({server.IpAddress}:{server.Port})");
+            Debug.Log($"[ServerBrowser] Joining server: {server.Name}");
             FrontendController.Show(FrontendPage.LobbyRoom);
+
         }
 
         private void OpenDirectConnect()
@@ -454,7 +476,7 @@ namespace SlopArena.Client.UI
             {
                 var chat = ChatSession.Instance;
                 ChatSession.ConfigureMasterServerUrl(ClientSession.MasterServerUrl);
-                SetHostStatus("Signing in as a guest…", ct);
+                SetHostStatus("Signing in to the room directory…", ct);
                 bool authenticated = chat != null && await chat.EnsureConnectedAsync();
                 if (!IsCurrentHost(ct))
                     return;

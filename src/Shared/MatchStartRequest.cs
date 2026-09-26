@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System;
+using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 
 namespace SlopArena.Shared;
@@ -9,22 +12,20 @@ namespace SlopArena.Shared;
 /// (1..N by lobby join order) and sends the locked-in character class so the
 /// game server spawns the right entity instead of hardcoded Manki.
 /// </summary>
-/// <param name="SteamId">Guest SteamId (identifies the player across master + game server).</param>
+/// <param name="SteamId">Master-verified SteamID (development guests only in development mode).</param>
 /// <param name="CharacterClass">Locked-in character class the game server must spawn.</param>
 /// <param name="EntityId">Server entity ID (1..N) the player drives and the server broadcasts state for.</param>
 public sealed record MatchPlayer(long SteamId, CharacterClass CharacterClass, int EntityId);
 
-/// <summary>
-/// Body of the master server's <c>POST /match/start</c> call to the game server
-/// (ADR-0008, issue #35). The game server spawns one entity per player with the
-/// given character class + entity ID, runs the match on a dedicated UDP port,
-/// and replies with that port so the master server can broadcast it to clients.
-/// </summary>
-/// <param name="MatchId">Opaque match identifier (for logging + orchestrator bookkeeping).</param>
-/// <param name="ArenaName">Arena the game server should load for this match.</param>
-/// <param name="Players">Ordered roster (index 0 = host) the game server spawns.</param>
-/// <param name="MaxStocks">Stocks per player (default 3, issue #37).</param>
-public sealed record MatchStartRequest(string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players, int MaxStocks = MatchDefaults.DefaultMaxStocks);
+/// <summary>Master match-start command. Protocol 2 adds Steam admission coordinates;
+/// protocol 0 is retained only for explicit development UDP sessions.</summary>
+public sealed record MatchStartRequest(
+    string MatchId, string ArenaName, IReadOnlyList<MatchPlayer> Players,
+    int MaxStocks = MatchDefaults.DefaultMaxStocks,
+    int ProtocolVersion = 0,
+    int VirtualPort = SteamMatchDescriptor.GameplayVirtualPort,
+    DateTimeOffset? AdmissionExpiresAtUtc = null,
+    string? CatalogHash = null);
 
 /// <summary>
 /// Parses the <c>POST /match/start</c> JSON body (<see cref="MatchStartRequest"/>).
@@ -72,7 +73,8 @@ public static class MatchStartRequestCodec
             if (item.ValueKind != JsonValueKind.Object)
                 return null;
 
-            if (!item.TryGetProperty("steamId", out var steam) || steam.ValueKind != JsonValueKind.Number)
+            if (!item.TryGetProperty("steamId", out var steam) || steam.ValueKind != JsonValueKind.Number ||
+                !steam.TryGetInt64(out var steamId) || steamId <= 0)
                 return null;
 
             if (!item.TryGetProperty("characterClass", out var cc) || cc.ValueKind != JsonValueKind.String)
@@ -82,18 +84,16 @@ public static class MatchStartRequestCodec
                 return null;
             // Case-insensitive enum parse; reject unknown classes so a typo can't
             // silently spawn Manki (the exact bug this ticket fixes).
-            if (!System.Enum.TryParse<CharacterClass>(classStr, ignoreCase: true, out var characterClass))
-                return null;
-            if (characterClass == CharacterClass.None)
-                return null;
-
-            if (!item.TryGetProperty("entityId", out var eid) || eid.ValueKind != JsonValueKind.Number)
-                return null;
-            int entityId = eid.GetInt32();
-            if (entityId <= 0)
+            if (!System.Enum.TryParse<CharacterClass>(classStr, ignoreCase: true, out var characterClass) ||
+                !System.Enum.IsDefined(typeof(CharacterClass), characterClass) ||
+                characterClass == CharacterClass.None)
                 return null;
 
-            list.Add(new MatchPlayer(steam.GetInt64(), characterClass, entityId));
+            if (!item.TryGetProperty("entityId", out var eid) || eid.ValueKind != JsonValueKind.Number ||
+                !eid.TryGetInt32(out var entityId) || entityId <= 0)
+                return null;
+
+            list.Add(new MatchPlayer(steamId, characterClass, entityId));
         }
 
         if (list.Count is < 2 or > 4)
@@ -113,6 +113,36 @@ public static class MatchStartRequestCodec
                 return null;
         }
 
-        return new MatchStartRequest(matchId, arenaName, list, maxStocks);
+        int protocolVersion = 0;
+        int virtualPort = SteamMatchDescriptor.GameplayVirtualPort;
+        DateTimeOffset? admissionExpiresAtUtc = null;
+        string? catalogHash = null;
+        if (element.TryGetProperty("protocolVersion", out var protocol))
+        {
+            if (protocol.ValueKind != JsonValueKind.Number ||
+                !protocol.TryGetInt32(out protocolVersion) ||
+                protocolVersion != SteamMatchDescriptor.CurrentProtocolVersion ||
+                !Guid.TryParse(matchId, out var matchGuid) || matchGuid == Guid.Empty ||
+                !element.TryGetProperty("virtualPort", out var vp) ||
+                vp.ValueKind != JsonValueKind.Number ||
+                !vp.TryGetInt32(out virtualPort) ||
+                virtualPort != SteamMatchDescriptor.GameplayVirtualPort ||
+                !element.TryGetProperty("catalogHash", out var expected) ||
+                expected.ValueKind != JsonValueKind.String ||
+                expected.GetString() is not { Length: 64 } expectedHash ||
+                expectedHash.Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f')) ||
+                !element.TryGetProperty("admissionExpiresAtUtc", out var deadline) ||
+                deadline.ValueKind != JsonValueKind.String ||
+                !DateTimeOffset.TryParse(deadline.GetString(), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var expires) ||
+                list.Exists(p => p.SteamId <= 0 || p.EntityId <= 0) ||
+                list.Select(p => p.SteamId).Distinct().Count() != list.Count ||
+                list.Select(p => p.EntityId).Distinct().Count() != list.Count)
+                return null;
+            admissionExpiresAtUtc = expires;
+            catalogHash = expectedHash;
+        }
+        return new MatchStartRequest(matchId, arenaName, list, maxStocks,
+            protocolVersion, virtualPort, admissionExpiresAtUtc, catalogHash);
     }
 }

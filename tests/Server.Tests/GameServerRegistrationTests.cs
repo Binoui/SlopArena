@@ -8,6 +8,7 @@ namespace SlopArena.Server.Tests;
 
 public class GameServerRegistrationTests
 {
+    private const ulong TestHostSteamId = 76561198000000001;
     private static ServerConfig TestConfig(bool vps = false) => new()
     {
         DeploymentProfile = vps ? "vps" : "development",
@@ -22,11 +23,17 @@ public class GameServerRegistrationTests
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
+        private readonly object _gate = new();
         public List<(string Path, HttpMethod Method, string? Token)> Requests { get; } = new();
+        public List<(string Path, string Body)> Bodies { get; } = new();
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
-            Requests.Add((request.RequestUri!.AbsolutePath, request.Method, request.Headers.Authorization?.Parameter));
+            lock (_gate)
+            {
+                Requests.Add((request.RequestUri!.AbsolutePath, request.Method, request.Headers.Authorization?.Parameter));
+                Bodies.Add((request.RequestUri.AbsolutePath, request.Content?.ReadAsStringAsync(ct).GetAwaiter().GetResult() ?? ""));
+            }
             return Task.FromResult(respond(request));
         }
     }
@@ -83,7 +90,7 @@ public class GameServerRegistrationTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
         var orchestrator = new MultiMatchOrchestrator(config);
-        var registration = new GameServerRegistration(config, orchestrator, handler, clock);
+        var registration = new GameServerRegistration(config, orchestrator, handler, clock, () => TestHostSteamId);
         using var control = new MatchControlServer(orchestrator, port, "slop_court",
             isReady: () => registration.HasFreshRegistration);
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
@@ -135,7 +142,8 @@ public class GameServerRegistrationTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
         var config = TestConfig(vps: true);
-        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler);
+        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler,
+            getSteamId: () => TestHostSteamId);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var run = registration.RunAsync(cts.Token, initialRetryDelay: TimeSpan.FromMilliseconds(10));
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
@@ -168,7 +176,8 @@ public class GameServerRegistrationTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
         var config = TestConfig(vps: true);
-        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler);
+        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler,
+            getSteamId: () => TestHostSteamId);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(30));
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
@@ -199,7 +208,8 @@ public class GameServerRegistrationTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
         var config = TestConfig(vps: true);
-        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler);
+        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler,
+            getSteamId: () => TestHostSteamId);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(30));
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(3));
@@ -231,11 +241,111 @@ public class GameServerRegistrationTests
     }
 
     [Fact]
+    public async Task VpsIdentityRotationReRegistersWithSameProcessInstance()
+    {
+        var serverId = Guid.NewGuid();
+        long currentSteamId = (long)TestHostSteamId;
+        int registrationCount = 0;
+        int heartbeatCount = 0;
+        var secondRegistration = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHandler(request =>
+        {
+            string path = request.RequestUri!.AbsolutePath;
+            if (path == "/servers/register")
+            {
+                int count = Interlocked.Increment(ref registrationCount);
+                if (count == 2) secondRegistration.TrySetResult();
+                return Registered(serverId, $"api-token-{count}");
+            }
+            if (path.EndsWith("/heartbeat", StringComparison.Ordinal) &&
+                Interlocked.Increment(ref heartbeatCount) == 1)
+            {
+                Interlocked.Exchange(ref currentSteamId, (long)TestHostSteamId + 1);
+                return new HttpResponseMessage(HttpStatusCode.Conflict);
+            }
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var config = TestConfig(vps: true);
+        var orchestrator = new MultiMatchOrchestrator(config);
+        var registration = new GameServerRegistration(config, orchestrator, handler,
+            getSteamId: () => (ulong)Interlocked.Read(ref currentSteamId));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(15));
+        await secondRegistration.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(SpinWait.SpinUntil(() => registration.HasFreshRegistration, 3000));
+        cts.Cancel();
+        await run;
+
+        Assert.NotEqual(Guid.Empty, registration.InstanceId);
+        Assert.NotNull(orchestrator.CatalogHash);
+        Assert.Equal(64, orchestrator.CatalogHash!.Length);
+        Assert.All(orchestrator.CatalogHash, c => Assert.True(c is >= '0' and <= '9' or >= 'a' and <= 'f'));
+        var registerBodies = handler.Bodies.Where(x => x.Path == "/servers/register").Select(x => x.Body).ToArray();
+        Assert.Equal(2, registerBodies.Length);
+        using var firstRegistration = JsonDocument.Parse(registerBodies[0]);
+        using var secondRegistrationBody = JsonDocument.Parse(registerBodies[1]);
+        Assert.Equal(TestHostSteamId.ToString(), firstRegistration.RootElement.GetProperty("steamId").GetString());
+        Assert.Equal((TestHostSteamId + 1).ToString(), secondRegistrationBody.RootElement.GetProperty("steamId").GetString());
+        foreach (var registrationBody in new[] { firstRegistration, secondRegistrationBody })
+        {
+            Assert.Equal(registration.InstanceId, registrationBody.RootElement.GetProperty("instanceId").GetGuid());
+            Assert.Equal(2, registrationBody.RootElement.GetProperty("protocolVersion").GetInt32());
+            Assert.Equal(orchestrator.CatalogHash, registrationBody.RootElement.GetProperty("catalogHash").GetString());
+        }
+        using var heartbeatBody = JsonDocument.Parse(handler.Bodies.First(x => x.Path.EndsWith("/heartbeat", StringComparison.Ordinal)).Body);
+        Assert.Equal(registration.InstanceId, heartbeatBody.RootElement.GetProperty("instanceId").GetGuid());
+        Assert.Equal(TestHostSteamId.ToString(), heartbeatBody.RootElement.GetProperty("steamId").GetString());
+        Assert.Equal(2, heartbeatBody.RootElement.GetProperty("protocolVersion").GetInt32());
+        Assert.Equal(orchestrator.CatalogHash, heartbeatBody.RootElement.GetProperty("catalogHash").GetString());
+    }
+
+    [Fact]
+    public async Task PendingResultRetriesTransientFailureAndCancellationConflictIsTerminal()
+    {
+        var serverId = Guid.NewGuid();
+        int resultRequests = 0;
+        int cancelRequests = 0;
+        var handler = new StubHandler(request =>
+        {
+            switch (request.RequestUri!.AbsolutePath)
+            {
+                case "/servers/register": return Registered(serverId);
+                case "/match/result":
+                    return new HttpResponseMessage(Interlocked.Increment(ref resultRequests) == 1
+                        ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
+                case "/match/cancel":
+                    Interlocked.Increment(ref cancelRequests);
+                    return new HttpResponseMessage(HttpStatusCode.Conflict);
+                default: return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+        });
+        var config = TestConfig(vps: true);
+        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler,
+            getSteamId: () => TestHostSteamId);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(15));
+        Assert.True(SpinWait.SpinUntil(() => registration.IsRegistered, 3000));
+
+        await registration.ReportMatchResultAsync(Guid.NewGuid(), 22);
+        registration.QueueMatchCancellation(Guid.NewGuid(), "absent");
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref resultRequests) == 2, 3000));
+        await Task.Delay(100);
+        Assert.Equal(2, resultRequests);
+        Assert.Equal(1, cancelRequests);
+
+        cts.Cancel();
+        await run;
+        Assert.Equal(2, handler.Requests.Count(x => x.Path == "/match/result"));
+        Assert.Equal(1, handler.Requests.Count(x => x.Path == "/match/cancel"));
+    }
+
+    [Fact]
     public async Task InvalidApprovedHostCredential_FailsWithoutRetry()
     {
         var config = TestConfig(vps: true);
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
-        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler);
+        var registration = new GameServerRegistration(config, new MultiMatchOrchestrator(config), handler,
+            getSteamId: () => TestHostSteamId);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => registration.RunAsync(cts.Token));

@@ -7,9 +7,10 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 Read these in order:
 
 1. [Playable friends demo reset](plans/2026-09-05-playable-demo-reset.md)
-2. [Architecture overview](architecture-overview.md)
-3. [Testing and verification](testing.md)
-4. [Contributing](../CONTRIBUTING.md)
+2. [Steam Playtest identity and gameplay on the VPS](plans/2026-09-25-steam-playtest-integration.md) — 2A accepted; 2B auth and 2C match routing implemented locally, live acceptance and release gates pending.
+3. [Architecture overview](architecture-overview.md)
+4. [Testing and verification](testing.md)
+5. [Contributing](../CONTRIBUTING.md)
 ## Architecture
 
 | Document | Use it for |

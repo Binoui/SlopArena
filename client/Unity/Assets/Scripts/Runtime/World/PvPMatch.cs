@@ -44,14 +44,8 @@ namespace SlopArena.Client.World
 
         protected override void LeaveMatch()
         {
-            // The host owns the embedded GameServer process (ADR-0005): abandoning
-            // PvP early must stop it, or it stays registered with the Master with
-            // no owner able to stop it (issue #48; same contract as backing out of
-            // fighter select). Non-hosts never touch it.
-            if (MatchConfig.IsHost)
+            if (MatchConfig.Transport == MatchTransport.DevelopmentUdp && MatchConfig.IsHost)
                 ServerHost.Instance?.Stop();
-            // Leaving the GameServer revokes Server Chat membership; Global/Direct
-            // keep running on the persistent connection (issue #210).
             _ = ClientSession.ActiveLobby?.LeaveLobbyAsync();
             FrontendController.Show(FrontendPage.ServerBrowser);
         }
@@ -65,21 +59,24 @@ namespace SlopArena.Client.World
             string? arenaPath = BakedContentPaths.ResolveArena(MatchConfig.ArenaName);
             if (arenaPath == null)
             {
-                Debug.LogError($"[PvPMatch] Baked arena '{MatchConfig.ArenaName}' not found (looked in StreamingAssets/arenas and repo data/arenas). " +
-                               "Bake the arena or run scripts/build-release.sh. Aborting match start.");
+                ClientSession.RejectMatchStart($"Baked arena '{MatchConfig.ArenaName}' is missing.");
                 return;
             }
             var arenaOpt = ArenaBinaryFormat.LoadFromFile(arenaPath);
             if (arenaOpt is not ArenaDefinition arena)
             {
-                Debug.LogError($"[PvPMatch] Failed to parse baked arena: {arenaPath}");
+                ClientSession.RejectMatchStart($"Baked arena could not be loaded: {arenaPath}");
                 return;
             }
             Debug.Log($"[PvPMatch] Loaded arena: {arenaPath}");
 
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
 
-            // Bridge
+            if (_networkClient == null)
+            {
+                ClientSession.RejectMatchStart("PvP scene is missing its NetworkClient.");
+                return;
+            }
             _networkClient.EntityId = PlayerEntityId;
             _bridge = new RollbackSimulationBridge(arena, _networkClient, PlayerEntityId);
             SpawnStageVisual(arena);
@@ -93,13 +90,13 @@ namespace SlopArena.Client.World
             var contentCatalog = SlopArena.Client.ClientSession.MatchContentCatalog;
             if (contentCatalog == null)
             {
-                Debug.LogError("[PvPMatch] No admitted match content catalog.");
+                ClientSession.RejectMatchStart("Admitted match content catalog is unavailable.");
                 return;
             }
             var playerEntry = contentCatalog.Resolve(MatchConfig.PlayerClass);
             if (playerEntry == null)
             {
-                Debug.LogError($"[PvPMatch] Player selector {MatchConfig.PlayerClass} is absent from the content catalog.");
+                ClientSession.RejectMatchStart($"Player selector {MatchConfig.PlayerClass} is absent from the admitted content catalog.");
                 return;
             }
             var playerDef = playerEntry.Definition;
@@ -107,7 +104,10 @@ namespace SlopArena.Client.World
 
             // Shared player renderer + HUD setup
             if (!SetupPlayerRenderer(playerEntry, arena))
+            {
+                ClientSession.RejectMatchStart("Player render content could not be loaded.");
                 return;
+            }
             SetupHUD(playerDef);
 
             // Opponent renderers — one per MatchConfig.Opponents entry. The scene's
@@ -137,12 +137,15 @@ namespace SlopArena.Client.World
                 var opponentEntry = contentCatalog.Resolve(opp.Class);
                 if (opponentEntry == null)
                 {
-                    Debug.LogError($"[PvPMatch] Opponent selector {opp.Class} is absent from the content catalog.");
+                    ClientSession.RejectMatchStart($"Opponent selector {opp.Class} is absent from the admitted content catalog.");
                     return;
                 }
                 var def = opponentEntry.Definition;
                 if (!SetupRenderer(renderer, opponentEntry, arena, opp.EntityId, false))
+                {
+                    ClientSession.RejectMatchStart($"Opponent render content could not be loaded for entity {opp.EntityId}.");
                     return;
+                }
                 renderer.transform.position = SpawnPosition(arena, opp.EntityId);
                 _opponentRenderers[opp.EntityId] = renderer;
 
@@ -191,7 +194,21 @@ namespace SlopArena.Client.World
             _lastPresentedDeaths[PlayerEntityId] = 0;
             foreach (var id in _opponentRenderers.Keys)
                 _lastPresentedDeaths[id] = 0;
-            _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
+            if (MatchConfig.Transport == MatchTransport.SteamP2P &&
+                MatchConfig.SteamDescriptor is { } descriptor)
+            {
+                _networkClient.ConnectionFailed += OnSteamConnectionFailed;
+                _networkClient.ConnectSteam(descriptor);
+            }
+            else if (MatchConfig.Transport == MatchTransport.DevelopmentUdp)
+            {
+                _networkClient.Connect(MatchConfig.ServerIP, MatchConfig.ServerPort);
+            }
+            else
+            {
+                ClientSession.RejectMatchStart("PvP match has no approved transport.");
+                return;
+            }
 
 
             // Shared camera + aim setup
@@ -416,6 +433,18 @@ namespace SlopArena.Client.World
             }
 
             FrontendController.Show(FrontendPage.Results);
+        }
+        private void OnSteamConnectionFailed(string reason)
+        {
+            if (MatchConfig.SteamDescriptor is { } descriptor)
+                ClientSession.ApplySteamTransportFailure(descriptor.MatchId, reason);
+        }
+
+        protected override void OnDestroy()
+        {
+            if (_networkClient != null)
+                _networkClient.ConnectionFailed -= OnSteamConnectionFailed;
+            base.OnDestroy();
         }
     }
 }

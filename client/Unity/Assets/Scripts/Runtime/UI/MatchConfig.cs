@@ -1,13 +1,18 @@
+#nullable enable
 using System.Collections.Generic;
+using SlopArena.Shared;
 using SlopArena.Shared.AI;
 
 namespace SlopArena.Client.UI
 {
     public enum GameMode { Training, Solo, PvP }
+    public enum MatchTransport { None, DevelopmentUdp, SteamP2P }
 
     public static class MatchConfig
     {
         public static GameMode Mode = GameMode.Training;
+        public static MatchTransport Transport = MatchTransport.None;
+        public static SteamMatchDescriptor? SteamDescriptor;
         public static SlopArena.Shared.CharacterClass PlayerClass
             = SlopArena.Shared.CharacterClass.FightGuy;
         public static string PlayerPackageId = "fightguy";
@@ -37,8 +42,7 @@ namespace SlopArena.Client.UI
 
         // Per-match entity IDs assigned by the master server at match start
         // (issue #35). The local player drives LocalEntityId; the opponents
-        // come from Opponents (issue #36). Defaults keep training and the old
-        // join-by-IP path working unchanged.
+        // come from Opponents (issue #36).
         public static ulong LocalEntityId = 1;
 
         /// <summary>All non-local players, in master-server roster order.</summary>
@@ -48,9 +52,19 @@ namespace SlopArena.Client.UI
         /// server's rule; the master server push carries it when present, else 3.</summary>
         public static int MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;
 
-        public static void Reset()
+        public static void ClearActiveMatch()
         {
             Mode = GameMode.Training;
+            Transport = MatchTransport.None;
+            SteamDescriptor = null;
+            LocalEntityId = 1;
+            Opponents.Clear();
+            MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;
+        }
+
+        public static void Reset()
+        {
+            ClearActiveMatch();
             PlayerPackageId = "fightguy";
             PlayerClass = SlopArena.Shared.CharacterClass.FightGuy;
             SoloBotClass = SlopArena.Shared.CharacterClass.FightGuy;
@@ -59,9 +73,6 @@ namespace SlopArena.Client.UI
             IsHost = true;
             ServerIP = "127.0.0.1";
             ServerPort = 9876;
-            LocalEntityId = 1;
-            Opponents.Clear();
-            MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;
         }
     }
 }
