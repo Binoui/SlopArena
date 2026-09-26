@@ -133,9 +133,20 @@ new Steam web tickets during a temporary Master outage.
 
 Build the Playtest Windows player via the installed Unity CLI/Pipeline, upload with `scripts/steam-playtest.sh`, and deploy pinned Master/GameHost image digests and migration bundle with `deploy/vps/release.py`. The older direct-Editor `scripts/build-release.sh` is not this Steam test build. The packaged player selects the VPS Master **before** authentication, never the home host or a tester shell override. The isolated SteamCMD game-server runtime mount is checksum-pinned for this test; confirm permitted dedicated-server redistribution before production packaging. Never distribute `steam_appid.txt`, publisher credentials or a guest/UDP fallback.
 
+For friends outside one fixed IP, the operator approved public **IPv4 TCP 443**
+to the test Master through the OVH provider firewall, host UFW and
+Docker-aware Caddy forwarding policy. TCP 80 remains ACME/redirect only;
+management SSH stays CIDR-restricted, IPv6 TCP 443 remains blocked until
+reviewed, and no GameHost UDP/private Master/control/DB ports are published.
+Steam ticket/entitlement checks and per-source HTTP quotas remain in force,
+but anonymous Internet traffic and resource abuse become possible. The policy
+is not considered live until both provider and host changes and an external
+non-management-source `/ready` check succeed; never substitute a `0/0` entry
+in the old tester list (that would couple public HTTPS with obsolete UDP).
+
 The Steam-installed **Windows** Playtest build must also prove Steam initialization, the expected GameHost identity, authenticated relay handshake and a short packet exchange on real Windows hardware. Its compiled `steam_api64.dll` is packaging evidence only. This check moved from 2A to the 2D acceptance ticket by explicit decision; do not report it as passed from the Linux route proof.
 
-Run two real Steam accounts on packaged clients: install/launch → verified login → chat → browse/join → select fighter/stage → authoritative match → results → lobby → rematch. Check Steam unavailable at login, Master/Steam API outage during an existing match, non-rostered or stale join, account switching, duplicate connection, content/protocol mismatch, brief disconnect, GameHost restart and an abandoned waiting match. Record Playtest AppID/build IDs, client/server revisions, image digests, route/RTT, match/abort outcomes and remaining limitations. No production raw-UDP/guest fallback; exercise maintenance/roll-forward rather than treating a legacy public rollback as safe. Keep [Phase 1 live acceptance #234](https://github.com/Binoui/SlopArena/issues/234) open for its independent pending packaged-client, ingress and recovery gates; Phase 2 does not retroactively pass them.
+Run two real Steam accounts on packaged clients: install/launch → verified login → chat → browse/join → select fighter/stage → authoritative match → results → lobby → rematch. Check Steam unavailable at login, Master/Steam API outage during an existing match, non-rostered or stale join, account switching, duplicate connection, content/protocol mismatch, brief disconnect, GameHost restart and an abandoned waiting match. Record Playtest AppID/build IDs, client/server revisions/image digests, route/RTT, match/abort outcomes and remaining limitations. No production raw-UDP/guest fallback; exercise maintenance/roll-forward rather than treating a legacy public rollback as safe. Phase 1 #234 is closed as a historical handoff; its unverified observations are not retroactive Phase 2 proof.
 
 Keep an admitted match active for at least 90 seconds with healthy state
 traffic; no elapsed-connection-age timer may force a 30-second reconnect.

@@ -24,23 +24,23 @@ commits. Re-check the current state before each subsequent release step.
 ## Operator prerequisites
 
 1. Acquire an EU VPS and verify its Ubuntu 24.04 amd64 image, public IPv4, optional IPv6, provider-console access, and SSH host key fingerprint out of band. Keep console recovery working before restricting SSH. Back up any existing VPS data before using the target directory. Never run this profile on the home host.
-2. Set up an operator SSH account/key, allowlisted tester IPv4 CIDRs (and IPv6 CIDRs only if IPv6 is deliberately enabled), and a separate SSH management CIDR. Restrict SSH sources at the provider firewall as well as on the host; verify one new SSH session before closing the current one. If locked out, recover through the provider console and restore the prior firewall configuration, not by exposing the DB or raw control ports.
+2. Set up an operator SSH account/key and a **management-only** SSH source CIDR. For the Steam Playtest, public IPv4 TCP 443 reaches Caddy; Steam ticket/entitlement checks protect online application routes. Keep management SSH restricted at both the provider and host. Verify a new SSH session before closing the current one. If locked out, recover through the provider console, not by exposing the DB or raw control ports.
 
 Bootstrap (only on the verified fresh VPS, after copying these scripts there):
 
 ```bash
 sudo deploy/vps/bootstrap.sh --confirm-vps \
-  --ssh-source <management-ipv4-or-ipv6-cidr> \
-  --tester-source <tester-ipv4-cidr>
+  --ssh-source <management-ipv4-or-ipv6-cidr>
 ```
 
-Repeat `--tester-source` for each authorized IPv4/IPv6 tester range. The command
-resets host UFW, checks the operator's key and OS, installs Ubuntu Docker/Compose
-packages, disables root/password SSH, and installs the Docker-aware ingress
-filter. It is not a command to run on this development workstation or the home
-server. Re-run with the complete tester list, not an incremental addition; the
-provider firewall remains an independent gate. Test a new SSH connection and
-inspect both IPv4 and IPv6 host/provider rules before attempting a release.
+Bootstrap resets host UFW, checks the operator's key and OS, installs Ubuntu
+Docker/Compose packages, disables root/password SSH, and installs the
+Docker-aware ingress filter. **Do not rerun it on the prepared VPS.** It is
+not a command for the development workstation or home server. Before the
+provider firewall cutover, allow only management-source SSH, public TCP 80
+for ACME/redirect, and public **IPv4** TCP 443. Keep IPv6 TCP 443 blocked
+unless a separate IPv6 policy is reviewed and tested; never open gameplay
+UDP 7777–7781 or private Master/database/control ports.
 
 If the SSH source rule locks you out, use the provider's out-of-band console,
 not the game ports: inspect `sudo ufw status numbered`, restore a rule for the
@@ -51,7 +51,7 @@ closing the recovery session. If the login key itself is rejected, use the
 console to correct the sudo operator's `authorized_keys` and file permissions;
 do not enable password/root SSH or open SSH to `0.0.0.0/0`.
 
-3. The test DNS names `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST` point to the VPS IPv4, not the home tunnel. Keep SSH restricted to management CIDRs and HTTPS 443 to tester CIDRs; port 80 serves ACME/redirect. The Steam GameHost listens through Valve relay and Compose publishes **no UDP or private TCP gameplay/control ports**. Existing restricted UDP firewall rules are historical and should be removed separately after the no-listener cutover; do not open new ingress for this release.
+3. The test DNS names `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST` point to the VPS IPv4, not the home tunnel. Keep SSH management-only and allow public IPv4 TCP 443 through the OVH provider firewall, UFW and Docker forwarding filter. Public TCP 80 serves ACME/redirect. Master uses bounded Steam tickets and per-source POST rate limits through an exact trusted proxy; any Internet source can still send anonymous requests and consume resources. Steam GameHost uses Valve relay; Compose publishes **no gameplay UDP or private TCP control port**. A source CIDR is not a Steam identity.
 4. Publish compatible GameServer, Master and EF migration images under one release ID via their explicit workflows. Pin image digests and both source revisions. An upload/push alone never deploys the VPS.
 5. Keep DB/JWT/registration/control credentials in private operator files. Master additionally needs `Steam__ApiKey` from the Playtest publisher; Compose pins `Auth__Mode=steam`, Playtest AppID `5325920` and identity `sloparena-playtest`. Supply the tested Valve SteamCMD `steamclient.so` separately as a read-only runtime file, pin its SHA-256 in the release record, and confirm production redistributable rights before treating this test mount as a shippable image. `game.json` keeps the provisioned host GUID, private `masterServerUrl` and control port; its `publicIp` is metadata, never a Steam identity. Store runtime files outside Git with private permissions and grant container UID 1654 read-only access to the GameHost config. Never put keys or the GameHost config in an image, client or release JSON.
 
@@ -416,23 +416,23 @@ data-directory copy of a running home server is not a safe import.
 
 ## Acceptance on a live target
 
-From a **non-allowlisted** external network, attempt guest auth, hub WebSocket/long polling, UDP 7777–7781, and TCP 7777, 5432, 8080; none may reach the service. From an allowlisted external client verify trusted HTTPS, guest auth, hub both transports, character catalog, direct UDP match and rematch. Check 80/tcp only redirects or handles ACME validation, and HTTPS certificates are publicly trusted. Verify IPv6 separately or that no AAAA/public IPv6 listener exists. Restart the VPS and verify service readiness/registration and certificate persistence. A failed firewall, readiness, migration, backup, or digest check blocks release rather than falling through to a broader ingress rule.
+From an arbitrary external IPv4 source, verify trusted HTTPS `/ready` and
+Steam Playtest login, while invalid tickets, public guest issuance and
+unauthorized hub calls fail closed. The friend must be able to reach Master
+without IP approval, then use a distinct entitled Steam account to join
+through the current packaged BuildID. From the same source verify SSH,
+raw Master, PostgreSQL, GameHost control and all gameplay UDP/TCP ports remain
+unreachable; Steam relay traffic is outbound. Verify IPv6 TCP 443 remains
+denied, and TCP 80 only redirects or serves ACME. Source-aware POST quotas
+remain active, but public HTTPS cannot by itself prevent volumetric abuse.
+Verify service readiness/registration and certificate persistence after a
+restart. A firewall, readiness, backup or digest failure blocks release
+instead of permitting an unauthenticated gameplay fallback.
 
-For a newly built packaged Windows client, set the test Master origin **before
-launch**, in each tester's PowerShell session:
-
-```powershell
-$env:SLOPARENA_MASTER_URL = "https://<test-master-host>"
-.\SlopArena.exe
-Remove-Item Env:SLOPARENA_MASTER_URL
-```
-
-The override requires a bare HTTPS origin; an invalid value stops guest session
-startup rather than silently connecting to the home Master. Without the variable,
-the shipped player continues to use the home endpoint. Set it for both packaged
-clients and confirm the browser/chat connect to the test Master before joining.
-Previously built players do not contain this launch override. Neither this
-override nor the synthetic UDP probe constitutes a completed Unity-client match.
+The packaged Playtest client pins `https://master-test.sloparena.barakaslurp.fr`
+before auth and does not accept a shell override. Launch AppID `5325920`
+through Steam (the Windows binary can use Proton on Linux). Testing Training
+alone does not prove an admitted 90-second two-account PvP match.
 
 ## Observed live test release (2026-09-25)
 

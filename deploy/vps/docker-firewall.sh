@@ -1,51 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-allowlist=/etc/sloparena-vps/tester-cidrs
-for tool in iptables ip6tables; do
-  command -v "$tool" >/dev/null || { echo "missing required firewall tool: $tool" >&2; exit 1; }
-done
-[[ -f $allowlist && $(stat -c %u "$allowlist") == 0 ]] || {
-  echo "missing root-owned tester allowlist: $allowlist" >&2; exit 1;
-}
-[[ $((8#$(stat -c %a "$allowlist") & 18)) == 0 ]] || {
-  echo "tester allowlist must not be group/other writable" >&2; exit 1;
-}
-normalized_cidrs=$(python3 - "$allowlist" <<'PY'
-import ipaddress
-import sys
-
-with open(sys.argv[1], encoding="ascii") as source:
-    lines = [line.strip() for line in source if line.strip()]
-if not lines:
-    raise SystemExit("tester allowlist is empty")
-for line in lines:
-    network = ipaddress.ip_network(line, strict=True)
-    if network.prefixlen == 0:
-        raise SystemExit(f"unrestricted tester network: {line}")
-    print(network)
-PY
-) || { echo "tester allowlist is invalid" >&2; exit 1; }
-mapfile -t cidrs <<< "$normalized_cidrs"
-[[ -n ${cidrs[0]:-} ]] || { echo "tester allowlist is empty" >&2; exit 1; }
 
 expected_policy() {
-  local tool=$1 chain=$2 cidr
+  local tool=$1 chain=$2
   printf '%s\n' \
     "-A $chain -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN" \
     "-A $chain -i docker0 -j RETURN" \
     "-A $chain -i br+ -j RETURN" \
     "-A $chain -p tcp --dport 80 -j RETURN"
-  for cidr in "${cidrs[@]}"; do
-    if [[ $cidr == *:* && $tool == iptables || $cidr != *:* && $tool == ip6tables ]]; then
-      continue
-    fi
-    printf '%s\n' \
-      "-A $chain -s $cidr -p tcp --dport 443 -j RETURN" \
-      "-A $chain -s $cidr -p udp --dport 7777:7781 -j RETURN"
-  done
+  if [[ $tool == iptables ]]; then
+    printf '%s\n' "-A $chain -p tcp --dport 443 -j RETURN"
+  fi
   printf '%s\n' "-A $chain -j DROP"
 }
+
+if [[ ${1:-} == --print-policy ]]; then
+  [[ $# == 2 ]] || { echo "usage: $0 --print-policy ipv4|ipv6" >&2; exit 2; }
+  case "$2" in
+    ipv4) expected_policy iptables SLOPARENA-VPS-CHECK ;;
+    ipv6) expected_policy ip6tables SLOPARENA-VPS-CHECK ;;
+    *) echo "usage: $0 --print-policy ipv4|ipv6" >&2; exit 2 ;;
+  esac
+  exit 0
+fi
+for tool in iptables ip6tables; do
+  command -v "$tool" >/dev/null || { echo "missing required firewall tool: $tool" >&2; exit 1; }
+done
 
 verify_family() {
   local tool=$1 active count expected_count rule actual_count

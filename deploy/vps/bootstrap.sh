@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: sudo deploy/vps/bootstrap.sh --confirm-vps --ssh-source CIDR --tester-source CIDR [--tester-source CIDR ...] [--ssh-port PORT]
+Usage: sudo deploy/vps/bootstrap.sh --confirm-vps --ssh-source CIDR [--ssh-port PORT]
 
 Run only on a new, dedicated Ubuntu 24.04 amd64 VPS after confirming that the
 provider recovery console works and an SSH public key is installed for the
@@ -11,21 +11,20 @@ sudo user. This script resets UFW rules, disables SSH password/root login,
 installs Ubuntu Docker/Compose packages, and installs/enforces the Docker
 published-port firewall. It does not deploy the application.
 
-TCP 443 and UDP 7777-7781 are restricted to the required tester CIDRs.
-Public TCP 80 remains open for ACME/redirect. Before enabling a provider
-firewall, allow the SSH source, public TCP 80, tester TCP 443/UDP 7777-7781,
+Public TCP 80 serves ACME/redirect; public IPv4 TCP 443 reaches the Steam-only
+Master through Caddy. SSH remains restricted to the management CIDR. No
+gameplay UDP or private Master/database/control port is published. Before
+enabling a provider firewall, allow only management SSH, public TCP 80/443
 and keep console access available for lockout recovery.
 EOF
 }
 confirm_vps=false
 ssh_source=
 ssh_port=22
-tester_sources=()
 while (($#)); do
   case "$1" in
     --confirm-vps) confirm_vps=true; shift ;;
     --ssh-source) (($# >= 2)) || { usage >&2; exit 2; }; ssh_source=$2; shift 2 ;;
-    --tester-source) (($# >= 2)) || { usage >&2; exit 2; }; tester_sources+=("$2"); shift 2 ;;
     --ssh-port) (($# >= 2)) || { usage >&2; exit 2; }; ssh_port=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
@@ -39,26 +38,20 @@ done
 . /etc/os-release
 [[ ${ID:-} == ubuntu && ${VERSION_ID:-} == 24.04 ]] || { echo 'requires Ubuntu 24.04' >&2; exit 1; }
 [[ $(dpkg --print-architecture) == amd64 ]] || { echo 'requires amd64' >&2; exit 1; }
-[[ -n $ssh_source && ${#tester_sources[@]} -gt 0 ]] || {
-  echo 'provide --ssh-source and at least one --tester-source CIDR' >&2; exit 2;
-}
+[[ -n $ssh_source ]] || { echo 'provide --ssh-source CIDR' >&2; exit 2; }
 [[ $ssh_port =~ ^[0-9]+$ ]] && ((ssh_port >= 1 && ssh_port <= 65535)) || {
   echo 'SSH port must be 1-65535' >&2; exit 2;
 }
-normalized_sources=$(python3 - "$ssh_source" "${tester_sources[@]}" <<'PY'
+ssh_source=$(python3 - "$ssh_source" <<'PY'
 import ipaddress
 import sys
 
-for raw in sys.argv[1:]:
-    network = ipaddress.ip_network(raw, strict=False)
-    if network.prefixlen == 0:
-        raise SystemExit(f"refusing unrestricted source CIDR: {raw}")
-    print(network)
+network = ipaddress.ip_network(sys.argv[1], strict=False)
+if network.prefixlen == 0:
+    raise SystemExit(f"refusing unrestricted management source CIDR: {network}")
+print(network)
 PY
-) || { echo 'invalid source CIDR' >&2; exit 2; }
-mapfile -t normalized_sources <<< "$normalized_sources"
-ssh_source=${normalized_sources[0]}
-tester_cidrs=("${normalized_sources[@]:1}")
+) || { echo 'invalid management CIDR' >&2; exit 2; }
 [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]] || {
   echo 'run through sudo as the non-root SSH operator account' >&2; exit 1;
 }
@@ -75,12 +68,6 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ufw iptables
 
-# Persist root-owned tester ranges consumed by the Docker bridge firewall.
-install -d -o root -g root -m 0755 /etc/sloparena-vps
-printf '%s\n' "${tester_cidrs[@]}" > /etc/sloparena-vps/tester-cidrs.tmp
-chown root:root /etc/sloparena-vps/tester-cidrs.tmp
-chmod 0644 /etc/sloparena-vps/tester-cidrs.tmp
-mv /etc/sloparena-vps/tester-cidrs.tmp /etc/sloparena-vps/tester-cidrs
 
 # Rebuild a known-deny host firewall; Docker-published ports are separately
 # constrained by DOCKER-USER because UFW does not filter them.
@@ -90,10 +77,7 @@ ufw default deny incoming
 ufw default allow outgoing
 ufw allow from "$ssh_source" to any port "$ssh_port" proto tcp
 ufw allow 80/tcp
-for cidr in "${tester_cidrs[@]}"; do
-  ufw allow from "$cidr" to any port 443 proto tcp
-  ufw allow from "$cidr" to any port 7777:7781 proto udp
-done
+ufw allow from 0.0.0.0/0 to any port 443 proto tcp
 ufw --force enable
 
 install -d -m 0755 /etc/ssh/sshd_config.d

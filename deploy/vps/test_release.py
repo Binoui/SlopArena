@@ -1,6 +1,7 @@
 import hashlib
 import json
 import tempfile
+import subprocess
 import unittest
 from datetime import datetime as DateTime, timezone
 from pathlib import Path
@@ -9,6 +10,29 @@ from unittest.mock import patch
 
 import recovery
 import release
+
+
+class DockerFirewallPolicyTests(unittest.TestCase):
+    def test_public_ipv4_https_never_opens_udp_ssh_or_ipv6_https(self):
+        helper = Path(__file__).with_name("docker-firewall.sh")
+
+        def policy(family):
+            result = subprocess.run(
+                ["bash", str(helper), "--print-policy", family],
+                capture_output=True, text=True, check=True,
+            )
+            return result.stdout.splitlines()
+
+        ipv4 = policy("ipv4")
+        ipv6 = policy("ipv6")
+        self.assertIn("-A SLOPARENA-VPS-CHECK -p tcp --dport 80 -j RETURN", ipv4)
+        self.assertIn("-A SLOPARENA-VPS-CHECK -p tcp --dport 443 -j RETURN", ipv4)
+        self.assertIn("-A SLOPARENA-VPS-CHECK -p tcp --dport 80 -j RETURN", ipv6)
+        self.assertNotIn("-A SLOPARENA-VPS-CHECK -p tcp --dport 443 -j RETURN", ipv6)
+        for rules in (ipv4, ipv6):
+            self.assertEqual("-A SLOPARENA-VPS-CHECK -j DROP", rules[-1])
+            self.assertFalse(any("--dport 7777" in rule or "-p udp" in rule or "--dport 22" in rule
+                                 for rule in rules))
 
 
 class PublishedPortsTests(unittest.TestCase):
