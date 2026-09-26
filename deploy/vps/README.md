@@ -24,7 +24,7 @@ commits. Re-check the current state before each subsequent release step.
 ## Operator prerequisites
 
 1. Acquire an EU VPS and verify its Ubuntu 24.04 amd64 image, public IPv4, optional IPv6, provider-console access, and SSH host key fingerprint out of band. Keep console recovery working before restricting SSH. Back up any existing VPS data before using the target directory. Never run this profile on the home host.
-2. Set up an operator SSH account/key and a **management-only** SSH source CIDR. For the Steam Playtest, public IPv4 TCP 443 reaches Caddy; Steam ticket/entitlement checks protect online application routes. Keep management SSH restricted at both the provider and host. Verify a new SSH session before closing the current one. If locked out, recover through the provider console, not by exposing the DB or raw control ports.
+2. Set up an operator SSH account/key and a **management-only** SSH source CIDR in host UFW. For the Steam Playtest, public IPv4 TCP 443 reaches Caddy; Steam ticket/entitlement checks protect online application routes. If an OVH Edge Firewall is attached, mirror management-only SSH and public TCP 80/443 there; the `/ip/firewall` API reported **no Edge Firewall object** for `135.125.100.228/32` on 2026-09-26, so no provider rule was changed for this test. Verify a new SSH session before closing the current one. If locked out, recover through the provider console, not by exposing DB or control ports.
 
 Bootstrap (only on the verified fresh VPS, after copying these scripts there):
 
@@ -45,17 +45,17 @@ UDP 7777–7781 or private Master/database/control ports.
 If the SSH source rule locks you out, use the provider's out-of-band console,
 not the game ports: inspect `sudo ufw status numbered`, restore a rule for the
 operator's *current* source CIDR and configured SSH port, and confirm `sshd -t`
-before reloading SSH. Correct the provider firewall's management-source rule
-through its console too. Open a new key-authenticated SSH session before
-closing the recovery session. If the login key itself is rejected, use the
-console to correct the sudo operator's `authorized_keys` and file permissions;
-do not enable password/root SSH or open SSH to `0.0.0.0/0`.
+before reloading SSH. If an OVH Edge Firewall is later attached, correct its
+management-source rule through the console too. Open a new key-authenticated
+SSH session before closing the recovery session. If the login key itself is
+rejected, use the console to correct the sudo operator's `authorized_keys` and
+file permissions; do not enable password/root SSH or open SSH to `0.0.0.0/0`.
 
-3. The test DNS names `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST` point to the VPS IPv4, not the home tunnel. Keep SSH management-only and allow public IPv4 TCP 443 through the OVH provider firewall, UFW and Docker forwarding filter. Public TCP 80 serves ACME/redirect. Master uses bounded Steam tickets and per-source POST rate limits through an exact trusted proxy; any Internet source can still send anonymous requests and consume resources. Steam GameHost uses Valve relay; Compose publishes **no gameplay UDP or private TCP control port**. A source CIDR is not a Steam identity.
+3. The test DNS names `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST` point to the VPS IPv4, not the home tunnel. Keep SSH management-only and allow public IPv4 TCP 443 through host UFW and Docker forwarding. On 2026-09-26 `ovhcloud ip firewall list 135.125.100.228/32` returned no attached Edge Firewall and `get` returned 404; **do not create one merely to admit testers**. If a provider firewall is attached later, mirror the same TCP 80/443 and SSH policies there. Public TCP 80 serves ACME/redirect. Master uses bounded Steam tickets and per-source POST quotas through an exact trusted proxy; any Internet source can still send anonymous requests and consume resources. Steam GameHost uses Valve relay; Compose publishes **no gameplay UDP or private TCP control port**.
 4. Publish compatible GameServer, Master and EF migration images under one release ID via their explicit workflows. Pin image digests and both source revisions. An upload/push alone never deploys the VPS.
 5. Keep DB/JWT/registration/control credentials in private operator files. Master additionally needs `Steam__ApiKey` from the Playtest publisher; Compose pins `Auth__Mode=steam`, Playtest AppID `5325920` and identity `sloparena-playtest`. Supply the tested Valve SteamCMD `steamclient.so` separately as a read-only runtime file, pin its SHA-256 in the release record, and confirm production redistributable rights before treating this test mount as a shippable image. `game.json` keeps the provisioned host GUID, private `masterServerUrl` and control port; its `publicIp` is metadata, never a Steam identity. Store runtime files outside Git with private permissions and grant container UID 1654 read-only access to the GameHost config. Never put keys or the GameHost config in an image, client or release JSON.
 
-The release command must fail if DNS points to the home host or firewall preflight fails. Treat provider firewall validation and off-host network probing as separate operator gates: a Docker host firewall cannot prove provider rules or a friend's ISP reachability. Certificate data and PostgreSQL data persist in named volumes; make an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
+The release command must fail if DNS points to the home host or host firewall preflight fails. Check an attached provider firewall separately if one exists; the Docker host firewall cannot prove a friend's ISP reachability. Certificate and PostgreSQL data persist in named volumes; make an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
 
 ## Operator release commands
 

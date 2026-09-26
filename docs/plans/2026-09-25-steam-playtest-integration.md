@@ -134,15 +134,16 @@ new Steam web tickets during a temporary Master outage.
 Build the Playtest Windows player via the installed Unity CLI/Pipeline, upload with `scripts/steam-playtest.sh`, and deploy pinned Master/GameHost image digests and migration bundle with `deploy/vps/release.py`. The older direct-Editor `scripts/build-release.sh` is not this Steam test build. The packaged player selects the VPS Master **before** authentication, never the home host or a tester shell override. The isolated SteamCMD game-server runtime mount is checksum-pinned for this test; confirm permitted dedicated-server redistribution before production packaging. Never distribute `steam_appid.txt`, publisher credentials or a guest/UDP fallback.
 
 For friends outside one fixed IP, the operator approved public **IPv4 TCP 443**
-to the test Master through the OVH provider firewall, host UFW and
-Docker-aware Caddy forwarding policy. TCP 80 remains ACME/redirect only;
-management SSH stays CIDR-restricted, IPv6 TCP 443 remains blocked until
-reviewed, and no GameHost UDP/private Master/control/DB ports are published.
-Steam ticket/entitlement checks and per-source HTTP quotas remain in force,
-but anonymous Internet traffic and resource abuse become possible. The policy
-is not considered live until both provider and host changes and an external
-non-management-source `/ready` check succeed; never substitute a `0/0` entry
-in the old tester list (that would couple public HTTPS with obsolete UDP).
+to the test Master through host UFW and Docker-aware Caddy forwarding. TCP 80
+remains ACME/redirect only; management SSH stays CIDR-restricted at the host,
+IPv6 TCP 443 remains blocked and no GameHost UDP/private Master/control/DB
+ports are published. On 2026-09-26 the OVH `/ip/firewall` API listed no Edge
+Firewall for `135.125.100.228/32` (`get` returned 404); there was no provider
+rule to change. Steam tickets/entitlements and per-source POST quotas remain
+in force, but anonymous Internet traffic and resource abuse are possible.
+The guarded host cutover succeeded and preserved SSH and Master `/ready` for
+the original source; an off-site Windows `/ready` retry is still required
+before attributing any remaining failure to Steam auth or gameplay relay.
 
 The Steam-installed **Windows** Playtest build must also prove Steam initialization, the expected GameHost identity, authenticated relay handshake and a short packet exchange on real Windows hardware. Its compiled `steam_api64.dll` is packaging evidence only. This check moved from 2A to the 2D acceptance ticket by explicit decision; do not report it as passed from the Linux route proof.
 
