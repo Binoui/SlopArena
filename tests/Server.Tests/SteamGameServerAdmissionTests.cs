@@ -88,11 +88,18 @@ public class SteamGameServerAdmissionTests
         match.Start();
         try
         {
-            Assert.True(match.TryBindSteamPlayer(1001, 11, ContentHash, out _, out _, out _));
-            Assert.True(match.TryBindSteamPlayer(1002, 22, ContentHash, out _, out _, out _));
-            Assert.True(SpinWait.SpinUntil(() => match.HasStartedCountdown, 2000));
+            bool firstAdmitted = match.TryBindSteamPlayer(1001, 11, ContentHash, out _, out _, out byte denial);
+            Assert.True(firstAdmitted,
+                $"First admission denied: code={denial}, countdown={match.HasStartedCountdown}, running={match.IsRunning}.");
+            bool secondAdmitted = match.TryBindSteamPlayer(1002, 22, ContentHash, out _, out _, out denial);
+            Assert.True(secondAdmitted,
+                $"Second admission denied: code={denial}, countdown={match.HasStartedCountdown}, running={match.IsRunning}.");
+            Assert.True(SpinWait.SpinUntil(() => match.HasStartedCountdown, 2000),
+                $"Expected countdown, running={match.IsRunning}.");
 
-            Assert.True(match.TryBindSteamPlayer(1001, 33, ContentHash, out _, out long replaced, out _));
+            bool reconnected = match.TryBindSteamPlayer(1001, 33, ContentHash, out _, out long replaced, out denial);
+            Assert.True(reconnected,
+                $"Same-account reconnect denied: code={denial}, countdown={match.HasStartedCountdown}, running={match.IsRunning}.");
             Assert.Equal(11L, replaced);
             Assert.False(match.TryQueueSteamInput(11, 1, default));
             Assert.True(match.TryQueueSteamInput(33, 1, default));

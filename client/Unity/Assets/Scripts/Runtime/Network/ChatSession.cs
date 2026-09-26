@@ -173,8 +173,9 @@ namespace SlopArena.Client.Network
             if (_ownsSteamApi)
             {
                 SteamAPI.RunCallbacks();
-                if (_authenticatedSteamId != 0 &&
-                    (!SteamUser.BLoggedOn() || SteamUser.GetSteamID().m_SteamID != _authenticatedSteamId))
+                ulong observedSteamId = SteamUser.GetSteamID().m_SteamID;
+                if (_authenticatedSteamId != 0 && observedSteamId != 0 &&
+                    observedSteamId != _authenticatedSteamId)
                     ClearAccountSession();
             }
             if (_lobby?.HasPendingOverflow == true)
@@ -642,19 +643,23 @@ namespace SlopArena.Client.Network
             }
             if (generation != _accountGeneration)
                 return false;
-            if (!_developmentGuest && authenticated &&
-                 (!SteamUser.BLoggedOn() ||
-                  _masterClient?.SteamId != (long)SteamUser.GetSteamID().m_SteamID))
+            if (!_developmentGuest && authenticated)
             {
-                ClearAccountSession();
-                return false;
+                ulong verifiedSteamId = (ulong)(_masterClient?.SteamId ?? 0);
+                ulong observedSteamId = SteamUser.GetSteamID().m_SteamID;
+                if ((_authenticatedSteamId != 0 && verifiedSteamId != _authenticatedSteamId) ||
+                    (observedSteamId != 0 && observedSteamId != verifiedSteamId))
+                {
+                    ClearAccountSession();
+                    return false;
+                }
             }
             if (!authenticated)
             {
                 SetStatus("Could not authenticate with Master. Local play remains available.");
                 return false;
             }
-            _authenticatedSteamId = _developmentGuest ? 0 : SteamUser.GetSteamID().m_SteamID;
+            _authenticatedSteamId = _developmentGuest ? 0 : (ulong)(_masterClient?.SteamId ?? 0);
             ClientSession.AuthToken = _masterClient.Token;
             ClientSession.SteamId = _masterClient.SteamId ?? 0;
             return true;

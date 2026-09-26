@@ -1,6 +1,6 @@
 # Steam Playtest identity and gameplay on the VPS
 
-**Status:** 2A transport feasibility accepted on 2026-09-25. The coordinated 2B Steam session and 2C Master/GameHost/Unity match routing code are implemented **locally**, with isolated Shared/Server/Master tests and Unity compile/Editor startup checks. Neither phase has live two-account Playtest gameplay, a PostgreSQL migration run, a compatible VPS deployment, or a packaged Steam PvP match as acceptance evidence. Steam-installed Windows and install-to-rematch remain 2D release checks, not blockers for local 2C coding. This is the cross-repository contract for SlopArena and [SlopArena-MasterServer](https://github.com/Binoui/SlopArena-MasterServer); the [playable friends demo reset](2026-09-05-playable-demo-reset.md) remains the product target.
+**Status:** 2A relay feasibility accepted. Playtest BuildID `25546025` was uploaded and the operator reported adding it to a private branch; the compatible Master/GameHost images and both schema migrations were deployed to the VPS test stack in release `steam-2c-proton-20260926`. Master `/ready` returned 200; invalid ticket/anonymous browser/guest were denied. A real Steam-installed login, two-account match and Proton join-to-rematch have **not** been observed. Stability corrections for match connection age, transient Steam backend loss and hub JWT expiry are local pending verified hotfix rollout. The [playable friends demo reset](2026-09-05-playable-demo-reset.md) remains the product target.
 
 ## Outcome and ownership
 
@@ -54,7 +54,7 @@ Keep compatible `InputState`/state/event codecs and the existing `NetworkClient`
 
 Implement the authentication interface in both repositories, keeping one persistent chat/lobby session owner and a deliberately separate local/development path. Test stable same-account identity across launches, distinct accounts, account switch, display-name preservation, global/server/direct chat, invalid/reused/wrong-app tickets, missing entitlement, publisher/API outage, expired token, guest JWT rejection on REST/SignalR/refresh and fresh-ticket hourly renewal. Existing active matches do not depend on a successful renewal during a brief outage.
 
-**2B implementation contract (local, not deployed):** `POST /auth/steam` accepts JSON
+**2B runtime contract (VPS test deployed; real Playtest login pending):** `POST /auth/steam` accepts JSON
 `{"ticket":"<hex>"}`; `POST /auth/refresh` accepts the same payload with the
 current bearer JWT. Both return `{token,steamId,expiresAt}` with numeric, lossless
 SteamID in the existing client DTO. Unity requests each ticket via
@@ -62,9 +62,9 @@ SteamID in the existing client DTO. Unity requests each ticket via
 ticket valid through the Master response and cancels it afterward. Development
 guests can renew without a ticket only if the Master explicitly enables them;
 public Steam sessions never use guest issuance or renewal. The packaged client
-selects `https://sloparena.barakaslurp.fr` before startup; Editor-only overrides
-and guest opt-in do not ship as public fallbacks. This is an implementation
-contract, **not** two-account/Steam-installed acceptance or deployment evidence.
+selects `https://master-test.sloparena.barakaslurp.fr` before startup; Editor-only
+overrides and guest opt-in do not ship as public fallbacks. Package/Editor
+verification is not two-account Steam-installed acceptance.
 
 Master requires explicit `Auth:Mode=steam`, publisher `Steam:ApiKey`, verified
 Playtest `Steam:AppId`, and `Steam:Identity=sloparena-playtest`; in
@@ -73,9 +73,18 @@ JWT provider claims reject guest and legacy providerless tokens in Steam mode
 on REST and SignalR. One-hour Steam renewal rechecks the same verified account
 and current ownership; consumed ticket hashes persist in a new DB table with
 a unique key. Run the `AddSteamAuthIdentity` migration before a Master cutover.
-The pinned AppID candidate `5325920` is **not** an asserted live Master
-configuration. Neither credentials nor migration nor service cutover were
-applied by the local implementation.
+The VPS test release pins Playtest AppID `5325920`; the operator reported
+setting the private publisher key and applying both migrations. Valid-ticket
+ownership and same-account renewal still require a Steam-launched client run.
+
+Treat `SteamUser.BLoggedOn() == false` as backend unavailability, **not** proof
+of account switch. Only a different nonzero observed SteamID or a freshly
+verified different account clears the existing match/session. Ticket renewal
+may fail during an outage and chat ends at JWT expiry; already admitted
+GameHost gameplay continues while its Steam connection remains healthy.
+Master closes WebSocket hub connections at token expiry; the existing
+LobbyClient reconnects with the current renewed JWT and revalidates remembered
+Server Chat/waiting-roster membership without a new gameplay admission.
 
 ### 2C — Steam match routing and admission
 
@@ -122,11 +131,19 @@ new Steam web tickets during a temporary Master outage.
 
 ### 2D — Packaged Playtest and cutover
 
-Reuse `scripts/build-release.sh`, `scripts/steam-playtest.sh` and the pinned VPS release workflow. A packaged Steam player selects the intended VPS Master **before** authentication, never a home/Alfred default or tester shell override; development endpoint overrides stay separate. Bundle permitted native libraries and version metadata; omit developer-only `steam_appid.txt` from the distributed client. Get separate operator approval for any dependency installation, Playtest upload/branch activation, live ingress change and VPS deployment.
+Build the Playtest Windows player via the installed Unity CLI/Pipeline, upload with `scripts/steam-playtest.sh`, and deploy pinned Master/GameHost image digests and migration bundle with `deploy/vps/release.py`. The older direct-Editor `scripts/build-release.sh` is not this Steam test build. The packaged player selects the VPS Master **before** authentication, never the home host or a tester shell override. The isolated SteamCMD game-server runtime mount is checksum-pinned for this test; confirm permitted dedicated-server redistribution before production packaging. Never distribute `steam_appid.txt`, publisher credentials or a guest/UDP fallback.
 
 The Steam-installed **Windows** Playtest build must also prove Steam initialization, the expected GameHost identity, authenticated relay handshake and a short packet exchange on real Windows hardware. Its compiled `steam_api64.dll` is packaging evidence only. This check moved from 2A to the 2D acceptance ticket by explicit decision; do not report it as passed from the Linux route proof.
 
 Run two real Steam accounts on packaged clients: install/launch → verified login → chat → browse/join → select fighter/stage → authoritative match → results → lobby → rematch. Check Steam unavailable at login, Master/Steam API outage during an existing match, non-rostered or stale join, account switching, duplicate connection, content/protocol mismatch, brief disconnect, GameHost restart and an abandoned waiting match. Record Playtest AppID/build IDs, client/server revisions, image digests, route/RTT, match/abort outcomes and remaining limitations. No production raw-UDP/guest fallback; exercise maintenance/roll-forward rather than treating a legacy public rollback as safe. Keep [Phase 1 live acceptance #234](https://github.com/Binoui/SlopArena/issues/234) open for its independent pending packaged-client, ingress and recovery gates; Phase 2 does not retroactively pass them.
+
+Keep an admitted match active for at least 90 seconds with healthy state
+traffic; no elapsed-connection-age timer may force a 30-second reconnect.
+Stalled initial Steam connection and missing reliable join ACK must still
+fail within their separate 30-second and 15-second deadlines. Simulate a
+Steam backend outage separately from a confirmed account switch, and expire
+a short-lived open WebSocket separately from gameplay to verify fresh-token
+chat reconnection.
 
 ## Implementation tickets
 
@@ -144,4 +161,4 @@ Run two real Steam accounts on packaged clients: install/launch → verified log
 - [Valve SDR/dedicated-server routing](https://partner.steamgames.com/doc/features/multiplayer/steamdatagramrelay), [SteamNetworkingSockets](https://partner.steamgames.com/doc/api/ISteamNetworkingSockets), [backend authentication/ownership](https://partner.steamgames.com/doc/features/auth), [Steam Playtest](https://partner.steamgames.com/doc/features/playtest), [Steamworks.NET](https://steamworks.github.io/).
 - [`scripts/steam-playtest.sh`](../../scripts/steam-playtest.sh) names the candidate Playtest AppID/depot; verify against operator-owned Steamworks settings.
 - [`ChatSession`](../../client/Unity/Assets/Scripts/Runtime/Network/ChatSession.cs) and [`MasterServerClient`](../../src/Shared/MasterServerClient.cs) own one Steam-backed application session with an explicit Editor guest path. [`NetworkClient`](../../client/Unity/Assets/Scripts/Runtime/Network/NetworkClient.cs) uses Steam P2P for packaged PvP and keeps raw UDP only behind the Editor development opt-in; [`MatchControlServer`](../../src/Server/MatchControlServer.cs), [`MultiMatchOrchestrator`](../../src/Server/MultiMatchOrchestrator.cs), and [`MatchInstance`](../../src/Server/MatchInstance.cs) own authoritative match control, allocation and Steam input routing.
-- Master pre-creates a match row before `POST /match/start`, pins its roster and catalog digest, and uses a private match-control credential (`Program.cs`, `Lobbies/HttpMatchLauncher.cs` in the separate repository). The compatible Steam admission/descriptor code is local-only; release and live acceptance remain pending.
+- Master pre-creates a match row before `POST /match/start`, pins its roster and catalog digest, and uses a private match-control credential (`Program.cs`, `Lobbies/HttpMatchLauncher.cs` in the separate repository). The Steam admission/descriptor code is deployed to the test VPS, not yet accepted from a Steam-installed two-account match.

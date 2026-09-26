@@ -18,7 +18,8 @@ public class MatchControlSecurityTests
         var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
         reservation.Stop();
         var config = new ServerConfig { Port = port, MaxConcurrentMatches = 1 };
-        ArenaRegistry.LoadFromDirectory(Path.GetFullPath("data/arenas"));
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+        ArenaRegistry.LoadFromDirectory(Path.Combine(root, "data/arenas"));
         var orchestrator = new MultiMatchOrchestrator(config);
         using var control = new MatchControlServer(orchestrator, port, "slop_court", "control-secret-0123456789abcdef01234567");
         control.Start();

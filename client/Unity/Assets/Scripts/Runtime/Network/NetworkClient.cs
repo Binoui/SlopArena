@@ -415,11 +415,6 @@ namespace SlopArena.Client.Network
 
             if (_hasSteamConnection)
             {
-                if (ElapsedSeconds(_steamAttemptStartedAt, now) >= SteamConnectionTimeoutSeconds)
-                {
-                    HandleSteamConnectionLoss("Steam match connection timed out.");
-                    return;
-                }
                 if (!SteamNetworkingSockets.GetConnectionInfo(_steamConnection, out var info))
                 {
                     HandleSteamConnectionLoss("Steam connection information is unavailable.");
@@ -435,6 +430,8 @@ namespace SlopArena.Client.Network
                 {
                     if (_steamAdmitted)
                         HandleSteamConnectionLoss("Steam match connection is no longer connected.");
+                    else if (ElapsedSeconds(_steamAttemptStartedAt, now) >= SteamConnectionTimeoutSeconds)
+                        HandleSteamConnectionLoss("Steam match connection establishment timed out.");
                     return;
                 }
 
