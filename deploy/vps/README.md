@@ -84,9 +84,11 @@ sudo python3 deploy/vps/release.py rollback \
 No command targets the home host. The deployment lock serializes changes;
 image/digest/label, DNS and Compose checks precede writer disruption. Schema
 changes stop writers, require a successful `pg_dump` before running the pinned
-EF bundle, then check the applied migration. Incompatible rollback aborts
-without replacing the database or certificate volumes. Inspect saved event
-history, previous logs and database backup before retrying a failed migration.
+EF bundle, then check the applied migration. The old guest/raw-UDP release
+record stays readable for preflight, but **cannot** be automatically restored
+through Steam-only Compose even if migration fails: pause new matches and
+repair/roll forward instead of reviving an insecure public fallback. Inspect
+saved event history, previous logs and the database backup before retrying.
 
 ## Disposable two-pair rehearsal
 

@@ -106,7 +106,7 @@ services:
     stop_grace_period: 15s
     volumes:
       - ${GAME_CONFIG_FILE:?set the private GameServer config file}:/run/config/server.json:ro
-      - ${STEAMCLIENT_FILE:?set the pinned, private SteamCMD game-server runtime file}:/app/steamclient.so:ro
+      - ${STEAMCLIENT_FILE:-/etc/sloparena/private/steamclient.so}:/app/steamclient.so:ro
     command: ["/run/config/server.json"]
     environment:
       SteamAppId: "5325920"

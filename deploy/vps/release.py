@@ -124,7 +124,7 @@ def external_file(value: Any, name: str) -> str:
     return str(resolved)
 
 
-def validate_manifest(value: Any, allow_localhost: bool = False) -> dict[str, Any]:
+def validate_manifest(value: Any, allow_localhost: bool = False, allow_legacy_runtime: bool = False) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"release_id", "source_revisions", "images", "schema", "runtime"}:
         raise ReleaseError("release JSON must contain exactly release_id, source_revisions, images, schema, runtime")
 
@@ -169,8 +169,11 @@ def validate_manifest(value: Any, allow_localhost: bool = False) -> dict[str, An
         "master_env_file", "migration_env_file", "game_config_file", "postgres_password_file",
         "steamclient_file", "steamclient_sha256",
     }
-    if not isinstance(runtime, dict) or set(runtime) != required_runtime:
-        raise ReleaseError("runtime must specify VPS hosts, five private files and the pinned Steam runtime checksum")
+    legacy_runtime = required_runtime - {"steamclient_file", "steamclient_sha256"}
+    if not isinstance(runtime, dict) or (
+        set(runtime) != required_runtime and not (allow_legacy_runtime and set(runtime) == legacy_runtime)
+    ):
+        raise ReleaseError("runtime must specify VPS hosts, private files and a pinned Steam game-server runtime")
     try:
         runtime["public_ipv4"] = str(ipaddress.IPv4Address(runtime["public_ipv4"]))
     except (ipaddress.AddressValueError, TypeError) as exc:
@@ -184,23 +187,25 @@ def validate_manifest(value: Any, allow_localhost: bool = False) -> dict[str, An
     if runtime["master_test_host"] == runtime["gameplay_test_host"]:
         raise ReleaseError("Master and gameplay test hostnames must be distinct")
     for key in ("master_env_file", "migration_env_file", "game_config_file",
-                "postgres_password_file", "steamclient_file"):
+                "postgres_password_file"):
         runtime[key] = external_file(runtime[key], key)
-    if Path(runtime["master_env_file"]).stat().st_mode & 0o077:
-        raise ReleaseError("private Master environment file must not be group/world-accessible")
-    if not isinstance(runtime["steamclient_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", runtime["steamclient_sha256"]):
-        raise ReleaseError("runtime.steamclient_sha256 must be a lowercase SHA-256 digest")
-    digest = hashlib.sha256()
-    with Path(runtime["steamclient_file"]).open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    if digest.hexdigest() != runtime["steamclient_sha256"]:
-        raise ReleaseError("pinned Steam game-server runtime checksum does not match")
-    master_env = Path(runtime["master_env_file"]).read_text(encoding="utf-8")
-    publisher_keys = [line.partition("=")[2].strip().strip('\"')
-                      for line in master_env.splitlines() if line.startswith("Steam__ApiKey=")]
-    if len(publisher_keys) != 1 or not publisher_keys[0]:
-        raise ReleaseError("private Master environment must configure Steam__ApiKey")
+    if set(runtime) == required_runtime:
+        runtime["steamclient_file"] = external_file(runtime["steamclient_file"], "steamclient_file")
+        if Path(runtime["master_env_file"]).stat().st_mode & 0o077:
+            raise ReleaseError("private Master environment file must not be group/world-accessible")
+        if not isinstance(runtime["steamclient_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", runtime["steamclient_sha256"]):
+            raise ReleaseError("runtime.steamclient_sha256 must be a lowercase SHA-256 digest")
+        digest = hashlib.sha256()
+        with Path(runtime["steamclient_file"]).open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        if digest.hexdigest() != runtime["steamclient_sha256"]:
+            raise ReleaseError("pinned Steam game-server runtime checksum does not match")
+        master_env = Path(runtime["master_env_file"]).read_text(encoding="utf-8")
+        publisher_keys = [line.partition("=")[2].strip().strip('\"')
+                          for line in master_env.splitlines() if line.startswith("Steam__ApiKey=")]
+        if len(publisher_keys) != 1 or not publisher_keys[0]:
+            raise ReleaseError("private Master environment must configure Steam__ApiKey")
 
     # EF migration bundles for Master are built from the same source revision.
     return value
@@ -549,7 +554,7 @@ def active_manifest(target: Path, allow_localhost: bool = False) -> dict[str, An
     path = target / "releases" / f"{release}.json"
     if not path.is_file():
         raise ReleaseError(f"active release record is missing: {path}")
-    manifest = validate_manifest(parse_json(path), allow_localhost)
+    manifest = validate_manifest(parse_json(path), allow_localhost, allow_legacy_runtime=True)
     if manifest["release_id"] != release:
         raise ReleaseError("active.json and saved release manifest disagree")
     return manifest
@@ -740,6 +745,9 @@ def restore_previous(event: dict[str, Any], target: Path, previous: dict[str, An
     if previous is None or previous_env is None or not schema_compatible(previous, current_schema):
         event["recovery"] = "not attempted: no prior release or prior release is not compatible with the observed database schema"
         return
+    if "steamclient_file" not in previous["runtime"]:
+        event["recovery"] = "not attempted: legacy guest/UDP release cannot serve Steam-only Playtest clients"
+        return
     event["stage"] = "restore_previous_release"
     atomic_write(target / "release.env", previous_env)
     compose_action(event, target, target / "release.env", override, env, "restore_previous_services", ["up", "-d", "caddy", "master", "game"])
@@ -817,7 +825,10 @@ def rollback(event: dict[str, Any], args: argparse.Namespace, target: Path, env:
     path = target / "releases" / f"{release}.json"
     if not path.is_file():
         raise ReleaseError(f"no recorded release {release!r} exists in {target / 'releases'}")
-    manifest = validate_manifest(parse_json(path), args.allow_disposable_host)
+    recorded = parse_json(path)
+    if "steamclient_file" not in recorded.get("runtime", {}):
+        raise ReleaseError("Steam-only Compose cannot roll back to a legacy raw-UDP release; restore the database through an explicit recovery procedure")
+    manifest = validate_manifest(recorded, args.allow_disposable_host)
     validate_dns(event, manifest, args.allow_disposable_host)
     previous = active_manifest(target, args.allow_disposable_host)
     ensure_postgres_password_path(previous, manifest)

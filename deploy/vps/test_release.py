@@ -85,6 +85,34 @@ class SteamRuntimeManifestTests(unittest.TestCase):
                 release.validate_manifest(manifest)
 
 
+    def test_legacy_active_record_is_readable_but_cannot_be_new_release_or_rollback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            manifest = json.loads(Path(__file__).with_name("release.example.json").read_text())
+            manifest["release_id"] = "legacy-udp"
+            manifest["runtime"].pop("steamclient_file")
+            manifest["runtime"].pop("steamclient_sha256")
+            for key in ("master_env_file", "migration_env_file", "game_config_file", "postgres_password_file"):
+                path = target / key
+                path.write_text("legacy-test\n")
+                manifest["runtime"][key] = str(path)
+            releases = target / "releases"
+            releases.mkdir()
+            (releases / "legacy-udp.json").write_text(json.dumps(manifest))
+            (target / "active.json").write_text(json.dumps({"release_id": "legacy-udp"}))
+            self.assertEqual("legacy-udp", release.active_manifest(target)["release_id"])
+            with self.assertRaises(release.ReleaseError):
+                release.validate_manifest(manifest)
+            args = SimpleNamespace(release_id="legacy-udp", allow_disposable_host=False)
+            with self.assertRaisesRegex(release.ReleaseError, "legacy raw-UDP release"):
+                release.rollback({}, args, target, {})
+            event = {}
+            release.restore_previous(event, target, release.active_manifest(target), b"old-env",
+                                     manifest["schema"]["target_migration"], None, {})
+            self.assertIn("legacy guest/UDP", event["recovery"])
+            self.assertFalse((target / "release.env").exists())
+
+
 class BackupRetentionTests(unittest.TestCase):
     def test_backup_keeps_newest_three_daily_pairs_and_ignores_pre_migration_files(self):
         with tempfile.TemporaryDirectory() as tmp:
