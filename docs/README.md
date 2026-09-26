@@ -7,7 +7,7 @@ Canonical guidance is short and linked below. Dated plans, research, generated r
 Read these in order:
 
 1. [Playable friends demo reset](plans/2026-09-05-playable-demo-reset.md)
-2. [Steam Playtest identity and gameplay on the VPS](plans/2026-09-25-steam-playtest-integration.md) — 2A accepted; 2B/2C deployed to the test VPS, Proton/two-account acceptance pending and stability hotfix local.
+2. [Steam Playtest identity and gameplay on the VPS](plans/2026-09-25-steam-playtest-integration.md) — 2B/2C and the stability hotfix deployed to the test VPS; Proton/two-account acceptance pending.
 3. [Architecture overview](architecture-overview.md)
 4. [Testing and verification](testing.md)
 5. [Contributing](../CONTRIBUTING.md)

@@ -1,6 +1,6 @@
 # Steam Playtest identity and gameplay on the VPS
 
-**Status:** 2A relay feasibility accepted. Playtest BuildID `25546025` was uploaded and the operator reported adding it to a private branch; the compatible Master/GameHost images and both schema migrations were deployed to the VPS test stack in release `steam-2c-proton-20260926`. Master `/ready` returned 200; invalid ticket/anonymous browser/guest were denied. A real Steam-installed login, two-account match and Proton join-to-rematch have **not** been observed. Stability corrections for match connection age, transient Steam backend loss and hub JWT expiry are local pending verified hotfix rollout. The [playable friends demo reset](2026-09-05-playable-demo-reset.md) remains the product target.
+**Status:** 2A relay feasibility accepted. Playtest BuildID `25546025` was the initial test candidate; stability hotfix BuildID `25547241` is uploaded but awaits private-branch activation. Master/GameHost release `steam-2c-proton-20260926-hf1` was deployed on the VPS test stack at schema `20260926000000_AddSteamMatchRouting` (operator event `c083833dee19473eba88978896b130ba`). Master `/ready` returned 200; invalid ticket, anonymous hub and guest were denied. A real Steam-installed login, 90-second admitted match, Steam-backend outage/account switch and two-account join-to-rematch have **not** been observed. The [playable friends demo reset](2026-09-05-playable-demo-reset.md) remains the product target.
 
 ## Outcome and ownership
 
