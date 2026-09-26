@@ -51,9 +51,9 @@ closing the recovery session. If the login key itself is rejected, use the
 console to correct the sudo operator's `authorized_keys` and file permissions;
 do not enable password/root SSH or open SSH to `0.0.0.0/0`.
 
-3. Have the operator create two **new** public DNS A records, `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST`, pointing to the VPS IPv4, not the home tunnel. If no IPv6 policy is deployed, do **not** add AAAA records. Check both names from an external resolver before ACME issuance. Configure the provider firewall: port 80/tcp to the VPS for ACME HTTP challenge/HTTPS redirect; 443/tcp and 7777–7781/udp only from tester CIDRs; SSH only from management CIDRs; deny all other inbound traffic including IPv6. Verify the provider rules independently of the Docker host rules.
-4. Publish one GameServer image and one Master + EF migration image under one release ID via the explicit publication workflows. Record immutable registry image digests and both source revisions. Publication must never deploy a push to `main`. Keep this release record and any secrets outside Git and outside the images.
-5. Create private operator-owned runtime files from `../local/master.env.example`, `../local/migration.env.example`, and `../local/game.json.example`, with new independent DB/JWT/registration/control credentials. The migration environment contains only the DB connection string; the Master and GameServer share only the approved host identity/registration/control credentials. Set the GameServer `publicIp` to the new gameplay test DNS, Master `ApprovedHost__PublicHost` to the same value, and `masterServerUrl` to `http://master:8080`. Keep runtime files at mode 600 in a mode-700 private directory; permit container UID 1654 read-only access to the GameServer JSON with an ACL. Never put secrets in a release JSON, Compose command line, shell history, client, registry image, or tracked config.
+3. The test DNS names `MASTER_TEST_HOST` and `GAMEPLAY_TEST_HOST` point to the VPS IPv4, not the home tunnel. Keep SSH restricted to management CIDRs and HTTPS 443 to tester CIDRs; port 80 serves ACME/redirect. The Steam GameHost listens through Valve relay and Compose publishes **no UDP or private TCP gameplay/control ports**. Existing restricted UDP firewall rules are historical and should be removed separately after the no-listener cutover; do not open new ingress for this release.
+4. Publish compatible GameServer, Master and EF migration images under one release ID via their explicit workflows. Pin image digests and both source revisions. An upload/push alone never deploys the VPS.
+5. Keep DB/JWT/registration/control credentials in private operator files. Master additionally needs `Steam__ApiKey` from the Playtest publisher; Compose pins `Auth__Mode=steam`, Playtest AppID `5325920` and identity `sloparena-playtest`. Supply the tested Valve SteamCMD `steamclient.so` separately as a read-only runtime file, pin its SHA-256 in the release record, and confirm production redistributable rights before treating this test mount as a shippable image. `game.json` keeps the provisioned host GUID, private `masterServerUrl` and control port; its `publicIp` is metadata, never a Steam identity. Store runtime files outside Git with private permissions and grant container UID 1654 read-only access to the GameHost config. Never put keys or the GameHost config in an image, client or release JSON.
 
 The release command must fail if DNS points to the home host or firewall preflight fails. Treat provider firewall validation and off-host network probing as separate operator gates: a Docker host firewall cannot prove provider rules or a friend's ISP reachability. Certificate data and PostgreSQL data persist in named volumes; make an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
 
@@ -61,16 +61,15 @@ The release command must fail if DNS points to the home host or firewall preflig
 
 The script runs **on the selected VPS itself**, not through an SSH default.
 Create a release JSON from `release.example.json` in an operator-owned
-directory outside Git. Fill the exact published `repository@sha256:<digest>`
-references from the GameServer and Master workflow artifacts, both source
-revisions, their shared `release_id`, the actual EF migration target and
-compatibility list, two new test DNS names and the VPS public IPv4 (set
-`public_ipv4_is_provider_nat` only for verified provider 1:1 NAT), and absolute
-paths to the private runtime files. Do not substitute local Docker image IDs,
-tags, or a home endpoint. Keep each release JSON; the CLI saves a copy in the
-private target state directory. Run as the sudo operator to access Docker and
-write the state/backup directory; do not grant Docker-group access merely to
-avoid `sudo`. The installed bootstrap firewall helper must be executable.
+directory outside Git. Fill exact published `repository@sha256:<digest>`
+references for GameHost, Master and migrations, their two source revisions,
+shared `release_id`, target/compatible EF migrations, two test DNS names,
+VPS IPv4, five absolute private runtime file paths (including the
+SteamCMD `steamclient.so`), and its independently verified SHA-256. Do not
+substitute local Docker image IDs, tags or a home endpoint. Keep each release
+record; the CLI saves a copy under the private target. Run as the sudo
+operator to access Docker and make the database backup. The installed
+firewall helper must be executable.
 
 ```bash
 sudo python3 deploy/vps/release.py deploy \
@@ -105,10 +104,10 @@ services:
     ports: !override
       - "127.0.0.1:18080:80/tcp"
       - "127.0.0.1:18443:443/tcp"
-  game:
-    ports: !override
-      - "127.0.0.1:17777-17781:7777-7781/udp"
 ```
+
+The disposable override changes only Caddy's public ports. Steam gameplay
+has no host UDP port even in the rehearsal.
 
 With that override saved as `<loopback.yaml>` and an explicit executable
 firewall fixture `<fixture>` for the disposable host, execute the *same*
@@ -130,12 +129,12 @@ python3 deploy/vps/release.py rollback --target-dir <absolute-disposable-state> 
 ```
 
 These flags deliberately do **not** validate registry publication, host
-firewall, public DNS or the provider firewall. Never use them for live release.
-Only `caddy` and gameplay UDP bind loopback in the disposable override; the
-Master, database and TCP control remain unbound. Inspect the active release,
-`schema.json`, history, SHA-256 backup and `docker compose ps` after each
-step. Keep or explicitly clean up the disposable volumes separately; never
-apply `down -v` to a production target.
+firewall, public DNS or the provider firewall. Never use them for a live
+release. Only Caddy binds loopback in the disposable override; Master,
+PostgreSQL and private GameHost control remain unbound. Inspect the active
+release, schema, backup/checksum and Compose status after each step. Keep
+or explicitly clean up disposable volumes separately; never apply `down -v`
+to production state.
 
 ### Observed isolated rehearsal (2026-09-25)
 

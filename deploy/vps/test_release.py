@@ -1,3 +1,5 @@
+import hashlib
+import json
 import tempfile
 import unittest
 from datetime import datetime as DateTime, timezone
@@ -23,39 +25,64 @@ class PublishedPortsTests(unittest.TestCase):
         return {
             "services": {
                 "caddy": {"ports": [port("0.0.0.0", 80, 80, "tcp"), port("0.0.0.0", 443, 443, "tcp")]},
-                "game": {"ports": [port("0.0.0.0", number, number, "udp") for number in range(7777, 7782)]},
+                "game": {},
                 "master": {},
                 "postgres": {},
                 "migrate": {},
             }
         }
 
-    def test_public_profile_admits_only_https_and_five_gameplay_ports(self):
+    def test_public_profile_admits_only_https_without_gameplay_ports(self):
         release.check_published_ports(self.config(), disposable=False)
 
-    def test_raw_master_and_extra_gameplay_port_block_release(self):
+    def test_raw_master_or_any_gameplay_port_blocks_release(self):
         config = self.config()
         config["services"]["master"]["ports"] = [{"published": "8080", "target": 8080, "protocol": "tcp"}]
         with self.assertRaises(release.ReleaseError):
             release.check_published_ports(config, disposable=False)
 
         config = self.config()
-        config["services"]["game"]["ports"].append(
-            {"host_ip": "0.0.0.0", "published": "7777", "target": 7777, "protocol": "tcp"}
-        )
+        config["services"]["game"]["ports"] = [
+            {"host_ip": "0.0.0.0", "published": "7777", "target": 7777, "protocol": "udp"}
+        ]
         with self.assertRaises(release.ReleaseError):
             release.check_published_ports(config, disposable=False)
 
     def test_disposable_profile_rejects_public_binding(self):
         config = self.config()
-        for service in ("caddy", "game"):
-            for binding in config["services"][service]["ports"]:
-                binding["host_ip"] = "127.0.0.1"
-                binding["published"] = str(int(binding["published"]) + (18000 if service == "caddy" else 10000))
+        for binding in config["services"]["caddy"]["ports"]:
+            binding["host_ip"] = "127.0.0.1"
+            binding["published"] = str(int(binding["published"]) + 18000)
         release.check_published_ports(config, disposable=True)
         config["services"]["caddy"]["ports"][1]["host_ip"] = "0.0.0.0"
         with self.assertRaises(release.ReleaseError):
             release.check_published_ports(config, disposable=True)
+
+
+class SteamRuntimeManifestTests(unittest.TestCase):
+    def test_runtime_checksum_and_private_publisher_key_gate_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            private = Path(tmp)
+            manifest = json.loads(Path(__file__).with_name("release.example.json").read_text())
+            runtime = manifest["runtime"]
+            for key in ("master_env_file", "migration_env_file", "game_config_file",
+                        "postgres_password_file", "steamclient_file"):
+                path = private / key
+                path.write_bytes(b"test-runtime")
+                runtime[key] = str(path)
+            (private / "master_env_file").write_text("Steam__ApiKey=test-publisher-key\n")
+            (private / "master_env_file").chmod(0o600)
+            digest = hashlib.sha256(b"test-runtime").hexdigest()
+            runtime["steamclient_sha256"] = digest
+            self.assertEqual(digest, release.validate_manifest(manifest)["runtime"]["steamclient_sha256"])
+
+            runtime["steamclient_sha256"] = "0" * 64
+            with self.assertRaisesRegex(release.ReleaseError, "checksum"):
+                release.validate_manifest(manifest)
+            runtime["steamclient_sha256"] = digest
+            (private / "master_env_file").write_text("Jwt__Secret=test-only\n")
+            with self.assertRaisesRegex(release.ReleaseError, "Steam__ApiKey"):
+                release.validate_manifest(manifest)
 
 
 class BackupRetentionTests(unittest.TestCase):

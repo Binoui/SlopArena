@@ -167,9 +167,10 @@ def validate_manifest(value: Any, allow_localhost: bool = False) -> dict[str, An
     required_runtime = {
         "public_ipv4", "public_ipv4_is_provider_nat", "master_test_host", "gameplay_test_host",
         "master_env_file", "migration_env_file", "game_config_file", "postgres_password_file",
+        "steamclient_file", "steamclient_sha256",
     }
     if not isinstance(runtime, dict) or set(runtime) != required_runtime:
-        raise ReleaseError("runtime must specify VPS IPv4/NAT mode, two test hosts and four operator-owned file paths")
+        raise ReleaseError("runtime must specify VPS hosts, five private files and the pinned Steam runtime checksum")
     try:
         runtime["public_ipv4"] = str(ipaddress.IPv4Address(runtime["public_ipv4"]))
     except (ipaddress.AddressValueError, TypeError) as exc:
@@ -182,8 +183,24 @@ def validate_manifest(value: Any, allow_localhost: bool = False) -> dict[str, An
             raise ReleaseError(f"runtime.{key} must be a distinct public DNS hostname")
     if runtime["master_test_host"] == runtime["gameplay_test_host"]:
         raise ReleaseError("Master and gameplay test hostnames must be distinct")
-    for key in required_runtime - {"public_ipv4", "public_ipv4_is_provider_nat", "master_test_host", "gameplay_test_host"}:
+    for key in ("master_env_file", "migration_env_file", "game_config_file",
+                "postgres_password_file", "steamclient_file"):
         runtime[key] = external_file(runtime[key], key)
+    if Path(runtime["master_env_file"]).stat().st_mode & 0o077:
+        raise ReleaseError("private Master environment file must not be group/world-accessible")
+    if not isinstance(runtime["steamclient_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", runtime["steamclient_sha256"]):
+        raise ReleaseError("runtime.steamclient_sha256 must be a lowercase SHA-256 digest")
+    digest = hashlib.sha256()
+    with Path(runtime["steamclient_file"]).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    if digest.hexdigest() != runtime["steamclient_sha256"]:
+        raise ReleaseError("pinned Steam game-server runtime checksum does not match")
+    master_env = Path(runtime["master_env_file"]).read_text(encoding="utf-8")
+    publisher_keys = [line.partition("=")[2].strip().strip('\"')
+                      for line in master_env.splitlines() if line.startswith("Steam__ApiKey=")]
+    if len(publisher_keys) != 1 or not publisher_keys[0]:
+        raise ReleaseError("private Master environment must configure Steam__ApiKey")
 
     # EF migration bundles for Master are built from the same source revision.
     return value
@@ -356,6 +373,7 @@ def release_env(manifest: dict[str, Any]) -> bytes:
         "MIGRATION_ENV_FILE": manifest["runtime"]["migration_env_file"],
         "GAME_CONFIG_FILE": manifest["runtime"]["game_config_file"],
         "POSTGRES_PASSWORD_FILE": manifest["runtime"]["postgres_password_file"],
+        "STEAMCLIENT_FILE": manifest["runtime"]["steamclient_file"],
     }
     return "".join(f"{name}={env_value(value)}\n" for name, value in values.items()).encode()
 
@@ -431,9 +449,8 @@ def check_published_ports(config: dict[str, Any], disposable: bool) -> None:
     web = sorted(normalized_ports(services["caddy"]))
     game = sorted(normalized_ports(services["game"]))
     expected_web = sorted([(bind, (18080, 18080), (80, 80), "tcp"), (bind, (18443, 18443), (443, 443), "tcp")]) if disposable else sorted([(bind, (80, 80), (80, 80), "tcp"), (bind, (443, 443), (443, 443), "tcp")])
-    expected_game = [(bind, (port + (10000 if disposable else 0),) * 2, (port,) * 2, "udp") for port in range(7777, 7782)]
-    if web != expected_web or game != expected_game:
-        target = "loopback disposable ports" if disposable else "published 80/443 TCP and 7777-7781 UDP ports"
+    if web != expected_web or game:
+        target = "loopback HTTPS-only ports" if disposable else "published 80/443 TCP with no gameplay ports"
         raise ReleaseError(f"Compose must expose only the exact {target}")
     unexpected = [name for name, service in services.items() if name not in {"caddy", "game", "master", "postgres"} and service.get("ports")]
     if unexpected:

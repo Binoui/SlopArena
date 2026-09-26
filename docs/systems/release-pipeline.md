@@ -95,22 +95,25 @@ docker build --platform linux/amd64 -f Dockerfile.gameserver \
 scripts/smoke-gameserver-image.sh sloparena-gameserver:local-test
 ```
 
-The VPS GameServer starts with an operator-owned, read-only `server.json` at
-an absolute path supplied as the container argument. Its
-`deploymentProfile` must be `"vps"`; a missing file/profile is fatal.
-Set `hostId` to the Master-provisioned `ApprovedHost:Id`, `publicIp` to
-the approved gameplay DNS, `port` to its approved UDP base port,
-`maxConcurrentMatches` to the intended slot count, `masterServerUrl` to
-the private Master URL, and `arenaDataDir` to `data/arenas`. Supply distinct
-32–4096 character bearer-token `registrationKey` and `matchControlKey` values
-(independent `openssl rand -base64 48` outputs work) through the private
-read-only configuration file; match them to `ApprovedHost:RegistrationKey`
-and `MatchControl:Key` on Master. Never put this file in an image, client,
-release record or repository. Master owns the advertised public address
-and the private `ApprovedHost:ControlUrl` (`/match/start` on the control
-network); do not publish GameServer TCP control publicly. The packaged
-`server.json` is intentionally absent. Legacy/local setups must select
-`"development"` explicitly; the local image smoke does so.
+The Steam VPS GameHost starts with an operator-owned, read-only `server.json`
+at an absolute path supplied as the container argument. Its
+`deploymentProfile` must be `"vps"`; a missing file/profile is fatal. Pin
+`hostId` to Master `ApprovedHost:Id`, use the private Master URL, control port,
+match capacity, and `data/arenas`. The `publicIp` remains browser metadata,
+not a Steam connection identity. Configure distinct private
+`registrationKey`/`matchControlKey` values matching Master; never embed those
+credentials in an image, client, release record or repository.
+
+Compose mounts a checksum-pinned Valve SteamCMD `steamclient.so` read-only
+alongside the already pinned Steamworks.NET wrapper and sets the Playtest
+AppID. This mount is for the controlled test only; confirm the permitted
+dedicated-server redistributable before production packaging. The GameHost
+has one Steam P2P listener and **no published gameplay UDP ports**. Private
+Master→GameHost `/match/start` and `/match/abort` stay on the control
+network. Development smoke continues to use explicit UDP mode, not a public
+fallback. Apply the `AddSteamAuthIdentity` and `AddSteamMatchRouting`
+Master migrations through the backed-up pinned release workflow before
+starting the compatible Master/GameHost pair.
 
 The restricted VPS profile and operator-only ingress, migration, deployment
 and rollback gates are in [`deploy/vps/README.md`](../../deploy/vps/README.md).

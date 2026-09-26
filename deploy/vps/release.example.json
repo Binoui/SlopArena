@@ -26,6 +26,8 @@
     "master_env_file": "/etc/sloparena/private/master.env",
     "migration_env_file": "/etc/sloparena/private/migration.env",
     "game_config_file": "/etc/sloparena/private/game.json",
-    "postgres_password_file": "/etc/sloparena/private/postgres-password"
+    "postgres_password_file": "/etc/sloparena/private/postgres-password",
+    "steamclient_file": "/etc/sloparena/private/steamclient.so",
+    "steamclient_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
   }
 }

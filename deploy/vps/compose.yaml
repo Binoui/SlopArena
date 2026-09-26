@@ -75,6 +75,9 @@ services:
       # Hosting request-start/end logs include query strings (SignalR access_token).
       Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics: Warning
       Deployment__Profile: vps
+      Auth__Mode: steam
+      Steam__AppId: "5325920"
+      Steam__Identity: sloparena-playtest
       ApprovedHost__PublicHost: ${GAMEPLAY_TEST_HOST:?set the public gameplay hostname}
       ApprovedHost__PublicPort: "7777"
       ApprovedHost__ControlUrl: http://game:7777/match/start
@@ -103,9 +106,11 @@ services:
     stop_grace_period: 15s
     volumes:
       - ${GAME_CONFIG_FILE:?set the private GameServer config file}:/run/config/server.json:ro
+      - ${STEAMCLIENT_FILE:?set the pinned, private SteamCMD game-server runtime file}:/app/steamclient.so:ro
     command: ["/run/config/server.json"]
-    ports:
-      - "7777-7781:7777-7781/udp"
+    environment:
+      SteamAppId: "5325920"
+      LD_LIBRARY_PATH: /app
     networks:
       - control
     healthcheck:
